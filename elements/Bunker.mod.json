@@ -1,0 +1,33 @@
+{
+  "_fv": 69,
+  "_type": "structure",
+  "definition": {
+    "structure": "thunders_bunker",
+    "projection": "rigid",
+    "ignoredBlocks": [
+      {
+        "value": "Blocks.STRUCTURE_BLOCK"
+      }
+    ],
+    "spacing": 1000,
+    "separation": 500,
+    "restrictionBiomes": [
+      {
+        "value": "plains"
+      },
+      {
+        "value": "snowy_tundra"
+      }
+    ],
+    "terrainAdaptation": "none",
+    "generationStep": "RAW_GENERATION",
+    "surfaceDetectionType": "WORLD_SURFACE",
+    "useStartHeight": false,
+    "startHeightProviderType": "UNIFORM",
+    "startHeightMin": 0,
+    "startHeightMax": 128,
+    "size": 1,
+    "maxDistanceFromCenter": 64,
+    "jigsawPools": []
+  }
+}

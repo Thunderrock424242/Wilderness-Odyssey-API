@@ -1,35 +1,38 @@
 modLoader="javafml"
-loaderVersion="[2,)"
+loaderVersion="[4,)"
 license="All Rights Reserved"
 
 [[mods]]
-modId="wilderness_oddesy_api"
-version="0.9.0.3"
-displayName="Wilderness Oddesy API"
+modId="wilderness_odyssey_api"
+version="0.9.9"
+displayName="Wilderness Odyssey API"
 displayURL="https://mcreator.net"
 credits="Created using mod maker MCreator but i codded all the parts to the mod"
 authors="thunderrock424242"
-description="this is a mod made for the modpack wilderness odessy. it has opomizations and mixins to make your experince better."
+description="this is a mod made for the modpack wilderness odessy."
 
 # Start of user code block mod configuration
 # End of user code block mod configuration
 
-[[dependencies.wilderness_oddesy_api]]
-    modId="neoforge"
-    type="required"
-    versionRange="[20.6.117,)"
-    ordering="AFTER"
-    side="BOTH"
+[[dependencies.wilderness_odyssey_api]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.65,)"
+ordering="AFTER"
+side="BOTH"
 
-[[dependencies.wilderness_oddesy_api]]
-    modId="minecraft"
-    type="required"
-    versionRange="[1.20.6]"
-    ordering="AFTER"
-    side="BOTH"
+[[dependencies.wilderness_odyssey_api]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1]"
+ordering="AFTER"
+side="BOTH"
 
 
 
+
+[[mixins]]
+    config="mixins.wilderness_odyssey_api.json"
 
 # Start of user code block dependencies configuration
 # End of user code block dependencies configuration

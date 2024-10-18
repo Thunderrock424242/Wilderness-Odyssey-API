@@ -1,0 +1,14 @@
+{
+  "structures": [
+    {
+      "structure": "wilderness_odyssey_api:bunker",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 1000,
+    "separation": 500,
+    "salt": 767793854
+  }
+}

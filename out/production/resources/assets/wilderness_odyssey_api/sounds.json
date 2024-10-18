@@ -1,0 +1,20 @@
+{
+  "playing_with_light": {
+    "subtitle": "subtitles.playing_with_light",
+    "sounds": [
+      {
+        "name": "wilderness_odyssey_api:roie_shpigler_-_playing_with_light",
+        "stream": false
+      }
+    ]
+  },
+  "bubbles_drop": {
+    "subtitle": "subtitles.bubbles_drop",
+    "sounds": [
+      {
+        "name": "wilderness_odyssey_api:cosmonkey_-_bubbles_drop",
+        "stream": false
+      }
+    ]
+  }
+}

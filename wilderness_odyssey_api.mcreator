@@ -1,0 +1,427 @@
+{
+  "mod_elements": [
+    {
+      "name": "ClearItemsCommand",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "clear_items_command",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessoddesyapi/ClearItemsCommand.java"
+        ]
+      },
+      "path": "~/Commands"
+    },
+    {
+      "name": "CrawlKey",
+      "type": "keybind",
+      "compiles": true,
+      "locked_code": false,
+      "registry_name": "crawl_key",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessodysseyapi/network/CrawlKeyMessage.java"
+        ]
+      },
+      "path": "~/Procedures/Crawling"
+    },
+    {
+      "name": "StopCrawling",
+      "type": "procedure",
+      "compiles": true,
+      "locked_code": false,
+      "registry_name": "stop_crawling",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessodysseyapi/procedures/StopCrawlingProcedure.java"
+        ],
+        "dependencies": [
+          {
+            "name": "entity",
+            "type": "entity"
+          }
+        ]
+      },
+      "path": "~/Procedures/Crawling"
+    },
+    {
+      "name": "SetupCrawl",
+      "type": "procedure",
+      "compiles": true,
+      "locked_code": false,
+      "registry_name": "setup_crawl",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessodysseyapi/procedures/SetupCrawlProcedure.java"
+        ],
+        "dependencies": [
+          {
+            "name": "entity",
+            "type": "entity"
+          }
+        ]
+      },
+      "path": "~/Procedures/Crawling"
+    },
+    {
+      "name": "ClearItems",
+      "type": "procedure",
+      "compiles": true,
+      "locked_code": false,
+      "registry_name": "clear_items",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessodysseyapi/procedures/ClearItemsProcedure.java"
+        ],
+        "dependencies": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "z",
+            "type": "number"
+          },
+          {
+            "name": "world",
+            "type": "world"
+          }
+        ]
+      },
+      "path": "~/Procedures"
+    },
+    {
+      "name": "AdminCommand",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "admin_command",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessoddesyapi/AdminCommand.java"
+        ]
+      },
+      "path": "~/Commands/multiplayer tools"
+    },
+    {
+      "name": "ModCommands",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "mod_commands",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessoddesyapi/ModCommands.java"
+        ]
+      },
+      "path": "~/Commands"
+    },
+    {
+      "name": "Bunker",
+      "type": "structure",
+      "compiles": true,
+      "locked_code": false,
+      "registry_name": "bunker",
+      "metadata": {
+        "files": [
+          "src/main/resources/data/wilderness_odyssey_api/worldgen/structure_set/bunker.json",
+          "src/main/resources/data/wilderness_odyssey_api/worldgen/structure/bunker.json",
+          "src/main/resources/data/wilderness_odyssey_api/worldgen/template_pool/bunker.json"
+        ]
+      }
+    },
+    {
+      "name": "Crawl",
+      "type": "procedure",
+      "compiles": true,
+      "locked_code": false,
+      "registry_name": "crawl",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessodysseyapi/procedures/CrawlProcedure.java"
+        ],
+        "dependencies": [
+          {
+            "name": "entity",
+            "type": "entity"
+          }
+        ]
+      },
+      "path": "~/Procedures/Crawling"
+    },
+    {
+      "name": "ModWhitelistChecker",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "mod_whitelist_checker",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessoddesyapi/ModWhitelistChecker.java"
+        ]
+      },
+      "path": "~/Anti Cheat/build errros "
+    },
+    {
+      "name": "Logger",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "logger",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessoddesyapi/Logger.java"
+        ]
+      },
+      "path": "~/Anti Cheat"
+    },
+    {
+      "name": "READMEGenerator",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "readme_generator",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessoddesyapi/READMEGenerator.java"
+        ]
+      },
+      "path": "~/Anti Cheat/Readme"
+    },
+    {
+      "name": "ConfigGenerator",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "config_generator",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessoddesyapi/ConfigGenerator.java"
+        ]
+      },
+      "path": "~/Anti Cheat"
+    },
+    {
+      "name": "WildernessOdysseyAPI",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "wilderness_odyssey_api",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessodysseyapi/WildernessOdysseyAPI.java"
+        ]
+      },
+      "path": "~/Main Mod Class"
+    },
+    {
+      "name": "BanCommand",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "ban_command",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessodysseyapi/BanCommand.java"
+        ]
+      },
+      "path": "~/Anti Cheat/Moderation"
+    },
+    {
+      "name": "BanManager",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "ban_manager",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessodysseyapi/BanManager.java"
+        ]
+      },
+      "path": "~/Anti Cheat/Moderation"
+    },
+    {
+      "name": "HealCommand",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "heal_command",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessodysseyapi/HealCommand.java"
+        ]
+      },
+      "path": "~/Commands"
+    },
+    {
+      "name": "DimensionTPCommand",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "dimension_tp_command",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessodysseyapi/DimensionTPCommand.java"
+        ]
+      },
+      "path": "~/Commands"
+    },
+    {
+      "name": "DefaultWorldType",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "default_world_type",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessodysseyapi/DefaultWorldType.java"
+        ]
+      },
+      "path": "~/DefaultWorldType"
+    },
+    {
+      "name": "ClientConfig",
+      "type": "code",
+      "compiles": true,
+      "locked_code": true,
+      "registry_name": "client_config",
+      "metadata": {
+        "files": [
+          "src/main/java/net/mcreator/wildernessodysseyapi/ClientConfig.java"
+        ]
+      },
+      "path": "~/DefaultWorldType"
+    }
+  ],
+  "variable_elements": [
+    {
+      "name": "Is_this_a_new_world",
+      "type": "logic",
+      "scope": "world",
+      "value": "true"
+    },
+    {
+      "name": "Is_player_crawling",
+      "type": "logic",
+      "scope": "player_persistent",
+      "value": "false"
+    }
+  ],
+  "sound_elements": [
+    {
+      "name": "playing_with_light",
+      "files": [
+        "roie_shpigler_-_playing_with_light"
+      ],
+      "category": "ambient",
+      "subtitle": "playing with light"
+    },
+    {
+      "name": "bubbles_drop",
+      "files": [
+        "cosmonkey_-_bubbles_drop"
+      ],
+      "category": "ambient",
+      "subtitle": "bubbles_drop"
+    }
+  ],
+  "tag_elements": {},
+  "tab_element_order": {},
+  "language_map": {
+    "en_us": {
+      "subtitles.playing_with_light": "playing with light",
+      "subtitles.bubbles_drop": "bubbles_drop",
+      "key.wilderness_oddesy_api.crawl_key": "Crawl Key",
+      "key.wilderness_odyssey_api.crawl_key": "Crawl Key"
+    },
+    "el_cy": {
+      "subtitles.playing_with_light": "playing with light",
+      "subtitles.bubbles_drop": "bubbles_drop",
+      "key.wilderness_oddesy_api.crawl_key": "κλειδί ανίχνευσης",
+      "key.wilderness_odyssey_api.crawl_key": "Crawl Key"
+    }
+  },
+  "foldersRoot": {
+    "name": "~",
+    "children": [
+      {
+        "name": "Procedures",
+        "children": [
+          {
+            "name": "Crawling",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "custom code",
+        "children": []
+      },
+      {
+        "name": "Commands",
+        "children": [
+          {
+            "name": "multiplayer tools",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "tools and hacks ",
+        "children": []
+      },
+      {
+        "name": "Toasts",
+        "children": []
+      },
+      {
+        "name": "Anti Cheat",
+        "children": [
+          {
+            "name": "Readme",
+            "children": []
+          },
+          {
+            "name": "Moderation",
+            "children": []
+          },
+          {
+            "name": "build errros ",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "DefaultWorldType",
+        "children": []
+      },
+      {
+        "name": "Main Mod Class",
+        "children": []
+      }
+    ]
+  },
+  "workspaceSettings": {
+    "modid": "wilderness_odyssey_api",
+    "modName": "Wilderness Odyssey API",
+    "version": "0.9.9",
+    "description": "this is a mod made for the modpack wilderness odessy.",
+    "author": "thunderrock424242",
+    "websiteURL": "https://mcreator.net",
+    "license": "All Rights Reserved",
+    "serverSideOnly": false,
+    "requiredMods": [],
+    "dependencies": [],
+    "dependants": [],
+    "mcreatorDependencies": [],
+    "currentGenerator": "neoforge-1.21.1",
+    "credits": "Created using mod maker MCreator but i codded all the parts to the mod",
+    "modElementsPackage": "net.mcreator.wildernessodysseyapi"
+  },
+  "mcreatorVersion": 202400340615
+}

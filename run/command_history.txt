@@ -1,0 +1,49 @@
+/give Dev minecraft:structure_block
+/tick rate 2000
+/tick rate 20
+/locate biome minecraft:plains
+/tp @s -161 77 -185
+/locate biome minecraft:plains
+/tp @s 9 78 22
+/locate biome minecraft:plains
+/tp @s 61 72 -184
+/locate structure wilderness_oddesy_api:bunker
+/tp @s 448 ~ 704
+/locate structure wilderness_oddesy_api:bunker
+/tp @s -544 ~ -192
+/locate structure wilderness_oddesy_api:bunker
+/tp @s -928 ~ 128
+/time set day
+/weather clear
+/tick rate 2000
+/tick rate 20
+/time set day
+/locate structure wilderness_oddesy_api:bunker
+/tp @s -1184 ~ -848
+/locate structure wilderness_oddesy_api:bunker
+/tp @s -624 ~ -304
+/locate structure wilderness_oddesy_api:bunker
+/tp @s -240 ~ -176
+/locate structure wilderness_oddesy_api:bunker
+/tp @s -928 ~ -192
+/locate biome minecraft:plains
+/tp @s -178 92 203
+/gamemode spectator
+/weather clear
+/locate structure wilderness_oddesy_api:bunker
+/tp @s -608 ~ -944
+/gamemode spectator
+/tick rate 2000
+/tick rate 10000
+/tick rate 20
+/weather clear
+/gamemode spectator
+/gamemode creative
+/gamemode spectator
+/gamemode creative
+/locate structure wilderness_oddesy_api:bunker
+/tp @s 1424 ~ 1280
+/locate structure wilderness_oddesy_api:bunker
+/tp @s 464 ~ -576
+/locate structure wilderness_oddesy_api:bunker
+/tp @s 112 ~ -208
