@@ -7,7 +7,7 @@
 modLoader="javafml" #mandatory
 
 # A version range to match for said mod loader - for regular FML @Mod it will be the FML version. This is currently 2.
-loaderVersion="${loader_version_range}" #mandatory
+loaderVersion="${2,}" #mandatory
 
 # The license for you mod. This is mandatory metadata and allows for easier comprehension of your redistributive properties.
 # Review your options at https://choosealicense.com/. All rights reserved is the default copyright stance, and is thus the default here.
@@ -20,13 +20,13 @@ license="${mod_license}"
 [[mods]] #mandatory
 
 # The modid of the mod
-modId="${mod_id}" #mandatory
+modId="${wildernessodysseyapii}" #mandatory
 
 # The version number of the mod
-version="${mod_version}" #mandatory
+version="${1.0.0}" #mandatory
 
 # A display name for the mod
-displayName="${mod_name}" #mandatory
+displayName="${WildernessOdysseyAPI}" #mandatory
 
 # A URL to query for updates for this mod. See the JSON update specification https://docs.neoforged.net/docs/misc/updatechecker/
 #updateJSONURL="https://change.me.example.invalid/updates.json" #optional
@@ -35,7 +35,7 @@ displayName="${mod_name}" #mandatory
 #displayURL="https://change.me.to.your.mods.homepage.example.invalid/" #optional
 
 # A file name (in the root of the mod JAR) containing a logo for display
-#logoFile="examplemod.png" #optional
+#logoFile="wildernessodysseyapi.png" #optional
 
 # A text field displayed in the mod UI
 #credits="" #optional
@@ -44,7 +44,9 @@ displayName="${mod_name}" #mandatory
 authors="${mod_authors}" #optional
 
 # The description text for the mod (multi line!) (#mandatory)
-description='''${mod_description}'''
+description='''${this mod adds some commands and some usefull ingame things to make being able to make my modpack eassier.
+
+0.9.9 and bellow i used mcreator now i am not.}'''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.
 #[[mixins]]
