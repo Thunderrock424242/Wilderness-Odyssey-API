@@ -25,3 +25,5 @@ jobs:
         env:
           GITHUB_ACTOR: ${{ secrets.GPR_USER }}
           GITHUB_TOKEN: ${{ secrets.GPR_TOKEN }}
+          ORG_GRADLE_PROJECT_githubUser: ${{ secrets.GPR_USER }}
+          ORG_GRADLE_PROJECT_githubToken: ${{ secrets.GPR_TOKEN }}

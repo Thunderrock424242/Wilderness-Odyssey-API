@@ -171,11 +171,11 @@ publishing {
     }
     repositories {
         maven {
-            name = 'GitHubPackages'
+            name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/Thunderrock424242/Wilderness-Odyssey-API")
             credentials {
-                username = System.getenv("GPR_USER")
-                password = System.getenv("GPR_TOKEN")
+                username = findProperty("githubUser") ?: System.getenv("GITHUB_ACTOR")
+                password = findProperty("githubToken") ?: System.getenv("GITHUB_TOKEN")
             }
         }
     }
