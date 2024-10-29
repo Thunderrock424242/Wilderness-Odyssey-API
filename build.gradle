@@ -167,12 +167,11 @@ publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
-            groupId = 'com.thunder.wildernessodysseyapi' // Ensure it's valid here
-            artifactId = 'WildernessOdysseyAPI'
-            version = '1.0.0-beta-1'
+            groupId = 'com.thunder.wildernessodysseyapi' as Publication
+            artifactId = 'WildernessOdysseyAPI' as Publication
+            version = '1.0.0-beta-1' as Publication
         }
     }
-}
     repositories {
         maven {
             name = "GitHubPackages"
@@ -183,6 +182,8 @@ publishing {
             }
         }
     }
+}
+
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
