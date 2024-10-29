@@ -108,7 +108,7 @@ public class WildernessOdysseyAPIMainModClass
 
         // If terms are not agreed to, terminate server startup
         if (!ConfigGenerator.AGREE_TO_TERMS.get()) {
-            LOGGER.fatal("You must agree to the terms outlined in the README.md file by setting 'agreeToTerms' to true in the configuration file.");
+            LOGGER.error("You must agree to the terms outlined in the README.md file by setting 'agreeToTerms' to true in the configuration file.");
             throw new RuntimeException("Server cannot start without agreement to the mod's terms and conditions.");
 
     }
@@ -177,17 +177,5 @@ public class WildernessOdysseyAPIMainModClass
      */
     public static boolean isGlobalLoggingEnabled() {
         return globalLoggingEnabled;
-    }
-
-
-    // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
-    @EventBusSubscriber(modid = MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
-    public static class ClientModEvents
-    {
-        @SubscribeEvent
-        public static void onClientSetup(FMLClientSetupEvent event)
-        {
-
-        }
     }
 }

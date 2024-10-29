@@ -34,7 +34,7 @@ public class ModBlacklistChecker {
      */
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!WildernessOdysseyAPI.antiCheatEnabled) {
+        if (!WildernessOdysseyAPIMainModClass.antiCheatEnabled) {
             return; // Do nothing if anti-cheat is disabled
         }
 
