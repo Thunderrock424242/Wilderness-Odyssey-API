@@ -167,9 +167,9 @@ publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
-            groupId = 'com.thunder.wildernessodysseyapi' as Publication
-            artifactId = 'WildernessOdysseyAPI' as Publication
-            version = '1.0.0-beta-1' as Publication
+            groupId = 'com.thunder.wildernessodysseyapi'
+            artifactId = 'Wilderness-Odyssey-API'
+            version = '1.0.0-beta-1'
         }
     }
     repositories {
