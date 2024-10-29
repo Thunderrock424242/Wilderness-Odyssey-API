@@ -13,20 +13,22 @@ import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 
+import static com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass.MOD_ID;
+
 /**
  * The type Default world type.
  */
-@Mod("wildernessodysseyapi")
+@Mod(MOD_ID)
 public class DefaultWorldType {
 
     /**
      * The constant MOD_ID.
      */
-    public static final String MOD_ID = "wildernessodysseyapi";
     /**
      * The constant LOGGER.
      */
     public static final Logger LOGGER = LogManager.getLogger();
+    public static final String MOD_ID = "wildernessodysseyapii";
 
     /**
      * Instantiates a new Default world type.
