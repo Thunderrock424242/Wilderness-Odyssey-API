@@ -4,6 +4,12 @@ import com.thunder.wildernessodysseyapi.command.AdminCommand;
 import com.thunder.wildernessodysseyapi.command.BanCommand;
 import com.thunder.wildernessodysseyapi.command.ClearItemsCommand;
 import com.thunder.wildernessodysseyapi.command.DimensionTPCommand;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.handling.IPayloadHandler;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
@@ -21,7 +27,11 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass.MOD_ID;
@@ -34,8 +44,6 @@ public class WildernessOdysseyAPIMainModClass
     public static final String MOD_ID = "wildernessodysseyapii";
     // Directly reference a slf4j logger
     private static final Logger LOGGER = LogUtils.getLogger();
-
-    public static final String MODID = "wildernessodysseyapi";
 
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
 
@@ -50,7 +58,7 @@ public class WildernessOdysseyAPIMainModClass
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void registerNetworking(final RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar(MODID);
+        final PayloadRegistrar registrar = event.registrar(MOD_ID);
         MESSAGES.forEach((id, networkMessage) -> registrar.playBidirectional(id, ((NetworkMessage) networkMessage).reader(), ((NetworkMessage) networkMessage).handler()));
         networkingRegistered = true;
     }

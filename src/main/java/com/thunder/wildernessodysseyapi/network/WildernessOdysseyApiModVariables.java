@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.network;
 
-import com.thunder.wildernessodysseyapi.WildernessOdysseyAPI;
+import com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
