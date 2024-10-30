@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi;
 
-import net.neoforged.api.distmarker.Dist;
+import com.thunder.wildernessodysseyapi.config.ClientConfig;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;

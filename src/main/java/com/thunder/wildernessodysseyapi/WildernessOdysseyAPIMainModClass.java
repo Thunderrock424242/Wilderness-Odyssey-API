@@ -4,9 +4,14 @@ import com.thunder.wildernessodysseyapi.command.AdminCommand;
 import com.thunder.wildernessodysseyapi.command.BanCommand;
 import com.thunder.wildernessodysseyapi.command.ClearItemsCommand;
 import com.thunder.wildernessodysseyapi.command.DimensionTPCommand;
+import com.thunder.wildernessodysseyapi.config.ConfigGenerator;
+import com.thunder.wildernessodysseyapi.config.ToolDamageConfig;
+import com.thunder.wildernessodysseyapi.config.ClientConfig;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.neoforged.fml.config.IConfigSpec;
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -15,13 +20,10 @@ import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
 
-import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
@@ -89,7 +91,7 @@ public class WildernessOdysseyAPIMainModClass
 
     // The constructor for the mod class is the first code that is run when your mod is loaded.
     // FML will recognize some parameter types like IEventBus or ModContainer and pass them in automatically.
-    public WildernessOdysseyAPIMainModClass(IEventBus modEventBus, ModContainer modContainer)
+    public WildernessOdysseyAPIMainModClass(IEventBus modEventBus, ModContainer modContainer, ModContainer container)
     {
         // Register the commonSetup method for modloading
         modEventBus.addListener(this::commonSetup);
@@ -105,9 +107,14 @@ public class WildernessOdysseyAPIMainModClass
 
         //load config
         loadConfig();
+        //Register the config
+        container.registerConfig(ModConfig.Type.COMMON, (IConfigSpec) ClientConfig.CONFIG);
+        container.registerConfig(ModConfig.Type.COMMON, (IConfigSpec) ConfigGenerator.CONFIG);
+        container.registerConfig(ModConfig.Type.COMMON, (IConfigSpec) ToolDamageConfig.CONFIG);
+
 
         // If terms are not agreed to, terminate server startup
-        if (!ConfigGenerator.AGREE_TO_TERMS.get()) {
+        if (!ConfigGenerator.AGREE_TO_TERMS) {
             LOGGER.error("You must agree to the terms outlined in the README.md file by setting 'agreeToTerms' to true in the configuration file.");
             throw new RuntimeException("Server cannot start without agreement to the mod's terms and conditions.");
 
@@ -155,7 +162,7 @@ public class WildernessOdysseyAPIMainModClass
 
     private void loadConfig() {
         // Load settings from configuration
-        globalLoggingEnabled = ConfigGenerator.GLOBAL_LOGGING_ENABLED.get();
+        globalLoggingEnabled = ConfigGenerator.GLOBAL_LOGGING_ENABLED;
     }
 
     private void startBanSyncTask() {
