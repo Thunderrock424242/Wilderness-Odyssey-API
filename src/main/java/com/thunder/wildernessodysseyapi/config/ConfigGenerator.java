@@ -10,11 +10,15 @@ import org.apache.commons.lang3.tuple.Pair;
  */
 public class ConfigGenerator {
 
+    public static final ModConfigSpec CONFIG_SPEC = null;
+    public static final ToolDamageConfig CONFIG = null;
+
     public static final ModConfigSpec COMMON_CONFIG;
     public static final AntiCheatConfig COMMON;
     public static final ModConfigSpec CLIENT_CONFIG;
     public static final ClientConfig CLIENT;
     public static final boolean AGREE_TO_TERMS = false;
+    public static final boolean GLOBAL_LOGGING_ENABLED = true;
 
     static {
         // Build common config

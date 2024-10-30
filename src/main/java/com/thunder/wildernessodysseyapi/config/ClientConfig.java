@@ -18,6 +18,8 @@ import java.nio.file.Paths;
 public class ClientConfig {
 
     // Configuration fields
+    public static final ModConfigSpec CONFIG_SPEC = null;
+    public static final ToolDamageConfig CONFIG = null;
     public static final Path CONFIG_PATH;
     public static final ClientConfig CLIENT;
     public static final ModConfigSpec CLIENT_SPEC;
@@ -66,7 +68,8 @@ public class ClientConfig {
     public static ResourceKey<WorldPreset> getKey() {
         ResourceLocation location = ResourceLocation.tryParse(CLIENT.worldTypeName.get());
         return location == null ?
-                ResourceKey.create(Registries.WORLD_PRESET, new ResourceLocation("minecraft:normal")) :
+                ResourceKey.create(Registries.WORLD_PRESET, ResourceLocation.tryParse("minecraft:normal")) :
+
                 ResourceKey.create(Registries.WORLD_PRESET, location);
     }
 }
