@@ -84,6 +84,6 @@ jobs:
 
       # Step 6: Run Minecraft server with NeoForge (headless)
       - name: Start Minecraft server with NeoForge
-        run: |
+        run: | 
           cd minecraft-server
           java -Xmx1G -Xms1G -jar neoforge-1.21.1-21.1.73.jar nogui
