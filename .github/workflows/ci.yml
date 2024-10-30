@@ -39,7 +39,7 @@ jobs:
 
       # Step 6: Run the Minecraft client with NeoForge (headless mode)
       - name: Run Minecraft client with NeoForge
-        run: |
+        run: | 
           mkdir -p minecraft-client
           curl -L -o minecraft-client/neoforge-installer.jar https://maven.neoforged.net/net/neoforged/installer/21.1.73/installer-21.1.73.jar
           java -jar minecraft-client/neoforge-installer.jar --installServer minecraft-client
