@@ -21,7 +21,6 @@ public class ClientConfig {
     public static final Path CONFIG_PATH;
     public static final ClientConfig CLIENT;
     public static final ModConfigSpec CLIENT_SPEC;
-    public static final ClientConfig CONFIG = null;
 
     // Config values
     public final ModConfigSpec.ConfigValue<String> worldTypeName;
@@ -48,14 +47,13 @@ public class ClientConfig {
         // Define worldTypeName
         worldTypeName = builder
                 .comment("Type in the name from the world type which should be selected by default.")
-                .define("world-preset", "minecraft:large_biomes", value -> value instanceof String);
+                .define("worldTypeName", "minecraft:large_biomes");
 
         // Define flatMapSettings
         flatMapSettings = builder
                 .comment("Type in a valid generation setting for flat world type.",
                         "Only works if world-type is 'minecraft:flat'.")
-                .define("flat-settings", "minecraft:bedrock,2*minecraft:dirt,minecraft:grass_block;minecraft:plains",
-                        value -> value instanceof String);
+                .define("flatMapSettings", "minecraft:bedrock,2*minecraft:dirt,minecraft:grass_block;minecraft:plains");
 
         builder.pop();
     }
@@ -66,10 +64,9 @@ public class ClientConfig {
      * @return the ResourceKey of WorldPreset
      */
     public static ResourceKey<WorldPreset> getKey() {
-        // Parse the ResourceLocation and return a valid key
         ResourceLocation location = ResourceLocation.tryParse(CLIENT.worldTypeName.get());
         return location == null ?
-                ResourceKey.create(Registries.WORLD_PRESET, ResourceLocation.tryParse("minecraft:normal")) :
+                ResourceKey.create(Registries.WORLD_PRESET, new ResourceLocation("minecraft:normal")) :
                 ResourceKey.create(Registries.WORLD_PRESET, location);
     }
 }

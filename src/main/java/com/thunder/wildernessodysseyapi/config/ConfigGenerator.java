@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.config;
 
-import com.thunder.wildernessodysseyapi.network.WildernessOdysseyApiModVariables;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.ModConfigSpec;
@@ -12,15 +11,21 @@ import org.apache.commons.lang3.tuple.Pair;
 public class ConfigGenerator {
 
     public static final ModConfigSpec COMMON_CONFIG;
-    public static final AntiCheatConfig CONFIG;
+    public static final AntiCheatConfig COMMON;
+    public static final ModConfigSpec CLIENT_CONFIG;
+    public static final ClientConfig CLIENT;
     public static final boolean AGREE_TO_TERMS = false;
-    public static final boolean GLOBAL_LOGGING_ENABLED = true;
 
     static {
-        // Create a builder and configure the config class
-        Pair<AntiCheatConfig, ModConfigSpec> configPair = new ModConfigSpec.Builder().configure(AntiCheatConfig::new);
-        CONFIG = configPair.getLeft();
-        COMMON_CONFIG = configPair.getRight();
+        // Build common config
+        Pair<AntiCheatConfig, ModConfigSpec> commonPair = new ModConfigSpec.Builder().configure(AntiCheatConfig::new);
+        COMMON = commonPair.getLeft();
+        COMMON_CONFIG = commonPair.getRight();
+
+        // Build client config
+        Pair<ClientConfig, ModConfigSpec> clientPair = new ModConfigSpec.Builder().configure(ClientConfig::new);
+        CLIENT = clientPair.getLeft();
+        CLIENT_CONFIG = clientPair.getRight();
     }
 
     /**
@@ -29,7 +34,11 @@ public class ConfigGenerator {
      * @param container the mod container
      */
     public static void register(ModContainer container) {
+        // Register common config
         container.registerConfig(ModConfig.Type.COMMON, COMMON_CONFIG, "anti-cheat.toml");
+
+        // Register client config
+        container.registerConfig(ModConfig.Type.CLIENT, CLIENT_CONFIG, "world-preset.toml");
     }
 
     /**
@@ -52,13 +61,13 @@ public class ConfigGenerator {
 
             // Agreement to Terms and Privacy Policy
             agreeToTerms = builder
-                    .comment("You must agree to the terms and privacy policy outlined in the README.md file to use this mod.",
+                    .comment("You must agree to the terms and privacy policy outlined in the README.md file.",
                             "Set this to true to confirm your agreement. The server will not start unless this is set to true.")
                     .define("agreeToTerms", false);
 
-            // Enable or disable anti-cheat features (only applicable if the server is whitelisted)
+            // Enable or disable anti-cheat features
             antiCheatEnabled = builder
-                    .comment("Enable or disable the anti-cheat functionality. Note: Anti-cheat will only be active if the server is on the hardcoded whitelist.")
+                    .comment("Enable or disable the anti-cheat functionality. Only active if the server is on the whitelist.")
                     .define("antiCheatEnabled", true);
 
             // Enable or disable global logging for player violations
