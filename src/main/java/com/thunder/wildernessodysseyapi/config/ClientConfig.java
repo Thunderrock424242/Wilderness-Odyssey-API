@@ -14,61 +14,68 @@ import java.nio.file.Paths;
 import java.util.Objects;
 
 /**
- * The Client Configuration class.
+ * The Client Configuration class for managing world preset options.
  */
 public class ClientConfig {
 
-    // Configuration fields
+    // Main Configuration Spec
     public static final ModConfigSpec CONFIG_SPEC;
-    public static final ToolDamageConfig CONFIG;
+    public static final ModConfigSpec CONFIG;  // Add CONFIG as a reference for compatibility
     public static final Path CONFIG_PATH;
     public static final ClientConfig CLIENT;
     public static final ModConfigSpec CLIENT_SPEC;
 
-    // Config values
+    // Configurable values for world type and flat map settings
     public final ModConfigSpec.ConfigValue<String> worldTypeName;
     public final ModConfigSpec.ConfigValue<String> flatMapSettings;
 
     static {
-        // Define the config path
-        CONFIG_PATH = Paths.get(FMLPaths.CONFIGDIR.get().toAbsolutePath().toString(), DefaultWorldType.MOD_ID);
+        // Define the config path for this mod
+        CONFIG_PATH = FMLPaths.CONFIGDIR.get().resolve(DefaultWorldType.MOD_ID);
 
-        // Build the configuration
+        // Build the configuration and assign CLIENT and CLIENT_SPEC
         Pair<ClientConfig, ModConfigSpec> specPair = new ModConfigSpec.Builder().configure(ClientConfig::new);
         CLIENT = specPair.getLeft();
         CLIENT_SPEC = specPair.getRight();
+
+        // Link CONFIG_SPEC and CONFIG to CLIENT_SPEC for external use
+        CONFIG_SPEC = CLIENT_SPEC;
+        CONFIG = CLIENT_SPEC; // Link CONFIG to CLIENT_SPEC for backward compatibility
     }
 
     /**
      * Constructor for the ClientConfig.
      *
-     * @param builder the ModConfigSpec builder
+     * @param builder the ModConfigSpec builder for building configuration options
      */
     ClientConfig(ModConfigSpec.Builder builder) {
-        builder.comment("Client-side world preset configuration").push("world-preset");
+        builder.comment("Client-side configuration for world presets").push("world-preset");
 
-        // Define worldTypeName
+        // Define the world type name setting
         worldTypeName = builder
-                .comment("Type in the name from the world type which should be selected by default.")
+                .comment("Specify the default world type name (e.g., minecraft:large_biomes).",
+                        "Set to 'minecraft:flat' for a flat world type.")
                 .define("worldTypeName", "minecraft:large_biomes");
 
-        // Define flatMapSettings
+        // Define the flat world map generation settings
         flatMapSettings = builder
-                .comment("Type in a valid generation setting for flat world type.",
-                        "Only works if world-type is 'minecraft:flat'.")
+                .comment("Enter a valid generation setting for flat worlds.",
+                        "Only applicable if 'worldTypeName' is set to 'minecraft:flat'.",
+                        "Example: 'minecraft:bedrock,2*minecraft:dirt,minecraft:grass_block;minecraft:plains'")
                 .define("flatMapSettings", "minecraft:bedrock,2*minecraft:dirt,minecraft:grass_block;minecraft:plains");
 
         builder.pop();
     }
 
     /**
-     * Gets the ResourceKey for the world preset.
+     * Gets the ResourceKey for the world preset based on the configuration.
      *
-     * @return the ResourceKey of WorldPreset
+     * @return the ResourceKey of the WorldPreset based on user-defined 'worldTypeName'
      */
     public static ResourceKey<WorldPreset> getKey() {
+        // Attempt to parse the world type from config or fallback to 'minecraft:normal'
         ResourceLocation location = ResourceLocation.tryParse(CLIENT.worldTypeName.get());
-        return location == null ?
+        return location != null ?
                 ResourceKey.create(Registries.WORLD_PRESET, Objects.requireNonNull(ResourceLocation.tryParse("minecraft:normal"))) :
 
                 ResourceKey.create(Registries.WORLD_PRESET, location);

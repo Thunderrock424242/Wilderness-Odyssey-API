@@ -108,7 +108,7 @@ public class WildernessOdysseyAPIMainModClass
         //load config
         loadConfig();
         //Register the config
-        container.registerConfig(ModConfig.Type.COMMON, (IConfigSpec) ClientConfig.CONFIG);
+        container.registerConfig(ModConfig.Type.COMMON, (IConfigSpec) ClientConfig.CONFIG_SPEC);
         container.registerConfig(ModConfig.Type.COMMON, (IConfigSpec) ConfigGenerator.CONFIG);
         container.registerConfig(ModConfig.Type.COMMON, (IConfigSpec) ToolDamageConfig.CONFIG);
 
