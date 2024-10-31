@@ -19,8 +19,8 @@ import java.util.Objects;
 public class ClientConfig {
 
     // Configuration fields
-    public static final ModConfigSpec CONFIG_SPEC = null;
-    public static final ToolDamageConfig CONFIG = null;
+    public static final ModConfigSpec CONFIG_SPEC;
+    public static final ToolDamageConfig CONFIG;
     public static final Path CONFIG_PATH;
     public static final ClientConfig CLIENT;
     public static final ModConfigSpec CLIENT_SPEC;
