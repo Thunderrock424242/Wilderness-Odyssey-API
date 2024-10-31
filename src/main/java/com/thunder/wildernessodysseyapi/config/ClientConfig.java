@@ -11,6 +11,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Objects;
 
 /**
  * The Client Configuration class.
@@ -68,7 +69,7 @@ public class ClientConfig {
     public static ResourceKey<WorldPreset> getKey() {
         ResourceLocation location = ResourceLocation.tryParse(CLIENT.worldTypeName.get());
         return location == null ?
-                ResourceKey.create(Registries.WORLD_PRESET, ResourceLocation.tryParse("minecraft:normal")) :
+                ResourceKey.create(Registries.WORLD_PRESET, Objects.requireNonNull(ResourceLocation.tryParse("minecraft:normal"))) :
 
                 ResourceKey.create(Registries.WORLD_PRESET, location);
     }
