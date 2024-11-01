@@ -69,7 +69,7 @@ public class WildernessOdysseyAPIMainModClass
     public static boolean ENABLE_OUTLINE = true; // Default is false, meant to be used in dev environment.
 
     // Hardcoded Server Whitelist - Only these servers can use the anti-cheat feature
-    private static final Set<String> SERVER_WHITELIST = Set.of(
+    public static final Set<String> SERVER_WHITELIST = Set.of(
             "server-id-1",
             "server-id-2",
             "server-id-3"
