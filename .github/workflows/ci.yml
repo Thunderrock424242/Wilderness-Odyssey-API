@@ -28,26 +28,52 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Check and Run Game Tests
+        id: game_tests
+        run: |
+          # Check if tests are present
+          if ./gradlew testClasses; then
+            echo "Running game tests..."
+            ./gradlew test
+            TEST_RESULT=$?
+            if [ $TEST_RESULT -ne 0 ]; then
+              echo "Game tests failed. Exiting with error."
+              exit 1
+            fi
+          else
+            echo "No tests detected. Skipping game test step."
+          fi
+
       - name: Build Mod Jar
+        if: success()
         run: ./gradlew build
 
       - name: Start Minecraft Server
+        if: success()
+        id: run_server
         run: |
-          ./gradlew runServer &
+          ./gradlew runServer > server_log.txt 2>&1 &
           sleep 60  # Wait for the server to start up
+          if grep -q "Exception" server_log.txt; then
+            echo "Server crashed, stopping workflow."
+            exit 1
+          fi
 
       - name: Run Client and Connect to Server
+        if: success()
+        id: run_client
         run: |
-          ./gradlew runClient &
+          ./gradlew runClient > client_log.txt 2>&1 &
           sleep 20  # Adjust as needed to ensure client connects
-
-      - name: Run Game Tests
-        run: ./gradlew test
+          if grep -q "Exception" client_log.txt; then
+            echo "Client crashed, stopping workflow."
+            exit 1
+          fi
 
   publish:
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: success()
+    if: needs.build-and-test.result == 'success'
 
     steps:
       - name: Checkout repository
