@@ -10,8 +10,8 @@ import org.apache.commons.lang3.tuple.Pair;
  */
 public class ConfigGenerator {
 
-    public static final ModConfigSpec CONFIG_SPEC = null;
-    public static final ToolDamageConfig CONFIG = null;
+    public static final ModConfigSpec CONFIG_SPEC;
+    public static final ToolDamageConfig CONFIG;
 
     public static final ModConfigSpec COMMON_CONFIG;
     public static final AntiCheatConfig COMMON;
