@@ -10,8 +10,6 @@ import org.apache.commons.lang3.tuple.Pair;
  */
 public class ConfigGenerator {
 
-    public static final ModConfigSpec CONFIG_SPEC;
-    public static final ToolDamageConfig CONFIG;
 
     public static final ModConfigSpec COMMON_CONFIG;
     public static final AntiCheatConfig COMMON;
@@ -43,6 +41,8 @@ public class ConfigGenerator {
 
         // Register client config
         container.registerConfig(ModConfig.Type.CLIENT, CLIENT_CONFIG, "world-preset.toml");
+        // Register tool damage mixin config
+        container.registerConfig(ModConfig.Type.CLIENT, COMMON_CONFIG, "Tool-Damage.toml");
     }
 
     /**
