@@ -35,7 +35,7 @@ public class ConfigGenerator {
      *
      * @param container the mod container
      */
-    public static void register(ModContainer container) {
+   public static void register(ModContainer container) {
         // Register common config
         container.registerConfig(ModConfig.Type.COMMON, COMMON_CONFIG, "anti-cheat.toml");
 
