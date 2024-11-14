@@ -31,7 +31,7 @@ public class BanManager {
      */
     public static void syncBanListFromGitHub() {
         try {
-            URL url = new URL(GITHUB_BAN_FILE_URL);
+            URL url = new URL("https://raw.githubusercontent.com/Thunderrock424242/Wilderness-Odyssey-API/refs/heads/main/BAN_FILE");
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
 

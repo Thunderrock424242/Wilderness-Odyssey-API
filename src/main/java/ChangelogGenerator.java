@@ -79,3 +79,43 @@ public class ChangelogGenerator
         }
     }
 }
+
+/* Here is the formatting for the changelog, in case you need it:
+
+The very first line is the title of the changelog (i.e. "2.3.6"). Font size will be set to 18 and bolded.
+        ":" at the end of a line (that isn't a list element) indicates a section. Font size will be set to 14 and bolded.
+        ":-" at the end of a line (that isn't a list element) indicates a group or subsection. Font size will be set to 13, bolded, and colored blue.
+
+        "-" at the beginning of a line indicates a list element.
+        "*" at the beginning of a line indicates an important list element. Will be bolded.
+        "!" at the beginning of a line indicates a warning list element. Will be colored orange.
+        "!!" at the beginning of a line indicates a major warning list element. Will be colored red.
+
+        Example changelog:
+        2.3
+        !! This is a major warning! I usually put these at the top if necessary
+
+        Main section 1:
+
+        Group 1:-
+        - Added a new feature
+        - Here is a description of the feature. The formatter respects indentation.
+        * Here is an important feature!
+        ! But watch out for this thing!
+
+        Main section 2:
+
+        Group 1:-
+        * This thing was changed
+        - This thing also changed, but isn't as important
+
+                                          Group 2:-
+                                          - Another thing happened here
+
+
+                                          Result:
+                                          Image
+
+ */
+
+/// credits go to https://github.com/Momo-Softworks/Cold-Sweat for the changelog generator I got perms to use it from them.
