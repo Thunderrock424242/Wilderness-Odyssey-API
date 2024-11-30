@@ -1,11 +1,8 @@
 package com.thunder.wildernessodysseyapi;
 
 import com.thunder.wildernessodysseyapi.command.AdminCommand;
-import com.thunder.wildernessodysseyapi.command.BanCommand;
 import com.thunder.wildernessodysseyapi.command.ClearItemsCommand;
 import com.thunder.wildernessodysseyapi.command.DimensionTPCommand;
-import com.thunder.wildernessodysseyapi.config.ConfigGenerator;
-import com.thunder.wildernessodysseyapi.config.ToolDamageConfig;
 import com.thunder.wildernessodysseyapi.config.ClientConfig;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -17,7 +14,6 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
-import org.apache.logging.log4j.core.ErrorHandler;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
@@ -118,26 +114,6 @@ public class WildernessOdysseyAPIMainModClass
 
         //Register the config
         container.registerConfig(ModConfig.Type.COMMON, ClientConfig.CONFIG_SPEC);
-        container.registerConfig(ModConfig.Type.COMMON, ConfigGenerator.COMMON_CONFIG);
-        container.registerConfig(ModConfig.Type.COMMON, (IConfigSpec) ToolDamageConfig.CONFIG);
-
-
-        // If terms are not agreed to, terminate server startup
-        if (!ConfigGenerator.AGREE_TO_TERMS) {
-            LOGGER.error("You must agree to the terms outlined in the README.md file by setting 'agreeToTerms' to true in the configuration file.");
-            throw new RuntimeException("Server cannot start without agreement to the mod's terms and conditions.");
-
-    }
-        // Enable anti-cheat only if the server is whitelisted
-        String currentServerId = "server-unique-id";  // Replace with logic to fetch the current server's unique ID
-        antiCheatEnabled = SERVER_WHITELIST.contains(currentServerId);
-
-        // Generate README file during initialization
-        READMEGenerator.generateReadme();
-        // Start the periodic sync with GitHub to update banned players
-        startBanSyncTask();
-
-        LOGGER.info("Wilderness Oddessy Anti-Cheat Mod Initialized. Anti-cheat enabled: {}", antiCheatEnabled);
     }
     public static void queueServerWork(int delay, Runnable task) {
         // Schedule the task to be run after the specified delay
@@ -211,38 +187,11 @@ public class WildernessOdysseyAPIMainModClass
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event)
     {
-        BanCommand.register(event.getServer().getCommands().getDispatcher());
         ClearItemsCommand.register(event.getServer().getCommands().getDispatcher());
         AdminCommand.register(event.getServer().getCommands().getDispatcher());
         DimensionTPCommand.register(event.getServer().getCommands().getDispatcher());
         LOGGER.info("Ban command registered");
 
 
-    }
-
-    private void loadConfig() {
-        // Load settings from configuration
-        globalLoggingEnabled = ConfigGenerator.GLOBAL_LOGGING_ENABLED;
-    }
-
-    private void startBanSyncTask() {
-        // Schedule periodic sync with GitHub to update the ban list every 10 minutes
-        scheduler.scheduleAtFixedRate(() -> {
-            try {
-                BanManager.syncBanListFromGitHub();
-                LOGGER.info("Ban list synced with GitHub");
-            } catch (Exception e) {
-                LOGGER.error("Failed to sync ban list with GitHub", e);
-            }
-        }, 0, 10, TimeUnit.MINUTES);
-    }
-
-    /**
-     * Is global logging enabled boolean.
-     *
-     * @return the boolean
-     */
-    public static boolean isGlobalLoggingEnabled() {
-        return globalLoggingEnabled;
     }
 }
