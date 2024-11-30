@@ -7,9 +7,6 @@ import com.thunder.wildernessodysseyapi.config.ClientConfig;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.fml.config.IConfigSpec;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
@@ -31,7 +28,6 @@ import net.neoforged.neoforge.event.server.ServerStartingEvent;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -43,14 +39,12 @@ import static com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass.
 public class WildernessOdysseyAPIMainModClass
 {
     // Define mod id in a common place for everything to reference
-    public static final String MOD_ID = "wildernessodysseyapii";
+    public static final String MOD_ID = "wildernessodysseyapi";
 
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public WildernessOdysseyAPIMainModClass() {
 
-    }
 
     private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader, IPayloadHandler<T> handler) {
     }
@@ -70,23 +64,6 @@ public class WildernessOdysseyAPIMainModClass
 
 
     public static boolean ENABLE_OUTLINE = true; // Default is false, meant to be used in dev environment.
-
-    // Hardcoded Server Whitelist - Only these servers can use the anti-cheat feature
-    public static final Set<String> SERVER_WHITELIST = Set.of(
-            "server-id-1",
-            "server-id-2",
-            "server-id-3"
-    );
-
-    /**
-     * The constant antiCheatEnabled.
-     */
-// Configuration flags
-    public static boolean antiCheatEnabled;
-    /**
-     * The constant globalLoggingEnabled.
-     */
-    public static boolean globalLoggingEnabled;
 
     // Scheduled Executor for periodic checks
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -123,59 +100,8 @@ public class WildernessOdysseyAPIMainModClass
 
     private void commonSetup(final FMLCommonSetupEvent event)
     {
-        // Register server-side crash handler
-        setServerCrashHandler();
-
-        // Register client-side crash handler (only executed on client side)
-        setClientCrashHandler();
 
     }
-
-    // Server-side crash handler setup using NeoForge event bus
-    private void setServerCrashHandler() {
-        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
-            LOGGER.error("A server-side crash occurred on thread: " + thread.getName());
-            LOGGER.error("Analyzing server crash report...");
-
-            analyzeCrash(throwable);
-        });
-    }
-
-    // Client-side crash handler setup (only used in single-player/client context)
-    @OnlyIn(Dist.CLIENT)
-    private void setClientCrashHandler() {
-        Thread.setDefaultUncaughtExceptionHandler(new WildernessOdysseyAPIMainModClass.CrashHandler());
-    }
-
-    // A reusable method to analyze crash causes
-    private void analyzeCrash(@NotNull Throwable throwable) {
-        Throwable cause = throwable.getCause() != null ? throwable.getCause() : throwable;
-
-        LOGGER.error("Crash caused by: " + cause.getMessage());
-        for (StackTraceElement element : cause.getStackTrace()) {
-            String className = element.getClassName();
-
-            // Check for possible mod involvement (customize with your package names)
-            if (className.contains("com.mymod") || className.contains("net.modpackage")) {
-                LOGGER.error("Potential Mod Culprit: " + className);
-            }
-        }
-
-        LOGGER.error("Crash analysis complete. Please check logs for details.");
-    }
-
-    // Inner static class to handle client-side crashes
-    public static class CrashHandler implements Thread.UncaughtExceptionHandler {
-        @Override
-        public void uncaughtException(@NotNull Thread thread, Throwable throwable) {
-            LOGGER.error("A crash occurred on thread: " + thread.getName());
-            LOGGER.error("Analyzing crash report...");
-
-            // Reuse crash analysis method for consistency
-            new WildernessOdysseyAPIMainModClass().analyzeCrash(throwable);
-        }
-    }
-
 
     // Add the example block item to the building blocks tab
     private void addCreative(BuildCreativeModeTabContentsEvent event)
@@ -185,7 +111,7 @@ public class WildernessOdysseyAPIMainModClass
 
     // You can use SubscribeEvent and let the Event Bus discover methods to call
     @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event)
+    public void onServerStarting(@NotNull ServerStartingEvent event)
     {
         ClearItemsCommand.register(event.getServer().getCommands().getDispatcher());
         AdminCommand.register(event.getServer().getCommands().getDispatcher());
