@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi;
 
-import com.thunder.wildernessodysseyapi.command.AdminCommand;
 import com.thunder.wildernessodysseyapi.command.ClearItemsCommand;
 import com.thunder.wildernessodysseyapi.command.DimensionTPCommand;
 import com.thunder.wildernessodysseyapi.config.ClientConfig;
@@ -114,7 +113,6 @@ public class WildernessOdysseyAPIMainModClass
     public void onServerStarting(@NotNull ServerStartingEvent event)
     {
         ClearItemsCommand.register(event.getServer().getCommands().getDispatcher());
-        AdminCommand.register(event.getServer().getCommands().getDispatcher());
         DimensionTPCommand.register(event.getServer().getCommands().getDispatcher());
         LOGGER.info("Ban command registered");
 
