@@ -2,7 +2,6 @@ package com.thunder.wildernessodysseyapi;
 
 import com.thunder.wildernessodysseyapi.command.ClearItemsCommand;
 import com.thunder.wildernessodysseyapi.command.DimensionTPCommand;
-import com.thunder.wildernessodysseyapi.config.ClientConfig;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -88,8 +87,6 @@ public class WildernessOdysseyAPIMainModClass
         // Register the item to a creative tab
         modEventBus.addListener(this::addCreative);
 
-        //Register the config
-        container.registerConfig(ModConfig.Type.COMMON, ClientConfig.CONFIG_SPEC);
     }
     public static void queueServerWork(int delay, Runnable task) {
         // Schedule the task to be run after the specified delay
