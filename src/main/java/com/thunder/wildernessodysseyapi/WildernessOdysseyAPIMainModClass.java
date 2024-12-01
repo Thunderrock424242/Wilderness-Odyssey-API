@@ -1,11 +1,9 @@
 package com.thunder.wildernessodysseyapi;
 
-import com.thunder.wildernessodysseyapi.command.ClearItemsCommand;
 import com.thunder.wildernessodysseyapi.command.DimensionTPCommand;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -27,7 +25,6 @@ import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass.MOD_ID;
@@ -59,15 +56,6 @@ public class WildernessOdysseyAPIMainModClass
         MESSAGES.forEach((id, networkMessage) -> registrar.playBidirectional(id, ((NetworkMessage) networkMessage).reader(), ((NetworkMessage) networkMessage).handler()));
         networkingRegistered = true;
     }
-
-
-    public static boolean ENABLE_OUTLINE = true; // Default is false, meant to be used in dev environment.
-
-    // Scheduled Executor for periodic checks
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
-
-
 
 
 
@@ -109,7 +97,6 @@ public class WildernessOdysseyAPIMainModClass
     @SubscribeEvent
     public void onServerStarting(@NotNull ServerStartingEvent event)
     {
-        ClearItemsCommand.register(event.getServer().getCommands().getDispatcher());
         DimensionTPCommand.register(event.getServer().getCommands().getDispatcher());
         LOGGER.info("Ban command registered");
 
