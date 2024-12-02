@@ -34,7 +34,9 @@ public class BlacklistChecker {
             if (checkBlacklistedMods(player) || checkBlacklistedResourcePacks(player)) {
                 // Kick the player if any blacklist condition is met
                 player.connection.disconnect(Component.literal(
-                        "Error: Blacklisted mods or resource packs detected. Remove them and try again."
+                        "Error: Blacklisted mods or resource packs detected. Remove them and try again." +
+                                "if you added any mods remove them or install the pack again." +
+                                "if its still not working contact server support or modpack creator team."
                 ));
             }
         }

@@ -1,14 +1,14 @@
 package com.thunder.wildernessodysseyapi;
 
-import com.thunder.wildernessodysseyapi.command.DimensionTPCommand;
+import com.thunder.wildernessodysseyapi.config.ToolDamageConfig;
 import com.thunder.wildernessodysseyapi.security.BlacklistChecker;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
-import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -22,8 +22,6 @@ import com.mojang.logging.LogUtils;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 @Mod(WildernessOdysseyAPIMainModClass.MOD_ID)
 public class WildernessOdysseyAPIMainModClass {
@@ -42,6 +40,10 @@ public class WildernessOdysseyAPIMainModClass {
         // Register global events and BlacklistChecker
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new BlacklistChecker()); // Register BlacklistChecker
+
+        // Register the common config
+        container.registerConfig(ModConfig.Type.COMMON, ToolDamageConfig.CONFIG_SPEC);
+
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
@@ -54,19 +56,20 @@ public class WildernessOdysseyAPIMainModClass {
 
     @SubscribeEvent
     public void onServerStarting(@NotNull ServerStartingEvent event) {
-        DimensionTPCommand.register(event.getServer().getCommands().getDispatcher());
+
         LOGGER.info("Server starting: commands registered");
     }
-
-    public static void queueServerWork(int delay, Runnable task) {
-        Executors.newSingleThreadScheduledExecutor().schedule(task, delay, TimeUnit.MILLISECONDS);
+    // Handle config loading
+    private void onConfigLoading(ModConfigEvent.Loading event) {
+        if (event.getConfig().getSpec() == ToolDamageConfig.CONFIG_SPEC) {
+            ToolDamageConfig.CONFIG.loadConfig();
+        }
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    private void registerNetworking(final RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar(MOD_ID);
-        MESSAGES.forEach((id, networkMessage) -> registrar.playBidirectional(
-                id, ((NetworkMessage) networkMessage).reader(), ((NetworkMessage) networkMessage).handler()));
-        boolean networkingRegistered = true;
+    // Handle config reloading
+    private void onConfigReloading(ModConfigEvent.Reloading event) {
+        if (event.getConfig().getSpec() == ToolDamageConfig.CONFIG_SPEC) {
+            ToolDamageConfig.CONFIG.loadConfig();
+        }
     }
 }
