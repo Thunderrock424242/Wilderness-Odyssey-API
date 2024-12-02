@@ -14,7 +14,7 @@ API Changes:
 * will be moving away from mcreator while trying to keep everything from breaking.
 * will be trying to redo a lot of code and add support for mod pack developers.
 * removed a lot of code since we are using 0 mcreator code we are now starting from scratch.
-!! server side support is broken as of 0.9.9
+* added the spawn block where you will spawn evreytime.
 
 
 

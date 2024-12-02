@@ -1,10 +1,12 @@
 package com.thunder.wildernessodysseyapi;
 
+import com.thunder.wildernessodysseyapi.block.ModBlocks;
+import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.security.BlacklistChecker;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.neoforged.fml.config.ModConfig;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
 import net.neoforged.bus.api.IEventBus;
@@ -39,6 +41,9 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new BlacklistChecker()); // Register BlacklistChecker
 
+        ModBlocks.register(modEventBus);
+        ModItems.register(modEventBus);
+
 
     }
 
@@ -47,7 +52,9 @@ public class WildernessOdysseyAPIMainModClass {
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
-        // Creative tab logic
+        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            event.accept(ModBlocks.UNBREAKABLE_BLOCK.get());
+        }
     }
 
     @SubscribeEvent
