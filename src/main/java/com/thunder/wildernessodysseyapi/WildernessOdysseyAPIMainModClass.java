@@ -1,12 +1,10 @@
 package com.thunder.wildernessodysseyapi;
 
-import com.thunder.wildernessodysseyapi.config.ToolDamageConfig;
 import com.thunder.wildernessodysseyapi.security.BlacklistChecker;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.neoforged.fml.config.ModConfig;
-import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
 import net.neoforged.bus.api.IEventBus;
@@ -41,8 +39,6 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new BlacklistChecker()); // Register BlacklistChecker
 
-        // Register the common config
-        container.registerConfig(ModConfig.Type.COMMON, ToolDamageConfig.CONFIG_SPEC);
 
     }
 
@@ -59,17 +55,5 @@ public class WildernessOdysseyAPIMainModClass {
 
         LOGGER.info("Server starting: commands registered");
     }
-    // Handle config loading
-    private void onConfigLoading(ModConfigEvent.Loading event) {
-        if (event.getConfig().getSpec() == ToolDamageConfig.CONFIG_SPEC) {
-            ToolDamageConfig.CONFIG.loadConfig();
-        }
-    }
 
-    // Handle config reloading
-    private void onConfigReloading(ModConfigEvent.Reloading event) {
-        if (event.getConfig().getSpec() == ToolDamageConfig.CONFIG_SPEC) {
-            ToolDamageConfig.CONFIG.loadConfig();
-        }
-    }
 }

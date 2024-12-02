@@ -4,7 +4,6 @@
   "compatibilityLevel": "JAVA_21",
   "refmap": "mixins.wildernessodysseyapi.refmap.json",
   "mixins": [
-    "ToolDamageMixin"
   ],
   "injectors": {
     "defaultRequire": 1
