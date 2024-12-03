@@ -1,7 +1,7 @@
 {
   "variants": {
     "": {
-      "model": "wildernessodysseyapi:block/unbreakable_block"
+      "model": "wildernessodysseyapi:block/world_spawn_block"
     }
   }
 }

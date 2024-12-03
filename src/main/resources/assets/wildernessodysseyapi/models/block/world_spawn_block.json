@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:block/cube_all",
   "textures": {
-    "all": "wildernessodysseyapi:block/unbreakable_block"
+    "all": "wildernessodysseyapi:block/world_spawn_block"
   }
 }
