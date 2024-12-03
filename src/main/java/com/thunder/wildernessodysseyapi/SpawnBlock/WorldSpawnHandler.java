@@ -1,11 +1,10 @@
 package com.thunder.wildernessodysseyapi.SpawnBlock;
 
-
 import com.thunder.wildernessodysseyapi.block.ModBlocks;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -29,11 +28,16 @@ public class WorldSpawnHandler {
     }
 
     private static BlockPos findWorldSpawnBlock(ServerLevel world) {
-        for (ChunkAccess chunk : world.getChunkSource().chunkMap.getChunks()) {
-            for (BlockPos pos : BlockPos.betweenClosed(chunk.getPos().getMinBlockX(), world.getMinBuildHeight(), chunk.getPos().getMinBlockZ(),
-                    chunk.getPos().getMaxBlockX(), world.getMaxBuildHeight(), chunk.getPos().getMaxBlockZ())) {
-                if (world.getBlockState(pos).is(ModBlocks.WORLD_SPAWN_BLOCK.get())) {
-                    return pos; // Return the first occurrence of the block
+        for (int x = world.getMinBuildHeight(); x < world.getMaxBuildHeight(); x += 16) {
+            for (int z = world.getMinBuildHeight(); z < world.getMaxBuildHeight(); z += 16) {
+                LevelChunk chunk = world.getChunkSource().getChunk(x >> 4, z >> 4, false);
+                if (chunk != null) {
+                    for (BlockPos pos : BlockPos.betweenClosed(chunk.getPos().getMinBlockX(), world.getMinBuildHeight(),
+                            chunk.getPos().getMinBlockZ(), chunk.getPos().getMaxBlockX(), world.getMaxBuildHeight(), chunk.getPos().getMaxBlockZ())) {
+                        if (world.getBlockState(pos).is(ModBlocks.WORLD_SPAWN_BLOCK.get())) {
+                            return pos; // Return the first occurrence of the block
+                        }
+                    }
                 }
             }
         }

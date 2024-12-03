@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.SpawnBlock;
 
-
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -16,7 +15,7 @@ public class PlayerSpawnHandler {
     @SubscribeEvent
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         ServerPlayer player = (ServerPlayer) event.getEntity();
-        ServerLevel world = player.getLevel();
+        ServerLevel world = player.serverLevel(); // Corrected method to get the ServerLevel
         BlockPos spawnPos = world.getSharedSpawnPos();
 
         // Ensure the player spawns on the custom block
@@ -26,7 +25,7 @@ public class PlayerSpawnHandler {
     @SubscribeEvent
     public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
         ServerPlayer player = (ServerPlayer) event.getEntity();
-        ServerLevel world = player.getLevel();
+        ServerLevel world = player.serverLevel(); // Corrected method to get the ServerLevel
         BlockPos spawnPos = world.getSharedSpawnPos();
 
         // Teleport player to the custom block on respawn
