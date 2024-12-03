@@ -18,7 +18,7 @@ public class ModBlocks {
             DeferredRegister.createBlocks(WildernessOdysseyAPIMainModClass.MOD_ID);
 
     // Unbreakable Block
-    public static final DeferredBlock<Block> UNBREAKABLE_BLOCK = registerBlock("unbreakable_block",
+    public static final DeferredBlock<Block> WORLD_SPAWN_BLOCK = registerBlock("world_spawn_block",
             () -> new Block(BlockBehaviour.Properties.of()
                     .strength(-1.0F, 3600000.0F) // Unbreakable and explosion-resistant
                     .noLootTable()               // Prevents any drops

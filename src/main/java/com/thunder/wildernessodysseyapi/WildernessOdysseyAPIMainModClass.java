@@ -53,7 +53,7 @@ public class WildernessOdysseyAPIMainModClass {
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(ModBlocks.UNBREAKABLE_BLOCK.get());
+            event.accept(ModBlocks.WORLD_SPAWN_BLOCK.get());
         }
     }
 
