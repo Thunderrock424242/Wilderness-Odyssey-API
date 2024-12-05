@@ -6,16 +6,10 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.neoforged.bus.api.SubscribeEvent;
-import org.apache.logging.log4j.core.Logger;
+
 
 
 public class StructureTerrainAdapter {
-
-    private final Logger logger;
-
-    public StructureTerrainAdapter(Logger logger) {
-        this.logger = logger;
-    }
 
     @SubscribeEvent
     public void onStructureSpawn(StructureSpawnEvent event) {
@@ -34,7 +28,7 @@ public class StructureTerrainAdapter {
         for (int x = -5; x <= 5; x++) {
             for (int z = -5; z <= 5; z++) {
                 mutable.set(pos.getX() + x, pos.getY(), pos.getZ() + z);
-                int terrainHeight = world.getHeight(mutable);
+                int terrainHeight = world.getHeight();
                 if (terrainHeight < pos.getY()) {
                     world.setBlock(mutable, Blocks.DIRT.defaultBlockState(), 3);
                 } else if (terrainHeight > pos.getY()) {

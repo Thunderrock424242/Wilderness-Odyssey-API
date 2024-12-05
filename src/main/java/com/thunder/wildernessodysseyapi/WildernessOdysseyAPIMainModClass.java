@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi;
 
+import com.thunder.wildernessodysseyapi.WorldGenHelper.StructureTerrainAdapter;
 import com.thunder.wildernessodysseyapi.block.ModBlocks;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
