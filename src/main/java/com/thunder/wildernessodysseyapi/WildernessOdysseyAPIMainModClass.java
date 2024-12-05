@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi;
 
 import com.thunder.wildernessodysseyapi.block.ModBlocks;
 import com.thunder.wildernessodysseyapi.item.ModItems;
-import com.thunder.wildernessodysseyapi.security.BlacklistChecker;
+import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -16,7 +16,6 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
@@ -39,7 +38,8 @@ public class WildernessOdysseyAPIMainModClass {
 
         // Register global events and BlacklistChecker
         NeoForge.EVENT_BUS.register(this);
-        NeoForge.EVENT_BUS.register(new BlacklistChecker()); // Register BlacklistChecker
+        NeoForge.EVENT_BUS.register(new BlacklistChecker());// Register BlacklistChecker
+        NeoForge.EVENT_BUS.register(new StructureTerrainAdapter());
 
         ModBlocks.register(modEventBus);
         ModItems.register(modEventBus);
@@ -58,7 +58,7 @@ public class WildernessOdysseyAPIMainModClass {
     }
 
     @SubscribeEvent
-    public void onServerStarting(@NotNull ServerStartingEvent event) {
+    public void onServerStarting(ServerStartingEvent event){
 
         LOGGER.info("Server starting: commands registered");
     }

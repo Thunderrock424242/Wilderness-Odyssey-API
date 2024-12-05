@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.security;
+package com.thunder.wildernessodysseyapi.AntiCheat;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
