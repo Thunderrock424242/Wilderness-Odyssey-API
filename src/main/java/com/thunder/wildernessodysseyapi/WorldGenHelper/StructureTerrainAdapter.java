@@ -14,7 +14,7 @@ public class StructureTerrainAdapter {
     @SubscribeEvent
     public void onStructureSpawn(StructureSpawnEvent event) {
         Structure structure = event.getStructure();
-        ResourceLocation id = ForgeRegistries.STRUCTURES.getKey(structure);
+        ResourceLocation id = Registries.STRUCTURES.getKey(structure);
 
         if (id != null) {
             logger.info("Adapting terrain for structure: {}", id);
