@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi;
 
-import com.thunder.wildernessodysseyapi.WorldGenHelper.StructureTerrainAdapter;
 import com.thunder.wildernessodysseyapi.block.ModBlocks;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
@@ -40,7 +39,6 @@ public class WildernessOdysseyAPIMainModClass {
         // Register global events and BlacklistChecker
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new BlacklistChecker());// Register BlacklistChecker
-        NeoForge.EVENT_BUS.register(new StructureTerrainAdapter());
 
         ModBlocks.register(modEventBus);
         ModItems.register(modEventBus);
