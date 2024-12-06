@@ -1,21 +1,25 @@
-0.0.1:
+0.0.2:
 Added:
+-
 
 
 Changed:
-
-
+* added some mixins that i forgot to include last update it should include a minor performance gain
+* defult world option is large biomes
+!! activated chunky to work on 50 chunks you will lose performance for a little while try not to move a lot just explore the bunker.
+* crops are not not affected by seasons i don't want gameplay to be too harsh
+* Starting season is late winter so your coming out of winter
 
 Fixed:
 
 API Changes:
-* Bumped version to 0.9.9
-* some things don't work as intended that's why we are gonna at v 0.9.9
-* will be moving away from mcreator while trying to keep everything from breaking.
-* will be trying to redo a lot of code and add support for mod pack developers.
-* removed a lot of code since we are using 0 mcreator code we are now starting from scratch.
-* added the spawn block where you will spawn evreytime.
+* Bumped version to 1.0.0
 
 
 
-note:
+
+Note:
+!! one of our main temp mods will be disabled till i have time to work on it.
+
+Dev Notes:-
+!! Remember this is the first alpha so expect bugs and a lot of new changes and things that are not ready yet.
