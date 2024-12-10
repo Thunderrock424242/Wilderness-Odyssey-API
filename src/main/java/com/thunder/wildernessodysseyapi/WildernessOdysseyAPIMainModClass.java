@@ -1,12 +1,19 @@
 package com.thunder.wildernessodysseyapi;
 
+import com.thunder.wildernessodysseyapi.GlobalChat.ChatClient;
+import com.thunder.wildernessodysseyapi.GlobalChat.CustomChatScreen;
 import com.thunder.wildernessodysseyapi.block.ModBlocks;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
 import net.neoforged.bus.api.IEventBus;
@@ -60,6 +67,19 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStarting(ServerStartingEvent event){
 
         LOGGER.info("Server starting: commands registered");
+    }
+    private void onClientSetup(final FMLClientSetupEvent event) {
+        ChatClient.startClient("209.192.200.84", 25582); // Replace it with actual IP and port
+    }
+    @SubscribeEvent
+    public void onClientTick(ClientTickEvent event) {
+        Minecraft mc = Minecraft.getInstance();
+        Screen currentScreen = mc.screen;
+
+        // Check if the current screen is the default ChatScreen
+        if (currentScreen instanceof ChatScreen && !(currentScreen instanceof CustomChatScreen)) {
+            mc.setScreen(new CustomChatScreen());
+        }
     }
 
 }
