@@ -72,7 +72,7 @@ public class WildernessOdysseyAPIMainModClass {
         ChatClient.startClient("209.192.200.84", 25582); // Replace it with actual IP and port
     }
     @SubscribeEvent
-    public void onClientTick(ClientTickEvent event) {
+    public void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         Screen currentScreen = mc.screen;
 
