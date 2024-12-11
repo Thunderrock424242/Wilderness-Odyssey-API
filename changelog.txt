@@ -14,9 +14,12 @@ Fixed:
 
 API Changes:
 * Bumped version to 1.0.0
+!! added global chat system
 
 
 
+API/Modpack bugs:
+!! chat system curently is broken due to global chat system.
 
 Note:
 !! one of our main temp mods will be disabled till i have time to work on it.
