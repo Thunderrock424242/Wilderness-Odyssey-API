@@ -29,7 +29,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 neoForge {
     // Specify the version of NeoForge to use.
-    version = "21.1.88."
+    version = "21.1.88"
 
     parchment {
         mappingsVersion = project.parchment_mappings_version
