@@ -1,5 +1,6 @@
-package com.thunder.wildernessodysseyapi.GlobalChat;
+package com.thunder.wildernessodysseyapi.GlobalChat.gui.Screen;
 
+import com.thunder.wildernessodysseyapi.GlobalChat.ChatClient;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.Component;

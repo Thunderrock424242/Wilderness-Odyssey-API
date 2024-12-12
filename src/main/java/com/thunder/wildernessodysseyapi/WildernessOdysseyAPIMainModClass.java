@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi;
 
 import com.thunder.wildernessodysseyapi.GlobalChat.ChatClient;
-import com.thunder.wildernessodysseyapi.GlobalChat.CustomChatScreen;
+import com.thunder.wildernessodysseyapi.GlobalChat.gui.Screen.CustomChatScreen;
 import com.thunder.wildernessodysseyapi.block.ModBlocks;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;

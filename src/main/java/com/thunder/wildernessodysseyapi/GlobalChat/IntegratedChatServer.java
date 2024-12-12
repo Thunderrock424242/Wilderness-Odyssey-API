@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.GlobalChat;
 
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 
 import java.io.BufferedReader;
@@ -12,6 +13,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import static com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass.MOD_ID;
+
+@EventBusSubscriber(modid = MOD_ID)
 public class IntegratedChatServer {
 
     private static final int PORT = 25582;
@@ -19,7 +23,7 @@ public class IntegratedChatServer {
     private static ServerSocket serverSocket;
 
     @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {
+    public static void onServerStarting(ServerStartingEvent event) {
         startServer(event.getServer());
     }
 

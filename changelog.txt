@@ -1,28 +1,41 @@
 0.0.2:
 Added:
--
+!
 
 
 Changed:
-* added some mixins that i forgot to include last update it should include a minor performance gain
-* defult world option is large biomes
+* added some mixins that I forgot to include last update it should include a minor performance gain
+* default world option is large biomes
 !! activated chunky to work on 50 chunks you will lose performance for a little while try not to move a lot just explore the bunker.
-* crops are not not affected by seasons i don't want gameplay to be too harsh
-* Starting season is late winter so your coming out of winter
-
+* crops are not affected by seasons I don't want gameplay to be too harsh
+* Starting season is late winter, so you're coming out of winter
+* updated configs
+* changed build limit to y640
+* made it so spiders can't climb in the rain.
+* changed some fluid ticks so it can reduce lag but bugs may occur.
+* we are now preventing players from going into unloaded chunks
+* if villagers are in a 1x1 space, they tick less.
+* if the server is overloaded, it may try to fix itself added dynamic performance checks
+* working on discord RPC
+* updated recommended memory
 Fixed:
 
 API Changes:
 * Bumped version to 1.0.0
-!! added global chat system
+!! added a global chat system
+* added global chat package and its sub packages are client and gui and the subpackage of gui is screen
+* added a bug fixes package for the modpack
+- updated neoforge to its latest as of now.
+
 
 
 
 API/Modpack bugs:
-!! chat system curently is broken due to global chat system.
+!! chat system currently is broken due to a global chat system.
+!! if you switch to global chat, it does not work you have to switch to local exit the game in order to use local chat.
 
 Note:
-!! one of our main temp mods will be disabled till i have time to work on it.
+!! one of our main temp mods will be disabled till I have time to work on it.
 
 Dev Notes:-
-!! Remember this is the first alpha so expect bugs and a lot of new changes and things that are not ready yet.
+!! Remember this is the first alpha, so expect bugs and a lot of new changes and things that are not ready yet.
