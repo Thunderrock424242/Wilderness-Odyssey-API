@@ -1,6 +1,6 @@
 0.0.2:
 Added:
-!
+! check mod list for now for all mods which is in the github repo under the folder mods
 
 
 Changed:
@@ -18,7 +18,10 @@ Changed:
 * if the server is overloaded, it may try to fix itself added dynamic performance checks
 * working on discord RPC
 * updated recommended memory
+* added a set ammount of ram you need 10-12 gigs of ram
 Fixed:
+! Removed William Wythers' Expanded Ecosphere as it was conflicting world gen with another mod
+
 
 API Changes:
 * Bumped version to 1.0.0

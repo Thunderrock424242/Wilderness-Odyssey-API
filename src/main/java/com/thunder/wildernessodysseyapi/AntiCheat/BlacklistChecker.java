@@ -14,7 +14,7 @@ public class BlacklistChecker {
 
     // Hardcoded list of blacklisted mods and resource packs
     private static final List<String> BLACKLISTED_MODS = Arrays.asList(
-            "examplemod1", // Replace with real mod IDs
+            "xray", // Replace with real mod IDs
             "examplemod2"
     );
 
