@@ -21,6 +21,8 @@ Changed:
 * added a set ammount of ram you need 10-12 gigs of ram
 Fixed:
 ! Removed William Wythers' Expanded Ecosphere as it was conflicting world gen with another mod
+* fixed a loot texture
+* hopefully fixed chunky issue
 
 
 API Changes:

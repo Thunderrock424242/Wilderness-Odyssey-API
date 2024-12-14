@@ -1,9 +1,12 @@
 package com.thunder.wildernessodysseyapi.GlobalChat.gui.Screen;
 
 import com.thunder.wildernessodysseyapi.GlobalChat.ChatClient;
+import com.thunder.wildernessodysseyapi.GlobalChat.FakePlayer;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.NotNull;
 
 public class CustomChatScreen extends ChatScreen {
     private boolean inGlobalChat = false;
@@ -17,7 +20,6 @@ public class CustomChatScreen extends ChatScreen {
     protected void init() {
         super.init();
 
-        // Add a button to switch chat tabs
         switchTabButton = Button.builder(Component.literal("Switch to Global"), button -> {
             inGlobalChat = !inGlobalChat;
             switchTabButton.setMessage(Component.literal(inGlobalChat ? "Switch to Local" : "Switch to Global"));
@@ -31,18 +33,17 @@ public class CustomChatScreen extends ChatScreen {
         if (input.isEmpty()) return;
 
         if (inGlobalChat) {
-            ChatClient.sendMessage(input);  // Send to the global chat server
+            FakePlayer.connectIfNotConnected(Minecraft.getInstance().player.getUUID());
+            ChatClient.sendMessage(input);
         } else {
-            // Send to Minecraft's built-in chat
             super.handleChatInput(input, addToHistory);
         }
     }
 
     @Override
-    public void render(net.minecraft.client.gui.GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void render(net.minecraft.client.gui.@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.render(guiGraphics, mouseX, mouseY, partialTicks);
 
-        // Corrected drawCenteredString usage
         guiGraphics.drawCenteredString(this.font,
                 Component.literal(inGlobalChat ? "Global Chat" : "Local Chat"),
                 this.width / 2,
