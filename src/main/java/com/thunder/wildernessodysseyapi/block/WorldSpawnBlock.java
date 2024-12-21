@@ -13,7 +13,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 import java.util.function.Supplier;
 
-public class ModBlocks {
+public class WorldSpawnBlock {
     public static final DeferredRegister.Blocks BLOCKS =
             DeferredRegister.createBlocks(WildernessOdysseyAPIMainModClass.MOD_ID);
 

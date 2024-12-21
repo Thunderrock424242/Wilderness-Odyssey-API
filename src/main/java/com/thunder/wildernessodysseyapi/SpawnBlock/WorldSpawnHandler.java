@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.SpawnBlock;
 
-import com.thunder.wildernessodysseyapi.block.ModBlocks;
+import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -33,7 +33,7 @@ public class WorldSpawnHandler {
                 if (chunk != null) {
                     for (BlockPos pos : BlockPos.betweenClosed(chunk.getPos().getMinBlockX(), world.getMinBuildHeight(),
                             chunk.getPos().getMinBlockZ(), chunk.getPos().getMaxBlockX(), world.getMaxBuildHeight(), chunk.getPos().getMaxBlockZ())) {
-                        if (world.getBlockState(pos).is(ModBlocks.WORLD_SPAWN_BLOCK.get())) {
+                        if (world.getBlockState(pos).is(WorldSpawnBlock.WORLD_SPAWN_BLOCK.get())) {
                             return pos; // Return the first occurrence of the block
                         }
                     }

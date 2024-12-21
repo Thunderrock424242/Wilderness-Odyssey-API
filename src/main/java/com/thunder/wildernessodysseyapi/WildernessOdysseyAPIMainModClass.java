@@ -2,19 +2,23 @@ package com.thunder.wildernessodysseyapi;
 
 import com.thunder.wildernessodysseyapi.GlobalChat.ChatClient;
 import com.thunder.wildernessodysseyapi.GlobalChat.gui.Screen.CustomChatScreen;
-import com.thunder.wildernessodysseyapi.block.ModBlocks;
+import com.thunder.wildernessodysseyapi.biome.BiomeModifiers;
+import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
+import com.thunder.wildernessodysseyapi.structure.ModStructures;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.common.world.BiomeModifier;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -47,7 +51,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new BlacklistChecker());// Register BlacklistChecker
 
-        ModBlocks.register(modEventBus);
+        WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
 
 
@@ -59,15 +63,22 @@ public class WildernessOdysseyAPIMainModClass {
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(ModBlocks.WORLD_SPAWN_BLOCK.get());
+            event.accept(WorldSpawnBlock.WORLD_SPAWN_BLOCK.get());
         }
     }
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
-
-        LOGGER.info("Server starting: commands registered");
+        event.enqueueWork(() -> {
+            RegistryObject<ConfiguredStructureFeature<?, ?>> structure = ModStructures.CONFIGURED_CUSTOM_STRUCTURE;
+            BiomeModifier biomeModifier = new BiomeModifiers(structure.getHolder().orElseThrow());
+            ForgeRegistries.BIOME_MODIFIER_SERIALIZERS.register(
+                    new ResourceLocation("wildernessodyssey", "custom_structure_modifier"),
+                    biomeModifier
+            );
+        });
     }
+
     private void onClientSetup(final FMLClientSetupEvent event) {
         ChatClient.startClient("209.192.200.84", 25582); // Replace it with actual IP and port
     }
