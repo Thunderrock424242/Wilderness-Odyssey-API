@@ -4,6 +4,7 @@ import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.extent.clipboard.Clipboard;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormat;
+import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardReader;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.session.ClipboardHolder;
@@ -15,39 +16,33 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import java.io.InputStream;
 
 public class WorldEditStructurePlacer {
-    private final String schematicNamespace;
-    private final String schematicPath;
+    private final String namespace;
+    private final String path;
 
     public WorldEditStructurePlacer(String namespace, String path) {
-        this.schematicNamespace = namespace;
-        this.schematicPath = path;
+        this.namespace = namespace;
+        this.path = path;
     }
 
     public boolean placeStructure(ServerLevel world, BlockPos position) {
         try {
-            // Load the schematic from resources
             InputStream schemStream = getClass().getResourceAsStream(
-                    "/assets/" + schematicNamespace + "/" + schematicPath
+                    "/assets/" + namespace + "/" + path
             );
 
             if (schemStream == null) {
-                System.out.println("Schematic file not found: " + schematicNamespace + "/" + schematicPath);
+                System.out.println("Schematic file not found: " + namespace + "/" + path);
                 return false;
             }
 
-            ClipboardFormat format = ClipboardFormat.findByAlias("schem");
-            if (format == null) {
-                System.out.println("Unsupported schematic format!");
-                return false;
-            }
+            ClipboardFormat format = ClipboardFormats.findByFileExtension("schem").orElseThrow(() ->
+                    new IllegalArgumentException("Unsupported schematic format!")
+            );
 
             try (ClipboardReader reader = format.getReader(schemStream)) {
                 Clipboard clipboard = reader.read();
-
-                // Determine the surface position
                 BlockPos surfacePos = world.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, position);
 
-                // Paste the schematic at the surface position
                 try (EditSession editSession = WorldEdit.getInstance().newEditSession((World) world)) {
                     ClipboardHolder holder = new ClipboardHolder(clipboard);
                     holder.createPaste(editSession)

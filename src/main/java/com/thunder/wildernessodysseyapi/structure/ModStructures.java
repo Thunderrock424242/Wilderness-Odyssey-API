@@ -8,17 +8,10 @@ public class ModStructures {
     public static final StructureFeature<NoneFeatureConfiguration> CUSTOM_STRUCTURE =
             new CustomStructure(NoneFeatureConfiguration.CODEC);
 
-    public static final RegistryObject<ConfiguredStructureFeature<?, ?>> CONFIGURED_CUSTOM_STRUCTURE =
-            Registry.register(
-                    ForgeRegistries.CONFIGURED_STRUCTURE_FEATURES,
-                    new ResourceLocation("wildernessodyssey", "custom_structure"),
-                    CUSTOM_STRUCTURE.configured(NoneFeatureConfiguration.INSTANCE)
-            );
-
     public static void registerStructures() {
         Registry.register(
-                ForgeRegistries.STRUCTURE_FEATURES,
-                new ResourceLocation("wildernessodyssey", "custom_structure"),
+                Registry.STRUCTURE_FEATURE,
+                ResourceLocation.of("wildernessodyssey:custom_structure"),
                 CUSTOM_STRUCTURE
         );
     }
