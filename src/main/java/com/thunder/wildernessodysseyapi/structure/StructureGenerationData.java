@@ -21,6 +21,11 @@ public class StructureGenerationData extends SavedData {
         this.structureGenerated = false;
     }
 
+    /**
+     * @param tag
+     * @param registries
+     * @return
+     */
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
         return null;

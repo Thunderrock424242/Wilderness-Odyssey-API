@@ -2,10 +2,10 @@ package com.thunder.wildernessodysseyapi;
 
 import com.thunder.wildernessodysseyapi.GlobalChat.ChatClient;
 import com.thunder.wildernessodysseyapi.GlobalChat.gui.Screen.CustomChatScreen;
+import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
-import com.thunder.wildernessodysseyapi.structure.ModStructureHandler;
 import com.thunder.wildernessodysseyapi.structure.StructureGenerationData;
 import com.thunder.wildernessodysseyapi.structure.WorldEditStructurePlacer;
 import net.minecraft.client.Minecraft;
@@ -59,7 +59,7 @@ public class WildernessOdysseyAPIMainModClass {
         // Register global events and BlacklistChecker
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new BlacklistChecker());// Register BlacklistChecker
-        NeoForge.EVENT_BUS.register(new ModStructureHandler());
+        ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
@@ -68,7 +68,9 @@ public class WildernessOdysseyAPIMainModClass {
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        // General setup logic
+        event.enqueueWork(() -> {
+            System.out.println("Wilderness Odyssey setup complete!");
+        });
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
