@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi;
 
-import com.thunder.wildernessodysseyapi.GlobalChat.ChatClient;
 import com.thunder.wildernessodysseyapi.GlobalChat.gui.Screen.CustomChatScreen;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
@@ -131,17 +130,20 @@ public class WildernessOdysseyAPIMainModClass {
     }
 
     private void onClientSetup(final FMLClientSetupEvent event) {
-        ChatClient.startClient("209.192.200.84", 25582); // Replace it with actual IP and port
+        // No longer starts a client connection to a server
+        System.out.println("Client setup complete. Ready to handle unified chat.");
     }
+
     @SubscribeEvent
     public void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         Screen currentScreen = mc.screen;
 
-        // Check if the current screen is the default ChatScreen
+        // Replace the default ChatScreen with CustomChatScreen
         if (currentScreen instanceof ChatScreen && !(currentScreen instanceof CustomChatScreen)) {
             mc.setScreen(new CustomChatScreen());
         }
     }
+
 
 }
