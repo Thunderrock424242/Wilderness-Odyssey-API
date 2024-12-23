@@ -5,7 +5,7 @@ import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
-import com.thunder.wildernessodysseyapi.structure.StructureGenerationData;
+import com.thunder.wildernessodysseyapi.structure.ModStructures;
 import com.thunder.wildernessodysseyapi.structure.WorldEditStructurePlacer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -62,6 +62,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new BlacklistChecker());// Register BlacklistChecker
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
+        ModStructures.PLACED_FEATURES.register((IEventBus) this);
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
@@ -90,9 +91,7 @@ public class WildernessOdysseyAPIMainModClass {
     public void onWorldLoad(LevelEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
 
-        // Check if the structure has already been generated
-        StructureGenerationData data = StructureGenerationData.get(serverLevel);
-        if (data.isStructureGenerated()) return;
+
 
         // Find a position in the Plains biome
         BlockPos pos = findPlainsBiomePosition(serverLevel);
@@ -105,7 +104,7 @@ public class WildernessOdysseyAPIMainModClass {
                     pos.getX() - 10, pos.getY() - 5, pos.getZ() - 10,
                     pos.getX() + 10, pos.getY() + 10, pos.getZ() + 10
             ); // Define a bounding box around the structure
-            data.setStructureGenerated(true); // Mark as generated
+             // Mark as generated
         }
     }
 

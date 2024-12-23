@@ -63,7 +63,7 @@ description='''${mod_description}'''
 #[features.${mod_id}]
 #openGLVersion="[3.2,)"
 
-[[dependencies.${mod_id}]] #optional
+[[dependencies.wildernessodysseyapi]] #optional
 # the modid of the dependency
 modId="worldedit" #mandatory
 # The type of the dependency. Can be one of "required", "optional", "incompatible" or "discouraged" (case insensitive).

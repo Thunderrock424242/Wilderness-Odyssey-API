@@ -35,7 +35,8 @@ public class WorldEditStructurePlacer {
                 return false;
             }
 
-            ClipboardFormat format = ClipboardFormats.findByFileExtension("schem").orElseThrow(() ->
+            // Use findByAlias instead of findByFileExtension
+            ClipboardFormat format = ClipboardFormats.findByAlias("schematic").orElseThrow(() ->
                     new IllegalArgumentException("Unsupported schematic format!")
             );
 
