@@ -6,28 +6,42 @@ import java.net.URL;
 
 public class DiscordWebhook {
 
-    private static final String WEBHOOK_URL = "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_TOKEN";
+    private final String webhookUrl;
+    private String content;
+    private String username;
 
-    public static void sendMessage(String username, String message) {
-        try {
-            URL url = new URL(WEBHOOK_URL);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type", "application/json");
+    public DiscordWebhook(String webhookUrl) {
+        this.webhookUrl = webhookUrl;
+    }
 
-            String jsonPayload = String.format("{\"username\": \"%s\", \"content\": \"%s\"}", username, message);
-            try (OutputStream os = connection.getOutputStream()) {
-                os.write(jsonPayload.getBytes());
-                os.flush();
-            }
+    public void setContent(String content) {
+        this.content = content;
+    }
 
-            int responseCode = connection.getResponseCode();
-            if (responseCode != 204) {
-                System.err.println("Failed to send message to Discord. HTTP response code: " + responseCode);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public void execute() throws Exception {
+        if (this.content == null || this.content.isEmpty()) {
+            throw new IllegalArgumentException("Content must not be null or empty");
+        }
+
+        URL url = new URL(webhookUrl);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setDoOutput(true);
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "application/json");
+
+        String payload = String.format("{\"content\":\"%s\", \"username\":\"%s\"}", content, username);
+        try (OutputStream os = connection.getOutputStream()) {
+            os.write(payload.getBytes());
+            os.flush();
+        }
+
+        int responseCode = connection.getResponseCode();
+        if (responseCode != 204) {
+            throw new RuntimeException("Failed to send Discord webhook. Response code: " + responseCode);
         }
     }
 }

@@ -18,6 +18,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
@@ -47,6 +48,8 @@ public class WildernessOdysseyAPIMainModClass {
     public static final String MOD_ID = "wildernessodysseyapi";
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
     public static final Logger LOGGER = LogUtils.getLogger();
+    public static final GameRules.Key<GameRules.BooleanValue> ENABLE_GLOBAL_CHAT =
+            GameRules.register("enableGlobalChat", GameRules.Category.CHAT, GameRules.BooleanValue.create(false));
 
     private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader, IPayloadHandler<T> handler) {}
 
