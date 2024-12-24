@@ -8,14 +8,16 @@ import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 
+import java.util.Objects;
+
 public class ModConfiguredFeatures {
     public static final ResourceKey<ConfiguredFeature<?, ?>> CUSTOM_STRUCTURE_KEY = ResourceKey.create(
             Registries.CONFIGURED_FEATURE,
-            new ResourceLocation("wildernessodyssey", "custom_structure")
+            Objects.requireNonNull(ResourceLocation.tryParse("wildernessodyssey:custom_structure")) // Use tryParse to create the ResourceLocation
     );
 
     public static final ConfiguredFeature<?, ?> CUSTOM_STRUCTURE = new ConfiguredFeature<>(
-            Feature.STRUCTURE, // Replace with your feature type
+            Feature.NO_OP, // Replace with your custom feature if available
             NoneFeatureConfiguration.INSTANCE // Use the appropriate configuration
     );
 }
