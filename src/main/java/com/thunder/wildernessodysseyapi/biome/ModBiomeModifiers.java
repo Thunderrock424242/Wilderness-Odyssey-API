@@ -23,9 +23,9 @@ public class ModBiomeModifiers {
         BIOME_MODIFIERS.register(
                 "custom_modifier",
                 () -> new CustomBiomeModifier(
-                        ModFeatures.CUSTOM_STRUCTURE_PLACED, // PlacedFeature holder
-                        Biomes.PLAINS,                       // Target biome
-                        500                                  // Minimum Plains biome size in blocks
+                        ModFeatures.CUSTOM_STRUCTURE_PLACED_KEY, // Reference PlacedFeature key
+                        Biomes.PLAINS,                           // Target biome
+                        500                                      // Minimum Plains biome size in blocks
                 )
         );
     }
