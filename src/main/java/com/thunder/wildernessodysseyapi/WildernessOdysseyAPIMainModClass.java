@@ -1,16 +1,12 @@
 package com.thunder.wildernessodysseyapi;
 
 import com.thunder.wildernessodysseyapi.Features.ModFeatures;
-import com.thunder.wildernessodysseyapi.GlobalChat.gui.Screen.CustomChatScreen;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WordlEdit.WorldEditStructurePlacer;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.ChatScreen;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -23,8 +19,6 @@ import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -45,10 +39,9 @@ import java.util.Map;
 @Mod(WildernessOdysseyAPIMainModClass.MOD_ID)
 public class WildernessOdysseyAPIMainModClass {
 
-    public static final String MODID = "modpacklogger";
-    public static final String NAME = "Mod Pack Logger";
     public static final String VERSION = "0.0.3"; // Change this to your mod pack version
     public static final Logger LOGGER = LoggerFactory.getLogger("WildernessOdysseyAPI");
+    public static final String WEBHOOK_URL = "https://your.webhook.link/here";
 
 
     private static AABB structureBoundingBox;

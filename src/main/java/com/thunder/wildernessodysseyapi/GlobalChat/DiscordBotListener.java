@@ -1,8 +1,7 @@
 package com.thunder.wildernessodysseyapi.GlobalChat;
 
-import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
-import net.dv8tion.jda.api.hooks.ListenerAdapter;
+
+import ca.weblite.objc.Message;
 
 public class DiscordBotListener extends ListenerAdapter {
     @Override
