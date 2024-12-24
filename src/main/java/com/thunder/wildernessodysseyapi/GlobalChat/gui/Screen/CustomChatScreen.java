@@ -24,19 +24,20 @@ public class CustomChatScreen extends ChatScreen {
             return; // Skip empty messages and commands
         }
 
-        // Send to local chat
-        super.handleChatInput(input, addToHistory);
-
         // Check if the global chat game rule is enabled
         boolean enableGlobalChat = Minecraft.getInstance().level.getGameRules()
                 .getBoolean(WildernessOdysseyAPIMainModClass.ENABLE_GLOBAL_CHAT);
+
         if (enableGlobalChat) {
             sendToDiscord(input);
         }
+
+        // Always send to local chat
+        super.handleChatInput(input, addToHistory);
     }
 
     private void sendToDiscord(String message) {
-        String webhookUrl = "YOUR_DISCORD_WEBHOOK_URL"; // Replace with your webhook URL
+        String webhookUrl = "https://discord.com/api/webhooks/1320768393111932979/3eNmHT__P2hZ3FPh7fm5oay3ire8jP83RTV7iZS5J5BJORgWYCuqS0gtj__yDzSyMJra"; // Replace with your webhook URL
         DiscordWebhook webhook = new DiscordWebhook(webhookUrl);
         webhook.setContent(message);
         webhook.setUsername(Minecraft.getInstance().player.getName().getString());

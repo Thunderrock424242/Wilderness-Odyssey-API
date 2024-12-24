@@ -54,8 +54,7 @@ public class WildernessOdysseyAPIMainModClass {
     private static AABB structureBoundingBox;
     public static final String MOD_ID = "wildernessodysseyapi";
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
-    public static final GameRules.Key<GameRules.BooleanValue> ENABLE_GLOBAL_CHAT =
-            GameRules.register("enableGlobalChat", GameRules.Category.CHAT, GameRules.BooleanValue.create(false));
+    public static final GameRules.Key<GameRules.BooleanValue> ENABLE_GLOBAL_CHAT = GameRules.register("enableGlobalChat", GameRules.Category.MISC, GameRules.BooleanValue.create(false));
 
     private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader, IPayloadHandler<T> handler) {}
 
@@ -94,6 +93,7 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStarting(ServerStartingEvent event){
             LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
             LOGGER.warn("This message is for development purposes only."); // Logs as info
+        event.getServer().getGameRules().getRule(ENABLE_GLOBAL_CHAT);
 
     }
 
@@ -143,19 +143,5 @@ public class WildernessOdysseyAPIMainModClass {
 
     private void onClientSetup(final FMLClientSetupEvent event) {
         // No longer starts a client connection to a server
-        System.out.println("Client setup complete. Ready to handle unified chat.");
     }
-
-    @SubscribeEvent
-    public void onClientTick(ClientTickEvent.Post event) {
-        Minecraft mc = Minecraft.getInstance();
-        Screen currentScreen = mc.screen;
-
-        // Replace the default ChatScreen with CustomChatScreen
-        if (currentScreen instanceof ChatScreen && !(currentScreen instanceof CustomChatScreen)) {
-            mc.setScreen(new CustomChatScreen());
-        }
-    }
-
-
 }
