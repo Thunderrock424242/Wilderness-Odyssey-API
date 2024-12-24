@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.structure;
+package com.thunder.wildernessodysseyapi.BunkerStructure;
 
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
@@ -9,7 +9,7 @@ import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 
 public class MobSpawnHandler {
     private static final AABB STRUCTURE_BOUNDING_BOX = new AABB(
-            -50, 0, -50, 50, 256, 50 // Replace with actual structure coordinates
+            -50, 0, -50, 50, 256, 50 // Replace with actual BunkerStructure coordinates
     );
 
     public MobSpawnHandler() {

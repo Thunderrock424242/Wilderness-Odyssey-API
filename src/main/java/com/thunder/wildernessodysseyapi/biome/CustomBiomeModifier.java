@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.GenerationStep;
@@ -19,8 +20,8 @@ public class CustomBiomeModifier implements BiomeModifier {
     // Define the Codec for serialization/deserialization
     public static final Codec<CustomBiomeModifier> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    ResourceKey.codec(ForgeRegistries.Keys.PLACED_FEATURES).fieldOf("bunker.schem").forGetter(modifier -> modifier.structure),
-                    ResourceKey.codec(ForgeRegistries.Keys.BIOMES).fieldOf("Plains").forGetter(modifier -> modifier.targetBiome),
+                    ResourceKey.codec(Registries.PLACED_FEATURE).fieldOf("bunker.schem").forGetter(modifier -> modifier.structure),
+                    ResourceKey.codec(Registries.BIOME).fieldOf("Plains").forGetter(modifier -> modifier.targetBiome),
                     Codec.INT.fieldOf("whats the min biome sise?").forGetter(modifier -> modifier.minBiomeSize)
             ).apply(instance, CustomBiomeModifier::new)
     );

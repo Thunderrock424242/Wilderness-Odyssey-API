@@ -1,12 +1,13 @@
 package com.thunder.wildernessodysseyapi;
 
+import com.thunder.wildernessodysseyapi.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.GlobalChat.gui.Screen.CustomChatScreen;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
-import com.thunder.wildernessodysseyapi.structure.ModStructures;
-import com.thunder.wildernessodysseyapi.structure.WorldEditStructurePlacer;
+import com.thunder.wildernessodysseyapi.BunkerStructure.ModStructures;
+import com.thunder.wildernessodysseyapi.WordlEdit.WorldEditStructurePlacer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -35,8 +36,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import org.apache.logging.log4j.LogManager;
 import org.slf4j.Logger;
-import com.mojang.logging.LogUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -44,10 +45,15 @@ import java.util.Map;
 @Mod(WildernessOdysseyAPIMainModClass.MOD_ID)
 public class WildernessOdysseyAPIMainModClass {
 
+    public static final String MODID = "modpacklogger";
+    public static final String NAME = "Mod Pack Logger";
+    public static final String VERSION = "0.0.3"; // Change this to your mod pack version
+    private static final Logger LOGGER = (Logger) LogManager.getLogger();
+
+
     private static AABB structureBoundingBox;
     public static final String MOD_ID = "wildernessodysseyapi";
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
-    public static final Logger LOGGER = LogUtils.getLogger();
     public static final GameRules.Key<GameRules.BooleanValue> ENABLE_GLOBAL_CHAT =
             GameRules.register("enableGlobalChat", GameRules.Category.CHAT, GameRules.BooleanValue.create(false));
 
@@ -63,6 +69,8 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(new BlacklistChecker());// Register BlacklistChecker
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register((IEventBus) this);
+        ModFeatures.CONFIGURED_FEATURES.register((IEventBus) this);
+        ModFeatures.PLACED_FEATURES.register((IEventBus) this);
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
@@ -84,6 +92,8 @@ public class WildernessOdysseyAPIMainModClass {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
+            LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
+            LOGGER.warn("This message is for development purposes only."); // Logs as info
 
     }
 
@@ -97,13 +107,13 @@ public class WildernessOdysseyAPIMainModClass {
         BlockPos pos = findPlainsBiomePosition(serverLevel);
         if (pos == null) return;
 
-        // Place the structure
+        // Place the BunkerStructure
         WorldEditStructurePlacer placer = new WorldEditStructurePlacer("wildernessodyssey", "schematics/my_structure.schem");
         if (placer.placeStructure(serverLevel, pos)) {
             structureBoundingBox = new AABB(
                     pos.getX() - 10, pos.getY() - 5, pos.getZ() - 10,
                     pos.getX() + 10, pos.getY() + 10, pos.getZ() + 10
-            ); // Define a bounding box around the structure
+            ); // Define a bounding box around the BunkerStructure
              // Mark as generated
         }
     }

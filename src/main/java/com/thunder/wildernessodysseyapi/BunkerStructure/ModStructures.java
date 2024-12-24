@@ -1,8 +1,7 @@
-package com.thunder.wildernessodysseyapi.structure;
+package com.thunder.wildernessodysseyapi.BunkerStructure;
 
 import net.minecraft.core.Holder;
-import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
@@ -14,11 +13,11 @@ import java.util.List;
 
 public class ModStructures {
     public static final DeferredRegister<PlacedFeature> PLACED_FEATURES = DeferredRegister.create(
-            ForgeRegistries.Keys.PLACED_FEATURES,
+            Registries.PLACED_FEATURE,
             "wildernessodyssey"
     );
 
-    // Register the custom structure as a PlacedFeature
+    // Register the custom BunkerStructure as a PlacedFeature
     public static final DeferredHolder<PlacedFeature, PlacedFeature> CUSTOM_STRUCTURE = PLACED_FEATURES.register(
             "custom_structure",
             () -> new PlacedFeature(

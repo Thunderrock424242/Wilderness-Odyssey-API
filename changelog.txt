@@ -1,6 +1,6 @@
 0.0.2:
 Added:
-! check mod list for now for all mods which is in the github repo under the folder mods
+* added christmas time mods.
 
 
 Changed:
@@ -12,14 +12,14 @@ Fixed:
 API Changes:
 - updated to latest gradle
 !! now using worldedit plugin
+!! bumped to version 1.1.0 this will be out in a future update not this one.
 
 
 
 
 
 API/Modpack bugs:
-!! chat system currently is broken due to a global chat system.
-!! if you switch to global chat, it does not work you have to switch to local exit the game in order to use local chat.
+
 
 Note:
 !! one of our main temp mods will be disabled till I have time to work on it.
