@@ -36,8 +36,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
-import org.apache.logging.log4j.LogManager;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -48,7 +48,7 @@ public class WildernessOdysseyAPIMainModClass {
     public static final String MODID = "modpacklogger";
     public static final String NAME = "Mod Pack Logger";
     public static final String VERSION = "0.0.3"; // Change this to your mod pack version
-    private static final Logger LOGGER = (Logger) LogManager.getLogger();
+    public static final Logger LOGGER = LoggerFactory.getLogger("WildernessOdysseyAPI");
 
 
     private static AABB structureBoundingBox;
@@ -68,9 +68,9 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new BlacklistChecker());// Register BlacklistChecker
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
-        ModStructures.PLACED_FEATURES.register((IEventBus) this);
-        ModFeatures.CONFIGURED_FEATURES.register((IEventBus) this);
-        ModFeatures.PLACED_FEATURES.register((IEventBus) this);
+        ModStructures.PLACED_FEATURES.register(modEventBus);
+        ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
+        ModFeatures.PLACED_FEATURES.register(modEventBus);
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
