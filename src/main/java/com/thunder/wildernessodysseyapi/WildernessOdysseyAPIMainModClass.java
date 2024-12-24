@@ -140,8 +140,4 @@ public class WildernessOdysseyAPIMainModClass {
         }
         return null; // No Plains biome found in the search range
     }
-
-    private void onClientSetup(final FMLClientSetupEvent event) {
-        // No longer starts a client connection to a server
-    }
 }
