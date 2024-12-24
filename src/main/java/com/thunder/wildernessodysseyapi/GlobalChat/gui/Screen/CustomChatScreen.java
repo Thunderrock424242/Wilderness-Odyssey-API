@@ -9,6 +9,8 @@ import net.minecraft.network.chat.MutableComponent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import static com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass.WEBHOOK_URL;
+
 public class CustomChatScreen extends ChatScreen {
 
     private static final Logger LOGGER = LogManager.getLogger();
@@ -37,8 +39,8 @@ public class CustomChatScreen extends ChatScreen {
     }
 
     private void sendToDiscord(String message) {
-        String webhookUrl = "https://discord.com/api/webhooks/1320768393111932979/3eNmHT__P2hZ3FPh7fm5oay3ire8jP83RTV7iZS5J5BJORgWYCuqS0gtj__yDzSyMJra"; // Replace with your webhook URL
-        DiscordWebhook webhook = new DiscordWebhook(webhookUrl);
+        // Replace with your webhook URL
+        DiscordWebhook webhook = new DiscordWebhook(WEBHOOK_URL);
         webhook.setContent(message);
         webhook.setUsername(Minecraft.getInstance().player.getName().getString());
 
