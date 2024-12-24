@@ -12,6 +12,7 @@ import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 import java.util.List;
+import java.util.Objects;
 
 public class ModFeatures {
     // DeferredRegisters for ConfiguredFeature and PlacedFeature
@@ -49,6 +50,6 @@ public class ModFeatures {
     // Expose CUSTOM_STRUCTURE_PLACED
     public static final ResourceKey<PlacedFeature> CUSTOM_STRUCTURE_PLACED_KEY = ResourceKey.create(
             Registries.PLACED_FEATURE,
-            new ResourceLocation("wildernessodyssey", "custom_structure")
+            Objects.requireNonNull(ResourceLocation.tryParse("wildernessodyssey:custom_structure"))
     );
 }

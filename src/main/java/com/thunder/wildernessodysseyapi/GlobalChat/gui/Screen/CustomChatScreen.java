@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -44,19 +45,21 @@ public class CustomChatScreen extends ChatScreen {
         new Thread(() -> {
             try {
                 webhook.execute();
-                // Provide feedback to the player
-                Minecraft.getInstance().player.sendMessage(
-                        Component.literal("Message sent to global chat!"), Minecraft.getInstance().player.getUUID());
+                // Provide feedback to the player via the in-game chat
+                displayFeedbackToPlayer("Message sent to global chat!");
                 LOGGER.info("Message successfully sent to Discord.");
             } catch (DiscordWebhook.RateLimitException e) {
                 LOGGER.warn("Rate limit hit: Message not sent.", e);
-                Minecraft.getInstance().player.sendMessage(
-                        Component.literal("You're sending messages too fast! Please wait."), Minecraft.getInstance().player.getUUID());
+                displayFeedbackToPlayer("You're sending messages too fast! Please wait.");
             } catch (Exception e) {
                 LOGGER.error("Failed to send message to Discord:", e);
-                Minecraft.getInstance().player.sendMessage(
-                        Component.literal("Failed to send message to global chat. Please try again later."), Minecraft.getInstance().player.getUUID());
+                displayFeedbackToPlayer("Failed to send message to global chat. Please try again later.");
             }
         }).start();
+    }
+
+    private void displayFeedbackToPlayer(String feedback) {
+        MutableComponent feedbackComponent = Component.literal(feedback);
+        Minecraft.getInstance().gui.getChat().addMessage(feedbackComponent);
     }
 }

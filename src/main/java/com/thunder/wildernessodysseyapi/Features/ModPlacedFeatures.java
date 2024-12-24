@@ -8,11 +8,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 
 import java.util.List;
+import java.util.Objects;
 
 public class ModPlacedFeatures {
     public static final ResourceKey<PlacedFeature> CUSTOM_STRUCTURE_PLACED_KEY = ResourceKey.create(
             Registries.PLACED_FEATURE,
-            new ResourceLocation("wildernessodyssey", "custom_structure")
+            Objects.requireNonNull(ResourceLocation.tryParse("wildernessodyssey:custom_structure")) // Use tryParse to create ResourceLocation
     );
 
     public static final PlacedFeature CUSTOM_STRUCTURE_PLACED = new PlacedFeature(

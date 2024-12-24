@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.WordlEdit;
 
 import com.sk89q.worldedit.EditSession;
+import com.sk89q.worldedit.MaxChangedBlocksException;
 import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.extent.clipboard.Clipboard;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormat;
@@ -58,7 +59,11 @@ public class WorldEditStructurePlacer {
                             );
 
                             // Delegate block replacement to the utility class
-                            TerrainBlockReplacer.replaceBlockWithTerrain(editSession, world, blockVector, terrainPos);
+                            try {
+                                TerrainBlockReplacer.replaceBlockWithTerrain(editSession, world, blockVector, terrainPos);
+                            } catch (MaxChangedBlocksException e) {
+                                throw new RuntimeException(e);
+                            }
                         }
                     });
 
