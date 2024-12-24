@@ -53,9 +53,9 @@ public class WorldEditStructurePlacer {
                     clipboard.getRegion().forEach(blockVector -> {
                         if (clipboard.getFullBlock(blockVector).getBlockType().equals(BlockTypes.WHITE_WOOL)) {
                             BlockPos terrainPos = new BlockPos(
-                                    blockVector.getBlockX() + surfacePos.getX(),
-                                    blockVector.getBlockY() + surfacePos.getY(),
-                                    blockVector.getBlockZ() + surfacePos.getZ()
+                                    blockVector.getX() + surfacePos.getX(),
+                                    blockVector.getY() + surfacePos.getY(),
+                                    blockVector.getZ() + surfacePos.getZ()
                             );
 
                             // Delegate block replacement to the utility class
@@ -66,6 +66,7 @@ public class WorldEditStructurePlacer {
                             }
                         }
                     });
+
 
                     // Paste the BunkerStructure into the world
                     holder.createPaste(editSession)
