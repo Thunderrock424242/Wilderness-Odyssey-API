@@ -5,6 +5,9 @@ plugins {
     id 'net.neoforged.moddev' version '1.0.23'
     id("com.gradleup.shadow") version "9.0.0-beta4"
 }
+tasks.named('shadowJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+    zip64 = true // Enable Zip64 for large archives
+}
 
 tasks.named('wrapper', Wrapper).configure {
     // Define wrapper values here so as to not have to always do so when updating gradlew.properties.
