@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi;
 
+import com.thunder.wildernessodysseyapi.DiscordBot.GlobalChat.DiscordBot;
+import com.thunder.wildernessodysseyapi.DiscordBot.GlobalChat.MinecraftMessageRelay;
 import com.thunder.wildernessodysseyapi.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
@@ -41,7 +43,8 @@ public class WildernessOdysseyAPIMainModClass {
 
     public static final String VERSION = "0.0.3"; // Change this to your mod pack version
     public static final Logger LOGGER = LoggerFactory.getLogger("WildernessOdysseyAPI");
-    public static final String WEBHOOK_URL = "https://your.webhook.link/here";
+    private static final String DISCORD_BOT_TOKEN = "YOUR_DISCORD_BOT_TOKEN";
+    private static final String DISCORD_CHANNEL_ID = "YOUR_DISCORD_CHANNEL_ID";
 
 
     private static AABB structureBoundingBox;
@@ -84,9 +87,20 @@ public class WildernessOdysseyAPIMainModClass {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
+        try {
+            // Initialize the Discord bot
+            DiscordBot.initializeBot(DISCORD_BOT_TOKEN);
+            DiscordBot.setChannelId(DISCORD_CHANNEL_ID);
+            MinecraftMessageRelay.setServer(event.getServer());
+            System.out.println("Discord bot started successfully!");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
             LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
             LOGGER.warn("This message is for development purposes only."); // Logs as info
         event.getServer().getGameRules().getRule(ENABLE_GLOBAL_CHAT);
+
 
     }
 
