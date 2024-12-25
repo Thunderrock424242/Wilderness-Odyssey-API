@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.GlobalChat;
+package com.thunder.wildernessodysseyapi.DiscordBot.GlobalChat;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

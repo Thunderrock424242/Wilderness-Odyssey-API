@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.GlobalChat;
+package com.thunder.wildernessodysseyapi.DiscordBot.GlobalChat;
 
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;

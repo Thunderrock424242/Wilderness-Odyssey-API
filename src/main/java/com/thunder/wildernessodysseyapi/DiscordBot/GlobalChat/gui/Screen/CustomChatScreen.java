@@ -1,6 +1,6 @@
-package com.thunder.wildernessodysseyapi.GlobalChat.gui.Screen;
+package com.thunder.wildernessodysseyapi.DiscordBot.GlobalChat.gui.Screen;
 
-import com.thunder.wildernessodysseyapi.GlobalChat.DiscordWebhook;
+import com.thunder.wildernessodysseyapi.DiscordBot.GlobalChat.DiscordWebhook;
 import com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;

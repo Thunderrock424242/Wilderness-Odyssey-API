@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.GlobalChat;
+package com.thunder.wildernessodysseyapi.DiscordBot.GlobalChat;
 
 import com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass;
 

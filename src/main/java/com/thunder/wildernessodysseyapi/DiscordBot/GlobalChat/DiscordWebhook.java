@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.GlobalChat;
+package com.thunder.wildernessodysseyapi.DiscordBot.GlobalChat;
 
 import java.io.OutputStream;
 import java.net.HttpURLConnection;

@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.GlobalChat;
+package com.thunder.wildernessodysseyapi.DiscordBot.GlobalChat;
 
 public class DiscordMessageHandler {
     private static final String WEBHOOK_URL = "https://your.webhook.url";
