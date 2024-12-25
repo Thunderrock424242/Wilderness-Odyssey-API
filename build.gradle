@@ -3,11 +3,8 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'net.neoforged.moddev' version '1.0.23'
-    id("com.gradleup.shadow") version "9.0.0-beta4"
 }
-tasks.named('shadowJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
-    zip64 = true // Enable Zip64 for large archives
-}
+
 
 tasks.named('wrapper', Wrapper).configure {
     // Define wrapper values here so as to not have to always do so when updating gradlew.properties.
@@ -124,7 +121,6 @@ repositories {
 
 dependencies {
     implementation "curse.maven:worldedit-225608:5830452"
-    implementation("net.dv8tion:JDA:5.0.0-beta.21")
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
@@ -148,12 +144,7 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
 }
-shadowJar {
-    archiveClassifier.set('')
-    relocate 'net.dv8tion.jda', 'com.thunder.wildernessodysseyapi.jda'
-}
 
-tasks.build.dependsOn shadowJar
 
 // This block of code expands all declared replace properties in the specified resource targets.
 // A missing property will result in an error. Properties are expanded using ${} Groovy notation.

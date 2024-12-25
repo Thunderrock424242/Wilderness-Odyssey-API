@@ -1,8 +1,8 @@
 package com.thunder.wildernessodysseyapi;
 
-import com.thunder.wildernessodysseyapi.DiscordBot.GlobalChat.DiscordBot;
-import com.thunder.wildernessodysseyapi.DiscordBot.GlobalChat.MinecraftMessageRelay;
 import com.thunder.wildernessodysseyapi.Features.ModFeatures;
+import com.thunder.wildernessodysseyapi.GlobalChat.ChatServer;
+import com.thunder.wildernessodysseyapi.GlobalChat.ChatServerHandler;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -13,6 +13,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
@@ -24,6 +25,7 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -40,11 +42,10 @@ import java.util.Map;
 
 @Mod(WildernessOdysseyAPIMainModClass.MOD_ID)
 public class WildernessOdysseyAPIMainModClass {
+    private ChatServerHandler chatServerHandler;
 
     public static final String VERSION = "0.0.3"; // Change this to your mod pack version
     public static final Logger LOGGER = LoggerFactory.getLogger("WildernessOdysseyAPI");
-    private static final String DISCORD_BOT_TOKEN = "YOUR_DISCORD_BOT_TOKEN";
-    private static final String DISCORD_CHANNEL_ID = "YOUR_DISCORD_CHANNEL_ID";
 
 
     private static AABB structureBoundingBox;
@@ -69,6 +70,7 @@ public class WildernessOdysseyAPIMainModClass {
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
+        chatServerHandler = new ChatServerHandler(); // Port 3000
 
 
     }
@@ -87,19 +89,15 @@ public class WildernessOdysseyAPIMainModClass {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
-        try {
-            // Initialize the Discord bot
-            DiscordBot.initializeBot(DISCORD_BOT_TOKEN);
-            DiscordBot.setChannelId(DISCORD_CHANNEL_ID);
-            MinecraftMessageRelay.setServer(event.getServer());
-            System.out.println("Discord bot started successfully!");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        MinecraftServer server = event.getServer();
+        chatServerHandler.startChatServer();
 
-            LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
-            LOGGER.warn("This message is for development purposes only."); // Logs as info
-        event.getServer().getGameRules().getRule(ENABLE_GLOBAL_CHAT);
+        System.out.println("Global Chat Server started for server: ");
+
+
+        LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
+        LOGGER.warn("This message is for development purposes only."); // Logs as info
+
 
 
     }
@@ -146,5 +144,11 @@ public class WildernessOdysseyAPIMainModClass {
             }
         }
         return null; // No Plains biome found in the search range
+    }
+    @SubscribeEvent
+    public void onServerStopping(ServerStoppingEvent event) {
+        chatServerHandler.stopChatServer();
+
+        System.out.println("Global Chat Server stopped.");
     }
 }
