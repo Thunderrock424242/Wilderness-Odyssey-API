@@ -1,8 +1,6 @@
 package com.thunder.wildernessodysseyapi;
 
 import com.thunder.wildernessodysseyapi.Features.ModFeatures;
-import com.thunder.wildernessodysseyapi.GlobalChat.ChatServer;
-import com.thunder.wildernessodysseyapi.GlobalChat.ChatServerHandler;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -13,7 +11,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
@@ -42,7 +39,6 @@ import java.util.Map;
 
 @Mod(WildernessOdysseyAPIMainModClass.MOD_ID)
 public class WildernessOdysseyAPIMainModClass {
-    private ChatServerHandler chatServerHandler;
 
     public static final String VERSION = "0.0.3"; // Change this to your mod pack version
     public static final Logger LOGGER = LoggerFactory.getLogger("WildernessOdysseyAPI");
@@ -70,7 +66,6 @@ public class WildernessOdysseyAPIMainModClass {
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
-        chatServerHandler = new ChatServerHandler(); // Port 3000
 
 
     }
@@ -89,8 +84,6 @@ public class WildernessOdysseyAPIMainModClass {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
-        MinecraftServer server = event.getServer();
-        chatServerHandler.startChatServer();
 
         System.out.println("Global Chat Server started for server: ");
 
@@ -147,7 +140,6 @@ public class WildernessOdysseyAPIMainModClass {
     }
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
-        chatServerHandler.stopChatServer();
 
         System.out.println("Global Chat Server stopped.");
     }
