@@ -74,6 +74,8 @@ public class WildernessOdysseyAPIMainModClass {
         event.enqueueWork(() -> {
             System.out.println("Wilderness Odyssey setup complete!");
         });
+        LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
+        LOGGER.warn("This message is for development purposes only."); // Logs as info
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
@@ -85,11 +87,9 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
 
-        System.out.println("Global Chat Server started for server: ");
 
 
-        LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
-        LOGGER.warn("This message is for development purposes only."); // Logs as info
+
 
 
 
