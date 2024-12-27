@@ -88,11 +88,6 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStarting(ServerStartingEvent event){
 
 
-
-
-
-
-
     }
 
     @SubscribeEvent
