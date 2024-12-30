@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi;
 
 import com.thunder.wildernessodysseyapi.Features.ModFeatures;
+import com.thunder.wildernessodysseyapi.WormHole.entities.EntityWormhole;
+import com.thunder.wildernessodysseyapi.WormHole.events.WormholeEventHandler;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -19,6 +21,7 @@ import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -58,7 +61,8 @@ public class WildernessOdysseyAPIMainModClass {
 
         // Register global events and BlacklistChecker
         NeoForge.EVENT_BUS.register(this);
-        NeoForge.EVENT_BUS.register(new BlacklistChecker());// Register BlacklistChecker
+        NeoForge.EVENT_BUS.register(new BlacklistChecker());
+        NeoForge.EVENT_BUS.register(new WormholeEventHandler());// Register BlacklistChecker
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
@@ -76,6 +80,7 @@ public class WildernessOdysseyAPIMainModClass {
         });
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
+        EntityWormhole.registerEntityType();
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
@@ -136,6 +141,9 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
 
-        System.out.println("Global Chat Server stopped.");
+    }
+    private void doClientStuff(final FMLClientSetupEvent event) {
+        // Client-specific setup, such as entity rendering
+        EntityWormhole.registerEntityRenderer();
     }
 }
