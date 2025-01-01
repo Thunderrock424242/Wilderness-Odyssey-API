@@ -59,7 +59,7 @@ public class WildernessOdysseyAPIMainModClass {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
 
-        // Register global events and BlacklistChecker
+        // Register global events
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new BlacklistChecker());
         NeoForge.EVENT_BUS.register(new WormholeEventHandler());// Register BlacklistChecker
@@ -70,6 +70,7 @@ public class WildernessOdysseyAPIMainModClass {
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
+        EntityWormhole.register(modEventBus);
 
 
     }
@@ -80,7 +81,6 @@ public class WildernessOdysseyAPIMainModClass {
         });
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
-        EntityWormhole.registerEntityType();
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
@@ -143,7 +143,6 @@ public class WildernessOdysseyAPIMainModClass {
 
     }
     private void doClientStuff(final FMLClientSetupEvent event) {
-        // Client-specific setup, such as entity rendering
-        EntityWormhole.registerEntityRenderer();
+
     }
 }
