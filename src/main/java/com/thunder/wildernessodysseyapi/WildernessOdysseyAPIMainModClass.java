@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi;
 import com.thunder.wildernessodysseyapi.BugFixes.InfiniteSourceHandler;
 import com.thunder.wildernessodysseyapi.BugFixes.events.SmokeEventHandler;
 import com.thunder.wildernessodysseyapi.Features.ModFeatures;
+import com.thunder.wildernessodysseyapi.MobControl.MobSpawnHandler;
 import com.thunder.wildernessodysseyapi.MobControl.SpiderMovementHandler;
 import com.thunder.wildernessodysseyapi.MobControl.SpiderSpawnHandler;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
@@ -70,6 +71,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(new SmokeEventHandler());
         NeoForge.EVENT_BUS.register(new SpiderSpawnHandler());
         NeoForge.EVENT_BUS.register(new SpiderMovementHandler());
+        NeoForge.EVENT_BUS.register(new MobSpawnHandler());
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
