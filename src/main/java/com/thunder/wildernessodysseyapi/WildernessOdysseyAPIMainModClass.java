@@ -140,7 +140,4 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStopping(ServerStoppingEvent event) {
 
     }
-    private void doClientStuff(final FMLClientSetupEvent event) {
-
-    }
 }
