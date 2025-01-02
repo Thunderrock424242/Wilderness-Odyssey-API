@@ -1,14 +1,13 @@
 package com.thunder.wildernessodysseyapi;
 
 import com.thunder.wildernessodysseyapi.Features.ModFeatures;
-import com.thunder.wildernessodysseyapi.WormHole.entities.EntityWormhole;
-import com.thunder.wildernessodysseyapi.WormHole.events.WormholeEventHandler;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WordlEdit.WorldEditStructurePlacer;
+import com.thunder.wildernessodysseyapi.ocean.events.WaveHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -62,7 +61,7 @@ public class WildernessOdysseyAPIMainModClass {
         // Register global events
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new BlacklistChecker());
-        NeoForge.EVENT_BUS.register(new WormholeEventHandler());// Register BlacklistChecker
+        NeoForge.EVENT_BUS.register(new WaveHandler());
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
@@ -70,7 +69,6 @@ public class WildernessOdysseyAPIMainModClass {
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
-        EntityWormhole.register(modEventBus);
 
 
     }
