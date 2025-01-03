@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.SpawnBlock;
 
-import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
+import com.thunder.wildernessodysseyapi.blocks.WorldSpawnBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;

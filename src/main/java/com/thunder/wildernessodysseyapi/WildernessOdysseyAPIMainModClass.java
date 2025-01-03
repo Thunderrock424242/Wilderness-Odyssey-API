@@ -7,7 +7,8 @@ import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
 import com.thunder.wildernessodysseyapi.MobControl.SpiderMovementHandler;
 import com.thunder.wildernessodysseyapi.MobControl.SpiderSpawnHandler;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
-import com.thunder.wildernessodysseyapi.block.WorldSpawnBlock;
+import com.thunder.wildernessodysseyapi.blocks.ModBlocks;
+import com.thunder.wildernessodysseyapi.blocks.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.BunkerStructure.ModStructures;
@@ -75,6 +76,7 @@ public class WildernessOdysseyAPIMainModClass {
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
         ModFeatures.PLACED_FEATURES.register(modEventBus);
+        ModBlocks.BLOCKS.register(modEventBus);
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
