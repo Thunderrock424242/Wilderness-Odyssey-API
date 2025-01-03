@@ -1,21 +1,26 @@
 package com.thunder.wildernessodysseyapi.MobControl;
 
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.MobCategory;
 
 public class MobSpawnAdjuster {
 
-    public static void adjustMobSpawning(ServerLevel world, int day) {
-        // Dynamic adjustment based on day
-        int spawnMultiplier = Math.min(day, 10); // Cap the multiplier at 10 for balance
-        for (MobCategory category : MobCategory.values()) {
-            if (category == MobCategory.MONSTER) {
-                world.getChunkSource().getGenerator().getSpawnSettings().getSpawns(category).forEach(spawnData -> {
-                    int baseWeight = spawnData.getWeight().get();
-                    int newWeight = baseWeight * spawnMultiplier;
-                    spawnData.setWeight(newWeight);
-                });
-            }
-        }
+    /**
+     * Calculates the current day in the Minecraft world.
+     *
+     * @param world The server-level world.
+     * @return The current day (1-based index).
+     */
+    public static int getCurrentDay(ServerLevel world) {
+        return (int) (world.getDayTime() / 24000); // Convert ticks to days
+    }
+
+    /**
+     * Calculates the spawn chance based on the current day.
+     *
+     * @param currentDay The current day in the Minecraft world.
+     * @return The spawn chance percentage (0-100).
+     */
+    public static int calculateSpawnChance(int currentDay) {
+        return Math.min(currentDay * 10, 100); // Scale: 10% per day, max at 100%
     }
 }

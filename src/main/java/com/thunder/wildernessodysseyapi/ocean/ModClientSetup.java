@@ -7,9 +7,13 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 
 @EventBusSubscriber
 public class ModClientSetup {
+    public static void onClientSetup(FMLClientSetupEvent event) {
+        WaveRenderer.initShader();
+    }
 
     @SubscribeEvent
     public static void onRenderWorld(RenderWorldLastEvent event) {

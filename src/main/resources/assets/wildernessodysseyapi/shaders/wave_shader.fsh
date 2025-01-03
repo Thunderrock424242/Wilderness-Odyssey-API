@@ -1,23 +1,44 @@
 #version 120
 
-uniform sampler2D waveHeightMap;
-uniform sampler2D foamTexture;
-uniform float time;
+uniform sampler2D waterTexture;    // Base water texture
+uniform sampler2D underwaterTexture; // Underwater refraction texture
+uniform float time;                // Time uniform for animation
+uniform float waterDepth;          // Maximum water depth
+uniform vec3 lightDir;             // Direction of the light source
+uniform vec3 viewDir;              // Direction of the camera
 
-varying vec3 worldPos;
+varying vec3 worldPos;             // World position passed from vertex shader
 
 void main() {
-    // Sample wave height
-    vec2 texCoord = worldPos.xz * 0.01;
-    float waveHeight = texture2D(waveHeightMap, texCoord).r;
+    // Sample base water texture
+    vec2 uv = gl_TexCoord[0].st;
 
-    // Foam near the peak of waves
-    float foamIntensity = smoothstep(0.8, 1.0, waveHeight);
-    vec4 foamColor = texture2D(foamTexture, texCoord) * foamIntensity;
+    // Add UV distortion for flowing effect
+    vec2 flowUV = uv + vec2(sin(time + worldPos.x * 0.2) * 0.02, cos(time + worldPos.z * 0.2) * 0.02);
+    vec4 baseColor = texture2D(waterTexture, flowUV);
 
-    // Water color blending
-    vec4 waterColor = vec4(0.0, 0.3, 0.7, 1.0); // Deep blue water
-    waterColor.rgb += waveHeight * 0.1; // Lighten based on wave height
+    // Depth-based color gradient
+    float depthFactor = smoothstep(0.0, waterDepth, worldPos.y);
+    vec4 deepColor = vec4(0.0, 0.1, 0.3, 1.0);   // Deep blue
+    vec4 shallowColor = vec4(0.3, 0.6, 0.9, 1.0); // Light aqua
+    vec4 depthColor = mix(deepColor, shallowColor, depthFactor);
 
-    gl_FragColor = mix(waterColor, foamColor, foamIntensity);
+    // Add foam based on wave peaks
+    float foamIntensity = smoothstep(0.6, 0.8, abs(sin(worldPos.y * 5.0)));
+    foamIntensity += sin(time + worldPos.x * 0.5 + worldPos.z * 0.5) * 0.05; // Dynamic foam motion
+    vec4 foamColor = vec4(1.0, 1.0, 1.0, foamIntensity); // White foam with transparency
+
+    // Specular highlights for sunlight
+    vec3 normal = normalize(vec3(dFdx(worldPos.y), 1.0, dFdz(worldPos.y))); // Approximate normal
+    vec3 reflection = reflect(-lightDir, normal); // Reflection vector
+    float specular = pow(max(dot(reflection, viewDir), 0.0), 32.0); // Specular intensity
+    vec4 highlightColor = vec4(1.0, 1.0, 0.8, specular); // Bright yellow-white highlights
+
+    // Combine base color, depth gradient, foam, and highlights
+    vec4 finalColor = mix(baseColor, depthColor, 0.5);
+    finalColor = mix(finalColor, foamColor, foamIntensity);
+    finalColor = mix(finalColor, highlightColor, specular);
+
+    // Apply final color
+    gl_FragColor = finalColor;
 }

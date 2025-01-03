@@ -1,19 +1,22 @@
 #version 120
 
-uniform float time;
-uniform sampler2D waveHeightMap;
-
-varying vec3 worldPos;
+uniform float time; // Time uniform for animation
+varying vec3 worldPos; // Pass world position to fragment shader
 
 void main() {
-    // Extract wave height from the heightmap
-    vec2 texCoord = gl_Vertex.xy * 0.01; // Scale for heightmap lookup
-    float waveHeight = texture2D(waveHeightMap, texCoord).r;
+    vec4 pos = gl_Vertex; // Original vertex position
 
-    // Modify the vertex position with the wave height
-    vec3 pos = gl_Vertex.xyz;
-    pos.y += waveHeight * sin(time + pos.x * 0.05 + pos.z * 0.05);
+    // Multiple wave layers for complex motion
+    float wave1 = sin(pos.x * 0.1 + time * 0.05) * 0.5; // Long, slow wave
+    float wave2 = sin(pos.z * 0.15 + time * 0.08) * 0.3; // Medium wave
+    float wave3 = sin((pos.x + pos.z) * 0.2 + time * 0.1) * 0.2; // Small ripples
 
-    worldPos = pos;
-    gl_Position = gl_ModelViewProjectionMatrix * vec4(pos, 1.0);
+    // Combine wave layers
+    float totalWaveHeight = wave1 + wave2 + wave3;
+
+    // Apply wave height to Y coordinate
+    pos.y += totalWaveHeight;
+
+    worldPos = pos.xyz; // Pass transformed position to fragment shader
+    gl_Position = gl_ModelViewProjectionMatrix * pos; // Apply transformation
 }

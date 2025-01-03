@@ -6,12 +6,14 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 public class SmokeEventHandler {
 
     @SubscribeEvent
-    public void onWorldTick(TickEvent.WorldTickEvent event) {
-        if (event.world instanceof ServerLevel serverWorld && event.phase == TickEvent.Phase.END) {
+    public void onLevelTick(LevelTickEvent event) {
+        // Ensure the event's level is a server world
+        if (event.getLevel() instanceof ServerLevel serverWorld) {
             serverWorld.players().forEach(player -> {
                 BlockPos playerPos = player.blockPosition();
                 for (BlockPos pos : BlockPos.betweenClosed(playerPos.offset(-16, -16, -16), playerPos.offset(16, 16, 16))) {
