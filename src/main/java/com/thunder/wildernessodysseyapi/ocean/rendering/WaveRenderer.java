@@ -1,7 +1,13 @@
 package com.thunder.wildernessodysseyapi.ocean.rendering;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix4f;
 
@@ -18,6 +24,7 @@ public class WaveRenderer {
      */
     public static void initializeShader() {
         try {
+            assert WAVE_SHADER_LOCATION != null;
             waveShader = new ShaderInstance(
                     Minecraft.getInstance().getResourceManager(),
                     WAVE_SHADER_LOCATION,
