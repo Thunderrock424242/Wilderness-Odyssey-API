@@ -10,7 +10,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 
 public class WaveHandler {
     @SubscribeEvent
-    public void onWorldTick(TickEvent.WorldTickEvent event) {
+    public void onLevelTick(TickEvent.levelTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
             Level world = event.world;
             long time = world.getDayTime();
