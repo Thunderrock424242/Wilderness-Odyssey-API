@@ -11,6 +11,7 @@ import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.neoforged.neoforge.common.world.BiomeModifier;
 import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
+import org.jetbrains.annotations.NotNull;
 
 public class CustomBiomeModifier implements BiomeModifier {
     private final ResourceKey<PlacedFeature> structure;
@@ -33,14 +34,14 @@ public class CustomBiomeModifier implements BiomeModifier {
     }
 
     @Override
-    public void modify(Holder<Biome> biome, Phase phase, ModifiableBiomeInfo.BiomeInfo.Builder builder) {
+    public void modify(@NotNull Holder<Biome> biome, @NotNull Phase phase, ModifiableBiomeInfo.BiomeInfo.@NotNull Builder builder) {
         if (phase == Phase.ADD && biome.unwrapKey().orElseThrow().equals(targetBiome)) {
             builder.getGenerationSettings().addFeature(GenerationStep.Decoration.SURFACE_STRUCTURES, (Holder<PlacedFeature>) structure);
         }
     }
 
     @Override
-    public MapCodec<? extends BiomeModifier> codec() {
+    public @NotNull MapCodec<? extends BiomeModifier> codec() {
         return (MapCodec<? extends BiomeModifier>) CODEC;
     }
 }

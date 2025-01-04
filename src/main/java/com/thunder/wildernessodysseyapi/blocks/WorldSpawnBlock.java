@@ -18,20 +18,20 @@ public class WorldSpawnBlock {
             DeferredRegister.createBlocks(WildernessOdysseyAPIMainModClass.MOD_ID);
 
     // Unbreakable Block
-    public static final DeferredBlock<Block> WORLD_SPAWN_BLOCK = registerBlock("world_spawn_block",
+    public static final DeferredBlock<Block> WORLD_SPAWN_BLOCK = registerBlock(
             () -> new Block(BlockBehaviour.Properties.of()
                     .strength(-1.0F, 3600000.0F) // Unbreakable and explosion-resistant
                     .noLootTable()               // Prevents any drops
                     .sound(SoundType.STONE)));
 
-    private static <T extends Block> DeferredBlock<T> registerBlock(String name, Supplier<T> block) {
-        DeferredBlock<T> toReturn = BLOCKS.register(name, block);
-        registerBlockItem(name, toReturn);
+    private static <T extends Block> DeferredBlock<T> registerBlock(Supplier<T> block) {
+        DeferredBlock<T> toReturn = BLOCKS.register("world_spawn_block", block);
+        registerBlockItem(toReturn);
         return toReturn;
     }
 
-    private static <T extends Block> void registerBlockItem(String name, DeferredBlock<T> block) {
-        ModItems.ITEMS.register(name, () -> new BlockItem(block.get(), new Item.Properties()));
+    private static <T extends Block> void registerBlockItem(DeferredBlock<T> block) {
+        ModItems.ITEMS.register("world_spawn_block", () -> new BlockItem(block.get(), new Item.Properties()));
     }
 
     public static void register(IEventBus eventBus) {
