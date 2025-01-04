@@ -1,9 +1,11 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
+import com.thunder.wildernessodysseyapi.mixin.EntityAccessor;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -16,8 +18,12 @@ public abstract class EntityMixin {
     private void applyWaveAndTideMotion(CallbackInfo ci) {
         Entity entity = (Entity) (Object) this;
 
-        // Skip updates for entities far from players
-        Player nearestPlayer = entity.level.getNearestPlayer(entity, 64); // 64-block radius
+        // Use the accessor to get the level
+        Level level = ((EntityAccessor) entity).getLevel();
+        if (level.isClientSide) return; // Ensure this runs only on the server
+
+        // Check for the nearest player within a 64-block radius
+        Player nearestPlayer = level.getNearestPlayer(entity, 64);
         if (nearestPlayer == null) {
             return;
         }
