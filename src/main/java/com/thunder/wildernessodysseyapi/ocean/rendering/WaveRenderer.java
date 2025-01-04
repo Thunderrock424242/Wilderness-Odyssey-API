@@ -74,28 +74,28 @@ public class WaveRenderer {
                 .addVertex(pose, -1.0F, 0.0F, -1.0F)
                 .setColor(255, 255, 255, (int) (255 * foamAlpha))
                 .setUv(0.0F, 0.0F)
-                .setUv2(light)
+                .setLight(light)
                 .endVertex();
 
         vertexConsumer
                 .addVertex(pose, 1.0F, 0.0F, -1.0F)
                 .setColor(255, 255, 255, (int) (255 * foamAlpha))
                 .setUv(1.0F, 0.0F)
-                .setUv2(light)
+                .setLight(light)
                 .endVertex();
 
         vertexConsumer
                 .addVertex(pose, 1.0F, 0.0F, 1.0F)
                 .setColor(255, 255, 255, (int) (255 * foamAlpha))
                 .setUv(1.0F, 1.0F)
-                .setUv2(light)
+                .setLight(light)
                 .endVertex();
 
         vertexConsumer
                 .addVertex(pose, -1.0F, 0.0F, 1.0F)
                 .setColor(255, 255, 255, (int) (255 * foamAlpha))
                 .setUv(0.0F, 1.0F)
-                .setUv2(light)
+                .setLight(light)
                 .endVertex();
 
         bufferSource.endBatch();
