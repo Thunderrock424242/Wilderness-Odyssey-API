@@ -2,7 +2,6 @@ package com.thunder.wildernessodysseyapi.ocean;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.thunder.wildernessodysseyapi.ocean.rendering.WaveRenderer;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -17,7 +16,7 @@ public class ModClientSetup {
      */
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
-        WaveRenderer.initializeShader(); // Update this to match your WaveRenderer method
+        WaveRenderer.initializeShader(); // Initialize wave-related shaders if needed
     }
 
     /**
@@ -33,12 +32,11 @@ public class ModClientSetup {
         if (mc.level != null) {
             PoseStack poseStack = event.getPoseStack();
 
-            // Use frame time as partial ticks
-            float partialTicks = Minecraft.getInstance().getFrameTime();
+            // Get partialTicks directly from the event
+            float partialTicks = event.getPartialTick();
 
             // Use the WaveRenderer to render foam and waves
             WaveRenderer.renderFoamAndWaves(poseStack, partialTicks, 0xF000F0);
         }
     }
-
 }
