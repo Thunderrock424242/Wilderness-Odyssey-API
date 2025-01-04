@@ -71,31 +71,31 @@ public class WaveRenderer {
 
         // Define vertices with position, UV mapping, and color using addVertex
         vertexConsumer
-                .vertex(pose, -1.0F, 0.0F, -1.0F)
-                .color(255, 255, 255, (int) (255 * foamAlpha))
-                .uv(0.0F, 0.0F)
-                .uv2(light)
+                .addVertex(pose, -1.0F, 0.0F, -1.0F)
+                .setColor(255, 255, 255, (int) (255 * foamAlpha))
+                .setUv(0.0F, 0.0F)
+                .setUv2(light)
                 .endVertex();
 
         vertexConsumer
-                .vertex(pose, 1.0F, 0.0F, -1.0F)
-                .color(255, 255, 255, (int) (255 * foamAlpha))
-                .uv(1.0F, 0.0F)
-                .uv2(light)
+                .addVertex(pose, 1.0F, 0.0F, -1.0F)
+                .setColor(255, 255, 255, (int) (255 * foamAlpha))
+                .setUv(1.0F, 0.0F)
+                .setUv2(light)
                 .endVertex();
 
         vertexConsumer
-                .vertex(pose, 1.0F, 0.0F, 1.0F)
-                .color(255, 255, 255, (int) (255 * foamAlpha))
-                .uv(1.0F, 1.0F)
-                .uv2(light)
+                .addVertex(pose, 1.0F, 0.0F, 1.0F)
+                .setColor(255, 255, 255, (int) (255 * foamAlpha))
+                .setUv(1.0F, 1.0F)
+                .setUv2(light)
                 .endVertex();
 
         vertexConsumer
-                .vertex(pose, -1.0F, 0.0F, 1.0F)
-                .color(255, 255, 255, (int) (255 * foamAlpha))
-                .uv(0.0F, 1.0F)
-                .uv2(light)
+                .addVertex(pose, -1.0F, 0.0F, 1.0F)
+                .setColor(255, 255, 255, (int) (255 * foamAlpha))
+                .setUv(0.0F, 1.0F)
+                .setUv2(light)
                 .endVertex();
 
         bufferSource.endBatch();
