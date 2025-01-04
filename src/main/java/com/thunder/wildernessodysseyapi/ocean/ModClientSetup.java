@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.ocean;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.thunder.wildernessodysseyapi.ocean.rendering.WaveRenderer;
+import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -33,7 +34,7 @@ public class ModClientSetup {
             PoseStack poseStack = event.getPoseStack();
 
             // Get partialTicks directly from the event
-            float partialTicks = event.getPartialTick();
+            DeltaTracker partialTicks = event.getPartialTick();
 
             // Use the WaveRenderer to render foam and waves
             WaveRenderer.renderFoamAndWaves(poseStack, partialTicks, 0xF000F0);
