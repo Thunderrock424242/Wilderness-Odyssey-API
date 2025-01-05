@@ -53,7 +53,6 @@ public class WildernessOdysseyAPIMainModClass {
     private static AABB structureBoundingBox;
     public static final String MOD_ID = "wildernessodysseyapi";
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
-    public static final GameRules.Key<GameRules.BooleanValue> ENABLE_GLOBAL_CHAT = GameRules.register("enableGlobalChat", GameRules.Category.MISC, GameRules.BooleanValue.create(false));
 
     private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader, IPayloadHandler<T> handler) {}
 
