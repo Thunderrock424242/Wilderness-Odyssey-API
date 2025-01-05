@@ -1,6 +1,6 @@
-package com.thunder.wildernessodysseyapi.BugFixes.events;
+package com.thunder.wildernessodysseyapi.BugFixes.smoke.events;
 
-import com.thunder.wildernessodysseyapi.BugFixes.util.SmokeUtils;
+import com.thunder.wildernessodysseyapi.BugFixes.smoke.util.SmokeUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
@@ -11,15 +11,14 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 public class SmokeEventHandler {
 
     @SubscribeEvent
-    public void onLevelTickPre(LevelTickEvent.Pre event) {
-        // Ensure the event's level is a server world
+    public void onLevelTick(LevelTickEvent.Pre event) {
         if (event.getLevel() instanceof ServerLevel serverWorld) {
             serverWorld.players().forEach(player -> {
                 BlockPos playerPos = player.blockPosition();
                 for (BlockPos pos : BlockPos.betweenClosed(playerPos.offset(-16, -16, -16), playerPos.offset(16, 16, 16))) {
                     BlockState state = serverWorld.getBlockState(pos);
                     if (state.is(Blocks.CAMPFIRE)) {
-                        SmokeUtils.spawnSmoke(serverWorld, pos);
+                        SmokeUtils.spawnSmoke(pos, serverWorld.getMaxBuildHeight());
                     }
                 }
             });
