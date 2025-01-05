@@ -11,7 +11,7 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 public class SmokeEventHandler {
 
     @SubscribeEvent
-    public void onLevelTick(LevelTickEvent event) {
+    public void onLevelTickPre(LevelTickEvent.Pre event) {
         // Ensure the event's level is a server world
         if (event.getLevel() instanceof ServerLevel serverWorld) {
             serverWorld.players().forEach(player -> {

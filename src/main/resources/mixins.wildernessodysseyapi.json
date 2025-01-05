@@ -6,7 +6,6 @@
   "mixins": [
     "EntityAccessor",
     "EntityMixin",
-    "VillagePoolsMixin",
     "WaterFluidMixin"
   ],
   "injectors": {

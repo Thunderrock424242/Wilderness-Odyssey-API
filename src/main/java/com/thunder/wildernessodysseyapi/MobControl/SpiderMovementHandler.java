@@ -10,7 +10,7 @@ import net.neoforged.neoforge.event.tick.EntityTickEvent;
 public class SpiderMovementHandler {
 
     @SubscribeEvent
-    public void onSpiderMove(EntityTickEvent event) {
+    public void onSpiderMove(EntityTickEvent.Pre event) { // Use Pre phase here
         if (event.getEntity() instanceof Spider spider) {
             Level world = spider.getCommandSenderWorld();
             BlockPos pos = spider.blockPosition();
