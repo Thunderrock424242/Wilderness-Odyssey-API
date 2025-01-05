@@ -1,6 +1,6 @@
 0.0.2:
 Added:
-* added christmas time mods.
+re did the pack again
 
 
 Changed:
@@ -11,8 +11,12 @@ Fixed:
 
 API Changes:
 - updated to latest gradle
-!! now using worldedit plugin
-!! bumped to version 1.1.0 this will be out in a future update not this one.
+!! bumped to 2.0 of the mod
+! added a spawn block for you to spawn at when our starter structure loads
+! added a couple bug fixes and made camp fire smoke go very heigh as if you see smoke you will find enemys and loot
+! taking away a couple of villages in place is going to be a enemy camp to find loot
+! added a wave render to added waves (wip)
+!! a lot more coming and this update will take a couple weeks or months.
 
 
 
