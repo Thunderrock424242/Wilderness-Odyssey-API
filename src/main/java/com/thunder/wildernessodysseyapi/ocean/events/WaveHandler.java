@@ -12,7 +12,7 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 public class WaveHandler {
 
     @SubscribeEvent
-    public void onLevelTickPost(LevelTickEvent.Post event) { // Listen to the Post tick event
+    public void onLevelTickPost(LevelTickEvent.Post event) {
         Level world = event.getLevel();
         long time = world.getDayTime();
 
