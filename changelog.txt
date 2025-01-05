@@ -1,6 +1,6 @@
-0.0.2:
+0.1.0:
 Added:
-re did the pack again
+re did the pack again adding things carefully i want to first add my api things so then i can fix things as i go.
 
 
 Changed:
