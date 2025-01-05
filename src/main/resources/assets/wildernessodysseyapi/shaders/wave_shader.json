@@ -1,0 +1,16 @@
+{
+  "vertex": "wildernessodysseyapi:shaders/wave_shader.vsh",
+  "fragment": "wildernessodysseyapi:shaders/wave_shader.fsh",
+  "sampler": {
+    "foamTexture": "wildernessodysseyapi:textures/misc/foam.png"
+  },
+  "attributes": [
+    "Position",
+    "UV",
+    "Color"
+  ],
+  "uniforms": {
+    "Time": "time",
+    "Light": "light"
+  }
+}

@@ -16,8 +16,12 @@ import java.io.IOException;
 public class WaveRenderer {
 
     private static ShaderInstance waveShader;
-    private static final ResourceLocation WAVE_SHADER_LOCATION = ResourceLocation.tryParse("mymod:shaders/wave_shader");
-    private static final ResourceLocation FOAM_TEXTURE = ResourceLocation.tryParse("mymod:textures/misc/foam.png");
+
+    // ResourceLocation for the shader (base name, excluding file extensions)
+    private static final ResourceLocation WAVE_SHADER_LOCATION = ResourceLocation.tryParse("wildernessodysseyapi:shaders/wave_shader");
+
+    // ResourceLocation for the foam texture
+    private static final ResourceLocation FOAM_TEXTURE = ResourceLocation.tryParse("wildernessodysseyapi:textures/misc/foam.png");
 
     /**
      * Initializes the custom wave shader.
@@ -25,6 +29,8 @@ public class WaveRenderer {
     public static void initializeShader() {
         try {
             assert WAVE_SHADER_LOCATION != null;
+
+            // Load the shader by referencing its base path (Minecraft will find .vsh and .fsh)
             waveShader = new ShaderInstance(
                     Minecraft.getInstance().getResourceManager(),
                     WAVE_SHADER_LOCATION,
