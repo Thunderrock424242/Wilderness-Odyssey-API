@@ -24,6 +24,7 @@ API Changes:
 
 
 API/Modpack bugs:
+!! api bug: water mobs sink to the bottom and die for some strange reason. (todo)
 
 
 Note:
