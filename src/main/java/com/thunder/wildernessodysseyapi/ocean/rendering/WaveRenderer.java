@@ -10,6 +10,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
 import java.io.IOException;
 
@@ -40,6 +41,23 @@ public class WaveRenderer {
             System.err.println("Failed to initialize wave shader: " + e.getMessage());
             waveShader = null;
         }
+    }
+
+    /**
+     * Updates uniforms for the wave shader.
+     *
+     * @param time       The current time for wave animation.
+     * @param amplitudes Amplitudes of the wave layers.
+     * @param frequencies Frequencies of the wave layers.
+     * @param speeds     Speeds of the wave layers.
+     */
+    public static void updateWaveUniforms(float time, Vector3f amplitudes, Vector3f frequencies, Vector3f speeds) {
+        if (waveShader == null) return;
+
+        waveShader.safeGetUniform("time").set(time);
+        waveShader.safeGetUniform("waveAmplitudes").set(amplitudes.x(), amplitudes.y(), amplitudes.z());
+        waveShader.safeGetUniform("waveFrequencies").set(frequencies.x(), frequencies.y(), frequencies.z());
+        waveShader.safeGetUniform("waveSpeeds").set(speeds.x(), speeds.y(), speeds.z());
     }
 
     /**
