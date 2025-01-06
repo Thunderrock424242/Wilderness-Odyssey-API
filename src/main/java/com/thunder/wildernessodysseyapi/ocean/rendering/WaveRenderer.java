@@ -18,7 +18,7 @@ public class WaveRenderer {
     private static ShaderInstance waveShader;
 
     // ResourceLocation for the shader (base name, excluding file extensions)
-    private static final ResourceLocation WAVE_SHADER_LOCATION = ResourceLocation.tryParse("wildernessodysseyapi:shaders/core/wave_shader");
+    private static final ResourceLocation WAVE_SHADER_LOCATION = ResourceLocation.tryParse("wildernessodysseyapi:wave_shader");
 
     // ResourceLocation for the foam texture
     private static final ResourceLocation FOAM_TEXTURE = ResourceLocation.tryParse("wildernessodysseyapi:textures/misc/foam.png");

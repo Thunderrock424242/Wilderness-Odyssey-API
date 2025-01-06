@@ -1,16 +1,50 @@
 {
-  "vertex": "wildernessodysseyapi:shaders/wave_shader.vsh",
-  "fragment": "wildernessodysseyapi:shaders/wave_shader.fsh",
-  "sampler": {
-    "foamTexture": "wildernessodysseyapi:textures/misc/foam.png"
-  },
+  "name": "wave_shader",
+  "vertex": "wildernessodysseyapi:shaders/core/wave_shader.vsh",
+  "fragment": "wildernessodysseyapi:shaders/core/wave_shader.fsh",
+  "samplers": [
+    {
+      "name": "waterTexture",
+      "file": "minecraft:textures/block/water_flow.png"
+    },
+    {
+      "name": "underwaterTexture",
+      "file": "minecraft:textures/block/water_still.png"
+    }
+  ],
   "attributes": [
     "Position",
-    "UV",
+    "UV0",
     "Color"
   ],
-  "uniforms": {
-    "Time": "time",
-    "Light": "light"
-  }
+  "uniforms": [
+    {
+      "name": "time",
+      "type": "float"
+    },
+    {
+      "name": "waveAmplitudes",
+      "type": "vec3"
+    },
+    {
+      "name": "waveFrequencies",
+      "type": "vec3"
+    },
+    {
+      "name": "waveSpeeds",
+      "type": "vec3"
+    },
+    {
+      "name": "waterDepth",
+      "type": "float"
+    },
+    {
+      "name": "lightDir",
+      "type": "vec3"
+    },
+    {
+      "name": "viewDir",
+      "type": "vec3"
+    }
+  ]
 }

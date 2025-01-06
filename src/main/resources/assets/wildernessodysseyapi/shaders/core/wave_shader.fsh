@@ -1,21 +1,22 @@
-#version 120
+#version 150
 
-uniform sampler2D waterTexture;    // Base water texture
-uniform sampler2D underwaterTexture; // Underwater refraction texture
-uniform float time;                // Time uniform for animation
-uniform float waterDepth;          // Maximum water depth
-uniform vec3 lightDir;             // Direction of the light source
-uniform vec3 viewDir;              // Direction of the camera
+uniform sampler2D waterTexture;       // Base water texture
+uniform sampler2D underwaterTexture;  // Underwater refraction texture
+uniform float time;                   // Time uniform for animation
+uniform float waterDepth;             // Maximum water depth for gradient
+uniform vec3 lightDir;                // Direction of the light source
+uniform vec3 viewDir;                 // Direction of the camera
 
-varying vec3 worldPos;             // World position passed from vertex shader
+in vec3 worldPos;                     // World position passed from vertex shader
+in vec2 vUV;                          // UV coordinates from vertex shader
+
+out vec4 FragColor;                   // Output fragment color
 
 void main() {
-    // Sample base water texture
-    vec2 uv = gl_TexCoord[0].st;
-
-    // Add UV distortion for flowing effect
+    // Sample base water texture with animated UV distortion
+    vec2 uv = vUV;
     vec2 flowUV = uv + vec2(sin(time + worldPos.x * 0.2) * 0.02, cos(time + worldPos.z * 0.2) * 0.02);
-    vec4 baseColor = texture2D(waterTexture, flowUV);
+    vec4 baseColor = texture(waterTexture, flowUV);
 
     // Depth-based color gradient
     float depthFactor = smoothstep(0.0, waterDepth, worldPos.y);
@@ -23,7 +24,7 @@ void main() {
     vec4 shallowColor = vec4(0.3, 0.6, 0.9, 1.0); // Light aqua
     vec4 depthColor = mix(deepColor, shallowColor, depthFactor);
 
-    // Add foam based on wave peaks
+    // Foam effect based on wave peaks
     float foamIntensity = smoothstep(0.6, 0.8, abs(sin(worldPos.y * 5.0)));
     foamIntensity += sin(time + worldPos.x * 0.5 + worldPos.z * 0.5) * 0.05; // Dynamic foam motion
     vec4 foamColor = vec4(1.0, 1.0, 1.0, foamIntensity); // White foam with transparency
@@ -40,5 +41,5 @@ void main() {
     finalColor = mix(finalColor, highlightColor, specular);
 
     // Apply final color
-    gl_FragColor = finalColor;
+    FragColor = finalColor;
 }

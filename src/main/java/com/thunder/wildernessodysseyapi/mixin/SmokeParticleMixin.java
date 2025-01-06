@@ -16,34 +16,26 @@ public abstract class SmokeParticleMixin extends TextureSheetParticle {
     }
 
     /**
-     * Modify the tick behavior to make particles rise continuously,
-     * fade out, and despawn at max build height.
+     * Modify the `tick` method to allow natural upward movement
+     * and despawn particles at the max build height.
      */
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
     public void modifyTickBehavior(CallbackInfo ci) {
-        // Make the particle rise
-        this.yd = 0.05;
+        // Increase upward speed for a natural rise
+        if (this.yd < 0.05) {
+            this.yd += 0.005; // Gradually accelerate upwards
+        }
 
         // Gradually fade out near the maximum build height
         int maxBuildHeight = this.level.getMaxBuildHeight();
         if (this.y >= maxBuildHeight - 5) {
-            this.alpha -= 0.02F; // Decrease transparency
+            this.alpha -= 0.02F; // Reduce transparency
         }
 
-        // Remove particle when it fades out completely or exceeds max build height
+        // Remove particle when it fully fades or reaches max build height
         if (this.alpha <= 0 || this.y >= maxBuildHeight) {
             this.remove();
             ci.cancel(); // Skip the original tick logic
         }
-    }
-
-    /**
-     * Adjust render logic by extending particle rendering range.
-     * Override render-related settings to increase visibility distance.
-     */
-    @Override
-    public void tick() {
-        super.tick();
-        // Optionally, further adjust visibility settings here if needed.
     }
 }
