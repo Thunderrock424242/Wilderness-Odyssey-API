@@ -10,7 +10,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
-import static com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass.MOD_ID;
+import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
 
 @EventBusSubscriber
 public class ModClientSetup {

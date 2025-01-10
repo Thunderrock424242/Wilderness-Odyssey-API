@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi;
+package com.thunder.wildernessodysseyapi.MainModClass;
 
 import com.thunder.wildernessodysseyapi.BugFixes.InfiniteSourceHandler;
 import com.thunder.wildernessodysseyapi.BugFixes.smoke.events.SmokeEventHandler;
