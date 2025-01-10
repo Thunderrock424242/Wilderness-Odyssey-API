@@ -14,12 +14,12 @@ public class BlacklistChecker {
 
     // Hardcoded list of blacklisted mods and resource packs
     private static final List<String> BLACKLISTED_MODS = Arrays.asList(
-            "xray", // Replace with real mod IDs
-            "examplemod2"
+            "xray",
+            "examplemod2" // if there are others keep listing same as resource packs
     );
 
     private static final List<String> BLACKLISTED_RESOURCE_PACKS = Arrays.asList(
-            "Xray_Ultimate_1.21_v5.0.4.zip", // Replace with real resource pack file names
+            "Xray_Ultimate_1.21_v5.0.4.zip",
             "badpack2.zip"
     );
 
