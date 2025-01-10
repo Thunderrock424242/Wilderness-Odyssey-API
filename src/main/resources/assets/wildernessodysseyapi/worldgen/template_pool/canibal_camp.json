@@ -1,12 +1,12 @@
 {
-  "name": "structure_help:canibalcamp",
+  "name": "wildernessodysseyapi:canibal_camp",
   "fallback": "minecraft:empty",
   "elements": [
     {
       "weight": 1,
       "element": {
         "element_type": "minecraft:single_pool_element",
-        "location": "structure_help:canibal_camp",
+        "location": "wildernessodysseyapi:canibal_camp",
         "projection": "terrain_matching",
         "processors": {
           "processors": [
