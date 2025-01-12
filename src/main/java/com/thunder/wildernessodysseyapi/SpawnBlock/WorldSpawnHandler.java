@@ -8,6 +8,9 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
 
 @EventBusSubscriber(modid = MOD_ID)
@@ -17,16 +20,16 @@ public class WorldSpawnHandler {
     public static void onWorldLoad(LevelEvent.Load event) {
         if (event.getLevel() instanceof ServerLevel world) {
             // Locate the spawn block in the world
-            BlockPos spawnBlockPos = findWorldSpawnBlock(world);
+            BlockPos spawnBlockPos = (BlockPos) findAllWorldSpawnBlocks(world);
 
-            if (spawnBlockPos != null) {
-                // Set spawn point to the block's position
-                world.setDefaultSpawnPos(spawnBlockPos.above(), 0.0F);
-            }
+            // Set spawn point to the block's position
+            world.setDefaultSpawnPos(spawnBlockPos.above(), 0.0F);
         }
     }
 
-    private static BlockPos findWorldSpawnBlock(ServerLevel world) {
+    static List<BlockPos> findAllWorldSpawnBlocks(ServerLevel world) {
+        List<BlockPos> spawnBlocks = new ArrayList<>();
+
         for (int x = world.getMinBuildHeight(); x < world.getMaxBuildHeight(); x += 16) {
             for (int z = world.getMinBuildHeight(); z < world.getMaxBuildHeight(); z += 16) {
                 LevelChunk chunk = world.getChunkSource().getChunk(x >> 4, z >> 4, false);
@@ -34,12 +37,13 @@ public class WorldSpawnHandler {
                     for (BlockPos pos : BlockPos.betweenClosed(chunk.getPos().getMinBlockX(), world.getMinBuildHeight(),
                             chunk.getPos().getMinBlockZ(), chunk.getPos().getMaxBlockX(), world.getMaxBuildHeight(), chunk.getPos().getMaxBlockZ())) {
                         if (world.getBlockState(pos).is(WorldSpawnBlock.WORLD_SPAWN_BLOCK.get())) {
-                            return pos; // Return the first occurrence of the block
+                            spawnBlocks.add(pos);
                         }
                     }
                 }
             }
         }
-        return null; // Return null if no block is found
+        return spawnBlocks;
     }
+
 }
