@@ -31,3 +31,4 @@ Note:
 
 Dev Notes:-
 !! Remember this is an alpha, so expect bugs and a lot of new changes and things that are not ready yet.
+- future update locke and key show add the keys with cool doors aka portals check your generated chat gpt response to remeber your idea. (todo)
