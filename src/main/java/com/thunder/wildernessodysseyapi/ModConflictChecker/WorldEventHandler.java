@@ -5,28 +5,30 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 
+import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.LOGGER;
+
 @EventBusSubscriber
 public class WorldEventHandler {
 
     public static void register() {
-        ModConflictChecker.LOGGER.info("WorldEventHandler registered.");
+        LOGGER.info("WorldEventHandler registered.");
     }
 
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
         ResourceLocation dimensionKey = event.getLevel().dimension().location();
-        ModConflictChecker.LOGGER.info("Chunk loaded in dimension '{}'", dimensionKey);
+        LOGGER.info("Chunk loaded in dimension '{}'", dimensionKey);
     }
 
     @SubscribeEvent
     public static void onWorldLoad(WorldEvent.Load event) {
         ResourceLocation dimensionKey = event.getWorld().dimension().location();
-        ModConflictChecker.LOGGER.info("World loaded in dimension '{}'", dimensionKey);
+        LOGGER.info("World loaded in dimension '{}'", dimensionKey);
     }
 
     @SubscribeEvent
     public static void onStructureSpawn(WorldEvent.PotentialSpawns event) {
         ResourceLocation structureKey = event.getSpawner().getType().getRegistryName();
-        ModConflictChecker.LOGGER.info("Structure '{}' attempted to spawn in the world.", structureKey);
+        LOGGER.info("Structure '{}' attempted to spawn in the world.", structureKey);
     }
 }

@@ -6,10 +6,12 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 
+import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.LOGGER;
+
 @EventBusSubscriber
 public class EntityEventHandler {
     public static void register() {
-        ModConflictChecker.LOGGER.info("EntityEventHandler registered.");
+        LOGGER.info("EntityEventHandler registered.");
     }
 
     @SubscribeEvent
@@ -20,7 +22,7 @@ public class EntityEventHandler {
         ResourceLocation entityKey = entityType.getRegistryName();
         if (entityKey != null) {
             String modSource = entityKey.getNamespace();
-            ModConflictChecker.LOGGER.info("Entity '{}' spawned in the world by '{}'", entityKey, modSource);
+            LOGGER.info("Entity '{}' spawned in the world by '{}'", entityKey, modSource);
         }
     }
 }

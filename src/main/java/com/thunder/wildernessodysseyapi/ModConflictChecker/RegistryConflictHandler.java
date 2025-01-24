@@ -7,6 +7,9 @@ import net.neoforged.neoforge.event.server.ServerStartingEvent;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+
+import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.LOGGER;
 
 @EventBusSubscriber
 public class RegistryConflictHandler {
@@ -17,12 +20,12 @@ public class RegistryConflictHandler {
     private static final Map<ResourceLocation, String> entityRegistry = new HashMap<>();
 
     public static void initialize() {
-        ModConflictChecker.LOGGER.info("RegistryConflictHandler initialized.");
+        LOGGER.info("RegistryConflictHandler initialized.");
     }
 
     @SubscribeEvent
     public static void onServerStart(ServerStartingEvent event) {
-        ModConflictChecker.LOGGER.info("Server starting. Checking for registry conflicts...");
+        LOGGER.info("Server starting. Checking for registry conflicts...");
 
         detectConflicts(ForgeRegistries.BIOMES, biomeRegistry, "Biome");
         detectConflicts(ForgeRegistries.DIMENSIONS, dimensionRegistry, "Dimension");
@@ -37,8 +40,8 @@ public class RegistryConflictHandler {
             if (trackedRegistry.containsKey(key)) {
                 String otherMod = trackedRegistry.get(key);
                 if (!modSource.equals(otherMod)) {
-                    ModConflictChecker.LOGGER.error("Conflict detected: {} '{}' registered by both '{}' and '{}'",
-                            type, key, otherMod, modSource);
+                    LOGGER.error("Conflict detected: {} '{}' registered by both '{}' and '{}'",
+                            (Object) type, Optional.of(key), otherMod, modSource);
                 }
             } else {
                 trackedRegistry.put(key, modSource);
