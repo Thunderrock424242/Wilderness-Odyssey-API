@@ -6,6 +6,9 @@ import com.thunder.wildernessodysseyapi.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
 import com.thunder.wildernessodysseyapi.MobControl.SpiderMovementHandler;
 import com.thunder.wildernessodysseyapi.MobControl.SpiderSpawnHandler;
+import com.thunder.wildernessodysseyapi.ModConflictChecker.EntityEventHandler;
+import com.thunder.wildernessodysseyapi.ModConflictChecker.RegistryConflictHandler;
+import com.thunder.wildernessodysseyapi.ModConflictChecker.WorldEventHandler;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.blocks.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -56,6 +59,7 @@ public class WildernessOdysseyAPIMainModClass {
     private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader, IPayloadHandler<T> handler) {}
 
     public WildernessOdysseyAPIMainModClass(IEventBus modEventBus, ModContainer container) {
+        LOGGER.info("WildernessOdysseyAPI initialized. Tracking conflicts in the modpack...");
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
@@ -76,6 +80,13 @@ public class WildernessOdysseyAPIMainModClass {
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
+
+        // Initialize Registry Conflict Handler
+        RegistryConflictHandler.initialize();
+
+        // Register Event Handlers
+        EntityEventHandler.register();
+        WorldEventHandler.register();
 
 
     }
