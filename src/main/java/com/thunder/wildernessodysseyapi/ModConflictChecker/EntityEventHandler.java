@@ -16,7 +16,7 @@ public class EntityEventHandler {
 
     @SubscribeEvent
     public static void onEntityJoin(EntityJoinLevelEvent event) {
-        if (event.getEntity() == null) return;
+        event.getEntity();
 
         EntityType<?> entityType = event.getEntity().getType();
         ResourceLocation entityKey = entityType.getRegistryName();

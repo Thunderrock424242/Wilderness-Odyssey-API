@@ -4,6 +4,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -27,14 +28,14 @@ public class RegistryConflictHandler {
     public static void onServerStart(ServerStartingEvent event) {
         LOGGER.info("Server starting. Checking for registry conflicts...");
 
-        detectConflicts(ForgeRegistries.BIOMES, biomeRegistry, "Biome");
-        detectConflicts(ForgeRegistries.DIMENSIONS, dimensionRegistry, "Dimension");
-        detectConflicts(ForgeRegistries.BLOCKS, blockRegistry, "Block");
-        detectConflicts(ForgeRegistries.ITEMS, itemRegistry, "Item");
-        detectConflicts(ForgeRegistries.ENTITIES, entityRegistry, "Entity");
+        detectConflicts(NeoForgeRegistries.BIOMES, biomeRegistry, "Biome");
+        detectConflicts(NeoForgeRegistries.DIMENSIONS, dimensionRegistry, "Dimension");
+        detectConflicts(NeoForgeRegistries.BLOCKS, blockRegistry, "Block");
+        detectConflicts(NeoForgeRegistries.ITEMS, itemRegistry, "Item");
+        detectConflicts(NeoForgeRegistries.ENTITIES, entityRegistry, "Entity");
     }
 
-    private static <T> void detectConflicts(ForgeRegistries<T> registry, Map<ResourceLocation, String> trackedRegistry, String type) {
+    private static <T> void detectConflicts(NeoForgeRegistries registry, Map<ResourceLocation, String> trackedRegistry, String type) {
         registry.getKeys().forEach(key -> {
             String modSource = key.getNamespace();
             if (trackedRegistry.containsKey(key)) {
