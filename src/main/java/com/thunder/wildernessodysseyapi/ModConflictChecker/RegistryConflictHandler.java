@@ -19,6 +19,8 @@ public class RegistryConflictHandler {
     private static final Map<ResourceLocation, String> blockRegistry = new HashMap<>();
     private static final Map<ResourceLocation, String> itemRegistry = new HashMap<>();
     private static final Map<ResourceLocation, String> entityRegistry = new HashMap<>();
+    // Track the original sources of registered structures
+    private static final Map<ResourceLocation, String> structureRegistry = new HashMap<>();
 
     public static void initialize() {
         LOGGER.info("RegistryConflictHandler initialized.");
@@ -27,12 +29,30 @@ public class RegistryConflictHandler {
     @SubscribeEvent
     public static void onServerStart(ServerStartingEvent event) {
         LOGGER.info("Server starting. Checking for registry conflicts...");
+        LOGGER.info("Server starting. Checking for structure overwrites...");
 
         detectConflicts(NeoForgeRegistries.BIOMES, biomeRegistry, "Biome");
         detectConflicts(NeoForgeRegistries.DIMENSIONS, dimensionRegistry, "Dimension");
         detectConflicts(NeoForgeRegistries.BLOCKS, blockRegistry, "Block");
         detectConflicts(NeoForgeRegistries.ITEMS, itemRegistry, "Item");
         detectConflicts(NeoForgeRegistries.ENTITIES, entityRegistry, "Entity");
+
+        NeoForgeRegistries.STRUCTURES.getKeys().forEach(key -> {
+            String modSource = key.getNamespace();
+
+            if (structureRegistry.containsKey(key)) {
+                String originalMod = structureRegistry.get(key);
+
+                // If the structure is being overwritten, log the conflict
+                if (!originalMod.equals(modSource)) {
+                    LOGGER.error("Structure overwrite detected: '{}' was originally registered by '{}' but has been replaced by '{}'.",
+                            key, originalMod, modSource);
+                }
+            } else {
+                // Record the original source of the structure
+                structureRegistry.put(key, modSource);
+            }
+        });
     }
 
     private static <T> void detectConflicts(NeoForgeRegistries registry, Map<ResourceLocation, String> trackedRegistry, String type) {

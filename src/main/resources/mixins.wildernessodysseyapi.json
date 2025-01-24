@@ -4,8 +4,12 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "mixins.wildernessodysseyapi.refmap.json",
   "mixins": [
+    "BiomeMixin",
+    "DimensionLoadMixin",
     "EntityAccessor",
     "EntityMixin",
+    "EntitySpawnMixin",
+    "StructureMixin",
     "WaterFluidMixin"
   ],
   "injectors": {
