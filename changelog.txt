@@ -1,6 +1,6 @@
 0.1.0:
 Added:
-re did the pack again adding things carefully i want to first add my api things so then i can fix things as i go.
+redid the pack again adding things carefully I want to first add my api things so then I can fix things as I go.
 
 
 Changed:
@@ -13,10 +13,10 @@ API Changes:
 - updated to latest gradle
 !! bumped to 2.0 of the mod
 ! added a spawn block for you to spawn at when our starter structure loads
-! added a couple bug fixes and made camp fire smoke go very heigh as if you see smoke you will find enemys and loot todo
+! added a couple bug fixes and made camp fire smoke go very high as if you see smoke you will find enemy's and loot todo
 ! added a wave render to added waves (wip) todo
-!! a lot more coming and this update will take a couple weeks or months.
-* removed global chat as its a bad idea for now.
+!! a lot more coming and this update will take a couple of weeks or months.
+* removed global chat as it's a bad idea for now.
 !! added a mod conflict checker this is to make sure 2 mods are not overlapping this also comes with some neat features todo
 
 
@@ -28,7 +28,11 @@ API/Modpack bugs:
 
 
 Note:
-!! we have Mallard working on the tempature system
+!! we have Mallard working on the temperature system
 
 Dev Notes:-
 !! Remember this is an alpha, so expect bugs and a lot of new changes and things that are not ready yet.
+
+Thank you:
+* this list is for people that have made this possible.
+! We have Mallard who is our main tester and contributor working on our temperature system
