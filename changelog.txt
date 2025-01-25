@@ -17,6 +17,7 @@ API Changes:
 ! added a wave render to added waves (wip) todo
 !! a lot more coming and this update will take a couple weeks or months.
 * removed global chat as its a bad idea for now.
+!! added a mod conflict checker this is to make sure 2 mods are not overlapping this also comes with some neat features todo
 
 
 
