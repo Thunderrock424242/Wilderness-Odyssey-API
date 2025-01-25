@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.ModConflictChecker;
+package com.thunder.wildernessodysseyapi.ModConflictChecker.Util;
 
 import net.minecraft.resources.ResourceLocation;
 
