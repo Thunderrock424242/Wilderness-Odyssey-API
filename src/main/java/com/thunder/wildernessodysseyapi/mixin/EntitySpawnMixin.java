@@ -11,7 +11,7 @@ import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPI
 @Mixin(EntityType.class)
 public class EntitySpawnMixin {
 
-    @Inject(method = "spawn", at = @At("HEAD"))
+    @Inject(method = "spawn*", at = @At("HEAD"))
     private void onEntitySpawn(CallbackInfo ci) {
         LOGGER.info("Entity spawned: {}", this.getClass().getSimpleName());
     }
