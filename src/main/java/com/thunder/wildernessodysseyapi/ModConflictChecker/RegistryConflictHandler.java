@@ -1,11 +1,13 @@
 package com.thunder.wildernessodysseyapi.ModConflictChecker;
 
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.core.Registry;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+
 
 import java.util.HashMap;
 import java.util.Map;
@@ -27,10 +29,13 @@ public class RegistryConflictHandler {
 
         MinecraftServer server = event.getServer();
 
+        // Fetch registry access
+        var registryAccess = server.registryAccess();
+
         // Check for conflicts in structures, POIs, and biomes
-        checkRegistryConflicts(server.registryAccess().registryOrThrow(Registry.STRUCTURE_REGISTRY), structureRegistry, "Structure");
-        checkRegistryConflicts(server.registryAccess().registryOrThrow(Registry.POINT_OF_INTEREST_TYPE_REGISTRY), poiRegistry, "POI");
-        checkRegistryConflicts(server.registryAccess().registryOrThrow(Registry.BIOME_REGISTRY), biomeRegistry, "Biome");
+        checkRegistryConflicts(registryAccess.registryOrThrow(Registries.STRUCTURE), structureRegistry, "Structure");
+        checkRegistryConflicts(registryAccess.registryOrThrow(Registries.POINT_OF_INTEREST_TYPE), poiRegistry, "POI");
+        checkRegistryConflicts(registryAccess.registryOrThrow(Registries.BIOME), biomeRegistry, "Biome");
 
         // Check for crafting recipe conflicts
         checkRecipeConflicts(server);
@@ -71,8 +76,8 @@ public class RegistryConflictHandler {
     private static void checkRecipeConflicts(MinecraftServer server) {
         LOGGER.info("Checking for crafting recipe conflicts...");
 
-        server.getRecipeManager().getRecipes().forEach(recipe -> {
-            ResourceLocation recipeKey = recipe.getId();
+        server.getRecipeManager().getRecipes().forEach(recipeHolder -> {
+            ResourceLocation recipeKey = recipeHolder.id(); // Use 'id()' instead of 'getId()'
             String modSource = recipeKey.getNamespace();
 
             if (recipeRegistry.containsKey(recipeKey)) {
