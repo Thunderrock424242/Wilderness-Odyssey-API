@@ -5,8 +5,6 @@ import com.thunder.wildernessodysseyapi.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
 import com.thunder.wildernessodysseyapi.MobControl.SpiderMovementHandler;
 import com.thunder.wildernessodysseyapi.MobControl.SpiderSpawnHandler;
-import com.thunder.wildernessodysseyapi.ModConflictChecker.EntityEventHandler;
-import com.thunder.wildernessodysseyapi.ModConflictChecker.RegistryConflictHandler;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.blocks.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -77,12 +75,6 @@ public class WildernessOdysseyAPIMainModClass {
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
-
-        // Initialize Registry Conflict Handler
-        RegistryConflictHandler.initialize();
-
-        // Register Event Handlers
-        EntityEventHandler.register();
 
     }
 

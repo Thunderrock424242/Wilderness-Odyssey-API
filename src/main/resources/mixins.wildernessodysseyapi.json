@@ -6,17 +6,13 @@
   "mixins": [
     "BiomeMixin",
     "CampfireBlockMixin",
-    "DimensionLoadMixin",
     "EntityAccessor",
     "EntityMixin",
-    "EntitySpawnMixin",
-    "StructureMixin",
     "WaterFluidMixin"
   ],
   "injectors": {
     "defaultRequire": 1
   },
   "client": [
-    "SmokeParticleMixin"
   ]
 }
