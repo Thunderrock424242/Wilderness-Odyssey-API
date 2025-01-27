@@ -10,7 +10,7 @@ Fixed:
 
 
 API Changes:
-- updated to latest gradle
+- updated to latest gradle and neo
 !! bumped to 2.0 of the mod
 ! added a spawn block for you to spawn at when our starter structure loads
 ! added a couple bug fixes and made camp fire smoke go very high as if you see smoke you will find enemy's and loot todo
