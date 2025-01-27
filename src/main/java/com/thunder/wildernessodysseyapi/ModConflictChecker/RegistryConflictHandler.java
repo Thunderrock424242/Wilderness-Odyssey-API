@@ -1,10 +1,11 @@
 package com.thunder.wildernessodysseyapi.ModConflictChecker;
 
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.Registry;
+import net.minecraft.server.MinecraftServer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
-import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -14,44 +15,79 @@ import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPI
 @EventBusSubscriber
 public class RegistryConflictHandler {
 
-    // Track the original sources of registered structures, POIs, and biomes
+    // Track the original sources of registered items
     private static final Map<ResourceLocation, String> structureRegistry = new HashMap<>();
     private static final Map<ResourceLocation, String> poiRegistry = new HashMap<>();
     private static final Map<ResourceLocation, String> biomeRegistry = new HashMap<>();
+    private static final Map<ResourceLocation, String> recipeRegistry = new HashMap<>();
 
     @SubscribeEvent
     public static void onServerStart(ServerStartingEvent event) {
         LOGGER.info("Server starting. Checking for registry conflicts...");
 
+        MinecraftServer server = event.getServer();
+
         // Check for conflicts in structures, POIs, and biomes
-        detectConflicts(NeoForgeRegistries.STRUCTURES.getKeys(), structureRegistry, "Structure");
-        detectConflicts(NeoForgeRegistries.POI_TYPES.getKeys(), poiRegistry, "POI");
-        detectConflicts(NeoForgeRegistries.BIOMES.getKeys(), biomeRegistry, "Biome");
+        checkRegistryConflicts(server.registryAccess().registryOrThrow(Registry.STRUCTURE_REGISTRY), structureRegistry, "Structure");
+        checkRegistryConflicts(server.registryAccess().registryOrThrow(Registry.POINT_OF_INTEREST_TYPE_REGISTRY), poiRegistry, "POI");
+        checkRegistryConflicts(server.registryAccess().registryOrThrow(Registry.BIOME_REGISTRY), biomeRegistry, "Biome");
+
+        // Check for crafting recipe conflicts
+        checkRecipeConflicts(server);
     }
 
     /**
-     * Detects conflicts in a specific registry and logs them.
+     * Detects and logs conflicts in a specific registry.
      *
-     * @param keys            The keys from the registry (ResourceLocation set).
+     * @param registry        The registry to check.
      * @param trackedRegistry A map tracking registered items and their sources.
      * @param type            The type of registry (e.g., "Structure", "POI", "Biome").
+     * @param <T>             The type of elements in the registry.
      */
-    private static void detectConflicts(Iterable<ResourceLocation> keys, Map<ResourceLocation, String> trackedRegistry, String type) {
-        for (ResourceLocation key : keys) {
+    private static <T> void checkRegistryConflicts(Registry<T> registry, Map<ResourceLocation, String> trackedRegistry, String type) {
+        registry.keySet().forEach(key -> {
             String modSource = key.getNamespace();
             if (trackedRegistry.containsKey(key)) {
                 String originalMod = trackedRegistry.get(key);
 
-                // Log the conflict if the ID is already registered
+                // Log conflict if detected
                 if (!originalMod.equals(modSource)) {
                     LOGGER.error("Conflict detected: {} '{}' was originally registered by '{}' but has been overwritten by '{}'.",
                             type, key, originalMod, modSource);
                 }
             } else {
-                // Record the source of the registration
+                // Log successful registration
                 trackedRegistry.put(key, modSource);
                 LOGGER.info("{} '{}' registered by '{}'.", type, key, modSource);
             }
-        }
+        });
+    }
+
+    /**
+     * Detects and logs conflicts in crafting recipes.
+     *
+     * @param server The Minecraft server instance.
+     */
+    private static void checkRecipeConflicts(MinecraftServer server) {
+        LOGGER.info("Checking for crafting recipe conflicts...");
+
+        server.getRecipeManager().getRecipes().forEach(recipe -> {
+            ResourceLocation recipeKey = recipe.getId();
+            String modSource = recipeKey.getNamespace();
+
+            if (recipeRegistry.containsKey(recipeKey)) {
+                String originalMod = recipeRegistry.get(recipeKey);
+
+                // Log conflict if detected
+                if (!originalMod.equals(modSource)) {
+                    LOGGER.error("Conflict detected: Recipe '{}' was originally registered by '{}' but has been overwritten by '{}'.",
+                            recipeKey, originalMod, modSource);
+                }
+            } else {
+                // Log successful registration
+                recipeRegistry.put(recipeKey, modSource);
+                LOGGER.info("Recipe '{}' registered by '{}'.", recipeKey, modSource);
+            }
+        });
     }
 }
