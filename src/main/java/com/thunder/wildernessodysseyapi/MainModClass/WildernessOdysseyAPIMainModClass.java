@@ -1,7 +1,6 @@
 package com.thunder.wildernessodysseyapi.MainModClass;
 
 import com.thunder.wildernessodysseyapi.BugFixes.InfiniteSourceHandler;
-import com.thunder.wildernessodysseyapi.BugFixes.smoke.events.SmokeEventHandler;
 import com.thunder.wildernessodysseyapi.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
 import com.thunder.wildernessodysseyapi.MobControl.SpiderMovementHandler;
@@ -68,7 +67,6 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(new BlacklistChecker());
         NeoForge.EVENT_BUS.register(new WaveHandler());
         NeoForge.EVENT_BUS.register(new InfiniteSourceHandler());
-        NeoForge.EVENT_BUS.register(new SmokeEventHandler());
         NeoForge.EVENT_BUS.register(new SpiderSpawnHandler());
         NeoForge.EVENT_BUS.register(new SpiderMovementHandler());
         NeoForge.EVENT_BUS.register(new EventHandler());

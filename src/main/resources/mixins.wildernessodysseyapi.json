@@ -5,6 +5,7 @@
   "refmap": "mixins.wildernessodysseyapi.refmap.json",
   "mixins": [
     "BiomeMixin",
+    "CampfireBlockMixin",
     "DimensionLoadMixin",
     "EntityAccessor",
     "EntityMixin",
