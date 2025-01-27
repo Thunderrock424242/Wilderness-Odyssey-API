@@ -15,7 +15,7 @@ public class LoggerUtil {
     public static void log(ConflictSeverity severity, String message) {
         // Add a timestamp to the message
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        String formattedMessage = "[" + timestamp + "] [" + severity.name() + "] " + message;
+        String formattedMessage = formatLogMessage(severity, timestamp, message);
 
         // Log to the console
         switch (severity) {
@@ -26,6 +26,14 @@ public class LoggerUtil {
 
         // Log to the file
         logToFile(formattedMessage);
+    }
+
+    private static String formatLogMessage(ConflictSeverity severity, String timestamp, String message) {
+        return switch (severity) {
+            case INFO -> String.format("[INFO] >>> %s - %s", timestamp, message);
+            case WARN -> String.format("[!!! WARNING !!!] >>> %s - %s", timestamp, message);
+            case ERROR -> String.format("[!!! ERROR !!!] >>> %s - %s", timestamp, message);
+        };
     }
 
     private static void logToFile(String message) {

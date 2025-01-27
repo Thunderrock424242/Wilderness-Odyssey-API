@@ -29,7 +29,6 @@ API/Modpack bugs:
 
 Note:
 !! we have Mallard working on the temperature system
-note for thunder remeber to update mod conflict handler with the correct logger
 
 Dev Notes:-
 !! Remember this is an alpha, so expect bugs and a lot of new changes and things that are not ready yet.

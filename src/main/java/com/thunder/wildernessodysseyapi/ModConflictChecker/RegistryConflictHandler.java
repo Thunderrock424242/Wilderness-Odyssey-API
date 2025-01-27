@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.ModConflictChecker;
 
+import com.thunder.wildernessodysseyapi.ModConflictChecker.Util.LoggerUtil;
+import com.thunder.wildernessodysseyapi.ModConflictChecker.Util.LoggerUtil.ConflictSeverity;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.core.Registry;
@@ -8,11 +10,8 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 
-
 import java.util.HashMap;
 import java.util.Map;
-
-import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.LOGGER;
 
 @EventBusSubscriber
 public class RegistryConflictHandler {
@@ -25,7 +24,7 @@ public class RegistryConflictHandler {
 
     @SubscribeEvent
     public static void onServerStart(ServerStartingEvent event) {
-        LOGGER.info("Server starting. Checking for registry conflicts...");
+        LoggerUtil.log(ConflictSeverity.INFO, "Server starting. Checking for registry conflicts...");
 
         MinecraftServer server = event.getServer();
 
@@ -57,13 +56,15 @@ public class RegistryConflictHandler {
 
                 // Log conflict if detected
                 if (!originalMod.equals(modSource)) {
-                    LOGGER.error("Conflict detected: {} '{}' was originally registered by '{}' but has been overwritten by '{}'.",
-                            type, key, originalMod, modSource);
+                    LoggerUtil.log(ConflictSeverity.ERROR, String.format(
+                            "Conflict detected: %s '%s' was originally registered by '%s' but has been overwritten by '%s'.",
+                            type, key, originalMod, modSource));
                 }
             } else {
                 // Log successful registration
                 trackedRegistry.put(key, modSource);
-                LOGGER.info("{} '{}' registered by '{}'.", type, key, modSource);
+                LoggerUtil.log(ConflictSeverity.INFO, String.format(
+                        "%s '%s' registered by '%s'.", type, key, modSource));
             }
         });
     }
@@ -74,7 +75,7 @@ public class RegistryConflictHandler {
      * @param server The Minecraft server instance.
      */
     private static void checkRecipeConflicts(MinecraftServer server) {
-        LOGGER.info("Checking for crafting recipe conflicts...");
+        LoggerUtil.log(ConflictSeverity.INFO, "Checking for crafting recipe conflicts...");
 
         server.getRecipeManager().getRecipes().forEach(recipeHolder -> {
             ResourceLocation recipeKey = recipeHolder.id(); // Use 'id()' instead of 'getId()'
@@ -85,13 +86,15 @@ public class RegistryConflictHandler {
 
                 // Log conflict if detected
                 if (!originalMod.equals(modSource)) {
-                    LOGGER.error("Conflict detected: Recipe '{}' was originally registered by '{}' but has been overwritten by '{}'.",
-                            recipeKey, originalMod, modSource);
+                    LoggerUtil.log(ConflictSeverity.ERROR, String.format(
+                            "Conflict detected: Recipe '%s' was originally registered by '%s' but has been overwritten by '%s'.",
+                            recipeKey, originalMod, modSource));
                 }
             } else {
                 // Log successful registration
                 recipeRegistry.put(recipeKey, modSource);
-                LOGGER.info("Recipe '{}' registered by '{}'.", recipeKey, modSource);
+                LoggerUtil.log(ConflictSeverity.INFO, String.format(
+                        "Recipe '%s' registered by '%s'.", recipeKey, modSource));
             }
         });
     }
