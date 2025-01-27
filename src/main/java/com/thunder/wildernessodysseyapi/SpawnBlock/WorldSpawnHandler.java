@@ -10,6 +10,7 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
 
@@ -19,11 +20,20 @@ public class WorldSpawnHandler {
     @SubscribeEvent
     public static void onWorldLoad(LevelEvent.Load event) {
         if (event.getLevel() instanceof ServerLevel world) {
-            // Locate the spawn block in the world
-            BlockPos spawnBlockPos = (BlockPos) findAllWorldSpawnBlocks(world);
+            // Locate all spawn blocks in the world
+            List<BlockPos> spawnBlockPositions = findAllWorldSpawnBlocks(world);
 
-            // Set spawn point to the block's position
-            world.setDefaultSpawnPos(spawnBlockPos.above(), 0.0F);
+            if (!spawnBlockPositions.isEmpty()) {
+                // Select a random spawn block
+                Random random = new Random();
+                BlockPos spawnBlockPos = spawnBlockPositions.get(random.nextInt(spawnBlockPositions.size()));
+
+                // Set the world's default spawn position
+                world.setDefaultSpawnPos(spawnBlockPos.above(), 0.0F);
+            } else {
+                // Log a warning or handle cases where no spawn blocks are found
+                System.err.println("No World Spawn Blocks found in the world!");
+            }
         }
     }
 
