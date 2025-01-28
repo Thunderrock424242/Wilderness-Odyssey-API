@@ -22,3 +22,5 @@ public abstract class ParticleEngineMixin {
         }
     }
 }
+
+// this corresponds to the camp fire block mixin file.

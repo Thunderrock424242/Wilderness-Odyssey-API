@@ -60,3 +60,5 @@ public abstract class EntityMixin {
         seaCreature.setPos(seaCreature.getX(), currentY + (targetY - currentY) * 0.1F, seaCreature.getZ());
     }
 }
+
+// this corresponds to the ocean package.

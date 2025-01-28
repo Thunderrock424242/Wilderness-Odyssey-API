@@ -30,3 +30,5 @@ public abstract class WaterFluidMixin {
         WaveRenderer.renderFoamAndWaves(poseStack, partialTicks, 0xF000F0);
     }
 }
+
+// this corresponds to the ocean package.

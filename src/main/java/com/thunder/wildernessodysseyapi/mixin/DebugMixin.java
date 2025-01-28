@@ -15,3 +15,5 @@ public abstract class DebugMixin {
         }
     }
 }
+
+// this corresponds to the camp fire block mixin file.

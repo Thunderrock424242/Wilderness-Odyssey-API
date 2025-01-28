@@ -42,3 +42,5 @@ public class CampfireBlockMixin {
         ci.cancel();
     }
 }
+
+// this corresponds to the Higher smoke package.
