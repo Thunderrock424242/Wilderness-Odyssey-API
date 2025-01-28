@@ -1,10 +1,13 @@
 0.1.0:
 Added:
-redid the pack again adding things carefully I want to first add my api things so then I can fix things as I go.
+* redid the pack again adding things carefully I want to first add my api things so then I can fix things as I go.
+* added a default shader aka a less hard one.
+* added a hyper realistic shader
 
 
 Changed:
--
+- changed our main shader to fit the pack more.
+
 Fixed:
 -
 
