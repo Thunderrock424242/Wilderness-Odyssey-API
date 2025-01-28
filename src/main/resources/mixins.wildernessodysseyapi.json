@@ -1,5 +1,6 @@
 {
   "required": true,
+  "minVersion": "0.8",
   "package": "com.thunder.wildernessodysseyapi.mixin",
   "compatibilityLevel": "JAVA_17",
   "refmap": "mixins.wildernessodysseyapi.refmap.json",
@@ -13,5 +14,7 @@
     "defaultRequire": 1
   },
   "client": [
+    "DebugMixin",
+    "ParticleEngineMixin"
   ]
 }

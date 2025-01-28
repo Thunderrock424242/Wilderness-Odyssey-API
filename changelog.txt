@@ -14,7 +14,7 @@ API Changes:
 !! bumped to 2.0 of the mod
 ! added a spawn block for you to spawn at when our starter structure loads
 ! added a couple bug fixes and made camp fire smoke go very high as if you see smoke you will find enemy's and loot todo
-! added a wave render to added waves (wip) todo
+! added a wave render to added waves and tides (wip) todo
 !! a lot more coming and this update will take a couple of weeks or months.
 * removed global chat as it's a bad idea for now.
 !! added a mod conflict checker this is to make sure 2 mods are not overlapping this also comes with some neat features todo
@@ -24,7 +24,7 @@ API Changes:
 
 
 API/Modpack bugs:
-!! api bug: water mobs sink to the bottom and die for some strange reason. (todo)
+!! api bug: water mobs sink to the bottom and die for some strange reason. squids are also stuck at the surface and maybe its due to waves.todo
 
 
 Note:
