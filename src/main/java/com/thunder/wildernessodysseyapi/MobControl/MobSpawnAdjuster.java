@@ -2,6 +2,9 @@ package com.thunder.wildernessodysseyapi.MobControl;
 
 import net.minecraft.server.level.ServerLevel;
 
+/**
+ * The type Mob spawn adjuster.
+ */
 public class MobSpawnAdjuster {
 
     /**

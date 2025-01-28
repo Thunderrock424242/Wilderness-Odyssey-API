@@ -8,8 +8,16 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
+/**
+ * The type Infinite source handler.
+ */
 public class InfiniteSourceHandler {
 
+    /**
+     * On water or lava update.
+     *
+     * @param event the event
+     */
     @SubscribeEvent
     public void onWaterOrLavaUpdate(BlockEvent.NeighborNotifyEvent event) {
         // Ensure this is a server-side event

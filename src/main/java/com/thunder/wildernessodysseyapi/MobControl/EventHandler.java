@@ -6,8 +6,16 @@ import net.minecraft.world.entity.MobCategory;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 
+/**
+ * The type Event handler.
+ */
 public class EventHandler {
 
+    /**
+     * On entity join level.
+     *
+     * @param event the event
+     */
     @SubscribeEvent
     public void onEntityJoinLevel(EntityJoinLevelEvent event) {
         // Check if the level is a ServerLevel

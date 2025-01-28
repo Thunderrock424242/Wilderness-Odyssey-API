@@ -9,9 +9,18 @@ import java.time.format.DateTimeFormatter;
 
 import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.LOGGER;
 
+/**
+ * The type Logger util.
+ */
 public class LoggerUtil {
     private static final String LOG_FILE_PATH = "config/WildernessOdysseyAPI/conflict_log.txt";
 
+    /**
+     * Log.
+     *
+     * @param severity the severity
+     * @param message  the message
+     */
     public static void log(ConflictSeverity severity, String message) {
         // Add a timestamp to the message
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
@@ -56,9 +65,21 @@ public class LoggerUtil {
         }
     }
 
+    /**
+     * The enum Conflict severity.
+     */
     public enum ConflictSeverity {
+        /**
+         * Info conflict severity.
+         */
         INFO,
+        /**
+         * Warn conflict severity.
+         */
         WARN,
+        /**
+         * Error conflict severity.
+         */
         ERROR
     }
 }

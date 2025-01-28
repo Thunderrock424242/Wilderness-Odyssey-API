@@ -3,8 +3,6 @@ package com.thunder.wildernessodysseyapi.MainModClass;
 import com.thunder.wildernessodysseyapi.BugFixes.InfiniteSourceHandler;
 import com.thunder.wildernessodysseyapi.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
-import com.thunder.wildernessodysseyapi.MobControl.SpiderMovementHandler;
-import com.thunder.wildernessodysseyapi.MobControl.SpiderSpawnHandler;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.blocks.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -41,19 +39,37 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * The type Wilderness odyssey api main mod class.
+ */
 @Mod(WildernessOdysseyAPIMainModClass.MOD_ID)
 public class WildernessOdysseyAPIMainModClass {
 
+    /**
+     * The constant VERSION.
+     */
     public static final String VERSION = "0.0.3"; // Change this to your mod pack version
+    /**
+     * The constant LOGGER.
+     */
     public static final Logger LOGGER = LoggerFactory.getLogger("WildernessOdysseyAPI");
 
 
     private static AABB structureBoundingBox;
+    /**
+     * The constant MOD_ID.
+     */
     public static final String MOD_ID = "wildernessodysseyapi";
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
 
     private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader, IPayloadHandler<T> handler) {}
 
+    /**
+     * Instantiates a new Wilderness odyssey api main mod class.
+     *
+     * @param modEventBus the mod event bus
+     * @param container   the container
+     */
     public WildernessOdysseyAPIMainModClass(IEventBus modEventBus, ModContainer container) {
         LOGGER.info("WildernessOdysseyAPI initialized. Tracking conflicts in the modpack...");
         // Register mod setup and creative tabs
@@ -92,12 +108,22 @@ public class WildernessOdysseyAPIMainModClass {
         }
     }
 
+    /**
+     * On server starting.
+     *
+     * @param event the event
+     */
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
 
 
     }
 
+    /**
+     * On world load.
+     *
+     * @param event the event
+     */
     @SubscribeEvent
     public void onWorldLoad(LevelEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
@@ -119,6 +145,11 @@ public class WildernessOdysseyAPIMainModClass {
         }
     }
 
+    /**
+     * On mob spawn.
+     *
+     * @param event the event
+     */
     @SubscribeEvent
     public void onMobSpawn(EntityJoinLevelEvent event) {
         if (event.getEntity() instanceof Mob mob) {
@@ -141,6 +172,12 @@ public class WildernessOdysseyAPIMainModClass {
         }
         return null; // No Plains biome found in the search range
     }
+
+    /**
+     * On server stopping.
+     *
+     * @param event the event
+     */
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
 

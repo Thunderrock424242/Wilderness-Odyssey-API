@@ -12,12 +12,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
 
+/**
+ * The type Player spawn handler.
+ */
 @EventBusSubscriber(modid = MOD_ID)
 public class PlayerSpawnHandler {
 
     private static final AtomicInteger spawnIndex = new AtomicInteger(0);
     private static List<BlockPos> spawnBlocks = null;
 
+    /**
+     * On player join.
+     *
+     * @param event the event
+     */
     @SubscribeEvent
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         ServerPlayer player = (ServerPlayer) event.getEntity();
@@ -35,6 +43,11 @@ public class PlayerSpawnHandler {
         }
     }
 
+    /**
+     * On player respawn.
+     *
+     * @param event the event
+     */
     @SubscribeEvent
     public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
         ServerPlayer player = (ServerPlayer) event.getEntity();

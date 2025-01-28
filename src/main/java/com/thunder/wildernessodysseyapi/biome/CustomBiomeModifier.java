@@ -13,12 +13,18 @@ import net.neoforged.neoforge.common.world.BiomeModifier;
 import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * The type Custom biome modifier.
+ */
 public class CustomBiomeModifier implements BiomeModifier {
     private final ResourceKey<PlacedFeature> structure;
     private final ResourceKey<Biome> targetBiome;
     private final int minBiomeSize;
 
-    // Define the Codec for serialization/deserialization
+    /**
+     * The constant CODEC.
+     */
+// Define the Codec for serialization/deserialization
     public static final Codec<CustomBiomeModifier> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
                     ResourceKey.codec(Registries.PLACED_FEATURE).fieldOf("bunker.schem").forGetter(modifier -> modifier.structure),
@@ -27,6 +33,13 @@ public class CustomBiomeModifier implements BiomeModifier {
             ).apply(instance, CustomBiomeModifier::new)
     );
 
+    /**
+     * Instantiates a new Custom biome modifier.
+     *
+     * @param structure    the structure
+     * @param targetBiome  the target biome
+     * @param minBiomeSize the min biome size
+     */
     public CustomBiomeModifier(ResourceKey<PlacedFeature> structure, ResourceKey<Biome> targetBiome, int minBiomeSize) {
         this.structure = structure;
         this.targetBiome = targetBiome;

@@ -10,12 +10,21 @@ import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConf
 
 import java.util.Objects;
 
+/**
+ * The type Mod configured features.
+ */
 public class ModConfiguredFeatures {
+    /**
+     * The constant CUSTOM_STRUCTURE_KEY.
+     */
     public static final ResourceKey<ConfiguredFeature<?, ?>> CUSTOM_STRUCTURE_KEY = ResourceKey.create(
             Registries.CONFIGURED_FEATURE,
             Objects.requireNonNull(ResourceLocation.tryParse("wildernessodyssey:custom_structure")) // Use tryParse to create the ResourceLocation
     );
 
+    /**
+     * The constant CUSTOM_STRUCTURE.
+     */
     public static final ConfiguredFeature<?, ?> CUSTOM_STRUCTURE = new ConfiguredFeature<>(
             Feature.NO_OP, // Replace with your custom feature if available
             NoneFeatureConfiguration.INSTANCE // Use the appropriate configuration

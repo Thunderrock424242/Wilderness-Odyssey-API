@@ -10,6 +10,9 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * The type Blacklist checker.
+ */
 public class BlacklistChecker {
 
     // Hardcoded list of blacklisted mods and resource packs
@@ -23,11 +26,19 @@ public class BlacklistChecker {
             "badpack2.zip"
     );
 
+    /**
+     * Instantiates a new Blacklist checker.
+     */
     public BlacklistChecker() {
         // Register the event listener
         NeoForge.EVENT_BUS.register(this);
     }
 
+    /**
+     * On player login.
+     *
+     * @param event the event
+     */
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {

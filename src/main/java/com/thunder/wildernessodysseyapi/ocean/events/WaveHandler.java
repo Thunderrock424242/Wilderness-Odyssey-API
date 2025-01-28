@@ -9,8 +9,16 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
+/**
+ * The type Wave handler.
+ */
 public class WaveHandler {
 
+    /**
+     * On level tick post.
+     *
+     * @param event the event
+     */
     @SubscribeEvent
     public void onLevelTickPost(LevelTickEvent.Post event) {
         Level world = event.getLevel();

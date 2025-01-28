@@ -11,13 +11,22 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 import java.util.List;
 
+/**
+ * The type Mod structures.
+ */
 public class ModStructures {
+    /**
+     * The constant PLACED_FEATURES.
+     */
     public static final DeferredRegister<PlacedFeature> PLACED_FEATURES = DeferredRegister.create(
             Registries.PLACED_FEATURE,
             "wildernessodyssey"
     );
 
-    // Register the custom BunkerStructure as a PlacedFeature
+    /**
+     * The constant CUSTOM_STRUCTURE.
+     */
+// Register the custom BunkerStructure as a PlacedFeature
     public static final DeferredHolder<PlacedFeature, PlacedFeature> CUSTOM_STRUCTURE = PLACED_FEATURES.register(
             "custom_structure",
             () -> new PlacedFeature(

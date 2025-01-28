@@ -12,6 +12,9 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * The type Particle engine mixin.
+ */
 @Mixin(ParticleEngine.class)
 public abstract class ParticleEngineMixin {
 

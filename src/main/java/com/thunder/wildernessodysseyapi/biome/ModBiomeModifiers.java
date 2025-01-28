@@ -9,8 +9,14 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 import java.util.Objects;
 
+/**
+ * The type Mod biome modifiers.
+ */
 public class ModBiomeModifiers {
-    // Create the DeferredRegister for Biome Modifiers
+    /**
+     * The constant BIOME_MODIFIERS.
+     */
+// Create the DeferredRegister for Biome Modifiers
     public static final DeferredRegister<BiomeModifier> BIOME_MODIFIERS = DeferredRegister.create(
             ResourceKey.createRegistryKey(
                     Objects.requireNonNull(ResourceLocation.tryParse("neoforge:biome_modifier"))

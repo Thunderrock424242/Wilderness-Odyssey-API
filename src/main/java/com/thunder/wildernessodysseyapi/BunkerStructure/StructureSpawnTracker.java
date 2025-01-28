@@ -6,11 +6,17 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * The type Structure spawn tracker.
+ */
 public class StructureSpawnTracker extends SavedData {
     private static final String DATA_NAME = "wildernessodyssey_structure_spawn_tracker";
     private boolean hasSpawned;
 
-    // Constructor for creating a new tracker
+    /**
+     * Instantiates a new Structure spawn tracker.
+     */
+// Constructor for creating a new tracker
     public StructureSpawnTracker() {
         this.hasSpawned = false;
     }
@@ -25,23 +31,43 @@ public class StructureSpawnTracker extends SavedData {
         return null;
     }
 
-    // Constructor for loading tracker from saved data
+    /**
+     * Instantiates a new Structure spawn tracker.
+     *
+     * @param tag        the tag
+     * @param registries the registries
+     */
+// Constructor for loading tracker from saved data
     public StructureSpawnTracker(CompoundTag tag, HolderLookup.Provider registries) {
         this.hasSpawned = tag.getBoolean("hasSpawned");
     }
 
-    // Check if the structure has already spawned
+    /**
+     * Has spawned boolean.
+     *
+     * @return the boolean
+     */
+// Check if the structure has already spawned
     public boolean hasSpawned() {
         return this.hasSpawned;
     }
 
-    // Mark the structure as spawned
+    /**
+     * Mark as spawned.
+     */
+// Mark the structure as spawned
     public void markAsSpawned() {
         this.hasSpawned = true;
         this.setDirty(); // Mark data as dirty so it gets saved
     }
 
-    // Static method to get the tracker for the world
+    /**
+     * Get structure spawn tracker.
+     *
+     * @param level the level
+     * @return the structure spawn tracker
+     */
+// Static method to get the tracker for the world
     public static StructureSpawnTracker get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
                 new SavedData.Factory<>(

@@ -6,8 +6,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * The type Changelog generator.
+ */
 public class ChangelogGenerator
 {
+    /**
+     * The entry point of application.
+     *
+     * @param args the input arguments
+     */
     public static void main(String[] args)
     {
         String inputFilePath = "changelog.txt";

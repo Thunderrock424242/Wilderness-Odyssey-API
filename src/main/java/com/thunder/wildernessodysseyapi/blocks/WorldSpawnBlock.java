@@ -13,11 +13,20 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 import java.util.function.Supplier;
 
+/**
+ * The type World spawn block.
+ */
 public class WorldSpawnBlock {
+    /**
+     * The constant BLOCKS.
+     */
     public static final DeferredRegister.Blocks BLOCKS =
             DeferredRegister.createBlocks(WildernessOdysseyAPIMainModClass.MOD_ID);
 
-    // Unbreakable Block
+    /**
+     * The constant WORLD_SPAWN_BLOCK.
+     */
+// Unbreakable Block
     public static final DeferredBlock<Block> WORLD_SPAWN_BLOCK = registerBlock(
             () -> new Block(BlockBehaviour.Properties.of()
                     .strength(-1.0F, 3600000.0F) // Unbreakable and explosion-resistant
@@ -34,6 +43,11 @@ public class WorldSpawnBlock {
         ModItems.ITEMS.register("world_spawn_block", () -> new BlockItem(block.get(), new Item.Properties()));
     }
 
+    /**
+     * Register.
+     *
+     * @param eventBus the event bus
+     */
     public static void register(IEventBus eventBus) {
         BLOCKS.register(eventBus);
     }

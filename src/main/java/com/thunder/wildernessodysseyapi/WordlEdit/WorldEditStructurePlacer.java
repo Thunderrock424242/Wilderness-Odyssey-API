@@ -18,15 +18,31 @@ import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.io.InputStream;
 
+/**
+ * The type World edit structure placer.
+ */
 public class WorldEditStructurePlacer {
     private final String namespace;
     private final String path;
 
+    /**
+     * Instantiates a new World edit structure placer.
+     *
+     * @param namespace the namespace
+     * @param path      the path
+     */
     public WorldEditStructurePlacer(String namespace, String path) {
         this.namespace = namespace;
         this.path = path;
     }
 
+    /**
+     * Place structure boolean.
+     *
+     * @param world    the world
+     * @param position the position
+     * @return the boolean
+     */
     public boolean placeStructure(ServerLevel world, BlockPos position) {
         try {
             InputStream schemStream = getClass().getResourceAsStream(

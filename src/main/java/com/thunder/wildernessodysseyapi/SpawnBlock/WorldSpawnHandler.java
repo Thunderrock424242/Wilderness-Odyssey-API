@@ -14,9 +14,17 @@ import java.util.Random;
 
 import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
 
+/**
+ * The type World spawn handler.
+ */
 @EventBusSubscriber(modid = MOD_ID)
 public class WorldSpawnHandler {
 
+    /**
+     * On world load.
+     *
+     * @param event the event
+     */
     @SubscribeEvent
     public static void onWorldLoad(LevelEvent.Load event) {
         if (event.getLevel() instanceof ServerLevel world) {
@@ -37,6 +45,12 @@ public class WorldSpawnHandler {
         }
     }
 
+    /**
+     * Find all world spawn blocks list.
+     *
+     * @param world the world
+     * @return the list
+     */
     static List<BlockPos> findAllWorldSpawnBlocks(ServerLevel world) {
         List<BlockPos> spawnBlocks = new ArrayList<>();
 

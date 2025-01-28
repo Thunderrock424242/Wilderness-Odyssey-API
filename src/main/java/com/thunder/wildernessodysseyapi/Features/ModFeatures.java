@@ -14,19 +14,31 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * The type Mod features.
+ */
 public class ModFeatures {
-    // DeferredRegisters for ConfiguredFeature and PlacedFeature
+    /**
+     * The constant CONFIGURED_FEATURES.
+     */
+// DeferredRegisters for ConfiguredFeature and PlacedFeature
     public static final DeferredRegister<ConfiguredFeature<?, ?>> CONFIGURED_FEATURES = DeferredRegister.create(
             Registries.CONFIGURED_FEATURE,
             "wildernessodyssey"
     );
 
+    /**
+     * The constant PLACED_FEATURES.
+     */
     public static final DeferredRegister<PlacedFeature> PLACED_FEATURES = DeferredRegister.create(
             Registries.PLACED_FEATURE,
             "wildernessodyssey"
     );
 
-    // Register ConfiguredFeature
+    /**
+     * The constant CUSTOM_STRUCTURE.
+     */
+// Register ConfiguredFeature
     public static final ConfiguredFeature<?, ?> CUSTOM_STRUCTURE = new ConfiguredFeature<>(
             Feature.NO_OP, // Placeholder feature
             NoneFeatureConfiguration.INSTANCE
@@ -47,7 +59,10 @@ public class ModFeatures {
         );
     }
 
-    // Expose CUSTOM_STRUCTURE_PLACED
+    /**
+     * The constant CUSTOM_STRUCTURE_PLACED_KEY.
+     */
+// Expose CUSTOM_STRUCTURE_PLACED
     public static final ResourceKey<PlacedFeature> CUSTOM_STRUCTURE_PLACED_KEY = ResourceKey.create(
             Registries.PLACED_FEATURE,
             Objects.requireNonNull(ResourceLocation.tryParse("wildernessodyssey:custom_structure"))

@@ -12,6 +12,9 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
 
+/**
+ * The type Mod client setup.
+ */
 @EventBusSubscriber
 public class ModClientSetup {
 
@@ -22,6 +25,11 @@ public class ModClientSetup {
     public static class ClientModEvents {
 
 
+        /**
+         * On client setup.
+         *
+         * @param event the event
+         */
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
             WaveRenderer.initializeShader(); // Initialize wave-related shaders if needed
@@ -30,6 +38,8 @@ public class ModClientSetup {
 
     /**
      * Handles the rendering of foam and wave effects for vanilla water blocks.
+     *
+     * @param event the event
      */
     @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
