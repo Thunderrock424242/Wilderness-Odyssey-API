@@ -81,8 +81,6 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(new BlacklistChecker());
         NeoForge.EVENT_BUS.register(new WaveHandler());
         NeoForge.EVENT_BUS.register(new InfiniteSourceHandler());
-        NeoForge.EVENT_BUS.register(new SpiderSpawnHandler());
-        NeoForge.EVENT_BUS.register(new SpiderMovementHandler());
         NeoForge.EVENT_BUS.register(new EventHandler());
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
