@@ -13,7 +13,7 @@ import java.nio.file.StandardCopyOption;
 public class SaferInPlaceObfuscateMulti {
 
     // List all the files you want to XOR in-place
-    private static final String FILE_PATH_1 = "Modpack_Checklist";
+    private static final String FILE_PATH_1 = "Modpack_Checklist.txt";
     private static final String FILE_PATH_2 = "changelog.txt";
 
     // The XOR key – same key is used for obfuscation & deobfuscation
