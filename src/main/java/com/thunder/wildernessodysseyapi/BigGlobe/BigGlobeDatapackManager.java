@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.BigGlobe;
+/*package com.thunder.wildernessodysseyapi.BigGlobe;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.dedicated.DedicatedServer;
@@ -57,9 +57,6 @@ public class BigGlobeDatapackManager {
         }
     }
 
-    /**
-     * Checks if the current server is using the "bigglobe:bigglobe" world type.
-     */
     private static boolean isBigGlobeWorld(MinecraftServer server) {
         // In many modern versions, server.getWorldData() is a PrimaryLevelData on a dedicated server
         if (server.getWorldData() instanceof PrimaryLevelData primaryLevelData) {
@@ -87,9 +84,6 @@ public class BigGlobeDatapackManager {
         return false;
     }
 
-    /**
-     * Register a folder as a datapack source for the server, so that any datapacks in it are loaded.
-     */
     private static void registerDatapackFolder(AddPackFindersEvent event, File folder) {
         if (!folder.exists()) {
             LOGGER.warn("Datapack folder does not exist (could not register): {}", folder);
@@ -126,3 +120,4 @@ public class BigGlobeDatapackManager {
         LOGGER.info("Registered big_globe_datapacks folder: {}", folder.getAbsolutePath());
     }
 }
+*/
