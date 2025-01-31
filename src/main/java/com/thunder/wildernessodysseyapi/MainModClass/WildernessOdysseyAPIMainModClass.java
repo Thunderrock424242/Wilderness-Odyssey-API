@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.MainModClass;
 
+import com.thunder.wildernessodysseyapi.BigGlobe.BigGlobeDatapackManager;
 import com.thunder.wildernessodysseyapi.BugFixes.InfiniteSourceHandler;
 import com.thunder.wildernessodysseyapi.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
@@ -82,6 +83,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(new WaveHandler());
         NeoForge.EVENT_BUS.register(new InfiniteSourceHandler());
         NeoForge.EVENT_BUS.register(new EventHandler());
+        NeoForge.EVENT_BUS.register(new BigGlobeDatapackManager());
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
