@@ -71,7 +71,7 @@ public class WildernessOdysseyAPIMainModClass {
      * @param container   the container
      */
     public WildernessOdysseyAPIMainModClass(IEventBus modEventBus, ModContainer container) {
-        LOGGER.info("WildernessOdysseyAPI initialized. Tracking conflicts in the modpack...");
+        LOGGER.info("WildernessOdysseyAPI initialized. I will also start to track mod conflicts");
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
