@@ -1,4 +1,4 @@
-/*package com.thunder.wildernessodysseyapi.BigGlobe;
+/*package com.thunder.wildernessodysseyapi.WIP.BigGlobe;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.dedicated.DedicatedServer;
