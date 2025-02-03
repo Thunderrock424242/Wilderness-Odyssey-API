@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.MainModClass;
 
 import com.thunder.wildernessodysseyapi.BugFixes.InfiniteSourceHandler;
+import com.thunder.wildernessodysseyapi.ErrorLog.UncaughtExceptionLogger;
 import com.thunder.wildernessodysseyapi.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
 import com.thunder.wildernessodysseyapi.biome.ModBiomeModifiers;
@@ -99,6 +100,7 @@ public class WildernessOdysseyAPIMainModClass {
         });
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
+        UncaughtExceptionLogger.init();
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
