@@ -174,6 +174,17 @@ sourceSets.main.resources.srcDir generateModMetadata
 // To avoid having to run "generateModMetadata" manually, make it run on every project reload
 neoForge.ideSyncTask generateModMetadata
 
+tasks.register('obfuscateFiles', JavaExec) {
+    group = "obfuscation"
+    description = "Runs the in-place obfuscation (XOR) on two hardcoded files."
+
+    // Use the fully qualified main class name:
+    mainClass.set('com.thunder.wildernessodysseyapi.FileSecurity.SaferInPlaceObfuscateMulti')
+
+    // The more traditional way to set the classpath in build.gradle (Groovy DSL):
+    classpath = sourceSets.main.runtimeClasspath
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
 }
