@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.MainModClass;
 
+import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.BugFixes.InfiniteSourceHandler;
 import com.thunder.wildernessodysseyapi.ErrorLog.UncaughtExceptionLogger;
 import com.thunder.wildernessodysseyapi.Features.ModFeatures;
@@ -12,6 +13,7 @@ import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WordlEdit.WorldEditStructurePlacer;
 import com.thunder.wildernessodysseyapi.ocean.events.WaveHandler;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -128,8 +130,9 @@ public class WildernessOdysseyAPIMainModClass {
      * @param event the event
      */
     @SubscribeEvent
-    public static void onRegisterCommands(RegisterCommandsEvent event) {
-        ModListDiffCommand.register(event.getDispatcher());
+    public void onRegisterCommands(RegisterCommandsEvent event) {
+        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
+        ModListDiffCommand.register(dispatcher);
     }
 
     /**
