@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
 
@@ -18,7 +19,7 @@ public class UncaughtExceptionLogger {
     private static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     // We'll store the path to our dedicated log file in the logs folder
-    private static final Path LOG_FILE_PATH = FMLPaths.LOG_DIR.get().resolve("myapimod-uncaught.log");
+    private static final Path LOG_FILE_PATH = Paths.get("logs", "myapimod-uncaught.log");
 
     /**
      * Called once during mod setup to install the uncaught exception handler.
