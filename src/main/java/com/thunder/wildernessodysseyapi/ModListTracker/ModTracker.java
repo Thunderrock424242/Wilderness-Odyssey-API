@@ -51,11 +51,14 @@ public class ModTracker {
 
     private static Map<String, String> getCurrentMods() {
         return ModList.get().getMods().stream()
+                .filter(mod -> mod instanceof ModInfo) // Ensure we're working with ModInfo
+                .map(mod -> (ModInfo) mod) // Explicitly cast to ModInfo
                 .collect(Collectors.toMap(
                         ModInfo::getModId,
-                        mod -> mod.getVersion().toString() // Ensures a String conversion
+                        mod -> mod.getVersion().toString() // Convert ArtifactVersion to String
                 ));
     }
+
 
 
 
