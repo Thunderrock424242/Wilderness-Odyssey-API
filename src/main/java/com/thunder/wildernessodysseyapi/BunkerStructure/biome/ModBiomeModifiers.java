@@ -1,6 +1,6 @@
-package com.thunder.wildernessodysseyapi.biome;
+package com.thunder.wildernessodysseyapi.BunkerStructure.biome;
 
-import com.thunder.wildernessodysseyapi.Features.ModFeatures;
+import com.thunder.wildernessodysseyapi.BunkerStructure.Features.ModFeatures;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.biome.Biomes;

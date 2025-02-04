@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.SpawnBlock;
+package com.thunder.wildernessodysseyapi.BunkerStructure.SpawnBlock;
 
 import com.thunder.wildernessodysseyapi.blocks.WorldSpawnBlock;
 import net.minecraft.core.BlockPos;
