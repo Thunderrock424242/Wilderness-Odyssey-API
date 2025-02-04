@@ -4,7 +4,6 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.moddiscovery.ModInfo;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-
 import java.io.*;
 import java.nio.file.*;
 import java.time.LocalDateTime;
@@ -16,17 +15,17 @@ public class ModTracker {
     private static final Path TRACKING_FILE = Paths.get("config", "mods-tracking.json");
     private static final Path LOG_FILE = Paths.get("logs", "mod-changes.log");
 
-    public static void checkModChanges() {
-        // Get current mods with versions as Strings
-        Map<String, String> currentMods = getCurrentMods();
+    private static final List<String> addedMods = new ArrayList<>();
+    private static final List<String> removedMods = new ArrayList<>();
+    private static final List<String> updatedMods = new ArrayList<>();
 
-        // Load previous mods
+    public static void checkModChanges() {
+        Map<String, String> currentMods = getCurrentMods();
         Map<String, String> previousMods = loadPreviousMods();
 
-        // Compare mods
-        List<String> addedMods = new ArrayList<>();
-        List<String> removedMods = new ArrayList<>();
-        List<String> updatedMods = new ArrayList<>();
+        addedMods.clear();
+        removedMods.clear();
+        updatedMods.clear();
 
         for (String modId : currentMods.keySet()) {
             if (!previousMods.containsKey(modId)) {
@@ -42,25 +41,34 @@ public class ModTracker {
             }
         }
 
-        // Log changes
+        // Log changes to console and file
         logChanges(addedMods, removedMods, updatedMods);
 
-        // Save current mod list for next launch
+        // Save the latest mod list for future comparison
         saveModList(currentMods);
+    }
+
+    public static List<String> getAddedMods() {
+        return addedMods;
+    }
+
+    public static List<String> getRemovedMods() {
+        return removedMods;
+    }
+
+    public static List<String> getUpdatedMods() {
+        return updatedMods;
     }
 
     private static Map<String, String> getCurrentMods() {
         return ModList.get().getMods().stream()
-                .filter(mod -> mod instanceof ModInfo) // Ensure we're working with ModInfo
-                .map(mod -> (ModInfo) mod) // Explicitly cast to ModInfo
+                .filter(mod -> mod instanceof ModInfo) // Ensure it's an instance of ModInfo
+                .map(mod -> (ModInfo) mod) // Cast mod to ModInfo
                 .collect(Collectors.toMap(
                         ModInfo::getModId,
-                        mod -> mod.getVersion().toString() // Convert ArtifactVersion to String
+                        mod -> mod.getVersion().toString() // Convert version to String
                 ));
     }
-
-
-
 
 
     private static Map<String, String> loadPreviousMods() {
@@ -103,7 +111,10 @@ public class ModTracker {
             logMessage.append("No mod changes detected.\n");
         }
 
+        // Print to console
         System.out.println(logMessage.toString());
+
+        // Write to file
         writeToFile(logMessage.toString());
     }
 
