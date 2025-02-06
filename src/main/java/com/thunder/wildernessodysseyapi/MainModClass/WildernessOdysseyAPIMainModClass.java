@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.MainModClass;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.BugFixes.InfiniteSourceHandler;
+import com.thunder.wildernessodysseyapi.Cloak.CloakRenderHandler;
 import com.thunder.wildernessodysseyapi.ErrorLog.UncaughtExceptionLogger;
 import com.thunder.wildernessodysseyapi.BunkerStructure.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
@@ -25,6 +26,7 @@ import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
@@ -187,6 +189,16 @@ public class WildernessOdysseyAPIMainModClass {
             }
         }
         return null; // No Plains biome found in the search range
+    }
+
+    /**
+     * The type Client mod events.
+     */
+    public static class ClientModEvents {
+        @SubscribeEvent
+        public static void clientSetup(FMLClientSetupEvent event) {
+            CloakRenderHandler.init(); // Initialize framebuffer system
+        }
     }
 
     /**
