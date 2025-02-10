@@ -22,6 +22,7 @@ Alpha checklist:
  [] HUD and ui testing
  [] modpack folder cleanup
  [] get a QA team aka testers.
+ [] amythest crystal metor and around the impact site maybe have some animals look amaythist.
 
 
 
