@@ -40,3 +40,4 @@ Alpha checklist:
  [] test resource packs and make sure our core shader is optimized for best settings.
  [] improve ingame docs
  [] clean up modpack files and configs.
+ [] during beta also set up so half of my earnings go to cancer research.

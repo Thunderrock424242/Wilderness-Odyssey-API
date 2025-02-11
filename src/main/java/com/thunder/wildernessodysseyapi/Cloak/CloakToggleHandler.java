@@ -18,9 +18,9 @@ public class CloakToggleHandler {
         Player player = event.getEntity();
         ItemStack heldItem = event.getItemStack();
 
-        // Check if player is holding an Amethyst Crystal
+        // Check if the player is holding an Amethyst Crystal
         if (heldItem.getItem() == Items.AMETHYST_SHARD) {
-            event.setCanceled(true); // Prevents default use action
+            event.setCanceled(true); // Prevent default use action
 
             // Toggle cloak state
             player.getCapability(YourMod.CLOAK_CAPABILITY).ifPresent(cloak -> {
@@ -33,6 +33,11 @@ public class CloakToggleHandler {
 
                 // Play a sound effect
                 player.level().playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.0F);
+
+                // Consume one Amethyst Crystal
+                if (!player.isCreative()) {
+                    heldItem.shrink(1);
+                }
             });
         }
     }

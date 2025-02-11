@@ -21,7 +21,7 @@ public class CloakLayer<T extends LivingEntity, M extends EntityModel<T>> extend
     public void render(PoseStack matrixStack, MultiBufferSource buffer, int light, T entity, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
         entity.getCapability(YourMod.CLOAK_CAPABILITY).ifPresent(cloak -> {
             if (cloak.isCloakEnabled()) {
-                CloakRenderHandler.applyCloakTexture(entity);
+                CloakRenderHandler.applyCloakTexture((Player) entity);
                 VertexConsumer vertexconsumer = buffer.getBuffer(RenderType.entityTranslucent(getTextureLocation(entity)));
                 this.getParentModel().renderToBuffer(matrixStack, vertexconsumer, light, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
             }
@@ -30,6 +30,6 @@ public class CloakLayer<T extends LivingEntity, M extends EntityModel<T>> extend
 
     @Override
     public ResourceLocation getTextureLocation(T entity) {
-        return new ResourceLocation(YourMod.MODID, "textures/entity/cloak.png"); // Default texture
+        return new ResourceLocation(YourMod.MOD_ID, "textures/entity/cloak.png"); // Default texture
     }
 }
