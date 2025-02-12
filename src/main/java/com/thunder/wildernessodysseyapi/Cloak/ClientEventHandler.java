@@ -3,7 +3,6 @@ package com.thunder.wildernessodysseyapi.Cloak;
 import net.minecraft.client.Minecraft;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.fml.common.Mod;
 
 @EventBusSubscriber
 public class ClientEventHandler {

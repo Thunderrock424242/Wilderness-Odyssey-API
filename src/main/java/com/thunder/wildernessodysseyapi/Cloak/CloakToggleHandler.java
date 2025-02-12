@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.Cloak;
 
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -9,36 +10,47 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
 @EventBusSubscriber
 public class CloakToggleHandler {
+
+    private static boolean wasKeyPressed = false;
+
     @SubscribeEvent
-    public static void onPlayerRightClick(PlayerInteractEvent.RightClickItem event) {
-        Player player = event.getEntity();
-        ItemStack heldItem = event.getItemStack();
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || event.phase != TickEvent.Phase.END) return;
 
-        // Check if the player is holding an Amethyst Crystal
-        if (heldItem.getItem() == Items.AMETHYST_SHARD) {
-            event.setCanceled(true); // Prevent default use action
+        Player player = mc.player;
 
-            // Toggle cloak state
-            player.getCapability(YourMod.CLOAK_CAPABILITY).ifPresent(cloak -> {
-                boolean newState = !cloak.isCloakEnabled();
-                cloak.setCloakEnabled(newState);
+        // Check if the off-hand swap key (default: F) is pressed
+        boolean isKeyPressed = mc.options.keySwapOffhand.isDown();
 
-                // Send feedback message
-                player.sendSystemMessage(Component.literal("Cloak " + (newState ? "enabled!" : "disabled!"))
-                        .withStyle(newState ? ChatFormatting.AQUA : ChatFormatting.RED));
+        if (isKeyPressed && !wasKeyPressed) {
+            ItemStack offHandItem = player.getOffhandItem();
 
-                // Play a sound effect
-                player.level().playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.0F);
+            // Check if the player has an Amethyst Shard in the off-hand
+            if (offHandItem.getItem() == Items.AMETHYST_SHARD) {
+                player.getCapability(YourMod.CLOAK_CAPABILITY).ifPresent(cloak -> {
+                    boolean newState = !cloak.isCloakEnabled();
+                    cloak.setCloakEnabled(newState);
 
-                // Consume one Amethyst Crystal
-                if (!player.isCreative()) {
-                    heldItem.shrink(1);
-                }
-            });
+                    // Send feedback message
+                    player.sendSystemMessage(Component.literal("Cloak " + (newState ? "enabled!" : "disabled!"))
+                            .withStyle(newState ? ChatFormatting.AQUA : ChatFormatting.RED));
+
+                    // Play a sound effect
+                    player.level().playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.0F);
+
+                    // Consume one Amethyst Shard (unless in Creative mode)
+                    if (!player.isCreative()) {
+                        offHandItem.shrink(1);
+                    }
+                });
+            }
         }
+
+        // Update key state tracking
+        wasKeyPressed = isKeyPressed;
     }
 }

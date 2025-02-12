@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.BunkerStructure.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.BunkerStructure.biome.ModBiomeModifiers;
+import com.thunder.wildernessodysseyapi.SkyBeam.AmethystBeamHandler;
 import com.thunder.wildernessodysseyapi.blocks.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
@@ -89,6 +90,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(new WaveHandler());
         NeoForge.EVENT_BUS.register(new InfiniteSourceHandler());
         NeoForge.EVENT_BUS.register(new EventHandler());
+        NeoForge.EVENT_BUS.register(new AmethystBeamHandler());
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
