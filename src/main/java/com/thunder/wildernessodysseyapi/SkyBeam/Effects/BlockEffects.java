@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.SkyBeam;
+package com.thunder.wildernessodysseyapi.SkyBeam.Effects;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;

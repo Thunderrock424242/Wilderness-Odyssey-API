@@ -1,5 +1,8 @@
 package com.thunder.wildernessodysseyapi.SkyBeam;
 
+import com.thunder.wildernessodysseyapi.SkyBeam.Effects.BeamEffects;
+import com.thunder.wildernessodysseyapi.SkyBeam.Effects.BlockEffects;
+import com.thunder.wildernessodysseyapi.SkyBeam.Effects.TreeEffects;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Items;
