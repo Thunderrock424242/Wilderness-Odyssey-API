@@ -15,7 +15,7 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = "3.0.0-alpha-2"
+version = "3.0.0"
 group = mod_group_id
 
 repositories {

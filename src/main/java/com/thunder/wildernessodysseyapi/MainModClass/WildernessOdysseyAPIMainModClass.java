@@ -5,6 +5,8 @@ import com.thunder.wildernessodysseyapi.BugFixes.InfiniteSourceHandler;
 import com.thunder.wildernessodysseyapi.Cloak.CloakRenderHandler;
 import com.thunder.wildernessodysseyapi.ErrorLog.UncaughtExceptionLogger;
 import com.thunder.wildernessodysseyapi.BunkerStructure.Features.ModFeatures;
+import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
+import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
 import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.BunkerStructure.biome.ModBiomeModifiers;
@@ -20,6 +22,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
@@ -136,6 +139,7 @@ public class WildernessOdysseyAPIMainModClass {
     public void onRegisterCommands(RegisterCommandsEvent event) {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
         ModListDiffCommand.register(dispatcher);
+        MemCheckCommand.register(event.getDispatcher());
     }
 
     /**
@@ -211,4 +215,22 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStopping(ServerStoppingEvent event) {
 
     }
+
+    @SubscribeEvent
+    public void onServerTick(TickEvent.ServerTickEvent event) {
+        if (event.phase == TickEvent.Phase.END) {
+            // Example: every 600 ticks (30 seconds at 20 TPS)
+            MinecraftServer server = event.server;
+            if (server != null && server.getTickCount() % 600 == 0) {
+                long usedMB  = MemoryUtils.getUsedMemoryMB();
+                long totalMB = MemoryUtils.getTotalMemoryMB();
+                int recommended = MemoryUtils.calculateRecommendedRAM(usedMB, MOD_COUNT);
+
+                server.getLogger().info("[ResourceManagerMod] Memory usage: "
+                        + usedMB + "MB / " + totalMB + "MB. "
+                        + "Recommended ~" + recommended + "MB.");
+            }
+        }
+    }
+
 }
