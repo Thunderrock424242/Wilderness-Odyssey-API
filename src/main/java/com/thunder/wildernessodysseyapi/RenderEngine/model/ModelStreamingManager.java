@@ -1,11 +1,13 @@
 package com.thunder.wildernessodysseyapi.RenderEngine.model;
 
+import com.thunder.wildernessodysseyapi.RenderEngine.Threading.RenderThreadManager;
+import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.client.model.data.ModelData;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ModelStreamingManager {
     private static final Map<ResourceLocation, ModelData> loadedModels = new ConcurrentHashMap<>();
@@ -19,8 +21,19 @@ public class ModelStreamingManager {
             ModelData model = loadModel(modelPath);
             loadedModels.put(modelPath, model);
             return model;
-        });
+        }, RenderThreadManager::execute);
     }
+
+    public static void unloadUnusedModels() {
+        loadedModels.entrySet().removeIf(entry -> !isModelInUse(entry.getKey()));
+    }
+
+    private static boolean isModelInUse(ResourceLocation modelPath) {
+        return Minecraft.getInstance().level.getEntities().stream()
+                .anyMatch(entity -> ModdedModelLoader.getModelForEntity(entity.getType()).equals(modelPath));
+    }
+
+
 
     private static ModelData loadModel(ResourceLocation modelPath) {
         // TODO: Implement actual model loading (OBJ, JSON, etc.)
