@@ -1,19 +1,26 @@
 package com.thunder.wildernessodysseyapi.RenderEngine;
 
-import com.thunder.wildernessodysseyapi.RenderEngine.Threading.RenderThreadManager;
-import com.thunder.wildernessodysseyapi.RenderEngine.model.ModdedModelLoader;
+
+import com.thunder.wildernessodysseyapi.RenderEngine.Threading.ModdedRenderInterceptor;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 @EventBusSubscriber
 public class ClientModEvents {
+
     @SubscribeEvent
-    public static void onRegisterRenderers(RegisterRenderersEvent event) {
-        ModdedModelLoader.initialize(); // Ensure modded models load
+    public static void onRenderWorld(RenderLevelLastEvent event) {
+        ModdedRenderInterceptor.executeModRender(() -> {
+            // TODO: Run modded world rendering logic
+        });
     }
 
     @SubscribeEvent
-    public static void onShutdown(net.minecraftforge.fml.event.lifecycle.FMLClientStoppingEvent event) {
-        RenderThreadManager.shutdown(); // Properly shut down render thread
+    public static void onRenderOverlay(RenderGameOverlayEvent.Pre event) {
+        ModdedRenderInterceptor.executeModRender(() -> {
+            event.getMatrixStack().pushPose();
+            // TODO: Run modded UI rendering logic
+            event.getMatrixStack().popPose();
+        });
     }
 }
