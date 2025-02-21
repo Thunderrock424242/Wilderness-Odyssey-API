@@ -31,6 +31,9 @@ Added:
 * added matmos ambient sound
 * added gun mod
 * added a bunch of smaller helper mods.
+* added a sushi making mod
+* added exposure a camera mod
+* added a secret doors mod.
 
 
 Changed:
