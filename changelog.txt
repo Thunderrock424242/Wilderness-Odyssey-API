@@ -29,12 +29,15 @@ Added:
 * added screenshot to clipboard
 * added desired server mod
 * added matmos ambient sound
+* added gun mod
+* added a bunch of smaller helper mods.
 
 
 Changed:
 - changed our main shader to fit the pack more.
 ! edited our chunk management engine to optimize it.
 !! added an optimization to mob spawning but it may make mobs bleed into another biome they are not supposed to be in.
+! main shader aka defult is now comp unbound and the high version of it will be comp unbound/euphoria patches
 
 Fixed:
 -
@@ -57,6 +60,10 @@ API Changes:
 !! added a mod conflict checker this is to make sure 2 mods are not overlapping this also comes with some neat features todo
 * added exception logger so we can find major mod issues and report them.
 * added a mod list to see what mods updated or got removed or added. you can also do /modlistdiff to see it too.
+* added a memory util command to keep a eye on memory usage.
+* added a cloak todo
+* added sky mean todo
+!! added a rendering engine that will help transfer resources from the cpu to the gpu.
 
 
 
