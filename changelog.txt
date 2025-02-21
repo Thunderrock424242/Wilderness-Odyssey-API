@@ -34,6 +34,8 @@ Added:
 * added a sushi making mod
 * added exposure a camera mod
 * added a secret doors mod.
+* added extension to the wild update
+* added extenstion to the trails and tales update.
 
 
 Changed:
