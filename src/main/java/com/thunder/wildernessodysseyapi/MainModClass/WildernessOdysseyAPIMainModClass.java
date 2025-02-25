@@ -16,7 +16,6 @@ import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.BunkerStructure.WordlEdit.WorldEditStructurePlacer;
-import com.thunder.wildernessodysseyapi.ocean.events.WaveHandler;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -90,7 +89,6 @@ public class WildernessOdysseyAPIMainModClass {
         // Register global events
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new BlacklistChecker());
-        NeoForge.EVENT_BUS.register(new WaveHandler());
         NeoForge.EVENT_BUS.register(new InfiniteSourceHandler());
         NeoForge.EVENT_BUS.register(new EventHandler());
         NeoForge.EVENT_BUS.register(new AmethystBeamHandler());

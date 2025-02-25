@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.mixin;
+/* package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.mixin.EntityAccessor;
 import net.minecraft.world.entity.Entity;
@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * The type Entity mixin.
  */
-@Mixin(Entity.class)
+/*@Mixin(Entity.class)
 public abstract class EntityMixin {
 
     @Inject(method = "tick", at = @At("HEAD"))
@@ -65,3 +65,5 @@ public abstract class EntityMixin {
 }
 
 // this corresponds to the ocean package.
+*/
+/// this class is for if we will acomadate water entities to our new system.
