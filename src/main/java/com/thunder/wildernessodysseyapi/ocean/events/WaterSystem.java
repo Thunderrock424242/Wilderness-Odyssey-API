@@ -7,7 +7,6 @@ import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
 
 public class WaterSystem {
 
