@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.RenderEngine.model;
+package com.thunder.wildernessodysseyapi.NovaAPI.RenderEngine.model;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.EntityRenderers;

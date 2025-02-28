@@ -1,6 +1,6 @@
-package com.thunder.wildernessodysseyapi.RenderEngine.instancing;
+package com.thunder.wildernessodysseyapi.NovaAPI.RenderEngine.instancing;
 
-import com.thunder.wildernessodysseyapi.RenderEngine.model.ModelStreamingManager;
+import com.thunder.wildernessodysseyapi.NovaAPI.RenderEngine.model.ModelStreamingManager;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;

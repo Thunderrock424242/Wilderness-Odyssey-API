@@ -1,6 +1,6 @@
-package com.thunder.wildernessodysseyapi.RenderEngine.API;
+package com.thunder.wildernessodysseyapi.NovaAPI.RenderEngine.API;
 
-import com.thunder.wildernessodysseyapi.RenderEngine.Threading.RenderThreadManager;
+import com.thunder.wildernessodysseyapi.NovaAPI.RenderEngine.Threading.RenderThreadManager;
 
 public class RenderThreadAPI {
     /**

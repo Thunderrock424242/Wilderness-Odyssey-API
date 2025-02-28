@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.RenderEngine.Threading;
+package com.thunder.wildernessodysseyapi.NovaAPI.RenderEngine.Threading;
 
 import net.neoforged.fml.ModList;
 

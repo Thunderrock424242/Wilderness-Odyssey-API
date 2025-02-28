@@ -1,7 +1,7 @@
-package com.thunder.wildernessodysseyapi.RenderEngine;
+package com.thunder.wildernessodysseyapi.NovaAPI.RenderEngine;
 
 
-import com.thunder.wildernessodysseyapi.RenderEngine.Threading.ModdedRenderInterceptor;
+import com.thunder.wildernessodysseyapi.NovaAPI.RenderEngine.Threading.ModdedRenderInterceptor;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 
