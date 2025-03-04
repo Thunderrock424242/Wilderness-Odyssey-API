@@ -11,7 +11,9 @@ import net.minecraft.world.item.Items;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 
-@EventBusSubscriber
+import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
+
+@EventBusSubscriber(modid = MOD_ID)
 public class CloakToggleHandler {
 
     private static boolean wasKeyPressed = false;
@@ -31,7 +33,7 @@ public class CloakToggleHandler {
 
             // Check if the player has an Amethyst Shard in the off-hand
             if (offHandItem.getItem() == Items.AMETHYST_SHARD) {
-                player.getCapability(YourMod.CLOAK_CAPABILITY).ifPresent(cloak -> {
+                player.getCapability(MOD_ID.CLOAK_CAPABILITY).ifPresent(cloak -> {
                     boolean newState = !cloak.isCloakEnabled();
                     cloak.setCloakEnabled(newState);
 
