@@ -5,7 +5,9 @@ import com.thunder.wildernessodysseyapi.NovaAPI.RenderEngine.Threading.ModdedRen
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 
-@EventBusSubscriber
+import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
+
+@EventBusSubscriber(modid = MOD_ID)
 public class ClientModEvents {
 
     @SubscribeEvent
