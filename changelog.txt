@@ -66,7 +66,7 @@ API Changes:
 * added a mod list to see what mods updated or got removed or added. you can also do /modlistdiff to see it too.
 * added a memory util command to keep a eye on memory usage.
 * added a cloak todo
-* added sky mean todo
+* added sky beam todo
 !! added a rendering engine that will help transfer resources from the cpu to the gpu.
 
 
