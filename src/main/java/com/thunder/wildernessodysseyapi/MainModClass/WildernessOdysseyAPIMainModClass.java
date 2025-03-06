@@ -10,6 +10,8 @@ import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
 import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.BunkerStructure.biome.ModBiomeModifiers;
+import com.thunder.wildernessodysseyapi.ModPackPatches.ChunkSaveOptimizer;
+import com.thunder.wildernessodysseyapi.ModPackPatches.ClientSaveHandler;
 import com.thunder.wildernessodysseyapi.SkyBeam.AmethystBeamHandler;
 import com.thunder.wildernessodysseyapi.blocks.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -92,6 +94,8 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(new InfiniteSourceHandler());
         NeoForge.EVENT_BUS.register(new EventHandler());
         NeoForge.EVENT_BUS.register(new AmethystBeamHandler());
+        NeoForge.EVENT_BUS.register(new ChunkSaveOptimizer());
+        NeoForge.EVENT_BUS.register(new ClientSaveHandler());
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
