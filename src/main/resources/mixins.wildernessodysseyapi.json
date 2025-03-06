@@ -8,7 +8,6 @@
     "CampfireBlockMixin",
     "DayNightCycle",
     "EntityAccessor",
-    "EntityMixin",
     "WaterFluidMixin"
   ],
   "injectors": {
