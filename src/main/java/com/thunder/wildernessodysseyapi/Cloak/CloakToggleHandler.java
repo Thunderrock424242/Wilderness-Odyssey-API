@@ -20,9 +20,10 @@ public class CloakToggleHandler {
     private static boolean wasKeyPressed = false;
 
     @SubscribeEvent
-    public static void onClientTick(ClientTickEvent event) {
+    public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || event.phase != TickEvent.Phase.END) return;
+        // The usual null check is fine:
+        if (mc.player == null) return;
 
         Player player = mc.player;
 

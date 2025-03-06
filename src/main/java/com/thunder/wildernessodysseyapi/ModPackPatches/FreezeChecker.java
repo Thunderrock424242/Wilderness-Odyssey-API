@@ -51,8 +51,9 @@ public class FreezeChecker {
      * Update lastTickTime each time the server finishes a tick.
      */
     @SubscribeEvent
-    public void onServerTick(ServerTickEvent event) {
-        if (event.phase == TickEvent.Phase.END) {
+    public void onServerTick(ServerTickEvent.Post event) {
+        MinecraftServer server = event.getServer();
+        if (!event.hasTime()) return;                                                {
             lastTickTime = System.currentTimeMillis();
         }
     }

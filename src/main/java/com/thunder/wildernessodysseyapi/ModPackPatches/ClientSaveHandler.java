@@ -50,9 +50,9 @@ public class ClientSaveHandler {
      * you could do so every X ticks on the client side, when in singleplayer.
      */
     @SubscribeEvent
-    public void onClientTick(ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END) {
+    public void onClientTick(ClientTickEvent.Post event) {{
             Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null) return;
             if (mc.hasSingleplayerServer()) {
                 // Example: flush once every 10,000 ticks on the client side
                 long time = mc.level.getGameTime();

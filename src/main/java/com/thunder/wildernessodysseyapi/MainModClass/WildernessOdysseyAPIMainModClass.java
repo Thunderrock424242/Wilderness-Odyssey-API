@@ -220,10 +220,10 @@ public class WildernessOdysseyAPIMainModClass {
     }
 
     @SubscribeEvent
-    public void onServerTick(ServerTickEvent event) {
-        if (event.phase == TickEvent.Phase.END) {
-            // Example: every 600 ticks (30 seconds at 20 TPS)
-            MinecraftServer server = event.server;
+    public void onServerTick(ServerTickEvent.Post event) {
+        // This is equivalent to the old "END" phase.
+        MinecraftServer server = event.getServer();
+        if (!event.hasTime()) return;
             if (server != null && server.getTickCount() % 600 == 0) {
                 long usedMB  = MemoryUtils.getUsedMemoryMB();
                 long totalMB = MemoryUtils.getTotalMemoryMB();
@@ -235,5 +235,3 @@ public class WildernessOdysseyAPIMainModClass {
             }
         }
     }
-
-}
