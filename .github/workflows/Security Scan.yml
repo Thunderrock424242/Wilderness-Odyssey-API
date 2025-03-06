@@ -1,0 +1,37 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  codeql-analysis:
+    name: Analyze code with CodeQL
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up CodeQL
+        uses: github/codeql-action/setup@v2
+        with:
+          languages: java
+
+      # Build your Minecraft Java project (e.g., a Forge or Spigot plugin) using Gradle.
+      - name: Build with Gradle
+        run: |
+          ./gradlew clean build
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/security-extended"
