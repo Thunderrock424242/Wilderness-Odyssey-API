@@ -118,7 +118,7 @@ public class FreezeChecker {
 
                 // 2) Save the crash report with a timestamp
                 String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH.mm.ss"));
-                File crashDir = new File(server.getServerDirectory(), "crash-reports");
+                File crashDir = new File(String.valueOf(server.getServerDirectory()), "crash-reports");
                 if (!crashDir.exists() && !crashDir.mkdirs()) {
                     LOGGER.error("Could not create crash-reports directory!");
                 }
