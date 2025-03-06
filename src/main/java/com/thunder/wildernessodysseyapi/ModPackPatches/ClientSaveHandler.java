@@ -3,8 +3,8 @@ package com.thunder.wildernessodysseyapi.ModPackPatches;
 import net.minecraft.client.Minecraft;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
 import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
@@ -45,20 +45,12 @@ public class ClientSaveHandler {
     }
 
     /**
-     * Example: A client setup event for any other initialization you need to do.
-     */
-    @SubscribeEvent
-    public static void onClientSetup(FMLClientSetupEvent event) {
-        // Here, you might set up keybindings, etc.
-    }
-
-    /**
      * (Optional) Periodic approach:
      * If you want to flush chunks more frequently to reduce final save time,
      * you could do so every X ticks on the client side, when in singleplayer.
      */
     @SubscribeEvent
-    public void onClientTick(TickEvent.ClientTickEvent event) {
+    public void onClientTick(ClientTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
             Minecraft mc = Minecraft.getInstance();
             if (mc.hasSingleplayerServer()) {

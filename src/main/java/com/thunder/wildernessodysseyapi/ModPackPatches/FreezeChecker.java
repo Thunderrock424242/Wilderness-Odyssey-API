@@ -6,6 +6,7 @@ import net.minecraft.server.MinecraftServer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.io.File;
@@ -50,7 +51,7 @@ public class FreezeChecker {
      * Update lastTickTime each time the server finishes a tick.
      */
     @SubscribeEvent
-    public void onServerTick(TickEvent.ServerTickEvent event) {
+    public void onServerTick(ServerTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
             lastTickTime = System.currentTimeMillis();
         }
