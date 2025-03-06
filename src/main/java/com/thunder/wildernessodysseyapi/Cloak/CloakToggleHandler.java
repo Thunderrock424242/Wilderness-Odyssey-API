@@ -10,6 +10,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
 
@@ -19,7 +20,7 @@ public class CloakToggleHandler {
     private static boolean wasKeyPressed = false;
 
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
+    public static void onClientTick(ClientTickEvent event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || event.phase != TickEvent.Phase.END) return;
 

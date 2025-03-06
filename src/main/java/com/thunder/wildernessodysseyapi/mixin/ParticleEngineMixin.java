@@ -21,7 +21,7 @@ public abstract class ParticleEngineMixin {
     @Inject(method = "register", at = @At("HEAD"), remap = true)
     private void modifyCampfireParticles(ParticleType<? extends ParticleOptions> type, ParticleProvider<? extends ParticleOptions> provider, CallbackInfo ci) {
         if (type == ParticleTypes.CAMPFIRE_COSY_SMOKE || type == ParticleTypes.CAMPFIRE_SIGNAL_SMOKE) {
-            ((ParticleEngine) (Object) this).register((SimpleParticleType) type, sprite -> new CustomCampfireParticle.Factory(sprite));
+            ((ParticleEngine) (Object) this).register((SimpleParticleType) type, CustomCampfireParticle.Factory::new);
         }
     }
 }
