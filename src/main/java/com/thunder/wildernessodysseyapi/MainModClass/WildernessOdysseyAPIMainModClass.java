@@ -46,8 +46,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -65,7 +65,7 @@ public class WildernessOdysseyAPIMainModClass {
     /**
      * The constant LOGGER.
      */
-    public static final Logger LOGGER = LoggerFactory.getLogger("WildernessOdysseyAPI");
+    public static final Logger LOGGER = LogManager.getLogger("wildernessodysseyapi");
 
 
     private static AABB structureBoundingBox;
