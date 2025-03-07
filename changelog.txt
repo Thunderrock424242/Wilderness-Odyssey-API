@@ -11,7 +11,7 @@ Added:
 * added forest x reborn
 * added more babies adds creeper and enderman babies
 * added piglet structures
-* added regions unexplored (unofficial port)
+* added regions unexplored
 * added shroom dealer
 * discord rich presence coming soon
 * added soul incursion
