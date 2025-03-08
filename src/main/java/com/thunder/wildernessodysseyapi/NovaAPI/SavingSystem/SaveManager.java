@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.NovaAPI.SavingSystem;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NbtAccounter;
 
 import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
@@ -45,7 +46,7 @@ public class SaveManager {
         if (!Files.exists(filePath)) return new CompoundTag();
 
         try (FileInputStream fis = new FileInputStream(filePath.toFile())) {
-            return NbtIo.readCompressed(fis);
+            return NbtIo.readCompressed(fis, NbtAccounter.unlimitedHeap()); // FIX: Added NbtAccounter
         } catch (IOException e) {
             System.err.println("Failed to load data: " + fileName);
             e.printStackTrace();

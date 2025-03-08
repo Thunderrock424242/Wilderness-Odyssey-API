@@ -4,9 +4,14 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
+import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.LOGGER;
+import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
+
+@EventBusSubscriber(modid = MOD_ID)
 public class ChunkPreloadHandler {
 
     private static final int PRELOAD_RADIUS = 2; // Adjust radius as needed
@@ -37,6 +42,6 @@ public class ChunkPreloadHandler {
             }
         }
 
-        LogUtil.getLogger().info("[NovaAPI] Requested chunk preloading near player at " + center);
+        LOGGER.info("[NovaAPI] Requested chunk preloading near player at {}", center);
     }
 }

@@ -4,11 +4,11 @@ import com.thunder.wildernessodysseyapi.NovaAPI.utils.ThreadMonitor;
 
 public class NovaAPI {
 
-    public static void printThreadInfo() {
-        ThreadMonitor.logAllThreads();
+    public static void initialize() {
+        ThreadMonitor.startMonitoring(); // Start automatic monitoring
     }
 
-    public static void checkDeadlocks() {
-        ThreadMonitor.checkForDeadlocks();
+    public static void shutdown() {
+        ThreadMonitor.stopMonitoring(); // Stop monitoring on game exit
     }
 }

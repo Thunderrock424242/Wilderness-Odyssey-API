@@ -12,6 +12,7 @@ import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffComma
 import com.thunder.wildernessodysseyapi.BunkerStructure.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ChunkSaveOptimizer;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ClientSaveHandler;
+import com.thunder.wildernessodysseyapi.NovaAPI.NovaAPI;
 import com.thunder.wildernessodysseyapi.NovaAPI.chunk.ChunkPreloadHandler;
 import com.thunder.wildernessodysseyapi.SkyBeam.AmethystBeamHandler;
 import com.thunder.wildernessodysseyapi.blocks.WorldSpawnBlock;
@@ -89,6 +90,7 @@ public class WildernessOdysseyAPIMainModClass {
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
+        modEventBus.addListener(this::onServerStopping);
 
         // Register global events
         NeoForge.EVENT_BUS.register(this);
@@ -219,6 +221,7 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         com.thunder.wildernessodysseyapi.NovaAPI.chunk.ChunkPreloader.shutdown();
+        NovaAPI.shutdown(); // Stop monitoring when server shuts down
 
     }
 

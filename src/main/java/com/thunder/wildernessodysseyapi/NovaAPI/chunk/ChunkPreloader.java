@@ -4,11 +4,16 @@ import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.LOGGER;
+import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.MOD_ID;
+
+@EventBusSubscriber(modid = MOD_ID)
 public class ChunkPreloader {
     private static final int THREAD_POOL_SIZE = Runtime.getRuntime().availableProcessors() - 1;
     private static final ExecutorService CHUNK_LOADING_EXECUTOR = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
@@ -40,11 +45,11 @@ public class ChunkPreloader {
                 LevelChunk loadedChunk = chunkCache.getChunk(pos.x, pos.z, true);
 
                 if (loadedChunk != null) {
-                    LogUtil.getLogger().info("[NovaAPI] Preloaded chunk at: " + pos);
+                    LOGGER.info("[NovaAPI] Preloaded chunk at: " + pos);
                 }
             }
         } catch (Exception e) {
-            LogUtil.getLogger().error("[NovaAPI] Error loading chunk at " + pos, e);
+            LOGGER.error("[NovaAPI] Error loading chunk at " + pos, e);
         }
     }
 
