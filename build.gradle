@@ -120,9 +120,23 @@ repositories {
 }
 
 dependencies {
-    implementation "curse.maven:worldedit-225608:5830452"
     implementation "curse.maven:huge-structure-blocks-474114:5628956"
-    implementation 'com.esotericsoftware:kryo:5.6.2'
+
+
+
+    // Embed WorldEdit inside your mod while ensuring compatibility
+    jarJar(implementation("curse.maven:worldedit-225608:5830452")) {
+        version {
+            prefer '7.3.8'
+        }
+    }
+
+    // Embed Kryo inside your mod while avoiding conflicts
+    jarJar(implementation("com.esotericsoftware:kryo:5.6.2")) {
+        version {
+            prefer '5.6.2'
+        }
+    }
 
 
     // Example optional mod dependency with JEI
