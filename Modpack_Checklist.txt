@@ -23,6 +23,8 @@ Alpha checklist:
  [] modpack folder cleanup
  [] get a QA team aka testers.
  [] amythest crystal metor and around the impact site maybe have some animals look amaythist.
+ [] added patreon to main menu and get the store set up
+ [] added kickstarter to main menu and get it set up.
 
 
 

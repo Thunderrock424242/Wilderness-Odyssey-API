@@ -42,6 +42,8 @@ Changed:
 ! edited our chunk management engine to optimize it.
 !! added an optimization to mob spawning but it may make mobs bleed into another biome they are not supposed to be in.
 ! main shader aka defult is now comp unbound and the high version of it will be comp unbound/euphoria patches
+* added suppport me button on main menu link patreon todo
+* link kickstarter via button todo
 
 Fixed:
 -
