@@ -3,7 +3,7 @@ package com.thunder.wildernessodysseyapi.tpdim;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 
-public class TPProcedure {
+public class RiftGate {
 
     public static void execute(Entity entity, ServerLevel targetDimension, double x, double y, double z) {
         if (entity == null || targetDimension == null) {

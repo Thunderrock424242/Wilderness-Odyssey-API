@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.commands;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
-import com.thunder.wildernessodysseyapi.tpdim.TPProcedure;
+import com.thunder.wildernessodysseyapi.tpdim.RiftGate;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.DimensionArgument;
@@ -21,7 +21,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import java.util.Optional;
 
 @EventBusSubscriber
-public class TptodimesnionCommand {
+public class RiftGateCommand {
 
     @SubscribeEvent
     public static void registerCommand(RegisterCommandsEvent event) {
@@ -64,7 +64,7 @@ public class TptodimesnionCommand {
                 targetPos = targetDimension.getSharedSpawnPos();
             }
 
-            TPProcedure.execute(targetEntity, targetDimension, targetPos.getX(), targetPos.getY(), targetPos.getZ());
+            RiftGate.execute(targetEntity, targetDimension, targetPos.getX(), targetPos.getY(), targetPos.getZ());
             source.sendSuccess(() -> targetEntity.getName().copy().append(" has been teleported!"), true);
         } catch (Exception e) {
             context.getSource().sendFailure(Component.literal("Failed to execute teleport command: " + e.getMessage()));
