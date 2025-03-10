@@ -3,7 +3,7 @@ package com.thunder.wildernessodysseyapi.NovaAPI.MainModClass;
 import com.thunder.wildernessodysseyapi.NovaAPI.utils.ThreadMonitor;
 import net.neoforged.fml.common.Mod;
 
-@Mod(NovaAPI.MOD_ID)
+/// in future add mod anotation
 public class NovaAPI {
     //*/public NovaAPI() {
      //   LOGGER.info("[Nova API] Initializing Nova API...");
