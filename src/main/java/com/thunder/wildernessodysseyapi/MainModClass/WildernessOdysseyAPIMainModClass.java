@@ -134,7 +134,6 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
 
-
     }
 
     /**
