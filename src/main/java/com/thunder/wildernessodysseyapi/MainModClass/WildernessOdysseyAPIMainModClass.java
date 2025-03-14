@@ -12,6 +12,7 @@ import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffComma
 import com.thunder.wildernessodysseyapi.BunkerStructure.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ChunkSaveOptimizer;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ClientSaveHandler;
+import com.thunder.wildernessodysseyapi.ModPackPatches.WorldUpgrader.WorldUpgradeManager;
 import com.thunder.wildernessodysseyapi.NovaAPI.MainModClass.NovaAPI;
 import com.thunder.wildernessodysseyapi.NovaAPI.chunk.ChunkPreloadHandler;
 import com.thunder.wildernessodysseyapi.SkyBeam.AmethystBeamHandler;
@@ -133,6 +134,7 @@ public class WildernessOdysseyAPIMainModClass {
      */
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
+        WorldUpgradeManager.upgradeWorld(event.getServer());
 
     }
 
