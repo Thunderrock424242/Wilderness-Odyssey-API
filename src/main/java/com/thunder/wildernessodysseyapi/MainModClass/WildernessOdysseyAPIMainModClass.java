@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.MainModClass;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.thunder.wildernessodysseyapi.BugFixes.InfiniteSourceHandler;
+import com.thunder.wildernessodysseyapi.ModPackPatches.BugFixes.InfiniteSourceHandler;
 import com.thunder.wildernessodysseyapi.Cloak.CloakRenderHandler;
 import com.thunder.wildernessodysseyapi.ErrorLog.UncaughtExceptionLogger;
 import com.thunder.wildernessodysseyapi.BunkerStructure.Features.ModFeatures;
@@ -12,7 +12,6 @@ import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffComma
 import com.thunder.wildernessodysseyapi.BunkerStructure.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ChunkSaveOptimizer;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ClientSaveHandler;
-import com.thunder.wildernessodysseyapi.ModPackPatches.WorldUpgrader.WorldUpgradeManager;
 import com.thunder.wildernessodysseyapi.SkyBeam.AmethystBeamHandler;
 import com.thunder.wildernessodysseyapi.blocks.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -131,7 +130,6 @@ public class WildernessOdysseyAPIMainModClass {
      */
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
-        WorldUpgradeManager.upgradeWorld(event.getServer());
 
     }
 

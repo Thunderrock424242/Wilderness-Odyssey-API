@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.BugFixes;
+package com.thunder.wildernessodysseyapi.ModPackPatches.BugFixes;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
