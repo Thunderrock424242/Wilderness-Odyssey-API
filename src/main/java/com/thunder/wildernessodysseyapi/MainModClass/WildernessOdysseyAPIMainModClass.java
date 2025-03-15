@@ -13,8 +13,6 @@ import com.thunder.wildernessodysseyapi.BunkerStructure.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ChunkSaveOptimizer;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ClientSaveHandler;
 import com.thunder.wildernessodysseyapi.ModPackPatches.WorldUpgrader.WorldUpgradeManager;
-import com.thunder.wildernessodysseyapi.NovaAPI.MainModClass.NovaAPI;
-import com.thunder.wildernessodysseyapi.NovaAPI.chunk.ChunkPreloadHandler;
 import com.thunder.wildernessodysseyapi.SkyBeam.AmethystBeamHandler;
 import com.thunder.wildernessodysseyapi.blocks.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -101,7 +99,6 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(new AmethystBeamHandler());
         NeoForge.EVENT_BUS.register(new ChunkSaveOptimizer());
         NeoForge.EVENT_BUS.register(new ClientSaveHandler());
-        NeoForge.EVENT_BUS.register(new ChunkPreloadHandler());
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
@@ -221,8 +218,6 @@ public class WildernessOdysseyAPIMainModClass {
      */
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
-        com.thunder.wildernessodysseyapi.NovaAPI.chunk.ChunkPreloader.shutdown();
-        NovaAPI.shutdown(); // Stop monitoring when server shuts down
 
     }
 
