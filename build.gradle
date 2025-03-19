@@ -157,7 +157,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_id                 : "wildernessodysseyapi",
             mod_name               : "Wilderness Odyssey API",
             mod_license            : "APR",
-            mod_version            : "2.0.0",
+            mod_version            : "3.0.0",
             mod_authors            : "thunderrock424242",
             mod_description        : "a api for my modpack"
     ]
