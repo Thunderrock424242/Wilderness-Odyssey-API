@@ -18,7 +18,7 @@ public class BlacklistChecker {
     // Hardcoded list of blacklisted mods and resource packs
     private static final List<String> BLACKLISTED_MODS = Arrays.asList(
             "xray",
-            "examplemod2" // if there are others keep listing same as resource packs
+            "cheatutils" // if there are others keep listing same as resource packs
     );
 
     private static final List<String> BLACKLISTED_RESOURCE_PACKS = Arrays.asList(
