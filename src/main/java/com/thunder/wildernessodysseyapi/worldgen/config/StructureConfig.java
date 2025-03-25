@@ -34,7 +34,7 @@ public class StructureConfig {
     }
 
     private static final HashMap<String, ModConfigSpec.BooleanValue> POIS = new HashMap<>();
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static final ModConfigSpec MOD_CONFIG_SPEC;
 
     public static boolean isStructureEnabled(ResourceLocation id) {
         return STRUCTURES.getOrDefault(id.toString().replace(':', '_'), () -> true).get();
