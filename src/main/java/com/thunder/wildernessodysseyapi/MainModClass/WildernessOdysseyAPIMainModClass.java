@@ -14,6 +14,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.ChunkSaveOptimizer;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ClientSaveHandler;
 import com.thunder.wildernessodysseyapi.SkyBeam.AmethystBeamHandler;
 import com.thunder.wildernessodysseyapi.blocks.WorldSpawnBlock;
+import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.BunkerStructure.ModStructures;
@@ -105,6 +106,7 @@ public class WildernessOdysseyAPIMainModClass {
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
+       ///todo fix "ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);"
 
     }
 
@@ -143,6 +145,7 @@ public class WildernessOdysseyAPIMainModClass {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
         ModListDiffCommand.register(dispatcher);
         MemCheckCommand.register(event.getDispatcher());
+        StructureInfoCommand.register(event.getDispatcher());
     }
 
     /**
