@@ -12,10 +12,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.levelgen.structure.Structure;
 import net.neoforged.fml.ModList;
 
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class StructureInfoCommand {
 
@@ -29,34 +29,65 @@ public class StructureInfoCommand {
     private static int execute(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
         ServerLevel level = player.serverLevel();
+        BlockPos pos = getTargetBlockPos(player);
 
-        BlockPos targetPos = getTargetBlockPos(player);
-        if (targetPos == null) {
-            ctx.getSource().sendFailure(Component.literal("No valid block targeted."));
-            return 0;
+        StringBuilder output = new StringBuilder();
+
+        // Structures
+        var structureRegistry = level.registryAccess().registryOrThrow(Registries.STRUCTURE);
+        var structures = structureRegistry.holders()
+                .filter(holder -> level.structureManager().getStructureAt(pos, holder.value()).isValid())
+                .map(Holder::key)
+                .map(key -> formatEntry(key.location()))
+                .collect(Collectors.toList());
+
+        // Features
+        var featureRegistry = level.registryAccess().registryOrThrow(Registries.CONFIGURED_FEATURE);
+        var features = level.getChunk(pos).getFeatures().stream()
+                .map(featureRegistry::getResourceKey)
+                .flatMap(Optional::stream)
+                .map(key -> formatEntry(key.location()))
+                .distinct()
+                .collect(Collectors.toList());
+
+        // Points of Interest (POIs)
+        var poiRegistry = level.registryAccess().registryOrThrow(Registries.POINT_OF_INTEREST_TYPE);
+        var pois = poiRegistry.stream()
+                .filter(poi -> level.getPoiManager().existsAtPosition(poi, pos))
+                .map(poiRegistry::getResourceKey)
+                .flatMap(Optional::stream)
+                .map(key -> formatEntry(key.location()))
+                .collect(Collectors.toList());
+
+        // Output construction
+        if (structures.isEmpty() && features.isEmpty() && pois.isEmpty()) {
+            output.append("No structures, features, or POIs found at this location.");
+        } else {
+            output.append("Structure Info at your location:");
+
+            if (!structures.isEmpty()) {
+                output.append("\n§eStructures:");
+                structures.forEach(s -> output.append("\n - §6").append(s));
+            }
+            if (!features.isEmpty()) {
+                output.append("\n§aFeatures:");
+                features.forEach(f -> output.append("\n - §2").append(f));
+            }
+            if (!pois.isEmpty()) {
+                output.append("\n§bPoints of Interest:");
+                pois.forEach(p -> output.append("\n - §3").append(p));
+            }
         }
 
-        Optional<Holder.Reference<Structure>> structureHolder = level.registryAccess()
-                .registryOrThrow(Registries.STRUCTURE)
-                .holders()
-                .filter(holder -> level.structureManager().getStructureAt(targetPos, (Structure) holder.value()).isValid())
-                .findFirst();
+        ctx.getSource().sendSuccess(() -> Component.literal(output.toString()), false);
+        return 1;
+    }
 
-        if (structureHolder.isEmpty()) {
-            ctx.getSource().sendFailure(Component.literal("No structure found at this location."));
-            return 0;
-        }
-
-        ResourceLocation structureId = structureHolder.get().key().location();
-
-        String modName = ModList.get().getModContainerById(structureId.getNamespace())
+    private static String formatEntry(ResourceLocation location) {
+        String modName = ModList.get().getModContainerById(location.getNamespace())
                 .map(container -> container.getModInfo().getDisplayName())
                 .orElse("Unknown Mod");
-
-        ctx.getSource().sendSuccess(() -> Component.literal(
-                "Structure: " + structureId.getPath() + " | Mod: " + modName), false);
-
-        return 1;
+        return location.getPath() + " §7[" + modName + "§7]";
     }
 
     private static BlockPos getTargetBlockPos(ServerPlayer player) {
