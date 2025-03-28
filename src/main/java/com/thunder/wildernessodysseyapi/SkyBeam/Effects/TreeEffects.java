@@ -17,7 +17,7 @@ public class TreeEffects {
             Block block = state.getBlock();
 
             if (block.defaultMapColor() == Blocks.OAK_LOG.defaultBlockState().defaultMapColor()) {
-                world.setBlock(blockPos, Blocks.CHARCOAL_BLOCK.defaultBlockState(), 3);
+                world.setBlock(blockPos, Blocks.COAL_BLOCK.defaultBlockState(), 3);
             } else if (block instanceof LeavesBlock) {
                 world.setBlock(blockPos, Blocks.AIR.defaultBlockState(), 3);
             }

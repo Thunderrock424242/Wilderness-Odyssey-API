@@ -12,6 +12,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import org.joml.Matrix4f;
 
+import com.thunder.wildernessodysseyapi.ocean.events.WaterSystem;
+
 import java.io.IOException;
 
 public class WaveRenderer {
