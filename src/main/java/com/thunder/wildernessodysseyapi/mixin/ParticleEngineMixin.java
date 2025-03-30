@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.HigherSmoke.Particles.CustomCampfireParticle;
+import com.thunder.wildernessodysseyapi.ModPackPatches.HigherSmoke.Particles.CustomCampfireParticle;
 import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.core.particles.SimpleParticleType;

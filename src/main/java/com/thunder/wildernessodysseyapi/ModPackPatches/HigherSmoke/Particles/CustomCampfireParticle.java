@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.HigherSmoke.Particles;
+package com.thunder.wildernessodysseyapi.ModPackPatches.HigherSmoke.Particles;
 
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
