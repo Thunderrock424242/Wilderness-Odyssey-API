@@ -38,6 +38,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
@@ -47,7 +48,6 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -111,7 +111,6 @@ public class WildernessOdysseyAPIMainModClass {
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
         ///todo fix "ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);"
-
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
@@ -161,7 +160,6 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onWorldLoad(LevelEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
-
 
         // Find a position in the Plains biome
         BlockPos pos = findPlainsBiomePosition(serverLevel);
@@ -227,23 +225,20 @@ public class WildernessOdysseyAPIMainModClass {
     }
 
     @SubscribeEvent
-    public void onServerTick(ServerTickEvent event) {
+    public void onServerTick(ServerTickEvent.Post event) {
         // Every server tick event
-        if (event.phase == TickEvent.Phase.END) {
-            // Example: every 600 ticks (~30 seconds @ 20 TPS)
-            MinecraftServer server = event.server;
-            if (server != null && server.getTickCount() % 600 == 0) {
+        // This is equivalent to the old "END" phase.
+        MinecraftServer server = event.getServer();
+        if (!event.hasTime()) return;
+
+        if (server.getTickCount() % 600 == 0) {
                 long usedMB = MemoryUtils.getUsedMemoryMB();
                 long totalMB = MemoryUtils.getTotalMemoryMB();
 
                 // Use the dynamic mod count
                 int recommendedMB = MemoryUtils.calculateRecommendedRAM(usedMB, dynamicModCount);
 
-                server.getLogger().info("[ResourceManagerMod] Memory usage: "
-                        + usedMB + "MB / " + totalMB + "MB. "
-                        + "Recommended ~" + recommendedMB + "MB for "
-                        + dynamicModCount + " loaded mods.");
+            LOGGER.info("[ResourceManagerMod] Memory usage: {}MB / {}MB. Recommended ~{}MB for {} loaded mods.", usedMB, totalMB, recommendedMB, dynamicModCount);
             }
         }
     }
-}
