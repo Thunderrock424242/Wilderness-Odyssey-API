@@ -32,6 +32,7 @@ import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -68,6 +69,7 @@ public class WildernessOdysseyAPIMainModClass {
      */
     public static final Logger LOGGER = LogManager.getLogger("wildernessodysseyapi");
 
+    public static int dynamicModCount = 0;
 
     private static AABB structureBoundingBox;
     /**
@@ -76,7 +78,9 @@ public class WildernessOdysseyAPIMainModClass {
     public static final String MOD_ID = "wildernessodysseyapi";
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
 
-    private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader, IPayloadHandler<T> handler) {}
+    private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader,
+                                                                 IPayloadHandler<T> handler) {
+    }
 
     /**
      * Instantiates a new Wilderness odyssey api main mod class.
@@ -106,7 +110,7 @@ public class WildernessOdysseyAPIMainModClass {
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
-       ///todo fix "ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);"
+        ///todo fix "ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);"
 
     }
 
@@ -117,6 +121,7 @@ public class WildernessOdysseyAPIMainModClass {
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
         UncaughtExceptionLogger.init();
+        dynamicModCount = ModList.get().getMods().size();
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
@@ -131,7 +136,7 @@ public class WildernessOdysseyAPIMainModClass {
      * @param event the event
      */
     @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event){
+    public void onServerStarting(ServerStartingEvent event) {
 
     }
 
@@ -158,7 +163,6 @@ public class WildernessOdysseyAPIMainModClass {
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
 
 
-
         // Find a position in the Plains biome
         BlockPos pos = findPlainsBiomePosition(serverLevel);
         if (pos == null) return;
@@ -170,7 +174,7 @@ public class WildernessOdysseyAPIMainModClass {
                     pos.getX() - 10, pos.getY() - 5, pos.getZ() - 10,
                     pos.getX() + 10, pos.getY() + 10, pos.getZ() + 10
             ); // Define a bounding box around the BunkerStructure
-             // Mark as generated
+            // Mark as generated
         }
     }
 
@@ -223,18 +227,23 @@ public class WildernessOdysseyAPIMainModClass {
     }
 
     @SubscribeEvent
-    public void onServerTick(ServerTickEvent.Post event) {
-        // This is equivalent to the old "END" phase.
-        MinecraftServer server = event.getServer();
-        if (!event.hasTime()) return;
+    public void onServerTick(ServerTickEvent event) {
+        // Every server tick event
+        if (event.phase == TickEvent.Phase.END) {
+            // Example: every 600 ticks (~30 seconds @ 20 TPS)
+            MinecraftServer server = event.server;
             if (server != null && server.getTickCount() % 600 == 0) {
-                long usedMB  = MemoryUtils.getUsedMemoryMB();
+                long usedMB = MemoryUtils.getUsedMemoryMB();
                 long totalMB = MemoryUtils.getTotalMemoryMB();
-                int recommended = MemoryUtils.calculateRecommendedRAM(usedMB, MOD_COUNT);
+
+                // Use the dynamic mod count
+                int recommendedMB = MemoryUtils.calculateRecommendedRAM(usedMB, dynamicModCount);
 
                 server.getLogger().info("[ResourceManagerMod] Memory usage: "
                         + usedMB + "MB / " + totalMB + "MB. "
-                        + "Recommended ~" + recommended + "MB.");
+                        + "Recommended ~" + recommendedMB + "MB for "
+                        + dynamicModCount + " loaded mods.");
             }
         }
     }
+}
