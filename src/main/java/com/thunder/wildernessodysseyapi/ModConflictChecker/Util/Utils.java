@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.ModConflictChecker.Util;
 
 import net.minecraft.resources.ResourceLocation;
 
-import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.LOGGER;
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 
 /**
  * The type Utils.

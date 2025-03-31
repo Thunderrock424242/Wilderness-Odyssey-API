@@ -19,11 +19,14 @@ import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.BunkerStructure.WordlEdit.WorldEditStructurePlacer;
+import com.thunder.wildernessodysseyapi.worldgen.ModBiomes;
+import com.thunder.wildernessodysseyapi.worldgen.ModRegion;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
@@ -34,6 +37,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
@@ -48,11 +52,12 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
 
 /**
  * The type Wilderness odyssey api main mod class.
@@ -61,21 +66,14 @@ import java.util.Map;
 public class WildernessOdysseyAPIMainModClass {
 
     /**
-     * The constant VERSION.
+     * The constant MOD_ID.
      */
-    public static final String VERSION = "0.0.3"; // Change this to your mod pack version
-    /**
-     * The constant LOGGER.
-     */
-    public static final Logger LOGGER = LogManager.getLogger("wildernessodysseyapi");
+    public static final String MOD_ID = "wildernessodysseyapi";
 
     public static int dynamicModCount = 0;
 
     private static AABB structureBoundingBox;
-    /**
-     * The constant MOD_ID.
-     */
-    public static final String MOD_ID = "wildernessodysseyapi";
+
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
 
     private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader,
@@ -110,6 +108,13 @@ public class WildernessOdysseyAPIMainModClass {
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
+
+        // Register features & biomes
+        ModFeatures.FEATURES.register(modEventBus);
+        modEventBus.addListener(ModBiomes::register);
+
+        // TerraBlender region
+        TerraBlender.addRegion(new ModRegion(new ResourceLocation(WildernessOdysseyAPIMainModClass.MOD_ID, "meteor_region"), 1));
         ///todo fix "ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);"
     }
 
@@ -222,6 +227,11 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
 
+    }
+
+    private void onLoadComplete(FMLLoadCompleteEvent event) {
+        // Register structure placer or any late logic
+        NeoForge.EVENT_BUS.register(new WorldEvents());
     }
 
     @SubscribeEvent

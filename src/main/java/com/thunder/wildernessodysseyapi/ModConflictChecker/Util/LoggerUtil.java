@@ -7,8 +7,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.LOGGER;
-
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 /**
  * The type Logger util.
  */

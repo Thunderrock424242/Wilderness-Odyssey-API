@@ -80,3 +80,10 @@ versionRange="[7.3.8,]" #mandatory
 ordering="AFTER"
 # Side this dependency is applied on - BOTH, CLIENT, or SERVER
 side="BOTH"
+
+[[dependencies.wildernessodysseyapi]]
+modId="terrablender"
+mandatory=true
+versionRange="[4.1.0.8,)"
+ordering="NONE"
+side="BOTH"

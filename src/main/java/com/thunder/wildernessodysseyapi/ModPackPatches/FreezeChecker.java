@@ -13,7 +13,7 @@ import java.io.File;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-import static com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass.LOGGER;
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 
 /**
  * A FreezeChecker mod that tries to reduce world corruption and false positives by:
