@@ -19,7 +19,7 @@ public class ModRegion extends NetherRegion {
                         Climate.Parameter.point(0.01123F),
                         0L
                 ),
-                ModBiomes.METEOR_BIOME
+                ModBiomes.ANOMALY_REGION
         );
     }
 }

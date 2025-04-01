@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.item;
 
-import com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass;
+import com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredRegister;
 

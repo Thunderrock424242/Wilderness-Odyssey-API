@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.blocks;
 
-import com.thunder.wildernessodysseyapi.MainModClass.WildernessOdysseyAPIMainModClass;
+import com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;

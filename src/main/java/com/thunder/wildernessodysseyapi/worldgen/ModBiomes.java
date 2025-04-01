@@ -10,10 +10,10 @@ import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraft.world.level.levelgen.GenerationStep;
 
 public class ModBiomes {
-    public static final ResourceKey<Biome> METEOR_BIOME = ResourceKey.create(Registries.BIOME, new ResourceLocation("yourmodid", "meteor_biome"));
+    public static final ResourceKey<Biome> ANOMALY_REGION = ResourceKey.create(Registries.BIOME, new ResourceLocation("yourmodid", "meteor_biome"));
 
     public static void register(BootstapContext<Biome> context) {
-        context.register(METEOR_BIOME, createMeteorBiome());
+        context.register(ANOMALY_REGION, createMeteorBiome());
     }
 
     private static Biome createMeteorBiome() {

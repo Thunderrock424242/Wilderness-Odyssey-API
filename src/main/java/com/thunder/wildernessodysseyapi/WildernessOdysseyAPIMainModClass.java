@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.MainModClass;
+package com.thunder.wildernessodysseyapi;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.ModPackPatches.BugFixes.InfiniteSourceHandler;
