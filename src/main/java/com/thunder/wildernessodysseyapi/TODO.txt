@@ -22,6 +22,8 @@
 
 - trying to make a biome to put a metor crator and bunker structure. try to move the bunker structure package into the world gen one.
 
+- there is also shader issues the wave_shader.json needs help because it spams the console saying it can not be loaded.
+
 that should be it any questions just ask me aka thunderrock424242
 
 also most of the code is in forge but i am trying to convert to neoforge.
