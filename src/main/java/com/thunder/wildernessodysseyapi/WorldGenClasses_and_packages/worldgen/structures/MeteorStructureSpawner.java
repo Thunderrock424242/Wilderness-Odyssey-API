@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.worldgen.structures;
+package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen.structures;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;

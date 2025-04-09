@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.worldgen;
+package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;

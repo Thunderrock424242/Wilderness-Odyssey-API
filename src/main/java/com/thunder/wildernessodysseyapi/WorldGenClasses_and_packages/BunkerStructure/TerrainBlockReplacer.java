@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.BunkerStructure;
+package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure;
 
 import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.MaxChangedBlocksException;

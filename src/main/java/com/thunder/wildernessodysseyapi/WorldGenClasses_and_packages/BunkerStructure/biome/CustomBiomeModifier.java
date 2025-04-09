@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.BunkerStructure.biome;
+package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.biome;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;

@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.BunkerStructure;
+package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;

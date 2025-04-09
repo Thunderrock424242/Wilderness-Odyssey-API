@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.BunkerStructure.SpawnBlock;
+package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.SpawnBlock;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;

@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.BunkerStructure;
+package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure;
 
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;

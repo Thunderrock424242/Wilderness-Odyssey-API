@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.blocks;
+package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.blocks;
 
 import com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass;
 import com.thunder.wildernessodysseyapi.item.ModItems;

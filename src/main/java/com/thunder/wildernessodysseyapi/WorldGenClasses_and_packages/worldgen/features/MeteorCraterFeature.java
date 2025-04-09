@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.worldgen.features;
+package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen.features;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
