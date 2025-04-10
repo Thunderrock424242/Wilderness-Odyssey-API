@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.BugFixes.InfiniteSourceHa
 import com.thunder.wildernessodysseyapi.Cloak.CloakRenderHandler;
 import com.thunder.wildernessodysseyapi.ErrorLog.UncaughtExceptionLogger;
 import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqCommand;
+import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqManager;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
@@ -40,6 +41,7 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -253,4 +255,8 @@ public class WildernessOdysseyAPIMainModClass {
             LOGGER.info("[ResourceManagerMod] Memory usage: {}MB / {}MB. Recommended ~{}MB for {} loaded mods.", usedMB, totalMB, recommendedMB, dynamicModCount);
             }
         }
+    @SubscribeEvent
+    public static void onReload(AddReloadListenerEvent event) {
+        event.addListener(FaqManager::loadFromResources);
+    }
     }

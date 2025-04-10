@@ -2,46 +2,30 @@ package com.thunder.wildernessodysseyapi.ModPackPatches.FAQ;
 
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
-import net.minecraft.util.profiling.ProfilerFiller;
 
+import java.io.InputStreamReader;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class FaqManager extends SimpleJsonResourceReloadListener {
-    private static final Type FAQ_TYPE = new TypeToken<List<FaqEntry>>() {}.getType();
+public class FaqManager {
     private static final Map<String, FaqEntry> FAQ_ENTRIES = new HashMap<>();
 
-    public FaqManager() {
-        super(new Gson(), "faq");
-    }
-
-    /**
-     * @param resourceLocationJsonElementMap
-     * @param resourceManager
-     * @param profilerFiller
-     */
-    @Override
-    protected void apply(Map<ResourceLocation, JsonElement> resourceLocationJsonElementMap, ResourceManager resourceManager, ProfilerFiller profilerFiller) {
-
-    }
-
-    @Override
-    protected void apply(Map<ResourceLocation, JsonElement> map, ResourceManager manager, MinecraftServer server) {
+    public static void loadFromResources(ResourceManager manager) {
         FAQ_ENTRIES.clear();
-        for (Map.Entry<ResourceLocation, JsonElement> entry : map.entrySet()) {
-            try {
-                FaqEntry[] entries = new Gson().fromJson(entry.getValue(), FaqEntry[].class);
-                for (FaqEntry faq : entries) {
-                    FAQ_ENTRIES.put(faq.id(), faq);
+        Gson gson = new Gson();
+        Type listType = new TypeToken<List<FaqEntry>>() {}.getType();
+
+        for (ResourceLocation id : manager.listResources("faq", path -> path.getPath().endsWith(".json")).keySet()) {
+            try (var reader = new InputStreamReader(manager.getResource(id).get().open())) {
+                List<FaqEntry> entries = gson.fromJson(reader, listType);
+                for (FaqEntry entry : entries) {
+                    FAQ_ENTRIES.put(entry.id(), entry);
                 }
             } catch (Exception e) {
-                System.err.println("Failed to parse FAQ: " + entry.getKey() + ", error: " + e);
+                System.err.println("Failed to parse FAQ: " + id + ", error: " + e);
             }
         }
         System.out.println("Loaded " + FAQ_ENTRIES.size() + " FAQ entries.");
@@ -64,7 +48,7 @@ public class FaqManager extends SimpleJsonResourceReloadListener {
     public static List<FaqEntry> getByCategory(String category) {
         return FAQ_ENTRIES.values().stream()
                 .filter(entry -> entry.category().equalsIgnoreCase(category))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public static Set<String> getCategories() {
