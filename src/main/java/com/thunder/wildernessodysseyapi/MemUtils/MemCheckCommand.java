@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.MemUtils;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.ChatFormatting;
@@ -17,7 +18,7 @@ public class MemCheckCommand {
                             long totalMB = MemoryUtils.getTotalMemoryMB();
                             int recommended = MemoryUtils.calculateRecommendedRAM(
                                     usedMB,
-                                    ResourceManagerMod.MOD_COUNT
+                                    WildernessOdysseyAPIMainModClass.dynamicModCount
                             );
 
                             source.sendSuccess(
