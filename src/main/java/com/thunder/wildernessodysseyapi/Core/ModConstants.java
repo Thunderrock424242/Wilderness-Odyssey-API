@@ -16,6 +16,8 @@ public class ModConstants {
      */
     public static final Logger LOGGER = LogManager.getLogger("wildernessodysseyapi");
 
+    public static final int CURRENT_WORLD_VERSION = 1; // increment when data changes
+
 
     // Optional: common paths
     public static final String STRUCTURE_PATH = MOD_ID + ":structures/";
