@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.saveUtil;
+package com.thunder.wildernessodysseyapi.WorldVersionChecker;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;

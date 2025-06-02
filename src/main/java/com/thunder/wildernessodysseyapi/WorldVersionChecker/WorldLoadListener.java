@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.saveUtil;
+package com.thunder.wildernessodysseyapi.WorldVersionChecker;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.network.chat.Component;
