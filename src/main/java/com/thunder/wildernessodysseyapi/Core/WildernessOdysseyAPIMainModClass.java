@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi;
+package com.thunder.wildernessodysseyapi.Core;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.ModPackPatches.BugFixes.InfiniteSourceHandler;
@@ -67,11 +67,6 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
  */
 @Mod(WildernessOdysseyAPIMainModClass.MOD_ID)
 public class WildernessOdysseyAPIMainModClass {
-
-    /**
-     * The constant MOD_ID.
-     */
-    public static final String MOD_ID = "wildernessodysseyapi";
 
     public static int dynamicModCount = 0;
 

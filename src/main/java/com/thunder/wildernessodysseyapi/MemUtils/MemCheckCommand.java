@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.MemUtils;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass;
+import com.thunder.wildernessodysseyapi.Core.WildernessOdysseyAPIMainModClass;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.ChatFormatting;

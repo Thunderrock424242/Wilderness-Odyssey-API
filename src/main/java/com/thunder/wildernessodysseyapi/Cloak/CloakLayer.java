@@ -12,7 +12,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 
-import static com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass.MOD_ID;
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
 public class CloakLayer<T extends LivingEntity, M extends EntityModel<T>> extends RenderLayer<T, M> {
     public CloakLayer(RenderLayerParent<T, M> entityRenderer) {

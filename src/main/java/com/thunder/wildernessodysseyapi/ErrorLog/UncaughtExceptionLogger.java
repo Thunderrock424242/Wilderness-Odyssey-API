@@ -8,7 +8,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import static com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass.MOD_ID;
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+
 
 /**
  * Sets up a global uncaught exception handler that logs errors to both the main Neoforge log

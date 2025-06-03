@@ -4,6 +4,8 @@ import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldVersionChecker.client.gui.OutdatedWorldScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+
 
 public class SyncWorldVersionPacket {
     public final int worldVersion;
@@ -12,26 +14,22 @@ public class SyncWorldVersionPacket {
         this.worldVersion = version;
     }
 
-    public static void encode(SyncWorldVersionPacket pkt, FriendlyByteBuf buf) {
-        buf.writeVarInt(pkt.worldVersion);
-    }
-
     public static SyncWorldVersionPacket decode(FriendlyByteBuf buf) {
         return new SyncWorldVersionPacket(buf.readVarInt());
     }
 
-    public static void handle(SyncWorldVersionPacket pkt, NetworkEvent.Context ctx) {
-        ctx.enqueueWork(() -> {
-            Minecraft mc = Minecraft.getInstance();
-            int clientVersion = pkt.worldVersion;
-            int expectedVersion = ModConstants.CURRENT_WORLD_VERSION;
+    public void encode(FriendlyByteBuf buf) {
+        buf.writeVarInt(worldVersion);
+    }
 
-            if (clientVersion < expectedVersion) {
-                mc.setScreen(new OutdatedWorldScreen(() -> {
-                    // Optional: resume game or return to menu
+    public void handle(IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
+            int expected = ModConstants.CURRENT_WORLD_VERSION;
+            if (worldVersion < expected) {
+                Minecraft.getInstance().setScreen(new OutdatedWorldScreen(() -> {
+                    // Optional callback after confirm
                 }));
             }
         });
-        ctx.setPacketHandled(true);
     }
 }

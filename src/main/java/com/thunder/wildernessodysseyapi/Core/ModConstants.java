@@ -3,9 +3,12 @@ package com.thunder.wildernessodysseyapi.Core;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import static com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass.MOD_ID;
-
 public class ModConstants {
+
+    /**
+     * The constant MOD_ID.
+     */
+    public static final String MOD_ID = "wildernessodysseyapi";
 
     /**
      * The constant VERSION.
