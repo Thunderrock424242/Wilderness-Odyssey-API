@@ -65,7 +65,7 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
 /**
  * The type Wilderness odyssey api main mod class.
  */
-@Mod(WildernessOdysseyAPIMainModClass.MOD_ID)
+@Mod(ModConstants.MOD_ID)
 public class WildernessOdysseyAPIMainModClass {
 
     public static int dynamicModCount = 0;
