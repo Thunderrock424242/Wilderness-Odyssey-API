@@ -3,80 +3,48 @@ package com.thunder.wildernessodysseyapi.WorldVersionChecker;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraft.world.level.storage.LevelResource;
-import net.minecraft.world.level.storage.LevelStorageSource;
 
-import java.io.IOException;
-import java.nio.file.Path;
-
-public abstract class WorldVersionData extends SavedData {
+public class WorldVersionData extends SavedData {
     public static final String FILE_NAME = "novaapi_version";
-
     private int version = 0;
 
-    public WorldVersionData() {}
+    /** No-arg constructor: required by SavedData.Factory<T> */
+    public WorldVersionData() {
+        this.version = 0;
+    }
+
+    /** NBT constructor: load from tag */
     public WorldVersionData(CompoundTag tag) {
         this.version = tag.getInt("WorldVersion");
     }
 
-    @Override
     public CompoundTag save(CompoundTag tag) {
         tag.putInt("WorldVersion", version);
         return tag;
     }
 
-    public static WorldVersionData load(CompoundTag tag) {
-        return new WorldVersionData(tag) {
-            /**
-             * @param compoundTag
-             * @param provider
-             * @return
-             */
-            @Override
-            public CompoundTag save(CompoundTag compoundTag, HolderLookup.Provider provider) {
-                return null;
-            }
-        };
+    @Override
+    public CompoundTag save(CompoundTag tag, HolderLookup.Provider provider) {
+        // Delegate to the single-argument save(...)
+        return this.save(tag);
     }
 
-    public static WorldVersionData getOrCreate(LevelStorageSource.LevelStorageAccess access) {
-        Path worldPath = access.getLevelPath(LevelResource.ROOT);
-        Path dataPath = worldPath.resolve("data").resolve(FILE_NAME + ".dat");
+    public static SavedData.Factory<WorldVersionData> factory() {
+        return new SavedData.Factory<>(
+                // (1) No-arg supplier → calls the no-arg constructor
+                WorldVersionData::new,
 
-        try {
-            CompoundTag nbt = CompressedStreamTools.read(dataPath.toFile());
-            return new WorldVersionData(nbt) {
-                /**
-                 * @param compoundTag
-                 * @param provider
-                 * @return
-                 */
-                @Override
-                public CompoundTag save(CompoundTag compoundTag, HolderLookup.Provider provider) {
-                    return null;
-                }
-            };
-        } catch (IOException e) {
-            return new WorldVersionData() {
-                /**
-                 * @param compoundTag
-                 * @param provider
-                 * @return
-                 */
-                @Override
-                public CompoundTag save(CompoundTag compoundTag, HolderLookup.Provider provider) {
-                    return null;
-                }
-            }; // fallback if no version exists
-        }
+                // (2) Loader from NBT → new WorldVersionData(tag)
+                (tag, provider) -> new WorldVersionData(tag)
+        );
+    }
+
+    public int getVersion() {
+        return version;
     }
 
     public void setVersion(int version) {
         this.version = version;
         setDirty();
-    }
-
-    public int getVersion() {
-        return version;
     }
 }

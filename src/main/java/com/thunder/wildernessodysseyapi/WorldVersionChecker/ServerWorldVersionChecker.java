@@ -21,7 +21,10 @@ public class ServerWorldVersionChecker {
         if (!level.dimension().equals(Level.OVERWORLD)) return;
 
         var storage = level.getDataStorage();
-        var data = storage.computeIfAbsent(WorldVersionData::load, WorldVersionData::new, WorldVersionData.FILE_NAME);
+        var data = storage.computeIfAbsent(
+                WorldVersionData.factory(),
+                WorldVersionData.FILE_NAME
+        );
 
         int current = ModConstants.CURRENT_WORLD_VERSION;
         int worldVer = data.getVersion();

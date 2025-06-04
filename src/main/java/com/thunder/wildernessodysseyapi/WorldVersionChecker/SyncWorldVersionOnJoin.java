@@ -16,10 +16,13 @@ public class SyncWorldVersionOnJoin {
 
         ServerLevel level = player.serverLevel();
         var storage = level.getDataStorage();
-        var data = storage.computeIfAbsent(WorldVersionData::load, WorldVersionData::new, WorldVersionData.FILE_NAME);
+        var data = storage.computeIfAbsent(
+                WorldVersionData.factory(),
+                WorldVersionData.FILE_NAME
+        );
+
 
         int version = data.getVersion();
-        NovaAPINetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
-                new SyncWorldVersionPacket(version));
+        NovaAPINetworkHandler.sendTo(player, new SyncWorldVersionPacket(version));
     }
 }

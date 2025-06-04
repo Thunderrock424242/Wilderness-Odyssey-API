@@ -24,7 +24,10 @@ public class WorldLoadListener {
         if (overworld == null) return;
 
         var dataStorage = overworld.getDataStorage();
-        var data = dataStorage.computeIfAbsent(WorldVersionData::load, WorldVersionData::new, WorldVersionData.FILE_NAME);
+        var data = dataStorage.computeIfAbsent(
+                WorldVersionData.factory(),
+                WorldVersionData.FILE_NAME
+        );
 
         int current = ModConstants.CURRENT_WORLD_VERSION;
         int worldVer = data.getVersion();

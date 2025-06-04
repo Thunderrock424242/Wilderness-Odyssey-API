@@ -35,7 +35,7 @@ public class OutdatedWorldScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.renderDirtBackground(guiGraphics); // Classic Minecraft dirt background
+        this.renderBackground(guiGraphics, mouseX, mouseY, partialTick); // Correct call
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         this.label.renderCentered(guiGraphics, this.width / 2, 40);
     }
