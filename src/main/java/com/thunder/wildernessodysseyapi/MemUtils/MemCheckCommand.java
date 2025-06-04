@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.Core.WildernessOdysseyAPIMainModClass;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 
 public class MemCheckCommand {
 
@@ -22,13 +23,13 @@ public class MemCheckCommand {
                             );
 
                             source.sendSuccess(
-                                    () -> ChatFormatting.GREEN + "Current memory usage: "
-                                            + usedMB + "MB / " + totalMB + "MB",
+                                    () -> Component.nullToEmpty(ChatFormatting.GREEN + "Current memory usage: "
+                                            + usedMB + "MB / " + totalMB + "MB"),
                                     false
                             );
                             source.sendSuccess(
-                                    () -> ChatFormatting.YELLOW + "Recommended allocation: ~"
-                                            + recommended + "MB",
+                                    () -> Component.nullToEmpty(ChatFormatting.YELLOW + "Recommended allocation: ~"
+                                            + recommended + "MB"),
                                     false
                             );
 
