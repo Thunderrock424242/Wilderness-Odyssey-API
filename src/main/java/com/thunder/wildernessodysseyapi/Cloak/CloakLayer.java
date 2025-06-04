@@ -32,6 +32,6 @@ public class CloakLayer<T extends LivingEntity, M extends EntityModel<T>> extend
 
     @Override
     public ResourceLocation getTextureLocation(T entity) {
-        return new ResourceLocation(MOD_ID, "textures/entity/cloak.png"); // Default texture
+        return ResourceLocation.tryBuild(MOD_ID, "textures/entity/cloak.png"); // Default texture
     }
 }

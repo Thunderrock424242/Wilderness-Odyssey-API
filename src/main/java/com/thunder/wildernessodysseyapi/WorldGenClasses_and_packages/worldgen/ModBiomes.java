@@ -9,8 +9,10 @@ import net.minecraft.world.level.biome.BiomeSpecialEffects;
 import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraft.world.level.levelgen.GenerationStep;
 
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+
 public class ModBiomes {
-    public static final ResourceKey<Biome> ANOMALY_REGION = ResourceKey.create(Registries.BIOME, new ResourceLocation("yourmodid", "meteor_biome"));
+    public static final ResourceKey<Biome> ANOMALY_REGION = ResourceKey.create(Registries.BIOME, ResourceLocation.tryBuild(MOD_ID, "meteor_biome"));
 
     public static void register(BootstapContext<Biome> context) {
         context.register(ANOMALY_REGION, createMeteorBiome());

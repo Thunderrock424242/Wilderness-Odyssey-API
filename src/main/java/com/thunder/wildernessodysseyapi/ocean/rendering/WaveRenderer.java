@@ -19,8 +19,8 @@ import java.io.IOException;
 public class WaveRenderer {
 
     private static ShaderInstance waveShader;
-    private static final ResourceLocation WAVE_SHADER_LOCATION = new ResourceLocation("wildernessodysseyapi:shaders/core/wave_shader");
-    private static final ResourceLocation FOAM_TEXTURE = new ResourceLocation("wildernessodysseyapi:textures/misc/foam.png");
+    private static final ResourceLocation WAVE_SHADER_LOCATION = ResourceLocation.tryParse("wildernessodysseyapi:shaders/core/wave_shader");
+    private static final ResourceLocation FOAM_TEXTURE = ResourceLocation.tryParse("wildernessodysseyapi:textures/misc/foam.png");
 
     public static void initializeShader() {
         try {
