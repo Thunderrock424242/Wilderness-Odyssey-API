@@ -31,6 +31,14 @@ public class FaqManager {
         System.out.println("Loaded " + FAQ_ENTRIES.size() + " FAQ entries.");
     }
 
+    public static void clear() {
+        FAQ_ENTRIES.clear();
+    }
+
+    public static void add(FaqEntry entry) {
+        FAQ_ENTRIES.put(entry.id(), entry);
+    }
+
     public static List<String> getIds() {
         return new ArrayList<>(FAQ_ENTRIES.keySet());
     }

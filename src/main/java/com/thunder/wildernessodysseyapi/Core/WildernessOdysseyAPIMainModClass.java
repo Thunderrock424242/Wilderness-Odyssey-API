@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.Cloak.CloakRenderHandler;
 import com.thunder.wildernessodysseyapi.ErrorLog.UncaughtExceptionLogger;
 import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqManager;
+import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqReloadListener;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
@@ -232,7 +233,8 @@ public class WildernessOdysseyAPIMainModClass {
 
     private void onLoadComplete(FMLLoadCompleteEvent event) {
         // Register structure placer or any late logic
-        NeoForge.EVENT_BUS.register(new WorldEvents());
+        //NeoForge.EVENT_BUS.register(new WorldEvents());
+        /// i think we don't need this anymore ^ but keep for now.
     }
 
     @SubscribeEvent
@@ -249,11 +251,11 @@ public class WildernessOdysseyAPIMainModClass {
                 // Use the dynamic mod count
                 int recommendedMB = MemoryUtils.calculateRecommendedRAM(usedMB, dynamicModCount);
 
-            LOGGER.info("[ResourceManagerMod] Memory usage: {}MB / {}MB. Recommended ~{}MB for {} loaded mods.", usedMB, totalMB, recommendedMB, dynamicModCount);
+            LOGGER.info("[ResourceManager] Memory usage: {}MB / {}MB. Recommended ~{}MB for {} loaded mods.", usedMB, totalMB, recommendedMB, dynamicModCount);
             }
         }
     @SubscribeEvent
     public static void onReload(AddReloadListenerEvent event) {
-        event.addListener(FaqManager::loadFromResources);
+        event.addListener(new FaqReloadListener());
     }
-    }
+}
