@@ -27,7 +27,7 @@ public class SyncWorldVersionPacket {
             int expected = ModConstants.CURRENT_WORLD_VERSION;
             if (worldVersion < expected) {
                 Minecraft.getInstance().setScreen(new OutdatedWorldScreen(() -> {
-                    // Optional callback after confirm
+                    // Optional callback after confirmation
                 }));
             }
         });

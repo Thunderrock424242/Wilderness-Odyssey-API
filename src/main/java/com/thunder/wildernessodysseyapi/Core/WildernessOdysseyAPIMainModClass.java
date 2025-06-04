@@ -55,6 +55,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.network.registration.NetworkRegistry;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -103,6 +104,7 @@ public class WildernessOdysseyAPIMainModClass {
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
         ModFeatures.PLACED_FEATURES.register(modEventBus);
+        NetworkRegistry.setup();
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
