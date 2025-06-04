@@ -11,7 +11,7 @@ import net.minecraft.world.level.Level;
 public class WaterSystem {
 
     private static ShaderInstance waveShader;
-    private static final ResourceLocation WAVE_SHADER_LOCATION = new ResourceLocation("wildernessodysseyapi:shaders/core/wave_shader.json");
+    private static final ResourceLocation WAVE_SHADER_LOCATION = ResourceLocation.tryParse("wildernessodysseyapi:shaders/core/wave_shader.json");
 
     // GPU-driven uniforms (Handled in the shader)
     private static float time = 0.0f;
