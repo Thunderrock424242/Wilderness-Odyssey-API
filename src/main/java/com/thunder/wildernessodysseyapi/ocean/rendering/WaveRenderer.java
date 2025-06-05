@@ -9,6 +9,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.FastColor;
 import org.joml.Matrix4f;
 
 import java.io.IOException;
@@ -86,24 +87,24 @@ public class WaveRenderer {
         // Four corners of a quad at y=0 in world coordinates, spanning [-1..1] in X and Z.
         // The GPU shader will displace these vertices along Y in the vertex shader.
         consumer.addVertex(pose, -1.0F, 0.0F, -1.0F)
-                .color(255, 255, 255, (int) (255 * foamAlpha))
-                .uv(0.0F, 0.0F)
-                .uv2(light)
+                .setColor(FastColor.ARGB32.color((int) (255 * foamAlpha), 255, 255, 255))
+                .setUv(0.0F, 0.0F)
+                .setUv2(light)
                 .endVertex();
         consumer.addVertex(pose, 1.0F, 0.0F, -1.0F)
                 .color(255, 255, 255, (int) (255 * foamAlpha))
-                .uv(1.0F, 0.0F)
-                .uv2(light)
+                .setUv(1.0F, 0.0F)
+                .setUv2(light)
                 .endVertex();
         consumer.addVertex(pose, 1.0F, 0.0F, 1.0F)
                 .color(255, 255, 255, (int) (255 * foamAlpha))
-                .uv(1.0F, 1.0F)
-                .uv2(light)
+                .setUv(1.0F, 1.0F)
+                .setUv2(light)
                 .endVertex();
         consumer.addVertex(pose, -1.0F, 0.0F, 1.0F)
                 .color(255, 255, 255, (int) (255 * foamAlpha))
-                .uv(0.0F, 1.0F)
-                .uv2(light)
+                .setUv(0.0F, 1.0F)
+                .setUv2(light)
                 .endVertex();
 
         // Push the quad through the buffer
