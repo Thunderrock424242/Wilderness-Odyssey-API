@@ -1,29 +1,39 @@
 package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen;
 
+import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen.features.anomolyzonePlacedFeature;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.biome.BiomeGenerationSettings;
-import net.minecraft.world.level.biome.BiomeSpecialEffects;
-import net.minecraft.world.level.biome.MobSpawnSettings;
+import net.minecraft.world.level.biome.*;
 import net.minecraft.world.level.levelgen.GenerationStep;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
 public class ModBiomes {
-    public static final ResourceKey<Biome> ANOMALY_REGION = ResourceKey.create(Registries.BIOME, ResourceLocation.tryBuild(MOD_ID, "meteor_biome"));
+    public static final ResourceKey<Biome> ANOMALY_ZONE =
+            ResourceKey.create(Registries.BIOME, ResourceLocation.tryBuild(MOD_ID, "anomaly_zone"));
 
     public static void register(BootstapContext<Biome> context) {
-        context.register(ANOMALY_REGION, createMeteorBiome());
-    }
+        // Look up our placed feature (must already be registered in the registry)
+        Holder<PlacedFeature> craterHolder =
+                context.lookup(Registries.PLACED_FEATURE).getOrThrow(anomolyzonePlacedFeature.METEOR_CRATER_PLACED);
 
-    private static Biome createMeteorBiome() {
-        BiomeGenerationSettings.Builder gen = new BiomeGenerationSettings.Builder();
-        gen.addFeature(GenerationStep.Decoration.LOCAL_MODIFICATIONS, ModPlacedFeatures.METEOR_CRATER_PLACED);
+        // Create a BiomeGenerationSettings.Builder with the two required holders:
+        BiomeGenerationSettings.Builder gen = new BiomeGenerationSettings.Builder(
+                context.lookup(Registries.PLACED_FEATURE),
+                context.lookup(Registries.CONFIGURED_CARVER)
+        );
 
-        return new Biome.BiomeBuilder()
-                .temperature(0.7F).downfall(0.3F).hasPrecipitation(true)
+        // Add our meteor crater into the biome’s LOCAL_MODIFICATIONS step:
+        gen.addFeature(GenerationStep.Decoration.LOCAL_MODIFICATIONS, (ResourceKey<PlacedFeature>) craterHolder);
+
+        // Finally build the Biome object:
+        Biome anomaly = new Biome.BiomeBuilder()
+                .temperature(0.7F)
+                .downfall(0.3F)
+                .hasPrecipitation(true)
                 .mobSpawnSettings(new MobSpawnSettings.Builder().build())
                 .generationSettings(gen.build())
                 .specialEffects(new BiomeSpecialEffects.Builder()
@@ -33,5 +43,7 @@ public class ModBiomes {
                         .fogColor(0x9999AA)
                         .build())
                 .build();
+
+        context.register(ANOMALY_ZONE, anomaly);
     }
 }
