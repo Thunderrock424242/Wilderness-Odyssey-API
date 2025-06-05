@@ -14,7 +14,7 @@ public class SmoothFluidRenderType {
             false,
             true,
             RenderType.CompositeState.builder()
-                    .setShaderState(new RenderStateShard.ShaderStateShard(() -> SmoothFluidShaders::getShader))
+                   // .setShaderState(new RenderStateShard.ShaderStateShard(() -> SmoothFluidShaders::getShader))
                     .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
                     .setTextureState(RenderStateShard.BLOCK_SHEET_MIPPED)
                     .createCompositeState(true)
