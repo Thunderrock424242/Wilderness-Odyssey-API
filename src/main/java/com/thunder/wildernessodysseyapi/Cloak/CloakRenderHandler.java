@@ -10,7 +10,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
+
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
@@ -29,7 +29,7 @@ public class CloakRenderHandler {
 
     /**
      * Every client tick (Post phase), if the player's “cloakEnabled” NBT is true,
-     * we move the camera 2 blocks behind the player and render the world into our offscreen texture.
+     * move the camera 2 blocks behind the player and render the world into our offscreen texture.
      */
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
@@ -58,21 +58,17 @@ public class CloakRenderHandler {
         float origYaw = camera.getYRot();
         float origPitch = camera.getXRot();
 
-        // 5) Move the camera to “behind” and (optionally) rotate it 180° so it truly
-        //    looks “forward from behind.” If you want just “behind” without flipping,
-        //    comment out the setRotation(...) line.
+        // 5) Move the camera to “behind‐player” and rotate it 180° so it faces forward.
         camera.setPosition(behindPos.x, behindPos.y, behindPos.z);
         camera.setRotation(player.getYRot() + 180.0F, -player.getXRot());
 
-        // 6) Prepare the offscreen buffer, set the viewport to 256×256:
+        // 6) Prepare the offscreen buffer, set viewport to 256×256:
         cloakRenderTarget.clear(Minecraft.ON_OSX);
         cloakRenderTarget.bindWrite(true);
         RenderSystem.viewport(0, 0, 256, 256);
 
-        // 7) Get the existing DeltaTracker from Minecraft (no need to 'new' one)
-        DeltaTracker tracker = mc.getFrameTime() >= 0.0F
-                ? new DeltaTracker(mc.getFrameTime()) // fallback if delta isn't ready
-                : mc.getDeltaTracker();               // if you’ve exposed it via AT, use mc.getDeltaTracker()
+        // 7) Get the existing DeltaTracker from Minecraft (via getTimer()):
+        DeltaTracker tracker = mc.getTimer();
 
         // 8) Render the world from the “behind‐player” camera into our offscreen target:
         mc.levelRenderer.renderLevel(
@@ -99,7 +95,9 @@ public class CloakRenderHandler {
      * is bound to texture unit 0 with linear filtering and clamp‐to‐edge.
      */
     public static void applyCloakTexture() {
-        if (cloakRenderTarget == null) return;
+        if (cloakRenderTarget == null) {
+            return;
+        }
         RenderSystem.setShaderTexture(0, cloakRenderTarget.getColorTextureId());
         RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
         RenderSystem.texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
