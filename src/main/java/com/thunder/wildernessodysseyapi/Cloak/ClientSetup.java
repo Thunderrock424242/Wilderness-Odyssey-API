@@ -1,20 +1,28 @@
 package com.thunder.wildernessodysseyapi.Cloak;
 
+
 import net.minecraft.client.renderer.entity.EntityRenderer;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
-import net.minecraft.client.resources.PlayerSkin;
+import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 
-@EventBusSubscriber
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+
+@EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
 public class ClientSetup {
+
     @SubscribeEvent
-    public static void registerRenderers(EntityRenderersEvent.AddLayers event) {
-        EntityRenderer<Player> renderer = event.getSkin(PlayerSkin.Model.valueOf("default"));
-        if (renderer instanceof LivingEntityRenderer livingRenderer) {
-            livingRenderer.addLayer(new CloakLayer(livingRenderer));
+    public static void onRegisterLayers(EntityRenderersEvent.AddLayers event) {
+        // Fetch as a raw/wildcard EntityRenderer so generics don’t block us:
+        EntityRenderer<?> anyRenderer = (EntityRenderer<?>) event.getRenderer(EntityType.PLAYER);
+
+        if (anyRenderer instanceof PlayerRenderer) {
+            PlayerRenderer playerRenderer = (PlayerRenderer) anyRenderer;
+            playerRenderer.addLayer(new CloakLayer(playerRenderer));
         }
     }
 }
