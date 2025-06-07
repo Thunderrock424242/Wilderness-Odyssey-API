@@ -115,7 +115,7 @@ public class WildernessOdysseyAPIMainModClass {
         modEventBus.addListener(ModBiomes::register);
 
         // TerraBlender region
-        TerraBlender.addRegion(new ModRegion(ResourceLocation.tryBuild(ModConstants.MOD_ID, "meteor_region"), 1));
+        //TerraBlender.addRegion(new ModRegion(ResourceLocation.tryBuild(ModConstants.MOD_ID, "meteor_region"), 1));
         ///todo fix "ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);"
     }
 
