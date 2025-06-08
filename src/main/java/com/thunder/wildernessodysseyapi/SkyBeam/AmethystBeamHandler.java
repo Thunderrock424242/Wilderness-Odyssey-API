@@ -16,7 +16,7 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 public class AmethystBeamHandler {
 
     @SubscribeEvent
-    public static void onRightClick(PlayerInteractEvent.RightClickBlock event) {
+    public void onRightClick(PlayerInteractEvent.RightClickBlock event) {
         if (event.getItemStack().is(Items.AMETHYST_SHARD)) {
             BlockPos targetPos = event.getPos();
             ServerLevel serverWorld = (ServerLevel) event.getLevel();
