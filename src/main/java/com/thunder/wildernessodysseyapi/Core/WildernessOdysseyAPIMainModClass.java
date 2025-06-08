@@ -5,7 +5,6 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.BugFixes.InfiniteSourceHa
 import com.thunder.wildernessodysseyapi.Cloak.CloakRenderHandler;
 import com.thunder.wildernessodysseyapi.ErrorLog.UncaughtExceptionLogger;
 import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqCommand;
-import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqReloadListener;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
@@ -141,7 +140,7 @@ public class WildernessOdysseyAPIMainModClass {
      */
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
-
+        ChunkSaveOptimizer.shutdownExecutor();
     }
 
     /**
