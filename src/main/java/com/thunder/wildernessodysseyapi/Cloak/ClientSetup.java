@@ -4,7 +4,6 @@ package com.thunder.wildernessodysseyapi.Cloak;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -17,7 +16,7 @@ public class ClientSetup {
 
     @SubscribeEvent
     public static void onRegisterLayers(EntityRenderersEvent.AddLayers event) {
-        // Fetch as a raw/wildcard EntityRenderer so generics don’t block us:
+
         EntityRenderer<?> anyRenderer = (EntityRenderer<?>) event.getRenderer(EntityType.PLAYER);
 
         if (anyRenderer instanceof PlayerRenderer) {

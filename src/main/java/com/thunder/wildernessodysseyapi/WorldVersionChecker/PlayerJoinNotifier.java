@@ -6,7 +6,9 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
-@EventBusSubscriber(modid = "novaapi")
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+
+@EventBusSubscriber(modid = MOD_ID)
 public class PlayerJoinNotifier {
 
     private static boolean notify = false;

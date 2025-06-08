@@ -58,7 +58,7 @@ public class WorldOutdatedAcknowledgement {
     }
 
     private static void crash(String reason) {
-        System.err.println("[NovaAPI] " + reason);
+        System.err.println("[WildernessOdysseyAPI] " + reason);
         throw new RuntimeException(reason);
     }
 }

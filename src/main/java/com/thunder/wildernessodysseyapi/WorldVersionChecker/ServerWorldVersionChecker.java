@@ -11,8 +11,9 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 import java.nio.file.Path;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
-@EventBusSubscriber(modid = "novaapi")
+@EventBusSubscriber(modid = MOD_ID)
 public class ServerWorldVersionChecker {
 
     @SubscribeEvent

@@ -11,10 +11,21 @@ import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
+/**
+ * The type Mod biomes.
+ */
 public class ModBiomes {
+    /**
+     * The constant ANOMALY_ZONE.
+     */
     public static final ResourceKey<Biome> ANOMALY_ZONE =
             ResourceKey.create(Registries.BIOME, ResourceLocation.tryBuild(MOD_ID, "anomaly_zone"));
 
+    /**
+     * Register.
+     *
+     * @param context the context
+     */
     public static void register(BootstapContext<Biome> context) {
         // Look up our placed feature (must already be registered in the registry)
         Holder<PlacedFeature> craterHolder =
@@ -29,7 +40,7 @@ public class ModBiomes {
         // Add our meteor crater into the biome’s LOCAL_MODIFICATIONS step:
         gen.addFeature(GenerationStep.Decoration.LOCAL_MODIFICATIONS, (ResourceKey<PlacedFeature>) craterHolder);
 
-        // Finally build the Biome object:
+        // Finally, build the Biome object:
         Biome anomaly = new Biome.BiomeBuilder()
                 .temperature(0.7F)
                 .downfall(0.3F)

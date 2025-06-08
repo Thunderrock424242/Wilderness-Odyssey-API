@@ -11,7 +11,7 @@ import net.minecraft.server.level.ServerPlayer;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
 
-public class NovaAPINetworkHandler {
+public class WildernessOdysseyAPINetworkHandler {
 
     // (1) Use ResourceLocation.of(namespace, path)
     public static final ResourceLocation SYNC_WORLD_VERSION_ID =

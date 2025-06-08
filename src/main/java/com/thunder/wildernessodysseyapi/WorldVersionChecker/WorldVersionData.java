@@ -5,7 +5,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.saveddata.SavedData;
 
 public class WorldVersionData extends SavedData {
-    public static final String FILE_NAME = "novaapi_version";
+    public static final String FILE_NAME = "Wilderness_Odyssey_version";
     private int version = 0;
 
     /** No-arg constructor: required by SavedData.Factory<T> */
