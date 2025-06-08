@@ -253,7 +253,7 @@ public class WildernessOdysseyAPIMainModClass {
             }
         }
     @SubscribeEvent
-    public static void onReload(AddReloadListenerEvent event) {
+    public void onReload(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
     }
 }
