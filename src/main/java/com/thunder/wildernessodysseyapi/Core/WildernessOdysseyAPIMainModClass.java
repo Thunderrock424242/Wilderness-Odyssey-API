@@ -1,11 +1,11 @@
-package com.thunder.wildernessodysseyapi;
+package com.thunder.wildernessodysseyapi.Core;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.ModPackPatches.BugFixes.InfiniteSourceHandler;
 import com.thunder.wildernessodysseyapi.Cloak.CloakRenderHandler;
 import com.thunder.wildernessodysseyapi.ErrorLog.UncaughtExceptionLogger;
 import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqCommand;
-import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqManager;
+import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqReloadListener;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
@@ -55,6 +55,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.network.registration.NetworkRegistry;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -65,13 +66,8 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
 /**
  * The type Wilderness odyssey api main mod class.
  */
-@Mod(WildernessOdysseyAPIMainModClass.MOD_ID)
+@Mod(ModConstants.MOD_ID)
 public class WildernessOdysseyAPIMainModClass {
-
-    /**
-     * The constant MOD_ID.
-     */
-    public static final String MOD_ID = "wildernessodysseyapi";
 
     public static int dynamicModCount = 0;
 
@@ -94,7 +90,6 @@ public class WildernessOdysseyAPIMainModClass {
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
-        modEventBus.addListener(this::onServerStopping);
 
         // Register global events
         NeoForge.EVENT_BUS.register(this);
@@ -108,16 +103,17 @@ public class WildernessOdysseyAPIMainModClass {
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
         ModFeatures.PLACED_FEATURES.register(modEventBus);
+        NetworkRegistry.setup();
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
 
         // Register features & biomes
-        ModFeatures.FEATURES.register(modEventBus);
+        //ModFeatures.FEATURES.register(modEventBus);
         modEventBus.addListener(ModBiomes::register);
 
         // TerraBlender region
-        TerraBlender.addRegion(new ModRegion(new ResourceLocation(WildernessOdysseyAPIMainModClass.MOD_ID, "meteor_region"), 1));
+        //terrablender.addRegion(new ModRegion(ResourceLocation.tryBuild(ModConstants.MOD_ID, "meteor_region"), 1));
         ///todo fix "ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);"
     }
 
@@ -144,7 +140,7 @@ public class WildernessOdysseyAPIMainModClass {
      */
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
-
+        ChunkSaveOptimizer.shutdownExecutor();
     }
 
     /**
@@ -235,7 +231,8 @@ public class WildernessOdysseyAPIMainModClass {
 
     private void onLoadComplete(FMLLoadCompleteEvent event) {
         // Register structure placer or any late logic
-        NeoForge.EVENT_BUS.register(new WorldEvents());
+        //NeoForge.EVENT_BUS.register(new WorldEvents());
+        /// i think we don't need this anymore ^ but keep for now.
     }
 
     @SubscribeEvent
@@ -252,11 +249,11 @@ public class WildernessOdysseyAPIMainModClass {
                 // Use the dynamic mod count
                 int recommendedMB = MemoryUtils.calculateRecommendedRAM(usedMB, dynamicModCount);
 
-            LOGGER.info("[ResourceManagerMod] Memory usage: {}MB / {}MB. Recommended ~{}MB for {} loaded mods.", usedMB, totalMB, recommendedMB, dynamicModCount);
+            LOGGER.info("[ResourceManager] Memory usage: {}MB / {}MB. Recommended ~{}MB for {} loaded mods.", usedMB, totalMB, recommendedMB, dynamicModCount);
             }
         }
     @SubscribeEvent
-    public static void onReload(AddReloadListenerEvent event) {
-        event.addListener(FaqManager::loadFromResources);
+    public void onReload(AddReloadListenerEvent event) {
+        event.addListener(new FaqReloadListener());
     }
-    }
+}

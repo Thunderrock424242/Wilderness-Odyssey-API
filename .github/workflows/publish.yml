@@ -1,0 +1,39 @@
+name: Publish to GitHub Packages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission to gradlew
+        run: chmod +x ./gradlew
+
+      - name: Read publish-config.json
+        id: config
+        run: |
+          ENABLE=$(jq -r '.enablePublishing' publish-config.json)
+          echo "enable-publish=$ENABLE" >> $GITHUB_OUTPUT
+
+      - name: Publish to GitHub Packages
+        if: steps.config.outputs.enable-publish == 'true'
+        env:
+          USERNAME: ${{ github.actor }}
+          TOKEN: ${{ secrets.GIT_TOKEN }}
+        run: ./gradlew publish

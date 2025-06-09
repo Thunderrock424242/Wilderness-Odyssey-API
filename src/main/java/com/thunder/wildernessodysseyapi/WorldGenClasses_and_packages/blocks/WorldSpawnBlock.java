@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.blocks;
 
-import com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass;
+import com.thunder.wildernessodysseyapi.Core.WildernessOdysseyAPIMainModClass;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -13,6 +13,8 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 import java.util.function.Supplier;
 
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+
 /**
  * The type World spawn block.
  */
@@ -21,7 +23,7 @@ public class WorldSpawnBlock {
      * The constant BLOCKS.
      */
     public static final DeferredRegister.Blocks BLOCKS =
-            DeferredRegister.createBlocks(WildernessOdysseyAPIMainModClass.MOD_ID);
+            DeferredRegister.createBlocks(MOD_ID);
 
     /**
      * The constant WORLD_SPAWN_BLOCK.

@@ -1,9 +1,11 @@
 package com.thunder.wildernessodysseyapi.MemUtils;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.thunder.wildernessodysseyapi.Core.WildernessOdysseyAPIMainModClass;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 
 public class MemCheckCommand {
 
@@ -17,17 +19,17 @@ public class MemCheckCommand {
                             long totalMB = MemoryUtils.getTotalMemoryMB();
                             int recommended = MemoryUtils.calculateRecommendedRAM(
                                     usedMB,
-                                    ResourceManagerMod.MOD_COUNT
+                                    WildernessOdysseyAPIMainModClass.dynamicModCount
                             );
 
                             source.sendSuccess(
-                                    () -> ChatFormatting.GREEN + "Current memory usage: "
-                                            + usedMB + "MB / " + totalMB + "MB",
+                                    () -> Component.nullToEmpty(ChatFormatting.GREEN + "Current memory usage: "
+                                            + usedMB + "MB / " + totalMB + "MB"),
                                     false
                             );
                             source.sendSuccess(
-                                    () -> ChatFormatting.YELLOW + "Recommended allocation: ~"
-                                            + recommended + "MB",
+                                    () -> Component.nullToEmpty(ChatFormatting.YELLOW + "Recommended allocation: ~"
+                                            + recommended + "MB"),
                                     false
                             );
 

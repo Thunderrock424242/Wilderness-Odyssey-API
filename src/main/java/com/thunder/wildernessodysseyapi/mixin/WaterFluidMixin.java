@@ -1,21 +1,46 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.ocean.events.WaterSystem;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.LiquidBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.material.Fluids;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(FluidState.class)
-public class WaterFluidMixin {
+/**
+ * By mixing into BlockBehaviour.entityInside(...), we catch every block that wants to
+ * apply “entity‐in‐block” behavior.  Then we simply filter for “is this water?”
+ * and, if so, apply our wave‐force logic.
+ */
+@Mixin(BlockBehaviour.class)
+public abstract class WaterFluidMixin {
 
-    @Inject(method = "entityInside", at = @At("HEAD"))
-    public void onEntityInside(FluidState state, Entity entity, CallbackInfo ci) {
-        WaterSystem.applyWaveForces(entity);
+    @Inject(
+            method = "entityInside("
+                    + "Lnet/minecraft/world/level/block/state/BlockState;"
+                    + "Lnet/minecraft/world/level/Level;"
+                    + "Lnet/minecraft/core/BlockPos;"
+                    + "Lnet/minecraft/world/entity/Entity;)V",
+            at = @At("HEAD"),
+            cancellable = false
+    )
+    private void onBlockEntityInside(
+            BlockState state,
+            Level world,
+            BlockPos pos,
+            Entity entity,
+            CallbackInfo ci
+    ) {
+        // Only run our wave logic if this block is a liquid block whose fluid is WATER:
+        if (state.getBlock() instanceof LiquidBlock
+                && state.getFluidState().getType() == Fluids.WATER) {
+            WaterSystem.applyWaveForces(entity);
+        }
     }
 }
-
-
-// this corresponds to the ocean package.

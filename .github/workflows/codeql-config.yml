@@ -1,0 +1,14 @@
+name: "Minecraft Mod CodeQL Config"
+
+queries:
+  - uses: security-and-quality
+
+paths:
+  - src/main/java
+  - src/generated/java
+  - buildSrc/src
+
+paths-ignore:
+  - '**/test/**'
+  - '**/example/**'
+  - '**/generated/**'

@@ -10,7 +10,8 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.thunder.wildernessodysseyapi.WildernessOdysseyAPIMainModClass.MOD_ID;
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+
 
 /**
  * The type Player spawn handler.

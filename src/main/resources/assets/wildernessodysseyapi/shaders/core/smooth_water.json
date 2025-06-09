@@ -1,0 +1,23 @@
+{
+  "name": "smooth_water",
+  "vertex": "wildernessodysseyapi:shaders/core/smooth_water.vert",
+  "fragment": "wildernessodysseyapi:shaders/core/smooth_water.frag",
+  "samplers": [
+    {
+      "name": "waterTexture",
+      "file": "minecraft:textures/block/water_flow.png"
+    }
+  ],
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "uniforms": [
+    {
+      "name": "time",
+      "type": "float",
+      "count": 1,
+      "values": [0.0]
+    }
+  ]
+}
