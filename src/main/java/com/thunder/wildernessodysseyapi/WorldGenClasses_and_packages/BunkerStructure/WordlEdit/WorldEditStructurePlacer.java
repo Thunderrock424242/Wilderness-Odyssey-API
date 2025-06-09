@@ -70,9 +70,9 @@ public class WorldEditStructurePlacer {
                     clipboard.getRegion().forEach(blockVector -> {
                         if (clipboard.getFullBlock(blockVector).getBlockType().equals(BlockTypes.WHITE_WOOL)) {
                             BlockPos terrainPos = new BlockPos(
-                                    blockVector.getX() + surfacePos.getX(),
-                                    blockVector.getY() + surfacePos.getY(),
-                                    blockVector.getZ() + surfacePos.getZ()
+                                    blockVector.x() + surfacePos.getX(),
+                                    blockVector.y() + surfacePos.getY(),
+                                    blockVector.z() + surfacePos.getZ()
                             );
 
                             // Delegate block replacement to the utility class

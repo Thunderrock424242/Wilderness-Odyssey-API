@@ -40,7 +40,7 @@ public class StructureInfoCommand {
 
         StringBuilder output = new StringBuilder();
 
-        // --- STRUCTURES ---
+        // Structures
         Registry<Structure> structReg = level.registryAccess()
                 .registryOrThrow(Registries.STRUCTURE);
         List<String> structures = structReg.entrySet().stream()
@@ -48,11 +48,11 @@ public class StructureInfoCommand {
                 .map(entry -> formatEntry(entry.getKey().location()))
                 .collect(Collectors.toList());
 
-        // --- FEATURES (from the biome at that position) ---
+        // --- FEATURES (from the biome at that position) ---Add commentMore actions
         Registry<ConfiguredFeature<?, ?>> featReg = level.registryAccess()
                 .registryOrThrow(Registries.CONFIGURED_FEATURE);
 
-// Get the biome’s generation settings
+        // Get the biome’s generation settings
         BiomeGenerationSettings gen = level.getBiome(pos).value().getGenerationSettings();
 
         List<String> features = gen.features().stream()                                 // Stream<HolderSet<PlacedFeature>>
@@ -65,7 +65,8 @@ public class StructureInfoCommand {
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
-        // --- POINTS OF INTEREST ---
+
+        // --- POINTS OF INTEREST ---Add commentMore actions
         Registry<PoiType> poiReg = level.registryAccess()
                 .registryOrThrow(Registries.POINT_OF_INTEREST_TYPE);
         List<String> pois = poiReg.entrySet().stream()
@@ -73,11 +74,12 @@ public class StructureInfoCommand {
                 .map(entry -> formatEntry(entry.getKey().location()))
                 .collect(Collectors.toList());
 
-        // --- BUILD OUTPUT ---
+        // Output construction
         if (structures.isEmpty() && features.isEmpty() && pois.isEmpty()) {
             output.append("No structures, features, or POIs found at this location.");
         } else {
             output.append("Structure Info at your location:");
+
             if (!structures.isEmpty()) {
                 output.append("\n§eStructures:");
                 structures.forEach(s -> output.append("\n - §6").append(s));
@@ -96,19 +98,18 @@ public class StructureInfoCommand {
         return 1;
     }
 
-    private static String formatEntry(ResourceLocation loc) {
-        String modName = ModList.get()
-                .getModContainerById(loc.getNamespace())
-                .map(c -> c.getModInfo().getDisplayName())
+    private static String formatEntry(ResourceLocation location) {
+        String modName = ModList.get().getModContainerById(location.getNamespace())
+                .map(container -> container.getModInfo().getDisplayName())
                 .orElse("Unknown Mod");
-        return loc.getPath() + " §7[" + modName + "§7]";
+        return location.getPath() + " §7[" + modName + "§7]";
     }
 
     private static BlockPos getTargetBlockPos(ServerPlayer player) {
-        var hit = player.pick(20.0D, 0.0F, false);
-        return switch (hit.getType()) {
-            case BLOCK, ENTITY -> BlockPos.containing(hit.getLocation());
-            default            -> player.blockPosition();
+        var hitResult = player.pick(20.0D, 0.0F, false);
+        return switch (hitResult.getType()) {
+            case BLOCK, ENTITY -> BlockPos.containing(hitResult.getLocation());
+            default -> player.blockPosition();
         };
     }
 }

@@ -1,10 +1,12 @@
 package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen.features;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.placement.PlacementUtils;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 import net.minecraft.world.level.levelgen.placement.BiomeFilter;
 import net.minecraft.world.level.levelgen.placement.InSquarePlacement;
@@ -32,7 +34,7 @@ public class anomolyzonePlacedFeature {
      * For the sake of compilation, we show how to create a PlacedFeature object in code:
      */
     public static final PlacedFeature METEOR_CRATER_FEATURE = new PlacedFeature(
-            ModFeatures.METEOR_CRATER.get().configured(NoneFeatureConfiguration.INSTANCE),
+            (Holder<ConfiguredFeature<?, ?>>) ModFeatures.METEOR_CRATER.get(),
             List.of(
                     // Rarity: on average once every 9,999 chunks (effectively “once per world” if world is < ~10000 chunks)
                     RarityFilter.onAverageOnceEvery(9999),
