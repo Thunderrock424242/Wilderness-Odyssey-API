@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen.features.anomolyzonePlacedFeature;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.data.worldgen.BootstrapContext;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.biome.*;
@@ -26,7 +27,7 @@ public class ModBiomes {
      *
      * @param context the context
      */
-    public static void register(BootstapContext<Biome> context) {
+    public static void register(BootstrapContext<Biome> context) {
         // Look up our placed feature (must already be registered in the registry)
         Holder<PlacedFeature> craterHolder =
                 context.lookup(Registries.PLACED_FEATURE).getOrThrow(anomolyzonePlacedFeature.METEOR_CRATER_PLACED);
