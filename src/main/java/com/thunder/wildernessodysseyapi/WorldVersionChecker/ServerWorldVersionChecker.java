@@ -29,15 +29,6 @@ public class ServerWorldVersionChecker {
 
         int current = ModConstants.CURRENT_WORLD_VERSION;
         int worldVer = data.getVersion();
-
-        if (worldVer < current) {
-            Path root = level.getServer().getWorldPath(LevelResource.ROOT);
-            WorldOutdatedAcknowledgement.validateOrCrash(root, current, worldVer);
-
-            LOGGER.warn("World is outdated. Proceeding after accepted acknowledgment.");
-            data.setVersion(current);
-            storage.set(WorldVersionData.FILE_NAME, data);
-        }
     }
 
 }

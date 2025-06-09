@@ -19,7 +19,7 @@ public class InfiniteSourceHandler {
      * @param event the event
      */
     @SubscribeEvent
-    public void onWaterOrLavaUpdate(BlockEvent.NeighborNotifyEvent event) {
+    public static void onWaterOrLavaUpdate(BlockEvent.NeighborNotifyEvent event) {
         // Ensure this is a server-side event
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
 

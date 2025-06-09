@@ -16,19 +16,18 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.ChunkSaveOptimizer;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ClientSaveHandler;
 import com.thunder.wildernessodysseyapi.SkyBeam.AmethystBeamHandler;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.blocks.WorldSpawnBlock;
+import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.WordlEdit.WorldEditStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen.ModBiomes;
-import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen.ModRegion;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
@@ -55,7 +54,6 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.network.registration.NetworkRegistry;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -93,28 +91,24 @@ public class WildernessOdysseyAPIMainModClass {
 
         // Register global events
         NeoForge.EVENT_BUS.register(this);
-        NeoForge.EVENT_BUS.register(new BlacklistChecker());
-        NeoForge.EVENT_BUS.register(new InfiniteSourceHandler());
-        NeoForge.EVENT_BUS.register(new EventHandler());
-        NeoForge.EVENT_BUS.register(new AmethystBeamHandler());
-        NeoForge.EVENT_BUS.register(new ChunkSaveOptimizer());
-        NeoForge.EVENT_BUS.register(new ClientSaveHandler());
+        NeoForge.EVENT_BUS.register(BlacklistChecker.class);
+        NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
+        NeoForge.EVENT_BUS.register(EventHandler.class);
+        NeoForge.EVENT_BUS.register(AmethystBeamHandler.class);
+        NeoForge.EVENT_BUS.register(ChunkSaveOptimizer.class);
+        NeoForge.EVENT_BUS.register(ClientSaveHandler.class);
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
         ModFeatures.PLACED_FEATURES.register(modEventBus);
-        NetworkRegistry.setup();
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
 
-        // Register features & biomes
-        //ModFeatures.FEATURES.register(modEventBus);
-        modEventBus.addListener(ModBiomes::register);
-
+       // todo remove  modEventBus.addListener(ModBiomes::register);
         // TerraBlender region
         //terrablender.addRegion(new ModRegion(ResourceLocation.tryBuild(ModConstants.MOD_ID, "meteor_region"), 1));
-        ///todo fix "ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);"
+         // todo ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {

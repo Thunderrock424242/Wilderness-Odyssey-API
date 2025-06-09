@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.WorldVersionChecker;
 
+import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.Core.WildernessOdysseyAPINetworkHandler;
 import com.thunder.wildernessodysseyapi.WorldVersionChecker.Packet.SyncWorldVersionPacket;
 import net.minecraft.server.level.ServerLevel;
@@ -16,15 +17,19 @@ public class SyncWorldVersionOnJoin {
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
-        ServerLevel level = player.serverLevel();
+        var level   = player.serverLevel();
         var storage = level.getDataStorage();
-        var data = storage.computeIfAbsent(
+        var data    = storage.computeIfAbsent(
                 WorldVersionData.factory(),
                 WorldVersionData.FILE_NAME
         );
 
+        int current  = ModConstants.CURRENT_WORLD_VERSION;
+        int worldVer = data.getVersion();
 
-        int version = data.getVersion();
-        WildernessOdysseyAPINetworkHandler.sendTo(player, new SyncWorldVersionPacket(version));
+        if (worldVer < current) {
+            WildernessOdysseyAPINetworkHandler.sendTo(player, new SyncWorldVersionPacket(worldVer));
+        }
     }
+
 }

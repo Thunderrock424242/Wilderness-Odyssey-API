@@ -40,7 +40,7 @@ public class BlacklistChecker {
      * @param event the event
      */
     @SubscribeEvent
-    public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+    public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             if (checkBlacklistedMods(player) || checkBlacklistedResourcePacks(player)) {
                 // Kick the player if any blacklist condition is met
@@ -53,7 +53,7 @@ public class BlacklistChecker {
         }
     }
 
-    private boolean checkBlacklistedMods(ServerPlayer player) {
+    private static boolean checkBlacklistedMods(ServerPlayer player) {
         for (String modId : BLACKLISTED_MODS) {
             if (ModList.get().isLoaded(modId)) {
                 return true; // Blacklisted mod detected
@@ -62,7 +62,7 @@ public class BlacklistChecker {
         return false;
     }
 
-    private boolean checkBlacklistedResourcePacks(ServerPlayer player) {
+    private static boolean checkBlacklistedResourcePacks(ServerPlayer player) {
         var server = player.server;
         server.getPackRepository();
         var loadedPacks = server.getPackRepository().getSelectedPacks();

@@ -29,7 +29,7 @@ public class ChunkSaveOptimizer {
      * Offloads heavy work (e.g., compression) to the background executor.
      */
     @SubscribeEvent
-    public void onChunkDataSave(ChunkDataEvent.Save event) {
+    public static void onChunkDataSave(ChunkDataEvent.Save event) {
         LevelChunk chunk = (LevelChunk) event.getChunk();
         if (!(chunk.getLevel() instanceof ServerLevel serverLevel)) {
             return;

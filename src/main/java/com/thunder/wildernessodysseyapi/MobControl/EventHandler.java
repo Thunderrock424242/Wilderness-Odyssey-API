@@ -17,7 +17,7 @@ public class EventHandler {
      * @param event the event
      */
     @SubscribeEvent
-    public void onEntityJoinLevel(EntityJoinLevelEvent event) {
+    public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
         // Check if the level is a ServerLevel
         if (event.getLevel() instanceof ServerLevel serverWorld) {
             // Check if the entity is a Mob and belongs to the MONSTER category

@@ -24,7 +24,7 @@ public class ClientSaveHandler {
      * the logout from a singleplayer session and do a pre-emptive flush.
      */
     @SubscribeEvent
-    public void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+    public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         Minecraft mc = Minecraft.getInstance();
 
         // Check if we are leaving a singleplayer world.
@@ -50,7 +50,7 @@ public class ClientSaveHandler {
      * you could do so every X ticks on the client side, when in singleplayer.
      */
     @SubscribeEvent
-    public void onClientTick(ClientTickEvent.Post event) {{
+    public static void onClientTick(ClientTickEvent.Post event) {{
             Minecraft mc = Minecraft.getInstance();
             if (mc.player == null) return;
             if (mc.hasSingleplayerServer()) {
