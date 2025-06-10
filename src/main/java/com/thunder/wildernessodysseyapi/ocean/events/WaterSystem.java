@@ -27,6 +27,11 @@ public class WaterSystem {
     // A single "time" uniform—everything else (amplitudes, frequencies, etc.) is baked into the GLSL.
     private static float time = 0.0f;
 
+    /** Call once per client‐tick (e.g. in ClientTickHandler). */
+    public static void tick(float deltaSeconds) {
+        time += deltaSeconds * 0.5F;
+    }
+
     /**
      * Call during client‐setup: load (and compile) our wave shader. Minecraft will
      * look for "wave_shader.vsh" and "wave_shader.fsh" under
