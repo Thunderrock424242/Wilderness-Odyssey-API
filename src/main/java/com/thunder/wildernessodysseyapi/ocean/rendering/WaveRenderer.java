@@ -22,7 +22,7 @@ public class WaveRenderer {
 
     private static ShaderInstance waveShader;
     private static final ResourceLocation WAVE_SHADER_LOCATION =
-            ResourceLocation.tryParse("wildernessodysseyapi:shaders/core/wave_shader");
+            ResourceLocation.tryParse("wildernessodysseyapi:shaders/core/wave_shader.json");
     private static final ResourceLocation FOAM_TEXTURE =
             ResourceLocation.tryParse("wildernessodysseyapi:textures/misc/foam.png");
 

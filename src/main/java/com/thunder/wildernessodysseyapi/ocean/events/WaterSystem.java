@@ -105,7 +105,7 @@ public class WaterSystem {
      *   layer1 = sin(x * 0.1 + time * 0.05) * 0.5
      *   layer2 = sin(z * 0.15 + time * 0.08) * 0.3
      *   layer3 = sin((x+z) * 0.2 + time * 0.1) * 0.2
-     *
+     * <p>
      * If you tweak amplitudes/frequencies/speeds in the shader JSON, keep this in sync.
      */
     public static double getWaveHeightAt(double x, double z) {
