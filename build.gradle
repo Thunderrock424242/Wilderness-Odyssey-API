@@ -185,10 +185,6 @@ tasks.register('obfuscateFiles', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
-}
-
 publishing {
     publications {
         create("mavenJava", MavenPublication) {
@@ -211,6 +207,9 @@ publishing {
     }
 }
 
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.
 
