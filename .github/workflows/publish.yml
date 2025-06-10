@@ -26,7 +26,6 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Publish to GitHub Packages
-        if: steps.config.outputs.enable-publish == 'true'
         env:
           USERNAME: ${{ github.actor }}
           TOKEN: ${{ secrets.GIT_TOKEN }}
