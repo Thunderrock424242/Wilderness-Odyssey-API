@@ -39,6 +39,7 @@ public class WaterSystem {
      */
     public static void initialize() {
         try {
+            assert WAVE_SHADER_LOCATION != null;
             waveShader = new ShaderInstance(
                     Minecraft.getInstance().getResourceManager(),
                     WAVE_SHADER_LOCATION,

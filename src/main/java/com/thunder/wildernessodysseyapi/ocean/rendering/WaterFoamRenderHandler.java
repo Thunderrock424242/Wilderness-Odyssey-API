@@ -1,10 +1,9 @@
-package com.thunder.wildernessodysseyapi.ocean.client;
+package com.thunder.wildernessodysseyapi.ocean.rendering;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.thunder.wildernessodysseyapi.ocean.rendering.WaveRenderer;
+import com.thunder.wildernessodysseyapi.ocean.events.WaterSystem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
@@ -23,17 +22,20 @@ public class WaterFoamRenderHandler {
         Level level = mc.level;
         if (level == null) return;
 
-        PoseStack poseStack = event.getPoseStack();
-        DeltaTracker dt = event.getPartialTick();
-        float partialTicks = dt.getGameTimeDeltaPartialTick(true);
+        // bind our shader with the updated time uniform
+        WaterSystem.bindWaveShader();
 
-        // Sample lighting at the camera (or player) position:
+        PoseStack pose = event.getPoseStack();
+        float partialTicks = event.getPartialTick().getGameTimeDeltaPartialTick(true);
+
+        // sample light at the camera position
         var cam = mc.cameraEntity;
-        BlockPos lightPos = (cam != null)
+        BlockPos lightPos = cam != null
                 ? cam.blockPosition()
                 : new BlockPos((int) mc.player.getX(), (int) mc.player.getY(), (int) mc.player.getZ());
         int packedLight = level.getLightEngine().getRawBrightness(lightPos, 0);
 
-        WaveRenderer.renderFoamAndWaves(poseStack, partialTicks, packedLight, level);
+        // now draw the foam & waves
+        WaveRenderer.renderFoamAndWaves(pose, partialTicks, packedLight, level);
     }
 }

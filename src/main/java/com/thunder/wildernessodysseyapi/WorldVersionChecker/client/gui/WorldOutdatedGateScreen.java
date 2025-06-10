@@ -23,9 +23,12 @@ public class WorldOutdatedGateScreen extends Screen {
         this.messageLines = MultiLineLabel.create(
                 this.font,
                 Component.literal(
-                        "This world was saved with an older version of Wilderness Odyssey.\n\n" +
-                                "It may corrupt or crash. Please BACK UP your world first.\n\n" +
-                                "Proceed at your own risk!"
+                        """
+                                This world was saved with an older version of Wilderness Odyssey.
+                                
+                                It may corrupt or crash. Please BACK UP your world first.
+                                
+                                Proceed at your own risk!"""
                 ),
                 this.width - 50
         );

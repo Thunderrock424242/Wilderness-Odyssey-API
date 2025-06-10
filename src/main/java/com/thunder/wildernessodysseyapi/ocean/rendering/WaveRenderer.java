@@ -31,6 +31,7 @@ public class WaveRenderer {
      */
     public static void initializeShader() {
         try {
+            assert WAVE_SHADER_LOCATION != null;
             waveShader = new ShaderInstance(
                     Minecraft.getInstance().getResourceManager(),
                     WAVE_SHADER_LOCATION,
@@ -72,6 +73,7 @@ public class WaveRenderer {
 
         // Bind our custom wave shader and foam texture
         RenderSystem.setShader(() -> waveShader);
+        assert FOAM_TEXTURE != null;
         RenderSystem.setShaderTexture(0, FOAM_TEXTURE);
 
         // Acquire a VertexConsumer for translucent rendering

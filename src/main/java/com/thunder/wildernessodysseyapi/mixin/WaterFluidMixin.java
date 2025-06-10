@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.thunder.wildernessodysseyapi.ocean.events.WaterSystem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -20,27 +21,24 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(BlockBehaviour.class)
 public abstract class WaterFluidMixin {
-
     @Inject(
-            method = "entityInside("
-                    + "Lnet/minecraft/world/level/block/state/BlockState;"
+            method = "entityInside(Lnet/minecraft/world/level/block/state/BlockState;"
                     + "Lnet/minecraft/world/level/Level;"
                     + "Lnet/minecraft/core/BlockPos;"
                     + "Lnet/minecraft/world/entity/Entity;)V",
-            at = @At("HEAD"),
-            cancellable = false
+            at = @At("HEAD")
     )
-    private void onBlockEntityInside(
+    private void onEntityInside(
             BlockState state,
             Level world,
             BlockPos pos,
             Entity entity,
             CallbackInfo ci
     ) {
-        // Only run our wave logic if this block is a liquid block whose fluid is WATER:
         if (state.getBlock() instanceof LiquidBlock
-                && state.getFluidState().getType() == Fluids.WATER) {
-            WaterSystem.applyWaveForces(entity);
+                && state.getFluidState().getType() == Fluids.WATER
+                && entity instanceof Boat boat) {
+            WaterSystem.applyWaveForces(boat);
         }
     }
 }
