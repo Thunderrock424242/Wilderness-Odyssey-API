@@ -25,14 +25,6 @@ jobs:
       - name: Grant execute permission to gradlew
         run: chmod +x ./gradlew
 
-      - name: Read publish-config.json
-        id: config
-        run: |
-          CONFIG_PATH="${{ github.workspace }}/configs/publish-config.json"
-          echo "Looking for $CONFIG_PATH"
-          ENABLE=$(jq -r '.enablePublishing' "$CONFIG_PATH")
-          echo "enable-publish=$ENABLE" >> $GITHUB_OUTPUT
-
       - name: Publish to GitHub Packages
         if: steps.config.outputs.enable-publish == 'true'
         env:
