@@ -1,29 +1,26 @@
 #version 150
+in vec4 Position;
+in vec2 UV0;
+in vec4 Color;
 
-uniform float time;  // Time uniform for animation
-uniform vec3 waveAmplitudes;  // Amplitude of each wave
-uniform vec3 waveFrequencies; // Frequency of each wave
-uniform vec3 waveSpeeds;      // Speed of each wave
-
-in vec3 Position;  // Vertex position input
-in vec2 UV0;       // Texture coordinates input
-
-out vec3 worldPos; // Pass transformed position to fragment shader
-out vec2 texCoord; // Pass texture coordinates
+uniform float waveTime;
+uniform float tideOffset;
+out vec2 vUV;
+out vec4 vColor;
+out vec3 worldPos;
 
 void main() {
-    vec4 pos = vec4(Position, 1.0);
-
-    // Apply multiple waves
-    float wave1 = sin(pos.x * waveFrequencies.x + time * waveSpeeds.x) * waveAmplitudes.x;
-    float wave2 = sin(pos.z * waveFrequencies.y + time * waveSpeeds.y) * waveAmplitudes.y;
-    float wave3 = sin((pos.x + pos.z) * waveFrequencies.z + time * waveSpeeds.z) * waveAmplitudes.z;
-
-    // Combine waves
-    float totalWaveHeight = wave1 + wave2 + wave3;
-    pos.y += totalWaveHeight;
+    vec4 pos = Position;
+    // apply tide
+    pos.y += tideOffset;
+    // apply simple wave layers
+    float w1 = sin(pos.x * 0.1 + waveTime * 0.05) * 0.5;
+    float w2 = sin(pos.z * 0.15 + waveTime * 0.08) * 0.3;
+    float w3 = sin((pos.x + pos.z) * 0.2 + waveTime * 0.1) * 0.2;
+    pos.y += w1 + w2 + w3;
 
     worldPos = pos.xyz;
-    texCoord = UV0;
+    vUV = UV0;
+    vColor = Color;
     gl_Position = gl_ModelViewProjectionMatrix * pos;
 }

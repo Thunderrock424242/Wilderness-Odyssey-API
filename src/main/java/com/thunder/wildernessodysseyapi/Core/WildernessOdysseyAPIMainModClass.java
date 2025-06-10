@@ -20,7 +20,6 @@ import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.WordlEdit.WorldEditStructurePlacer;
-import com.thunder.wildernessodysseyapi.ocean.events.WaterSystem;
 import com.thunder.wildernessodysseyapi.ocean.rendering.WaveRenderer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -110,9 +109,7 @@ public class WildernessOdysseyAPIMainModClass {
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> {
-            System.out.println("Wilderness Odyssey setup complete!");
-        });
+        event.enqueueWork(() -> System.out.println("Wilderness Odyssey setup complete!"));
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
         UncaughtExceptionLogger.init();
@@ -209,7 +206,6 @@ public class WildernessOdysseyAPIMainModClass {
         public static void clientSetup(FMLClientSetupEvent event) {
             CloakRenderHandler.init(); // Initialize framebuffer system
             WaveRenderer.initializeShader();
-            WaterSystem.initialize();
         }
     }
 
