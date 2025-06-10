@@ -6,7 +6,7 @@
   "refmap": "mixins.wildernessodysseyapi.refmap.json",
   "mixins": [
     "CampfireBlockMixin",
-    "DayNightCycle",
+    "DayNightCycleMixin",
     "EntityAccessor",
     "WaterFluidMixin"
   ],
