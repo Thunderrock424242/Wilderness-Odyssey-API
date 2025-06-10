@@ -12,17 +12,14 @@ import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
 import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.biome.ModBiomeModifiers;
-import com.thunder.wildernessodysseyapi.ModPackPatches.ChunkSaveOptimizer;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ClientSaveHandler;
 import com.thunder.wildernessodysseyapi.SkyBeam.AmethystBeamHandler;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.blocks.WorldSpawnBlock;
-import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.BunkerStructure.WordlEdit.WorldEditStructurePlacer;
-import com.thunder.wildernessodysseyapi.WorldGenClasses_and_packages.worldgen.ModBiomes;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -95,7 +92,6 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
         NeoForge.EVENT_BUS.register(EventHandler.class);
         NeoForge.EVENT_BUS.register(AmethystBeamHandler.class);
-        NeoForge.EVENT_BUS.register(ChunkSaveOptimizer.class);
         NeoForge.EVENT_BUS.register(ClientSaveHandler.class);
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
@@ -133,8 +129,8 @@ public class WildernessOdysseyAPIMainModClass {
      * @param event the event
      */
     @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {
-        ChunkSaveOptimizer.shutdownExecutor();
+    public void onServerStarting(ServerStartingEvent event){
+
     }
 
     /**
