@@ -28,7 +28,9 @@ jobs:
       - name: Read publish-config.json
         id: config
         run: |
-          ENABLE=$(jq -r '.enablePublishing' publish-config.json)
+          CONFIG_PATH="${{ github.workspace }}/configs/publish-config.json"
+          echo "Looking for $CONFIG_PATH"
+          ENABLE=$(jq -r '.enablePublishing' "$CONFIG_PATH")
           echo "enable-publish=$ENABLE" >> $GITHUB_OUTPUT
 
       - name: Publish to GitHub Packages
