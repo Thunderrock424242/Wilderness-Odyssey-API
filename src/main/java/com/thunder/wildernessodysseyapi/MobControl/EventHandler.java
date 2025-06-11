@@ -26,7 +26,7 @@ public class EventHandler {
                 int currentDay = MobSpawnAdjuster.getCurrentDay(serverWorld);
 
                 // Calculate the spawn chance
-                int spawnChance = MobSpawnAdjuster.calculateSpawnChance(currentDay);
+                int spawnChance = (int) MobSpawnAdjuster.calculateSpawnChance(currentDay);
 
                 // Randomly decide if the spawn should be canceled
                 if (serverWorld.random.nextInt(100) > spawnChance) {
