@@ -42,12 +42,16 @@ public class SkyBeamRenderer {
             float v1 = y1 / height + vScroll;
             float v2 = y2 / height + vScroll;
 
-            vc.addVertex(-width, y1, 0.0f).setColor(r, g, b, alpha).setUv(0.0f, v1).setUv1(0, 0).setUv2(0, 240).setNormal(0.0f, 1.0f, 0.0f);
-            vc.addVertex(width, y1, 0.0f).setColor(r, g, b, alpha).setUv(1.0f, v1).setUv1(0, 0).setUv2(0, 240).setNormal(0.0f, 1.0f, 0.0f);
-            vc.addVertex(width, y2, 0.0f).setColor(r, g, b, alpha).setUv(1.0f, v2).setUv1(0, 0).setUv2(0, 240).setNormal(0.0f, 1.0f, 0.0f);
-            vc.addVertex(-width, y2, 0.0f).setColor(r, g, b, alpha).setUv(0.0f, v2).setUv1(0, 0).setUv2(0, 240).setNormal(0.0f, 1.0f, 0.0f);
-        }
+            for (int i = 0; i < 4; i++) {
+                double angle = Math.toRadians(i * 90);
+                float dx = (float) Math.cos(angle) * width;
+                float dz = (float) Math.sin(angle) * width;
 
-        poseStack.popPose();
+                vc.addVertex(-dx, y1, -dz).setColor(r, g, b, alpha).setUv(0.0f, v1).setUv1(0, 0).setUv2(0, 240).setNormal(0.0f, 1.0f, 0.0f);
+                vc.addVertex(dx, y1, dz).setColor(r, g, b, alpha).setUv(1.0f, v1).setUv1(0, 0).setUv2(0, 240).setNormal(0.0f, 1.0f, 0.0f);
+                vc.addVertex(dx, y2, dz).setColor(r, g, b, alpha).setUv(1.0f, v2).setUv1(0, 0).setUv2(0, 240).setNormal(0.0f, 1.0f, 0.0f);
+                vc.addVertex(-dx, y2, -dz).setColor(r, g, b, alpha).setUv(0.0f, v2).setUv1(0, 0).setUv2(0, 240).setNormal(0.0f, 1.0f, 0.0f);
+            }
+        }
     }
 }

@@ -11,6 +11,6 @@ public class SkyBeamManager {
     }
 
     public static void tick(long gameTime) {
-        ACTIVE_BEAMS.removeIf(beam -> gameTime - beam.startTime() > beam.durationTicks());
+        ACTIVE_BEAMS.removeIf(b -> gameTime - b.startTime() > b.durationTicks());
     }
 }

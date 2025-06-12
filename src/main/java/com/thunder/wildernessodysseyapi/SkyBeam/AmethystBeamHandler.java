@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.SkyBeam;
 
+import com.thunder.wildernessodysseyapi.Core.WildernessOdysseyAPINetworkHandler;
 import com.thunder.wildernessodysseyapi.SkyBeam.Effects.BlockEffects;
 import com.thunder.wildernessodysseyapi.SkyBeam.Effects.TreeEffects;
 import net.minecraft.core.BlockPos;
@@ -45,7 +46,6 @@ public class AmethystBeamHandler {
 
 
                 // Run server-side effects at the hit location
-                SkyBeamManager.addBeam(new SkyBeamData(targetPos, 0x9900FF, world.getGameTime(), 100));
                 BlockEffects.destroyBlocks(world, hitPos);
                 BlockEffects.igniteArea(world, hitPos);
                 TreeEffects.charTrees(world, hitPos);
