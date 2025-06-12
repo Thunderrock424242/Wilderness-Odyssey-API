@@ -16,20 +16,12 @@ public class SyncWorldVersionOnJoin {
     @SubscribeEvent
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-
-        var level   = player.serverLevel();
-        var storage = level.getDataStorage();
-        var data    = storage.computeIfAbsent(
+        var level = player.serverLevel();
+        var data  = level.getDataStorage().computeIfAbsent(
                 WorldVersionData.factory(),
                 WorldVersionData.FILE_NAME
         );
-
-        int current  = ModConstants.CURRENT_WORLD_VERSION;
-        int worldVer = data.getVersion();
-
-        if (worldVer < current) {
-            WildernessOdysseyAPINetworkHandler.sendTo(player, new SyncWorldVersionPacket(worldVer));
-        }
+        WildernessOdysseyAPINetworkHandler.sendTo(player, new SyncWorldVersionPacket(data.getMajor(), data.getMinor()));
     }
-
 }
+

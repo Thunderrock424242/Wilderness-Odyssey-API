@@ -14,33 +14,32 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
 @EventBusSubscriber(modid = MOD_ID)
 public class WorldLoadListener {
-
     @SubscribeEvent
     public static void onWorldLoad(LevelEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
+        if (!level.dimension().equals(Level.OVERWORLD)) return;
 
-        MinecraftServer server = level.getServer();
-        ServerLevel overworld = server.getLevel(Level.OVERWORLD);
-        if (overworld == null) return;
+        var storage = level.getDataStorage();
+        var data = storage.computeIfAbsent(WorldVersionData.factory(), WorldVersionData.FILE_NAME);
 
-        var dataStorage = overworld.getDataStorage();
-        var data = dataStorage.computeIfAbsent(
-                WorldVersionData.factory(),
-                WorldVersionData.FILE_NAME
-        );
+        int expMaj = ModConstants.CURRENT_WORLD_VERSION_MAJOR;
+        int expMin = ModConstants.CURRENT_WORLD_VERSION_MINOR;
+        int wMaj   = data.getMajor();
+        int wMin   = data.getMinor();
 
-        int current = ModConstants.CURRENT_WORLD_VERSION;
-        int worldVer = data.getVersion();
-
-        if (worldVer < current) {
-            ServerPlayer player = server.getPlayerList().getPlayers().stream().findFirst().orElse(null);
+        // If world version is lower than current, warn first player
+        if (wMaj < expMaj || (wMaj == expMaj && wMin < expMin)) {
+            ServerPlayer player = level.getServer().getPlayerList().getPlayers().stream().findFirst().orElse(null);
             if (player != null) {
-                player.sendSystemMessage(Component.literal("§c[Warning] This world was created with an older version of the mod."));
-                player.sendSystemMessage(Component.literal("§6Please BACK UP your world and report any issues."));
+                player.sendSystemMessage(Component.literal(
+                        String.format("[Warning] World version %d.%d is outdated; expected %d.%d.",
+                                wMaj, wMin, expMaj, expMin)
+                ));
+                player.sendSystemMessage(Component.literal(
+                        "Please BACK UP your world, update the mod on both server and client, and verify compatibility before proceeding."
+                ));
             }
-
-            data.setVersion(current); // auto-upgrade version in save
-            dataStorage.set(WorldVersionData.FILE_NAME, data);
+            // Do not auto-upgrade; version remains unchanged until manual action
         }
     }
 }

@@ -19,7 +19,13 @@ public class ModConstants {
      */
     public static final Logger LOGGER = LogManager.getLogger("wildernessodysseyapi");
 
-    public static final int CURRENT_WORLD_VERSION = 1; // increment when data changes
+    /**
+     * this shows the world version MINOR means its small change MAJOR is a game breaking change
+     */
+    public static final String CURRENT_WORLD_VERSION = "1.1";
+    /** Numeric parts for comparison logic */
+    public static final int CURRENT_WORLD_VERSION_MAJOR = 1;
+    public static final int CURRENT_WORLD_VERSION_MINOR = 1;
 
 
     // Optional: common paths

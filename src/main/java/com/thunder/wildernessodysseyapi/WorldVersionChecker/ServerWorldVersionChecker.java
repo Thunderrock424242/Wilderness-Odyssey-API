@@ -15,7 +15,6 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
 @EventBusSubscriber(modid = MOD_ID)
 public class ServerWorldVersionChecker {
-
     @SubscribeEvent
     public static void onWorldLoad(LevelEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
@@ -27,8 +26,15 @@ public class ServerWorldVersionChecker {
                 WorldVersionData.FILE_NAME
         );
 
-        int current = ModConstants.CURRENT_WORLD_VERSION;
-        int worldVer = data.getVersion();
-    }
+        int expMaj = ModConstants.CURRENT_WORLD_VERSION_MAJOR;
+        int expMin = ModConstants.CURRENT_WORLD_VERSION_MINOR;
+        int wMaj   = data.getMajor();
+        int wMin   = data.getMinor();
 
+        if (wMaj < expMaj || (wMaj == expMaj && wMin < expMin)) {
+            data.setVersion(expMaj, expMin);
+            storage.set(WorldVersionData.FILE_NAME, data);
+        }
+    }
 }
+

@@ -8,31 +8,33 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 
 public class SyncWorldVersionPacket {
-    public final int worldVersion;
+    public final int major;
+    public final int minor;
 
-    public SyncWorldVersionPacket(int version) {
-        this.worldVersion = version;
+    public SyncWorldVersionPacket(int major, int minor) {
+        this.major = major;
+        this.minor = minor;
     }
 
     public static SyncWorldVersionPacket decode(FriendlyByteBuf buf) {
-        return new SyncWorldVersionPacket(buf.readVarInt());
+        return new SyncWorldVersionPacket(buf.readVarInt(), buf.readVarInt());
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeVarInt(worldVersion);
+        buf.writeVarInt(major);
+        buf.writeVarInt(minor);
     }
 
     public void handle(IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
-            int expected = ModConstants.CURRENT_WORLD_VERSION;
-            if (worldVersion < expected) {
+            int expMaj = ModConstants.CURRENT_WORLD_VERSION_MAJOR;
+            int expMin = ModConstants.CURRENT_WORLD_VERSION_MINOR;
+            if (major < expMaj || (major == expMaj && minor < expMin)) {
                 Minecraft.getInstance().setScreen(
-                        new WorldOutdatedGateScreen(() -> {
-                            // Player clicked “Proceed” → close the screen and let them in
-                            Minecraft.getInstance().setScreen(null);
-                        })
+                        new WorldOutdatedGateScreen(() -> Minecraft.getInstance().setScreen(null))
                 );
             }
         });
     }
 }
+
