@@ -99,7 +99,6 @@ public class WildernessOdysseyAPIMainModClass {
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
-        WildernessOdysseyAPINetworkHandler.init();
 
        // todo remove  modEventBus.addListener(ModBiomes::register);
         // TerraBlender region
