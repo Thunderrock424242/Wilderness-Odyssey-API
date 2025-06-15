@@ -1,37 +1,21 @@
 0.0.3:
 Added:
-* basic worldgen mods to setup phase 1 of the pack.
+-
 
 
 Changed:
-- changed our main shader to fit the pack more.
-! main shader aka defult is now comp unbound and the high version of it will be comp unbound/euphoria patches
-* added suppport me button on main menu link patreon todo
-* link kickstarter via button todo
-!! re did the pack again to fix many compat issues.
+-
 
 Fixed:
-- compat issues
+-
 
 
 
 Removed:
-- lots bassicly started over except not really
+-
 
 API Changes:
-- updated to latest gradle and neo
-!! bumped to 3.0 of the mod since there was a extreme amount of changes
-! added a spawn block for you to spawn at when our starter structure loads
-! added a couple bug fixes and made camp fire smoke go very high as if you see smoke you will find enemy's and loot todo
-! added a wave render to added waves and tides (wip) todo
-* removed global chat as it's a bad idea for now.
-!! added a mod conflict checker this is to make sure 2 mods are not overlapping this also comes with some neat features todo
-* added exception logger so we can find major mod issues and report them.
-* added a mod list to see what mods updated or got removed or added. you can also do /modlistdiff to see it too.
-* added a memory util command to keep an eye on memory usage.
-* added a cloak (needs testing)
-* added sky beam (needs testing)
-!! added a rendering engine that will help transfer resources from the cpu to the gpu (added onto nova api)
+-
 ! added world version checker to make sure all of the worlds are safe it will alert you when coruption could happen after each modpack update
 
 
@@ -39,7 +23,7 @@ API Changes:
 
 
 API/Modpack bugs:
-!! api bug: water mobs sink to the bottom and die for some strange reason. squids are also stuck at the surface and maybe its due to waves.todo
+-
 
 
 Note:
