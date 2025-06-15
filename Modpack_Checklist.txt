@@ -5,7 +5,7 @@ Alpha checklist:
  [] added enough structures
  [] added a good amount of peacefull mobs/hostile
  [] base concept for lore
- [] understanding how we are gonna approach to add lore
+ [] understanding how we are going to approach to add lore
  [] test for crashes and mod conflicts
  [] add performance optimizations
  [] check logs for errors if we can't fix them ask the mod that has errors to fix it
@@ -43,3 +43,5 @@ Alpha checklist:
  [] improve ingame docs
  [] clean up modpack files and configs.
  [] during beta also set up so half of my earnings go to cancer research.
+ [] set up quests and test them
+ [] set up a storyline along with the lore that people can follow ingame.
