@@ -23,6 +23,8 @@ Updated:
 - friends and foes
 - the undergaurden
 - oh the biomes weve gone
+- discord rpc
+- geckolib
 
 
 Changed:
@@ -36,15 +38,9 @@ Fixed:
 Removed:
 -
 
-API Changes:
--
-! added world version checker to make sure all of the worlds are safe it will alert you when coruption could happen after each modpack update
 
 
-
-
-
-API/Modpack bugs:
+Modpack bugs:
 -
 
 

@@ -9,70 +9,82 @@ import java.util.List;
 /**
  * The type Changelog generator.
  */
-public class ChangelogGenerator
-{
-    /**
-     * The entry point of application.
-     *
-     * @param args the input arguments
-     */
-    public static void main(String[] args)
-    {
-        String inputFilePath = "changelog.txt";
-        String outputFilePath = "formatted_changelog.txt";
+public class ChangelogGenerator {
 
+    public static void main(String[] args) {
+        // you can hardcode your two files here:
+        String[] inputs  = { "changelog.txt",    "APIchangelog.txt"   };
+        String[] outputs = { "formatted_changelog.txt", "formatted_APIchangelog.txt" };
+
+        if (inputs.length != outputs.length) {
+            System.err.println("Error: number of input files must match number of output files.");
+            System.exit(1);
+        }
+
+        for (int i = 0; i < inputs.length; i++) {
+            processFile(inputs[i], outputs[i]);
+        }
+    }
+
+    private static void processFile(String inputFilePath, String outputFilePath) {
         try (BufferedReader reader = new BufferedReader(new FileReader(inputFilePath));
-             BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath)))
-        {
+             BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath))) {
 
+            // read all lines
             List<String> lines = new ArrayList<>();
             String line;
-            while ((line = reader.readLine()) != null)
-            {   lines.add(line);
+            while ((line = reader.readLine()) != null) {
+                lines.add(line);
             }
 
+            // find the last “------” separator
             int lastDashIndex = -1;
-            for (int i = lines.size() - 1; i >= 0; i--)
-            {
-                if (lines.get(i).trim().matches("^-+$"))
-                {   // Check for line full of dashes
+            for (int i = lines.size() - 1; i >= 0; i--) {
+                if (lines.get(i).trim().matches("^-+$")) {
                     lastDashIndex = i;
                     break;
                 }
             }
 
-            writer.write("<div style=\"background-color: #212121; color: #aaafb6; font-family: 'JetBrains Mono', monospace; font-size: 9.8pt;\">");
+            // write your HTML wrapper
+            writer.write("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head><body>");
+            writer.write("<div style=\"background-color: #212121; color: #aaafb6; "
+                    + "font-family: 'JetBrains Mono', monospace; font-size: 9.8pt;\">");
             writer.write("<pre>");
 
-            for (int i = lastDashIndex + 1; i < lines.size(); i++)
-            {
+            // format and write only the lines *after* the last dash‐line
+            for (int i = lastDashIndex + 1; i < lines.size(); i++) {
                 line = lines.get(i);
-                String lineText = line.trim();
-                boolean isMajorWarning = lineText.startsWith("!!");
-                boolean isWarning = !isMajorWarning && lineText.startsWith("!");
-                boolean isImportant = lineText.startsWith("*");
-                boolean isListElement = lineText.startsWith("-") || isImportant || isMajorWarning || isWarning;
-                boolean isSectionTitle = !isListElement && lineText.endsWith(":");
-                boolean isGroupTitle = !isListElement && lineText.endsWith(":-");
-                boolean isTitleLine = !isListElement && !isSectionTitle && !isGroupTitle;
+                String trimmed = line.trim();
 
-                if (isTitleLine)
-                {   line = "<span style=\"font-size: 18px; color: #ffffff; font-weight: bold;\">" + line + "</span>";
-                }
-                else if (isGroupTitle)
-                {   line = "<strong style=\"font-size: 13px; color: #1A32CD;\"><u>" + line.substring(0, line.length() - 2) + "</u></strong>";
-                }
-                else if (isSectionTitle)
-                {   line = "<u><strong style=\"font-size: 14px; color: #ffffff;\">" + line + "</strong></u>";
-                }
-                else if (isMajorWarning)
-                {   line = "<span style=\"color: #ff4d49;\">" + line + "</span>";
-                }
-                else if (isWarning)
-                {   line = "<span style=\"color: #ff9900;\">" + line + "</span>";
-                }
-                else if (isImportant)
-                {   line = "<strong style=\"color: #ffffff;\">" + line + "</strong>";
+                boolean isMajorWarning = trimmed.startsWith("!!");
+                boolean isWarning      = !isMajorWarning && trimmed.startsWith("!");
+                boolean isImportant    = trimmed.startsWith("*");
+                boolean isListElement  = trimmed.startsWith("-")
+                        || isImportant
+                        || isMajorWarning
+                        || isWarning;
+                boolean isSectionTitle = !isListElement && trimmed.endsWith(":");
+                boolean isGroupTitle   = !isListElement && trimmed.endsWith(":-");
+                boolean isTitleLine    = !isListElement
+                        && !isSectionTitle
+                        && !isGroupTitle;
+
+                if (isTitleLine) {
+                    line = "<span style=\"font-size: 18px; color: #ffffff; font-weight: bold;\">"
+                            + line + "</span>";
+                } else if (isGroupTitle) {
+                    line = "<strong style=\"font-size: 13px; color: #1A32CD;\">"
+                            + "<u>" + line.substring(0, line.length() - 2) + "</u></strong>";
+                } else if (isSectionTitle) {
+                    line = "<u><strong style=\"font-size: 14px; color: #ffffff;\">"
+                            + line + "</strong></u>";
+                } else if (isMajorWarning) {
+                    line = "<span style=\"color: #ff4d49;\">" + line + "</span>";
+                } else if (isWarning) {
+                    line = "<span style=\"color: #ff9900;\">" + line + "</span>";
+                } else if (isImportant) {
+                    line = "<strong style=\"color: #ffffff;\">" + line + "</strong>";
                 }
 
                 writer.write(line + "<br />");
@@ -81,12 +93,14 @@ public class ChangelogGenerator
             writer.write("</pre></div>");
             writer.write("</body></html>");
 
+            System.out.println("Processed “" + inputFilePath + "” → “" + outputFilePath + "”");
         }
-        catch (IOException e)
-        {   System.err.println("Error processing the files: " + e.getMessage());
+        catch (IOException e) {
+            System.err.println("Error processing “" + inputFilePath + "”: " + e.getMessage());
         }
     }
 }
+
 
 /* Here is the formatting for the changelog, in case you need it:
 
