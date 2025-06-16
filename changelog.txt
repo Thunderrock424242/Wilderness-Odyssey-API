@@ -1,10 +1,29 @@
 0.0.3:
 Added:
--
+- MSS (soring structures)
+- pet sematary bring your pets back to life.
+- added feur mods jungle desset and fosil updates.
+- added yungs mods to revamp curent vanilla structures
+- added create and create strucrtures
+- doggy talents next
+- villages and pillaages
+- project vibraint jurnys
+- vanilla backport
+- golblin traders
+- earth mobs
+- repurposed structures
+- valisha core and structures
+
+
+Updated:
+- updated biolith
+- friends and foes
+- the undergaurden
+- oh the biomes weve gone
 
 
 Changed:
--
+
 
 Fixed:
 -
