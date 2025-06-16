@@ -13,6 +13,9 @@ Added:
 - earth mobs
 - repurposed structures
 - valisha core and structures
+- added ribbits
+- added betury
+- added fresh animations extension.
 
 
 Updated:
