@@ -11,7 +11,7 @@ import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
-@EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT,bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
 public class ClientSetup {
 
     @SubscribeEvent

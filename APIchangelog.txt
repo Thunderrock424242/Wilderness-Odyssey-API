@@ -1,2 +1,2 @@
 API Changes:
-- fixed a bug with camp fires acting strange.
+- added a dedicated server link because we have no revune.
