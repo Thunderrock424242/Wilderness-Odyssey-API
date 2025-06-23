@@ -8,10 +8,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.common.EventBusSubscriber;
 import org.joml.Matrix4f;
 
 import java.io.IOException;
 
+@EventBusSubscriber(value = Dist.CLIENT)
 public class WaveRenderer {
     private static ShaderInstance waveShader;
     private static final ResourceLocation JSON = ResourceLocation.tryBuild("wildernessodysseyapi", "wave_shader");

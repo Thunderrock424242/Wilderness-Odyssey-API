@@ -7,6 +7,7 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -17,7 +18,7 @@ import org.lwjgl.opengl.GL12;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
-@EventBusSubscriber(modid = MOD_ID)
+@EventBusSubscriber(modid = MOD_ID,value = Dist.CLIENT)
 public class CloakRenderHandler {
     /** Offscreen 256×256 target for rendering “behind‐the‐player.” */
     private static TextureTarget cloakRenderTarget = null;

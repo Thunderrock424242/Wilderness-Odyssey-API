@@ -6,10 +6,13 @@ import net.minecraft.client.particle.SimpleAnimatedParticle;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.core.particles.SimpleParticleType;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * The type Custom campfire particle.
  */
+@EventBusSubscriber(value = Dist.CLIENT)
 public class CustomCampfireParticle extends SimpleAnimatedParticle {
 
     /**

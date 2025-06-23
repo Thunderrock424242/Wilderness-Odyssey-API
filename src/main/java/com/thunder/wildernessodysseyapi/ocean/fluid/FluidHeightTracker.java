@@ -6,10 +6,13 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.AABB;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 import java.util.HashMap;
 import java.util.Map;
 
+@EventBusSubscriber(value = Dist.CLIENT)
 public class FluidHeightTracker {
     private static final Map<BlockPos, Float> lastHeights = new HashMap<>();
     private static final Map<BlockPos, Float> currentHeights = new HashMap<>();

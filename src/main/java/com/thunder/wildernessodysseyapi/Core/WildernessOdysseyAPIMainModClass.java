@@ -200,16 +200,6 @@ public class WildernessOdysseyAPIMainModClass {
         return null; // No Plains biome found in the search range
     }
 
-    /**
-     * The type Client mod events.
-     */
-    public static class ClientModEvents {
-        @SubscribeEvent
-        public static void clientSetup(FMLClientSetupEvent event) {
-            CloakRenderHandler.init(); // Initialize framebuffer system
-            WaveRenderer.initializeShader();
-        }
-    }
 
     /**
      * On server stopping.

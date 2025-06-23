@@ -4,7 +4,10 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.RenderStateShard;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.common.EventBusSubscriber;
 
+@EventBusSubscriber(value = Dist.CLIENT)
 public class SmoothFluidRenderType {
     public static final RenderType SMOOTH_WATER = RenderType.create(
             "smooth_water",

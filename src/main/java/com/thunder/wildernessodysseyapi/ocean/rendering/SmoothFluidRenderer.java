@@ -10,7 +10,10 @@ import net.minecraft.util.FastColor;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.material.FluidState;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.common.EventBusSubscriber;
 
+@EventBusSubscriber(value = Dist.CLIENT)
 public class SmoothFluidRenderer {
 
     /**

@@ -5,9 +5,12 @@ import com.thunder.wildernessodysseyapi.ocean.events.WaterSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
+@EventBusSubscriber(value = Dist.CLIENT)
 public class WaterFoamRenderHandler {
     @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
