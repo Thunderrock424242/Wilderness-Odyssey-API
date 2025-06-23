@@ -106,6 +106,8 @@ public class WildernessOdysseyAPIMainModClass {
         // TerraBlender region
         //terrablender.addRegion(new ModRegion(ResourceLocation.tryBuild(ModConstants.MOD_ID, "meteor_region"), 1));
         container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);
+
+
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
