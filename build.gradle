@@ -124,7 +124,8 @@ dependencies {
     implementation "curse.maven:worldedit-225608:5830452"
     implementation "curse.maven:terrablender-neoforge-940057:6054947"
     implementation "curse.maven:debug-guardian-1093679:6633853"
-    implementation "curse.maven:tick-tok-lib-1298954:6723549"
+    compileOnly "curse.maven:tick-tok-lib-1298954:6731548"
+
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
