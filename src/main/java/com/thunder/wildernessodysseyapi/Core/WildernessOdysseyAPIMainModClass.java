@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.Core;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.ModPackPatches.BugFixes.InfiniteSourceHandler;
 import com.thunder.wildernessodysseyapi.ErrorLog.UncaughtExceptionLogger;
@@ -19,9 +20,12 @@ import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.WordlEdit.WorldEditStructurePlacer;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Screenshot;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.MinecraftServer;
@@ -51,6 +55,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -167,6 +172,21 @@ public class WildernessOdysseyAPIMainModClass {
             ); // Define a bounding box around the BunkerStructure
             // Mark as generated
         }
+    }
+
+    @SubscribeEvent
+    public void onWorldUnload(LevelEvent.Unload event) {
+        if (!event.getLevel().isClientSide()) return;
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.screen != null) return;
+
+        RenderTarget framebuffer = mc.getMainRenderTarget();
+        File screenshotsDir = mc.gameDirectory.toPath().resolve("screenshots").toFile();
+
+        Screenshot.grab(screenshotsDir, null, framebuffer, (Component result) -> {
+            System.out.println("[WildernessOdysseyAPI] Screenshot taken: " + result.getString());
+        });
     }
 
     /**
