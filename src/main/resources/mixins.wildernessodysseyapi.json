@@ -7,14 +7,12 @@
   "mixins": [
     "CampfireBlockMixin",
     "DayNightCycleMixin",
-    "EntityAccessor",
-    "WaterFluidMixin"
+    "EntityAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
   },
   "client": [
-    "ClientLevelMixin",
     "DebugMixin",
     "MixinWorldCreationUiState",
     "ParticleEngineMixin"
