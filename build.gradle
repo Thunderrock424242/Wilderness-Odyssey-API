@@ -3,7 +3,7 @@ plugins {
     id 'application'
     id 'java-library'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.96'
+    id 'net.neoforged.moddev' version '2.0.99'
 }
 
 
@@ -16,7 +16,7 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = "3.0.1"
+version = "3.1.0"
 group = mod_group_id
 
 repositories {
