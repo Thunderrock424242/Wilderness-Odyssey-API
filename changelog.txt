@@ -45,7 +45,7 @@ Modpack bugs:
 
 
 Note:
-!! in the future hopefully get the mod big globe to work with the pack but its incompatible with territh and wwoo
+!! in the future hopefully get the mod big globe and jtthunder to the max to work with the pack but its incompatible with territh and wwoo
 
 Dev Notes:-
 !! Remember this is an alpha, so expect bugs and a lot of new changes and things that are not ready yet.
