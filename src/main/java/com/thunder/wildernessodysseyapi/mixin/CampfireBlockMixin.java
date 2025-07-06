@@ -6,6 +6,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.CampfireBlock;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -20,6 +21,7 @@ import java.util.WeakHashMap;
 public class CampfireBlockMixin {
 
     // Weak map so chunk unloads don’t cause memory leaks
+    @Unique
     private static final Map<BlockPos, Long> LAST_PARTICLE_TIME = new WeakHashMap<>();
 
     @Inject(method = "makeParticles", at = @At("HEAD"), cancellable = true)

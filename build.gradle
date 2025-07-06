@@ -32,7 +32,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 neoForge {
     // Specify the version of NeoForge to use.
-    version = "21.1.181"
+    version = "21.1.187"
 
     parchment {
         mappingsVersion = project.parchment_mappings_version
@@ -161,7 +161,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_id                 : "wildernessodysseyapi",
             mod_name               : "Wilderness Odyssey API",
             mod_license            : "APR",
-            mod_version            : "3.0.1",
+            mod_version            : "3.1.0",
             mod_authors            : "thunderrock424242",
             mod_description        : "a api for my modpack"
     ]
