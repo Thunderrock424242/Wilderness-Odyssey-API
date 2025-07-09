@@ -13,6 +13,7 @@ import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffComma
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ClientSaveHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.WorldSpawnBlock;
+import com.thunder.wildernessodysseyapi.WorldGen.client.ClientSetup;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -32,9 +33,11 @@ import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -103,9 +106,12 @@ public class WildernessOdysseyAPIMainModClass {
         // TerraBlender region
         //terrablender.addRegion(new ModRegion(ResourceLocation.tryBuild(ModConstants.MOD_ID, "meteor_region"), 1));
         container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);
-
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            ClientSetup.registerClientEvents();
+        }
 
     }
+
 
     private void commonSetup(final FMLCommonSetupEvent event) {
         event.enqueueWork(() -> System.out.println("Wilderness Odyssey setup complete!"));
