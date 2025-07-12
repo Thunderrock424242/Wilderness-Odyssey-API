@@ -22,6 +22,7 @@ import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.WordlEdit.WorldEditStructurePlacer;
+import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -113,7 +114,7 @@ public class WildernessOdysseyAPIMainModClass {
         if (FMLEnvironment.dist == Dist.CLIENT) {
             ClientSetup.registerClientEvents();
         }
-        container.registerConfig(ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG.SPEC);
+        container.registerConfig(ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC);
 
     }
 
