@@ -29,10 +29,15 @@ public class PartnerAdHandler {
     private static final Set<UUID> OPTED_OUT = new HashSet<>();
 
     // Partnership details—update these constants!
-    private static final String PARTNER_NAME  = "Kinetic_Hosting";
-    private static final String PARTNER_CODE  = "THUNDER";
-    private static final String DISCOUNT      = "15%";
-    private static final String HOSTING_LINK  = "https://billing.kinetichosting.net/aff.php?aff=606";
+    private static final String PARTNER_NAME = "Kinetic_Hosting";
+    private static final String PARTNER_CODE = "THUNDER";
+    private static final String DISCOUNT = "15%";
+    private static final String HOSTING_LINK = "https://billing.kinetichosting.net/aff.php?aff=606";
+
+    private static final long DELAY_TICKS = 20L * 90L; // 1.5 minutes
+    private static final Set<UUID> waitingPlayers = new HashSet<>();
+    private static final Set<UUID> sentAdPlayers = new HashSet<>();
+    private static final java.util.Map<UUID, Long> playerTickMap = new java.util.HashMap<>();
 
     /**
      * Build the styled advertisement message with clickable opt-in/out.
@@ -127,26 +132,39 @@ public class PartnerAdHandler {
      */
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (!OPTED_OUT.contains(player.getUUID())) {
-            player.sendSystemMessage(makeAd(player));
+        if (!(event.getEntity() instanceof ServerPlayer player)) return; // ✅ define player from event
+
+        UUID uuid = player.getUUID();
+        if (!OPTED_OUT.contains(uuid)) {
+            waitingPlayers.add(uuid);
+            playerTickMap.put(uuid, tickCounter);
         }
     }
+
 
     /**
      * Broadcast ad hourly to all non-opted-out players.
      */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        tickCounter++;
-        if (event.hasTime() && tickCounter % TICKS_PER_HOUR == 0) {
+        // Check for delayed ad delivery
+        if (!waitingPlayers.isEmpty()) {
             MinecraftServer server = event.getServer();
             PlayerList players = server.getPlayerList();
+
             for (ServerPlayer player : players.getPlayers()) {
-                if (!OPTED_OUT.contains(player.getUUID())) {
-                    player.sendSystemMessage(makeAd(player));
+                UUID uuid = player.getUUID();
+
+                if (waitingPlayers.contains(uuid)) {
+                    long joinedAt = playerTickMap.getOrDefault(uuid, -1L);
+                    if (joinedAt != -1 && tickCounter - joinedAt >= DELAY_TICKS) {
+                        player.sendSystemMessage(makeAd(player));
+                        waitingPlayers.remove(uuid);
+                        sentAdPlayers.add(uuid);
+                    }
                 }
             }
+
         }
     }
 }

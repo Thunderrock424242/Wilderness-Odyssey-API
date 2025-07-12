@@ -5,32 +5,34 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 
-@EventBusSubscriber
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+
+@EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
 public class DonationReminder {
-    private static boolean hasShownReminder = false;
-    private static int ticksElapsed = 0;
-    private static final int REMINDER_TICKS = 20 * 60 * 10; // 10 minutes
+    private static boolean pendingReminder = false;
+    private static int tickCountdown = 0;
+    private static final int DELAY_TICKS = 20 * 180; // 3 minutes
 
+    @SubscribeEvent
+    public static void onJoin(ClientPlayerNetworkEvent.LoggingIn event) {
+        if (DonationReminderConfig.disableReminder.get()) return;
 
-    public static void onClientJoin(ClientPlayerNetworkEvent.LoggingIn event) {
-        hasShownReminder = false;
-        ticksElapsed = 0;
+        tickCountdown = DELAY_TICKS;
+        pendingReminder = true;
     }
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
-        if (Minecraft.getInstance().player == null) return;
-        if (DonationReminderConfig.disableReminder.get()) return;
-        if (hasShownReminder) return;
+        if (!pendingReminder || Minecraft.getInstance().player == null) return;
 
-        ticksElapsed++;
-        if (ticksElapsed >= REMINDER_TICKS) {
-            hasShownReminder = true;
+        if (--tickCountdown <= 0) {
+            pendingReminder = false;
             showReminder();
         }
     }

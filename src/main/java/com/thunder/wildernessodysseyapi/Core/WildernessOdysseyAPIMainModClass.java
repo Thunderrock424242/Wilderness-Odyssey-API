@@ -90,8 +90,6 @@ public class WildernessOdysseyAPIMainModClass {
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
-        modEventBus.addListener(DonationReminder::onClientTick);
-        modEventBus.addListener(DonationReminder::onClientJoin);
 
         // Register global events
         NeoForge.EVENT_BUS.register(this);
