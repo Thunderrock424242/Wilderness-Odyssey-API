@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
@@ -21,10 +22,11 @@ public class DonationReminder {
         ticksElapsed = 0;
     }
 
-    public static void onClientTick(ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || Minecraft.getInstance().player == null) return;
-
-        if (hasShownReminder || DonationReminderConfig.INSTANCE.disableReminder.get()) return;
+    @SubscribeEvent
+    public static void onClientTick(ClientTickEvent.Post event) {
+        if (Minecraft.getInstance().player == null) return;
+        if (DonationReminderConfig.disableReminder.get()) return;
+        if (hasShownReminder) return;
 
         ticksElapsed++;
         if (ticksElapsed >= REMINDER_TICKS) {
