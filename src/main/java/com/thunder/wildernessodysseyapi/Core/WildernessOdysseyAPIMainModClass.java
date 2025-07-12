@@ -16,6 +16,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.blocks.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.client.ClientSetup;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
+import com.thunder.wildernessodysseyapi.donations.DonationReminder;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
@@ -88,6 +89,8 @@ public class WildernessOdysseyAPIMainModClass {
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
+        modEventBus.addListener(DonationReminder::onClientTick);
+        modEventBus.addListener(DonationReminder::onClientJoin);
 
         // Register global events
         NeoForge.EVENT_BUS.register(this);
@@ -110,6 +113,7 @@ public class WildernessOdysseyAPIMainModClass {
         if (FMLEnvironment.dist == Dist.CLIENT) {
             ClientSetup.registerClientEvents();
         }
+        container.registerConfig(ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG.SPEC);
 
     }
 

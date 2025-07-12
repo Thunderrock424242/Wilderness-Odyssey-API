@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.donations;
 
+import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -14,17 +15,13 @@ public class DonationReminder {
     private static int ticksElapsed = 0;
     private static final int REMINDER_TICKS = 20 * 60 * 10; // 10 minutes
 
-    public static void init() {
-        MinecraftForge.EVENT_BUS.addListener(DonationReminder::onClientTick);
-        MinecraftForge.EVENT_BUS.addListener(DonationReminder::onClientJoin);
-    }
 
-    private static void onClientJoin(ClientPlayerNetworkEvent.LoggingIn event) {
+    public static void onClientJoin(ClientPlayerNetworkEvent.LoggingIn event) {
         hasShownReminder = false;
         ticksElapsed = 0;
     }
 
-    private static void onClientTick(ClientTickEvent event) {
+    public static void onClientTick(ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END || Minecraft.getInstance().player == null) return;
 
         if (hasShownReminder || DonationReminderConfig.INSTANCE.disableReminder.get()) return;
@@ -43,15 +40,18 @@ public class DonationReminder {
                 .withStyle(Style.EMPTY.withColor(0xFFD700));
 
         Component mskLink = Component.literal("[Donate to MSKCC]")
-                .withStyle(Style.EMPTY.withColor(0x55FF55)
+                .withStyle(Style.EMPTY
+                        .withColor(0x55FF55)
                         .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://giving.mskcc.org/")));
 
-        Component optOut = Component.literal("[Don't remind me again]")
-                .withStyle(Style.EMPTY.withColor(0xFF5555)
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/donation_optout")));
+        Component optOutHint = Component.literal("If you’d like to stop receiving these reminders, ")
+                .append(Component.literal("click here to opt out.")
+                        .withStyle(Style.EMPTY
+                                .withColor(0xFF5555)
+                                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/donation_optout"))));
 
         mc.player.sendSystemMessage(msg);
         mc.player.sendSystemMessage(mskLink);
-        mc.player.sendSystemMessage(optOut);
+        mc.player.sendSystemMessage(optOutHint);
     }
 }

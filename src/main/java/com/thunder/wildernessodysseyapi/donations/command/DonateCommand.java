@@ -21,7 +21,7 @@ public class DonateCommand {
             Component mskDonation = Component.literal("🎗️ Donate to Cancer Research at Memorial Sloan Kettering")
                     .withStyle(Style.EMPTY
                             .withColor(0xFF55FF)
-                            .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://giving.mskcc.org/"));
+                            .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://giving.mskcc.org/")));
 
             // Personal message
             Component message = Component.literal("If you'd rather support a cause close to my heart, consider donating to cancer research. I've lost a friend and family to cancer, and every bit helps.");
