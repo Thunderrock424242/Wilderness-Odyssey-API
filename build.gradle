@@ -125,6 +125,8 @@ dependencies {
     implementation "curse.maven:terrablender-neoforge-940057:6054947"
     implementation "curse.maven:debug-guardian-1093679:6633853"
     implementation "curse.maven:tick-tok-lib-1298954:6731548"
+    implementation "curse.maven:create-328085:6641610"
+    implementation "curse.maven:regions-unexplored-659110:6273893"
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
