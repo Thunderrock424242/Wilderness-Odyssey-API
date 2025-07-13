@@ -46,7 +46,7 @@ public class WorldEditStructurePlacer {
     public boolean placeStructure(ServerLevel world, BlockPos position) {
         try {
             InputStream schemStream = getClass().getResourceAsStream(
-                    "/assets/" + namespace + "/structures/" + path
+                    "/assets/" + namespace + "/schematics/" + path
             );
 
             if (schemStream == null) {
