@@ -23,6 +23,7 @@ import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.WordlEdit.WorldEditStructurePlacer;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
+import com.thunder.wildernessodysseyapi.village.command.MyCommands;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -154,6 +155,7 @@ public class WildernessOdysseyAPIMainModClass {
         StructureInfoCommand.register(event.getDispatcher());
         FaqCommand.register(event.getDispatcher());
         DonateCommand.register(event.getDispatcher());
+        MyCommands.register(event.getDispatcher());
     }
 
     /**
