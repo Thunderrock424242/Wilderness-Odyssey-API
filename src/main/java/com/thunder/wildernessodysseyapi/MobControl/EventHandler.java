@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.MobControl;
+/*package com.thunder.wildernessodysseyapi.MobControl;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
@@ -6,16 +6,8 @@ import net.minecraft.world.entity.MobCategory;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 
-/**
- * The type Event handler.
- */
 public class EventHandler {
 
-    /**
-     * On entity join level.
-     *
-     * @param event the event
-     */
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
         // Check if the level is a ServerLevel
@@ -36,3 +28,4 @@ public class EventHandler {
         }
     }
 }
+*/
