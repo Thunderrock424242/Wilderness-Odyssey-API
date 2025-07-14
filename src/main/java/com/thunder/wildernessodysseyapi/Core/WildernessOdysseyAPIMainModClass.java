@@ -8,7 +8,6 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqReloadListener;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
-import com.thunder.wildernessodysseyapi.MobControl.EventHandler;
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ClientSaveHandler;
@@ -94,7 +93,6 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(BlacklistChecker.class);
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
-        NeoForge.EVENT_BUS.register(EventHandler.class);
         NeoForge.EVENT_BUS.register(ClientSaveHandler.class);
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
