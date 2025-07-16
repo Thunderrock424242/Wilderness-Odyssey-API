@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.WorldGen.SecretOrderVillage;
 
-import com.sk89q.worldedit.extension.factory.BlockFactory;
+import com.sk89q.worldedit.function.pattern.BlockPattern;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormat;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats;
 import com.sk89q.worldedit.EditSession;
@@ -77,11 +77,9 @@ public class SecretOrderVillagePlacer {
                                 BlockPos worldPos = new BlockPos(worldVec.getX(), worldVec.getY(), worldVec.getZ());
                                 BlockPos below = worldPos.below();
                                 net.minecraft.world.level.block.state.BlockState terrainBlock = world.getBlockState(below);
-                                BlockFactory weState = WorldEdit.getInstance()
-                                        .getBlockFactory();
                                 BlockType blockType = BlockTypes.get(terrainBlock.getBlock().builtInRegistryHolder().key().location().toString());
-
-                                editSession.setBlock(worldVec, (Pattern) weState);
+                                Pattern pattern = new BlockPattern(blockType.getDefaultState());
+                                editSession.setBlock(worldVec, pattern);
                             }
                         }
                     }

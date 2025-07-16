@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure;
 import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.MaxChangedBlocksException;
 import com.sk89q.worldedit.function.pattern.Pattern;
+import com.sk89q.worldedit.function.pattern.BlockPattern;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.block.BlockType;
 import com.sk89q.worldedit.world.block.BlockTypes;
@@ -29,7 +30,8 @@ public class TerrainBlockReplacer {
 
         if (weBlockState != null) {
             // Replace the block in the schematic
-            editSession.setBlock(blockVector, (Pattern) weBlockState);
+            Pattern pattern = new BlockPattern(weBlockState.getDefaultState());
+            editSession.setBlock(blockVector, pattern);
         }
     }
 

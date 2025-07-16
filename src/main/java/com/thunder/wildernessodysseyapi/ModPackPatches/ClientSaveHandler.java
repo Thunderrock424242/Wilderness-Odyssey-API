@@ -51,7 +51,7 @@ public class ClientSaveHandler {
      * you could do so every X ticks on the client side, when in singleplayer.
      */
     @SubscribeEvent
-    public static void onClientTick(ClientTickEvent.Post event) {{
+    public static void onClientTick(ClientTickEvent.Post event) {
             Minecraft mc = Minecraft.getInstance();
             if (mc.player == null) return;
             if (mc.hasSingleplayerServer()) {
