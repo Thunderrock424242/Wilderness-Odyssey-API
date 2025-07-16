@@ -136,6 +136,8 @@ dependencies {
     implementation "curse.maven:selene-499980:6699385"
     implementation "curse.maven:locate-fixer-1301683:6762552"
 
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
@@ -221,6 +223,10 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.
