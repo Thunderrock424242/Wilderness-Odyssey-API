@@ -4,6 +4,7 @@ import net.minecraft.resources.ResourceLocation;
 import terrablender.api.Region;
 import terrablender.api.RegionType;
 import net.minecraft.world.level.biome.Climate;
+import com.thunder.wildernessodysseyapi.WorldGen.worldgen.ModBiomes;
 
 public class ModRegion extends Region {
     public ModRegion(ResourceLocation name, int weight) {
@@ -27,5 +28,7 @@ public class ModRegion extends Region {
                         net.minecraft.core.registries.Registries.BIOME,
                         ModBiomes.ANOMALY_ZONE.location()
                 );
+
+        this.addBiome(parameterPoint, anomalyZoneKey);
     }
 }
