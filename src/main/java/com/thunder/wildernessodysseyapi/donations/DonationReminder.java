@@ -14,11 +14,17 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
 @EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
+/**
+ * Reminds players about donating after they join a server.
+ */
 public class DonationReminder {
     private static boolean pendingReminder = false;
     private static int tickCountdown = 0;
     private static final int DELAY_TICKS = 20 * 180; // 3 minutes
 
+    /**
+     * Starts the donation reminder countdown when the player joins.
+     */
     @SubscribeEvent
     public static void onJoin(ClientPlayerNetworkEvent.LoggingIn event) {
         if (DonationReminderConfig.disableReminder.get()) return;
@@ -27,6 +33,9 @@ public class DonationReminder {
         pendingReminder = true;
     }
 
+    /**
+     * Handles the countdown and shows the reminder when it expires.
+     */
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         if (!pendingReminder || Minecraft.getInstance().player == null) return;
@@ -37,10 +46,13 @@ public class DonationReminder {
         }
     }
 
+    /**
+     * Displays the donation reminder message to the player.
+     */
     private static void showReminder() {
         Minecraft mc = Minecraft.getInstance();
 
-        Component msg = Component.literal("💜 Consider supporting cancer research or this mod.")
+        Component msg = Component.literal("\uD83D\uDC9C Consider supporting cancer research or this mod.")
                 .withStyle(Style.EMPTY.withColor(0xFFD700));
 
         Component mskLink = Component.literal("[Donate to MSKCC]")

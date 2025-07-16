@@ -7,7 +7,15 @@ import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 
+/**
+ * Formats chat messages with the player's assigned role.
+ */
 public class RoleChatFormatter {
+    /**
+     * Prefixes chat messages with the player's role display name.
+     *
+     * @param event chat event containing the original message
+     */
     @SubscribeEvent
     public static void onChat(ServerChatEvent event) {
         ServerPlayer player = event.getPlayer();

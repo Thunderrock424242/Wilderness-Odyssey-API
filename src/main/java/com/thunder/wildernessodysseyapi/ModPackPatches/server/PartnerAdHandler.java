@@ -21,14 +21,15 @@ import java.util.Set;
 import java.util.UUID;
 
 @EventBusSubscriber
+/**
+ * Sends occasional partner advertisements to players.
+ */
 public class PartnerAdHandler {
     private static final long TICKS_PER_HOUR = 20L * 60L * 60L;
     private static long tickCounter = 0;
 
-    // Tracks players who have opted out
     private static final Set<UUID> OPTED_OUT = new HashSet<>();
 
-    // Partnership details—update these constants!
     private static final String PARTNER_NAME = "Kinetic_Hosting";
     private static final String PARTNER_CODE = "THUNDER";
     private static final String DISCOUNT = "15%";
@@ -43,24 +44,22 @@ public class PartnerAdHandler {
      * Build the styled advertisement message with clickable opt-in/out.
      */
     private static Component makeAd(ServerPlayer player) {
-        // Base text
         Component msg = Component.literal("Need your own Minecraft server? ")
-                .withStyle(style -> style.withColor(TextColor.fromRgb(0xFFD700))); // gold
+                .withStyle(style -> style.withColor(TextColor.fromRgb(0xFFD700)));
 
-        // Build the rest of the message
         msg = ((net.minecraft.network.chat.MutableComponent) msg)
                 .append(Component.literal("We’ve teamed up with ")
-                        .withStyle(style -> style.withColor(TextColor.fromRgb(0x00FFFF)))) // aqua
+                        .withStyle(style -> style.withColor(TextColor.fromRgb(0x00FFFF))))
                 .append(Component.literal(PARTNER_NAME)
-                        .withStyle(style -> style.withColor(TextColor.fromRgb(0x00FF00)))) // lime
+                        .withStyle(style -> style.withColor(TextColor.fromRgb(0x00FF00))))
                 .append(Component.literal(" — get ")
                         .withStyle(style -> style.withColor(TextColor.fromRgb(0x00FFFF))))
                 .append(Component.literal(DISCOUNT + " off")
-                        .withStyle(style -> style.withColor(TextColor.fromRgb(0x00FF00)))) // lime
+                        .withStyle(style -> style.withColor(TextColor.fromRgb(0x00FF00))))
                 .append(Component.literal(" when you use code ")
                         .withStyle(style -> style.withColor(TextColor.fromRgb(0x00FFFF))))
                 .append(Component.literal(PARTNER_CODE)
-                        .withStyle(style -> style.withColor(TextColor.fromRgb(0xFFAA00)))) // orange
+                        .withStyle(style -> style.withColor(TextColor.fromRgb(0xFFAA00))))
                 .append(Component.literal(" at ")
                         .withStyle(style -> style.withColor(TextColor.fromRgb(0x00FFFF))))
                 .append(Component.literal(HOSTING_LINK)
@@ -70,7 +69,6 @@ public class PartnerAdHandler {
                         )
                 );
 
-        // Add opt-in/out toggle
         if (OPTED_OUT.contains(player.getUUID())) {
             msg = ((net.minecraft.network.chat.MutableComponent) msg).append(
                     Component.literal(" [Opt In]")
@@ -132,7 +130,7 @@ public class PartnerAdHandler {
      */
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return; // ✅ define player from event
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         UUID uuid = player.getUUID();
         if (!OPTED_OUT.contains(uuid)) {
@@ -141,13 +139,11 @@ public class PartnerAdHandler {
         }
     }
 
-
     /**
      * Broadcast ad hourly to all non-opted-out players.
      */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        // Check for delayed ad delivery
         if (!waitingPlayers.isEmpty()) {
             MinecraftServer server = event.getServer();
             PlayerList players = server.getPlayerList();
@@ -164,7 +160,6 @@ public class PartnerAdHandler {
                     }
                 }
             }
-
         }
     }
 }

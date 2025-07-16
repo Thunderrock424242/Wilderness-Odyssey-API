@@ -5,6 +5,9 @@ import terrablender.api.Region;
 import terrablender.api.RegionType;
 import net.minecraft.world.level.biome.Climate;
 
+/****
+ * ModRegion for the Wilderness Odyssey API mod.
+ */
 public class ModRegion extends Region {
     public ModRegion(ResourceLocation name, int weight) {
         super(name, RegionType.OVERWORLD, weight);

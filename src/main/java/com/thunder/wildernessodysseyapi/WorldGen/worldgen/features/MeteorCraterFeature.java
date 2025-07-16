@@ -8,6 +8,9 @@ import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 
+/****
+ * MeteorCraterFeature for the Wilderness Odyssey API mod.
+ */
 public class MeteorCraterFeature extends Feature<NoneFeatureConfiguration> {
     private static boolean spawned = false;
 
