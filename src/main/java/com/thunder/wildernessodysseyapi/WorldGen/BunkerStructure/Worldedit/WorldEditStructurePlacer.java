@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.WordlEdit;
+package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit;
 
 import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.MaxChangedBlocksException;
