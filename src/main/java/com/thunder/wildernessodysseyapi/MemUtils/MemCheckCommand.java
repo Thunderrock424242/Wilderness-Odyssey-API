@@ -7,8 +7,14 @@ import net.minecraft.commands.Commands;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 
+/**
+ * Command that reports memory usage statistics.
+ */
 public class MemCheckCommand {
 
+    /**
+     * Registers the {@code /memcheck} command.
+     */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("memcheck")

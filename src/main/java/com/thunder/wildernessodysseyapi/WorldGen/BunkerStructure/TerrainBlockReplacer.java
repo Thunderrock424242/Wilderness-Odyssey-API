@@ -10,6 +10,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 
+/****
+ * TerrainBlockReplacer for the Wilderness Odyssey API mod.
+ */
 public class TerrainBlockReplacer {
 
     /**

@@ -12,17 +12,21 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(WorldCreationUiState.class)
+/**
+ * Forces the large biomes preset to be selected by default.
+ */
 public class MixinWorldCreationUiState {
 
+    /**
+     * After preset lists are populated, switch to the large biomes preset.
+     */
     @Inject(method = "updatePresetLists", at = @At("TAIL"))
     private void forceLargeBiomesPreset(CallbackInfo ci) {
         WorldCreationUiState state = (WorldCreationUiState)(Object)this;
         WorldCreationContext context = state.getSettings();
 
-        // Correct: get HolderGetter, NOT Registry
         HolderGetter<WorldPreset> getter = context.worldgenLoadContext().lookupOrThrow(Registries.WORLD_PRESET);
 
-        // Safely get the Holder for large_biomes preset
         getter.get(WorldPresets.LARGE_BIOMES).ifPresent(holder -> {
             state.setWorldType(new WorldCreationUiState.WorldTypeEntry(holder));
         });

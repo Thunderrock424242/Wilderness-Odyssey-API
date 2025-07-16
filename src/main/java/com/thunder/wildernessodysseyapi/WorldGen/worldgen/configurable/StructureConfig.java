@@ -7,6 +7,9 @@ import net.neoforged.neoforge.common.ModConfigSpec.BooleanValue;
 
 import java.util.HashMap;
 
+/****
+ * StructureConfig for the Wilderness Odyssey API mod.
+ */
 public class StructureConfig {
     public static final ModConfigSpec CONFIG_SPEC;
     private static final HashMap<String, BooleanValue> STRUCTURES = new HashMap<>();

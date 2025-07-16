@@ -11,6 +11,9 @@ import net.neoforged.neoforge.common.NeoForge;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
 @EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
+/****
+ * ClientSaveHandler for the Wilderness Odyssey API mod.
+ */
 public class ClientSaveHandler {
 
     public ClientSaveHandler() {

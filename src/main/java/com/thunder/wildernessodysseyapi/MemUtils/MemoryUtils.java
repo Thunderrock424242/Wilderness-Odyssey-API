@@ -1,5 +1,8 @@
 package com.thunder.wildernessodysseyapi.MemUtils;
 
+/****
+ * MemoryUtils for the Wilderness Odyssey API mod.
+ */
 public class MemoryUtils {
 
     // Base recommended MB; adjust as needed

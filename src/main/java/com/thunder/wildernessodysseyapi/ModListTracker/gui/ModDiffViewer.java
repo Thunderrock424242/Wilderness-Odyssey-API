@@ -7,9 +7,15 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.List;
 
+/**
+ * Utility window for viewing logged mod list changes.
+ */
 public class ModDiffViewer {
     private static final Path LOG_FILE = Paths.get("logs/mod-changes.log");
 
+    /**
+     * Creates and shows the swing window displaying the diff log.
+     */
     public static void createAndShowGUI() {
         JFrame frame = new JFrame("Mod List Differences");
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE); // Keep game running after closing GUI
@@ -22,12 +28,14 @@ public class ModDiffViewer {
         JScrollPane scrollPane = new JScrollPane(textPane);
         frame.add(scrollPane, BorderLayout.CENTER);
 
-        // Load log file and apply color-coding
         loadLog(textPane);
 
         frame.setVisible(true);
     }
 
+    /**
+     * Loads the log file and writes its color-coded contents into the text pane.
+     */
     private static void loadLog(JTextPane textPane) {
         try {
             List<String> logLines = Files.exists(LOG_FILE)
@@ -43,7 +51,7 @@ public class ModDiffViewer {
             Style updatedStyle = textPane.addStyle("updated", defaultStyle);
             StyleConstants.setForeground(updatedStyle, Color.ORANGE);
 
-            doc.remove(0, doc.getLength()); // Clear previous content
+            doc.remove(0, doc.getLength());
 
             for (String line : logLines) {
                 Style style = defaultStyle;

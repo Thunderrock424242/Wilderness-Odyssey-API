@@ -3,6 +3,9 @@ package com.thunder.wildernessodysseyapi.Core;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+/****
+ * ModConstants for the Wilderness Odyssey API mod.
+ */
 public class ModConstants {
 
     /**

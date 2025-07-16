@@ -6,10 +6,15 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
-
 import java.util.List;
 
+/**
+ * Provides the {@code /faq} command with multiple sub-commands.
+ */
 public class FaqCommand {
+    /**
+     * Registers the command and its sub commands.
+     */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("faq")
                 .then(Commands.literal("view")

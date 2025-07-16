@@ -11,6 +11,9 @@ import java.util.Optional;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
+/****
+ * MeteorStructureSpawner for the Wilderness Odyssey API mod.
+ */
 public class MeteorStructureSpawner {
     private static boolean placed = false;
 

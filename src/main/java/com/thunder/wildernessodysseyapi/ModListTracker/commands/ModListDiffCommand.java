@@ -9,7 +9,13 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import java.util.List;
 
+/**
+ * Command to display mod list differences since last launch.
+ */
 public class ModListDiffCommand {
+    /**
+     * Registers the {@code /modlistdiff} command.
+     */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("modlistdiff")
                 .executes(context -> {
@@ -18,6 +24,9 @@ public class ModListDiffCommand {
                 }));
     }
 
+    /**
+     * Sends the mod difference summary to chat and opens a GUI view.
+     */
     private static void showModDifferences(CommandSourceStack source) {
         List<String> addedMods = ModTracker.getAddedMods();
         List<String> removedMods = ModTracker.getRemovedMods();
@@ -27,20 +36,16 @@ public class ModListDiffCommand {
             source.sendSuccess(() -> Component.literal("No mod changes detected."), false);
         } else {
             if (!addedMods.isEmpty()) {
-                source.sendSuccess(() -> Component.literal("§a[Added Mods]: " + String.join(", ", addedMods)), false);
+                source.sendSuccess(() -> Component.literal("\u00A7a[Added Mods]: " + String.join(", ", addedMods)), false);
             }
             if (!removedMods.isEmpty()) {
-                source.sendSuccess(() -> Component.literal("§c[Removed Mods]: " + String.join(", ", removedMods)), false);
+                source.sendSuccess(() -> Component.literal("\u00A7c[Removed Mods]: " + String.join(", ", removedMods)), false);
             }
             if (!updatedMods.isEmpty()) {
-                source.sendSuccess(() -> Component.literal("§e[Updated Mods]: " + String.join(", ", updatedMods)), false);
+                source.sendSuccess(() -> Component.literal("\u00A7e[Updated Mods]: " + String.join(", ", updatedMods)), false);
             }
         }
 
-        // 🔹 Open the GUI on a separate thread to avoid freezing the game
-        new Thread(() -> {
-            // Ensure this method exists in ModDiffViewer
-            javax.swing.SwingUtilities.invokeLater(ModDiffViewer::createAndShowGUI);
-        }).start();
+        new Thread(() -> javax.swing.SwingUtilities.invokeLater(ModDiffViewer::createAndShowGUI)).start();
     }
 }
