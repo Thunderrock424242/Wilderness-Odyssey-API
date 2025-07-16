@@ -28,7 +28,8 @@ public class StructureSpawnTracker extends SavedData {
      */
     @Override
     public @NotNull CompoundTag save(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
-        return null;
+        tag.putBoolean("hasSpawned", this.hasSpawned);
+        return tag;
     }
 
     /**

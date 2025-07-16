@@ -147,6 +147,7 @@ public class PartnerAdHandler {
      */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        tickCounter++;
         // Check for delayed ad delivery
         if (!waitingPlayers.isEmpty()) {
             MinecraftServer server = event.getServer();
