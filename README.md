@@ -23,3 +23,8 @@ Additional Resources:
 ==========
 Community Documentation: https://docs.neoforged.net/  
 NeoForged Discord: https://discord.neoforged.net/
+
+Spawn Behavior:
+----------
+Players spawn inside a cryo tube when joining the world for the first time. Leaving the tube prevents re-entry.
+An introductory title sequence plays as they wake, which can be replaced with a custom cinematic in the future.
