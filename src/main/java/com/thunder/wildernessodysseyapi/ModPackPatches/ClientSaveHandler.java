@@ -13,11 +13,6 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 @EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
 public class ClientSaveHandler {
 
-    public ClientSaveHandler() {
-        // For some custom client events, you might want to register with MinecraftForge.EVENT_BUS:
-        NeoForge.EVENT_BUS.register(this);
-    }
-
     /**
      * If you want to optimize the final "Saving World" step on a singleplayer game,
      * you can ensure chunks are saved incrementally or flush them just before
