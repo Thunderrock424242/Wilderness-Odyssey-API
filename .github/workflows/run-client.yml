@@ -1,7 +1,6 @@
 name: Build and Run Client
 
-on:
-  pull_request:
+on: [push, pull-request]
 
 jobs:
   run-client:
