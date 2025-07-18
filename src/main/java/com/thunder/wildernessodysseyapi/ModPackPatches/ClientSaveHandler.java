@@ -6,14 +6,10 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.common.NeoForge;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
 @EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
-/****
- * ClientSaveHandler for the Wilderness Odyssey API mod.
- */
 public class ClientSaveHandler {
 
     /**
@@ -32,6 +28,7 @@ public class ClientSaveHandler {
             // The integrated server is about to close.
             // We can trigger a final chunk flush on the server side to minimize
             // how much is left to save during "Saving World."
+            assert mc.getSingleplayerServer() != null;
             mc.getSingleplayerServer().execute(() -> {
                 // Force chunks to save
                 mc.getSingleplayerServer().overworld().save(null, false, true);
@@ -54,8 +51,10 @@ public class ClientSaveHandler {
             if (mc.player == null) return;
             if (mc.hasSingleplayerServer()) {
                 // Example: flush once every 10,000 ticks on the client side
+                assert mc.level != null;
                 long time = mc.level.getGameTime();
                 if (time % 10000 == 0) {
+                    assert mc.getSingleplayerServer() != null;
                     mc.getSingleplayerServer().execute(() -> {
                         mc.getSingleplayerServer().overworld().save(null, false, true);
                     });
