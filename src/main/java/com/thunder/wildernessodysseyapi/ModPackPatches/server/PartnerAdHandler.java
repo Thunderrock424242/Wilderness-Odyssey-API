@@ -144,6 +144,7 @@ public class PartnerAdHandler {
      */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        tickCounter++;
         if (!waitingPlayers.isEmpty()) {
             MinecraftServer server = event.getServer();
             PlayerList players = server.getPlayerList();
