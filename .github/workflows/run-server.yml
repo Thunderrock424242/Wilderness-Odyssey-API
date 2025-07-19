@@ -1,0 +1,51 @@
+name: Build and Run Server
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  run-server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build
+        run: ./gradlew build --no-daemon
+
+      - name: Run server for world load
+        env:
+          JAVA_TOOL_OPTIONS: -Djava.awt.headless=true
+        run: |
+          xvfb-run --auto-servernum ./gradlew runServer --no-daemon > server.log 2>&1 &
+          PID=$!
+          if timeout 15m bash -c 'until grep -q "Done (" server.log; do sleep 5; done'; then
+            sleep 3m
+            kill $PID || true
+            wait $PID || true
+          else
+            echo "Server failed to load world" >&2
+            kill $PID || true
+            wait $PID || true
+            exit 1
+          fi
+
+      - name: Upload server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-log
+          path: server.log

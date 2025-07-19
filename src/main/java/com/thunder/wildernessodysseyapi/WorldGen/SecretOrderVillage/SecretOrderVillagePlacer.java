@@ -22,10 +22,16 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import java.io.InputStream;
 import java.util.Random;
 
+/**
+ * Places the secret order village structure in the world.
+ */
 public class SecretOrderVillagePlacer {
     private static final String NAMESPACE = "wildernessodyssey";
     private static final String PATH = "schematics/secret_order_village.schem";
 
+    /**
+     * Attempts to spawn the structure in the given chunk.
+     */
     public static void tryPlace(ServerLevel level, LevelChunk chunk) {
         BlockPos chunkPos = chunk.getPos().getWorldPosition();
         Random rand = new Random(chunkPos.asLong());
@@ -40,6 +46,9 @@ public class SecretOrderVillagePlacer {
         placeStructure(level, surfacePos);
     }
 
+    /**
+     * Actually loads the schematic and places it.
+     */
     public static boolean placeStructure(ServerLevel world, BlockPos position) {
         try {
             InputStream schemStream = SecretOrderVillagePlacer.class.getResourceAsStream(
@@ -68,7 +77,6 @@ public class SecretOrderVillagePlacer {
                             .ignoreAirBlocks(false)
                             .build();
 
-                    // Replace all white wool with terrain block beneath
                     for (int x = 0; x < clipboard.getDimensions().getX(); x++) {
                         for (int z = 0; z < clipboard.getDimensions().getZ(); z++) {
                             BlockVector3 local = BlockVector3.at(x, clipboard.getDimensions().getY() - 1, z);

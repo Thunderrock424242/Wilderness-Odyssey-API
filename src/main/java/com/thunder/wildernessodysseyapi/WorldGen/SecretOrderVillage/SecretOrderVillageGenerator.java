@@ -9,7 +9,13 @@ import net.neoforged.neoforge.event.level.ChunkEvent;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
 @EventBusSubscriber(modid = MOD_ID)
+/**
+ * Listens for chunk loads to spawn the secret village structure.
+ */
 public class SecretOrderVillageGenerator {
+    /**
+     * Attempts to place the village when a chunk loads.
+     */
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;

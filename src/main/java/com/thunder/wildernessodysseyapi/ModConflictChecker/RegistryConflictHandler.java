@@ -14,6 +14,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 @EventBusSubscriber
+/****
+ * RegistryConflictHandler for the Wilderness Odyssey API mod.
+ */
 public class RegistryConflictHandler {
 
     // Track the original sources of registered items

@@ -7,6 +7,9 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
+/****
+ * ModFeatures for the Wilderness Odyssey API mod.
+ */
 public class ModFeatures {
     public static final DeferredRegister<Feature<?>> FEATURES = DeferredRegister.create(Registries.FEATURE, MOD_ID);
 

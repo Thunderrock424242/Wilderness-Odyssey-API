@@ -12,6 +12,9 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Reload listener that populates the FAQ manager when data packs reload.
+ */
 public class FaqReloadListener extends SimpleJsonResourceReloadListener {
     private static final Gson GSON = new Gson();
     private static final Type LIST_TYPE = new TypeToken<List<FaqEntry>>() {}.getType();
@@ -20,6 +23,9 @@ public class FaqReloadListener extends SimpleJsonResourceReloadListener {
         super(GSON, "faq");
     }
 
+    /**
+     * Parses FAQ entries from JSON and stores them in {@link FaqManager}.
+     */
     @Override
     protected void apply(Map<ResourceLocation, JsonElement> map, ResourceManager resourceManager, ProfilerFiller profiler) {
         FaqManager.clear();
@@ -30,7 +36,7 @@ public class FaqReloadListener extends SimpleJsonResourceReloadListener {
                     FaqManager.add(entryObj);
                 }
             } catch (Exception e) {
-                System.err.println("Failed to parse FAQ: " + entry.getKey() + " → " + e.getMessage());
+                System.err.println("Failed to parse FAQ: " + entry.getKey() + "→ " + e.getMessage());
             }
         }
     }

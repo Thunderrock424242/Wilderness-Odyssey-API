@@ -22,6 +22,9 @@ import net.neoforged.neoforge.event.entity.living.LivingFallEvent;
 import java.util.Set;
 
 @OnlyIn(Dist.CLIENT)
+/**
+ * Adds glowing particles when players swim in certain biomes.
+ */
 public class UnderwaterBioluminescence {
 
     private static final Minecraft MC = Minecraft.getInstance();
@@ -40,6 +43,9 @@ public class UnderwaterBioluminescence {
 
     private static int clusterTimer = 0;
 
+    /**
+     * Emits gentle particles around the player when swimming at night.
+     */
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         if (MC.level == null || MC.player == null) return;
@@ -57,7 +63,6 @@ public class UnderwaterBioluminescence {
 
         if (biomeKey == null || !GLOW_BIOMES.contains(biomeKey)) return;
 
-        // Shoreline Glow
         boolean isShallow = (player.getY() % 1.0f < 0.2f);
 
         for (int i = 0; i < (isShallow ? 8 : 4); i++) {
@@ -72,7 +77,6 @@ public class UnderwaterBioluminescence {
             }
         }
 
-        // Cluster Burst
         if (++clusterTimer >= 200) {
             clusterTimer = 0;
             for (int i = 0; i < 30; i++) {
@@ -84,6 +88,9 @@ public class UnderwaterBioluminescence {
         }
     }
 
+    /**
+     * Creates a burst of particles when an entity splashes into water.
+     */
     @SubscribeEvent
     public static void onSplash(LivingFallEvent event) {
         Entity entity = event.getEntity();

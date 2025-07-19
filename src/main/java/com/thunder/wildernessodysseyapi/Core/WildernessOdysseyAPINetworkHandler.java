@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.Core;
 
+
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.NetworkRegistry;
 import net.neoforged.neoforge.network.PacketDistributor;
