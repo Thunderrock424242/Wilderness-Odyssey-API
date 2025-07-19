@@ -118,6 +118,7 @@ public class WildernessOdysseyAPIMainModClass {
         LOGGER.warn("This message is for development purposes only."); // Logs as info
         UncaughtExceptionLogger.init();
         dynamicModCount = ModList.get().getMods().size();
+        WildernessOdysseyAPINetworkHandler.register();
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
