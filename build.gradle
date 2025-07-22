@@ -124,7 +124,7 @@ dependencies {
     implementation "curse.maven:worldedit-225608:5830452"
     implementation "curse.maven:terrablender-neoforge-940057:6054947"
     implementation "curse.maven:debug-guardian-1093679:6633853"
-    implementation "curse.maven:tick-tok-lib-1298954:6731548"
+    implementation "curse.maven:tick-tok-lib-1298954:6797380"
     implementation "curse.maven:create-328085:6641610"
     implementation "curse.maven:regions-unexplored-659110:6273893"
     implementation "curse.maven:butchery-973620:6668101"
