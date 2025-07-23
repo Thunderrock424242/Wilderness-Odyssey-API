@@ -8,7 +8,7 @@ query-filters:
       id: java/unused-*
 
 paths:
-  - PACKAGE_PATH
+  - src/main/java/com/thunder/wildernessodeyssyapi
   - src/generated/java
   - buildSrc/src
 
