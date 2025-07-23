@@ -40,7 +40,7 @@ jobs:
           PACKAGE_PATH: ${{ github.event.inputs.package_path }}
         run: |
           cp .github/workflows/codeql-base-config.yml codeql-package-config.yml
-          PACKAGE_PATH="${PACKAGE_PATH:-src/main/java}"
+          PACKAGE_PATH="${PACKAGE_PATH:-src/main/java/com/thunder/wildernessodysseyapi}"
           sed -i "s|PACKAGE_PATH|$PACKAGE_PATH|g" codeql-package-config.yml
 
       - name: Initialize CodeQL
