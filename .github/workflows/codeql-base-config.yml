@@ -8,7 +8,7 @@ query-filters:
       id: java/unused-*
 
 paths:
-  - src/main/java/com/thunder/wildernessodeyssyapi
+  - src/main/java/com/thunder/wildernessodysseyapi
   - src/generated/java
   - buildSrc/src
 
