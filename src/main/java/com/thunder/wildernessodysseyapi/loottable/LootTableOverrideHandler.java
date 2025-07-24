@@ -3,7 +3,6 @@ package com.thunder.wildernessodysseyapi.loottable;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.neoforged.bus.api.EventPriority;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.LootTableLoadEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -11,7 +10,6 @@ import net.neoforged.neoforge.common.NeoForge;
 import java.io.IOException;
 import java.nio.file.Path;
 
-@EventBusSubscriber
 public class LootTableOverrideHandler {
 
     private static final Path CONFIG_DIR = Path.of("config", "loot_tables");
