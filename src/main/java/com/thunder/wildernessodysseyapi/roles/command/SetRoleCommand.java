@@ -10,7 +10,13 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
+/**
+ * Command for assigning roles to players.
+ */
 public class SetRoleCommand {
+    /**
+     * Registers the {@code /setrole} command.
+     */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("setrole")
                 .requires(source -> source.hasPermission(2))

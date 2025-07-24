@@ -5,6 +5,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
+/****
+ * WorldEvents for the Wilderness Odyssey API mod.
+ */
 public class WorldEvents {
     @SubscribeEvent
     public void onWorldLoad(LevelEvent.Load event) {

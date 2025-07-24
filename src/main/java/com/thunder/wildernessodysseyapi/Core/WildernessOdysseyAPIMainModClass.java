@@ -12,6 +12,7 @@ import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffComma
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ClientSaveHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
+import com.thunder.wildernessodysseyapi.WorldGen.blocks.WorldSpawnBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.client.ClientSetup;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
@@ -20,6 +21,7 @@ import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -93,7 +95,6 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(BlacklistChecker.class);
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
-        NeoForge.EVENT_BUS.register(ClientSaveHandler.class);
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
@@ -166,13 +167,12 @@ public class WildernessOdysseyAPIMainModClass {
         BlockPos pos = findPlainsBiomePosition(serverLevel);
         if (pos == null) return;
 
-        // Place the BunkerStructure
+        // Place the BunkerStructure and capture its bounds
         WorldEditStructurePlacer placer = new WorldEditStructurePlacer("wildernessodyssey", "schematics/my_structure.schem");
-        if (placer.placeStructure(serverLevel, pos)) {
-            structureBoundingBox = new AABB(
-                    pos.getX() - 10, pos.getY() - 5, pos.getZ() - 10,
-                    pos.getX() + 10, pos.getY() + 10, pos.getZ() + 10
-            ); // Define a bounding box around the BunkerStructure
+        AABB bounds = placer.placeStructure(serverLevel, pos);
+        if (bounds != null) {
+            structureBoundingBox = bounds;
+            BunkerProtectionHandler.setBunkerBounds(bounds);
             // Mark as generated
         }
     }

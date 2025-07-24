@@ -11,6 +11,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Tracks and logs changes to the installed mod list.
+ */
 public class ModTracker {
     private static final Path TRACKING_FILE = Paths.get("config", "mods-tracking.json");
     private static final Path LOG_FILE = Paths.get("logs", "mod-changes.log");
@@ -19,6 +22,9 @@ public class ModTracker {
     private static final List<String> removedMods = new ArrayList<>();
     private static final List<String> updatedMods = new ArrayList<>();
 
+    /**
+     * Compares the current mod list with the previous one and logs any differences.
+     */
     public static void checkModChanges() {
         Map<String, String> currentMods = getCurrentMods();
         Map<String, String> previousMods = loadPreviousMods();
@@ -41,35 +47,26 @@ public class ModTracker {
             }
         }
 
-        // Log changes to console and file
         logChanges(addedMods, removedMods, updatedMods);
-
-        // Save the latest mod list for future comparison
         saveModList(currentMods);
     }
 
-    public static List<String> getAddedMods() {
-        return addedMods;
-    }
-
-    public static List<String> getRemovedMods() {
-        return removedMods;
-    }
-
-    public static List<String> getUpdatedMods() {
-        return updatedMods;
-    }
+    /** Returns the list of newly added mods. */
+    public static List<String> getAddedMods() { return addedMods; }
+    /** Returns the list of removed mods. */
+    public static List<String> getRemovedMods() { return removedMods; }
+    /** Returns the list of updated mods. */
+    public static List<String> getUpdatedMods() { return updatedMods; }
 
     private static Map<String, String> getCurrentMods() {
         return ModList.get().getMods().stream()
-                .filter(mod -> mod instanceof ModInfo) // Ensure it's an instance of ModInfo
-                .map(mod -> (ModInfo) mod) // Cast mod to ModInfo
+                .filter(mod -> mod instanceof ModInfo)
+                .map(mod -> (ModInfo) mod)
                 .collect(Collectors.toMap(
                         ModInfo::getModId,
-                        mod -> mod.getVersion().toString() // Convert version to String
+                        mod -> mod.getVersion().toString()
                 ));
     }
-
 
     private static Map<String, String> loadPreviousMods() {
         if (!Files.exists(TRACKING_FILE)) {
@@ -111,16 +108,13 @@ public class ModTracker {
             logMessage.append("No mod changes detected.\n");
         }
 
-        // Print to console
         System.out.println(logMessage.toString());
-
-        // Write to file
         writeToFile(logMessage.toString());
     }
 
     private static void writeToFile(String logMessage) {
         try {
-            Files.createDirectories(LOG_FILE.getParent()); // Ensure logs directory exists
+            Files.createDirectories(LOG_FILE.getParent());
             Files.write(LOG_FILE, logMessage.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
             e.printStackTrace();

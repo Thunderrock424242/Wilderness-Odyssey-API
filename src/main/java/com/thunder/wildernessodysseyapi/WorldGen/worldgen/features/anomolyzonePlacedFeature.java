@@ -15,6 +15,9 @@ import java.util.List;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
+/****
+ * anomolyzonePlacedFeature for the Wilderness Odyssey API mod.
+ */
 public class anomolyzonePlacedFeature {
     public static final ResourceKey<PlacedFeature> METEOR_CRATER_PLACED =
             ResourceKey.create(Registries.PLACED_FEATURE, ResourceLocation.tryBuild(MOD_ID, "meteor_crater"));

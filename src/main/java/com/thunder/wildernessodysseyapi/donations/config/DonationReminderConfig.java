@@ -2,6 +2,9 @@ package com.thunder.wildernessodysseyapi.donations.config;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+/**
+ * Configuration options for donation reminders.
+ */
 public class DonationReminderConfig {
     public static final ModConfigSpec.BooleanValue disableReminder;
     public static final DonationReminderConfig INSTANCE;
@@ -14,6 +17,7 @@ public class DonationReminderConfig {
         INSTANCE = new DonationReminderConfig();
     }
 
+    /** Saves the configuration to disk. */
     public void save() {
         CONFIG_SPEC.save();
     }

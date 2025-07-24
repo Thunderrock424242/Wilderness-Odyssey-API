@@ -24,6 +24,9 @@ import net.neoforged.fml.ModList;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/****
+ * StructureInfoCommand for the Wilderness Odyssey API mod.
+ */
 public class StructureInfoCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {

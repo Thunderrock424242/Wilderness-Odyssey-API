@@ -9,6 +9,9 @@ import java.util.*;
 import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
 
+/****
+ * ShaderConflictChecker for the Wilderness Odyssey API mod.
+ */
 public class ShaderConflictChecker {
 
     private static final Map<String, List<String>> shaderUsageMap = new HashMap<>();
