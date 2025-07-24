@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.intro.util;
 
+import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.File;
@@ -14,12 +15,12 @@ import net.minecraft.client.server.IntegratedServer;
 
 public class VideoStateManager {
     private static final String STATE_FILE = "playonjoin_state.json";
-    private static final Gson GSON = (new GsonBuilder()).setPrettyPrinting().create();
-    private static Map<String, Boolean> videoPlayedState = new HashMap();
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static Map<String, Boolean> videoPlayedState = new HashMap<>();
 
     public static boolean hasVideoBeenPlayed() {
         String worldId = getCurrentWorldId();
-        return (Boolean)videoPlayedState.getOrDefault(worldId, false);
+        return videoPlayedState.getOrDefault(worldId, false);
     }
 
     public static void markVideoAsPlayed() {
@@ -30,6 +31,7 @@ public class VideoStateManager {
 
     private static String getCurrentWorldId() {
         Minecraft mc = Minecraft.getInstance();
+
         if (mc.level != null) {
             IntegratedServer server = mc.getSingleplayerServer();
             if (server != null) {
@@ -38,18 +40,19 @@ public class VideoStateManager {
                 String serverIP = mc.getCurrentServer() != null ? mc.getCurrentServer().ip : "unknown";
                 return "multiplayer_" + serverIP.hashCode();
             }
-        } else {
-            return "unknown_world";
         }
+
+        return "unknown_world";
     }
 
     public static void loadState() {
         File configDir = new File(new File(Minecraft.getInstance().gameDirectory, "config"), "playonjoin");
-        File stateFile = new File(configDir, "playonjoin_state.json");
+        File stateFile = new File(configDir, STATE_FILE);
+
         if (stateFile.exists()) {
             try (FileReader reader = new FileReader(stateFile)) {
-                Type type = (new 1()).getType();
-                Map<String, Boolean> loadedState = (Map)GSON.fromJson(reader, type);
+                Type type = new TypeToken<Map<String, Boolean>>(){}.getType();
+                Map<String, Boolean> loadedState = GSON.fromJson(reader, type);
                 if (loadedState != null) {
                     videoPlayedState = loadedState;
                 }
@@ -57,19 +60,17 @@ public class VideoStateManager {
                 e.printStackTrace();
             }
         }
-
     }
 
     private static void saveState() {
         File configDir = new File(new File(Minecraft.getInstance().gameDirectory, "config"), "playonjoin");
         configDir.mkdirs();
-        File stateFile = new File(configDir, "playonjoin_state.json");
+        File stateFile = new File(configDir, STATE_FILE);
 
         try (FileWriter writer = new FileWriter(stateFile)) {
             GSON.toJson(videoPlayedState, writer);
         } catch (IOException e) {
             e.printStackTrace();
         }
-
     }
 }
