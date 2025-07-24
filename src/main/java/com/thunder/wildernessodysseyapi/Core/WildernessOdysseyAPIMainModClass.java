@@ -22,6 +22,7 @@ import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -170,13 +171,12 @@ public class WildernessOdysseyAPIMainModClass {
         BlockPos pos = findPlainsBiomePosition(serverLevel);
         if (pos == null) return;
 
-        // Place the BunkerStructure
+        // Place the BunkerStructure and capture its bounds
         WorldEditStructurePlacer placer = new WorldEditStructurePlacer("wildernessodyssey", "schematics/my_structure.schem");
-        if (placer.placeStructure(serverLevel, pos)) {
-            structureBoundingBox = new AABB(
-                    pos.getX() - 10, pos.getY() - 5, pos.getZ() - 10,
-                    pos.getX() + 10, pos.getY() + 10, pos.getZ() + 10
-            ); // Define a bounding box around the BunkerStructure
+        AABB bounds = placer.placeStructure(serverLevel, pos);
+        if (bounds != null) {
+            structureBoundingBox = bounds;
+            BunkerProtectionHandler.setBunkerBounds(bounds);
             // Mark as generated
         }
     }

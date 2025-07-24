@@ -15,6 +15,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.TerrainBlockRep
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.AABB;
 
 import java.io.InputStream;
 
@@ -37,13 +38,13 @@ public class WorldEditStructurePlacer {
     }
 
     /**
-     * Place structure boolean.
+     * Places the schematic at the given position and returns its world bounds.
      *
      * @param world    the world
      * @param position the position
-     * @return the boolean
+     * @return the bounding box of the pasted structure or {@code null} on error
      */
-    public boolean placeStructure(ServerLevel world, BlockPos position) {
+    public AABB placeStructure(ServerLevel world, BlockPos position) {
         try {
             InputStream schemStream = getClass().getResourceAsStream(
                     "/assets/" + namespace + "/schematics/" + path
@@ -51,7 +52,7 @@ public class WorldEditStructurePlacer {
 
             if (schemStream == null) {
                 System.out.println("Schematic file not found: " + namespace + "/" + path);
-                return false;
+                return null;
             }
 
             ClipboardFormat format = ClipboardFormats.findByAlias("schematic");
@@ -62,6 +63,13 @@ public class WorldEditStructurePlacer {
             try (ClipboardReader reader = format.getReader(schemStream)) {
                 Clipboard clipboard = reader.read();
                 BlockPos surfacePos = world.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, position);
+
+                BlockVector3 min = clipboard.getRegion().getMinimumPoint();
+                BlockVector3 max = clipboard.getRegion().getMaximumPoint();
+                AABB bounds = new AABB(
+                        min.getBlockX() + surfacePos.getX(), min.getBlockY() + surfacePos.getY(), min.getBlockZ() + surfacePos.getZ(),
+                        max.getBlockX() + surfacePos.getX(), max.getBlockY() + surfacePos.getY(), max.getBlockZ() + surfacePos.getZ()
+                );
 
                 try (EditSession editSession = WorldEdit.getInstance().newEditSession((World) world)) {
                     ClipboardHolder holder = new ClipboardHolder(clipboard);
@@ -91,13 +99,12 @@ public class WorldEditStructurePlacer {
                             .ignoreAirBlocks(false)
                             .build();
                 }
+                return bounds;
             }
-
-            return true;
         } catch (Exception e) {
             System.out.println("Error placing BunkerStructure:");
             e.printStackTrace();
-            return false;
+            return null;
         }
     }
 }
