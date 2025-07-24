@@ -66,8 +66,13 @@ public class CryoTubeBlock {
             super(properties);
         }
 
-        @Override
-        public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+        // NeoForge 21 updated the Block interaction API. The previous
+        // `use` method now resolves through `useItemOn` for item based
+        // interactions or `useWithoutItem` when empty handed. Using the old
+        // signature causes compilation errors. Implement the new
+        // `useWithoutItem` variant to preserve the behaviour of letting the
+        // player sleep in the tube.
+        public InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand) {
             if (!level.isClientSide) {
                 player.startSleepInBed(pos);
             }

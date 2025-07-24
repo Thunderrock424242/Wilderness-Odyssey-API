@@ -55,13 +55,28 @@ public class WorldSpawnHandler {
     static List<BlockPos> findAllWorldSpawnBlocks(ServerLevel world) {
         List<BlockPos> spawnBlocks = new ArrayList<>();
 
-        for (LevelChunk chunk : world.getChunkSource().chunkMap.getChunks()) {
-            for (BlockPos pos : BlockPos.betweenClosed(chunk.getPos().getMinBlockX(), world.getMinBuildHeight(),
-                    chunk.getPos().getMinBlockZ(), chunk.getPos().getMaxBlockX(), world.getMaxBuildHeight(), chunk.getPos().getMaxBlockZ())) {
-                if (world.getBlockState(pos).is(CryoTubeBlock.CRYO_TUBE_BLOCK.get())) {
-                    spawnBlocks.add(pos);
+        try {
+            // ChunkMap#getChunks became protected; use reflection to access it
+            var method = world.getChunkSource().chunkMap.getClass().getDeclaredMethod("getChunks");
+            method.setAccessible(true);
+            Iterable<?> holders = (Iterable<?>) method.invoke(world.getChunkSource().chunkMap);
+            for (Object holderObj : holders) {
+                // Each holder represents a chunk; attempt to extract a loaded LevelChunk
+                var holderClass = holderObj.getClass();
+                var getTicking = holderClass.getMethod("getTickingChunk");
+                LevelChunk chunk = (LevelChunk) getTicking.invoke(holderObj);
+                if (chunk != null) {
+                    for (BlockPos pos : BlockPos.betweenClosed(chunk.getPos().getMinBlockX(), world.getMinBuildHeight(),
+                            chunk.getPos().getMinBlockZ(), chunk.getPos().getMaxBlockX(), world.getMaxBuildHeight(), chunk.getPos().getMaxBlockZ())) {
+                        if (world.getBlockState(pos).is(CryoTubeBlock.CRYO_TUBE_BLOCK.get())) {
+                            spawnBlocks.add(pos);
+                        }
+                    }
                 }
             }
+        } catch (ReflectiveOperationException e) {
+            // If reflection fails, fall back to empty result
+            e.printStackTrace();
         }
         return spawnBlocks;
     }
