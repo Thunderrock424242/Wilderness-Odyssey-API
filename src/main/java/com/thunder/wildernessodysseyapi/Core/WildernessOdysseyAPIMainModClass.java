@@ -15,6 +15,9 @@ import com.thunder.wildernessodysseyapi.WorldGen.client.ClientSetup;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
+import com.thunder.wildernessodysseyapi.intro.config.PlayOnJoinConfig;
+import com.thunder.wildernessodysseyapi.intro.event.PlayerJoinHandler;
+import com.thunder.wildernessodysseyapi.intro.util.VideoFileHelper;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.ModStructures;
@@ -96,6 +99,9 @@ public class WildernessOdysseyAPIMainModClass {
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
         ModFeatures.PLACED_FEATURES.register(modEventBus);
+        container.registerConfig(ModConfig.Type.CLIENT, PlayOnJoinConfig.SPEC, "playonjoin/playonjoin-client.toml");
+        VideoFileHelper.createDefaultVideoDirectory();
+        NeoForge.EVENT_BUS.register(new PlayerJoinHandler());
 
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);

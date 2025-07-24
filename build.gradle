@@ -136,6 +136,7 @@ dependencies {
     implementation "curse.maven:selene-499980:6699385"
     implementation "curse.maven:locate-fixer-1301683:6762552"
     implementation 'org.yaml:snakeyaml:2.2'
+    implementation "curse.maven:watermedia-869524:6797652"
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
