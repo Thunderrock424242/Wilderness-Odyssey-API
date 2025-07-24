@@ -124,7 +124,7 @@ dependencies {
     implementation "curse.maven:worldedit-225608:5830452"
     implementation "curse.maven:terrablender-neoforge-940057:6054947"
     implementation "curse.maven:debug-guardian-1093679:6633853"
-    implementation "curse.maven:tick-tok-lib-1298954:6800263"
+    implementation "curse.maven:tick-tok-lib-1298954:6805247"
     implementation "curse.maven:create-328085:6641610"
     implementation "curse.maven:regions-unexplored-659110:6273893"
     implementation "curse.maven:butchery-973620:6668101"
@@ -135,6 +135,7 @@ dependencies {
     implementation "curse.maven:amendments-896746:6332372"
     implementation "curse.maven:selene-499980:6699385"
     implementation "curse.maven:locate-fixer-1301683:6762552"
+    implementation 'org.yaml:snakeyaml:2.2'
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
