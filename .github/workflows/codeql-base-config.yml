@@ -3,8 +3,12 @@ name: "Minecraft Mod CodeQL Config"
 queries:
   - uses: security-and-quality
 
+query-filters:
+  - exclude:
+      id: java/unused-*
+
 paths:
-  - src/main/java
+  - PACKAGE_PATH
   - src/generated/java
   - buildSrc/src
 
