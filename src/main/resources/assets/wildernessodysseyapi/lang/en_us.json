@@ -1,5 +1,7 @@
 {
   "itemGroup.examplemod": "Example Mod Tab",
   "block.examplemod.example_block": "Example Block",
-  "item.examplemod.example_item": "Example Item"
-}
+  "item.examplemod.example_item": "Example Item",
+  "message.wildernessodysseyapi.wake_up": "Waking from cryostasis..."
+ }
+

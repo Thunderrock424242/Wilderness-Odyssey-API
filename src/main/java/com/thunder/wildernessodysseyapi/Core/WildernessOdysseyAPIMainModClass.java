@@ -11,7 +11,7 @@ import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ClientSaveHandler;
-import com.thunder.wildernessodysseyapi.WorldGen.blocks.WorldSpawnBlock;
+import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.client.ClientSetup;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
@@ -99,7 +99,7 @@ public class WildernessOdysseyAPIMainModClass {
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
         ModFeatures.PLACED_FEATURES.register(modEventBus);
 
-        WorldSpawnBlock.register(modEventBus);
+        CryoTubeBlock.register(modEventBus);
         ModItems.register(modEventBus);
 
        // todo remove  modEventBus.addListener(ModBiomes::register);
@@ -124,7 +124,7 @@ public class WildernessOdysseyAPIMainModClass {
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(WorldSpawnBlock.WORLD_SPAWN_BLOCK.get());
+            event.accept(CryoTubeBlock.CRYO_TUBE_BLOCK.get());
         }
     }
 

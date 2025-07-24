@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock;
 
-import com.thunder.wildernessodysseyapi.WorldGen.blocks.WorldSpawnBlock;
+import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -41,7 +41,7 @@ public class WorldSpawnHandler {
                 world.setDefaultSpawnPos(spawnBlockPos.above(), 0.0F);
             } else {
                 // Log a warning or handle cases where no spawn blocks are found
-                System.err.println("No World Spawn Blocks found in the world!");
+                System.err.println("No Cryo Tube Blocks found in the world!");
             }
         }
     }
@@ -55,16 +55,11 @@ public class WorldSpawnHandler {
     static List<BlockPos> findAllWorldSpawnBlocks(ServerLevel world) {
         List<BlockPos> spawnBlocks = new ArrayList<>();
 
-        for (int x = world.getMinBuildHeight(); x < world.getMaxBuildHeight(); x += 16) {
-            for (int z = world.getMinBuildHeight(); z < world.getMaxBuildHeight(); z += 16) {
-                LevelChunk chunk = world.getChunkSource().getChunk(x >> 4, z >> 4, false);
-                if (chunk != null) {
-                    for (BlockPos pos : BlockPos.betweenClosed(chunk.getPos().getMinBlockX(), world.getMinBuildHeight(),
-                            chunk.getPos().getMinBlockZ(), chunk.getPos().getMaxBlockX(), world.getMaxBuildHeight(), chunk.getPos().getMaxBlockZ())) {
-                        if (world.getBlockState(pos).is(WorldSpawnBlock.WORLD_SPAWN_BLOCK.get())) {
-                            spawnBlocks.add(pos);
-                        }
-                    }
+        for (LevelChunk chunk : world.getChunkSource().chunkMap.getChunks()) {
+            for (BlockPos pos : BlockPos.betweenClosed(chunk.getPos().getMinBlockX(), world.getMinBuildHeight(),
+                    chunk.getPos().getMinBlockZ(), chunk.getPos().getMaxBlockX(), world.getMaxBuildHeight(), chunk.getPos().getMaxBlockZ())) {
+                if (world.getBlockState(pos).is(CryoTubeBlock.CRYO_TUBE_BLOCK.get())) {
+                    spawnBlocks.add(pos);
                 }
             }
         }
