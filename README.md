@@ -23,3 +23,14 @@ Additional Resources:
 ==========
 Community Documentation: https://docs.neoforged.net/  
 NeoForged Discord: https://discord.neoforged.net/
+
+Spawn Behavior:
+----------
+Players spawn inside a cryo tube when joining the world for the first time. Leaving the tube prevents re-entry.
+An introductory title sequence plays as they wake, which can be replaced with a custom cinematic in the future.
+
+Custom Assets
+-------------
+Blockbench models and textures for blocks should be placed under:
+`src/main/resources/assets/wildernessodysseyapi/models/block` and `src/main/resources/assets/wildernessodysseyapi/textures/block` respectively.
+You can replace the placeholder cryo tube files with your own to customize the look.
