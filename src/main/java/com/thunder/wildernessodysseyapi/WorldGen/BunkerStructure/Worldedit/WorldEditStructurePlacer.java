@@ -74,18 +74,11 @@ public class WorldEditStructurePlacer {
                 try (EditSession editSession = WorldEdit.getInstance().newEditSession((World) world)) {
                     ClipboardHolder holder = new ClipboardHolder(clipboard);
 
-                    // Iterate through the clipboard's region
+                    // Iterate through the clipboard's region and replace placeholder blocks
                     clipboard.getRegion().forEach(blockVector -> {
                         if (clipboard.getFullBlock(blockVector).getBlockType().equals(BlockTypes.WHITE_WOOL)) {
-                            BlockPos terrainPos = new BlockPos(
-                                    blockVector.x() + surfacePos.getX(),
-                                    blockVector.y() + surfacePos.getY(),
-                                    blockVector.z() + surfacePos.getZ()
-                            );
-
-                            // Delegate block replacement to the utility class
                             try {
-                                TerrainBlockReplacer.replaceBlockWithTerrain(editSession, world, blockVector, terrainPos);
+                                TerrainBlockReplacer.replaceBlockWithTerrainRelative(editSession, world, blockVector, surfacePos);
                             } catch (MaxChangedBlocksException e) {
                                 throw new RuntimeException(e);
                             }
