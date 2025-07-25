@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.material.WaterFluid;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(WaterFluid.class)
 public abstract class WaterFluidMixin {
     @Inject(method = "getTickDelay", at = @At("HEAD"), cancellable = true)
-    private void wildernessapi$fastTicks(Level level, CallbackInfoReturnable<Integer> cir) {
+    private void wildernessapi$fastTicks(LevelReader level, CallbackInfoReturnable<Integer> cir) {
         cir.setReturnValue(1);
     }
 }
