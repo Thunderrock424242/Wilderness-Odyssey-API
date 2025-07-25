@@ -17,14 +17,16 @@ import net.minecraft.server.level.ServerLevel;
 public class TerrainBlockReplacer {
 
     /**
-     * Replaces specified blocks in the schematic with terrain-generated blocks.
+     * Replaces a block in a schematic with the terrain block sampled from the given world position.
      *
-     * @param editSession The WorldEdit EditSession for applying changes.
-     * @param world       The Minecraft ServerLevel (world).
+     * @param editSession The WorldEdit {@link EditSession} for applying changes.
+     * @param world       The Minecraft world.
      * @param blockVector The position of the block in the schematic.
      * @param terrainPos  The position in the Minecraft world for terrain sampling.
      */
-    public static void replaceBlockWithTerrain(EditSession editSession, ServerLevel world, BlockVector3 blockVector, BlockPos terrainPos) throws MaxChangedBlocksException {
+    public static void replaceBlockWithTerrain(EditSession editSession, ServerLevel world,
+                                               BlockVector3 blockVector, BlockPos terrainPos)
+            throws MaxChangedBlocksException {
         // Get terrain block from Minecraft world
         net.minecraft.world.level.block.state.BlockState terrainBlock = world.getBlockState(terrainPos.below());
 
@@ -36,6 +38,23 @@ public class TerrainBlockReplacer {
             Pattern pattern = new BlockPattern(weBlockState.getDefaultState());
             editSession.setBlock(blockVector, pattern);
         }
+    }
+
+    /**
+     * Convenience overload that calculates the terrain position relative to a
+     * structure's origin in the world.
+     *
+     * @param editSession The WorldEdit session.
+     * @param world       The Minecraft world.
+     * @param blockVector The block position within the schematic.
+     * @param origin      The world position of the schematic's origin.
+     */
+    public static void replaceBlockWithTerrainRelative(EditSession editSession, ServerLevel world,
+                                                       BlockVector3 blockVector, BlockPos origin)
+            throws MaxChangedBlocksException {
+        BlockPos terrainPos = origin.offset(blockVector.getBlockX(), blockVector.getBlockY(),
+                                            blockVector.getBlockZ());
+        replaceBlockWithTerrain(editSession, world, blockVector, terrainPos);
     }
 
     /**
