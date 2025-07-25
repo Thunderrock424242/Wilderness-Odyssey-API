@@ -19,12 +19,8 @@ import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.WordlEdit.WorldEditStructurePlacer;
-import com.thunder.wildernessodysseyapi.WorldGen.events.WorldEvents;
-import com.thunder.wildernessodysseyapi.WorldGen.worldgen.ModBiomes;
-import com.thunder.wildernessodysseyapi.WorldGen.worldgen.ModRegion;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -54,7 +50,6 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import terrablender.api.TerraBlenderApi;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -66,7 +61,7 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
  * The type Wilderness odyssey api main mod class.
  */
 @Mod(ModConstants.MOD_ID)
-public class WildernessOdysseyAPIMainModClass implements TerraBlenderApi {
+public class WildernessOdysseyAPIMainModClass {
 
     public static int dynamicModCount = 0;
 
@@ -96,7 +91,6 @@ public class WildernessOdysseyAPIMainModClass implements TerraBlenderApi {
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
         NeoForge.EVENT_BUS.register(EventHandler.class);
         NeoForge.EVENT_BUS.register(ClientSaveHandler.class);
-        NeoForge.EVENT_BUS.register(WorldEvents.class);
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModStructures.PLACED_FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
@@ -105,9 +99,9 @@ public class WildernessOdysseyAPIMainModClass implements TerraBlenderApi {
         WorldSpawnBlock.register(modEventBus);
         ModItems.register(modEventBus);
 
-        modEventBus.addListener(ModBiomes::register);
-
-        // TerraBlender region registered in onTerraBlenderInitialized
+       // todo remove  modEventBus.addListener(ModBiomes::register);
+        // TerraBlender region
+        //terrablender.addRegion(new ModRegion(ResourceLocation.tryBuild(ModConstants.MOD_ID, "meteor_region"), 1));
         container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);
 
 
@@ -215,6 +209,8 @@ public class WildernessOdysseyAPIMainModClass implements TerraBlenderApi {
 
     private void onLoadComplete(FMLLoadCompleteEvent event) {
         // Register structure placer or any late logic
+        //NeoForge.EVENT_BUS.register(new WorldEvents());
+        /// i think we don't need this anymore ^ but keep for now.
     }
 
     @SubscribeEvent
@@ -237,10 +233,5 @@ public class WildernessOdysseyAPIMainModClass implements TerraBlenderApi {
     @SubscribeEvent
     public void onReload(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
-    }
-
-    @Override
-    public void onTerraBlenderInitialized() {
-        TerraBlenderApi.addRegion(new ModRegion(ResourceLocation.tryBuild(ModConstants.MOD_ID, "meteor_region"), 1));
     }
 }
