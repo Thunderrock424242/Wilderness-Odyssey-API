@@ -70,8 +70,7 @@ public class PlayerSpawnHandler {
      * Prevent re-entry into the tube after exiting.
      */
     @SubscribeEvent
-    public static void onPlayerTick(PlayerTickEvent event) {
-        if (!(event instanceof PlayerTickEvent.Post)) return;
+    public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         CompoundTag tag = player.getPersistentData();
