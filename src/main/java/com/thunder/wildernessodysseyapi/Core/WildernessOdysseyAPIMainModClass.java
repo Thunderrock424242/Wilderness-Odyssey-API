@@ -20,6 +20,8 @@ import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.ModStructures;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.StructureSpawnTracker;
+import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -32,6 +34,9 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.biome.Biome;
+import com.thunder.wildernessodysseyapi.WorldGen.worldgen.ModBiomes;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.api.distmarker.Dist;
@@ -161,17 +166,28 @@ public class WildernessOdysseyAPIMainModClass {
     public void onWorldLoad(LevelEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
 
-        // Find a position in the Plains biome
-        BlockPos pos = findPlainsBiomePosition(serverLevel);
-        if (pos == null) return;
+        StructureSpawnTracker tracker = StructureSpawnTracker.get(serverLevel);
 
-        // Place the BunkerStructure and capture its bounds
-        WorldEditStructurePlacer placer = new WorldEditStructurePlacer("wildernessodyssey", "schematics/my_structure.schem");
+        BlockPos pos = findBiomePosition(serverLevel, ModBiomes.METEOR_IMPACT_ZONE);
+        if (pos == null) {
+            pos = findBiomePosition(serverLevel, Biomes.JUNGLE);
+        }
+        if (pos == null) return;
+        if (tracker.hasSpawned()) {
+            BlockPos last = tracker.getLastSpawnPos();
+            long dx = (pos.getX() - last.getX()) / 16L;
+            long dz = (pos.getZ() - last.getZ()) / 16L;
+            long dist = Math.max(Math.abs(dx), Math.abs(dz));
+            if (dist < 12000) return;
+        }
+
+        WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunkerfinal.schem");
         AABB bounds = placer.placeStructure(serverLevel, pos);
         if (bounds != null) {
             structureBoundingBox = bounds;
+            tracker.markAsSpawned();
+            tracker.setLastSpawnPos(pos);
             BunkerProtectionHandler.setBunkerBounds(bounds);
-            // Mark as generated
         }
     }
     /**
@@ -190,16 +206,16 @@ public class WildernessOdysseyAPIMainModClass {
         }
     }
 
-    private BlockPos findPlainsBiomePosition(ServerLevel serverLevel) {
+    private BlockPos findBiomePosition(ServerLevel serverLevel, ResourceKey<Biome> biomeKey) {
         for (int x = -1000; x < 1000; x += 16) {
             for (int z = -1000; z < 1000; z += 16) {
                 BlockPos pos = new BlockPos(x, serverLevel.getHeight(Heightmap.Types.WORLD_SURFACE, x, z), z);
-                if (serverLevel.getBiome(pos).is(Biomes.PLAINS)) {
+                if (serverLevel.getBiome(pos).is(biomeKey)) {
                     return pos;
                 }
             }
         }
-        return null; // No Plains biome found in the search range
+        return null;
     }
 
 
