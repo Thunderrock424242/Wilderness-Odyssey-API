@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class WorldVersionChecker {
 
     /** The default world version for the mod; update this when releasing new versions */
-    public static final String MOD_DEFAULT_WORLD_VERSION = "0.0.0"; // Update your Mod Version Here Major , Minor , Patch
+    public static final String MOD_DEFAULT_WORLD_VERSION = "1.0.0"; // Update your Mod Version Here Major , Minor , Patch
 
     /** Caches the config version to avoid repeated file reads */
     private static volatile String cachedConfigVersion = null;

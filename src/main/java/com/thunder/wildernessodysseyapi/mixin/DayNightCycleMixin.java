@@ -17,15 +17,15 @@ public abstract class DayNightCycleMixin {
 
     // Total custom cycle duration
     @Unique
-    private static final long TOTAL_CYCLE      = TickTokHelper.duration(1, 0, 0); // 1 real hour
+    private static final long TOTAL_CYCLE      = TickTokHelper.duration(1, 0, 0,0); // 1 real hour
     @Unique
-    private static final long DAY_DURATION     = TickTokHelper.duration(0, 30, 0); // 30 min
+    private static final long DAY_DURATION     = TickTokHelper.duration(0, 30, 0,0); // 30 min
     @Unique
-    private static final long SUNSET_DURATION  = TickTokHelper.duration(0, 5, 0);  // 5 min
+    private static final long SUNSET_DURATION  = TickTokHelper.duration(0, 5, 0,0);  // 5 min
     @Unique
-    private static final long NIGHT_DURATION   = TickTokHelper.duration(0, 20, 0); // 20 min
+    private static final long NIGHT_DURATION   = TickTokHelper.duration(0, 20, 0,0); // 20 min
     @Unique
-    private static final long SUNRISE_DURATION = TickTokHelper.duration(0, 5, 0);  // 5 min
+    private static final long SUNRISE_DURATION = TickTokHelper.duration(0, 5, 0,0);  // 5 min
 
     @Unique
     private static final long VANILLA_DAY_TICKS = 24000L;
