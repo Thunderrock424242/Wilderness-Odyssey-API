@@ -128,7 +128,6 @@ dependencies {
     implementation "curse.maven:create-328085:6641610"
     implementation "curse.maven:regions-unexplored-659110:6273893"
     implementation "curse.maven:butchery-973620:6668101"
-    implementation "curse.maven:patchouli-306770:6164617"
     implementation "curse.maven:geckolib-388172:6659026"
     implementation "curse.maven:supplementaries-412082:6757876"
     implementation "curse.maven:multipart-machines-cooking-885587:5686941"

@@ -24,7 +24,10 @@ Alpha checklist:
  [] get a QA team aka testers.
  [] amythest crystal metor and around the impact site maybe have some animals look amaythist.
  [] added patreon to main menu and get the store set up
- [] added kickstarter to main menu and get it set up.
+ [] make sure bunker and intro and cryo pods work
+ [] make sure all commisions are done
+ [] add in the main creature
+ [] complete main lore layout
 
 
 
