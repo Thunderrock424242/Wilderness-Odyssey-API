@@ -17,6 +17,8 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorImpactData;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
@@ -51,6 +53,16 @@ public class PlayerSpawnHandler {
         // Find spawn blocks if not already done
         if (spawnBlocks == null || spawnBlocks.isEmpty()) {
             spawnBlocks = WorldSpawnHandler.findAllWorldSpawnBlocks(world);
+            BlockPos meteorPos = MeteorImpactData.get(world).getImpactPos();
+            if (meteorPos != null && !spawnBlocks.isEmpty()) {
+                BlockPos closest = spawnBlocks.stream()
+                        .min((a, b) -> Double.compare(a.distSqr(meteorPos), b.distSqr(meteorPos)))
+                        .orElse(spawnBlocks.get(0));
+                final double maxDist = 400.0; // radius squared (20 blocks)
+                spawnBlocks = spawnBlocks.stream()
+                        .filter(p -> p.distSqr(closest) <= maxDist)
+                        .collect(Collectors.toList());
+            }
         }
 
         if (!spawnBlocks.isEmpty()) {
