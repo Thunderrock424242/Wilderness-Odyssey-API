@@ -1,8 +1,13 @@
 package com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures;
 
 import net.minecraft.core.BlockPos;
+import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.StructureSpawnTracker;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
@@ -22,7 +27,7 @@ public class MeteorStructureSpawner {
         if (placed) return;
         placed = true;
 
-        // Decide where to place the bunker. For example: at (0, surfaceY(0,0), 0)
+        // Decide where to place the meteor
         BlockPos spawnPos = new BlockPos(0, level.getHeight(), 0);
 
         ResourceLocation structureID = ResourceLocation.tryBuild(MOD_ID, "meteor_bunker");
@@ -32,14 +37,17 @@ public class MeteorStructureSpawner {
         if (templateOpt.isPresent()) {
             StructureTemplate template = templateOpt.get();
             StructurePlaceSettings settings = new StructurePlaceSettings();
-            template.placeInWorld(
-                    level,
-                    spawnPos,
-                    spawnPos,
-                    settings,
-                    level.random,
-                    2
-            );
+            template.placeInWorld(level, spawnPos, spawnPos, settings, level.random, 2);
+
+            // place bunker two chunks east of the meteor
+            BlockPos bunkerPos = spawnPos.offset(32, 0, 0);
+            bunkerPos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, bunkerPos);
+            WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunkerfinal.schem");
+            var bounds = placer.placeStructure(level, bunkerPos);
+            if (bounds != null) {
+                BunkerProtectionHandler.addBunkerBounds(bounds);
+                StructureSpawnTracker.get(level).addSpawnPos(bunkerPos);
+            }
         }
     }
 }

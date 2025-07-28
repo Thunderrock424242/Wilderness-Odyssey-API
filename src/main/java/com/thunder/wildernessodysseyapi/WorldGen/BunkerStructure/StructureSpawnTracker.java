@@ -1,80 +1,70 @@
 package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * The type Structure spawn tracker.
+ * Tracks where bunkers have spawned in the world.
  */
 public class StructureSpawnTracker extends SavedData {
     private static final String DATA_NAME = "wildernessodyssey_structure_spawn_tracker";
-    private boolean hasSpawned;
 
-    /**
-     * Instantiates a new Structure spawn tracker.
-     */
-// Constructor for creating a new tracker
+    private final List<Long> spawnPositions = new ArrayList<>();
+
     public StructureSpawnTracker() {
-        this.hasSpawned = false;
     }
 
-    /**
-     * @param tag
-     * @param registries
-     * @return
-     */
+    public StructureSpawnTracker(CompoundTag tag, HolderLookup.Provider registries) {
+        long[] arr = tag.getLongArray("spawns");
+        for (long l : arr) {
+            spawnPositions.add(l);
+        }
+    }
+
     @Override
     public @NotNull CompoundTag save(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
-        tag.putBoolean("hasSpawned", this.hasSpawned);
+        tag.putLongArray("spawns", spawnPositions.stream().mapToLong(Long::longValue).toArray());
         return tag;
     }
 
     /**
-     * Instantiates a new Structure spawn tracker.
-     *
-     * @param tag        the tag
-     * @param registries the registries
+     * Add a new bunker spawn position.
      */
-// Constructor for loading tracker from saved data
-    public StructureSpawnTracker(CompoundTag tag, HolderLookup.Provider registries) {
-        this.hasSpawned = tag.getBoolean("hasSpawned");
+    public void addSpawnPos(BlockPos pos) {
+        spawnPositions.add(pos.asLong());
+        setDirty();
     }
 
     /**
-     * Has spawned boolean.
-     *
-     * @return the boolean
+     * Check if the given position is far enough from all previous spawns.
      */
-// Check if the structure has already spawned
+    public boolean isFarEnough(BlockPos pos, int distanceChunks) {
+        for (long l : spawnPositions) {
+            BlockPos p = BlockPos.of(l);
+            long dx = (pos.getX() - p.getX()) / 16L;
+            long dz = (pos.getZ() - p.getZ()) / 16L;
+            long dist = Math.max(Math.abs(dx), Math.abs(dz));
+            if (dist < distanceChunks) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public boolean hasSpawned() {
-        return this.hasSpawned;
+        return !spawnPositions.isEmpty();
     }
 
-    /**
-     * Mark as spawned.
-     */
-// Mark the structure as spawned
-    public void markAsSpawned() {
-        this.hasSpawned = true;
-        this.setDirty(); // Mark data as dirty so it gets saved
-    }
-
-    /**
-     * Get structure spawn tracker.
-     *
-     * @param level the level
-     * @return the structure spawn tracker
-     */
-// Static method to get the tracker for the world
     public static StructureSpawnTracker get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
-                new SavedData.Factory<>(
-                        StructureSpawnTracker::new, // Constructor reference for new instances
-                        StructureSpawnTracker::new  // Deserialization logic
-                ),
+                new SavedData.Factory<>(StructureSpawnTracker::new, StructureSpawnTracker::new),
                 DATA_NAME
         );
     }
