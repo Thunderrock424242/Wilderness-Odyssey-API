@@ -24,15 +24,15 @@ public class BunkerProtectionHandler {
             Blocks.BEDROCK
     );
 
-    private static AABB bunkerBounds;
+    private static final java.util.List<AABB> bunkerBounds = new java.util.ArrayList<>();
 
     /**
      * Sets the bounding box of the bunker structure.
      *
      * @param bounds the structure bounds
      */
-    public static void setBunkerBounds(AABB bounds) {
-        bunkerBounds = bounds;
+    public static void addBunkerBounds(AABB bounds) {
+        bunkerBounds.add(bounds);
     }
 
     /**
@@ -40,14 +40,17 @@ public class BunkerProtectionHandler {
      */
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
-        if (bunkerBounds == null) return;
+        if (bunkerBounds.isEmpty()) return;
 
         BlockPos pos = event.getPos();
-        if (!bunkerBounds.contains(pos.getX(), pos.getY(), pos.getZ())) return;
-
-        BlockState state = event.getLevel().getBlockState(pos);
-        if (UNBREAKABLE_BLOCKS.contains(state.getBlock())) {
-            event.setCanceled(true);
+        for (AABB box : bunkerBounds) {
+            if (box.contains(pos.getX(), pos.getY(), pos.getZ())) {
+                BlockState state = event.getLevel().getBlockState(pos);
+                if (UNBREAKABLE_BLOCKS.contains(state.getBlock())) {
+                    event.setCanceled(true);
+                }
+                break;
+            }
         }
     }
 }

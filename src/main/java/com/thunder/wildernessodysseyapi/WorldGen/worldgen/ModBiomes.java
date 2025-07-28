@@ -23,6 +23,12 @@ public class ModBiomes {
             ResourceKey.create(Registries.BIOME, ResourceLocation.tryBuild(MOD_ID, "anomaly_zone"));
 
     /**
+     * Custom biome key for the meteor impact zone.
+     */
+    public static final ResourceKey<Biome> METEOR_IMPACT_ZONE =
+            ResourceKey.create(Registries.BIOME, ResourceLocation.tryBuild(MOD_ID, "meteor_impact_zone"));
+
+    /**
      * Register.
      *
      * @param context the context

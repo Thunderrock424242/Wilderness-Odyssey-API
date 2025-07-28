@@ -18,11 +18,9 @@ import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.ModStructures;
-import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
-import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
+import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -31,8 +29,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.item.CreativeModeTabs;
-import net.minecraft.world.level.biome.Biomes;
-import net.minecraft.world.level.levelgen.Heightmap;
+import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorStructureSpawner;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.ModList;
@@ -161,18 +158,7 @@ public class WildernessOdysseyAPIMainModClass {
     public void onWorldLoad(LevelEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
 
-        // Find a position in the Plains biome
-        BlockPos pos = findPlainsBiomePosition(serverLevel);
-        if (pos == null) return;
-
-        // Place the BunkerStructure and capture its bounds
-        WorldEditStructurePlacer placer = new WorldEditStructurePlacer("wildernessodyssey", "schematics/my_structure.schem");
-        AABB bounds = placer.placeStructure(serverLevel, pos);
-        if (bounds != null) {
-            structureBoundingBox = bounds;
-            BunkerProtectionHandler.setBunkerBounds(bounds);
-            // Mark as generated
-        }
+        MeteorStructureSpawner.tryPlace(serverLevel);
     }
     /**
      * On mob spawn.
@@ -190,17 +176,6 @@ public class WildernessOdysseyAPIMainModClass {
         }
     }
 
-    private BlockPos findPlainsBiomePosition(ServerLevel serverLevel) {
-        for (int x = -1000; x < 1000; x += 16) {
-            for (int z = -1000; z < 1000; z += 16) {
-                BlockPos pos = new BlockPos(x, serverLevel.getHeight(Heightmap.Types.WORLD_SURFACE, x, z), z);
-                if (serverLevel.getBiome(pos).is(Biomes.PLAINS)) {
-                    return pos;
-                }
-            }
-        }
-        return null; // No Plains biome found in the search range
-    }
 
 
     /**
