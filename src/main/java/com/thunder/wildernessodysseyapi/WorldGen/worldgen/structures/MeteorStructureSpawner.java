@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.StructureSpawnTracker;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
+import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorImpactData;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -29,6 +30,7 @@ public class MeteorStructureSpawner {
 
         // Decide where to place the meteor
         BlockPos spawnPos = new BlockPos(0, level.getHeight(), 0);
+        MeteorImpactData.get(level).setImpactPos(spawnPos);
 
         ResourceLocation structureID = ResourceLocation.tryBuild(MOD_ID, "meteor_bunker");
         StructureTemplateManager manager = level.getStructureManager();

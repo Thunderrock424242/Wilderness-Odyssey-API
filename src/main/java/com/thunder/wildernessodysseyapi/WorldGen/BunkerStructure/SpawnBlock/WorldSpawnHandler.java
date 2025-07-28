@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
+import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorImpactData;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -33,9 +34,16 @@ public class WorldSpawnHandler {
             List<BlockPos> spawnBlockPositions = findAllWorldSpawnBlocks(world);
 
             if (!spawnBlockPositions.isEmpty()) {
-                // Select a random spawn block
-                Random random = new Random();
-                BlockPos spawnBlockPos = spawnBlockPositions.get(random.nextInt(spawnBlockPositions.size()));
+                BlockPos meteorPos = MeteorImpactData.get(world).getImpactPos();
+                BlockPos spawnBlockPos;
+                if (meteorPos != null) {
+                    spawnBlockPos = spawnBlockPositions.stream()
+                            .min((a, b) -> Double.compare(a.distSqr(meteorPos), b.distSqr(meteorPos)))
+                            .orElse(spawnBlockPositions.get(0));
+                } else {
+                    Random random = new Random();
+                    spawnBlockPos = spawnBlockPositions.get(random.nextInt(spawnBlockPositions.size()));
+                }
 
                 // Set the world's default spawn position
                 world.setDefaultSpawnPos(spawnBlockPos.above(), 0.0F);
