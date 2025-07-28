@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Features.ModFea
 import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffCommand;
+import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.client.ClientSetup;
@@ -143,6 +144,7 @@ public class WildernessOdysseyAPIMainModClass {
     public void onRegisterCommands(RegisterCommandsEvent event) {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
         ModListDiffCommand.register(dispatcher);
+        ModListVersionCommand.register(dispatcher);
         MemCheckCommand.register(event.getDispatcher());
         StructureInfoCommand.register(event.getDispatcher());
         FaqCommand.register(event.getDispatcher());
