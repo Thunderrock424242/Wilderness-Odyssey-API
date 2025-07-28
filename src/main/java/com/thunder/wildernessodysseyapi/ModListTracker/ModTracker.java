@@ -3,7 +3,6 @@ package com.thunder.wildernessodysseyapi.ModListTracker;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.moddiscovery.ModInfo;
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import java.io.*;
 import java.nio.file.*;
 import java.time.LocalDateTime;
@@ -21,13 +20,24 @@ public class ModTracker {
     private static final List<String> addedMods = new ArrayList<>();
     private static final List<String> removedMods = new ArrayList<>();
     private static final List<String> updatedMods = new ArrayList<>();
+    private static String versionChange = "";
 
     /**
      * Compares the current mod list with the previous one and logs any differences.
      */
     public static void checkModChanges() {
         Map<String, String> currentMods = getCurrentMods();
-        Map<String, String> previousMods = loadPreviousMods();
+        ModTrackingHistory history = loadHistory();
+        Map<String, String> previousMods = Collections.emptyMap();
+        if (history != null && history.lastVersion != null) {
+            previousMods = history.versions.getOrDefault(history.lastVersion, Collections.emptyMap());
+        }
+
+        versionChange = "";
+        if (history != null && history.lastVersion != null &&
+                !Objects.equals(history.lastVersion, com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION)) {
+            versionChange = "Pack updated from " + history.lastVersion + " to " + com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
+        }
 
         addedMods.clear();
         removedMods.clear();
@@ -48,7 +58,13 @@ public class ModTracker {
         }
 
         logChanges(addedMods, removedMods, updatedMods);
-        saveModList(currentMods);
+
+        if (history == null) {
+            history = new ModTrackingHistory();
+        }
+        history.lastVersion = com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
+        history.versions.put(com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION, currentMods);
+        saveHistory(history);
     }
 
     /** Returns the list of newly added mods. */
@@ -57,6 +73,16 @@ public class ModTracker {
     public static List<String> getRemovedMods() { return removedMods; }
     /** Returns the list of updated mods. */
     public static List<String> getUpdatedMods() { return updatedMods; }
+    /** Returns a message describing pack version changes. */
+    public static String getVersionChange() { return versionChange; }
+
+    /** Returns the mods recorded for a specific pack version. */
+    public static Map<String, String> getModsForVersion(String version) {
+        ModTrackingHistory history = loadHistory();
+        if (history == null) return Collections.emptyMap();
+        Map<String, String> mods = history.versions.get(version);
+        return mods != null ? mods : Collections.emptyMap();
+    }
 
     private static Map<String, String> getCurrentMods() {
         return ModList.get().getMods().stream()
@@ -68,21 +94,21 @@ public class ModTracker {
                 ));
     }
 
-    private static Map<String, String> loadPreviousMods() {
+    private static ModTrackingHistory loadHistory() {
         if (!Files.exists(TRACKING_FILE)) {
-            return new HashMap<>();
+            return null;
         }
         try (Reader reader = Files.newBufferedReader(TRACKING_FILE)) {
-            return new Gson().fromJson(reader, new TypeToken<Map<String, String>>() {}.getType());
+            return new Gson().fromJson(reader, ModTrackingHistory.class);
         } catch (IOException e) {
             e.printStackTrace();
-            return new HashMap<>();
+            return null;
         }
     }
 
-    private static void saveModList(Map<String, String> modList) {
+    private static void saveHistory(ModTrackingHistory history) {
         try (Writer writer = Files.newBufferedWriter(TRACKING_FILE)) {
-            new Gson().toJson(modList, writer);
+            new Gson().toJson(history, writer);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -119,5 +145,10 @@ public class ModTracker {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static class ModTrackingHistory {
+        String lastVersion;
+        Map<String, Map<String, String>> versions = new HashMap<>();
     }
 }

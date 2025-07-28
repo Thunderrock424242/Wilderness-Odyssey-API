@@ -28,11 +28,13 @@ public class ModListDiffCommand {
      * Sends the mod difference summary to chat and opens a GUI view.
      */
     private static void showModDifferences(CommandSourceStack source) {
+        ModTracker.checkModChanges();
         List<String> addedMods = ModTracker.getAddedMods();
         List<String> removedMods = ModTracker.getRemovedMods();
         List<String> updatedMods = ModTracker.getUpdatedMods();
+        String versionChange = ModTracker.getVersionChange();
 
-        if (addedMods.isEmpty() && removedMods.isEmpty() && updatedMods.isEmpty()) {
+        if (addedMods.isEmpty() && removedMods.isEmpty() && updatedMods.isEmpty() && versionChange.isEmpty()) {
             source.sendSuccess(() -> Component.literal("No mod changes detected."), false);
         } else {
             if (!addedMods.isEmpty()) {
@@ -43,6 +45,9 @@ public class ModListDiffCommand {
             }
             if (!updatedMods.isEmpty()) {
                 source.sendSuccess(() -> Component.literal("\u00A7e[Updated Mods]: " + String.join(", ", updatedMods)), false);
+            }
+            if (!versionChange.isEmpty()) {
+                source.sendSuccess(() -> Component.literal("\u00A7b" + versionChange), false);
             }
         }
 
