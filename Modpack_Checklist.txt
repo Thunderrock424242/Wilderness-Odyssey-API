@@ -4,7 +4,7 @@ Alpha checklist:
  [] added enough biomes
  [] added enough structures
  [] added a good amount of peacefull mobs/hostile
- [] base concept for lore
+ [x] base concept for lore
  [] understanding how we are going to approach to add lore
  [] test for crashes and mod conflicts
  [] add performance optimizations
@@ -21,9 +21,9 @@ Alpha checklist:
  [] kebind conflicts fixed
  [] HUD and ui testing
  [] modpack folder cleanup
- [] get a QA team aka testers.
+ [x] get a QA team aka testers.
  [] amythest crystal metor and around the impact site maybe have some animals look amaythist.
- [] added patreon to main menu and get the store set up
+ [x] added patreon to main menu and get the store set up
  [] make sure bunker and intro and cryo pods work
  [] make sure all commisions are done
  [] add in the main creature
