@@ -133,10 +133,11 @@ public class WorldVersionChecker {
 
     public static String readVersion(Path path) throws IOException {
         if (!Files.exists(path)) {
-            saveVersion(path, "0.0.0");
-            LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "Created new version file with default '0.0.0' at: " + path);
-            return "0.0.0";
+            saveVersion(path, MOD_DEFAULT_WORLD_VERSION);
+            LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "Created new version file with default "+ MOD_DEFAULT_WORLD_VERSION  + " at " + path);
+            return MOD_DEFAULT_WORLD_VERSION;
         }
+
         try (Reader reader = Files.newBufferedReader(path)) {
             JsonObject obj = JsonParser.parseReader(reader).getAsJsonObject();
             return obj.get("world_version").getAsString();
