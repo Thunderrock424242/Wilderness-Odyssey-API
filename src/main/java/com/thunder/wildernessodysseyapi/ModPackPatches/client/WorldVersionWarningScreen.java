@@ -34,7 +34,7 @@ public class WorldVersionWarningScreen extends Screen {
         int buttonY = boxY + boxHeight - buttonHeight - margin;
 
         this.addRenderableWidget(Button.builder(
-                Component.literal("Operator must run /updateworldversion"),
+                Component.literal("Proceed (Return to Play)"),
                 b -> {
                     if (onProceed != null) {
                         LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "[WorldVersionWarningScreen] User chose to proceed and continue playing.");
