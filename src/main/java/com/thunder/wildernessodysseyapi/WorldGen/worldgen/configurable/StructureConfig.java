@@ -12,11 +12,24 @@ import java.util.HashMap;
  */
 public class StructureConfig {
     public static final ModConfigSpec CONFIG_SPEC;
+
+    /** Minimum chunk distance between bunker spawns */
+    public static final ModConfigSpec.IntValue BUNKER_MIN_DISTANCE;
+    /** Maximum bunkers allowed in a world */
+    public static final ModConfigSpec.IntValue BUNKER_MAX_COUNT;
+
     private static final HashMap<String, BooleanValue> STRUCTURES = new HashMap<>();
     private static final HashMap<String, BooleanValue> POIS = new HashMap<>();
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
     static {
+        BUILDER.push("bunker");
+        BUNKER_MIN_DISTANCE = BUILDER.comment("Minimum distance in chunks between bunkers")
+                .defineInRange("spawnDistanceChunks", 12000, 1, Integer.MAX_VALUE);
+        BUNKER_MAX_COUNT = BUILDER.comment("Maximum number of bunkers generated per world")
+                .defineInRange("maxSpawnCount", 1, 0, Integer.MAX_VALUE);
+        BUILDER.pop();
+
         registerAll();
         CONFIG_SPEC = BUILDER.build();
     }

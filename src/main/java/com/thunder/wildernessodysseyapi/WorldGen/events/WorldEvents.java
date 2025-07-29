@@ -12,7 +12,7 @@ public class WorldEvents {
     @SubscribeEvent
     public void onWorldLoad(LevelEvent.Load event) {
         if (event.getLevel() instanceof ServerLevel level) {
-            // As soon as the server‐level is loaded, place the bunker
+            // Place the meteor impact zone and bunker when the world loads
             MeteorStructureSpawner.tryPlace(level);
         }
     }
