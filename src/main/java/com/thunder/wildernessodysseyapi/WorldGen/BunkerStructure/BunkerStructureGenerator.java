@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
+import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -16,7 +17,7 @@ import net.neoforged.neoforge.event.level.ChunkEvent;
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public class BunkerStructureGenerator {
-    private static final int MIN_DISTANCE_CHUNKS = 12000;
+    private static final int DEFAULT_MIN_DISTANCE_CHUNKS = 12000;
 
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
@@ -27,7 +28,12 @@ public class BunkerStructureGenerator {
         BlockPos surfacePos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, chunkPos);
 
         StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
-        if (!tracker.isFarEnough(surfacePos, MIN_DISTANCE_CHUNKS)) return;
+
+        int minDist = StructureConfig.BUNKER_MIN_DISTANCE.get();
+        int maxCount = StructureConfig.BUNKER_MAX_COUNT.get();
+
+        if (tracker.getSpawnCount() >= maxCount) return;
+        if (!tracker.isFarEnough(surfacePos, minDist <= 0 ? DEFAULT_MIN_DISTANCE_CHUNKS : minDist)) return;
 
         WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunkerfinal.schem");
         AABB bounds = placer.placeStructure(level, surfacePos);

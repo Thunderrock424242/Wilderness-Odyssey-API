@@ -34,3 +34,10 @@ Custom Assets
 Blockbench models and textures for blocks should be placed under:
 `src/main/resources/assets/wildernessodysseyapi/models/block` and `src/main/resources/assets/wildernessodysseyapi/textures/block` respectively.
 You can replace the placeholder cryo tube files with your own to customize the look.
+
+World Generation
+----------------
+The bunker now spawns via the normal world generation pipeline. Two config options
+control its frequency:
+`bunker.spawnDistanceChunks` sets the minimum chunk distance between bunkers and
+`bunker.maxSpawnCount` limits how many bunkers can generate per world.
