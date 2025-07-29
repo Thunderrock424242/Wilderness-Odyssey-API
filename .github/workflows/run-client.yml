@@ -23,14 +23,18 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Build
         run: ./gradlew build --no-daemon
 
       - name: Run client until main menu
-        env:
-          JAVA_TOOL_OPTIONS: -Djava.awt.headless=true
         run: |
-          xvfb-run --auto-servernum ./gradlew runClient --no-daemon > client.log 2>&1 &
+          touch client.log
+          tail -F client.log &
+          TAIL_PID=$!
+          xvfb-run --auto-servernum --server-args='-screen 0 1024x768x24' ./gradlew runClient --no-daemon > client.log 2>&1 &
           PID=$!
           if timeout 20m bash -c 'until grep -q "Sound engine started" client.log; do sleep 5; done'; then
             sleep 1m
@@ -42,6 +46,8 @@ jobs:
             wait $PID || true
             exit 1
           fi
+          kill $TAIL_PID || true
+          wait $TAIL_PID || true
 
       - name: Upload client log
         if: always()
