@@ -9,7 +9,9 @@ import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Features.BunkerFeature;
 
 import java.util.List;
 import java.util.Objects;
@@ -18,10 +20,13 @@ import java.util.Objects;
  * The type Mod features.
  */
 public class ModFeatures {
-    /**
-     * The constant CONFIGURED_FEATURES.
-     */
-// DeferredRegisters for ConfiguredFeature and PlacedFeature
+    /** Registry for bunker feature */
+    public static final DeferredRegister<Feature<?>> FEATURES = DeferredRegister.create(
+            Registries.FEATURE,
+            "wildernessodyssey"
+    );
+
+    /** Configured features */
     public static final DeferredRegister<ConfiguredFeature<?, ?>> CONFIGURED_FEATURES = DeferredRegister.create(
             Registries.CONFIGURED_FEATURE,
             "wildernessodyssey"
@@ -38,9 +43,15 @@ public class ModFeatures {
     /**
      * The constant CUSTOM_STRUCTURE.
      */
-// Register ConfiguredFeature
+    // Base bunker feature
+    public static final DeferredHolder<Feature<?>, BunkerFeature> BUNKER_FEATURE = FEATURES.register(
+            "bunker",
+            BunkerFeature::new
+    );
+
+    // Configured feature using the bunker feature
     public static final ConfiguredFeature<?, ?> CUSTOM_STRUCTURE = new ConfiguredFeature<>(
-            Feature.NO_OP, // Placeholder feature
+            BUNKER_FEATURE.get(),
             NoneFeatureConfiguration.INSTANCE
     );
 

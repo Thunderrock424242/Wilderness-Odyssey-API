@@ -62,6 +62,13 @@ public class StructureSpawnTracker extends SavedData {
         return !spawnPositions.isEmpty();
     }
 
+    /**
+     * @return number of bunkers spawned so far
+     */
+    public int getSpawnCount() {
+        return spawnPositions.size();
+    }
+
     public static StructureSpawnTracker get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
                 new SavedData.Factory<>(StructureSpawnTracker::new, StructureSpawnTracker::new),

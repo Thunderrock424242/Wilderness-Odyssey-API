@@ -27,7 +27,8 @@ import java.util.Random;
  */
 public class SecretOrderVillagePlacer {
     private static final String NAMESPACE = "wildernessodyssey";
-    private static final String PATH = "schematics/secret_order_village.schem";
+    // Path to the schematic bundled with the mod resources
+    private static final String PATH = "schematics/village.schem";
 
     /**
      * Attempts to spawn the structure in the given chunk.
@@ -39,8 +40,8 @@ public class SecretOrderVillagePlacer {
         if (rand.nextFloat() > 0.001f) return; // Rare spawn chance
 
         BlockPos surfacePos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, chunkPos);
-        if (level.getBiome(surfacePos).is(BiomeTags.IS_OCEAN)) return;
-
+        // Only spawn in jungle biomes and avoid oceans
+        if (!level.getBiome(surfacePos).is(BiomeTags.IS_JUNGLE)) return;
         if (level.getBiome(surfacePos).is(BiomeTags.IS_OCEAN)) return;
 
         placeStructure(level, surfacePos);
