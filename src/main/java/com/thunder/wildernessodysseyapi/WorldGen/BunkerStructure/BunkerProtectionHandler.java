@@ -7,7 +7,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.MobCategory;
 
 import java.util.Set;
 
@@ -35,6 +38,16 @@ public class BunkerProtectionHandler {
         bunkerBounds.add(bounds);
     }
 
+    /** Checks if the given position is inside any bunker bounds. */
+    public static boolean isInside(BlockPos pos) {
+        for (AABB box : bunkerBounds) {
+            if (box.contains(pos.getX(), pos.getY(), pos.getZ())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Cancels block break events for protected blocks inside the bunker.
      */
@@ -43,14 +56,24 @@ public class BunkerProtectionHandler {
         if (bunkerBounds.isEmpty()) return;
 
         BlockPos pos = event.getPos();
-        for (AABB box : bunkerBounds) {
-            if (box.contains(pos.getX(), pos.getY(), pos.getZ())) {
-                BlockState state = event.getLevel().getBlockState(pos);
-                if (UNBREAKABLE_BLOCKS.contains(state.getBlock())) {
-                    event.setCanceled(true);
-                }
-                break;
+        if (isInside(pos)) {
+            BlockState state = event.getLevel().getBlockState(pos);
+            if (UNBREAKABLE_BLOCKS.contains(state.getBlock())) {
+                event.setCanceled(true);
             }
+        }
+    }
+
+    /** Prevent hostile mobs from spawning inside the bunker. */
+    @SubscribeEvent
+    public static void onMobSpawn(EntityJoinLevelEvent event) {
+        if (bunkerBounds.isEmpty()) return;
+        if (!(event.getEntity() instanceof Mob mob)) return;
+        if (mob.getType().getCategory() != MobCategory.MONSTER) return;
+
+        BlockPos pos = mob.blockPosition();
+        if (isInside(pos)) {
+            event.setCanceled(true);
         }
     }
 }
