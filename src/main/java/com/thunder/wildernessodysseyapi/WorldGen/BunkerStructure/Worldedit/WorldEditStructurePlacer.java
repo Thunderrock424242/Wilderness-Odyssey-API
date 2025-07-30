@@ -25,6 +25,7 @@ import java.io.InputStream;
 public class WorldEditStructurePlacer {
     private final String namespace;
     private final String path;
+    private Clipboard clipboard;
 
     /**
      * Instantiates a new World edit structure placer.
@@ -46,23 +47,27 @@ public class WorldEditStructurePlacer {
      */
     public AABB placeStructure(ServerLevel world, BlockPos position) {
         try {
-            InputStream schemStream = getClass().getResourceAsStream(
-                    "/assets/" + namespace + "/schematics/" + path
-            );
+            if (clipboard == null) {
+                InputStream schemStream = getClass().getResourceAsStream(
+                        "/assets/" + namespace + "/schematics/" + path
+                );
 
-            if (schemStream == null) {
-                System.out.println("Schematic file not found: " + namespace + "/" + path);
-                return null;
+                if (schemStream == null) {
+                    System.out.println("Schematic file not found: " + namespace + "/" + path);
+                    return null;
+                }
+
+                ClipboardFormat format = ClipboardFormats.findByAlias("schematic");
+                if (format == null) {
+                    throw new IllegalArgumentException("Unsupported schematic format!");
+                }
+
+                try (ClipboardReader reader = format.getReader(schemStream)) {
+                    clipboard = reader.read();
+                }
             }
 
-            ClipboardFormat format = ClipboardFormats.findByAlias("schematic");
-            if (format == null) {
-                throw new IllegalArgumentException("Unsupported schematic format!");
-            }
-
-            try (ClipboardReader reader = format.getReader(schemStream)) {
-                Clipboard clipboard = reader.read();
-                BlockPos surfacePos = world.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, position);
+            BlockPos surfacePos = world.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, position);
 
                 BlockVector3 min = clipboard.getRegion().getMinimumPoint();
                 BlockVector3 max = clipboard.getRegion().getMaximumPoint();

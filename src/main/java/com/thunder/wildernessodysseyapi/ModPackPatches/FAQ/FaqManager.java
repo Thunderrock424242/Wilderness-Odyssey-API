@@ -59,8 +59,9 @@ public class FaqManager {
 
     /** Searches FAQs by keyword in the question text. */
     public static List<FaqEntry> search(String keyword) {
+        String lower = keyword.toLowerCase();
         return FAQ_ENTRIES.values().stream()
-                .filter(entry -> entry.question().toLowerCase().contains(keyword.toLowerCase()))
+                .filter(entry -> entry.question().toLowerCase().contains(lower))
                 .toList();
     }
 
