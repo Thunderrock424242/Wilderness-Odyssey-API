@@ -12,7 +12,6 @@ import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffComma
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
-import com.thunder.wildernessodysseyapi.WorldGen.client.ClientSetup;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
@@ -104,9 +103,7 @@ public class WildernessOdysseyAPIMainModClass {
         // TerraBlender region
         //terrablender.addRegion(new ModRegion(ResourceLocation.tryBuild(ModConstants.MOD_ID, "meteor_region"), 1));
         container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            ClientSetup.registerClientEvents();
-        }
+        // Previously registered client-only events have been removed
         container.registerConfig(ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC);
 
     }
