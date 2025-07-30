@@ -21,8 +21,14 @@ import static com.thunder.wildernessodysseyapi.ModPackPatches.client.WorldVersio
 
 @EventBusSubscriber
 public class WorldVersionClientChecker {
+
+    public static boolean PATCH_UPDATE_NOTIFICATION = false;
+    public static boolean MINOR_UPDATE_NOTIFICATION = false;
+    public static boolean MAJOR_UPDATE_NOTIFICATION = true;
+
     private static boolean hasCheckedCurrentWorld = false;
     private static String lastCheckedWorldPath = "";
+
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof LocalPlayer) {
@@ -35,11 +41,9 @@ public class WorldVersionClientChecker {
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         Minecraft mc = Minecraft.getInstance();
 
-        // Only run on singleplayer client
         if (mc.getSingleplayerServer() == null)
         {
             LoggerUtil.log(LoggerUtil.ConflictSeverity.ERROR, "[WorldVersionClientChecker] Not in singleplayer, skipping world version check.");
-
             return;
         }
 
@@ -55,12 +59,20 @@ public class WorldVersionClientChecker {
             int[] worldSegments = parseVersion(worldVersion);
 
             if (isVersionGreater(configSegments, worldSegments)) {
-                mc.execute(() -> mc.setScreen(new WorldVersionWarningScreen(
-                        worldVersion,
-                        configVersion,
-                        () -> mc.setScreen(null),
-                        () -> saveAndQuitToMenu(mc)
-                )));
+                String updateType = getUpdateType(worldVersion, configVersion);
+
+                if (
+                        ("Patch".equals(updateType) && PATCH_UPDATE_NOTIFICATION) || ("Minor".equals(updateType) && MINOR_UPDATE_NOTIFICATION) || ("Major".equals(updateType) && MAJOR_UPDATE_NOTIFICATION)
+                )
+
+                {
+                    mc.execute(() -> mc.setScreen(new WorldVersionWarningScreen(
+                            worldVersion,
+                            configVersion,
+                            () -> mc.setScreen(null),
+                            () -> saveAndQuitToMenu(mc)
+                    )));
+                }
             }
         } catch (Exception e) {
             LoggerUtil.log(LoggerUtil.ConflictSeverity.ERROR,
@@ -109,5 +121,4 @@ public class WorldVersionClientChecker {
             mc.setScreen(new JoinMultiplayerScreen(titleScreen));
         }
     }
-
 }
