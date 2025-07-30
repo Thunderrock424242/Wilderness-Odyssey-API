@@ -90,11 +90,6 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(BlacklistChecker.class);
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
-        ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
-        ModStructures.PLACED_FEATURES.register(modEventBus);
-        ModFeatures.FEATURES.register(modEventBus);
-        ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
-        ModFeatures.PLACED_FEATURES.register(modEventBus);
 
         CryoTubeBlock.register(modEventBus);
         ModItems.register(modEventBus);
