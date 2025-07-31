@@ -28,6 +28,10 @@ public class CampfireBlockMixin {
     private static void modifyMakeParticles(Level level, BlockPos pos, boolean isSignalFire, boolean spawnExtraSmoke, CallbackInfo ci) {
         if (!level.isClientSide) return;
 
+        if (!level.canSeeSky(pos.above())) {
+            return; // Let vanilla handle smoke when covered
+        }
+
         long gameTime = level.getGameTime();
         long lastTime = LAST_PARTICLE_TIME.getOrDefault(pos.immutable(), 0L);
 
