@@ -214,5 +214,6 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onReload(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
+        event.addListener(com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager.INSTANCE);
     }
 }

@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.StructureSpawnT
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.levelgen.feature.Feature;
@@ -36,7 +37,7 @@ public class BunkerFeature extends Feature<NoneFeatureConfiguration> {
         if (tracker.getSpawnCount() >= maxCount) return false;
         if (!tracker.isFarEnough(origin, minDist)) return false;
 
-        // Use the bundled bunker schematic
+        // Use the bunker schematic from data packs if available, otherwise bundled resource
         WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
         AABB bounds = placer.placeStructure(level, origin);
         if (bounds != null) {
