@@ -10,6 +10,7 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.storage.LevelResource;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -19,7 +20,7 @@ import java.nio.file.Paths;
 
 import static com.thunder.wildernessodysseyapi.ModPackPatches.client.WorldVersionChecker.*;
 
-@EventBusSubscriber
+@EventBusSubscriber(Dist.CLIENT)
 public class WorldVersionClientChecker {
 
     public static boolean PATCH_UPDATE_NOTIFICATION = false;
