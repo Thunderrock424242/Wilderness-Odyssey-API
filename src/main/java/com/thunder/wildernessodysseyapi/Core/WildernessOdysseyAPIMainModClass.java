@@ -94,6 +94,9 @@ public class WildernessOdysseyAPIMainModClass {
         CryoTubeBlock.register(modEventBus);
         ModItems.register(modEventBus);
 
+       // todo remove  modEventBus.addListener(ModBiomes::register);
+        // TerraBlender region
+        //terrablender.addRegion(new ModRegion(ResourceLocation.tryBuild(ModConstants.MOD_ID, "meteor_region"), 1));
         container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);
         // Previously registered client-only events have been removed
         container.registerConfig(ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC);
