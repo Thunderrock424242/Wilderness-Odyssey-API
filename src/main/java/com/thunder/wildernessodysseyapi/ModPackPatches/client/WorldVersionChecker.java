@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class WorldVersionChecker {
 
     /** The default world version for the mod; update this when releasing new versions */
-    public static final String MOD_DEFAULT_WORLD_VERSION = "1.0.0"; // Update your Mod Version Here Major , Minor , Patch
+    public static final String MOD_DEFAULT_WORLD_VERSION = "2.0.0"; // Update your Mod Version Here Major , Minor , Patch
 
     /** Caches the config version to avoid repeated file reads */
     private static volatile String cachedConfigVersion = null;
@@ -85,13 +85,12 @@ public class WorldVersionChecker {
                     } catch (Exception e) {
                         LoggerUtil.log(LoggerUtil.ConflictSeverity.ERROR, "[WorldVersionChecker] Failed to auto-update patch: " + e.getMessage());
                     }
-                } else {
-                    // Major/Minor update: manual intervention required
-                    if (player.serverLevel().getServer().getPlayerList().isOp(player.getGameProfile())) {
-                        String msg = "[WorldVersionChecker] World version " + updateType + " update needed! Please back up your world and run /updateworldversion to apply the update. Old version: " + worldVersion + ", New version: " + cachedConfigVersion;
-                        player.sendSystemMessage(Component.literal(msg));
-                        LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "Sent world version warning to op: " + player.getGameProfile().getName());
-                    }
+                }
+                // Notify OP for ALL update types (Major, Minor, Patch)
+                if (player.serverLevel().getServer().getPlayerList().isOp(player.getGameProfile())) {
+                    String msg = "[WorldVersionChecker] World version " + updateType + " update needed! Please back up your world and run /updateworldversion to apply the update. Old version: " + worldVersion + ", New version: " + cachedConfigVersion;
+                    player.sendSystemMessage(Component.literal(msg));
+                    LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "Sent world version warning to op: " + player.getGameProfile().getName());
                 }
                 notifiedWorlds.put(worldId, true);
             }
@@ -114,6 +113,7 @@ public class WorldVersionChecker {
                                 String configVersion = readVersion(configPath);
                                 Path worldPath = server.getWorldPath(LevelResource.ROOT).resolve("world_version.json");
                                 saveVersion(worldPath, configVersion);
+                                notifiedWorlds.clear(); // <-- Added: clear notification cache after update
                                 ctx.getSource().sendSuccess(() -> Component.literal("World version updated to " + configVersion), true);
                                 LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "[WorldVersionChecker] World 'world_version.json' updated to " + configVersion + " via /updateworldversion command.");
                             } catch (Exception e) {

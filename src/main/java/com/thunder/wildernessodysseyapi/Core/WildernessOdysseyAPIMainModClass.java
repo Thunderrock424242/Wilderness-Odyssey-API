@@ -90,18 +90,10 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(BlacklistChecker.class);
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
-        ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
-        ModStructures.PLACED_FEATURES.register(modEventBus);
-        ModFeatures.FEATURES.register(modEventBus);
-        ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
-        ModFeatures.PLACED_FEATURES.register(modEventBus);
 
         CryoTubeBlock.register(modEventBus);
         ModItems.register(modEventBus);
 
-       // todo remove  modEventBus.addListener(ModBiomes::register);
-        // TerraBlender region
-        //terrablender.addRegion(new ModRegion(ResourceLocation.tryBuild(ModConstants.MOD_ID, "meteor_region"), 1));
         container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);
         // Previously registered client-only events have been removed
         container.registerConfig(ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC);

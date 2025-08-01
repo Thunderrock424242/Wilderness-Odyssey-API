@@ -31,12 +31,12 @@ jobs:
 
       - name: Run client until main menu
         run: |
-          touch client.log
-          tail -F client.log &
+          touch latest.log
+          tail -F latest.log &
           TAIL_PID=$!
-          xvfb-run --auto-servernum --server-args='-screen 0 1024x768x24' ./gradlew runClient --no-daemon > client.log 2>&1 &
+          xvfb-run --auto-servernum --server-args='-screen 0 1024x768x24' ./gradlew runClient --no-daemon > latest.log 2>&1 &
           PID=$!
-          if timeout 20m bash -c 'until grep -q "Sound engine started" client.log; do sleep 5; done'; then
+          if timeout 20m bash -c 'until grep -q "Created: 512x512x0 minecraft:textures/atlas/particles.png-atlas" latest.log; do sleep 5; done'; then
             sleep 1m
             kill $PID || true
             wait $PID || true
@@ -53,5 +53,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: client-log
-          path: client.log
+          name: latest-log
+          path: latest.log

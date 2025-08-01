@@ -28,7 +28,13 @@ import java.util.Random;
  * Places the secret order village structure in the world.
  */
 public class SecretOrderVillagePlacer {
+
     private static final String NAMESPACE = "wildernessodysseyapi";
+
+    // Use the mod id so resources resolve correctly when packaged
+    private static final String NAMESPACE = "wildernessodysseyapi";
+    // Path to the schematic bundled with the mod resources
+
     private static final String PATH = "schematics/village.schem";
 
     /**
@@ -76,6 +82,12 @@ public class SecretOrderVillagePlacer {
                 try (ClipboardReader reader = format.getReader(schemStream)) {
                     clipboard = reader.read();
                 }
+
+            ClipboardFormat format = ClipboardFormats.findByAlias("schem");
+            if (format == null) {
+                System.err.println("Unsupported schematic format!");
+                return false;
+
             }
 
             BlockPos basePos = world.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, position);
