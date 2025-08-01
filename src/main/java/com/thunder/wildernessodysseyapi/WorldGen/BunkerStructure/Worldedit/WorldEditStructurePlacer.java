@@ -55,7 +55,8 @@ public class WorldEditStructurePlacer {
                 return null;
             }
 
-            ClipboardFormat format = ClipboardFormats.findByAlias("schematic");
+            // Detect the Sponge schematic format used by our bundled file
+            ClipboardFormat format = ClipboardFormats.findByAlias("schem");
             if (format == null) {
                 throw new IllegalArgumentException("Unsupported schematic format!");
             }
