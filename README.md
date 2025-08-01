@@ -44,3 +44,17 @@ control its frequency:
 
 The meteor impact zone structure is generated when a new world loads, creating a crater and a bunker nearby.
 Secret Order villages may rarely appear in jungle biomes, using the bundled schematic.
+
+Using Data Pack Schematics
+-------------------------
+The mod now supports loading WorldEdit `.schem` files from data packs in the same
+way vanilla handles structure NBTs. Place your schematics under
+`data/<namespace>/structures/` inside a data pack. Referencing the structure by
+its namespace and path (without the `.schem` extension) will cause it to be
+loaded from the data pack when structures generate. If a matching data pack file
+is not found, the bundled schematic under
+`assets/<namespace>/schematics/` is used instead.
+
+Loot tables defined inside schematics work the same way as with vanilla
+`nbt` structures. The scanner now detects loot table references in both
+`.nbt` and `.schem` files so datapacks can supply their own chest contents.

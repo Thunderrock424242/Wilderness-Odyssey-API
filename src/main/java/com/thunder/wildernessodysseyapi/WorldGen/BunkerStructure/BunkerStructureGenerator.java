@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -35,6 +36,7 @@ public class BunkerStructureGenerator {
         if (tracker.getSpawnCount() >= maxCount) return;
         if (!tracker.isFarEnough(surfacePos, minDist <= 0 ? DEFAULT_MIN_DISTANCE_CHUNKS : minDist)) return;
 
+        // Load from data packs if available, else fall back to bundled schematic
         WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
         AABB bounds = placer.placeStructure(level, surfacePos);
         if (bounds != null) {

@@ -44,6 +44,7 @@ public class MeteorStructureSpawner {
             // place bunker two chunks east of the meteor
             BlockPos bunkerPos = spawnPos.offset(32, 0, 0);
             bunkerPos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, bunkerPos);
+            // Prefer schematics from data packs but fall back to bundled resource
             WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
             var bounds = placer.placeStructure(level, bunkerPos);
             if (bounds != null) {

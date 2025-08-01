@@ -18,6 +18,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
+import com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager;
+import net.minecraft.resources.ResourceLocation;
 
 import java.io.InputStream;
 import java.util.Random;
@@ -26,9 +28,13 @@ import java.util.Random;
  * Places the secret order village structure in the world.
  */
 public class SecretOrderVillagePlacer {
+
+    private static final String NAMESPACE = "wildernessodysseyapi";
+
     // Use the mod id so resources resolve correctly when packaged
     private static final String NAMESPACE = "wildernessodysseyapi";
     // Path to the schematic bundled with the mod resources
+
     private static final String PATH = "schematics/village.schem";
 
     /**
@@ -53,46 +59,59 @@ public class SecretOrderVillagePlacer {
      */
     public static boolean placeStructure(ServerLevel world, BlockPos position) {
         try {
-            InputStream schemStream = SecretOrderVillagePlacer.class.getResourceAsStream(
-                    "/assets/" + NAMESPACE + "/" + PATH
+            ResourceLocation id = ResourceLocation.tryBuild(
+                    NAMESPACE,
+                    PATH.substring("schematics/".length(), PATH.length() - ".schem".length())
             );
+            Clipboard clipboard = SchematicManager.INSTANCE.get(id);
+            if (clipboard == null) {
+                InputStream schemStream = SecretOrderVillagePlacer.class.getResourceAsStream(
+                        "/assets/" + NAMESPACE + "/" + PATH
+                );
+                if (schemStream == null) {
+                    System.err.println("Schematic not found: " + PATH);
+                    return false;
+                }
 
-            if (schemStream == null) {
-                System.err.println("Schematic not found: " + PATH);
-                return false;
-            }
+                ClipboardFormat format = ClipboardFormats.findByAlias("schematic");
+                if (format == null) {
+                    System.err.println("Unsupported schematic format!");
+                    return false;
+                }
+
+                try (ClipboardReader reader = format.getReader(schemStream)) {
+                    clipboard = reader.read();
+                }
 
             ClipboardFormat format = ClipboardFormats.findByAlias("schem");
             if (format == null) {
                 System.err.println("Unsupported schematic format!");
                 return false;
+
             }
 
-            try (ClipboardReader reader = format.getReader(schemStream)) {
-                Clipboard clipboard = reader.read();
-                BlockPos basePos = world.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, position);
+            BlockPos basePos = world.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, position);
 
-                try (EditSession editSession = WorldEdit.getInstance().newEditSession((World) world)) {
-                    ClipboardHolder holder = new ClipboardHolder(clipboard);
-                    holder.createPaste(editSession)
-                            .to(BlockVector3.at(basePos.getX(), basePos.getY(), basePos.getZ()))
-                            .ignoreAirBlocks(false)
-                            .build();
+            try (EditSession editSession = WorldEdit.getInstance().newEditSession((World) world)) {
+                ClipboardHolder holder = new ClipboardHolder(clipboard);
+                holder.createPaste(editSession)
+                        .to(BlockVector3.at(basePos.getX(), basePos.getY(), basePos.getZ()))
+                        .ignoreAirBlocks(false)
+                        .build();
 
-                    for (int x = 0; x < clipboard.getDimensions().getX(); x++) {
-                        for (int z = 0; z < clipboard.getDimensions().getZ(); z++) {
-                            BlockVector3 local = BlockVector3.at(x, clipboard.getDimensions().getY() - 1, z);
-                            BlockVector3 worldVec = local.add(clipboard.getOrigin()).add(BlockVector3.at(position.getX(), position.getY(), position.getZ()));
-                            if (clipboard.getBlock(local).getBlockType().equals(BlockTypes.WHITE_WOOL)) {
-                                BlockPos worldPos = new BlockPos(worldVec.getX(), worldVec.getY(), worldVec.getZ());
-                                BlockPos below = worldPos.below();
-                                net.minecraft.world.level.block.state.BlockState terrainBlock = world.getBlockState(below);
-                                BlockFactory weState = WorldEdit.getInstance()
-                                        .getBlockFactory();
-                                BlockType blockType = BlockTypes.get(terrainBlock.getBlock().builtInRegistryHolder().key().location().toString());
+                for (int x = 0; x < clipboard.getDimensions().getX(); x++) {
+                    for (int z = 0; z < clipboard.getDimensions().getZ(); z++) {
+                        BlockVector3 local = BlockVector3.at(x, clipboard.getDimensions().getY() - 1, z);
+                        BlockVector3 worldVec = local.add(clipboard.getOrigin())
+                                .add(BlockVector3.at(position.getX(), position.getY(), position.getZ()));
+                        if (clipboard.getBlock(local).getBlockType().equals(BlockTypes.WHITE_WOOL)) {
+                            BlockPos worldPos = new BlockPos(worldVec.getX(), worldVec.getY(), worldVec.getZ());
+                            BlockPos below = worldPos.below();
+                            net.minecraft.world.level.block.state.BlockState terrainBlock = world.getBlockState(below);
+                            BlockFactory weState = WorldEdit.getInstance().getBlockFactory();
+                            BlockType blockType = BlockTypes.get(terrainBlock.getBlock().builtInRegistryHolder().key().location().toString());
 
-                                editSession.setBlock(worldVec, (Pattern) weState);
-                            }
+                            editSession.setBlock(worldVec, (Pattern) weState);
                         }
                     }
                 }
