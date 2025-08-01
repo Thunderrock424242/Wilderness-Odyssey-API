@@ -82,13 +82,6 @@ ordering="AFTER"
 side="BOTH"
 
 [[dependencies.wildernessodysseyapi]]
-modId="terrablender"
-mandatory=true
-versionRange="[4.1.0.8,)"
-ordering="NONE"
-side="BOTH"
-
-[[dependencies.wildernessodysseyapi]]
 modId="ticktoklib"
 mandatory=true
 versionRange="[1.3.0,)"
