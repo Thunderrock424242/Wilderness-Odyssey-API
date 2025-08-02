@@ -1,0 +1,18 @@
+{
+  "loader": "neoforge:obj",
+  "model": "wildernessodysseyapi:models/block/cryo_tube.obj",
+  "flip-v": true,
+  "textures": {
+    "diffuse": "wildernessodysseyapi:block/cryo_tube_block",
+    "emissive": "wildernessodysseyapi:block/cryo_tube_block_emissive"
+  },
+  "materials": {
+    "GlowMaterial": {
+      "texture": "#diffuse",
+      "emissive": "#emissive"
+    },
+    "BaseMaterial": {
+      "texture": "#diffuse"
+    }
+  }
+}
