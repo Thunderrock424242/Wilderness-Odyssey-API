@@ -1,8 +1,10 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.server;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.thunder.wildernessodysseyapi.ModPackPatches.client.WorldVersionChecker;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
@@ -29,6 +31,8 @@ public class PartnerAdHandler {
     private static long tickCounter = 0;
 
     private static final Set<UUID> OPTED_OUT = new HashSet<>();
+    private static final String TAG_OPT_OUT = "partnerad_optout";
+    private static final String TAG_VERSION = "partnerad_version";
 
     private static final String PARTNER_NAME = "Kinetic_Hosting";
     private static final String PARTNER_CODE = "THUNDER";
@@ -103,6 +107,9 @@ public class PartnerAdHandler {
                         .then(Commands.literal("optout")
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    CompoundTag data = player.getPersistentData();
+                                    data.putBoolean(TAG_OPT_OUT, true);
+                                    data.putString(TAG_VERSION, WorldVersionChecker.MOD_DEFAULT_WORLD_VERSION);
                                     OPTED_OUT.add(player.getUUID());
                                     player.sendSystemMessage(
                                             Component.literal("Ads disabled.")
@@ -114,6 +121,9 @@ public class PartnerAdHandler {
                         .then(Commands.literal("optin")
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    CompoundTag data = player.getPersistentData();
+                                    data.putBoolean(TAG_OPT_OUT, false);
+                                    data.putString(TAG_VERSION, WorldVersionChecker.MOD_DEFAULT_WORLD_VERSION);
                                     OPTED_OUT.remove(player.getUUID());
                                     player.sendSystemMessage(
                                             Component.literal("Ads enabled.")
@@ -133,7 +143,18 @@ public class PartnerAdHandler {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         UUID uuid = player.getUUID();
-        if (!OPTED_OUT.contains(uuid)) {
+        CompoundTag data = player.getPersistentData();
+        String currentVersion = WorldVersionChecker.MOD_DEFAULT_WORLD_VERSION;
+        String storedVersion = data.getString(TAG_VERSION);
+        if (!storedVersion.equals(currentVersion)) {
+            data.putBoolean(TAG_OPT_OUT, false);
+            data.putString(TAG_VERSION, currentVersion);
+        }
+
+        if (data.getBoolean(TAG_OPT_OUT)) {
+            OPTED_OUT.add(uuid);
+        } else {
+            OPTED_OUT.remove(uuid);
             waitingPlayers.add(uuid);
             playerTickMap.put(uuid, tickCounter);
         }

@@ -100,6 +100,7 @@ public class WildernessOdysseyAPIMainModClass {
         container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);
         // Previously registered client-only events have been removed
         container.registerConfig(ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC);
+        DonationReminderConfig.validateVersion();
 
     }
 
