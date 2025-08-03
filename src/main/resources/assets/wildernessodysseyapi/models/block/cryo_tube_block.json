@@ -1,6 +1,6 @@
 {
   "loader": "neoforge:obj",
-  "model": "wildernessodysseyapi:models/block/cryo_tube.obj",
+  "model": "wildernessodysseyapi:models/block/cryotube.obj",
   "flip-v": true,
   "textures": {
     "diffuse": "wildernessodysseyapi:block/player_cabine",
