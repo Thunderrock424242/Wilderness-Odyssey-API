@@ -6,6 +6,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Block;
@@ -13,6 +14,9 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -39,6 +43,8 @@ public class CryoTubeBlock {
                     .strength(-1.0F, 3600000.0F)
                     .noLootTable()
                     .lightLevel(s -> 7)
+                    .noOcclusion()
+                    .noCollission()
                     .sound(SoundType.METAL)));
 
     private static <T extends Block> DeferredBlock<T> registerBlock(Supplier<T> block) {
@@ -62,8 +68,31 @@ public class CryoTubeBlock {
      * Simple implementation that allows players to sleep inside the tube.
      */
     public static class BlockImpl extends Block {
+        // Narrow voxel shape matching the tube's slender footprint.
+        private static final VoxelShape SHAPE = Block.box(2.0D, 0.0D, 2.0D, 14.0D, 16.0D, 14.0D);
+
         public BlockImpl(Properties properties) {
             super(properties);
+        }
+
+        @Override
+        public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+            return SHAPE;
+        }
+
+        @Override
+        public VoxelShape getVisualShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+            return SHAPE;
+        }
+
+        @Override
+        public VoxelShape getInteractionShape(BlockState state, BlockGetter level, BlockPos pos) {
+            return SHAPE;
+        }
+
+        @Override
+        public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+            return Shapes.empty();
         }
 
         // NeoForge 21 updated the Block interaction API. The previous
