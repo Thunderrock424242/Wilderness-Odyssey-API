@@ -60,7 +60,7 @@ public class WorldSpawnHandler {
      * @param world the world
      * @return the list
      */
-    static List<BlockPos> findAllWorldSpawnBlocks(ServerLevel world) {
+    public static List<BlockPos> findAllWorldSpawnBlocks(ServerLevel world) {
         List<BlockPos> spawnBlocks = new ArrayList<>();
 
         try {
