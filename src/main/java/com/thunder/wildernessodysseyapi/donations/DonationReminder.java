@@ -28,7 +28,7 @@ public class DonationReminder {
     @SubscribeEvent
     public static void onJoin(ClientPlayerNetworkEvent.LoggingIn event) {
         DonationReminderConfig.validateVersion();
-        if (DonationReminderConfig.disableReminder.get()) return;
+        if (!DonationReminderConfig.CONFIG_SPEC.isLoaded() || DonationReminderConfig.disableReminder.get()) return;
 
         tickCountdown = DELAY_TICKS;
         pendingReminder = true;

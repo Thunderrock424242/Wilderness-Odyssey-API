@@ -30,6 +30,8 @@ public class DonationReminderConfig {
      * Resets opt-out if the stored version differs from the current modpack version.
      */
     public static void validateVersion() {
+        if (!CONFIG_SPEC.isLoaded()) return;
+
         String currentVersion = WorldVersionChecker.MOD_DEFAULT_WORLD_VERSION;
         if (!optOutWorldVersion.get().equals(currentVersion)) {
             disableReminder.set(false);
