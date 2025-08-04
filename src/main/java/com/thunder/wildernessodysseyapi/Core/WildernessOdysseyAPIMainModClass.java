@@ -10,6 +10,7 @@ import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
+import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
@@ -86,6 +87,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
 
         CryoTubeBlock.register(modEventBus);
+        TerrainReplacerBlock.register(modEventBus);
         ModItems.register(modEventBus);
 
         container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);

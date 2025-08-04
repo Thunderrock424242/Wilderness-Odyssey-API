@@ -10,6 +10,7 @@ import com.sk89q.worldedit.extent.clipboard.io.ClipboardReader;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.session.ClipboardHolder;
 import com.sk89q.worldedit.world.World;
+import com.sk89q.worldedit.world.block.BlockType;
 import com.sk89q.worldedit.world.block.BlockTypes;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.TerrainBlockReplacer;
 import com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager;
@@ -94,8 +95,15 @@ public class WorldEditStructurePlacer {
                 ClipboardHolder holder = new ClipboardHolder(clipboard);
 
                 // Iterate through the clipboard's region and replace placeholder blocks
+                BlockType terrainReplacerType = null;
+                try {
+                    terrainReplacerType = BlockTypes.get("wildernessodysseyapi:terrain_replacer");
+                } catch (Exception ignored) {
+                }
+
                 for (BlockVector3 vec : clipboard.getRegion()) {
-                    if (clipboard.getFullBlock(vec).getBlockType().equals(BlockTypes.WHITE_WOOL)) {
+                    if (terrainReplacerType != null &&
+                            clipboard.getFullBlock(vec).getBlockType().equals(terrainReplacerType)) {
                         try {
                             TerrainBlockReplacer.replaceBlockWithTerrainRelative(editSession, world, vec, surfacePos);
                         } catch (MaxChangedBlocksException e) {

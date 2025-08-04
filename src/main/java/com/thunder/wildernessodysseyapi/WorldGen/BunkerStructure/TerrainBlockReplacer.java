@@ -27,8 +27,11 @@ public class TerrainBlockReplacer {
     public static void replaceBlockWithTerrain(EditSession editSession, ServerLevel world,
                                                BlockVector3 blockVector, BlockPos terrainPos)
             throws MaxChangedBlocksException {
-        // Get terrain block from Minecraft world
-        net.minecraft.world.level.block.state.BlockState terrainBlock = world.getBlockState(terrainPos.below());
+        // Sample the block at the terrain position. If it's air, fall back to the block below
+        net.minecraft.world.level.block.state.BlockState terrainBlock = world.getBlockState(terrainPos);
+        if (terrainBlock.isAir()) {
+            terrainBlock = world.getBlockState(terrainPos.below());
+        }
 
         // Convert Minecraft BlockState to WorldEdit BlockState
         BlockType weBlockState = convertMinecraftToWorldEdit(terrainBlock);
