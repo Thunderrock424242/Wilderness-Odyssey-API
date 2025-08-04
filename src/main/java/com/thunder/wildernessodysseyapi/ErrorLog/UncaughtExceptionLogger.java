@@ -3,6 +3,8 @@ package com.thunder.wildernessodysseyapi.ErrorLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import net.minecraft.network.chat.Component;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -27,7 +29,7 @@ public class UncaughtExceptionLogger {
      */
     public static void init() {
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
-            String msg = String.format("Uncaught exception in thread '%s': %s", thread.getName(), throwable);
+            String msg = Component.translatable("log.wildernessodysseyapi.uncaught_exception", thread.getName(), throwable).getString();
 
             // 1) Log to the standard Neoforge logs
             LOGGER.error(msg, throwable);
@@ -51,7 +53,7 @@ public class UncaughtExceptionLogger {
             }
         } catch (IOException e) {
             // If writing fails, at least log that in the main logs
-            LOGGER.error("Failed to write to {}", LOG_FILE_PATH, e);
+            LOGGER.error(Component.translatable("log.wildernessodysseyapi.failed_write", LOG_FILE_PATH).getString(), e);
         }
     }
 }

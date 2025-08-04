@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+
+import net.minecraft.network.chat.Component;
 /**
  * The type Logger util.
  */
@@ -38,9 +40,9 @@ public class LoggerUtil {
 
     private static String formatLogMessage(ConflictSeverity severity, String timestamp, String message) {
         return switch (severity) {
-            case INFO -> String.format("[INFO] >>> %s - %s", timestamp, message);
-            case WARN -> String.format("[!!! WARNING !!!] >>> %s - %s", timestamp, message);
-            case ERROR -> String.format("[!!! ERROR !!!] >>> %s - %s", timestamp, message);
+            case INFO -> Component.translatable("log.wildernessodysseyapi.conflict_info", timestamp, message).getString();
+            case WARN -> Component.translatable("log.wildernessodysseyapi.conflict_warn", timestamp, message).getString();
+            case ERROR -> Component.translatable("log.wildernessodysseyapi.conflict_error", timestamp, message).getString();
         };
     }
 
@@ -50,7 +52,7 @@ public class LoggerUtil {
             // Ensure parent directory exists
             File parentDir = logFile.getParentFile();
             if (!parentDir.exists() && !parentDir.mkdirs()) {
-                LOGGER.error("Failed to create log directory: {}", parentDir.getAbsolutePath());
+                LOGGER.error(Component.translatable("log.wildernessodysseyapi.failed_create_log_dir", parentDir.getAbsolutePath()).getString());
                 return;
             }
 
@@ -60,7 +62,7 @@ public class LoggerUtil {
                 writer.newLine();
             }
         } catch (IOException e) {
-            LOGGER.error("Failed to write to conflict log file: {}", e.getMessage());
+            LOGGER.error(Component.translatable("log.wildernessodysseyapi.failed_write_conflict_log", e.getMessage()).getString());
         }
     }
 

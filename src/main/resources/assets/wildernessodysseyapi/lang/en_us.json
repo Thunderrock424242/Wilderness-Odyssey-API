@@ -1,7 +1,21 @@
 {
-  "itemGroup.examplemod": "Example Mod Tab",
-  "block.examplemod.example_block": "Example Block",
-  "item.examplemod.example_item": "Example Item",
-  "message.wildernessodysseyapi.wake_up": "Waking from cryostasis..."
- }
+  "block.wildernessodysseyapi.cryo_tube_block": "Cryo Tube",
+  "item.wildernessodysseyapi.cryo_tube_block": "Cryo Tube",
+  "block.wildernessodysseyapi.terrain_replacer": "Terrain Replacer",
+  "item.wildernessodysseyapi.terrain_replacer": "Terrain Replacer",
+  "message.wildernessodysseyapi.wake_up": "Waking from cryostasis...",
+  "log.wildernessodysseyapi.init": "WildernessOdysseyAPI initialized. I will also start to track mod conflicts",
+  "log.wildernessodysseyapi.setup_complete": "Wilderness Odyssey setup complete!",
+  "log.wildernessodysseyapi.mod_pack_version": "Mod Pack Version: %s",
+  "log.wildernessodysseyapi.dev_only": "This message is for development purposes only.",
+  "log.wildernessodysseyapi.memory_usage": "[ResourceManager] Memory usage: %sMB / %sMB. Recommended ~%sMB for %s loaded mods.",
+  "log.wildernessodysseyapi.invalid_resource_location": "Invalid ResourceLocation: '%s'",
+  "log.wildernessodysseyapi.conflict_info": "[INFO] >>> %s - %s",
+  "log.wildernessodysseyapi.conflict_warn": "[!!! WARNING !!!] >>> %s - %s",
+  "log.wildernessodysseyapi.conflict_error": "[!!! ERROR !!!] >>> %s - %s",
+  "log.wildernessodysseyapi.failed_create_log_dir": "Failed to create log directory: %s",
+  "log.wildernessodysseyapi.failed_write_conflict_log": "Failed to write to conflict log file: %s",
+  "log.wildernessodysseyapi.failed_write": "Failed to write to %s",
+  "log.wildernessodysseyapi.uncaught_exception": "Uncaught exception in thread '%s': %s"
+}
 

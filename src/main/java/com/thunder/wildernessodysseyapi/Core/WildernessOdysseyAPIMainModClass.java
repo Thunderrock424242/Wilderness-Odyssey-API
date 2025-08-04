@@ -53,6 +53,8 @@ import java.util.Map;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
 
+import net.minecraft.network.chat.Component;
+
 /**
  * The type Wilderness odyssey api main mod class.
  */
@@ -76,7 +78,7 @@ public class WildernessOdysseyAPIMainModClass {
      * @param container   the container
      */
     public WildernessOdysseyAPIMainModClass(IEventBus modEventBus, ModContainer container) {
-        LOGGER.info("WildernessOdysseyAPI initialized. I will also start to track mod conflicts");
+        LOGGER.info(Component.translatable("log.wildernessodysseyapi.init").getString());
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);
@@ -99,9 +101,9 @@ public class WildernessOdysseyAPIMainModClass {
 
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> System.out.println("Wilderness Odyssey setup complete!"));
-        LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
-        LOGGER.warn("This message is for development purposes only."); // Logs as info
+        event.enqueueWork(() -> LOGGER.info(Component.translatable("log.wildernessodysseyapi.setup_complete").getString()));
+        LOGGER.warn(Component.translatable("log.wildernessodysseyapi.mod_pack_version", VERSION).getString());
+        LOGGER.warn(Component.translatable("log.wildernessodysseyapi.dev_only").getString());
         UncaughtExceptionLogger.init();
         dynamicModCount = ModList.get().getMods().size();
     }
@@ -197,7 +199,7 @@ public class WildernessOdysseyAPIMainModClass {
                 // Use the dynamic mod count
                 int recommendedMB = MemoryUtils.calculateRecommendedRAM(usedMB, dynamicModCount);
 
-            LOGGER.info("[ResourceManager] Memory usage: {}MB / {}MB. Recommended ~{}MB for {} loaded mods.", usedMB, totalMB, recommendedMB, dynamicModCount);
+            LOGGER.info(Component.translatable("log.wildernessodysseyapi.memory_usage", usedMB, totalMB, recommendedMB, dynamicModCount).getString());
             }
         }
     @SubscribeEvent

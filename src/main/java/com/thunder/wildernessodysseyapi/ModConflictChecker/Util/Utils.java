@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.ModConflictChecker.Util;
 
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.network.chat.Component;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 
@@ -18,7 +19,7 @@ public class Utils {
     public static boolean isValidResourceLocation(String name) {
         ResourceLocation key = ResourceLocation.tryParse(name);
         if (key == null) {
-            LOGGER.error("Invalid ResourceLocation: '{}'", name);
+            LOGGER.error(Component.translatable("log.wildernessodysseyapi.invalid_resource_location", name).getString());
             return false;
         }
         return true;
