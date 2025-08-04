@@ -13,7 +13,7 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 /**
  * Registers client side rendering for the cryo tube block.
  */
-@EventBusSubscriber(modid = MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+@EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
 public class CryoTubeRenderSetup {
 
     /**

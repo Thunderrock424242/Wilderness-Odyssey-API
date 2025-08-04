@@ -1,10 +1,10 @@
 {
   "loader": "neoforge:obj",
-  "model": "wildernessodysseyapi:models/block/cryotube.obj",
+  "model": "wildernessodysseyapi:models/block/Cryo_tube.obj",
   "flip-v": true,
   "textures": {
-    "diffuse": "wildernessodysseyapi:block/player_cabine",
-    "emissive": "wildernessodysseyapi:block/emissive"
+    "diffuse": "wildernessodysseyapi:block/Cryo_tube.png",
+    "emissive": "wildernessodysseyapi:block/emissive.png"
   },
   "materials": {
     "m_3514b7c8-1e71-f1a7-304a-94c510b4f38c": {
