@@ -1,6 +1,6 @@
 # Made in Blockbench 4.12.5
 newmtl m_3b852ac4-fdad-7ffd-2dbb-8057c6633b08
-map_Kd Cryo_tube.png
+map_Kd cryo_tube.png
 newmtl m_3514b7c8-1e71-f1a7-304a-94c510b4f38c
 map_Kd emissive.png
 newmtl none
