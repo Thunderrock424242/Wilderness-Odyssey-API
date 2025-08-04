@@ -23,7 +23,7 @@ public class CryoTubeRenderSetup {
      */
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
-        ItemBlockRenderTypes.setRenderLayer(CryoTubeBlock.CRYO_TUBE_BLOCK.get(), RenderType.cutout());
+        ItemBlockRenderTypes.setRenderLayer(CryoTubeBlock.CRYO_TUBE.get(), RenderType.cutout());
     }
 }
 

@@ -76,7 +76,7 @@ public class WorldSpawnHandler {
                 if (chunk != null) {
                     for (BlockPos pos : BlockPos.betweenClosed(chunk.getPos().getMinBlockX(), world.getMinBuildHeight(),
                             chunk.getPos().getMinBlockZ(), chunk.getPos().getMaxBlockX(), world.getMaxBuildHeight(), chunk.getPos().getMaxBlockZ())) {
-                        if (world.getBlockState(pos).is(CryoTubeBlock.CRYO_TUBE_BLOCK.get())) {
+                        if (world.getBlockState(pos).is(CryoTubeBlock.CRYO_TUBE.get())) {
                             spawnBlocks.add(pos);
                         }
                     }

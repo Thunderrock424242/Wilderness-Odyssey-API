@@ -38,7 +38,7 @@ public class CryoTubeBlock {
     /**
      * The cryo tube block instance.
      */
-    public static final DeferredBlock<Block> CRYO_TUBE_BLOCK = registerBlock(
+    public static final DeferredBlock<Block> CRYO_TUBE = registerBlock(
             () -> new BlockImpl(BlockBehaviour.Properties.of()
                     .strength(-1.0F, 3600000.0F)
                     .noLootTable()
