@@ -27,7 +27,7 @@ public class RegistryConflictHandler {
 
     @SubscribeEvent
     public static void onServerStart(ServerStartingEvent event) {
-        LoggerUtil.log(ConflictSeverity.INFO, "Server starting. Checking for registry conflicts...");
+        LoggerUtil.log(ConflictSeverity.INFO, "Server starting. Checking for registry conflicts...", false);
 
         MinecraftServer server = event.getServer();
 
@@ -64,13 +64,13 @@ public class RegistryConflictHandler {
                 if (!originalMod.equals(modSource)) {
                     LoggerUtil.log(ConflictSeverity.ERROR, String.format(
                             "Conflict detected: %s '%s' was originally registered by '%s' but has been overwritten by '%s'.",
-                            type, key, originalMod, modSource));
+                            type, key, originalMod, modSource), false);
                 }
             } else {
                 // Log successful registration
                 trackedRegistry.put(key, modSource);
                 LoggerUtil.log(ConflictSeverity.INFO, String.format(
-                        "%s '%s' registered by '%s'.", type, key, modSource));
+                        "%s '%s' registered by '%s'.", type, key, modSource), false);
             }
         });
     }
@@ -81,7 +81,7 @@ public class RegistryConflictHandler {
      * @param server The Minecraft server instance.
      */
     private static void checkRecipeConflicts(MinecraftServer server) {
-        LoggerUtil.log(ConflictSeverity.INFO, "Checking for crafting recipe conflicts...");
+        LoggerUtil.log(ConflictSeverity.INFO, "Checking for crafting recipe conflicts...", false);
 
         server.getRecipeManager().getRecipes().forEach(recipeHolder -> {
             ResourceLocation recipeKey = recipeHolder.id(); // Use 'id()' instead of 'getId()'
@@ -92,15 +92,15 @@ public class RegistryConflictHandler {
 
                 // Log conflict if detected
                 if (!originalMod.equals(modSource)) {
-                    LoggerUtil.log(ConflictSeverity.ERROR, String.format(
-                            "Conflict detected: Recipe '%s' was originally registered by '%s' but has been overwritten by '%s'.",
-                            recipeKey, originalMod, modSource));
+                        LoggerUtil.log(ConflictSeverity.ERROR, String.format(
+                                "Conflict detected: Recipe '%s' was originally registered by '%s' but has been overwritten by '%s'.",
+                                recipeKey, originalMod, modSource), false);
                 }
             } else {
                 // Log successful registration
                 recipeRegistry.put(recipeKey, modSource);
                 LoggerUtil.log(ConflictSeverity.INFO, String.format(
-                        "Recipe '%s' registered by '%s'.", recipeKey, modSource));
+                        "Recipe '%s' registered by '%s'.", recipeKey, modSource), false);
             }
         });
     }
