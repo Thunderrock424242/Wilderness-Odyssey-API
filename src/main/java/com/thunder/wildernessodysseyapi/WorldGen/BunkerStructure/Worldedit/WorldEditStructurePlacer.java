@@ -12,6 +12,7 @@ import com.sk89q.worldedit.session.ClipboardHolder;
 import com.sk89q.worldedit.world.World;
 import com.sk89q.worldedit.world.block.BlockType;
 import com.sk89q.worldedit.world.block.BlockTypes;
+import net.neoforged.fml.ModList;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.TerrainBlockReplacer;
 import com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
@@ -56,6 +57,11 @@ public class WorldEditStructurePlacer {
      */
     public AABB placeStructure(ServerLevel world, BlockPos position) {
         try {
+            // Wait for WorldEdit to finish booting so BlockTypes are populated.
+            if (!waitForWorldEdit()) {
+                System.out.println("WorldEdit not initialized (BlockTypes.AIR is null); skipping placement of " + id);
+                return null;
+            }
             Clipboard clipboard = SchematicManager.INSTANCE.get(id);
             if (clipboard == null) {
                 InputStream schemStream = getClass().getResourceAsStream(
@@ -140,10 +146,34 @@ public class WorldEditStructurePlacer {
                         .build();
             }
             return bounds;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             System.out.println("Error placing BunkerStructure:");
             e.printStackTrace();
             return null;
+        }
+    }
+
+    /**
+     * Wait briefly for WorldEdit to populate its block registry. Returns {@code true} when
+     * {@code BlockTypes.AIR} is available or {@code false} if WorldEdit is missing or still
+     * uninitialized after waiting.
+     */
+    private static boolean waitForWorldEdit() {
+        try {
+            if (BlockTypes.AIR != null) {
+                return true;
+            }
+            if (!ModList.get().isLoaded("worldedit")) {
+                return false;
+            }
+            for (int i = 0; i < 50 && BlockTypes.AIR == null; i++) {
+                WorldEdit.getInstance();
+                BlockTypes.get("minecraft:air");
+                Thread.sleep(100);
+            }
+            return BlockTypes.AIR != null;
+        } catch (Throwable t) {
+            return false;
         }
     }
 }
