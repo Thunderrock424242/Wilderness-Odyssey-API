@@ -15,24 +15,37 @@ public class LoggerUtil {
     private static final String LOG_FILE_PATH = "config/WildernessOdysseyAPI/conflict_log.txt";
 
     /**
-     * Log.
+     * Log to console and file by default.
      *
      * @param severity the severity
      * @param message  the message
      */
     public static void log(ConflictSeverity severity, String message) {
+        log(severity, message, true);
+    }
+
+    /**
+     * Logs a message with the given severity. Optionally writes to the console in addition to the
+     * dedicated conflict log file.
+     *
+     * @param severity     the severity of the message
+     * @param message      the message to log
+     * @param logToConsole whether the message should also be logged to the standard console logger
+     */
+    public static void log(ConflictSeverity severity, String message, boolean logToConsole) {
         // Add a timestamp to the message
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String formattedMessage = formatLogMessage(severity, timestamp, message);
 
-        // Log to the console
-        switch (severity) {
-            case INFO -> LOGGER.info(formattedMessage);
-            case WARN -> LOGGER.warn(formattedMessage);
-            case ERROR -> LOGGER.error(formattedMessage);
+        if (logToConsole) {
+            switch (severity) {
+                case INFO -> LOGGER.info(formattedMessage);
+                case WARN -> LOGGER.warn(formattedMessage);
+                case ERROR -> LOGGER.error(formattedMessage);
+            }
         }
 
-        // Log to the file
+        // Always log to the file
         logToFile(formattedMessage);
     }
 

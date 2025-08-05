@@ -17,6 +17,7 @@ import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
+import com.thunder.wildernessodysseyapi.ModConflictChecker.Util.LoggerUtil;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -79,7 +80,8 @@ public class WildernessOdysseyAPIMainModClass {
      * @param container   the container
      */
     public WildernessOdysseyAPIMainModClass(IEventBus modEventBus, ModContainer container) {
-        LOGGER.info("WildernessOdysseyAPI initialized. I will also start to track mod conflicts");
+        LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO,
+                "WildernessOdysseyAPI initialized. I will also start to track mod conflicts", false);
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreative);

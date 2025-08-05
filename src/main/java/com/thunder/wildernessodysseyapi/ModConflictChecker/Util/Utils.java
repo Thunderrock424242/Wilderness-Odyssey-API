@@ -2,8 +2,6 @@ package com.thunder.wildernessodysseyapi.ModConflictChecker.Util;
 
 import net.minecraft.resources.ResourceLocation;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
-
 /**
  * The type Utils.
  */
@@ -18,7 +16,8 @@ public class Utils {
     public static boolean isValidResourceLocation(String name) {
         ResourceLocation key = ResourceLocation.tryParse(name);
         if (key == null) {
-            LOGGER.error("Invalid ResourceLocation: '{}'", name);
+            LoggerUtil.log(LoggerUtil.ConflictSeverity.ERROR,
+                    String.format("Invalid ResourceLocation: '%s'", name), false);
             return false;
         }
         return true;

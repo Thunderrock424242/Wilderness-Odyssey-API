@@ -17,7 +17,7 @@ public class ShaderConflictChecker {
     private static final Map<String, List<String>> shaderUsageMap = new HashMap<>();
 
     public static void scanForConflicts() {
-        LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "Scanning mods for potential shader conflicts...");
+        LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "Scanning mods for potential shader conflicts...", false);
 
         for (var mod : ModList.get().getMods()) {
             ModFile file = (ModFile) mod.getOwningFile().getFile();
@@ -35,7 +35,7 @@ public class ShaderConflictChecker {
                     }
                 }
             } catch (IOException e) {
-                LoggerUtil.log(LoggerUtil.ConflictSeverity.WARN, "Failed to inspect mod: " + mod.getModId() + " for shader conflicts. " + e.getMessage());
+                LoggerUtil.log(LoggerUtil.ConflictSeverity.WARN, "Failed to inspect mod: " + mod.getModId() + " for shader conflicts. " + e.getMessage(), false);
             }
         }
 
@@ -44,7 +44,7 @@ public class ShaderConflictChecker {
             if (modIds.size() > 1) {
                 LoggerUtil.log(LoggerUtil.ConflictSeverity.ERROR,
                         String.format("Shader conflict detected: '%s' is used by multiple mods: %s",
-                                shaderPath, String.join(", ", modIds)));
+                                shaderPath, String.join(", ", modIds)), false);
             }
         });
     }
