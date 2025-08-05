@@ -47,6 +47,9 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 
+import com.sk89q.worldedit.WorldEdit;
+import com.sk89q.worldedit.world.block.BlockTypes;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -99,7 +102,15 @@ public class WildernessOdysseyAPIMainModClass {
 
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> System.out.println("Wilderness Odyssey setup complete!"));
+        event.enqueueWork(() -> {
+            System.out.println("Wilderness Odyssey setup complete!");
+            if (ModList.get().isLoaded("worldedit")) {
+                WorldEdit.getInstance();
+                if (BlockTypes.AIR == null) {
+                    BlockTypes.get("minecraft:air");
+                }
+            }
+        });
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
         UncaughtExceptionLogger.init();

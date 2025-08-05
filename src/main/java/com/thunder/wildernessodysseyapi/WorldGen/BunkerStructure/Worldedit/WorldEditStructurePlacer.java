@@ -56,6 +56,13 @@ public class WorldEditStructurePlacer {
      */
     public AABB placeStructure(ServerLevel world, BlockPos position) {
         try {
+            // WorldEdit's block registry is not initialized until the mod fully loads.
+            // If another mod calls into WorldEdit too early, static entries like
+            // BlockTypes.AIR remain null and cause NPEs when reading schematics.
+            if (BlockTypes.AIR == null) {
+                System.out.println("WorldEdit not initialized (BlockTypes.AIR is null); skipping placement of " + id);
+                return null;
+            }
             Clipboard clipboard = SchematicManager.INSTANCE.get(id);
             if (clipboard == null) {
                 InputStream schemStream = getClass().getResourceAsStream(
