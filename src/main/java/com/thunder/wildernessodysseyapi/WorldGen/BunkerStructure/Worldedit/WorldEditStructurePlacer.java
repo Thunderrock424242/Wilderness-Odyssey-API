@@ -14,6 +14,7 @@ import com.sk89q.worldedit.world.block.BlockType;
 import com.sk89q.worldedit.world.block.BlockTypes;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.TerrainBlockReplacer;
 import com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager;
+import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -80,6 +81,32 @@ public class WorldEditStructurePlacer {
 
             BlockVector3 min = clipboard.getRegion().getMinimumPoint();
             BlockVector3 max = clipboard.getRegion().getMaximumPoint();
+
+            // Prevent duplicating bunker structures by checking for a key block
+            if (id.getPath().contains("bunker")) {
+                BlockType cryoType = null;
+                try {
+                    cryoType = BlockTypes.get("wildernessodysseyapi:cryo_tube");
+                } catch (Exception ignored) {
+                }
+                if (cryoType != null) {
+                    for (BlockVector3 vec : clipboard.getRegion()) {
+                        if (clipboard.getFullBlock(vec).getBlockType().equals(cryoType)) {
+                            BlockPos checkPos = surfacePos.offset(
+                                    vec.getBlockX() - min.getBlockX(),
+                                    vec.getBlockY() - min.getBlockY(),
+                                    vec.getBlockZ() - min.getBlockZ()
+                            );
+                            if (world.getBlockState(checkPos).is(CryoTubeBlock.CRYO_TUBE.get())) {
+                                System.out.println("Bunker structure already present at " + checkPos + ", skipping placement.");
+                                return null;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
             AABB bounds = new AABB(
                     min.getBlockX() + surfacePos.getX(), min.getBlockY() + surfacePos.getY(), min.getBlockZ() + surfacePos.getZ(),
                     max.getBlockX() + surfacePos.getX(), max.getBlockY() + surfacePos.getY(), max.getBlockZ() + surfacePos.getZ()
