@@ -3,7 +3,7 @@ plugins {
     id 'application'
     id 'java-library'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.99'
+    id 'net.neoforged.moddev' version '2.0.106'
 }
 
 
@@ -32,7 +32,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 neoForge {
     // Specify the version of NeoForge to use.
-    version = "21.1.187"
+    version = "21.1.197"
 
     parchment {
         mappingsVersion = project.parchment_mappings_version
@@ -126,7 +126,6 @@ dependencies {
     implementation "curse.maven:create-328085:6641610"
     implementation "curse.maven:regions-unexplored-659110:6273893"
     implementation "curse.maven:terrablender-neoforge-940057:6054947"
-    implementation "curse.maven:butchery-973620:6668101"
     implementation "curse.maven:geckolib-388172:6659026"
     implementation "curse.maven:supplementaries-412082:6757876"
     implementation "curse.maven:multipart-machines-cooking-885587:5686941"
@@ -135,8 +134,6 @@ dependencies {
     implementation "curse.maven:locate-fixer-1301683:6762552"
     implementation "curse.maven:applied-energistics-2-223794:6763533"
     implementation "curse.maven:guideme-1173950:6812025"
-    implementation "curse.maven:cloth-config-348521:5729127"
-    implementation "curse.maven:powah-rearchitected-633483:6830067"
     implementation 'org.yaml:snakeyaml:2.2'
 
     // Example optional mod dependency with JEI
