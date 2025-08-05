@@ -3,8 +3,8 @@
   "model": "wildernessodysseyapi:models/block/cryo_tube.obj",
   "flip-v": true,
   "textures": {
-    "diffuse": "wildernessodysseyapi:block/cryo_tube.png",
-    "emissive": "wildernessodysseyapi:block/emissive.png"
+    "diffuse": "wildernessodysseyapi:block/cryo_tube",
+    "emissive": "wildernessodysseyapi:block/emissive"
   },
   "materials": {
     "m_3514b7c8-1e71-f1a7-304a-94c510b4f38c": {
