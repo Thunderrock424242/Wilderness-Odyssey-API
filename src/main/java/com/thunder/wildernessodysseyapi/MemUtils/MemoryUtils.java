@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.MemUtils;
 
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+
 /****
  * MemoryUtils for the Wilderness Odyssey API mod.
  */
@@ -14,7 +16,9 @@ public class MemoryUtils {
     public static long getUsedMemoryMB() {
         long free  = Runtime.getRuntime().freeMemory();
         long total = Runtime.getRuntime().totalMemory();
-        return (total - free) / (1024 * 1024);
+        long used = (total - free) / (1024 * 1024);
+        LOGGER.debug("Calculated used memory: {} MB (total={} MB, free={} MB)", used, total / (1024 * 1024), free / (1024 * 1024));
+        return used;
     }
 
     /**
@@ -22,7 +26,9 @@ public class MemoryUtils {
      */
     public static long getTotalMemoryMB() {
         long total = Runtime.getRuntime().totalMemory();
-        return total / (1024 * 1024);
+        long totalMB = total / (1024 * 1024);
+        LOGGER.debug("Total memory allocated: {} MB", totalMB);
+        return totalMB;
     }
 
     /**
@@ -33,12 +39,14 @@ public class MemoryUtils {
      *   bump recommended to current usage + 512MB.
      */
     public static int calculateRecommendedRAM(long currentUsedMB, int modCount) {
+        LOGGER.debug("Calculating recommended RAM with currentUsedMB={} and modCount={}", currentUsedMB, modCount);
         int extraPer10Mods = (modCount / 10) * 128;
         int recommendedMB = BASE_RECOMMENDED_MB + extraPer10Mods;
 
         if (currentUsedMB > recommendedMB) {
             recommendedMB = (int) currentUsedMB + 512;
         }
+        LOGGER.debug("Recommended RAM determined to be {} MB", recommendedMB);
         return recommendedMB;
     }
 }

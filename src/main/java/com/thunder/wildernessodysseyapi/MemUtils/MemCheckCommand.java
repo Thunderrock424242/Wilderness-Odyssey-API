@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.MemUtils;
 
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+
 import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.Core.WildernessOdysseyAPIMainModClass;
 import net.minecraft.commands.CommandSourceStack;
@@ -20,6 +22,7 @@ public class MemCheckCommand {
                 Commands.literal("memcheck")
                         .executes(ctx -> {
                             CommandSourceStack source = ctx.getSource();
+                            LOGGER.info("/memcheck command executed");
 
                             long usedMB  = MemoryUtils.getUsedMemoryMB();
                             long totalMB = MemoryUtils.getTotalMemoryMB();
