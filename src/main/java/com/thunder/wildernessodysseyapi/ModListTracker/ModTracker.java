@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.ModListTracker;
 
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.moddiscovery.ModInfo;
 import com.google.gson.Gson;
@@ -26,6 +28,7 @@ public class ModTracker {
      * Compares the current mod list with the previous one and logs any differences.
      */
     public static void checkModChanges() {
+        LOGGER.info("Starting mod list change check.");
         Map<String, String> currentMods = getCurrentMods();
         ModTrackingHistory history = loadHistory();
         Map<String, String> previousMods = Collections.emptyMap();
@@ -37,6 +40,7 @@ public class ModTracker {
         if (history != null && history.lastVersion != null &&
                 !Objects.equals(history.lastVersion, com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION)) {
             versionChange = "Pack updated from " + history.lastVersion + " to " + com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
+            LOGGER.info(versionChange);
         }
 
         addedMods.clear();
@@ -46,17 +50,21 @@ public class ModTracker {
         for (String modId : currentMods.keySet()) {
             if (!previousMods.containsKey(modId)) {
                 addedMods.add(modId + " v" + currentMods.get(modId));
+                LOGGER.debug("Detected new mod: {} v{}", modId, currentMods.get(modId));
             } else if (!Objects.equals(previousMods.get(modId), currentMods.get(modId))) {
                 updatedMods.add(modId + " updated from " + previousMods.get(modId) + " to " + currentMods.get(modId));
+                LOGGER.debug("Detected updated mod: {} from {} to {}", modId, previousMods.get(modId), currentMods.get(modId));
             }
         }
 
         for (String modId : previousMods.keySet()) {
             if (!currentMods.containsKey(modId)) {
                 removedMods.add(modId + " v" + previousMods.get(modId));
+                LOGGER.debug("Detected removed mod: {} v{}", modId, previousMods.get(modId));
             }
         }
 
+        LOGGER.info("Mod changes - added: {}, removed: {}, updated: {}", addedMods.size(), removedMods.size(), updatedMods.size());
         logChanges(addedMods, removedMods, updatedMods);
 
         if (history == null) {
@@ -65,6 +73,7 @@ public class ModTracker {
         history.lastVersion = com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
         history.versions.put(com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION, currentMods);
         saveHistory(history);
+        LOGGER.info("Mod list change check completed.");
     }
 
     /** Returns the list of newly added mods. */
@@ -85,6 +94,7 @@ public class ModTracker {
     }
 
     private static Map<String, String> getCurrentMods() {
+        LOGGER.debug("Gathering current mod list.");
         return ModList.get().getMods().stream()
                 .filter(mod -> mod instanceof ModInfo)
                 .map(mod -> (ModInfo) mod)
@@ -96,21 +106,24 @@ public class ModTracker {
 
     private static ModTrackingHistory loadHistory() {
         if (!Files.exists(TRACKING_FILE)) {
+            LOGGER.debug("No mod tracking history found at {}", TRACKING_FILE);
             return null;
         }
         try (Reader reader = Files.newBufferedReader(TRACKING_FILE)) {
+            LOGGER.debug("Loading mod tracking history from {}", TRACKING_FILE);
             return new Gson().fromJson(reader, ModTrackingHistory.class);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.error("Failed to load mod tracking history", e);
             return null;
         }
     }
 
     private static void saveHistory(ModTrackingHistory history) {
         try (Writer writer = Files.newBufferedWriter(TRACKING_FILE)) {
+            LOGGER.debug("Saving mod tracking history to {}", TRACKING_FILE);
             new Gson().toJson(history, writer);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.error("Failed to save mod tracking history", e);
         }
     }
 
@@ -134,16 +147,17 @@ public class ModTracker {
             logMessage.append("No mod changes detected.\n");
         }
 
-        System.out.println(logMessage.toString());
+        LOGGER.info(logMessage.toString());
         writeToFile(logMessage.toString());
     }
 
     private static void writeToFile(String logMessage) {
         try {
             Files.createDirectories(LOG_FILE.getParent());
+            LOGGER.debug("Writing mod change log to {}", LOG_FILE);
             Files.write(LOG_FILE, logMessage.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.error("Failed to write mod change log", e);
         }
     }
 
