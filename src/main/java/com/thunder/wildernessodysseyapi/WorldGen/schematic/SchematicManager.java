@@ -33,7 +33,7 @@ public class SchematicManager extends SimplePreparableReloadListener<Map<Resourc
             String path = file.getPath().substring("structures/".length(), file.getPath().length() - ".schem".length());
             ResourceLocation id = ResourceLocation.tryBuild(file.getNamespace(), path);
             try (InputStream in = entry.getValue().open()) {
-                ClipboardFormat fmt = ClipboardFormats.findByAlias("schematic");
+                ClipboardFormat fmt = ClipboardFormats.findByAlias("schem");
                 if (fmt != null) {
                     try (ClipboardReader reader = fmt.getReader(in)) {
                         loaded.put(id, reader.read());
