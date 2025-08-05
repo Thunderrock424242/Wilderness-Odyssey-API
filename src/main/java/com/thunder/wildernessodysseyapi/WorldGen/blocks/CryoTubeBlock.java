@@ -48,13 +48,13 @@ public class CryoTubeBlock {
                     .sound(SoundType.METAL)));
 
     private static <T extends Block> DeferredBlock<T> registerBlock(Supplier<T> block) {
-        DeferredBlock<T> toReturn = BLOCKS.register("cryo_tube_block", block);
+        DeferredBlock<T> toReturn = BLOCKS.register("cryo_tube", block);
         registerBlockItem(toReturn);
         return toReturn;
     }
 
     private static <T extends Block> void registerBlockItem(DeferredBlock<T> block) {
-        ModItems.ITEMS.register("cryo_tube_block", () -> new BlockItem(block.get(), new Item.Properties()));
+        ModItems.ITEMS.register("cryo_tube", () -> new BlockItem(block.get(), new Item.Properties()));
     }
 
     /**
