@@ -61,7 +61,7 @@ public class WorldEditStructurePlacer {
                         "/assets/" + id.getNamespace() + "/schematics/" + id.getPath() + ".schem"
                 );
                 if (schemStream != null) {
-                    ClipboardFormat format = ClipboardFormats.findByAlias("schematic");
+                    ClipboardFormat format = ClipboardFormats.findByAlias("schem");
                     if (format != null) {
                         try (ClipboardReader reader = format.getReader(schemStream)) {
                             clipboard = reader.read();
@@ -74,12 +74,6 @@ public class WorldEditStructurePlacer {
             if (clipboard == null) {
                 System.out.println("Schematic file not found: " + id);
                 return null;
-            }
-
-            // Detect the Sponge schematic format used by our bundled file
-            ClipboardFormat format = ClipboardFormats.findByAlias("schem");
-            if (format == null) {
-                throw new IllegalArgumentException("Unsupported schematic format!");
             }
 
             final BlockPos surfacePos = world.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, position);
