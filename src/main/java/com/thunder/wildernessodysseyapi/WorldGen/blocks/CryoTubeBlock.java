@@ -10,16 +10,20 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
+import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraft.core.registries.Registries;
 
 import java.util.function.Supplier;
 
@@ -36,6 +40,12 @@ public class CryoTubeBlock {
             DeferredRegister.createBlocks(MOD_ID);
 
     /**
+     * Registry for block entities.
+     */
+    public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES =
+            DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, MOD_ID);
+
+    /**
      * The cryo tube block instance.
      */
     public static final DeferredBlock<Block> CRYO_TUBE = registerBlock(
@@ -46,6 +56,13 @@ public class CryoTubeBlock {
                     .noOcclusion()
                     .noCollission()
                     .sound(SoundType.METAL)));
+
+    /**
+     * Block entity type for the cryo tube.
+     */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CryoTubeBlockEntity>> CRYO_TUBE_ENTITY =
+            BLOCK_ENTITY_TYPES.register("cryo_tube",
+                    () -> BlockEntityType.Builder.of(CryoTubeBlockEntity::new, CRYO_TUBE.get()).build(null));
 
     private static <T extends Block> DeferredBlock<T> registerBlock(Supplier<T> block) {
         DeferredBlock<T> toReturn = BLOCKS.register("cryo_tube", block);
@@ -62,12 +79,13 @@ public class CryoTubeBlock {
      */
     public static void register(IEventBus eventBus) {
         BLOCKS.register(eventBus);
+        BLOCK_ENTITY_TYPES.register(eventBus);
     }
 
     /**
      * Simple implementation that allows players to sleep inside the tube.
      */
-    public static class BlockImpl extends Block {
+    public static class BlockImpl extends Block implements EntityBlock {
         // Narrow voxel shape matching the tube's slender footprint.
         private static final VoxelShape SHAPE = Block.box(2.0D, 0.0D, 2.0D, 14.0D, 16.0D, 14.0D);
 
@@ -106,6 +124,11 @@ public class CryoTubeBlock {
                 player.startSleepInBed(pos);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+
+        @Override
+        public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+            return new CryoTubeBlockEntity(pos, state);
         }
     }
 }
