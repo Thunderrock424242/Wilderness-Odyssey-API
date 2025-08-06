@@ -2,3 +2,6 @@ API Changes:
 - added a dedicated server link because we have no revune.
 ! fixed a bug related to spawn eggs thanks for reporting the issue Duck-Leader
 - finnaly fixed a server crash
+- added mod contraption compatibility utilities and conditional block replacement
+- expanded structure block limit to 256 blocks
+- added custom weighted jigsaw manager and lightweight math utilities
