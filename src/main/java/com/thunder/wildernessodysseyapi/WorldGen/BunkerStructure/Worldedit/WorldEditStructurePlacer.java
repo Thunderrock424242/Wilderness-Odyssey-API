@@ -155,23 +155,45 @@ public class WorldEditStructurePlacer {
 
     /**
      * Wait briefly for WorldEdit to populate its block registry. Returns {@code true} when
-     * {@code BlockTypes.AIR} is available or {@code false} if WorldEdit is missing or still
-     * uninitialized after waiting.
+     * WorldEdit can resolve the {@code minecraft:air} block or {@code false} if WorldEdit is missing
+     * or still uninitialized after waiting. Some WorldEdit versions no longer populate the
+     * {@code BlockTypes.AIR} constant, so we also fall back to querying the registry directly.
      */
     private static boolean waitForWorldEdit() {
         try {
-            if (BlockTypes.AIR != null) {
+            if (isBlockRegistryReady()) {
                 return true;
             }
             if (!ModList.get().isLoaded("worldedit")) {
                 return false;
             }
-            for (int i = 0; i < 50 && BlockTypes.AIR == null; i++) {
+            for (int i = 0; i < 50 && !isBlockRegistryReady(); i++) {
                 WorldEdit.getInstance();
-                BlockTypes.get("minecraft:air");
+                try {
+                    BlockTypes.get("minecraft:air");
+                } catch (Throwable ignored) {
+                }
                 Thread.sleep(100);
             }
-            return BlockTypes.AIR != null;
+            return isBlockRegistryReady();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Checks if WorldEdit's block registry is ready. Some versions expose {@code BlockTypes.AIR}
+     * while others require an explicit lookup.
+     */
+    private static boolean isBlockRegistryReady() {
+        try {
+            if (BlockTypes.AIR != null) {
+                return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            return BlockTypes.get("minecraft:air") != null;
         } catch (Throwable t) {
             return false;
         }
