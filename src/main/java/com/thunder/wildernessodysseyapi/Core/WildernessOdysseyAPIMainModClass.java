@@ -14,6 +14,8 @@ import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
+import com.thunder.wildernessodysseyapi.doorlock.DoorLockEvents;
+import com.thunder.wildernessodysseyapi.command.DoorLockCommand;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
@@ -87,6 +89,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(BlacklistChecker.class);
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
+        NeoForge.EVENT_BUS.register(DoorLockEvents.class);
 
         CryoTubeBlock.register(modEventBus);
         TerrainReplacerBlock.register(modEventBus);
@@ -148,6 +151,7 @@ public class WildernessOdysseyAPIMainModClass {
         StructureInfoCommand.register(event.getDispatcher());
         FaqCommand.register(event.getDispatcher());
         DonateCommand.register(event.getDispatcher());
+        DoorLockCommand.register(event.getDispatcher());
     }
 
     /**
