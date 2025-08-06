@@ -19,6 +19,14 @@ import java.util.Map;
 public class DoorLockSavedData extends SavedData {
     private static final String DATA_NAME = "wildernessodyssey_door_locks";
 
+    /**
+     * If set to {@code true}, door locks will not begin counting down until the
+     * mod is run without this flag. The flag is read from the environment
+     * variable {@code WO_DOORLOCK_DEV} to allow developers to stage locks without
+     * immediately activating them.
+     */
+    public static final boolean DEV_MODE = Boolean.parseBoolean(System.getenv().getOrDefault("WO_DOORLOCK_DEV", "false"));
+
     private final Map<Long, LockInfo> locks = new HashMap<>();
 
     public record LockInfo(long duration, long start) {}
@@ -51,13 +59,23 @@ public class DoorLockSavedData extends SavedData {
     }
 
     public void setLock(BlockPos pos, long duration, long start) {
-        locks.put(pos.asLong(), new LockInfo(duration, start));
+        long startTime = DEV_MODE ? -1L : start;
+        locks.put(pos.asLong(), new LockInfo(duration, startTime));
         setDirty();
+    }
+
+    public boolean removeLock(BlockPos pos) {
+        if (locks.remove(pos.asLong()) != null) {
+            setDirty();
+            return true;
+        }
+        return false;
     }
 
     public long remaining(BlockPos pos, long now) {
         LockInfo info = locks.get(pos.asLong());
         if (info == null) return 0L;
+        if (info.start < 0) return info.duration();
         TickTokCountdown countdown = new TickTokCountdown(info.duration(), info.start());
         return countdown.remaining(now);
     }
@@ -65,6 +83,15 @@ public class DoorLockSavedData extends SavedData {
     public boolean isLocked(BlockPos pos, long now) {
         LockInfo info = locks.get(pos.asLong());
         if (info == null) return false;
+        if (info.start < 0) {
+            if (!DEV_MODE) {
+                locks.put(pos.asLong(), new LockInfo(info.duration(), now));
+                setDirty();
+                TickTokCountdown countdown = new TickTokCountdown(info.duration(), now);
+                return !countdown.isFinished(now);
+            }
+            return false;
+        }
         TickTokCountdown countdown = new TickTokCountdown(info.duration(), info.start());
         return !countdown.isFinished(now);
     }
