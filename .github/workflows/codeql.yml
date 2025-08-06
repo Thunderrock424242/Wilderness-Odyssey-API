@@ -11,7 +11,7 @@ on:
     inputs:
       package_path:
         description: 'Relative path of the package to analyze'
-        required: false
+        required: true
         default: ''
 
 permissions:
