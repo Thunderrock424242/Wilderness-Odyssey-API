@@ -34,6 +34,7 @@ public class PlayerSpawnHandler {
     private static final String CRYO_TAG = "wo_in_cryo";
     private static final String CRYO_USED_TAG = "wo_cryo_used";
     private static final String CRYO_POS_TAG = "wo_cryo_pos";
+    private static final String CRYO_DELAY_TAG = "wo_spawn_delay";
 
     /**
      * On player join.
@@ -50,42 +51,45 @@ public class PlayerSpawnHandler {
             return;
         }
 
-        // Find spawn blocks if not already done
-        if (spawnBlocks == null || spawnBlocks.isEmpty()) {
-            spawnBlocks = WorldSpawnHandler.findAllWorldSpawnBlocks(world);
-            BlockPos meteorPos = MeteorImpactData.get(world).getImpactPos();
-            if (meteorPos != null && !spawnBlocks.isEmpty()) {
-                BlockPos closest = spawnBlocks.stream()
-                        .min((a, b) -> Double.compare(a.distSqr(meteorPos), b.distSqr(meteorPos)))
-                        .orElse(spawnBlocks.get(0));
-                final double maxDist = 400.0; // radius squared (20 blocks)
-                spawnBlocks = spawnBlocks.stream()
-                        .filter(p -> p.distSqr(closest) <= maxDist)
-                        .collect(Collectors.toList());
-            }
-        }
+        ensureSpawnBlocks(world);
 
-        if (!spawnBlocks.isEmpty()) {
-            BlockPos spawnPos = getNextSpawnBlock();
-            player.teleportTo(world, spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5, player.getYRot(), player.getXRot());
-            tag.putBoolean(CRYO_TAG, true);
-            tag.putBoolean(CRYO_USED_TAG, true);
-            tag.putLong(CRYO_POS_TAG, spawnPos.asLong());
-            player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 60, 255, false, false));
-            playIntroCinematic(player);
-        }
+        tag.putInt(CRYO_DELAY_TAG, 200); // 10 second delay (20 ticks * 10)
+        playIntroCinematic(player);
     }
 
-    // Intentionally empty - players should only wake in the cryo tube on their first join
-
     /**
-     * Prevent re-entry into the tube after exiting.
+     * Handle delayed teleportation and prevent re-entry into the tube after exiting.
      */
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         CompoundTag tag = player.getPersistentData();
+        ServerLevel world = player.serverLevel();
+
+        if (tag.contains(CRYO_DELAY_TAG)) {
+            int delay = tag.getInt(CRYO_DELAY_TAG) - 1;
+            if (delay > 0) {
+                tag.putInt(CRYO_DELAY_TAG, delay);
+                return;
+            }
+            tag.remove(CRYO_DELAY_TAG);
+
+            ensureSpawnBlocks(world);
+            if (!spawnBlocks.isEmpty()) {
+                BlockPos spawnPos = getNextSpawnBlock();
+                player.teleportTo(world, spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5, player.getYRot(), player.getXRot());
+                tag.putBoolean(CRYO_TAG, true);
+                tag.putBoolean(CRYO_USED_TAG, true);
+                tag.putLong(CRYO_POS_TAG, spawnPos.asLong());
+                player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 60, 255, false, false));
+            } else {
+                // No cryo tube yet, try again in a second
+                tag.putInt(CRYO_DELAY_TAG, 20);
+            }
+            return;
+        }
+
         if (!tag.contains(CRYO_POS_TAG)) return;
         BlockPos spawnPos = BlockPos.of(tag.getLong(CRYO_POS_TAG));
 
@@ -115,5 +119,21 @@ public class PlayerSpawnHandler {
     private static BlockPos getNextSpawnBlock() {
         int index = spawnIndex.getAndUpdate(i -> (i + 1) % spawnBlocks.size());
         return spawnBlocks.get(index);
+    }
+
+    private static void ensureSpawnBlocks(ServerLevel world) {
+        if (spawnBlocks == null || spawnBlocks.isEmpty()) {
+            spawnBlocks = WorldSpawnHandler.findAllWorldSpawnBlocks(world);
+            BlockPos meteorPos = MeteorImpactData.get(world).getImpactPos();
+            if (meteorPos != null && !spawnBlocks.isEmpty()) {
+                BlockPos closest = spawnBlocks.stream()
+                        .min((a, b) -> Double.compare(a.distSqr(meteorPos), b.distSqr(meteorPos)))
+                        .orElse(spawnBlocks.get(0));
+                final double maxDist = 400.0; // radius squared (20 blocks)
+                spawnBlocks = spawnBlocks.stream()
+                        .filter(p -> p.distSqr(closest) <= maxDist)
+                        .collect(Collectors.toList());
+            }
+        }
     }
 }

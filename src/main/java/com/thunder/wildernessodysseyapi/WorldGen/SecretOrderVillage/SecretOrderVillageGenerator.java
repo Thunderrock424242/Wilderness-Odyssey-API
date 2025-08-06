@@ -5,6 +5,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.fml.ModList;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
@@ -18,6 +19,7 @@ public class SecretOrderVillageGenerator {
      */
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
+        if (!ModList.get().isLoaded("worldedit")) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         if (!(event.getChunk() instanceof LevelChunk chunk)) return;
 

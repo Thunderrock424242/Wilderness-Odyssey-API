@@ -16,6 +16,7 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemp
 import java.util.Optional;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+import net.neoforged.fml.ModList;
 
 /****
  * MeteorStructureSpawner for the Wilderness Odyssey API mod.
@@ -24,6 +25,7 @@ public class MeteorStructureSpawner {
     private static boolean placed = false;
 
     public static void tryPlace(ServerLevel level) {
+        if (!ModList.get().isLoaded("worldedit")) return;
         // Only place once in the entire world
         if (placed) return;
         placed = true;
