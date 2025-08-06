@@ -38,13 +38,23 @@ public class DoorLockEvents {
             if (stack.is(Items.STICK) && custom != null) {
                 CompoundTag tag = custom.copyTag();
                 if (tag.contains("door_lock_duration")) {
-                    int duration = tag.getInt("door_lock_duration");
-                    data.setLock(pos, duration, now);
-                    if (!player.isCreative()) {
-                        stack.shrink(1);
+                    if (player.isShiftKeyDown()) {
+                        if (data.removeLock(pos)) {
+                            player.displayClientMessage(Component.literal("Door lock removed"), true);
+                        }
+                    } else {
+                        int duration = tag.getInt("door_lock_duration");
+                        data.setLock(pos, duration, now);
+                        if (!player.isCreative()) {
+                            stack.shrink(1);
+                        }
+                        float seconds = TickTokHelper.toSeconds(duration);
+                        String msg = "Door locked for " + seconds + "s";
+                        if (DoorLockSavedData.DEV_MODE) {
+                            msg += " (pending)";
+                        }
+                        player.displayClientMessage(Component.literal(msg), true);
                     }
-                    float seconds = TickTokHelper.toSeconds(duration);
-                    player.displayClientMessage(Component.literal("Door locked for " + seconds + "s"), true);
                     event.setCanceled(true);
                     return;
                 }
