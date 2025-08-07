@@ -32,6 +32,9 @@ public class BunkerFeature extends Feature<NoneFeatureConfiguration> {
         BlockPos origin = context.origin();
         StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
 
+        // Skip placement if a bunker already exists at this location
+        if (tracker.hasSpawnedAt(origin)) return false;
+
         // Respect configured spawn distance and max count
         int minDist = StructureConfig.BUNKER_MIN_DISTANCE.get();
         int maxCount = StructureConfig.BUNKER_MAX_COUNT.get();

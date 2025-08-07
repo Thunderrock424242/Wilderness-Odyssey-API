@@ -48,10 +48,13 @@ public class MeteorStructureSpawner {
             bunkerPos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, bunkerPos);
             // Prefer schematics from data packs but fall back to bundled resource
             WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
-            var bounds = placer.placeStructure(level, bunkerPos);
-            if (bounds != null) {
-                BunkerProtectionHandler.addBunkerBounds(bounds);
-                StructureSpawnTracker.get(level).addSpawnPos(bunkerPos);
+            StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
+            if (!tracker.hasSpawnedAt(bunkerPos)) {
+                var bounds = placer.placeStructure(level, bunkerPos);
+                if (bounds != null) {
+                    BunkerProtectionHandler.addBunkerBounds(bounds);
+                    tracker.addSpawnPos(bunkerPos);
+                }
             }
         }
     }

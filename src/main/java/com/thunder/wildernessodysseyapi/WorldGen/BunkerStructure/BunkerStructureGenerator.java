@@ -32,6 +32,9 @@ public class BunkerStructureGenerator {
 
         StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
 
+        // Skip if a bunker has already spawned at this position
+        if (tracker.hasSpawnedAt(surfacePos)) return;
+
         int minDist = StructureConfig.BUNKER_MIN_DISTANCE.get();
         int maxCount = StructureConfig.BUNKER_MAX_COUNT.get();
 
