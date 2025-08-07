@@ -4,7 +4,7 @@
 	"parent": "builtin/entity",
 	"texture_size": [256, 256],
 	"textures": {
-		"0": "Cryo_tube",
+		"0": "cryo_tube",
 		"1": "emissive"
 	},
 	"elements": [
@@ -316,7 +316,7 @@
 	},
 	"groups": [
 		{
-			"name": "player_cabine",
+			"name": "cryo_tube",
 			"origin": [8, -20, 5.75],
 			"color": 0,
 			"children": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
