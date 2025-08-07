@@ -113,7 +113,6 @@ public class WorldVersionChecker {
                                 String configVersion = readVersion(configPath);
                                 Path worldPath = server.getWorldPath(LevelResource.ROOT).resolve("world_version.json");
                                 saveVersion(worldPath, configVersion);
-                                notifiedWorlds.clear(); // <-- Added: clear notification cache after update
                                 ctx.getSource().sendSuccess(() -> Component.literal("World version updated to " + configVersion), true);
                                 LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "[WorldVersionChecker] World 'world_version.json' updated to " + configVersion + " via /updateworldversion command.");
                             } catch (Exception e) {
