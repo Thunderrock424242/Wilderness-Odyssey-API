@@ -95,28 +95,31 @@ public class WorldEditStructurePlacer {
             BlockVector3 min = clipboard.getRegion().getMinimumPoint();
             BlockVector3 max = clipboard.getRegion().getMaximumPoint();
 
-            // Prevent duplicating bunker structures by checking for a key block
+            // Ensure bunker schematics contain a cryo tube so we don't place
+            // incomplete structures. The previous implementation used the cryo
+            // tube as a duplication check which prevented placement if a cryo
+            // tube already existed in the world. Instead we now simply verify
+            // the schematic includes at least one cryo tube block.
             if (id.getPath().contains("bunker")) {
                 BlockType cryoType = null;
                 try {
                     cryoType = BlockTypes.get("wildernessodysseyapi:cryo_tube");
                 } catch (Exception ignored) {
                 }
+
+                boolean hasCryoTube = false;
                 if (cryoType != null) {
                     for (BlockVector3 vec : clipboard.getRegion()) {
                         if (clipboard.getFullBlock(vec).getBlockType().equals(cryoType)) {
-                            BlockPos checkPos = surfacePos.offset(
-                                    vec.getBlockX() - min.getBlockX(),
-                                    vec.getBlockY() - min.getBlockY(),
-                                    vec.getBlockZ() - min.getBlockZ()
-                            );
-                            if (world.getBlockState(checkPos).is(CryoTubeBlock.CRYO_TUBE.get())) {
-                                System.out.println("Bunker structure already present at " + checkPos + ", skipping placement.");
-                                return null;
-                            }
+                            hasCryoTube = true;
                             break;
                         }
                     }
+                }
+
+                if (!hasCryoTube) {
+                    System.out.println("Skipping bunker placement: schematic missing cryo tube.");
+                    return null;
                 }
             }
 

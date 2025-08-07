@@ -7,8 +7,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Tracks where bunkers have spawned in the world.
@@ -16,7 +16,7 @@ import java.util.List;
 public class StructureSpawnTracker extends SavedData {
     private static final String DATA_NAME = "wildernessodyssey_structure_spawn_tracker";
 
-    private final List<Long> spawnPositions = new ArrayList<>();
+    private final Set<Long> spawnPositions = new HashSet<>();
 
     public StructureSpawnTracker() {
     }
@@ -38,8 +38,9 @@ public class StructureSpawnTracker extends SavedData {
      * Add a new bunker spawn position.
      */
     public void addSpawnPos(BlockPos pos) {
-        spawnPositions.add(pos.asLong());
-        setDirty();
+        if (spawnPositions.add(pos.asLong())) {
+            setDirty();
+        }
     }
 
     /**
@@ -60,6 +61,13 @@ public class StructureSpawnTracker extends SavedData {
 
     public boolean hasSpawned() {
         return !spawnPositions.isEmpty();
+    }
+
+    /**
+     * Check if a bunker has already spawned at the given position.
+     */
+    public boolean hasSpawnedAt(BlockPos pos) {
+        return spawnPositions.contains(pos.asLong());
     }
 
     /**
