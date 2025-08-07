@@ -13,6 +13,7 @@ import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 import net.minecraft.world.phys.AABB;
+import net.neoforged.fml.ModList;
 
 /**
  * Feature that places the bunker structure during world generation.
@@ -25,6 +26,7 @@ public class BunkerFeature extends Feature<NoneFeatureConfiguration> {
     @Override
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
         LevelAccessor levelAccessor = context.level();
+        if (!ModList.get().isLoaded("worldedit")) return false;
         if (!(levelAccessor instanceof ServerLevel level)) return false;
 
         BlockPos origin = context.origin();

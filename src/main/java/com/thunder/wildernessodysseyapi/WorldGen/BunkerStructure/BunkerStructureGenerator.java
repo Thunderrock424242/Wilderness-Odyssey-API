@@ -12,6 +12,7 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.fml.ModList;
 
 /**
  * Generates bunker structures when suitable chunks load.
@@ -22,6 +23,7 @@ public class BunkerStructureGenerator {
 
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
+        if (!ModList.get().isLoaded("worldedit")) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         if (!(event.getChunk() instanceof LevelChunk chunk)) return;
 

@@ -30,6 +30,10 @@ import java.io.InputStream;
 public class WorldEditStructurePlacer {
     private final ResourceLocation id;
 
+    // Cache WorldEdit availability to avoid repeated startup checks and log spam
+    private static Boolean worldEditReady = null;
+    private static boolean missingLogged = false;
+
     /**
      * Instantiates a new World edit structure placer.
      *
@@ -59,7 +63,10 @@ public class WorldEditStructurePlacer {
         try {
             // Wait for WorldEdit to finish booting so BlockTypes are populated.
             if (!waitForWorldEdit()) {
-                System.out.println("WorldEdit not initialized (BlockTypes.AIR is null); skipping placement of " + id);
+                if (!missingLogged) {
+                    System.out.println("WorldEdit not initialized (BlockTypes.AIR is null); skipping placement of " + id);
+                    missingLogged = true;
+                }
                 return null;
             }
             Clipboard clipboard = SchematicManager.INSTANCE.get(id);
@@ -160,11 +167,16 @@ public class WorldEditStructurePlacer {
      * {@code BlockTypes.AIR} constant, so we also fall back to querying the registry directly.
      */
     private static boolean waitForWorldEdit() {
+        if (worldEditReady != null) {
+            return worldEditReady;
+        }
         try {
             if (isBlockRegistryReady()) {
+                worldEditReady = true;
                 return true;
             }
             if (!ModList.get().isLoaded("worldedit")) {
+                worldEditReady = false;
                 return false;
             }
             for (int i = 0; i < 50 && !isBlockRegistryReady(); i++) {
@@ -175,8 +187,10 @@ public class WorldEditStructurePlacer {
                 }
                 Thread.sleep(100);
             }
-            return isBlockRegistryReady();
+            worldEditReady = isBlockRegistryReady();
+            return worldEditReady;
         } catch (Throwable t) {
+            worldEditReady = false;
             return false;
         }
     }
