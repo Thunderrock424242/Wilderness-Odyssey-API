@@ -44,6 +44,10 @@ public class DoorLockEvents {
                         }
                     } else {
                         int duration = tag.getInt("door_lock_duration");
+                        DoorBlock door = (DoorBlock) state.getBlock();
+                        if (state.getValue(DoorBlock.OPEN)) {
+                            door.setOpen(player, level, state, pos, false);
+                        }
                         data.setLock(pos, duration, now);
                         if (!player.isCreative()) {
                             stack.shrink(1);
