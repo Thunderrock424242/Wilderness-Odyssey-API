@@ -35,6 +35,7 @@ public class DoorLockCommand {
         tag.putInt("door_lock_duration", duration);
         stick.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
         stick.set(DataComponents.CUSTOM_NAME, Component.literal("Door Timer (" + seconds + "s)"));
+        stick.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
         player.addItem(stick);
         return 1;
     }
