@@ -47,7 +47,7 @@ jobs:
 
       - name: Initialize CodeQL (Java)
         if: matrix.language == 'java'
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           config-file: codeql-package-config.yml
@@ -55,7 +55,7 @@ jobs:
 
       - name: Initialize CodeQL (Actions)
         if: matrix.language == 'actions'
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
 
@@ -82,11 +82,11 @@ jobs:
           use-caches: false
       - name: Upload Qodana results to code scanning
         if: matrix.language == 'java'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
       - name: Note Actions analysis requires no build
         if: matrix.language == 'actions'
         run: echo "Scanning GitHub Actions workflows"
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
