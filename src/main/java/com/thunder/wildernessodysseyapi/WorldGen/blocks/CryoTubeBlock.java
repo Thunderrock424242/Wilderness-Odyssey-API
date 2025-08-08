@@ -86,8 +86,8 @@ public class CryoTubeBlock {
      * Simple implementation that allows players to sleep inside the tube.
      */
     public static class BlockImpl extends Block implements EntityBlock {
-        // Narrow voxel shape matching the tube's slender footprint.
-        private static final VoxelShape SHAPE = Block.box(2.0D, 0.0D, 2.0D, 14.0D, 16.0D, 14.0D);
+        // Bounding shape covering the entire cryo tube (1x1 block footprint, 2.5 blocks tall).
+        private static final VoxelShape SHAPE = Block.box(0.0D, 0.0D, 0.0D, 16.0D, 40.0D, 16.0D);
 
         public BlockImpl(Properties properties) {
             super(properties);
