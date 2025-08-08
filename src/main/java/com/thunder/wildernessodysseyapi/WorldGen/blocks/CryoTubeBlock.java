@@ -1,14 +1,19 @@
 package com.thunder.wildernessodysseyapi.WorldGen.blocks;
 
+import com.thunder.wildernessodysseyapi.api.CryoSleepEvent;
 import com.thunder.wildernessodysseyapi.item.ModItems;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
-import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.SoundType;
@@ -20,10 +25,10 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.minecraft.core.registries.Registries;
 
 import java.util.function.Supplier;
 
@@ -88,6 +93,10 @@ public class CryoTubeBlock {
     public static class BlockImpl extends Block implements EntityBlock {
         // Narrow voxel shape matching the tube's slender footprint.
         private static final VoxelShape SHAPE = Block.box(2.0D, 0.0D, 2.0D, 14.0D, 16.0D, 14.0D);
+        /**
+         * After this many ticks (10 Minecraft days) tubes no longer function.
+         */
+        private static final long MAX_SLEEP_TICKS = 24000L * 10L;
 
         public BlockImpl(Properties properties) {
             super(properties);
@@ -120,8 +129,19 @@ public class CryoTubeBlock {
         // `useWithoutItem` variant to preserve the behaviour of letting the
         // player sleep in the tube.
         public InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand) {
+            if (level.getDayTime() >= MAX_SLEEP_TICKS) {
+                if (!level.isClientSide) {
+                    player.displayClientMessage(Component.translatable("message.wildernessodysseyapi.cryo_tube_locked"), true);
+                }
+                return InteractionResult.FAIL;
+            }
+
             if (!level.isClientSide) {
                 player.startSleepInBed(pos);
+                player.setPose(Pose.STANDING);
+                if (player instanceof ServerPlayer serverPlayer) {
+                    NeoForge.EVENT_BUS.post(new CryoSleepEvent(serverPlayer));
+                }
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
