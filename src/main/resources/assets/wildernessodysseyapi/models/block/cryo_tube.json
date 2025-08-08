@@ -3,10 +3,11 @@
 	"credit": "Made with Blockbench",
 	"parent": "builtin/entity",
 	"texture_size": [256, 256],
-	"textures": {
-		"0": "cryo_tube",
-		"1": "emissive"
-	},
+        "textures": {
+                "0": "wildernessodysseyapi:block/cryo_tube",
+                "1": "wildernessodysseyapi:block/emissive",
+                "particle": "wildernessodysseyapi:block/cryo_tube"
+        },
 	"elements": [
 		{
 			"from": [-2, -16, -4.25],
