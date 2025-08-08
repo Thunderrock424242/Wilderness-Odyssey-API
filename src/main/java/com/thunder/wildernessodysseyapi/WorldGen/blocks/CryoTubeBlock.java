@@ -92,11 +92,14 @@ public class CryoTubeBlock {
      */
     public static class BlockImpl extends Block implements EntityBlock {
         // Narrow voxel shape matching the tube's slender footprint.
-        private static final VoxelShape SHAPE = Block.box(2.0D, 0.0D, 2.0D, 14.0D, 16.0D, 14.0D);
+        private static final VoxelShape SHAPE = Block.box(0.0D, 0.0D, 0.0D, 16.0D, 40.0D, 16.0D);
         /**
          * After this many ticks (10 Minecraft days) tubes no longer function.
          */
         private static final long MAX_SLEEP_TICKS = 24000L * 10L;
+        // Bounding shape covering the entire cryo tube (1x1 block footprint, 2.5 blocks tall).
+        private static final VoxelShape SHAPE = Block.box(0.0D, 0.0D, 0.0D, 16.0D, 40.0D, 16.0D);
+
 
         public BlockImpl(Properties properties) {
             super(properties);
