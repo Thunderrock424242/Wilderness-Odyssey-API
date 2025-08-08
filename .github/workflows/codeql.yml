@@ -47,7 +47,7 @@ jobs:
 
       - name: Initialize CodeQL (Java)
         if: matrix.language == 'java'
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           config-file: codeql-package-config.yml
@@ -55,7 +55,7 @@ jobs:
 
       - name: Initialize CodeQL (Actions)
         if: matrix.language == 'actions'
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
 
