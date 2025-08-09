@@ -4,6 +4,6 @@
   "item.examplemod.example_item": "Example Item",
   "message.wildernessodysseyapi.wake_up": "Waking from cryostasis...",
   "message.wildernessodysseyapi.cryo_tube_locked": "The cryo tube can no longer be used.",
-  "block.wildernessodysseyapi.cryo_tube": "Cryo Tube"
+  "block.wildernessodysseyapi.cryo_tube": "Cryo Tube",
+  "item.wildernessodysseyapi.cloak_item": "Handheld Cloak"
 }
-
