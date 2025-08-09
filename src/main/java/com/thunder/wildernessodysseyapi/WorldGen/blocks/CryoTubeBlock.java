@@ -10,7 +10,6 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -76,7 +75,7 @@ public class CryoTubeBlock {
     }
 
     private static <T extends Block> void registerBlockItem(DeferredBlock<T> block) {
-        ModItems.ITEMS.register("cryo_tube", () -> new BlockItem(block.get(), new Item.Properties()));
+        ModItems.ITEMS.register("cryo_tube", () -> new CryoTubeBlockItem(block.get(), new Item.Properties()));
     }
 
     /**
@@ -92,7 +91,7 @@ public class CryoTubeBlock {
      */
     public static class BlockImpl extends Block implements EntityBlock {
         // Narrow voxel shape matching the tube's slender footprint.
-        private static final VoxelShape SHAPE = Block.box(0.0D, 0.0D, 0.0D, 16.0D, 40.0D, 16.0D);
+        private static final VoxelShape SHAPE = Block.box(0.0D, 0.0D, 0.0D, 16.0D, 48.0D, 16.0D);
         /**
          * After this many ticks (10 Minecraft days) tubes no longer function.
          */
