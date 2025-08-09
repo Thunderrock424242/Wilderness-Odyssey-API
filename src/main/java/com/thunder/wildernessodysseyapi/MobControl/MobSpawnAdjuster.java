@@ -3,9 +3,10 @@ package com.thunder.wildernessodysseyapi.MobControl;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.MobSpawnType;
-import net.minecraft.world.entity.EntityType;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.MobSpawnEvent.SpawnPlacementCheck;
@@ -26,25 +27,32 @@ public class MobSpawnAdjuster {
             return;
         }
 
-        // 2) Only for monsters
         EntityType<?> type = event.getEntityType();
-        if (type.getCategory() != MobCategory.MONSTER) {
-            LOGGER.debug("Ignoring non-monster entity: {}", type);
-            return;
-        }
 
-        // 3) Must be on the server side
+        // 2) Must be on the server side
         if (!(event.getLevel() instanceof ServerLevel world)) {
             LOGGER.debug("Spawn event not on server level for entity: {}", type);
             return;
         }
 
-        // 4) Compute day-based spawn chance
+        // 3) Respect Peaceful difficulty where monsters never spawn
+        if (world.getDifficulty() == Difficulty.PEACEFUL) {
+            LOGGER.debug("Skipping spawn adjustments during peaceful difficulty for {}", type);
+            return;
+        }
+
+        // 4) Only for monsters
+        if (type.getCategory() != MobCategory.MONSTER) {
+            LOGGER.debug("Ignoring non-monster entity: {}", type);
+            return;
+        }
+
+        // 5) Compute day-based spawn chance
         int day = getCurrentDay(world);
         double chance = calculateSpawnChance(day);
         LOGGER.debug("Evaluating spawn for {} on day {} with chance {}", type, day, chance);
 
-        // 5) Randomly deny the placement if roll exceeds chance
+        // 6) Randomly deny the placement if roll exceeds chance
         if (world.getRandom().nextDouble() > chance) {
             LOGGER.debug("Denied spawn for {} due to random roll", type);
             event.setResult(Result.FAIL);
