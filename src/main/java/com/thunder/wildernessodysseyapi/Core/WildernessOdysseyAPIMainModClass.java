@@ -124,6 +124,7 @@ public class WildernessOdysseyAPIMainModClass {
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(CryoTubeBlock.CRYO_TUBE.get());
+            event.accept(ModItems.SKY_TORCH_STAFF.get());
         }
     }
 
