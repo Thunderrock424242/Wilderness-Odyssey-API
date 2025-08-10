@@ -16,6 +16,7 @@ import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.doorlock.DoorLockEvents;
 import com.thunder.wildernessodysseyapi.command.DoorLockCommand;
+import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
@@ -28,7 +29,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
-import net.minecraft.world.item.CreativeModeTabs;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorStructureSpawner;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.fml.ModList;
@@ -48,7 +48,6 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 
 
 import java.util.HashMap;
@@ -80,10 +79,10 @@ public class WildernessOdysseyAPIMainModClass {
      * @param container   the container
      */
     public WildernessOdysseyAPIMainModClass(IEventBus modEventBus, ModContainer container) {
-        LOGGER.info ("WildernessOdysseyAPI initialized. I will also start to track mod conflicts");
+        LOGGER.info("WildernessOdysseyAPI initialized. I will also start to track mod conflicts");
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
-        modEventBus.addListener(this::addCreative);
+        ModCreativeTabs.register(modEventBus);
 
         // Register global events
         NeoForge.EVENT_BUS.register(this);
@@ -119,12 +118,6 @@ public class WildernessOdysseyAPIMainModClass {
         LOGGER.warn("This message is for development purposes only."); // Logs as info
         UncaughtExceptionLogger.init();
         dynamicModCount = ModList.get().getMods().size();
-    }
-
-    private void addCreative(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(CryoTubeBlock.CRYO_TUBE.get());
-        }
     }
 
     /**

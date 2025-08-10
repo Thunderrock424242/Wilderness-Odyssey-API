@@ -18,12 +18,19 @@ public class CryoTubeRenderSetup {
 
     /**
      * Configure render layers on client setup.
+     * <p>
+     * The cryo tube model uses a texture with transparent pixels for its glass
+     * portion.  Registering the block with a translucent render layer ensures
+     * those pixels render with alpha blending while the rest of the model
+     * remains unaffected.
      *
      * @param event the client setup event
      */
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
-        ItemBlockRenderTypes.setRenderLayer(CryoTubeBlock.CRYO_TUBE.get(), RenderType.cutout());
+        event.enqueueWork(() ->
+                ItemBlockRenderTypes.setRenderLayer(CryoTubeBlock.CRYO_TUBE.get(), RenderType.translucent())
+        );
     }
 }
 
