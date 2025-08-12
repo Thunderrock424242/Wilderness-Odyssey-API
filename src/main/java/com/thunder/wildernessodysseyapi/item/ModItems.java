@@ -14,8 +14,6 @@ public class ModItems {
      */
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MOD_ID);
 
-    // No standalone items needed, as the unbreakable block's BlockItem is automatically registered.
-
     /**
      * Register.
      *

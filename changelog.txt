@@ -16,6 +16,7 @@ Added:
 - added ribbits
 - added betury
 - added fresh animations extension.
+ - added Sky Torch Staff that summons a light shaft and burns a tunnel from the sky
 
 
 Updated:
