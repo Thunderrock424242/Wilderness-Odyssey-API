@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.thunder.wildernessodysseyapi.Client.CloakRenderHandler;
-import com.thunder.wildernessodysseyapi.item.CloakItem;
+import com.thunder.wildernessodysseyapi.cloak.CloakItem;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.world.entity.LivingEntity;

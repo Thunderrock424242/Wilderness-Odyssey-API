@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.item;
+package com.thunder.wildernessodysseyapi.cloak;
 
 import java.util.Set;
 
