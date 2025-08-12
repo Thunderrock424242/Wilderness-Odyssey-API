@@ -13,9 +13,10 @@
   "injectors": {
     "defaultRequire": 1
   },
-  "client": [
-    "DebugMixin",
-    "MixinWorldCreationUiState",
-    "ParticleEngineMixin"
-  ]
-} 
+    "client": [
+        "DebugMixin",
+        "MixinWorldCreationUiState",
+        "ParticleEngineMixin",
+        "CloakRenderMixin"
+    ]
+}
