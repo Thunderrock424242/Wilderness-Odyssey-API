@@ -16,6 +16,7 @@ import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.doorlock.DoorLockEvents;
 import com.thunder.wildernessodysseyapi.command.DoorLockCommand;
+import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.skytorch.SkyTorchItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
@@ -29,7 +30,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
-import net.minecraft.world.item.CreativeModeTabs;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorStructureSpawner;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.fml.ModList;
@@ -37,6 +37,7 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
+import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -49,7 +50,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraft.world.item.CreativeModeTabs;
 
 
 import java.util.HashMap;
@@ -81,10 +82,10 @@ public class WildernessOdysseyAPIMainModClass {
      * @param container   the container
      */
     public WildernessOdysseyAPIMainModClass(IEventBus modEventBus, ModContainer container) {
-        LOGGER.info ("WildernessOdysseyAPI initialized. I will also start to track mod conflicts");
+        LOGGER.info("WildernessOdysseyAPI initialized. I will also start to track mod conflicts");
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
-        modEventBus.addListener(this::addCreative);
+        ModCreativeTabs.register(modEventBus);
 
         // Register global events
         NeoForge.EVENT_BUS.register(this);
@@ -122,14 +123,13 @@ public class WildernessOdysseyAPIMainModClass {
         UncaughtExceptionLogger.init();
         dynamicModCount = ModList.get().getMods().size();
     }
-
+  
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(CryoTubeBlock.CRYO_TUBE.get());
             event.accept(SkyTorchItems.SKY_TORCH_STAFF.get());
         }
     }
-
     /**
      * On server starting.
      *
