@@ -12,9 +12,15 @@ import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import com.thunder.wildernessodysseyapi.skytorch.SkyTorchLaser;
+
 
 /**
  * Simple staff item that calls down a beam from the sky and ignites the target.
@@ -35,6 +41,31 @@ public class SkyTorchStaffItem extends Item {
             Vec3 start = player.getEyePosition();
             Vec3 end = start.add(player.getLookAngle().scale(256));
             HitResult result = level.clip(new ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
+            if (result.getType() == HitResult.Type.BLOCK) {
+                BlockHitResult blockResult = (BlockHitResult) result;
+                BlockPos hitPos = blockResult.getBlockPos();
+                Vec3 originVec = new Vec3(hitPos.getX() + 0.5, level.getMaxBuildHeight() - 1, hitPos.getZ() + 0.5);
+                Vec3 hitVec = Vec3.atCenterOf(hitPos);
+
+                SkyTorchLaser.Options options = new SkyTorchLaser.Options();
+                options.boreDistance = originVec.distanceTo(hitVec);
+
+                new SkyTorchLaser(level, originVec, hitVec, options).fire();
+
+                if (level instanceof ServerLevel serverLevel) {
+                    for (int y = level.getMaxBuildHeight() - 1; y >= hitPos.getY(); y--) {
+                        serverLevel.sendParticles(ParticleTypes.END_ROD, hitPos.getX() + 0.5, y + 0.5, hitPos.getZ() + 0.5, 1, 0, 0, 0, 0);
+                    }
+
+                    LightningBolt bolt = EntityType.LIGHTNING_BOLT.create(serverLevel);
+                    if (bolt != null) {
+                        bolt.moveTo(Vec3.atBottomCenterOf(hitPos));
+                        if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+                            bolt.setCause(serverPlayer);
+                        }
+                        serverLevel.addFreshEntity(bolt);
+                    }
+                }
 
             if (result.getType() == HitResult.Type.BLOCK) {
                 BlockHitResult blockResult = (BlockHitResult) result;

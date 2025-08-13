@@ -24,10 +24,10 @@ public class ModItems {
     public static final DeferredItem<CloakItem> CLOAK_ITEM =
             ITEMS.register("cloak_item", () -> new CloakItem(new Item.Properties().stacksTo(1)));
 
+
     // No standalone items needed, as the unbreakable block's BlockItem is automatically registered.
     public static final DeferredItem<SkyTorchStaffItem> SKY_TORCH_STAFF =
             ITEMS.register("sky_torch_staff", () -> new SkyTorchStaffItem(new Item.Properties().stacksTo(1)));
-
     /**
      * Register.
      *
