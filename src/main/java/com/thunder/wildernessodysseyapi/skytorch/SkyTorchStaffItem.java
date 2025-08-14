@@ -67,55 +67,56 @@ public class SkyTorchStaffItem extends Item {
                     }
                 }
 
-            if (result.getType() == HitResult.Type.BLOCK) {
-                BlockHitResult blockResult = (BlockHitResult) result;
-                BlockPos hitPos = blockResult.getBlockPos();
-                BlockPos topPos = new BlockPos(hitPos.getX(), level.getMaxBuildHeight() - 1, hitPos.getZ());
+                if (result.getType() == HitResult.Type.BLOCK) {
+                    BlockHitResult blockResult = (BlockHitResult) result;
+                    BlockPos hitPos = blockResult.getBlockPos();
+                    BlockPos topPos = new BlockPos(hitPos.getX(), level.getMaxBuildHeight() - 1, hitPos.getZ());
 
-                // carve a vertical shaft with radius
-                for (int y = topPos.getY(); y >= hitPos.getY(); y--) {
-                    for (int dx = -BORE_RADIUS; dx <= BORE_RADIUS; dx++) {
-                        for (int dz = -BORE_RADIUS; dz <= BORE_RADIUS; dz++) {
-                            if (dx * dx + dz * dz <= BORE_RADIUS * BORE_RADIUS) {
-                                BlockPos current = new BlockPos(hitPos.getX() + dx, y, hitPos.getZ() + dz);
-                                if (!level.getBlockState(current).isAir()) {
-                                    level.destroyBlock(current, false);
+                    // carve a vertical shaft with radius
+                    for (int y = topPos.getY(); y >= hitPos.getY(); y--) {
+                        for (int dx = -BORE_RADIUS; dx <= BORE_RADIUS; dx++) {
+                            for (int dz = -BORE_RADIUS; dz <= BORE_RADIUS; dz++) {
+                                if (dx * dx + dz * dz <= BORE_RADIUS * BORE_RADIUS) {
+                                    BlockPos current = new BlockPos(hitPos.getX() + dx, y, hitPos.getZ() + dz);
+                                    if (!level.getBlockState(current).isAir()) {
+                                        level.destroyBlock(current, false);
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // render a light shaft from build height to the target
-                if (level instanceof ServerLevel serverLevel) {
-                    for (int y = topPos.getY(); y >= hitPos.getY(); y--) {
-                        serverLevel.sendParticles(
-                                ParticleTypes.END_ROD,
-                                hitPos.getX() + 0.5,
-                                y + 0.5,
-                                hitPos.getZ() + 0.5,
-                                1, 0.0, 0.0, 0.0, 0.0);
+                    // render a light shaft from build height to the target
+                    if (level instanceof ServerLevel serverLevel) {
+                        for (int y = topPos.getY(); y >= hitPos.getY(); y--) {
+                            serverLevel.sendParticles(
+                                    ParticleTypes.END_ROD,
+                                    hitPos.getX() + 0.5,
+                                    y + 0.5,
+                                    hitPos.getZ() + 0.5,
+                                    1, 0.0, 0.0, 0.0, 0.0);
+                        }
                     }
-                }
 
-                // explosion at the impact and ignite surrounding ring
-                level.explode(null, hitPos.getX() + 0.5, hitPos.getY(), hitPos.getZ() + 0.5, 2.0F, Level.ExplosionInteraction.TNT);
-                for (int dx = -BURN_RADIUS; dx <= BURN_RADIUS; dx++) {
-                    for (int dz = -BURN_RADIUS; dz <= BURN_RADIUS; dz++) {
-                        if (dx * dx + dz * dz <= BURN_RADIUS * BURN_RADIUS) {
-                            BlockPos firePos = hitPos.offset(dx, 0, dz);
-                            if (level.isEmptyBlock(firePos) && !level.isEmptyBlock(firePos.below())) {
-                                level.setBlock(firePos, Blocks.FIRE.defaultBlockState(), 11);
+                    // explosion at the impact and ignite surrounding ring
+                    level.explode(null, hitPos.getX() + 0.5, hitPos.getY(), hitPos.getZ() + 0.5, 2.0F, Level.ExplosionInteraction.TNT);
+                    for (int dx = -BURN_RADIUS; dx <= BURN_RADIUS; dx++) {
+                        for (int dz = -BURN_RADIUS; dz <= BURN_RADIUS; dz++) {
+                            if (dx * dx + dz * dz <= BURN_RADIUS * BURN_RADIUS) {
+                                BlockPos firePos = hitPos.offset(dx, 0, dz);
+                                if (level.isEmptyBlock(firePos) && !level.isEmptyBlock(firePos.below())) {
+                                    level.setBlock(firePos, Blocks.FIRE.defaultBlockState(), 11);
+                                }
                             }
                         }
                     }
+
+                    level.gameEvent(player, GameEvent.ITEM_INTERACT_FINISH, hitPos);
                 }
-
-                level.gameEvent(player, GameEvent.ITEM_INTERACT_FINISH, hitPos);
             }
-        }
 
-        player.getCooldowns().addCooldown(this, 100);
-        return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+            player.getCooldowns().addCooldown(this, 100);
+            return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+        }
     }
 }
