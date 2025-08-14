@@ -25,15 +25,21 @@ public class MemCheckCommand {
                             LOGGER.info("/memcheck command executed");
 
                             long usedMB  = MemoryUtils.getUsedMemoryMB();
+                            long peakMB  = MemoryUtils.getPeakUsedMemoryMB();
                             long totalMB = MemoryUtils.getTotalMemoryMB();
                             int recommended = MemoryUtils.calculateRecommendedRAM(
-                                    usedMB,
+                                    peakMB,
                                     WildernessOdysseyAPIMainModClass.dynamicModCount
                             );
 
                             source.sendSuccess(
                                     () -> Component.nullToEmpty(ChatFormatting.GREEN + "Current memory usage: "
                                             + usedMB + "MB / " + totalMB + "MB"),
+                                    false
+                            );
+                            source.sendSuccess(
+                                    () -> Component.nullToEmpty(ChatFormatting.AQUA + "Peak usage observed: "
+                                            + peakMB + "MB"),
                                     false
                             );
                             source.sendSuccess(

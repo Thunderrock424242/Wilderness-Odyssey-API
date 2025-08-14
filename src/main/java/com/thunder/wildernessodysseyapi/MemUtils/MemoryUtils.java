@@ -11,6 +11,31 @@ public class MemoryUtils {
     private static final int BASE_RECOMMENDED_MB = 4096; // 4GB
 
     /**
+     * Tracks the peak memory usage observed during this session in MB.
+     */
+    private static long peakUsedMB = 0;
+
+    /**
+     * Samples the current memory usage and updates the {@code peakUsedMB} if a
+     * new high watermark is observed. This method is lightweight and intended to
+     * be called frequently (e.g., every tick).
+     */
+    public static void recordPeakUsage() {
+        long used = getUsedMemoryMB();
+        if (used > peakUsedMB) {
+            peakUsedMB = used;
+            LOGGER.debug("New peak memory usage recorded: {} MB", peakUsedMB);
+        }
+    }
+
+    /**
+     * Returns the highest memory usage recorded so far in MB.
+     */
+    public static long getPeakUsedMemoryMB() {
+        return peakUsedMB;
+    }
+
+    /**
      * Returns the amount of used memory in MB.
      */
     public static long getUsedMemoryMB() {
