@@ -118,5 +118,6 @@ public class SkyTorchStaffItem extends Item {
             player.getCooldowns().addCooldown(this, 100);
             return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
         }
+        return null;
     }
 }
