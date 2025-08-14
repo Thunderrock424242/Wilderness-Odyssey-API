@@ -18,10 +18,8 @@ import com.thunder.wildernessodysseyapi.doorlock.DoorLockEvents;
 import com.thunder.wildernessodysseyapi.command.DoorLockCommand;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
-import com.thunder.wildernessodysseyapi.skytorch.SkyTorchItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
-import com.thunder.wildernessodysseyapi.ModConflictChecker.Util.LoggerUtil;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -96,7 +94,6 @@ public class WildernessOdysseyAPIMainModClass {
         CryoTubeBlock.register(modEventBus);
         TerrainReplacerBlock.register(modEventBus);
         ModItems.register(modEventBus);
-        SkyTorchItems.register(modEventBus);
 
         container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);
         // Previously registered client-only events have been removed
@@ -127,7 +124,6 @@ public class WildernessOdysseyAPIMainModClass {
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(CryoTubeBlock.CRYO_TUBE.get());
-            event.accept(SkyTorchItems.SKY_TORCH_STAFF.get());
         }
     }
     /**

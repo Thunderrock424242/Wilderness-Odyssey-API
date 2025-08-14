@@ -22,8 +22,7 @@ public class BlacklistChecker {
     );
 
     private static final List<String> BLACKLISTED_RESOURCE_PACKS = Arrays.asList(
-            "Xray_Ultimate_1.21_v5.0.4.zip",
-            "badpack2.zip"
+            "Xray_Ultimate_1.21_v5.0.4.zip"
     );
 
     /**

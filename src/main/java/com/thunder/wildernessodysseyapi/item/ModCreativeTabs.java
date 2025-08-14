@@ -32,7 +32,6 @@ public class ModCreativeTabs {
                     .icon(() -> new ItemStack(Items.AMETHYST_SHARD))
                     .displayItems((parameters, output) -> {
                         output.accept(CryoTubeBlock.CRYO_TUBE.get());
-                        output.accept(ModItems.SKY_TORCH_STAFF.get());
                     })
                     .build()
     );

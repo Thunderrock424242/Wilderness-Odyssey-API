@@ -1,7 +1,6 @@
 package com.thunder.wildernessodysseyapi.item;
 
 import com.thunder.wildernessodysseyapi.cloak.CloakItem;
-import com.thunder.wildernessodysseyapi.skytorch.SkyTorchStaffItem;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -26,8 +25,6 @@ public class ModItems {
 
 
     // No standalone items needed, as the unbreakable block's BlockItem is automatically registered.
-    public static final DeferredItem<SkyTorchStaffItem> SKY_TORCH_STAFF =
-            ITEMS.register("sky_torch_staff", () -> new SkyTorchStaffItem(new Item.Properties().stacksTo(1)));
     /**
      * Register.
      *
