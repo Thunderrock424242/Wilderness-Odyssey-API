@@ -14,6 +14,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
@@ -53,17 +54,25 @@ public class WorldSpawnHandler {
                 BlockPos meteorPos = MeteorImpactData.get(world).getImpactPos();
                 BlockPos spawnBlockPos;
                 if (meteorPos != null) {
-                    spawnBlockPos = spawnBlockPositions.stream()
+                    BlockPos closest = spawnBlockPositions.stream()
                             .min((a, b) -> Double.compare(a.distSqr(meteorPos), b.distSqr(meteorPos)))
                             .orElse(spawnBlockPositions.get(0));
+                    final double maxDist = 400.0; // radius squared (20 blocks)
+                    spawnBlockPositions = spawnBlockPositions.stream()
+                            .filter(p -> p.distSqr(closest) <= maxDist)
+                            .collect(Collectors.toList());
+                    spawnBlockPos = closest;
                 } else {
                     Random random = new Random();
                     spawnBlockPos = spawnBlockPositions.get(random.nextInt(spawnBlockPositions.size()));
                 }
 
+                PlayerSpawnHandler.setSpawnBlocks(spawnBlockPositions);
+
                 // Set the world's default spawn position
                 world.setDefaultSpawnPos(spawnBlockPos.above(), 0.0F);
             } else {
+                PlayerSpawnHandler.setSpawnBlocks(spawnBlockPositions);
                 // Log a warning or handle cases where no spawn blocks are found
                 LOGGER.warn("No Cryo Tube Blocks found in the world!");
             }
