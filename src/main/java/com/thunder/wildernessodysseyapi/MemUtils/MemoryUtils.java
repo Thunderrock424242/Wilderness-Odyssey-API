@@ -9,6 +9,8 @@ public class MemoryUtils {
 
     // Base recommended MB; adjust as needed
     private static final int BASE_RECOMMENDED_MB = 4096; // 4GB
+    private static final Runtime RUNTIME = Runtime.getRuntime();
+    private static final long MB = 1024L * 1024L;
 
     /**
      * Tracks the peak memory usage observed during this session in MB.
@@ -39,21 +41,17 @@ public class MemoryUtils {
      * Returns the amount of used memory in MB.
      */
     public static long getUsedMemoryMB() {
-        long free  = Runtime.getRuntime().freeMemory();
-        long total = Runtime.getRuntime().totalMemory();
-        long used = (total - free) / (1024 * 1024);
-        LOGGER.debug("Calculated used memory: {} MB (total={} MB, free={} MB)", used, total / (1024 * 1024), free / (1024 * 1024));
-        return used;
+        long free  = RUNTIME.freeMemory();
+        long total = RUNTIME.totalMemory();
+        return (total - free) / MB;
     }
 
     /**
      * Returns the total allocated memory (heap) in MB.
      */
     public static long getTotalMemoryMB() {
-        long total = Runtime.getRuntime().totalMemory();
-        long totalMB = total / (1024 * 1024);
-        LOGGER.debug("Total memory allocated: {} MB", totalMB);
-        return totalMB;
+        long total = RUNTIME.totalMemory();
+        return total / MB;
     }
 
     /**

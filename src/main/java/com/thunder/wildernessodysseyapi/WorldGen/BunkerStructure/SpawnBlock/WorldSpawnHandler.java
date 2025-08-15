@@ -3,15 +3,18 @@ package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ChunkMap;
 import net.minecraft.world.level.chunk.LevelChunk;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorImpactData;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
@@ -21,6 +24,19 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
  */
 @EventBusSubscriber(modid = MOD_ID)
 public class WorldSpawnHandler {
+
+    private static final Method GET_CHUNKS_METHOD;
+
+    static {
+        Method method;
+        try {
+            method = ChunkMap.class.getDeclaredMethod("getChunks");
+            method.setAccessible(true);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+        GET_CHUNKS_METHOD = method;
+    }
 
     /**
      * On world load.
@@ -37,17 +53,25 @@ public class WorldSpawnHandler {
                 BlockPos meteorPos = MeteorImpactData.get(world).getImpactPos();
                 BlockPos spawnBlockPos;
                 if (meteorPos != null) {
-                    spawnBlockPos = spawnBlockPositions.stream()
+                    BlockPos closest = spawnBlockPositions.stream()
                             .min((a, b) -> Double.compare(a.distSqr(meteorPos), b.distSqr(meteorPos)))
                             .orElse(spawnBlockPositions.get(0));
+                    final double maxDist = 400.0; // radius squared (20 blocks)
+                    spawnBlockPositions = spawnBlockPositions.stream()
+                            .filter(p -> p.distSqr(closest) <= maxDist)
+                            .collect(Collectors.toList());
+                    spawnBlockPos = closest;
                 } else {
                     Random random = new Random();
                     spawnBlockPos = spawnBlockPositions.get(random.nextInt(spawnBlockPositions.size()));
                 }
 
+                PlayerSpawnHandler.setSpawnBlocks(spawnBlockPositions);
+
                 // Set the world's default spawn position
                 world.setDefaultSpawnPos(spawnBlockPos.above(), 0.0F);
             } else {
+                PlayerSpawnHandler.setSpawnBlocks(spawnBlockPositions);
                 // Log a warning or handle cases where no spawn blocks are found
                 System.err.println("No Cryo Tube Blocks found in the world!");
             }
@@ -65,9 +89,7 @@ public class WorldSpawnHandler {
 
         try {
             // ChunkMap#getChunks became protected; use reflection to access it
-            var method = world.getChunkSource().chunkMap.getClass().getDeclaredMethod("getChunks");
-            method.setAccessible(true);
-            Iterable<?> holders = (Iterable<?>) method.invoke(world.getChunkSource().chunkMap);
+            Iterable<?> holders = (Iterable<?>) GET_CHUNKS_METHOD.invoke(world.getChunkSource().chunkMap);
             for (Object holderObj : holders) {
                 // Each holder represents a chunk; attempt to extract a loaded LevelChunk
                 var holderClass = holderObj.getClass();

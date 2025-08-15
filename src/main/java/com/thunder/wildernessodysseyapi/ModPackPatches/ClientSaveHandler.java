@@ -12,6 +12,9 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 @EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
 public class ClientSaveHandler {
 
+    private static final int FLUSH_INTERVAL = 10000;
+    private static int tickCounter = 0;
+
     /**
      * If you want to optimize the final "Saving World" step on a singleplayer game,
      * you can ensure chunks are saved incrementally or flush them just before
@@ -46,19 +49,16 @@ public class ClientSaveHandler {
      * you could do so every X ticks on the client side, when in singleplayer.
      */
     @SubscribeEvent
-    public static void onClientTick(ClientTickEvent.Post event) {{
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.player == null) return;
-            if (mc.hasSingleplayerServer()) {
-                // Example: flush once every 10,000 ticks on the client side
-                assert mc.level != null;
-                long time = mc.level.getGameTime();
-                if (time % 10000 == 0) {
-                    assert mc.getSingleplayerServer() != null;
-                    mc.getSingleplayerServer().execute(() -> {
-                        mc.getSingleplayerServer().overworld().save(null, false, true);
-                    });
-                }
+    public static void onClientTick(ClientTickEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        if (mc.hasSingleplayerServer()) {
+            if (++tickCounter >= FLUSH_INTERVAL) {
+                tickCounter = 0;
+                assert mc.getSingleplayerServer() != null;
+                mc.getSingleplayerServer().execute(() -> {
+                    mc.getSingleplayerServer().overworld().save(null, false, true);
+                });
             }
         }
     }
