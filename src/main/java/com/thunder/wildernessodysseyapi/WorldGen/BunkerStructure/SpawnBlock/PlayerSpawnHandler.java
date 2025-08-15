@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorImpactData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -31,7 +32,6 @@ public class PlayerSpawnHandler {
 
     private static final AtomicInteger spawnIndex = new AtomicInteger(0);
     private static List<BlockPos> spawnBlocks = Collections.emptyList();
-    private static List<BlockPos> spawnBlocks = null;
     private static long lastScanTime = Long.MIN_VALUE;
     private static final int SCAN_INTERVAL = 200;
     private static final String CRYO_TAG = "wo_in_cryo";
@@ -129,6 +129,8 @@ public class PlayerSpawnHandler {
     public static void setSpawnBlocks(List<BlockPos> blocks) {
         spawnBlocks = blocks == null ? Collections.emptyList() : blocks;
         spawnIndex.set(0);
+    }
+
     private static void ensureSpawnBlocks(ServerLevel world) {
         if ((spawnBlocks == null || spawnBlocks.isEmpty()) &&
                 world.getGameTime() - lastScanTime >= SCAN_INTERVAL) {
