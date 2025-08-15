@@ -62,8 +62,7 @@ public class TerrainBlockReplacer {
     public static void replaceBlockWithTerrainRelative(EditSession editSession, ServerLevel world,
                                                        BlockVector3 blockVector, BlockPos origin)
             throws MaxChangedBlocksException {
-        BlockPos terrainPos = origin.offset(blockVector.getBlockX(), blockVector.getBlockY(),
-                                            blockVector.getBlockZ());
+        BlockPos terrainPos = origin.offset(blockVector.x(), blockVector.y(), blockVector.z());
         replaceBlockWithTerrain(editSession, world, blockVector, terrainPos);
     }
 

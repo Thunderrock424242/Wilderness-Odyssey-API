@@ -96,13 +96,13 @@ public class SecretOrderVillagePlacer {
                         .ignoreAirBlocks(false)
                         .build();
 
-                for (int x = 0; x < clipboard.getDimensions().getX(); x++) {
-                    for (int z = 0; z < clipboard.getDimensions().getZ(); z++) {
-                        BlockVector3 local = BlockVector3.at(x, clipboard.getDimensions().getY() - 1, z);
+                for (int x = 0; x < clipboard.getDimensions().x(); x++) {
+                    for (int z = 0; z < clipboard.getDimensions().z(); z++) {
+                        BlockVector3 local = BlockVector3.at(x, clipboard.getDimensions().y() - 1, z);
                         BlockVector3 worldVec = local.add(clipboard.getOrigin())
                                 .add(BlockVector3.at(position.getX(), position.getY(), position.getZ()));
                         if (clipboard.getBlock(local).getBlockType().equals(BlockTypes.WHITE_WOOL)) {
-                            BlockPos worldPos = new BlockPos(worldVec.getX(), worldVec.getY(), worldVec.getZ());
+                            BlockPos worldPos = new BlockPos(worldVec.x(), worldVec.y(), worldVec.z());
                             BlockPos below = worldPos.below();
                             net.minecraft.world.level.block.state.BlockState terrainBlock = world.getBlockState(below);
                             BlockFactory weState = WorldEdit.getInstance().getBlockFactory();

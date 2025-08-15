@@ -133,8 +133,8 @@ public class WorldEditStructurePlacer {
             }
 
             AABB bounds = new AABB(
-                    min.getBlockX() + surfacePos.getX(), min.getBlockY() + surfacePos.getY(), min.getBlockZ() + surfacePos.getZ(),
-                    max.getBlockX() + surfacePos.getX(), max.getBlockY() + surfacePos.getY(), max.getBlockZ() + surfacePos.getZ()
+                    min.x() + surfacePos.getX(), min.y() + surfacePos.getY(), min.z() + surfacePos.getZ(),
+                    max.x() + surfacePos.getX(), max.y() + surfacePos.getY(), max.z() + surfacePos.getZ()
             );
 
             try (final EditSession editSession = WorldEdit.getInstance().newEditSession((World) world)) {
