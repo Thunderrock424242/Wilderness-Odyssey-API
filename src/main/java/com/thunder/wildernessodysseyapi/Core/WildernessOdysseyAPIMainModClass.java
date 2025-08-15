@@ -16,6 +16,7 @@ import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.doorlock.DoorLockEvents;
 import com.thunder.wildernessodysseyapi.command.DoorLockCommand;
+import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
@@ -154,6 +155,7 @@ public class WildernessOdysseyAPIMainModClass {
         FaqCommand.register(event.getDispatcher());
         DonateCommand.register(event.getDispatcher());
         DoorLockCommand.register(event.getDispatcher());
+        WorldGenScanCommand.register(event.getDispatcher());
     }
 
     /**
