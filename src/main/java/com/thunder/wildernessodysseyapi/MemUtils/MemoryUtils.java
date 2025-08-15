@@ -45,19 +45,16 @@ public class MemoryUtils {
      */
     private static long lastLoggedUsedMB = -1;
     public static long getUsedMemoryMB() {
-        long free  = RUNTIME.freeMemory();
+        long free = RUNTIME.freeMemory();
         long total = RUNTIME.totalMemory();
-        return (total - free) / MB;
-        long free = Runtime.getRuntime().freeMemory();
-        long total = Runtime.getRuntime().totalMemory();
-        long used = (total - free) / (1024 * 1024);
+        long used = (total - free) / MB;
         if (used != lastLoggedUsedMB) {
             lastLoggedUsedMB = used;
             LOGGER.debug(
                     "Calculated used memory: {} MB (total={} MB, free={} MB)",
                     used,
-                    total / (1024 * 1024),
-                    free / (1024 * 1024));
+                    total / MB,
+                    free / MB);
         }
         return used;
     }
@@ -69,9 +66,7 @@ public class MemoryUtils {
     private static long lastLoggedTotalMB = -1;
     public static long getTotalMemoryMB() {
         long total = RUNTIME.totalMemory();
-        return total / MB;
-        long total = Runtime.getRuntime().totalMemory();
-        long totalMB = total / (1024 * 1024);
+        long totalMB = total / MB;
         if (totalMB != lastLoggedTotalMB) {
             lastLoggedTotalMB = totalMB;
             LOGGER.debug("Total memory allocated: {} MB", totalMB);
