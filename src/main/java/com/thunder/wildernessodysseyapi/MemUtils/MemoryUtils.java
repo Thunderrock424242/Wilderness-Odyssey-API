@@ -24,7 +24,9 @@ public class MemoryUtils {
         long used = getUsedMemoryMB();
         if (used > peakUsedMB) {
             peakUsedMB = used;
-            LOGGER.debug("New peak memory usage recorded: {} MB", peakUsedMB);
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("New peak memory usage recorded: {} MB", peakUsedMB);
+            }
         }
     }
 
@@ -43,6 +45,7 @@ public class MemoryUtils {
     public static long getUsedMemoryMB() {
         long free  = Runtime.getRuntime().freeMemory();
         long total = Runtime.getRuntime().totalMemory();
+        return (total - free) / (1024 * 1024);
         long used = (total - free) / (1024 * 1024);
         if (used != lastLoggedUsedMB) {
             lastLoggedUsedMB = used;
@@ -59,6 +62,7 @@ public class MemoryUtils {
     private static long lastLoggedTotalMB = -1;
     public static long getTotalMemoryMB() {
         long total = Runtime.getRuntime().totalMemory();
+        return total / (1024 * 1024);
         long totalMB = total / (1024 * 1024);
         if (totalMB != lastLoggedTotalMB) {
             lastLoggedTotalMB = totalMB;
@@ -76,12 +80,16 @@ public class MemoryUtils {
      */
     private static int lastRecommendedMB = -1;
     public static int calculateRecommendedRAM(long currentUsedMB, int modCount) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Calculating recommended RAM with currentUsedMB={} and modCount={}", currentUsedMB, modCount);
+        }
         int extraPer10Mods = (modCount / 10) * 128;
         int recommendedMB = BASE_RECOMMENDED_MB + extraPer10Mods;
 
         if (currentUsedMB > recommendedMB) {
             recommendedMB = (int) currentUsedMB + 512;
         }
+        if (LOGGER.isDebugEnabled()) {
         if (recommendedMB != lastRecommendedMB) {
             lastRecommendedMB = recommendedMB;
             LOGGER.debug("Recommended RAM determined to be {} MB", recommendedMB);

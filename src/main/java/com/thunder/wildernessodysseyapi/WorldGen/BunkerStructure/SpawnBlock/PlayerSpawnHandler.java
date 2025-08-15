@@ -31,6 +31,8 @@ public class PlayerSpawnHandler {
 
     private static final AtomicInteger spawnIndex = new AtomicInteger(0);
     private static List<BlockPos> spawnBlocks = null;
+    private static long lastScanTime = Long.MIN_VALUE;
+    private static final int SCAN_INTERVAL = 200;
     private static final String CRYO_TAG = "wo_in_cryo";
     private static final String CRYO_USED_TAG = "wo_cryo_used";
     private static final String CRYO_POS_TAG = "wo_cryo_pos";
@@ -122,7 +124,9 @@ public class PlayerSpawnHandler {
     }
 
     private static void ensureSpawnBlocks(ServerLevel world) {
-        if (spawnBlocks == null || spawnBlocks.isEmpty()) {
+        if ((spawnBlocks == null || spawnBlocks.isEmpty()) &&
+                world.getGameTime() - lastScanTime >= SCAN_INTERVAL) {
+            lastScanTime = world.getGameTime();
             spawnBlocks = WorldSpawnHandler.findAllWorldSpawnBlocks(world);
             BlockPos meteorPos = MeteorImpactData.get(world).getImpactPos();
             if (meteorPos != null && !spawnBlocks.isEmpty()) {

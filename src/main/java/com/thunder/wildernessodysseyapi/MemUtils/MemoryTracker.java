@@ -13,11 +13,16 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 @EventBusSubscriber(modid = MOD_ID)
 public class MemoryTracker {
 
+    private static final int SAMPLE_INTERVAL = 20;
+    private static int tickCounter = 0;
+
     /**
-     * Invoked each server tick; updates peak memory usage statistics.
+     * Invoked on server ticks; periodically updates peak memory statistics.
      */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        MemoryUtils.recordPeakUsage();
+        if (++tickCounter % SAMPLE_INTERVAL == 0) {
+            MemoryUtils.recordPeakUsage();
+        }
     }
 }
