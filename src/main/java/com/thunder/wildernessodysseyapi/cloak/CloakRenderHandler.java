@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.Client;
+package com.thunder.wildernessodysseyapi.cloak;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
