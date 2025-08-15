@@ -22,6 +22,8 @@ public class MemoryTrackerClient {
      */
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
+        if (++tickCounter >= SAMPLE_INTERVAL) {
+            tickCounter = 0;
         if (++tickCounter % SAMPLE_INTERVAL == 0) {
             MemoryUtils.recordPeakUsage();
         }

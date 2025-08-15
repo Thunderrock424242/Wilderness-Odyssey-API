@@ -9,6 +9,8 @@ public class MemoryUtils {
 
     // Base recommended MB; adjust as needed
     private static final int BASE_RECOMMENDED_MB = 4096; // 4GB
+    private static final Runtime RUNTIME = Runtime.getRuntime();
+    private static final long MB = 1024L * 1024L;
 
     /**
      * Tracks the peak memory usage observed during this session in MB.
@@ -43,6 +45,9 @@ public class MemoryUtils {
      */
     private static long lastLoggedUsedMB = -1;
     public static long getUsedMemoryMB() {
+        long free  = RUNTIME.freeMemory();
+        long total = RUNTIME.totalMemory();
+        return (total - free) / MB;
         long free = Runtime.getRuntime().freeMemory();
         long total = Runtime.getRuntime().totalMemory();
         long used = (total - free) / (1024 * 1024);
@@ -63,6 +68,8 @@ public class MemoryUtils {
      */
     private static long lastLoggedTotalMB = -1;
     public static long getTotalMemoryMB() {
+        long total = RUNTIME.totalMemory();
+        return total / MB;
         long total = Runtime.getRuntime().totalMemory();
         long totalMB = total / (1024 * 1024);
         if (totalMB != lastLoggedTotalMB) {
