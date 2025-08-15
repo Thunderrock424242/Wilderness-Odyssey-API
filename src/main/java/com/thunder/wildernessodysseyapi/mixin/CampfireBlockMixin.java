@@ -11,8 +11,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.Map;
-import java.util.WeakHashMap;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 
 /**
  * The type Campfire block mixin.
@@ -20,9 +20,9 @@ import java.util.WeakHashMap;
 @Mixin(CampfireBlock.class)
 public class CampfireBlockMixin {
 
-    // Weak map so chunk unloads don’t cause memory leaks
+    // Track last particle emission times keyed by block position to throttle
     @Unique
-    private static final Map<BlockPos, Long> LAST_PARTICLE_TIME = new WeakHashMap<>();
+    private static final Long2LongOpenHashMap LAST_PARTICLE_TIME = new Long2LongOpenHashMap();
 
     @Inject(method = "makeParticles", at = @At("HEAD"), cancellable = true)
     private static void modifyMakeParticles(Level level, BlockPos pos, boolean isSignalFire, boolean spawnExtraSmoke, CallbackInfo ci) {
@@ -33,11 +33,24 @@ public class CampfireBlockMixin {
         }
 
         long gameTime = level.getGameTime();
-        long lastTime = LAST_PARTICLE_TIME.getOrDefault(pos.immutable(), 0L);
+        long key = pos.asLong();
+        long lastTime = LAST_PARTICLE_TIME.getOrDefault(key, 0L);
 
         // Throttle particle spawn per campfire every 5 ticks (1/4 second)
         if (gameTime - lastTime < 5) return;
-        LAST_PARTICLE_TIME.put(pos.immutable(), gameTime);
+        LAST_PARTICLE_TIME.put(key, gameTime);
+
+        // Periodically clean up stale entries to avoid unbounded growth
+        if (gameTime % 200 == 0) {
+            LongIterator iter = LAST_PARTICLE_TIME.keySet().iterator();
+            while (iter.hasNext()) {
+                long k = iter.nextLong();
+                long value = LAST_PARTICLE_TIME.get(k);
+                if (gameTime - value > 200) {
+                    iter.remove();
+                }
+            }
+        }
 
         RandomSource random = level.getRandom();
         int maxHeight = level.getMaxBuildHeight();
