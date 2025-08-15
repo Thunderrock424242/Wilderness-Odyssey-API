@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock;
 
+import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorImpactData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,6 +18,7 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
