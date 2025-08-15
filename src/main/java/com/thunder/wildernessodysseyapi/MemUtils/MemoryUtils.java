@@ -24,7 +24,9 @@ public class MemoryUtils {
         long used = getUsedMemoryMB();
         if (used > peakUsedMB) {
             peakUsedMB = used;
-            LOGGER.debug("New peak memory usage recorded: {} MB", peakUsedMB);
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("New peak memory usage recorded: {} MB", peakUsedMB);
+            }
         }
     }
 
@@ -41,9 +43,7 @@ public class MemoryUtils {
     public static long getUsedMemoryMB() {
         long free  = Runtime.getRuntime().freeMemory();
         long total = Runtime.getRuntime().totalMemory();
-        long used = (total - free) / (1024 * 1024);
-        LOGGER.debug("Calculated used memory: {} MB (total={} MB, free={} MB)", used, total / (1024 * 1024), free / (1024 * 1024));
-        return used;
+        return (total - free) / (1024 * 1024);
     }
 
     /**
@@ -51,9 +51,7 @@ public class MemoryUtils {
      */
     public static long getTotalMemoryMB() {
         long total = Runtime.getRuntime().totalMemory();
-        long totalMB = total / (1024 * 1024);
-        LOGGER.debug("Total memory allocated: {} MB", totalMB);
-        return totalMB;
+        return total / (1024 * 1024);
     }
 
     /**
@@ -64,14 +62,18 @@ public class MemoryUtils {
      *   bump recommended to current usage + 512MB.
      */
     public static int calculateRecommendedRAM(long currentUsedMB, int modCount) {
-        LOGGER.debug("Calculating recommended RAM with currentUsedMB={} and modCount={}", currentUsedMB, modCount);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Calculating recommended RAM with currentUsedMB={} and modCount={}", currentUsedMB, modCount);
+        }
         int extraPer10Mods = (modCount / 10) * 128;
         int recommendedMB = BASE_RECOMMENDED_MB + extraPer10Mods;
 
         if (currentUsedMB > recommendedMB) {
             recommendedMB = (int) currentUsedMB + 512;
         }
-        LOGGER.debug("Recommended RAM determined to be {} MB", recommendedMB);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Recommended RAM determined to be {} MB", recommendedMB);
+        }
         return recommendedMB;
     }
 }
