@@ -17,6 +17,7 @@ import java.util.Random;
 import java.util.stream.Collectors;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 
 
 /**
@@ -73,7 +74,7 @@ public class WorldSpawnHandler {
             } else {
                 PlayerSpawnHandler.setSpawnBlocks(spawnBlockPositions);
                 // Log a warning or handle cases where no spawn blocks are found
-                System.err.println("No Cryo Tube Blocks found in the world!");
+                LOGGER.warn("No Cryo Tube Blocks found in the world!");
             }
         }
     }
@@ -106,7 +107,7 @@ public class WorldSpawnHandler {
             }
         } catch (ReflectiveOperationException e) {
             // If reflection fails, fall back to empty result
-            e.printStackTrace();
+            LOGGER.error("Failed to locate Cryo Tube Blocks", e);
         }
         return spawnBlocks;
     }

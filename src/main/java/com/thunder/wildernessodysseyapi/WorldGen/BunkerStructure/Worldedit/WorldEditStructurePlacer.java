@@ -15,7 +15,6 @@ import com.sk89q.worldedit.world.block.BlockTypes;
 import net.neoforged.fml.ModList;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.TerrainBlockReplacer;
 import com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager;
-import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -23,6 +22,10 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 
 import java.io.InputStream;
+import java.util.HashSet;
+import java.util.Set;
+
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 
 /**
  * The type World edit structure placer.
@@ -33,6 +36,8 @@ public class WorldEditStructurePlacer {
     // Cache WorldEdit availability to avoid repeated startup checks and log spam
     private static Boolean worldEditReady = null;
     private static boolean missingLogged = false;
+    private static final Set<ResourceLocation> missingSchematicsLogged = new HashSet<>();
+    private static final Set<ResourceLocation> missingCryoTubeLogged = new HashSet<>();
 
     /**
      * Instantiates a new World edit structure placer.
@@ -64,7 +69,7 @@ public class WorldEditStructurePlacer {
             // Wait for WorldEdit to finish booting so BlockTypes are populated.
             if (!waitForWorldEdit()) {
                 if (!missingLogged) {
-                    System.out.println("WorldEdit not initialized (BlockTypes.AIR is null); skipping placement of " + id);
+                    LOGGER.warn("WorldEdit not initialized (BlockTypes.AIR is null); skipping placement of {}", id);
                     missingLogged = true;
                 }
                 return null;
@@ -86,7 +91,9 @@ public class WorldEditStructurePlacer {
 
 
             if (clipboard == null) {
-                System.out.println("Schematic file not found: " + id);
+                if (missingSchematicsLogged.add(id)) {
+                    LOGGER.warn("Schematic file not found: {}", id);
+                }
                 return null;
             }
 
@@ -118,14 +125,16 @@ public class WorldEditStructurePlacer {
                 }
 
                 if (!hasCryoTube) {
-                    System.out.println("Skipping bunker placement: schematic missing cryo tube.");
+                    if (missingCryoTubeLogged.add(id)) {
+                        LOGGER.warn("Skipping bunker placement: schematic missing cryo tube in {}", id);
+                    }
                     return null;
                 }
             }
 
             AABB bounds = new AABB(
-                    min.getBlockX() + surfacePos.getX(), min.getBlockY() + surfacePos.getY(), min.getBlockZ() + surfacePos.getZ(),
-                    max.getBlockX() + surfacePos.getX(), max.getBlockY() + surfacePos.getY(), max.getBlockZ() + surfacePos.getZ()
+                    min.x() + surfacePos.getX(), min.y() + surfacePos.getY(), min.z() + surfacePos.getZ(),
+                    max.x() + surfacePos.getX(), max.y() + surfacePos.getY(), max.z() + surfacePos.getZ()
             );
 
             try (final EditSession editSession = WorldEdit.getInstance().newEditSession((World) world)) {
@@ -157,8 +166,7 @@ public class WorldEditStructurePlacer {
             }
             return bounds;
         } catch (Throwable e) {
-            System.out.println("Error placing BunkerStructure:");
-            e.printStackTrace();
+            LOGGER.error("Error placing BunkerStructure {}", id, e);
             return null;
         }
     }

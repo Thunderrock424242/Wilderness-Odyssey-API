@@ -11,10 +11,17 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 
+import java.util.HashSet;
+import java.util.Set;
+
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+
 /****
  * TerrainBlockReplacer for the Wilderness Odyssey API mod.
  */
 public class TerrainBlockReplacer {
+
+    private static final Set<String> loggedBlockErrors = new HashSet<>();
 
     /**
      * Replaces a block in a schematic with the terrain block sampled from the given world position.
@@ -55,8 +62,7 @@ public class TerrainBlockReplacer {
     public static void replaceBlockWithTerrainRelative(EditSession editSession, ServerLevel world,
                                                        BlockVector3 blockVector, BlockPos origin)
             throws MaxChangedBlocksException {
-        BlockPos terrainPos = origin.offset(blockVector.getBlockX(), blockVector.getBlockY(),
-                                            blockVector.getBlockZ());
+        BlockPos terrainPos = origin.offset(blockVector.x(), blockVector.y(), blockVector.z());
         replaceBlockWithTerrain(editSession, world, blockVector, terrainPos);
     }
 
@@ -73,8 +79,9 @@ public class TerrainBlockReplacer {
         try {
             return BlockTypes.get(blockId);
         } catch (Exception e) {
-            System.out.println("Error converting block: " + blockId);
-            e.printStackTrace();
+            if (loggedBlockErrors.add(blockId)) {
+                LOGGER.warn("Error converting block {}", blockId, e);
+            }
             return null;
         }
     }

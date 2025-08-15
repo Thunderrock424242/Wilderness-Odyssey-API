@@ -29,6 +29,9 @@ public class PlayerSpawnHandler {
 
     private static final AtomicInteger spawnIndex = new AtomicInteger(0);
     private static List<BlockPos> spawnBlocks = Collections.emptyList();
+    private static List<BlockPos> spawnBlocks = null;
+    private static long lastScanTime = Long.MIN_VALUE;
+    private static final int SCAN_INTERVAL = 200;
     private static final String CRYO_TAG = "wo_in_cryo";
     private static final String CRYO_USED_TAG = "wo_cryo_used";
     private static final String CRYO_POS_TAG = "wo_cryo_pos";
@@ -124,5 +127,21 @@ public class PlayerSpawnHandler {
     public static void setSpawnBlocks(List<BlockPos> blocks) {
         spawnBlocks = blocks == null ? Collections.emptyList() : blocks;
         spawnIndex.set(0);
+    private static void ensureSpawnBlocks(ServerLevel world) {
+        if ((spawnBlocks == null || spawnBlocks.isEmpty()) &&
+                world.getGameTime() - lastScanTime >= SCAN_INTERVAL) {
+            lastScanTime = world.getGameTime();
+            spawnBlocks = WorldSpawnHandler.findAllWorldSpawnBlocks(world);
+            BlockPos meteorPos = MeteorImpactData.get(world).getImpactPos();
+            if (meteorPos != null && !spawnBlocks.isEmpty()) {
+                BlockPos closest = spawnBlocks.stream()
+                        .min((a, b) -> Double.compare(a.distSqr(meteorPos), b.distSqr(meteorPos)))
+                        .orElse(spawnBlocks.get(0));
+                final double maxDist = 400.0; // radius squared (20 blocks)
+                spawnBlocks = spawnBlocks.stream()
+                        .filter(p -> p.distSqr(closest) <= maxDist)
+                        .collect(Collectors.toList());
+            }
+        }
     }
 }
