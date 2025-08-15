@@ -67,6 +67,9 @@ public class WildernessOdysseyAPIMainModClass {
 
     private static AABB structureBoundingBox;
 
+    private int serverTickCounter = 0;
+    private static final int LOG_INTERVAL = 600;
+
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
 
     private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader,
@@ -205,16 +208,17 @@ public class WildernessOdysseyAPIMainModClass {
         MinecraftServer server = event.getServer();
         if (!event.hasTime()) return;
 
-        if (server.getTickCount() % 600 == 0) {
-                long usedMB = MemoryUtils.getUsedMemoryMB();
-                long totalMB = MemoryUtils.getTotalMemoryMB();
+        if (++serverTickCounter >= LOG_INTERVAL) {
+            serverTickCounter = 0;
+            long usedMB = MemoryUtils.getUsedMemoryMB();
+            long totalMB = MemoryUtils.getTotalMemoryMB();
 
-                // Use the dynamic mod count
-                int recommendedMB = MemoryUtils.calculateRecommendedRAM(usedMB, dynamicModCount);
+            // Use the dynamic mod count
+            int recommendedMB = MemoryUtils.calculateRecommendedRAM(usedMB, dynamicModCount);
 
             LOGGER.info("[ResourceManager] Memory usage: {}MB / {}MB. Recommended ~{}MB for {} loaded mods.", usedMB, totalMB, recommendedMB, dynamicModCount);
-            }
         }
+    }
     @SubscribeEvent
     public void onReload(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
