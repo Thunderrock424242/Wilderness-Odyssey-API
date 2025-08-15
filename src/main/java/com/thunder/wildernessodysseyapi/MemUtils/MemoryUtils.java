@@ -42,16 +42,17 @@ public class MemoryUtils {
      * to avoid spamming the console on frequent calls.
      */
     private static long lastLoggedUsedMB = -1;
-
     public static long getUsedMemoryMB() {
         long free = Runtime.getRuntime().freeMemory();
         long total = Runtime.getRuntime().totalMemory();
-        return (total - free) / (1024 * 1024);
         long used = (total - free) / (1024 * 1024);
         if (used != lastLoggedUsedMB) {
             lastLoggedUsedMB = used;
-            LOGGER.debug("Calculated used memory: {} MB (total={} MB, free={} MB)",
-                    used, total / (1024 * 1024), free / (1024 * 1024));
+            LOGGER.debug(
+                    "Calculated used memory: {} MB (total={} MB, free={} MB)",
+                    used,
+                    total / (1024 * 1024),
+                    free / (1024 * 1024));
         }
         return used;
     }
@@ -61,10 +62,8 @@ public class MemoryUtils {
      * changes to reduce noise.
      */
     private static long lastLoggedTotalMB = -1;
-
     public static long getTotalMemoryMB() {
         long total = Runtime.getRuntime().totalMemory();
-        return total / (1024 * 1024);
         long totalMB = total / (1024 * 1024);
         if (totalMB != lastLoggedTotalMB) {
             lastLoggedTotalMB = totalMB;
@@ -78,10 +77,9 @@ public class MemoryUtils {
      * - Start at 4GB (4096MB).
      * - Add 128MB for every 10 mods.
      * - If current usage is already higher than that naive guess,
-     * bump recommended to current usage + 512MB.
+     *   bump recommended to current usage + 512MB.
      */
     private static int lastRecommendedMB = -1;
-
     public static int calculateRecommendedRAM(long currentUsedMB, int modCount) {
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Calculating recommended RAM with currentUsedMB={} and modCount={}", currentUsedMB, modCount);
@@ -92,13 +90,12 @@ public class MemoryUtils {
         if (currentUsedMB > recommendedMB) {
             recommendedMB = (int) currentUsedMB + 512;
         }
-        if (LOGGER.isDebugEnabled()) {
-            if (recommendedMB != lastRecommendedMB) {
-                lastRecommendedMB = recommendedMB;
+        if (recommendedMB != lastRecommendedMB) {
+            lastRecommendedMB = recommendedMB;
+            if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Recommended RAM determined to be {} MB", recommendedMB);
             }
-            return recommendedMB;
         }
-        return extraPer10Mods;
+        return recommendedMB;
     }
 }
