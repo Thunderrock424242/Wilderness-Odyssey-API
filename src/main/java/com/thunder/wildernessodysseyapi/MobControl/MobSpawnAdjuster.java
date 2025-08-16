@@ -50,14 +50,14 @@ public class MobSpawnAdjuster {
         // 5) Compute day-based spawn chance
         int day = getCurrentDay(world);
         double chance = calculateSpawnChance(day);
-        LOGGER.debug("Evaluating spawn for {} on day {} with chance {}", type, day, chance);
+        LOGGER.trace("Evaluating spawn for {} on day {} with chance {}", type, day, chance);
 
         // 6) Randomly deny the placement if roll exceeds chance
         if (world.getRandom().nextDouble() > chance) {
-            LOGGER.debug("Denied spawn for {} due to random roll", type);
+            LOGGER.trace("Denied spawn for {} due to random roll", type);
             event.setResult(Result.FAIL);
         } else {
-            LOGGER.debug("Allowed spawn for {}", type);
+            LOGGER.trace("Allowed spawn for {}", type);
         }
     }
 
@@ -72,7 +72,7 @@ public class MobSpawnAdjuster {
      */
     public static double calculateSpawnChance(int currentDay) {
         double chance = Math.min(currentDay * 0.1, 1.0);
-        LOGGER.debug("Calculated spawn chance for day {}: {}", currentDay, chance);
+        LOGGER.trace("Calculated spawn chance for day {}: {}", currentDay, chance);
         return chance;
     }
 }
