@@ -26,9 +26,4 @@ public class ModConstants {
      * The constant LOGGER.
      */
     public static final Logger LOGGER = LogManager.getLogger("wildernessodysseyapi");
-
-
-    // Optional: common paths
-    public static final String STRUCTURE_PATH = MOD_ID + ":structures/";
-    public static final String PROCESSOR_LIST = MOD_ID + ":meteor_blend";
 }
