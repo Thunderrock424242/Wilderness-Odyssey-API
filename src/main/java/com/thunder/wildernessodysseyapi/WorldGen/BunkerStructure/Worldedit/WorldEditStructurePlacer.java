@@ -7,6 +7,7 @@ import com.sk89q.worldedit.extent.clipboard.Clipboard;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormat;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardReader;
+import com.sk89q.worldedit.function.operation.Operations;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.session.ClipboardHolder;
 import com.sk89q.worldedit.world.World;
@@ -158,11 +159,14 @@ public class WorldEditStructurePlacer {
                     }
                 }
 
-                // Paste the structure into the world
-                holder.createPaste(editSession)
-                        .to(BlockVector3.at(surfacePos.getX(), surfacePos.getY(), surfacePos.getZ()))
-                        .ignoreAirBlocks(false)
-                        .build();
+                // Paste the structure into the world and ensure the operation is completed
+                Operations.complete(
+                        holder.createPaste(editSession)
+                                .to(BlockVector3.at(surfacePos.getX(), surfacePos.getY(), surfacePos.getZ()))
+                                .ignoreAirBlocks(false)
+                                .build()
+                );
+                editSession.flushSession();
             }
             return bounds;
         } catch (Throwable e) {
