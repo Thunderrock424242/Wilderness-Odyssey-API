@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.server;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.ModPackPatches.client.WorldVersionChecker;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -109,7 +110,7 @@ public class PartnerAdHandler {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                                     CompoundTag data = player.getPersistentData();
                                     data.putBoolean(TAG_OPT_OUT, true);
-                                    data.putString(TAG_VERSION, WorldVersionChecker.MOD_DEFAULT_WORLD_VERSION);
+                                    data.putString(TAG_VERSION, ModConstants.MOD_DEFAULT_WORLD_VERSION);
                                     OPTED_OUT.add(player.getUUID());
                                     player.sendSystemMessage(
                                             Component.literal("Ads disabled.")
@@ -123,7 +124,7 @@ public class PartnerAdHandler {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                                     CompoundTag data = player.getPersistentData();
                                     data.putBoolean(TAG_OPT_OUT, false);
-                                    data.putString(TAG_VERSION, WorldVersionChecker.MOD_DEFAULT_WORLD_VERSION);
+                                    data.putString(TAG_VERSION, ModConstants.MOD_DEFAULT_WORLD_VERSION);
                                     OPTED_OUT.remove(player.getUUID());
                                     player.sendSystemMessage(
                                             Component.literal("Ads enabled.")
@@ -144,7 +145,7 @@ public class PartnerAdHandler {
 
         UUID uuid = player.getUUID();
         CompoundTag data = player.getPersistentData();
-        String currentVersion = WorldVersionChecker.MOD_DEFAULT_WORLD_VERSION;
+        String currentVersion = ModConstants.MOD_DEFAULT_WORLD_VERSION;
         String storedVersion = data.getString(TAG_VERSION);
         if (!storedVersion.equals(currentVersion)) {
             data.putBoolean(TAG_OPT_OUT, false);

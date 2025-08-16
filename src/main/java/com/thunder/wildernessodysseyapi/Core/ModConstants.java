@@ -14,6 +14,11 @@ public class ModConstants {
     public static final String MOD_ID = "wildernessodysseyapi";
 
     /**
+     * this shows the world version MINOR means its small change MAJOR is a game breaking change
+     */
+    public static final String MOD_DEFAULT_WORLD_VERSION = "1.0.0"; // Update your Mod Version Here Major , Minor , Patch
+
+    /**
      * The constant VERSION.
      */
     public static final String VERSION = "0.0.3"; // Change this to your mod pack version
@@ -21,14 +26,6 @@ public class ModConstants {
      * The constant LOGGER.
      */
     public static final Logger LOGGER = LogManager.getLogger("wildernessodysseyapi");
-
-    /**
-     * this shows the world version MINOR means its small change MAJOR is a game breaking change
-     */
-    public static final String CURRENT_WORLD_VERSION = "v1";
-    /** Numeric parts for comparison logic */
-    public static final int CURRENT_WORLD_VERSION_MAJOR = 1;
-    public static final int CURRENT_WORLD_VERSION_MINOR = 5;
 
 
     // Optional: common paths
