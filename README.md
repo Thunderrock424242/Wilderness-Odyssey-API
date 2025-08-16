@@ -58,3 +58,7 @@ is not found, the bundled schematic under
 Loot tables defined inside schematics work the same way as with vanilla
 `nbt` structures. The scanner now detects loot table references in both
 `.nbt` and `.schem` files so datapacks can supply their own chest contents.
+
+World Generation Diagnostics
+--------------------------
+Use `/worldgenscan <radius>` to count nearby structures, features, and biomes and identify which mods add them.
