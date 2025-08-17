@@ -26,7 +26,7 @@ public class DonationOptOutCommand {
             DonationReminderConfig.disableReminder.set(true);
             DonationReminderConfig.optOutWorldVersion.set(ModConstants.MOD_DEFAULT_WORLD_VERSION);
             DonationReminderConfig.save();
-            ctx.getSource().sendSuccess(() -> Component.literal("\u2705 You will no longer receive donation reminders."), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("✅ You will no longer receive donation reminders."), false);
             return 1;
         }));
     }

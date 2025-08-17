@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.worldgen.jigsaw;
+package com.thunder.wildernessodysseyapi.WorldGen.jigsaw;
 
 import net.minecraft.util.RandomSource;
 
