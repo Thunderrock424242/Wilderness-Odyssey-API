@@ -31,6 +31,8 @@ For CI workflows, add secrets in GitHub's repository Secret Manager (Settings â†
 
 CodeQL:
 -------
+GitHub's CodeQL workflow runs on every push and pull request.
+It analyzes both Java sources under `src/main/java` and the repository's GitHub Actions workflows.
 GitHub's CodeQL workflow runs on every push and pull request and scans sources under `src/main/java`.
 
 Spawn Behavior:

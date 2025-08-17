@@ -23,6 +23,7 @@ import net.neoforged.fml.ModList;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import javax.swing.*;
 
 /****
  * StructureInfoCommand for the Wilderness Odyssey API mod.
@@ -97,8 +98,25 @@ public class StructureInfoCommand {
             }
         }
 
+        showInfoWindow(structures, features, pois);
         ctx.getSource().sendSuccess(() -> Component.literal(output.toString()), false);
         return 1;
+    }
+
+    private static void showInfoWindow(List<String> structures, List<String> features, List<String> pois) {
+        SwingUtilities.invokeLater(() -> {
+            JFrame frame = new JFrame("Structure Info");
+            frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+            frame.setSize(400, 600);
+
+            JTabbedPane tabs = new JTabbedPane();
+            tabs.addTab("Structures", new JScrollPane(new JList<>(structures.toArray(new String[0]))));
+            tabs.addTab("Features", new JScrollPane(new JList<>(features.toArray(new String[0]))));
+            tabs.addTab("POIs", new JScrollPane(new JList<>(pois.toArray(new String[0]))));
+
+            frame.add(tabs);
+            frame.setVisible(true);
+        });
     }
 
     private static String formatEntry(ResourceLocation location) {

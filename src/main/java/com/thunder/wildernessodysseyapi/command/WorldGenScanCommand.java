@@ -22,6 +22,7 @@ import net.minecraft.world.level.biome.BiomeGenerationSettings;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.neoforged.fml.ModList;
+import java.awt.GraphicsEnvironment;
 
 import java.util.*;
 
@@ -152,6 +153,10 @@ public class WorldGenScanCommand {
                                     false
                             );
                         });
+            }
+
+            if (!GraphicsEnvironment.isHeadless()) {
+                WorldGenScanViewer.show(structureCounts, featureCounts, biomeCounts);
             }
         }
 
