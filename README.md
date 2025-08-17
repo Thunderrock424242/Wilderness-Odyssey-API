@@ -23,6 +23,16 @@ Additional Resources:
 ==========
 Community Documentation: https://docs.neoforged.net/  
 NeoForged Discord: https://discord.neoforged.net/
+Secrets:
+-------
+For local development, copy `.env.example` to `.env` and fill in required tokens.
+
+For CI workflows, add secrets in GitHub's repository Secret Manager (Settings → Secrets and variables → Actions) and reference them in workflow files as `${{ secrets.NAME }}`.
+
+CodeQL:
+-------
+GitHub's CodeQL workflow runs on every push and pull request.
+It analyzes both Java sources under `src/main/java` and the repository's GitHub Actions workflows.
 
 Spawn Behavior:
 ----------
