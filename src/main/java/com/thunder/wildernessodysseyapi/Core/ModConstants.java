@@ -22,7 +22,7 @@ public class ModConstants {
     /**
      * The constant VERSION.
      */
-    public static final String VERSION = "0.0.3"; // Change this to your mod pack version
+    public static final String VERSION = "0.0.4"; // Change this to your mod pack version
     /**
      * The constant LOGGER.
      */
