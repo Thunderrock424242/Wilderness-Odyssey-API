@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 60
     env:
       # Add repository secrets in Settings > Secrets and variables > Actions
-      EXAMPLE_SECRET: ${{ secrets.EXAMPLE_SECRET }}
+      EXAMPLE_SECRET: ${{ secrets.CODEQL }}
 
     steps:
       - name: Checkout Repository
