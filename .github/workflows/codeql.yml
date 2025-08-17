@@ -25,7 +25,6 @@ jobs:
     env:
       # Add repository secrets in Settings > Secrets and variables > Actions
       EXAMPLE_SECRET: ${{ secrets.CODEQL }}
-      EXAMPLE_SECRET: ${{ secrets.CODEQL }}
 
     steps:
       - name: Checkout Repository
