@@ -24,6 +24,11 @@ jobs:
     timeout-minutes: 60
     env:
       # Add repository secrets in Settings > Secrets and variables > Actions
+      EXAMPLE_SECRET: ${{ secrets.EXAMPLE_SECRET }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
       EXAMPLE_SECRET: ${{ secrets.CODEQL }}
 
     steps:
@@ -51,6 +56,11 @@ jobs:
         run: ./gradlew clean assemble --no-daemon --stacktrace --no-build-cache
 
       - name: Inspect Code with Qodana
+        uses: JetBrains/qodana-action@v2023.3
+        with:
+          linter: jetbrains/qodana-jvm-community
+          use-caches: false
+          results-dir: ${{ runner.temp }}/qodana
         uses: JetBrains/qodana-action@v2025
         with:
           linter: jetbrains/qodana-jvm-community
@@ -59,6 +69,16 @@ jobs:
       - name: Upload Qodana results to code scanning
         uses: github/codeql-action/upload-sarif@v3
         with:
+          sarif_file: ${{ runner.temp }}/qodana/qodana.sarif.json
+          category: qodana-jvm
+          wait-for-processing: true
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: codeql-java
+          upload: always
+          wait-for-processing: true
           sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
 
       - name: Perform CodeQL Analysis
@@ -79,3 +99,7 @@ jobs:
 
       - name: Perform CodeQL Analysis for Actions
         uses: github/codeql-action/analyze@v3
+        with:
+          category: codeql-actions
+          upload: always
+          wait-for-processing: true
