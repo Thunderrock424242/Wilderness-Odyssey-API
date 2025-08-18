@@ -8,7 +8,7 @@ query-filters:
       id: java/unused-*
 
 paths:
-  - PACKAGE_PATH
+  - src/main/java
   - src/generated/java
   - buildSrc/src
 
