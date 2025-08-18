@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.worldgen.structure;
+package com.thunder.wildernessodysseyapi.WorldGen.structure;
 
 /**
  * Miscellaneous helpers and constants related to structure handling.

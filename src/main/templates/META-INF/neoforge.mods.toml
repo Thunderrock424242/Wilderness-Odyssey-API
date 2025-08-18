@@ -20,7 +20,7 @@ license="${mod_license}"
 [[mods]] #mandatory
 
 # The modid of the mod
-modId="${mod_id}" #mandatory
+modId="wildernessodysseyapi" #mandatory
 
 # The version number of the mod
 version="${mod_version}" #mandatory
