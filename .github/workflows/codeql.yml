@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 60
     env:
       # Add repository secrets in Settings > Secrets and variables > Actions
-      EXAMPLE_SECRET: ${{ secrets.EXAMPLE_SECRET }}
+      EXAMPLE_SECRET: ${{ secrets.CODEQL }}
 
     steps:
       - name: Checkout Repository
@@ -69,6 +69,10 @@ jobs:
         with:
           upload: always
           wait-for-processing: true
+          sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
 
   analyze-actions:
     name: Analyze GitHub Actions

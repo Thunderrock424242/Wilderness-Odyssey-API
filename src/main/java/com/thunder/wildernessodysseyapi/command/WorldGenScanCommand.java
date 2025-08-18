@@ -12,6 +12,7 @@ import net.minecraft.core.HolderSet;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -21,6 +22,7 @@ import net.minecraft.world.level.biome.BiomeGenerationSettings;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.neoforged.fml.ModList;
+import java.awt.GraphicsEnvironment;
 
 import java.util.*;
 
@@ -55,6 +57,11 @@ public class WorldGenScanCommand {
         Map<ResourceLocation, Integer> featureCounts = new HashMap<>();
         Map<ResourceLocation, Integer> biomeCounts = new HashMap<>();
 
+        ctx.getSource().sendSuccess(
+                () -> Component.nullToEmpty(ChatFormatting.GOLD + "Scanning worldgen in radius " + radius + "..."),
+                false
+        );
+
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 ChunkPos pos = new ChunkPos(center.x + dx, center.z + dz);
@@ -84,56 +91,73 @@ public class WorldGenScanCommand {
         }
 
         if (structureCounts.isEmpty() && featureCounts.isEmpty() && biomeCounts.isEmpty()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("No structures, features, or biomes found in radius " + radius), false);
+            ctx.getSource().sendSuccess(
+                    () -> Component.nullToEmpty(ChatFormatting.RED + "No structures, features, or biomes found in radius " + radius),
+                    false
+            );
         } else {
-            StringBuilder out = new StringBuilder("Worldgen in radius " + radius + ":");
+            ctx.getSource().sendSuccess(
+                    () -> Component.nullToEmpty(ChatFormatting.AQUA + "Worldgen results for radius " + radius + ":"),
+                    false
+            );
 
             if (!structureCounts.isEmpty()) {
-                out.append("\nStructures:");
+                ctx.getSource().sendSuccess(
+                        () -> Component.nullToEmpty(ChatFormatting.YELLOW + "Structures:"),
+                        false
+                );
                 structureCounts.entrySet().stream()
                         .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                         .forEach(entry -> {
                             String modName = ModList.get().getModContainerById(entry.getKey().getNamespace())
                                     .map(c -> c.getModInfo().getDisplayName())
                                     .orElse("Unknown Mod");
-                            out.append("\n - ")
-                                    .append(entry.getKey().getPath())
-                                    .append(" [").append(modName).append("]: ")
-                                    .append(entry.getValue());
+                            ctx.getSource().sendSuccess(
+                                    () -> Component.nullToEmpty(" - " + entry.getKey().getPath() + " [" + modName + "]: " + entry.getValue()),
+                                    false
+                            );
                         });
             }
 
             if (!featureCounts.isEmpty()) {
-                out.append("\nFeatures:");
+                ctx.getSource().sendSuccess(
+                        () -> Component.nullToEmpty(ChatFormatting.YELLOW + "Features:"),
+                        false
+                );
                 featureCounts.entrySet().stream()
                         .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                         .forEach(entry -> {
                             String modName = ModList.get().getModContainerById(entry.getKey().getNamespace())
                                     .map(c -> c.getModInfo().getDisplayName())
                                     .orElse("Unknown Mod");
-                            out.append("\n - ")
-                                    .append(entry.getKey().getPath())
-                                    .append(" [").append(modName).append("]: ")
-                                    .append(entry.getValue());
+                            ctx.getSource().sendSuccess(
+                                    () -> Component.nullToEmpty(" - " + entry.getKey().getPath() + " [" + modName + "]: " + entry.getValue()),
+                                    false
+                            );
                         });
             }
 
             if (!biomeCounts.isEmpty()) {
-                out.append("\nBiomes:");
+                ctx.getSource().sendSuccess(
+                        () -> Component.nullToEmpty(ChatFormatting.YELLOW + "Biomes:"),
+                        false
+                );
                 biomeCounts.entrySet().stream()
                         .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                         .forEach(entry -> {
                             String modName = ModList.get().getModContainerById(entry.getKey().getNamespace())
                                     .map(c -> c.getModInfo().getDisplayName())
                                     .orElse("Unknown Mod");
-                            out.append("\n - ")
-                                    .append(entry.getKey().getPath())
-                                    .append(" [").append(modName).append("]: ")
-                                    .append(entry.getValue());
+                            ctx.getSource().sendSuccess(
+                                    () -> Component.nullToEmpty(" - " + entry.getKey().getPath() + " [" + modName + "]: " + entry.getValue()),
+                                    false
+                            );
                         });
             }
 
-            ctx.getSource().sendSuccess(() -> Component.literal(out.toString()), false);
+            if (!GraphicsEnvironment.isHeadless()) {
+                WorldGenScanViewer.show(structureCounts, featureCounts, biomeCounts);
+            }
         }
 
         return 1;

@@ -27,8 +27,6 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_DEFAULT_WOR
 @EventBusSubscriber
 public class WorldVersionChecker {
 
-    /** The default world version for the mod; update this when releasing new versions */
-
     /** Caches the config version to avoid repeated file reads */
     private static volatile String cachedConfigVersion = null;
 
