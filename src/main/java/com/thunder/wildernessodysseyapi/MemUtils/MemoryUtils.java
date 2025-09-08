@@ -2,8 +2,9 @@ package com.thunder.wildernessodysseyapi.MemUtils;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 
-/****
- * MemoryUtils for the Wilderness Odyssey API mod.
+/**
+ * Utility methods for inspecting runtime memory usage and recommending RAM
+ * allocations for the Wilderness Odyssey API mod.
  */
 public class MemoryUtils {
 
