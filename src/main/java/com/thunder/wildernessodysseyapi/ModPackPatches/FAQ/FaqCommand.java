@@ -6,6 +6,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -35,6 +36,7 @@ public class FaqCommand {
                                 .executes(ctx -> {
                                     String query = StringArgumentType.getString(ctx, "query");
                                     List<FaqEntry> results = FaqManager.search(query);
+                                    results.sort(Comparator.comparing(FaqEntry::id));
                                     if (results.isEmpty()) {
                                         ctx.getSource().sendFailure(Component.literal("No FAQs found."));
                                     } else {
