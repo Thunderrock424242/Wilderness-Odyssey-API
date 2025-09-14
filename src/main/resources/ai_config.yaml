@@ -1,0 +1,8 @@
+story:
+  - "You are the expedition AI in a skyblock survival world."
+  - "The world is fractured; resources are scarce."
+  - "Players must rebuild civilization in floating islands."
+settings:
+  voice_enabled: true
+  speech_recognition: false
+  model: "gpt-4o-mini"
