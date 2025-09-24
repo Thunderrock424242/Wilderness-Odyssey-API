@@ -37,9 +37,15 @@ public class BunkerStructureGenerator {
 
         int minDist = StructureConfig.BUNKER_MIN_DISTANCE.get();
         int maxCount = StructureConfig.BUNKER_MAX_COUNT.get();
+        int minChunks = minDist <= 0 ? DEFAULT_MIN_DISTANCE_CHUNKS : minDist;
 
         if (tracker.getSpawnCount() >= maxCount) return;
-        if (!tracker.isFarEnough(surfacePos, minDist <= 0 ? DEFAULT_MIN_DISTANCE_CHUNKS : minDist)) return;
+        if (!tracker.isFarEnough(surfacePos, minChunks)) return;
+
+        if (!WorldEditStructurePlacer.isWorldEditReady()) {
+            scheduleDeferredPlacement(level, surfacePos, tracker, minChunks, maxCount, 0);
+            return;
+        }
 
         // Load from data packs if available, else fall back to bundled schematic
         WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
@@ -48,5 +54,31 @@ public class BunkerStructureGenerator {
             tracker.addSpawnPos(surfacePos);
             BunkerProtectionHandler.addBunkerBounds(bounds);
         }
+    }
+
+    private static void scheduleDeferredPlacement(ServerLevel level, BlockPos surfacePos, StructureSpawnTracker tracker,
+                                                  int minChunks, int maxCount, int attempt) {
+        level.getServer().execute(() -> {
+            if (tracker.hasSpawnedAt(surfacePos)) return;
+            if (tracker.getSpawnCount() >= maxCount) return;
+            if (!tracker.isFarEnough(surfacePos, minChunks)) return;
+
+            if (!WorldEditStructurePlacer.isWorldEditReady()) {
+                if (attempt == 40) {
+                    ModConstants.LOGGER.warn("WorldEdit still initializing; bunker placement at {} delayed", surfacePos);
+                }
+                if (attempt < 100) {
+                    scheduleDeferredPlacement(level, surfacePos, tracker, minChunks, maxCount, attempt + 1);
+                }
+                return;
+            }
+
+            WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
+            AABB bounds = placer.placeStructure(level, surfacePos);
+            if (bounds != null) {
+                tracker.addSpawnPos(surfacePos);
+                BunkerProtectionHandler.addBunkerBounds(bounds);
+            }
+        });
     }
 }

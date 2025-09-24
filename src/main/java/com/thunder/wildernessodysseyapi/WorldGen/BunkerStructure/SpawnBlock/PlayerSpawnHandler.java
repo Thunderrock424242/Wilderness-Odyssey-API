@@ -1,9 +1,7 @@
 package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock;
 
-import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorImpactData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -19,7 +17,6 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
@@ -32,8 +29,6 @@ public class PlayerSpawnHandler {
 
     private static final AtomicInteger spawnIndex = new AtomicInteger(0);
     private static List<BlockPos> spawnBlocks = Collections.emptyList();
-    private static long lastScanTime = Long.MIN_VALUE;
-    private static final int SCAN_INTERVAL = 200;
     private static final String CRYO_TAG = "wo_in_cryo";
     private static final String CRYO_USED_TAG = "wo_cryo_used";
     private static final String CRYO_POS_TAG = "wo_cryo_pos";
@@ -131,21 +126,4 @@ public class PlayerSpawnHandler {
         spawnIndex.set(0);
     }
 
-    private static void ensureSpawnBlocks(ServerLevel world) {
-        if ((spawnBlocks == null || spawnBlocks.isEmpty()) &&
-                world.getGameTime() - lastScanTime >= SCAN_INTERVAL) {
-            lastScanTime = world.getGameTime();
-            spawnBlocks = WorldSpawnHandler.findAllWorldSpawnBlocks(world);
-            BlockPos meteorPos = MeteorImpactData.get(world).getImpactPos();
-            if (meteorPos != null && !spawnBlocks.isEmpty()) {
-                BlockPos closest = spawnBlocks.stream()
-                        .min((a, b) -> Double.compare(a.distSqr(meteorPos), b.distSqr(meteorPos)))
-                        .orElse(spawnBlocks.get(0));
-                final double maxDist = 400.0; // radius squared (20 blocks)
-                spawnBlocks = spawnBlocks.stream()
-                        .filter(p -> p.distSqr(closest) <= maxDist)
-                        .collect(Collectors.toList());
-            }
-        }
-    }
 }

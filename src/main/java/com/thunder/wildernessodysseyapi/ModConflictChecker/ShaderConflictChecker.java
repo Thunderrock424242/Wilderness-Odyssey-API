@@ -5,7 +5,14 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.moddiscovery.ModFile;
 
 import java.io.IOException;
-import java.util.*;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
 
@@ -14,10 +21,27 @@ import java.util.zip.ZipEntry;
  */
 public class ShaderConflictChecker {
 
-    private static final Map<String, List<String>> shaderUsageMap = new HashMap<>();
+    private static final AtomicBoolean RUNNING = new AtomicBoolean(false);
 
-    public static void scanForConflicts() {
-        LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "Scanning mods for potential shader conflicts...", false);
+    public static CompletableFuture<Void> scanForConflictsAsync() {
+        if (!RUNNING.compareAndSet(false, true)) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO,
+                "Scanning mods for potential shader conflicts in background...", false);
+
+        return CompletableFuture.runAsync(() -> {
+            try {
+                scanForConflictsInternal();
+            } finally {
+                RUNNING.set(false);
+            }
+        });
+    }
+
+    private static void scanForConflictsInternal() {
+        Map<String, List<String>> shaderUsageMap = new HashMap<>();
 
         for (var mod : ModList.get().getMods()) {
             ModFile file = (ModFile) mod.getOwningFile().getFile();
@@ -30,16 +54,17 @@ public class ShaderConflictChecker {
                     ZipEntry entry = entries.nextElement();
                     String name = entry.getName();
 
-                    if (name.startsWith("assets/") && name.contains("/shaders/") && (name.endsWith(".vsh") || name.endsWith(".fsh") || name.endsWith(".json"))) {
+                    if (name.startsWith("assets/") && name.contains("/shaders/") &&
+                            (name.endsWith(".vsh") || name.endsWith(".fsh") || name.endsWith(".json"))) {
                         shaderUsageMap.computeIfAbsent(name, k -> new ArrayList<>()).add(mod.getModId());
                     }
                 }
             } catch (IOException e) {
-                LoggerUtil.log(LoggerUtil.ConflictSeverity.WARN, "Failed to inspect mod: " + mod.getModId() + " for shader conflicts. " + e.getMessage(), false);
+                LoggerUtil.log(LoggerUtil.ConflictSeverity.WARN,
+                        "Failed to inspect mod: " + mod.getModId() + " for shader conflicts. " + e.getMessage(), false);
             }
         }
 
-        // Detect and log conflicts
         shaderUsageMap.forEach((shaderPath, modIds) -> {
             if (modIds.size() > 1) {
                 LoggerUtil.log(LoggerUtil.ConflictSeverity.ERROR,
@@ -47,5 +72,7 @@ public class ShaderConflictChecker {
                                 shaderPath, String.join(", ", modIds)), false);
             }
         });
+
+        LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "Shader conflict scan completed.", false);
     }
 }

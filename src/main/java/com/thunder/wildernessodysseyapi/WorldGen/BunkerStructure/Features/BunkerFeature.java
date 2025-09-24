@@ -43,6 +43,10 @@ public class BunkerFeature extends Feature<NoneFeatureConfiguration> {
         if (!tracker.isFarEnough(origin, minDist)) return false;
 
         // Use the bunker schematic from data packs if available, otherwise bundled resource
+        if (!WorldEditStructurePlacer.isWorldEditReady()) {
+            ModConstants.LOGGER.debug("WorldEdit not ready; skipping bunker feature placement at {}", origin);
+            return false;
+        }
         WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
         AABB bounds = placer.placeStructure(level, origin);
         if (bounds != null) {
