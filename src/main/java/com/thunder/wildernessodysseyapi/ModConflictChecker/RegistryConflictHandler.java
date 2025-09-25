@@ -42,7 +42,7 @@ public class RegistryConflictHandler {
         // Check for crafting recipe conflicts
         checkRecipeConflicts(server);
 
-        ShaderConflictChecker.scanForConflicts();
+        ShaderConflictChecker.scanForConflictsAsync();
 
     }
 

@@ -13,9 +13,11 @@ import com.sk89q.worldedit.session.ClipboardHolder;
 import com.sk89q.worldedit.world.World;
 import com.sk89q.worldedit.world.block.BlockType;
 import com.sk89q.worldedit.world.block.BlockTypes;
-import net.neoforged.fml.ModList;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.CryoSpawnData;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.PlayerSpawnHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.TerrainBlockReplacer;
 import com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager;
+import net.neoforged.fml.ModList;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -23,7 +25,9 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
@@ -35,7 +39,7 @@ public class WorldEditStructurePlacer {
     private final ResourceLocation id;
 
     // Cache WorldEdit availability to avoid repeated startup checks and log spam
-    private static Boolean worldEditReady = null;
+    private static boolean worldEditReady = false;
     private static boolean missingLogged = false;
     private static final Set<ResourceLocation> missingSchematicsLogged = new HashSet<>();
     private static final Set<ResourceLocation> missingCryoTubeLogged = new HashSet<>();
@@ -67,10 +71,9 @@ public class WorldEditStructurePlacer {
      */
     public AABB placeStructure(ServerLevel world, BlockPos position) {
         try {
-            // Wait for WorldEdit to finish booting so BlockTypes are populated.
-            if (!waitForWorldEdit()) {
+            if (!isWorldEditReady()) {
                 if (!missingLogged) {
-                    LOGGER.warn("WorldEdit not initialized (BlockTypes.AIR is null); skipping placement of {}", id);
+                    LOGGER.warn("WorldEdit not initialized (block registry not ready); skipping placement of {}", id);
                     missingLogged = true;
                 }
                 return null;
@@ -103,11 +106,15 @@ public class WorldEditStructurePlacer {
             BlockVector3 min = clipboard.getRegion().getMinimumPoint();
             BlockVector3 max = clipboard.getRegion().getMaximumPoint();
 
+            BlockVector3 origin = clipboard.getOrigin();
+            List<BlockPos> cryoTubes = null;
+
             // Ensure bunker schematics contain a cryo tube so we don't place
             // incomplete structures. The previous implementation used the cryo
             // tube as a duplication check which prevented placement if a cryo
             // tube already existed in the world. Instead we now simply verify
-            // the schematic includes at least one cryo tube block.
+            // the schematic includes at least one cryo tube block and capture
+            // their world positions for reuse when players spawn.
             if (id.getPath().contains("bunker")) {
                 BlockType cryoType = null;
                 try {
@@ -115,17 +122,16 @@ public class WorldEditStructurePlacer {
                 } catch (Exception ignored) {
                 }
 
-                boolean hasCryoTube = false;
+                cryoTubes = new ArrayList<>();
                 if (cryoType != null) {
                     for (BlockVector3 vec : clipboard.getRegion()) {
                         if (clipboard.getFullBlock(vec).getBlockType().equals(cryoType)) {
-                            hasCryoTube = true;
-                            break;
+                            cryoTubes.add(toWorldPos(surfacePos, origin, vec));
                         }
                     }
                 }
 
-                if (!hasCryoTube) {
+                if (cryoTubes.isEmpty()) {
                     if (missingCryoTubeLogged.add(id)) {
                         LOGGER.warn("Skipping bunker placement: schematic missing cryo tube in {}", id);
                     }
@@ -168,6 +174,11 @@ public class WorldEditStructurePlacer {
                 );
                 editSession.flushSession();
             }
+            if (cryoTubes != null && !cryoTubes.isEmpty()) {
+                CryoSpawnData data = CryoSpawnData.get(world);
+                data.addAll(cryoTubes);
+                PlayerSpawnHandler.setSpawnBlocks(data.getPositions());
+            }
             return bounds;
         } catch (Throwable e) {
             LOGGER.error("Error placing BunkerStructure {}", id, e);
@@ -176,38 +187,19 @@ public class WorldEditStructurePlacer {
     }
 
     /**
-     * Wait briefly for WorldEdit to populate its block registry. Returns {@code true} when
-     * WorldEdit can resolve the {@code minecraft:air} block or {@code false} if WorldEdit is missing
-     * or still uninitialized after waiting. Some WorldEdit versions no longer populate the
-     * {@code BlockTypes.AIR} constant, so we also fall back to querying the registry directly.
+     * Quickly checks if WorldEdit's block registry is ready without blocking the server thread.
      */
-    private static boolean waitForWorldEdit() {
-        if (worldEditReady != null) {
-            return worldEditReady;
+    public static boolean isWorldEditReady() {
+        if (worldEditReady) {
+            return true;
         }
-        try {
-            if (isBlockRegistryReady()) {
-                worldEditReady = true;
-                return true;
-            }
-            if (!ModList.get().isLoaded("worldedit")) {
-                worldEditReady = false;
-                return false;
-            }
-            for (int i = 0; i < 50 && !isBlockRegistryReady(); i++) {
-                WorldEdit.getInstance();
-                try {
-                    BlockTypes.get("minecraft:air");
-                } catch (Throwable ignored) {
-                }
-                Thread.sleep(100);
-            }
-            worldEditReady = isBlockRegistryReady();
-            return worldEditReady;
-        } catch (Throwable t) {
-            worldEditReady = false;
+        if (!ModList.get().isLoaded("worldedit")) {
             return false;
         }
+        if (isBlockRegistryReady()) {
+            worldEditReady = true;
+        }
+        return worldEditReady;
     }
 
     /**
@@ -226,5 +218,16 @@ public class WorldEditStructurePlacer {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    private static BlockPos toWorldPos(BlockPos surfacePos, BlockVector3 origin, BlockVector3 vec) {
+        int ox = origin == null ? 0 : origin.x();
+        int oy = origin == null ? 0 : origin.y();
+        int oz = origin == null ? 0 : origin.z();
+        return new BlockPos(
+                surfacePos.getX() + vec.x() - ox,
+                surfacePos.getY() + vec.y() - oy,
+                surfacePos.getZ() + vec.z() - oz
+        );
     }
 }

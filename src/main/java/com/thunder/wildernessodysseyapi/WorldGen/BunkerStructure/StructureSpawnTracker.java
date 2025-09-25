@@ -77,6 +77,17 @@ public class StructureSpawnTracker extends SavedData {
         return spawnPositions.size();
     }
 
+    /**
+     * @return a copy of all bunker spawn positions tracked in the world.
+     */
+    public Set<BlockPos> getSpawnPositions() {
+        Set<BlockPos> positions = new HashSet<>(spawnPositions.size());
+        for (long entry : spawnPositions) {
+            positions.add(BlockPos.of(entry));
+        }
+        return positions;
+    }
+
     public static StructureSpawnTracker get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
                 new SavedData.Factory<>(StructureSpawnTracker::new, StructureSpawnTracker::new),
