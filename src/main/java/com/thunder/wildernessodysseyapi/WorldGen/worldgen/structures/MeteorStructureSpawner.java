@@ -17,6 +17,7 @@ import net.neoforged.fml.ModList;
 import java.util.Optional;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+import static com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerStructureGenerator.scheduleDeferredPlacement;
 
 /****
  * MeteorStructureSpawner for the Wilderness Odyssey API mod.
@@ -57,74 +58,75 @@ public class MeteorStructureSpawner {
             StructureTemplateManager manager = level.getStructureManager();
             Optional<StructureTemplate> templateOpt = manager.get(METEOR_TEMPLATE_ID);
             if (templateOpt.isPresent()) {
-            StructureTemplate template = templateOpt.get();
-            StructurePlaceSettings settings = new StructurePlaceSettings();
-            template.placeInWorld(level, spawnPos, spawnPos, settings, level.random, 2);
+                StructureTemplate template = templateOpt.get();
+                StructurePlaceSettings settings = new StructurePlaceSettings();
+                template.placeInWorld(level, spawnPos, spawnPos, settings, level.random, 2);
 
-            // place bunker two chunks east of the meteor
-            BlockPos bunkerPos = spawnPos.offset(32, 0, 0);
-            bunkerPos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, bunkerPos);
-            // Prefer schematics from data packs but fall back to bundled resource
-            WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
-            StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
-            if (!tracker.hasSpawnedAt(bunkerPos)) {
-                if (!WorldEditStructurePlacer.isWorldEditReady()) {
-                    scheduleDeferredPlacement(level, bunkerPos, tracker, 0);
-                } else {
-                    var bounds = placer.placeStructure(level, bunkerPos);
-                    if (bounds != null) {
-                        BunkerProtectionHandler.addBunkerBounds(bounds);
-                        tracker.addSpawnPos(bunkerPos);
+                // place bunker two chunks east of the meteor
+                BlockPos bunkerPos = spawnPos.offset(32, 0, 0);
+                bunkerPos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, bunkerPos);
+                // Prefer schematics from data packs but fall back to bundled resource
+                WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
+                StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
+                if (!tracker.hasSpawnedAt(bunkerPos)) {
+                    if (!WorldEditStructurePlacer.isWorldEditReady()) {
+                        scheduleDeferredPlacement(level, bunkerPos, tracker, 0);
+                    } else {
+                        var bounds = placer.placeStructure(level, bunkerPos);
+                        if (bounds != null) {
+                            BunkerProtectionHandler.addBunkerBounds(bounds);
+                            tracker.addSpawnPos(bunkerPos);
+                        }
                     }
+                    template.placeInWorld(level, origin, origin, settings, level.random, 2);
                 }
-            template.placeInWorld(level, origin, origin, settings, level.random, 2);
             }
+
+            return origin;
         }
 
-        return origin;
-    }
+        private static void placeBunker (ServerLevel level, BlockPos impactPos){
+            if (!ModList.get().isLoaded("worldedit")) {
+                return;
+            }
 
-    private static void placeBunker(ServerLevel level, BlockPos impactPos) {
-        if (!ModList.get().isLoaded("worldedit")) {
-            return;
-        }
+            BlockPos bunkerPos = impactPos.offset(32, 0, 0);
+            bunkerPos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, bunkerPos);
 
-        BlockPos bunkerPos = impactPos.offset(32, 0, 0);
-        bunkerPos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, bunkerPos);
-
-        StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
-        if (tracker.hasSpawnedAt(bunkerPos)) {
-            return;
-        }
-
-        AABB bounds = BUNKER_PLACER.placeStructure(level, bunkerPos);
-        if (bounds != null) {
-            BunkerProtectionHandler.addBunkerBounds(bounds);
-            tracker.addSpawnPos(bunkerPos);
-        }
-    }
-
-    private static void scheduleDeferredPlacement(ServerLevel level, BlockPos bunkerPos,
-                                                  StructureSpawnTracker tracker, int attempt) {
-        level.getServer().execute(() -> {
+            StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
             if (tracker.hasSpawnedAt(bunkerPos)) {
                 return;
             }
-            if (!WorldEditStructurePlacer.isWorldEditReady()) {
-                if (attempt == 40) {
-                    ModConstants.LOGGER.warn("WorldEdit still initializing; meteor bunker placement at {} delayed", bunkerPos);
-                }
-                if (attempt < 100) {
-                    scheduleDeferredPlacement(level, bunkerPos, tracker, attempt + 1);
-                }
-                return;
-            }
-            WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
-            var bounds = placer.placeStructure(level, bunkerPos);
+
+            AABB bounds = BUNKER_PLACER.placeStructure(level, bunkerPos);
             if (bounds != null) {
                 BunkerProtectionHandler.addBunkerBounds(bounds);
                 tracker.addSpawnPos(bunkerPos);
             }
-        });
+        }
+
+        private static void scheduleDeferredPlacement (ServerLevel level, BlockPos bunkerPos,
+                StructureSpawnTracker tracker,int attempt){
+            level.getServer().execute(() -> {
+                if (tracker.hasSpawnedAt(bunkerPos)) {
+                    return;
+                }
+                if (!WorldEditStructurePlacer.isWorldEditReady()) {
+                    if (attempt == 40) {
+                        ModConstants.LOGGER.warn("WorldEdit still initializing; meteor bunker placement at {} delayed", bunkerPos);
+                    }
+                    if (attempt < 100) {
+                        scheduleDeferredPlacement(level, bunkerPos, tracker, attempt + 1);
+                    }
+                    return;
+                }
+                WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
+                var bounds = placer.placeStructure(level, bunkerPos);
+                if (bounds != null) {
+                    BunkerProtectionHandler.addBunkerBounds(bounds);
+                    tracker.addSpawnPos(bunkerPos);
+                }
+            });
+        }
     }
 }
