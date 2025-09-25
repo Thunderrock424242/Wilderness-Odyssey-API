@@ -65,6 +65,12 @@ loaded from the data pack when structures generate. If a matching data pack file
 is not found, the bundled schematic under
 `assets/<namespace>/schematics/` is used instead.
 
+The meteor impact site looks for the `wildernessodysseyapi:meteor_site`
+schematic. Drop your finished WorldEdit build at
+`data/wildernessodysseyapi/structures/meteor_site.schem` (or bundle it under
+`assets/wildernessodysseyapi/schematics/`) so the crash crater is pasted before
+the bunker generates.
+
 Loot tables defined inside schematics work the same way as with vanilla
 `nbt` structures. The scanner now detects loot table references in both
 `.nbt` and `.schem` files so datapacks can supply their own chest contents.
