@@ -1,5 +1,8 @@
 {
   "variants": {
-    "": { "model": "wildernessodysseyapi:block/cryo_tube" }
+    "facing=north": { "model": "wildernessodysseyapi:block/cryo_tube" },
+    "facing=south": { "model": "wildernessodysseyapi:block/cryo_tube", "y": 180 },
+    "facing=west": { "model": "wildernessodysseyapi:block/cryo_tube", "y": 270 },
+    "facing=east": { "model": "wildernessodysseyapi:block/cryo_tube", "y": 90 }
   }
 }
