@@ -2,6 +2,10 @@ package com.thunder.wildernessodysseyapi.MobControl;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.EntityType;
@@ -18,6 +22,14 @@ import net.neoforged.neoforge.event.entity.living.MobSpawnEvent.SpawnPlacementCh
  */
 @EventBusSubscriber
 public class MobSpawnAdjuster {
+
+    /**
+     * Keeps track of which non-monster entity types have already been logged so the debug log
+     * only reports them once per server lifecycle. This prevents the log from being flooded when
+     * entities such as bats repeatedly trigger the natural spawn event.
+     */
+    private static final Set<EntityType<?>> LOGGED_NON_MONSTERS =
+        Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     @SubscribeEvent
     public static void onSpawnPlacementCheck(SpawnPlacementCheck event) {
@@ -43,7 +55,9 @@ public class MobSpawnAdjuster {
 
         // 4) Only for monsters
         if (type.getCategory() != MobCategory.MONSTER) {
-            LOGGER.debug("Ignoring non-monster entity: {}", type);
+            if (LOGGED_NON_MONSTERS.add(type)) {
+                LOGGER.debug("Ignoring non-monster entity: {}", type);
+            }
             return;
         }
 
