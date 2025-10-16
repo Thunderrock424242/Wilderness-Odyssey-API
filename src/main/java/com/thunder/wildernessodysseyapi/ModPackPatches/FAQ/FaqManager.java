@@ -1,11 +1,16 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.FAQ;
+
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
+
 import java.io.InputStreamReader;
 import java.lang.reflect.Type;
 import java.util.*;
+
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 /**
  * Loads and stores FAQ entries from resources.
  */
@@ -19,14 +24,20 @@ public class FaqManager {
         clear();
         Gson gson = new Gson();
         Type listType = new TypeToken<List<FaqEntry>>() {}.getType();
-        for (ResourceLocation id : manager.listResources("faq", path -> path.getPath().endsWith(".json")).keySet()) {
-            try (var reader = new InputStreamReader(manager.getResource(id).get().open())) {
+        Map<ResourceLocation, Resource> resources = manager.listResources("faq", path -> path.getPath().endsWith(".json"));
+        for (Map.Entry<ResourceLocation, Resource> entry : resources.entrySet()) {
+            ResourceLocation id = entry.getKey();
+            try (var reader = new InputStreamReader(entry.getValue().open())) {
                 List<FaqEntry> entries = gson.fromJson(reader, listType);
-                for (FaqEntry entry : entries) {
-                    add(entry);
+                if (entries == null || entries.isEmpty()) {
+                    LOGGER.warn("FAQ data file '{}' was empty", id);
+                    continue;
+                }
+                for (FaqEntry faqEntry : entries) {
+                    add(faqEntry);
                 }
             } catch (Exception e) {
-                System.err.println("Failed to parse FAQ: " + id + ", error: " + e);
+                LOGGER.error("Failed to parse FAQ {}", id, e);
             }
         }
         System.out.println("Loaded " + FAQ_ENTRIES.size() + " FAQ entries.");
@@ -38,8 +49,20 @@ public class FaqManager {
     }
     /** Adds a single FAQ entry. */
     public static void add(FaqEntry entry) {
-        FAQ_ENTRIES.put(entry.id(), entry);
-        FAQ_BY_CATEGORY.computeIfAbsent(entry.category(), c -> new ArrayList<>()).add(entry);
+        if (entry == null) {
+            return;
+        }
+
+        String id = normalize(entry.id());
+        String category = normalize(entry.category());
+
+        if (id.isEmpty() || category.isEmpty()) {
+            LOGGER.warn("Skipping FAQ entry with missing id or category: {}", entry);
+            return;
+        }
+
+        FAQ_ENTRIES.put(id, entry);
+        FAQ_BY_CATEGORY.computeIfAbsent(category, c -> new ArrayList<>()).add(entry);
     }
     /** Returns all FAQ ids. */
     public static List<String> getIds() {
@@ -47,7 +70,7 @@ public class FaqManager {
     }
     /** Gets a FAQ entry by id. */
     public static FaqEntry get(String id) {
-        return FAQ_ENTRIES.get(id);
+        return FAQ_ENTRIES.get(normalize(id));
     }
 
     /** Searches FAQs by keyword across all fields with basic fuzzy matching. */
@@ -59,11 +82,21 @@ public class FaqManager {
                         containsIgnoreCase(entry.category(), lower) ||
                         containsIgnoreCase(entry.question(), lower) ||
                         containsIgnoreCase(entry.answer(), lower) ||
-                        levenshtein(entry.question().toLowerCase(), lower) <= 2)
+                        levenshtein(toLower(entry.question()), lower) <= 2)
                 .toList();
     }
     private static boolean containsIgnoreCase(String text, String query) {
+        if (text == null) {
+            return false;
+        }
         return text.toLowerCase().contains(query);
+    }
+    private static String toLower(String value) {
+        return value == null ? "" : value.toLowerCase();
+    }
+
+    private static String normalize(String value) {
+        return value == null ? "" : value.trim();
     }
     private static int levenshtein(String a, String b) {
         int[] costs = new int[b.length() + 1];
@@ -85,7 +118,7 @@ public class FaqManager {
 
     /** Returns FAQs that belong to the given category. */
     public static List<FaqEntry> getByCategory(String category) {
-        return FAQ_BY_CATEGORY.getOrDefault(category, Collections.emptyList())
+        return FAQ_BY_CATEGORY.getOrDefault(normalize(category), Collections.emptyList())
                 .stream().sorted(Comparator.comparing(FaqEntry::id))
                 .toList();
     }
