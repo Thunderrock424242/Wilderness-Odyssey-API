@@ -18,6 +18,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.core.Holder;
+import net.minecraft.tags.BiomeTags;
 
 import java.util.Set;
 import net.neoforged.fml.ModList;
@@ -220,6 +221,8 @@ public class MeteorStructureSpawner {
     private static BlockPos findNearbyPlains(ServerLevel level, BlockPos center, int radius) {
         int chunkRadius = Math.max(0, radius >> 4);
         ChunkPos originChunk = new ChunkPos(center);
+        BlockPos closestLand = null;
+        double closestLandDistSq = Double.MAX_VALUE;
         for (int r = 0; r <= chunkRadius; r++) {
             for (int dx = -r; dx <= r; dx++) {
                 for (int dz = -r; dz <= r; dz++) {
@@ -235,10 +238,17 @@ public class MeteorStructureSpawner {
                     if (isPlains(level, surface)) {
                         return surface;
                     }
+                    if (isLand(level, surface)) {
+                        double distSq = surface.distSqr(center);
+                        if (distSq < closestLandDistSq) {
+                            closestLand = surface;
+                            closestLandDistSq = distSq;
+                        }
+                    }
                 }
             }
         }
-        return null;
+        return closestLand;
     }
 
     private static boolean isPlains(ServerLevel level, BlockPos pos) {
@@ -249,6 +259,11 @@ public class MeteorStructureSpawner {
             }
         }
         return false;
+    }
+
+    private static boolean isLand(ServerLevel level, BlockPos pos) {
+        Holder<Biome> biome = level.getBiome(pos);
+        return !biome.is(BiomeTags.IS_OCEAN) && !biome.is(BiomeTags.IS_RIVER);
     }
 
     private static final Set<ResourceKey<Biome>> ALLOWED_PLAINS = Set.of(
