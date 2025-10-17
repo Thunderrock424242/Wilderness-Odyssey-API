@@ -6,13 +6,21 @@ import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.StructureSpawnT
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.core.Holder;
+import net.minecraft.tags.BiomeTags;
+
+import java.util.Set;
 import net.neoforged.fml.ModList;
 
 import java.util.ArrayList;
@@ -26,9 +34,11 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
  */
 public class MeteorStructureSpawner {
     private static final int IMPACT_SITE_COUNT = 3;
-    private static final int MIN_CHUNK_SEPARATION = 1000;
+    private static final int MIN_CHUNK_SEPARATION = 32;
     private static final int MIN_BLOCK_SEPARATION = MIN_CHUNK_SEPARATION * 16;
     private static final int POSITION_ATTEMPTS = 64;
+    private static final long WORLD_EDIT_GRACE_PERIOD_TICKS = 5L * 60L * 20L;
+    private static long worldEditCountdownExpiryTick = -1L;
 
     private static final ResourceLocation METEOR_TEMPLATE_ID = ResourceLocation.tryBuild(MOD_ID, "impact_zone");
     private static final WorldEditStructurePlacer METEOR_SITE_PLACER =
@@ -40,6 +50,11 @@ public class MeteorStructureSpawner {
 
     public static void tryPlace(ServerLevel level) {
         if (placed) {
+            return;
+        }
+
+        if (isCountdownExpired(level)) {
+            placed = true;
             return;
         }
 
@@ -98,8 +113,12 @@ public class MeteorStructureSpawner {
             return;
         }
 
+        if (isCountdownExpired(level)) {
+            return;
+        }
+
         BlockPos bunkerPos = impactPos.offset(32, 0, 0);
-        bunkerPos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, bunkerPos);
+        bunkerPos = ensurePlainsSurface(level, bunkerPos);
 
         StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
         if (tracker.hasSpawnedAt(bunkerPos)) {
@@ -125,6 +144,9 @@ public class MeteorStructureSpawner {
                                                   StructureSpawnTracker tracker,
                                                   MeteorImpactData impactData, int attempt) {
         level.getServer().execute(() -> {
+            if (isCountdownExpired(level)) {
+                return;
+            }
             if (tracker.hasSpawnedAt(bunkerPos)) {
                 impactData.setBunkerPos(bunkerPos);
                 return;
@@ -152,6 +174,18 @@ public class MeteorStructureSpawner {
         });
     }
 
+    private static boolean isCountdownExpired(ServerLevel level) {
+        if (!WorldEditStructurePlacer.isWorldEditReady()) {
+            worldEditCountdownExpiryTick = -1L;
+            return false;
+        }
+        if (worldEditCountdownExpiryTick < 0L) {
+            worldEditCountdownExpiryTick = level.getGameTime() + WORLD_EDIT_GRACE_PERIOD_TICKS;
+            return false;
+        }
+        return level.getGameTime() > worldEditCountdownExpiryTick;
+    }
+
     private static BlockPos findImpactOrigin(ServerLevel level, RandomSource random, BlockPos reference,
                                              List<BlockPos> existing) {
         long minDistanceSq = (long) MIN_BLOCK_SEPARATION * (long) MIN_BLOCK_SEPARATION;
@@ -175,11 +209,78 @@ public class MeteorStructureSpawner {
             }
 
             if (farEnough) {
-                return level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, candidate);
+                BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, candidate);
+                if (isPlains(level, surface)) {
+                    return surface;
+                }
             }
         }
 
         BlockPos fallback = reference.offset(MIN_BLOCK_SEPARATION * (existing.size() + 1), 0, 0);
-        return level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, fallback);
+        BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, fallback);
+        BlockPos plains = findNearbyPlains(level, surface, MIN_BLOCK_SEPARATION * 2);
+        return plains != null ? plains : surface;
     }
+
+    private static BlockPos ensurePlainsSurface(ServerLevel level, BlockPos position) {
+        BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, position);
+        if (isPlains(level, surface)) {
+            return surface;
+        }
+        BlockPos plains = findNearbyPlains(level, surface, MIN_BLOCK_SEPARATION);
+        return plains != null ? plains : surface;
+    }
+
+    private static BlockPos findNearbyPlains(ServerLevel level, BlockPos center, int radius) {
+        int chunkRadius = Math.max(0, radius >> 4);
+        ChunkPos originChunk = new ChunkPos(center);
+        BlockPos closestLand = null;
+        double closestLandDistSq = Double.MAX_VALUE;
+        for (int r = 0; r <= chunkRadius; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    if (r != 0 && Math.abs(dx) != r && Math.abs(dz) != r) {
+                        continue;
+                    }
+                    ChunkPos chunkPos = new ChunkPos(originChunk.x + dx, originChunk.z + dz);
+                    if (!level.getChunkSource().hasChunk(chunkPos.x, chunkPos.z)) {
+                        continue;
+                    }
+                    BlockPos sample = new BlockPos(chunkPos.getMiddleBlockX(), center.getY(), chunkPos.getMiddleBlockZ());
+                    BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, sample);
+                    if (isPlains(level, surface)) {
+                        return surface;
+                    }
+                    if (isLand(level, surface)) {
+                        double distSq = surface.distSqr(center);
+                        if (distSq < closestLandDistSq) {
+                            closestLand = surface;
+                            closestLandDistSq = distSq;
+                        }
+                    }
+                }
+            }
+        }
+        return closestLand;
+    }
+
+    private static boolean isPlains(ServerLevel level, BlockPos pos) {
+        Holder<Biome> biome = level.getBiome(pos);
+        for (ResourceKey<Biome> allowed : ALLOWED_PLAINS) {
+            if (biome.is(allowed)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isLand(ServerLevel level, BlockPos pos) {
+        Holder<Biome> biome = level.getBiome(pos);
+        return !biome.is(BiomeTags.IS_OCEAN) && !biome.is(BiomeTags.IS_RIVER);
+    }
+
+    private static final Set<ResourceKey<Biome>> ALLOWED_PLAINS = Set.of(
+            Biomes.PLAINS,
+            Biomes.SUNFLOWER_PLAINS
+    );
 }

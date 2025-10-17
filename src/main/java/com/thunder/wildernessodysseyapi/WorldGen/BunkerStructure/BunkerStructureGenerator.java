@@ -19,13 +19,16 @@ import net.neoforged.fml.ModList;
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public class BunkerStructureGenerator {
-    private static final int DEFAULT_MIN_DISTANCE_CHUNKS = 12000;
+    private static final int DEFAULT_MIN_DISTANCE_CHUNKS = 32;
+    private static final long WORLD_EDIT_GRACE_PERIOD_TICKS = 5L * 60L * 20L;
+    private static long worldEditCountdownExpiryTick = -1L;
 
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
         if (!ModList.get().isLoaded("worldedit")) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         if (!(event.getChunk() instanceof LevelChunk chunk)) return;
+        if (isCountdownExpired(level)) return;
 
         BlockPos chunkPos = chunk.getPos().getWorldPosition();
         BlockPos surfacePos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, chunkPos);
@@ -59,6 +62,7 @@ public class BunkerStructureGenerator {
     private static void scheduleDeferredPlacement(ServerLevel level, BlockPos surfacePos, StructureSpawnTracker tracker,
                                                   int minChunks, int maxCount, int attempt) {
         level.getServer().execute(() -> {
+            if (isCountdownExpired(level)) return;
             if (tracker.hasSpawnedAt(surfacePos)) return;
             if (tracker.getSpawnCount() >= maxCount) return;
             if (!tracker.isFarEnough(surfacePos, minChunks)) return;
@@ -73,6 +77,8 @@ public class BunkerStructureGenerator {
                 return;
             }
 
+            if (isCountdownExpired(level)) return;
+
             WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
             AABB bounds = placer.placeStructure(level, surfacePos);
             if (bounds != null) {
@@ -80,5 +86,17 @@ public class BunkerStructureGenerator {
                 BunkerProtectionHandler.addBunkerBounds(bounds);
             }
         });
+}
+
+    private static boolean isCountdownExpired(ServerLevel level) {
+        if (!WorldEditStructurePlacer.isWorldEditReady()) {
+            worldEditCountdownExpiryTick = -1L;
+            return false;
+        }
+        if (worldEditCountdownExpiryTick < 0L) {
+            worldEditCountdownExpiryTick = level.getGameTime() + WORLD_EDIT_GRACE_PERIOD_TICKS;
+            return false;
+        }
+        return level.getGameTime() > worldEditCountdownExpiryTick;
     }
 }
