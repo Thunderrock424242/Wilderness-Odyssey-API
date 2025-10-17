@@ -4,9 +4,6 @@ import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.MaxChangedBlocksException;
 import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.extent.clipboard.Clipboard;
-import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormat;
-import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats;
-import com.sk89q.worldedit.extent.clipboard.io.ClipboardReader;
 import com.sk89q.worldedit.function.operation.Operations;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.session.ClipboardHolder;
@@ -26,7 +23,6 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.AABB;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -47,6 +43,12 @@ public class WorldEditStructurePlacer {
     private static final Set<ResourceLocation> missingSchematicsLogged = new HashSet<>();
     private static final Set<ResourceLocation> missingCryoTubeLogged = new HashSet<>();
     private static final ResourceLocation CRYO_TUBE_ID = ResourceLocation.tryBuild(MOD_ID, "cryo_tube");
+    private static boolean cryoTubeBlockInitialized = false;
+    private static Block cachedCryoTubeBlock;
+    private static boolean cryoTubeTypeInitialized = false;
+    private static BlockType cachedCryoTubeType;
+    private static boolean terrainReplacerInitialized = false;
+    private static BlockType cachedTerrainReplacerType;
     private static final long MAX_WORLD_AGE_TICKS = 5L * 60L * 20L;
     private static boolean placementWindowLogged = false;
 
@@ -92,19 +94,6 @@ public class WorldEditStructurePlacer {
                 return null;
             }
             Clipboard clipboard = SchematicManager.INSTANCE.get(id);
-            if (clipboard == null) {
-                InputStream schemStream = getClass().getResourceAsStream(
-                        "/assets/" + id.getNamespace() + "/schematics/" + id.getPath() + ".schem"
-                );
-                if (schemStream != null) {
-                    ClipboardFormat format = ClipboardFormats.findByAlias("schem");
-                    if (format != null) {
-                        try (ClipboardReader reader = format.getReader(schemStream)) {
-                            clipboard = reader.read();
-                        }
-                    }
-                }
-            }
 
 
             if (clipboard == null) {
@@ -129,11 +118,7 @@ public class WorldEditStructurePlacer {
             // the schematic includes at least one cryo tube block and capture
             // their world positions for reuse when players spawn.
             if (id.getPath().contains("bunker")) {
-                BlockType cryoType = null;
-                try {
-                    cryoType = BlockTypes.get("wildernessodysseyapi:cryo_tube");
-                } catch (Exception ignored) {
-                }
+                BlockType cryoType = getCryoTubeBlockType();
 
                 cryoTubes = new ArrayList<>();
                 if (cryoType != null) {
@@ -161,11 +146,7 @@ public class WorldEditStructurePlacer {
                 ClipboardHolder holder = new ClipboardHolder(clipboard);
 
                 // Iterate through the clipboard's region and replace placeholder blocks
-                BlockType terrainReplacerType = null;
-                try {
-                    terrainReplacerType = BlockTypes.get("wildernessodysseyapi:terrain_replacer");
-                } catch (Exception ignored) {
-                }
+                BlockType terrainReplacerType = getTerrainReplacerBlockType();
 
                 for (BlockVector3 vec : clipboard.getRegion()) {
                     if (terrainReplacerType != null &&
@@ -188,13 +169,11 @@ public class WorldEditStructurePlacer {
                 editSession.flushSession();
             }
             if (cryoTubes != null && !cryoTubes.isEmpty()) {
-                if (CRYO_TUBE_ID != null) {
-                    Block cryoBlock = BuiltInRegistries.BLOCK.getOptional(CRYO_TUBE_ID).orElse(null);
-                    if (cryoBlock != null) {
-                        for (BlockPos cryoPos : cryoTubes) {
-                            if (!world.getBlockState(cryoPos).is(cryoBlock)) {
-                                world.setBlockAndUpdate(cryoPos, cryoBlock.defaultBlockState());
-                            }
+                Block cryoBlock = getCryoTubeBlock();
+                if (cryoBlock != null) {
+                    for (BlockPos cryoPos : cryoTubes) {
+                        if (!world.getBlockState(cryoPos).is(cryoBlock)) {
+                            world.setBlockAndUpdate(cryoPos, cryoBlock.defaultBlockState());
                         }
                     }
                 }
@@ -252,5 +231,37 @@ public class WorldEditStructurePlacer {
                 surfacePos.getY() + vec.y() - oy,
                 surfacePos.getZ() + vec.z() - oz
         );
+    }
+
+    private static BlockType getCryoTubeBlockType() {
+        if (!cryoTubeTypeInitialized) {
+            try {
+                cachedCryoTubeType = BlockTypes.get("wildernessodysseyapi:cryo_tube");
+            } catch (Exception ignored) {
+                cachedCryoTubeType = null;
+            }
+            cryoTubeTypeInitialized = true;
+        }
+        return cachedCryoTubeType;
+    }
+
+    private static BlockType getTerrainReplacerBlockType() {
+        if (!terrainReplacerInitialized) {
+            try {
+                cachedTerrainReplacerType = BlockTypes.get("wildernessodysseyapi:terrain_replacer");
+            } catch (Exception ignored) {
+                cachedTerrainReplacerType = null;
+            }
+            terrainReplacerInitialized = true;
+        }
+        return cachedTerrainReplacerType;
+    }
+
+    private static Block getCryoTubeBlock() {
+        if (!cryoTubeBlockInitialized) {
+            cachedCryoTubeBlock = CRYO_TUBE_ID == null ? null : BuiltInRegistries.BLOCK.getOptional(CRYO_TUBE_ID).orElse(null);
+            cryoTubeBlockInitialized = true;
+        }
+        return cachedCryoTubeBlock;
     }
 }
