@@ -12,6 +12,8 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
@@ -36,6 +38,13 @@ public class BunkerProtectionHandler {
      */
     public static void addBunkerBounds(AABB bounds) {
         bunkerBounds.add(bounds);
+    }
+
+    /**
+     * @return immutable view of all known bunker bounds.
+     */
+    public static List<AABB> getBunkerBounds() {
+        return Collections.unmodifiableList(bunkerBounds);
     }
 
     /** Checks if the given position is inside any bunker bounds. */

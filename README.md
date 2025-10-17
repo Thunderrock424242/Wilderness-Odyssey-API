@@ -38,6 +38,8 @@ Spawn Behavior:
 ----------
 Players spawn inside a cryo tube when joining the world for the first time. Leaving the tube prevents re-entry.
 An introductory title sequence plays as they wake, which can be replaced with a custom cinematic in the future.
+Set `bunker.debugIgnoreCryoTubeSpawns` to `true` in the common config when testing to bypass the cryo tubes and drop
+players at a random safe location inside the bunker instead.
 
 Custom Assets
 -------------
@@ -50,9 +52,10 @@ World Generation
 The bunker now spawns via the normal world generation pipeline. Two config options
 control its frequency:
 `bunker.spawnDistanceChunks` sets the minimum chunk distance between bunkers and
-`bunker.maxSpawnCount` limits how many bunkers can generate per world.
+`bunker.maxSpawnCount` limits how many bunkers can generate per world. Bunker schematics are
+validated to ensure at least one cryo tube is present, and any missing tubes are restored after placement.
 
-The meteor impact zone structure is generated when a new world loads, creating a crater and a bunker nearby.
+Multiple meteor impact zones are generated the first time a new world loads, each roughly 1,000 chunks (16,000 blocks) apart to encourage long-range exploration. A single bunker is placed adjacent to one of these craters to serve as the player's first destination.
 Secret Order villages may rarely appear in jungle biomes, using the bundled schematic.
 
 Using Data Pack Schematics
@@ -65,11 +68,11 @@ loaded from the data pack when structures generate. If a matching data pack file
 is not found, the bundled schematic under
 `assets/<namespace>/schematics/` is used instead.
 
-The meteor impact site looks for the `wildernessodysseyapi:meteor_site`
+The meteor impact site looks for the `wildernessodysseyapi:impact_zone`
 schematic. Drop your finished WorldEdit build at
-`data/wildernessodysseyapi/structures/meteor_site.schem` (or bundle it under
-`assets/wildernessodysseyapi/schematics/`) so the crash crater is pasted before
-the bunker generates.
+`data/wildernessodysseyapi/structures/impact_zone.schem` (or bundle it under
+`assets/wildernessodysseyapi/schematics/`) so the crash craters are pasted
+before the bunker generates.
 
 Loot tables defined inside schematics work the same way as with vanilla
 `nbt` structures. The scanner now detects loot table references in both
