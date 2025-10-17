@@ -20,8 +20,8 @@ import net.neoforged.fml.ModList;
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public class BunkerStructureGenerator {
     private static final int DEFAULT_MIN_DISTANCE_CHUNKS = 32;
-    private static final long MAX_WORLD_AGE_TICKS = 5L * 60L * 20L;
-    private static long worldEditCountdownStartTick = -1L;
+    private static final long WORLD_EDIT_GRACE_PERIOD_TICKS = 5L * 60L * 20L;
+    private static long worldEditCountdownExpiryTick = -1L;
 
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
@@ -90,12 +90,13 @@ public class BunkerStructureGenerator {
 
     private static boolean isCountdownExpired(ServerLevel level) {
         if (!WorldEditStructurePlacer.isWorldEditReady()) {
+            worldEditCountdownExpiryTick = -1L;
             return false;
         }
-        if (worldEditCountdownStartTick < 0L) {
-            worldEditCountdownStartTick = level.getGameTime();
+        if (worldEditCountdownExpiryTick < 0L) {
+            worldEditCountdownExpiryTick = level.getGameTime() + WORLD_EDIT_GRACE_PERIOD_TICKS;
             return false;
         }
-        return level.getGameTime() - worldEditCountdownStartTick > MAX_WORLD_AGE_TICKS;
+        return level.getGameTime() > worldEditCountdownExpiryTick;
     }
 }

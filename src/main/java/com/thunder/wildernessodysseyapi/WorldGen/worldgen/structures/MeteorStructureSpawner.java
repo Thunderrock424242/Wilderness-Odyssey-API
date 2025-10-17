@@ -37,8 +37,8 @@ public class MeteorStructureSpawner {
     private static final int MIN_CHUNK_SEPARATION = 32;
     private static final int MIN_BLOCK_SEPARATION = MIN_CHUNK_SEPARATION * 16;
     private static final int POSITION_ATTEMPTS = 64;
-    private static final long MAX_WORLD_AGE_TICKS = 5L * 60L * 20L;
-    private static long worldEditCountdownStartTick = -1L;
+    private static final long WORLD_EDIT_GRACE_PERIOD_TICKS = 5L * 60L * 20L;
+    private static long worldEditCountdownExpiryTick = -1L;
 
     private static final ResourceLocation METEOR_TEMPLATE_ID = ResourceLocation.tryBuild(MOD_ID, "impact_zone");
     private static final WorldEditStructurePlacer METEOR_SITE_PLACER =
@@ -176,13 +176,14 @@ public class MeteorStructureSpawner {
 
     private static boolean isCountdownExpired(ServerLevel level) {
         if (!WorldEditStructurePlacer.isWorldEditReady()) {
+            worldEditCountdownExpiryTick = -1L;
             return false;
         }
-        if (worldEditCountdownStartTick < 0L) {
-            worldEditCountdownStartTick = level.getGameTime();
+        if (worldEditCountdownExpiryTick < 0L) {
+            worldEditCountdownExpiryTick = level.getGameTime() + WORLD_EDIT_GRACE_PERIOD_TICKS;
             return false;
         }
-        return level.getGameTime() - worldEditCountdownStartTick > MAX_WORLD_AGE_TICKS;
+        return level.getGameTime() > worldEditCountdownExpiryTick;
     }
 
     private static BlockPos findImpactOrigin(ServerLevel level, RandomSource random, BlockPos reference,
