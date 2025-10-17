@@ -7,6 +7,8 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.List;
 
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+
 /**
  * Utility window for viewing logged mod list changes.
  */
@@ -17,6 +19,11 @@ public class ModDiffViewer {
      * Creates and shows the swing window displaying the diff log.
      */
     public static void createAndShowGUI() {
+        if (GraphicsEnvironment.isHeadless()) {
+            LOGGER.warn("Skipping mod diff viewer GUI because the environment is headless. See logs/mod-changes.log for details.");
+            return;
+        }
+
         JFrame frame = new JFrame("Mod List Differences");
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE); // Keep game running after closing GUI
         frame.setSize(600, 400);
