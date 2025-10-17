@@ -27,7 +27,7 @@ public class StructureConfig {
     static {
         BUILDER.push("bunker");
         BUNKER_MIN_DISTANCE = BUILDER.comment("Minimum distance in chunks between bunkers")
-                .defineInRange("spawnDistanceChunks", 12000, 1, Integer.MAX_VALUE);
+                .defineInRange("spawnDistanceChunks", 32, 1, Integer.MAX_VALUE);
         BUNKER_MAX_COUNT = BUILDER.comment("Maximum number of bunkers generated per world")
                 .defineInRange("maxSpawnCount", 1, 0, Integer.MAX_VALUE);
         DEBUG_IGNORE_CRYO_TUBE = BUILDER.comment(
