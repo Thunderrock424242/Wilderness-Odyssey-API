@@ -17,6 +17,8 @@ public class StructureConfig {
     public static final ModConfigSpec.IntValue BUNKER_MIN_DISTANCE;
     /** Maximum bunkers allowed in a world */
     public static final ModConfigSpec.IntValue BUNKER_MAX_COUNT;
+    /** Debug toggle to bypass cryo tube spawning */
+    public static final ModConfigSpec.BooleanValue DEBUG_IGNORE_CRYO_TUBE;
 
     private static final HashMap<String, BooleanValue> STRUCTURES = new HashMap<>();
     private static final HashMap<String, BooleanValue> POIS = new HashMap<>();
@@ -28,6 +30,10 @@ public class StructureConfig {
                 .defineInRange("spawnDistanceChunks", 12000, 1, Integer.MAX_VALUE);
         BUNKER_MAX_COUNT = BUILDER.comment("Maximum number of bunkers generated per world")
                 .defineInRange("maxSpawnCount", 1, 0, Integer.MAX_VALUE);
+        DEBUG_IGNORE_CRYO_TUBE = BUILDER.comment(
+                        "If true, players spawn at a random position inside the bunker instead of inside cryo tubes."
+                )
+                .define("debugIgnoreCryoTubeSpawns", false);
         BUILDER.pop();
 
         registerAll();
