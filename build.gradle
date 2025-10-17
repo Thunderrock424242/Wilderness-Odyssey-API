@@ -133,6 +133,7 @@ dependencies {
     implementation 'org.yaml:snakeyaml:2.2'
     implementation "curse.maven:selene-499980:7113115"
     implementation "curse.maven:amendments-896746:7054319"
+    implementation "curse.maven:spark-361579:6225208"
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
