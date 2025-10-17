@@ -1,14 +1,23 @@
 package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock;
 
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
+import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.BlockPos.MutableBlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -44,6 +53,22 @@ public class PlayerSpawnHandler {
         ServerPlayer player = (ServerPlayer) event.getEntity();
 
         CompoundTag tag = player.getPersistentData();
+
+        if (StructureConfig.DEBUG_IGNORE_CRYO_TUBE.get()) {
+            if (!tag.getBoolean(CRYO_USED_TAG)) {
+                BlockPos debugSpawn = findRandomBunkerSpawn(player);
+                if (debugSpawn != null) {
+                    playIntroCinematic(player);
+                    teleportPlayer(player, debugSpawn);
+                    tag.remove(CRYO_DELAY_TAG);
+                    tag.remove(CRYO_POS_TAG);
+                    tag.putBoolean(CRYO_TAG, false);
+                    tag.putBoolean(CRYO_USED_TAG, true);
+                }
+            }
+            return;
+        }
+
         if (tag.getBoolean(CRYO_USED_TAG)) {
             return;
         }
@@ -65,6 +90,15 @@ public class PlayerSpawnHandler {
 
         CompoundTag tag = player.getPersistentData();
 
+        if (StructureConfig.DEBUG_IGNORE_CRYO_TUBE.get()) {
+            if (tag.contains(CRYO_POS_TAG)) {
+                tag.remove(CRYO_POS_TAG);
+            }
+            tag.putBoolean(CRYO_TAG, false);
+            tag.putBoolean(CRYO_USED_TAG, true);
+            return;
+        }
+
         if (tag.contains(CRYO_DELAY_TAG)) {
             int delay = tag.getInt(CRYO_DELAY_TAG) - 1;
             if (delay > 0) {
@@ -75,12 +109,7 @@ public class PlayerSpawnHandler {
 
             if (!spawnBlocks.isEmpty()) {
                 BlockPos spawnPos = getNextSpawnBlock();
-                player.teleportTo(player.serverLevel(),
-                        spawnPos.getX() + 0.5,
-                        spawnPos.getY(),
-                        spawnPos.getZ() + 0.5,
-                        player.getYRot(),
-                        player.getXRot());
+                teleportPlayer(player, spawnPos);
                 tag.putBoolean(CRYO_TAG, true);
                 tag.putBoolean(CRYO_USED_TAG, true);
                 tag.putLong(CRYO_POS_TAG, spawnPos.asLong());
@@ -124,6 +153,64 @@ public class PlayerSpawnHandler {
     public static void setSpawnBlocks(List<BlockPos> blocks) {
         spawnBlocks = blocks == null ? Collections.emptyList() : blocks;
         spawnIndex.set(0);
+    }
+
+    private static void teleportPlayer(ServerPlayer player, BlockPos spawnPos) {
+        player.teleportTo(player.serverLevel(),
+                spawnPos.getX() + 0.5,
+                spawnPos.getY(),
+                spawnPos.getZ() + 0.5,
+                player.getYRot(),
+                player.getXRot());
+    }
+
+    private static BlockPos findRandomBunkerSpawn(ServerPlayer player) {
+        ServerLevel level = player.serverLevel();
+        List<AABB> bounds = BunkerProtectionHandler.getBunkerBounds();
+        if (bounds.isEmpty()) {
+            return null;
+        }
+
+        RandomSource random = level.getRandom();
+        MutableBlockPos mutable = new MutableBlockPos();
+
+        for (int attempt = 0; attempt < bounds.size() * 64; attempt++) {
+            AABB box = bounds.get(random.nextInt(bounds.size()));
+            int minX = Mth.floor(Math.min(box.minX, box.maxX));
+            int maxX = Mth.floor(Math.max(box.minX, box.maxX));
+            int minZ = Mth.floor(Math.min(box.minZ, box.maxZ));
+            int maxZ = Mth.floor(Math.max(box.minZ, box.maxZ));
+            int minY = Mth.floor(Math.min(box.minY, box.maxY));
+            int maxY = Mth.floor(Math.max(box.minY, box.maxY));
+
+            if (maxX < minX || maxZ < minZ) {
+                continue;
+            }
+
+            int x = Mth.nextInt(random, minX, maxX);
+            int z = Mth.nextInt(random, minZ, maxZ);
+
+            for (int y = maxY; y >= minY; y--) {
+                mutable.set(x, y, z);
+                BlockState floor = level.getBlockState(mutable);
+                VoxelShape floorShape = floor.getCollisionShape(level, mutable);
+                if (floorShape.isEmpty()) {
+                    continue;
+                }
+
+                BlockPos floorPos = mutable.immutable();
+                BlockPos bodyPos = floorPos.above();
+                BlockPos headPos = bodyPos.above();
+                BlockState body = level.getBlockState(bodyPos);
+                BlockState head = level.getBlockState(headPos);
+                if (body.getCollisionShape(level, bodyPos).isEmpty() &&
+                        head.getCollisionShape(level, headPos).isEmpty()) {
+                    return bodyPos;
+                }
+            }
+        }
+
+        return null;
     }
 
 }

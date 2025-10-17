@@ -9,6 +9,7 @@ import com.sk89q.worldedit.world.block.BlockType;
 import com.sk89q.worldedit.world.block.BlockTypes;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.StructureSpawnTracker;
 import com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager;
+import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorImpactData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -47,6 +48,8 @@ public class WorldSpawnHandler {
             return;
         }
 
+        boolean ignoreCryo = StructureConfig.DEBUG_IGNORE_CRYO_TUBE.get();
+
         List<BlockPos> spawnBlockPositions = new ArrayList<>(CryoSpawnData.get(world).getPositions());
 
         if (spawnBlockPositions.isEmpty()) {
@@ -57,14 +60,23 @@ public class WorldSpawnHandler {
         }
 
         if (!spawnBlockPositions.isEmpty()) {
-            BlockPos meteorPos = MeteorImpactData.get(world).getImpactPos();
+            MeteorImpactData impactData = MeteorImpactData.get(world);
+            BlockPos meteorPos = impactData.getBunkerPos();
+            if (meteorPos == null) {
+                List<BlockPos> impactSites = impactData.getImpactPositions();
+                if (!impactSites.isEmpty()) {
+                    meteorPos = impactSites.get(0);
+                }
+            }
             BlockPos spawnBlockPos;
+            List<BlockPos> filteredPositions = spawnBlockPositions;
             if (meteorPos != null) {
+                final BlockPos targetPos = meteorPos;
                 BlockPos closest = spawnBlockPositions.stream()
-                        .min((a, b) -> Double.compare(a.distSqr(meteorPos), b.distSqr(meteorPos)))
+                        .min((a, b) -> Double.compare(a.distSqr(targetPos), b.distSqr(targetPos)))
                         .orElse(spawnBlockPositions.get(0));
                 final double maxDist = 400.0; // radius squared (20 blocks)
-                spawnBlockPositions = spawnBlockPositions.stream()
+                filteredPositions = spawnBlockPositions.stream()
                         .filter(p -> p.distSqr(closest) <= maxDist)
                         .collect(Collectors.toList());
                 spawnBlockPos = closest;
@@ -73,10 +85,14 @@ public class WorldSpawnHandler {
                 spawnBlockPos = spawnBlockPositions.get(random.nextInt(spawnBlockPositions.size()));
             }
 
-            PlayerSpawnHandler.setSpawnBlocks(spawnBlockPositions);
-
-            // Set the world's default spawn position
-            world.setDefaultSpawnPos(spawnBlockPos.above(), 0.0F);
+            if (!ignoreCryo) {
+                PlayerSpawnHandler.setSpawnBlocks(filteredPositions);
+                world.setDefaultSpawnPos(spawnBlockPos.above(), 0.0F);
+            } else {
+                PlayerSpawnHandler.setSpawnBlocks(spawnBlockPositions);
+                BlockPos debugSpawnAnchor = meteorPos != null ? meteorPos : spawnBlockPos;
+                world.setDefaultSpawnPos(debugSpawnAnchor.above(), 0.0F);
+            }
         } else {
             PlayerSpawnHandler.setSpawnBlocks(Collections.emptyList());
             // Log a warning or handle cases where no spawn blocks are found

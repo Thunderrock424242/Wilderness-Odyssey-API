@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.World
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
@@ -14,6 +15,8 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemp
 import net.minecraft.world.phys.AABB;
 import net.neoforged.fml.ModList;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
@@ -22,25 +25,45 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
  * MeteorStructureSpawner for the Wilderness Odyssey API mod.
  */
 public class MeteorStructureSpawner {
-    private static final ResourceLocation METEOR_TEMPLATE_ID = ResourceLocation.tryBuild(MOD_ID, "meteor_bunker");
+    private static final int IMPACT_SITE_COUNT = 3;
+    private static final int MIN_CHUNK_SEPARATION = 1000;
+    private static final int MIN_BLOCK_SEPARATION = MIN_CHUNK_SEPARATION * 16;
+    private static final int POSITION_ATTEMPTS = 64;
+
+    private static final ResourceLocation METEOR_TEMPLATE_ID = ResourceLocation.tryBuild(MOD_ID, "impact_zone");
     private static final WorldEditStructurePlacer METEOR_SITE_PLACER =
-            new WorldEditStructurePlacer(ModConstants.MOD_ID, "meteor_site.schem");
+            new WorldEditStructurePlacer(ModConstants.MOD_ID, "impact_zone.schem");
     private static final WorldEditStructurePlacer BUNKER_PLACER =
             new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
 
     private static boolean placed = false;
 
     public static void tryPlace(ServerLevel level) {
-        // Only place once in the entire world
         if (placed) {
             return;
         }
 
-        BlockPos impactOrigin = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, BlockPos.ZERO);
-        BlockPos impactPos = placeMeteorSite(level, impactOrigin);
-        MeteorImpactData.get(level).setImpactPos(impactPos);
+        MeteorImpactData impactData = MeteorImpactData.get(level);
+        RandomSource random = RandomSource.create(level.getSeed());
+        BlockPos spawn = level.getSharedSpawnPos();
 
-        placeBunker(level, impactPos);
+        List<BlockPos> storedSites = new ArrayList<>(impactData.getImpactPositions());
+        int originalCount = storedSites.size();
+
+        for (int i = storedSites.size(); i < IMPACT_SITE_COUNT; i++) {
+            BlockPos origin = findImpactOrigin(level, random, spawn, storedSites);
+            BlockPos impactPos = placeMeteorSite(level, origin);
+            storedSites.add(impactPos);
+        }
+
+        if (storedSites.size() != originalCount) {
+            impactData.setImpactPositions(storedSites);
+        }
+
+        if (impactData.getBunkerPos() == null && !storedSites.isEmpty()) {
+            BlockPos bunkerAnchor = storedSites.get(random.nextInt(storedSites.size()));
+            placeBunker(level, bunkerAnchor, impactData);
+        }
 
         placed = true;
     }
@@ -70,7 +93,7 @@ public class MeteorStructureSpawner {
         return spawnPos;
     }
 
-    private static void placeBunker(ServerLevel level, BlockPos impactPos) {
+    private static void placeBunker(ServerLevel level, BlockPos impactPos, MeteorImpactData impactData) {
         if (!ModList.get().isLoaded("worldedit")) {
             return;
         }
@@ -80,11 +103,13 @@ public class MeteorStructureSpawner {
 
         StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
         if (tracker.hasSpawnedAt(bunkerPos)) {
+            impactData.setBunkerPos(bunkerPos);
             return;
         }
 
         if (!WorldEditStructurePlacer.isWorldEditReady()) {
-            scheduleDeferredPlacement(level, bunkerPos, tracker, 0);
+            impactData.setBunkerPos(bunkerPos);
+            scheduleDeferredPlacement(level, bunkerPos, tracker, impactData, 0);
             return;
         }
 
@@ -92,13 +117,16 @@ public class MeteorStructureSpawner {
         if (bounds != null) {
             BunkerProtectionHandler.addBunkerBounds(bounds);
             tracker.addSpawnPos(bunkerPos);
+            impactData.setBunkerPos(bunkerPos);
         }
     }
 
     private static void scheduleDeferredPlacement(ServerLevel level, BlockPos bunkerPos,
-                                                  StructureSpawnTracker tracker, int attempt) {
+                                                  StructureSpawnTracker tracker,
+                                                  MeteorImpactData impactData, int attempt) {
         level.getServer().execute(() -> {
             if (tracker.hasSpawnedAt(bunkerPos)) {
+                impactData.setBunkerPos(bunkerPos);
                 return;
             }
 
@@ -110,7 +138,7 @@ public class MeteorStructureSpawner {
                     );
                 }
                 if (attempt < 100) {
-                    scheduleDeferredPlacement(level, bunkerPos, tracker, attempt + 1);
+                    scheduleDeferredPlacement(level, bunkerPos, tracker, impactData, attempt + 1);
                 }
                 return;
             }
@@ -119,7 +147,39 @@ public class MeteorStructureSpawner {
             if (bounds != null) {
                 BunkerProtectionHandler.addBunkerBounds(bounds);
                 tracker.addSpawnPos(bunkerPos);
+                impactData.setBunkerPos(bunkerPos);
             }
         });
+    }
+
+    private static BlockPos findImpactOrigin(ServerLevel level, RandomSource random, BlockPos reference,
+                                             List<BlockPos> existing) {
+        long minDistanceSq = (long) MIN_BLOCK_SEPARATION * (long) MIN_BLOCK_SEPARATION;
+
+        for (int attempt = 0; attempt < POSITION_ATTEMPTS; attempt++) {
+            int distance = MIN_BLOCK_SEPARATION + random.nextInt(MIN_BLOCK_SEPARATION / 2);
+            double angle = random.nextDouble() * Math.PI * 2.0D;
+            int x = reference.getX() + (int) Math.round(Math.cos(angle) * distance);
+            int z = reference.getZ() + (int) Math.round(Math.sin(angle) * distance);
+
+            BlockPos candidate = new BlockPos(x, 0, z);
+            boolean farEnough = true;
+            for (BlockPos existingPos : existing) {
+                long dx = (long) candidate.getX() - existingPos.getX();
+                long dz = (long) candidate.getZ() - existingPos.getZ();
+                long distSq = dx * dx + dz * dz;
+                if (distSq < minDistanceSq) {
+                    farEnough = false;
+                    break;
+                }
+            }
+
+            if (farEnough) {
+                return level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, candidate);
+            }
+        }
+
+        BlockPos fallback = reference.offset(MIN_BLOCK_SEPARATION * (existing.size() + 1), 0, 0);
+        return level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, fallback);
     }
 }

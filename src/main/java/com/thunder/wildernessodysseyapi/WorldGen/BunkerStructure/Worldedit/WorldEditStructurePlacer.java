@@ -20,8 +20,10 @@ import com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager;
 import net.neoforged.fml.ModList;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.AABB;
 
 import java.io.InputStream;
@@ -31,6 +33,7 @@ import java.util.List;
 import java.util.Set;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
 /**
  * The type World edit structure placer.
@@ -43,6 +46,7 @@ public class WorldEditStructurePlacer {
     private static boolean missingLogged = false;
     private static final Set<ResourceLocation> missingSchematicsLogged = new HashSet<>();
     private static final Set<ResourceLocation> missingCryoTubeLogged = new HashSet<>();
+    private static final ResourceLocation CRYO_TUBE_ID = ResourceLocation.tryBuild(MOD_ID, "cryo_tube");
 
     /**
      * Instantiates a new World edit structure placer.
@@ -175,6 +179,16 @@ public class WorldEditStructurePlacer {
                 editSession.flushSession();
             }
             if (cryoTubes != null && !cryoTubes.isEmpty()) {
+                if (CRYO_TUBE_ID != null) {
+                    Block cryoBlock = BuiltInRegistries.BLOCK.getOptional(CRYO_TUBE_ID).orElse(null);
+                    if (cryoBlock != null) {
+                        for (BlockPos cryoPos : cryoTubes) {
+                            if (!world.getBlockState(cryoPos).is(cryoBlock)) {
+                                world.setBlockAndUpdate(cryoPos, cryoBlock.defaultBlockState());
+                            }
+                        }
+                    }
+                }
                 CryoSpawnData data = CryoSpawnData.get(world);
                 data.addAll(cryoTubes);
                 PlayerSpawnHandler.setSpawnBlocks(data.getPositions());
