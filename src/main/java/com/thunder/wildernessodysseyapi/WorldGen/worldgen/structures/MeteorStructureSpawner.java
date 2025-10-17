@@ -38,6 +38,7 @@ public class MeteorStructureSpawner {
     private static final int MIN_BLOCK_SEPARATION = MIN_CHUNK_SEPARATION * 16;
     private static final int POSITION_ATTEMPTS = 64;
     private static final long MAX_WORLD_AGE_TICKS = 5L * 60L * 20L;
+    private static long worldEditCountdownStartTick = -1L;
 
     private static final ResourceLocation METEOR_TEMPLATE_ID = ResourceLocation.tryBuild(MOD_ID, "impact_zone");
     private static final WorldEditStructurePlacer METEOR_SITE_PLACER =
@@ -52,7 +53,7 @@ public class MeteorStructureSpawner {
             return;
         }
 
-        if (level.getGameTime() > MAX_WORLD_AGE_TICKS) {
+        if (isCountdownExpired(level)) {
             placed = true;
             return;
         }
@@ -112,7 +113,7 @@ public class MeteorStructureSpawner {
             return;
         }
 
-        if (level.getGameTime() > MAX_WORLD_AGE_TICKS) {
+        if (isCountdownExpired(level)) {
             return;
         }
 
@@ -143,7 +144,7 @@ public class MeteorStructureSpawner {
                                                   StructureSpawnTracker tracker,
                                                   MeteorImpactData impactData, int attempt) {
         level.getServer().execute(() -> {
-            if (level.getGameTime() > MAX_WORLD_AGE_TICKS) {
+            if (isCountdownExpired(level)) {
                 return;
             }
             if (tracker.hasSpawnedAt(bunkerPos)) {
@@ -171,6 +172,17 @@ public class MeteorStructureSpawner {
                 impactData.setBunkerPos(bunkerPos);
             }
         });
+    }
+
+    private static boolean isCountdownExpired(ServerLevel level) {
+        if (!WorldEditStructurePlacer.isWorldEditReady()) {
+            return false;
+        }
+        if (worldEditCountdownStartTick < 0L) {
+            worldEditCountdownStartTick = level.getGameTime();
+            return false;
+        }
+        return level.getGameTime() - worldEditCountdownStartTick > MAX_WORLD_AGE_TICKS;
     }
 
     private static BlockPos findImpactOrigin(ServerLevel level, RandomSource random, BlockPos reference,
