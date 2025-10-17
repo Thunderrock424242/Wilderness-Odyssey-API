@@ -21,13 +21,14 @@ import net.neoforged.fml.ModList;
 public class BunkerStructureGenerator {
     private static final int DEFAULT_MIN_DISTANCE_CHUNKS = 32;
     private static final long MAX_WORLD_AGE_TICKS = 5L * 60L * 20L;
+    private static long worldEditCountdownStartTick = -1L;
 
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
         if (!ModList.get().isLoaded("worldedit")) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         if (!(event.getChunk() instanceof LevelChunk chunk)) return;
-        if (level.getGameTime() > MAX_WORLD_AGE_TICKS) return;
+        if (isCountdownExpired(level)) return;
 
         BlockPos chunkPos = chunk.getPos().getWorldPosition();
         BlockPos surfacePos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, chunkPos);
@@ -61,7 +62,7 @@ public class BunkerStructureGenerator {
     private static void scheduleDeferredPlacement(ServerLevel level, BlockPos surfacePos, StructureSpawnTracker tracker,
                                                   int minChunks, int maxCount, int attempt) {
         level.getServer().execute(() -> {
-            if (level.getGameTime() > MAX_WORLD_AGE_TICKS) return;
+            if (isCountdownExpired(level)) return;
             if (tracker.hasSpawnedAt(surfacePos)) return;
             if (tracker.getSpawnCount() >= maxCount) return;
             if (!tracker.isFarEnough(surfacePos, minChunks)) return;
@@ -76,7 +77,7 @@ public class BunkerStructureGenerator {
                 return;
             }
 
-            if (level.getGameTime() > MAX_WORLD_AGE_TICKS) return;
+            if (isCountdownExpired(level)) return;
 
             WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
             AABB bounds = placer.placeStructure(level, surfacePos);
@@ -85,5 +86,16 @@ public class BunkerStructureGenerator {
                 BunkerProtectionHandler.addBunkerBounds(bounds);
             }
         });
+}
+
+    private static boolean isCountdownExpired(ServerLevel level) {
+        if (!WorldEditStructurePlacer.isWorldEditReady()) {
+            return false;
+        }
+        if (worldEditCountdownStartTick < 0L) {
+            worldEditCountdownStartTick = level.getGameTime();
+            return false;
+        }
+        return level.getGameTime() - worldEditCountdownStartTick > MAX_WORLD_AGE_TICKS;
     }
 }
