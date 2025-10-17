@@ -7,7 +7,11 @@ import com.thunder.wildernessodysseyapi.ModListTracker.gui.ModDiffViewer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+
+import java.awt.GraphicsEnvironment;
 import java.util.List;
+
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 
 /**
  * Command to display mod list differences since last launch.
@@ -49,6 +53,14 @@ public class ModListDiffCommand {
             if (!versionChange.isEmpty()) {
                 source.sendSuccess(() -> Component.literal("\u00A7b" + versionChange), false);
             }
+        }
+
+        if (GraphicsEnvironment.isHeadless()) {
+            LOGGER.info("Headless environment detected; skipping mod diff viewer GUI."
+                    + " Players can review logs/mod-changes.log for the full diff.");
+            source.sendSuccess(() -> Component.literal(
+                    "GUI not available on this server. Check logs/mod-changes.log for details."), false);
+            return;
         }
 
         new Thread(() -> javax.swing.SwingUtilities.invokeLater(ModDiffViewer::createAndShowGUI)).start();
