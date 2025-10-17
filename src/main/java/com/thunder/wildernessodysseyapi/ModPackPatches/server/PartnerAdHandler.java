@@ -12,14 +12,16 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.players.PlayerList;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -41,9 +43,7 @@ public class PartnerAdHandler {
     private static final String HOSTING_LINK = "https://billing.kinetichosting.net/aff.php?aff=606";
 
     private static final long DELAY_TICKS = 20L * 90L; // 1.5 minutes
-    private static final Set<UUID> waitingPlayers = new HashSet<>();
-    private static final Set<UUID> sentAdPlayers = new HashSet<>();
-    private static final java.util.Map<UUID, Long> playerTickMap = new java.util.HashMap<>();
+    private static final Map<UUID, Long> PENDING_ADS = new HashMap<>();
 
     /**
      * Build the styled advertisement message with clickable opt-in/out.
@@ -112,6 +112,7 @@ public class PartnerAdHandler {
                                     data.putBoolean(TAG_OPT_OUT, true);
                                     data.putString(TAG_VERSION, ModConstants.MOD_DEFAULT_WORLD_VERSION);
                                     OPTED_OUT.add(player.getUUID());
+                                    PENDING_ADS.remove(player.getUUID());
                                     player.sendSystemMessage(
                                             Component.literal("Ads disabled.")
                                                     .withStyle(style -> style.withColor(TextColor.fromRgb(0xFF5555)))
@@ -126,6 +127,7 @@ public class PartnerAdHandler {
                                     data.putBoolean(TAG_OPT_OUT, false);
                                     data.putString(TAG_VERSION, ModConstants.MOD_DEFAULT_WORLD_VERSION);
                                     OPTED_OUT.remove(player.getUUID());
+                                    PENDING_ADS.put(player.getUUID(), tickCounter + DELAY_TICKS);
                                     player.sendSystemMessage(
                                             Component.literal("Ads enabled.")
                                                     .withStyle(style -> style.withColor(TextColor.fromRgb(0x00FF00)))
@@ -156,8 +158,7 @@ public class PartnerAdHandler {
             OPTED_OUT.add(uuid);
         } else {
             OPTED_OUT.remove(uuid);
-            waitingPlayers.add(uuid);
-            playerTickMap.put(uuid, tickCounter);
+            PENDING_ADS.put(uuid, tickCounter + DELAY_TICKS);
         }
     }
 
@@ -166,23 +167,39 @@ public class PartnerAdHandler {
      */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        if (!event.hasTime()) {
+            return;
+        }
+
         tickCounter++;
-        if (!waitingPlayers.isEmpty()) {
-            MinecraftServer server = event.getServer();
-            PlayerList players = server.getPlayerList();
 
-            for (ServerPlayer player : players.getPlayers()) {
-                UUID uuid = player.getUUID();
+        if (PENDING_ADS.isEmpty()) {
+            return;
+        }
 
-                if (waitingPlayers.contains(uuid)) {
-                    long joinedAt = playerTickMap.getOrDefault(uuid, -1L);
-                    if (joinedAt != -1 && tickCounter - joinedAt >= DELAY_TICKS) {
-                        player.sendSystemMessage(makeAd(player));
-                        waitingPlayers.remove(uuid);
-                        sentAdPlayers.add(uuid);
-                    }
-                }
+        MinecraftServer server = event.getServer();
+
+        Iterator<Map.Entry<UUID, Long>> iterator = PENDING_ADS.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, Long> entry = iterator.next();
+            if (tickCounter < entry.getValue()) {
+                continue;
             }
+
+            UUID uuid = entry.getKey();
+            if (OPTED_OUT.contains(uuid)) {
+                iterator.remove();
+                continue;
+            }
+
+            ServerPlayer player = server.getPlayerList().getPlayer(uuid);
+            if (player == null) {
+                iterator.remove();
+                continue;
+            }
+
+            player.sendSystemMessage(makeAd(player));
+            iterator.remove();
         }
     }
 }
