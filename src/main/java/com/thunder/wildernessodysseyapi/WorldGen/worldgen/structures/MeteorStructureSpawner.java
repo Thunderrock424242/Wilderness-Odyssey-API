@@ -9,6 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
@@ -217,14 +218,19 @@ public class MeteorStructureSpawner {
     }
 
     private static BlockPos findNearbyPlains(ServerLevel level, BlockPos center, int radius) {
-        int step = 8;
-        for (int r = 0; r <= radius; r += step) {
-            for (int dx = -r; dx <= r; dx += step) {
-                for (int dz = -r; dz <= r; dz += step) {
-                    if (dx == 0 && dz == 0 && r != 0) {
+        int chunkRadius = Math.max(0, radius >> 4);
+        ChunkPos originChunk = new ChunkPos(center);
+        for (int r = 0; r <= chunkRadius; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    if (r != 0 && Math.abs(dx) != r && Math.abs(dz) != r) {
                         continue;
                     }
-                    BlockPos sample = center.offset(dx, 0, dz);
+                    ChunkPos chunkPos = new ChunkPos(originChunk.x + dx, originChunk.z + dz);
+                    if (!level.getChunkSource().hasChunk(chunkPos.x, chunkPos.z)) {
+                        continue;
+                    }
+                    BlockPos sample = new BlockPos(chunkPos.getMiddleBlockX(), center.getY(), chunkPos.getMiddleBlockZ());
                     BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, sample);
                     if (isPlains(level, surface)) {
                         return surface;
