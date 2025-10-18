@@ -79,15 +79,13 @@ public class WorldEditStructurePlacer {
      */
     public AABB placeStructure(ServerLevel world, BlockPos position) {
         try {
-            if (world.getGameTime() > MAX_WORLD_AGE_TICKS) {
-                if (!placementWindowLogged) {
-                    LOGGER.warn("Skipping placement of {} because the 5 minute placement window has expired", id);
-                    placementWindowLogged = true;
-                }
-                return null;
-            }
             if (!isWorldEditReady()) {
-                if (!missingLogged) {
+                if (world.getGameTime() > MAX_WORLD_AGE_TICKS) {
+                    if (!placementWindowLogged) {
+                        LOGGER.warn("Skipping placement of {} because the 5 minute placement window has expired", id);
+                        placementWindowLogged = true;
+                    }
+                } else if (!missingLogged) {
                     LOGGER.warn("WorldEdit not initialized (block registry not ready); skipping placement of {}", id);
                     missingLogged = true;
                 }
