@@ -90,8 +90,13 @@ public class WorldSpawnHandler {
                 world.setDefaultSpawnPos(spawnBlockPos.above(), 0.0F);
             } else {
                 PlayerSpawnHandler.setSpawnBlocks(spawnBlockPositions);
-                BlockPos debugSpawnAnchor = meteorPos != null ? meteorPos : spawnBlockPos;
-                world.setDefaultSpawnPos(debugSpawnAnchor.above(), 0.0F);
+                BlockPos debugSpawn = PlayerSpawnHandler.findRandomBunkerSpawn(world);
+                if (debugSpawn != null) {
+                    world.setDefaultSpawnPos(debugSpawn, 0.0F);
+                } else {
+                    BlockPos debugSpawnAnchor = meteorPos != null ? meteorPos : spawnBlockPos;
+                    world.setDefaultSpawnPos(debugSpawnAnchor.above(), 0.0F);
+                }
             }
         } else {
             PlayerSpawnHandler.setSpawnBlocks(Collections.emptyList());

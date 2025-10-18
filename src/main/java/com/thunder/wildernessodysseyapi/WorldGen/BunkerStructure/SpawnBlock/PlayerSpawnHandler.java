@@ -56,7 +56,7 @@ public class PlayerSpawnHandler {
 
         if (StructureConfig.DEBUG_IGNORE_CRYO_TUBE.get()) {
             if (!tag.getBoolean(CRYO_USED_TAG)) {
-                BlockPos debugSpawn = findRandomBunkerSpawn(player);
+                BlockPos debugSpawn = findRandomBunkerSpawn(player.serverLevel());
                 if (debugSpawn != null) {
                     playIntroCinematic(player);
                     teleportPlayer(player, debugSpawn);
@@ -164,8 +164,7 @@ public class PlayerSpawnHandler {
                 player.getXRot());
     }
 
-    private static BlockPos findRandomBunkerSpawn(ServerPlayer player) {
-        ServerLevel level = player.serverLevel();
+    public static BlockPos findRandomBunkerSpawn(ServerLevel level) {
         List<AABB> bounds = BunkerProtectionHandler.getBunkerBounds();
         if (bounds.isEmpty()) {
             return null;
