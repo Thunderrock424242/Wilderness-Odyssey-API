@@ -1,9 +1,9 @@
 package com.wildernessodyssey.client.gui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.wildernessodyssey.client.hardware.HardwareRequirementChecker;
 import com.wildernessodyssey.client.hardware.HardwareRequirementConfig;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -34,8 +34,6 @@ public class HardwareRequirementScreen extends Screen {
     private int contentLeft;
     private int contentRight;
 
-    private Button doneButton;
-
     public HardwareRequirementScreen(HardwareRequirementChecker checker) {
         super(Component.translatable("screen.wildernessodyssey.hardware.title"));
         this.checker = Objects.requireNonNull(checker);
@@ -45,10 +43,6 @@ public class HardwareRequirementScreen extends Screen {
     protected void init() {
         snapshot = checker.refresh();
         evaluations = checker.evaluateAll(snapshot);
-
-        this.doneButton = addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> onClose())
-            .bounds(0, 0, 120, 20)
-            .build());
     }
 
     @Override
@@ -60,12 +54,6 @@ public class HardwareRequirementScreen extends Screen {
         this.contentRight = this.width - 20;
         this.contentTop = 48;
         this.contentBottom = this.height - 60;
-
-        if (this.doneButton != null) {
-            int buttonX = this.contentRight - this.doneButton.getWidth();
-            int buttonY = this.contentTop - this.doneButton.getHeight() - 4;
-            this.doneButton.setPosition(buttonX, buttonY);
-        }
 
         if (this.contentBottom <= this.contentTop) {
             this.contentBottom = this.contentTop + 1;
@@ -88,6 +76,15 @@ public class HardwareRequirementScreen extends Screen {
 
         renderScrollBar(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (this.shouldCloseOnEsc() && keyCode == InputConstants.KEY_ESCAPE) {
+            this.onClose();
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     private int renderCurrentHardware(GuiGraphics graphics, int y) {
