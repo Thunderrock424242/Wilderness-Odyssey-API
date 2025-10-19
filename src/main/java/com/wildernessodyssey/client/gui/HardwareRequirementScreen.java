@@ -34,6 +34,8 @@ public class HardwareRequirementScreen extends Screen {
     private int contentLeft;
     private int contentRight;
 
+    private Button doneButton;
+
     public HardwareRequirementScreen(HardwareRequirementChecker checker) {
         super(Component.translatable("screen.wildernessodyssey.hardware.title"));
         this.checker = Objects.requireNonNull(checker);
@@ -44,8 +46,8 @@ public class HardwareRequirementScreen extends Screen {
         snapshot = checker.refresh();
         evaluations = checker.evaluateAll(snapshot);
 
-        addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> onClose())
-            .bounds((this.width - 200) / 2, this.height - 40, 200, 20)
+        this.doneButton = addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> onClose())
+            .bounds(0, 0, 120, 20)
             .build());
     }
 
@@ -58,6 +60,12 @@ public class HardwareRequirementScreen extends Screen {
         this.contentRight = this.width - 20;
         this.contentTop = 48;
         this.contentBottom = this.height - 60;
+
+        if (this.doneButton != null) {
+            int buttonX = this.contentRight - this.doneButton.getWidth();
+            int buttonY = this.contentTop - this.doneButton.getHeight() - 4;
+            this.doneButton.setPosition(buttonX, buttonY);
+        }
 
         if (this.contentBottom <= this.contentTop) {
             this.contentBottom = this.contentTop + 1;
