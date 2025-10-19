@@ -1,6 +1,7 @@
 package com.wildernessodyssey.client;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.wildernessodyssey.client.command.AutoShaderCommand;
 import com.wildernessodyssey.client.gui.HardwareRequirementScreen;
 import com.wildernessodyssey.client.hardware.HardwareRequirementChecker;
 import com.wildernessodyssey.client.hardware.HardwareRequirementConfig;
@@ -50,12 +51,18 @@ public final class WildernessOdysseyClient {
         public static void registerClientCommands(RegisterClientCommandsEvent event) {
             event.getDispatcher().register(Commands.literal("hardwarecheck")
                 .executes(context -> executeOpenScreen(context.getSource())));
+            event.getDispatcher().register(Commands.literal("autoshader")
+                .executes(context -> executeAutoShader(context.getSource())));
         }
 
         private static int executeOpenScreen(CommandSourceStack source) {
             openHardwareScreen();
             source.sendSuccess(() -> Component.translatable("command.wildernessodyssey.hardware.open"), true);
             return 1;
+        }
+
+        private static int executeAutoShader(CommandSourceStack source) {
+            return AutoShaderCommand.execute(source, getOrCreateChecker());
         }
     }
 }
