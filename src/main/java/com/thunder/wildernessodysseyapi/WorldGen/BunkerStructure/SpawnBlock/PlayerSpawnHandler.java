@@ -38,6 +38,7 @@ public class PlayerSpawnHandler {
 
     private static final AtomicInteger spawnIndex = new AtomicInteger(0);
     private static List<BlockPos> spawnBlocks = Collections.emptyList();
+    private static BlockPos fallbackSpawn = null;
     private static final String CRYO_TAG = "wo_in_cryo";
     private static final String CRYO_USED_TAG = "wo_cryo_used";
     private static final String CRYO_POS_TAG = "wo_cryo_pos";
@@ -74,6 +75,13 @@ public class PlayerSpawnHandler {
         }
 
         if (spawnBlocks.isEmpty()) {
+            if (!tag.getBoolean(CRYO_USED_TAG) && fallbackSpawn != null) {
+                teleportPlayer(player, fallbackSpawn);
+                tag.remove(CRYO_DELAY_TAG);
+                tag.remove(CRYO_POS_TAG);
+                tag.putBoolean(CRYO_TAG, false);
+                tag.putBoolean(CRYO_USED_TAG, true);
+            }
             return;
         }
 
@@ -96,6 +104,17 @@ public class PlayerSpawnHandler {
             }
             tag.putBoolean(CRYO_TAG, false);
             tag.putBoolean(CRYO_USED_TAG, true);
+            return;
+        }
+
+        if (spawnBlocks.isEmpty()) {
+            if (fallbackSpawn != null && !tag.getBoolean(CRYO_USED_TAG)) {
+                teleportPlayer(player, fallbackSpawn);
+                tag.putBoolean(CRYO_TAG, false);
+                tag.putBoolean(CRYO_USED_TAG, true);
+                tag.remove(CRYO_DELAY_TAG);
+                tag.remove(CRYO_POS_TAG);
+            }
             return;
         }
 
@@ -151,8 +170,13 @@ public class PlayerSpawnHandler {
     }
 
     public static void setSpawnBlocks(List<BlockPos> blocks) {
+        setSpawnBlocks(blocks, null);
+    }
+
+    public static void setSpawnBlocks(List<BlockPos> blocks, BlockPos fallback) {
         spawnBlocks = blocks == null ? Collections.emptyList() : blocks;
         spawnIndex.set(0);
+        fallbackSpawn = fallback;
     }
 
     private static void teleportPlayer(ServerPlayer player, BlockPos spawnPos) {
