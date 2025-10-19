@@ -14,6 +14,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorImpac
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -48,30 +49,42 @@ public class WorldSpawnHandler {
             return;
         }
 
+        configureWorldSpawn(world);
+    }
+
+    public static void refreshWorldSpawn(ServerLevel world) {
+        configureWorldSpawn(world);
+    }
+
+    private static void configureWorldSpawn(ServerLevel world) {
         boolean ignoreCryo = StructureConfig.DEBUG_IGNORE_CRYO_TUBE.get();
 
-        List<BlockPos> spawnBlockPositions = new ArrayList<>(CryoSpawnData.get(world).getPositions());
+        CryoSpawnData data = CryoSpawnData.get(world);
+        List<BlockPos> spawnBlockPositions = new ArrayList<>(data.getPositions());
 
         if (spawnBlockPositions.isEmpty()) {
             spawnBlockPositions = rebuildSpawnCache(world);
             if (!spawnBlockPositions.isEmpty()) {
-                CryoSpawnData.get(world).replaceAll(spawnBlockPositions);
+                data.replaceAll(spawnBlockPositions);
             }
         }
 
-        if (!spawnBlockPositions.isEmpty()) {
-            MeteorImpactData impactData = MeteorImpactData.get(world);
-            BlockPos meteorPos = impactData.getBunkerPos();
-            if (meteorPos == null) {
-                List<BlockPos> impactSites = impactData.getImpactPositions();
-                if (!impactSites.isEmpty()) {
-                    meteorPos = impactSites.get(0);
-                }
+        MeteorImpactData impactData = MeteorImpactData.get(world);
+        BlockPos bunkerAnchor = impactData.getBunkerPos();
+        if (bunkerAnchor == null) {
+            List<BlockPos> impactSites = impactData.getImpactPositions();
+            if (!impactSites.isEmpty()) {
+                bunkerAnchor = impactSites.get(0);
             }
+        }
+
+        BlockPos fallbackSpawn = computeFallbackSpawn(world, bunkerAnchor);
+
+        if (!spawnBlockPositions.isEmpty()) {
             BlockPos spawnBlockPos;
             List<BlockPos> filteredPositions = spawnBlockPositions;
-            if (meteorPos != null) {
-                final BlockPos targetPos = meteorPos;
+            if (bunkerAnchor != null) {
+                final BlockPos targetPos = bunkerAnchor;
                 BlockPos closest = spawnBlockPositions.stream()
                         .min((a, b) -> Double.compare(a.distSqr(targetPos), b.distSqr(targetPos)))
                         .orElse(spawnBlockPositions.get(0));
@@ -86,23 +99,47 @@ public class WorldSpawnHandler {
             }
 
             if (!ignoreCryo) {
-                PlayerSpawnHandler.setSpawnBlocks(filteredPositions);
+                PlayerSpawnHandler.setSpawnBlocks(filteredPositions, fallbackSpawn);
                 world.setDefaultSpawnPos(spawnBlockPos.above(), 0.0F);
             } else {
-                PlayerSpawnHandler.setSpawnBlocks(spawnBlockPositions);
+                PlayerSpawnHandler.setSpawnBlocks(spawnBlockPositions, fallbackSpawn);
                 BlockPos debugSpawn = PlayerSpawnHandler.findRandomBunkerSpawn(world);
                 if (debugSpawn != null) {
                     world.setDefaultSpawnPos(debugSpawn, 0.0F);
+                } else if (fallbackSpawn != null) {
+                    world.setDefaultSpawnPos(fallbackSpawn, 0.0F);
                 } else {
-                    BlockPos debugSpawnAnchor = meteorPos != null ? meteorPos : spawnBlockPos;
+                    BlockPos debugSpawnAnchor = bunkerAnchor != null ? bunkerAnchor : spawnBlockPos;
                     world.setDefaultSpawnPos(debugSpawnAnchor.above(), 0.0F);
                 }
             }
         } else {
-            PlayerSpawnHandler.setSpawnBlocks(Collections.emptyList());
-            // Log a warning or handle cases where no spawn blocks are found
-            LOGGER.warn("No Cryo Tube Blocks found in the world!");
+            PlayerSpawnHandler.setSpawnBlocks(Collections.emptyList(), fallbackSpawn);
+            if (fallbackSpawn != null) {
+                world.setDefaultSpawnPos(fallbackSpawn, 0.0F);
+            } else if (bunkerAnchor != null) {
+                world.setDefaultSpawnPos(bunkerAnchor.above(), 0.0F);
+            } else {
+                LOGGER.warn("No Cryo Tube Blocks found in the world and no bunker fallback available!");
+            }
         }
+    }
+
+    private static BlockPos computeFallbackSpawn(ServerLevel world, BlockPos bunkerAnchor) {
+        BlockPos bunkerSpawn = PlayerSpawnHandler.findRandomBunkerSpawn(world);
+        if (bunkerSpawn != null) {
+            return bunkerSpawn;
+        }
+
+        if (bunkerAnchor != null) {
+            BlockPos surface = world.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bunkerAnchor);
+            if (!world.getBlockState(surface).getCollisionShape(world, surface).isEmpty()) {
+                surface = surface.above();
+            }
+            return surface;
+        }
+
+        return null;
     }
 
     private static List<BlockPos> rebuildSpawnCache(ServerLevel world) {
