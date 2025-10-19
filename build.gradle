@@ -122,7 +122,7 @@ repositories {
 
 dependencies {
     implementation "curse.maven:worldedit-225608:5830452"
-    implementation "curse.maven:tick-tok-lib-1298954:6814153"
+    implementation "curse.maven:tick-tok-lib-1298954:7119401"
     implementation "curse.maven:create-328085:6641610"
     implementation "curse.maven:regions-unexplored-659110:6273893"
     implementation "curse.maven:terrablender-neoforge-940057:6054947"
@@ -134,6 +134,8 @@ dependencies {
     implementation "curse.maven:selene-499980:7113115"
     implementation "curse.maven:amendments-896746:7054319"
     implementation "curse.maven:spark-361579:6225208"
+    implementation "curse.maven:sodium-394468:6382651"
+    implementation "curse.maven:irisshaders-455508:6661598"
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
@@ -170,7 +172,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_id                 : "wildernessodysseyapi",
             mod_name               : "Wilderness Odyssey API",
             mod_license            : "APR",
-            mod_version            : "3.0.2",
+            mod_version            : "3.1.0",
             mod_authors            : "thunderrock424242",
             mod_description        : "a api for my modpack"
     ]

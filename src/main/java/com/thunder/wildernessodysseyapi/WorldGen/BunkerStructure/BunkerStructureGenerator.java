@@ -1,10 +1,10 @@
 package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure;
 
+import com.thunder.ticktoklib.TickTokHelper;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -20,7 +20,7 @@ import net.neoforged.fml.ModList;
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public class BunkerStructureGenerator {
     private static final int DEFAULT_MIN_DISTANCE_CHUNKS = 32;
-    private static final long WORLD_EDIT_GRACE_PERIOD_TICKS = 5L * 60L * 20L;
+    private static final long WORLD_EDIT_GRACE_PERIOD_TICKS = TickTokHelper.duration(0,2,0,0);
     private static long worldEditCountdownExpiryTick = -1L;
 
     @SubscribeEvent
