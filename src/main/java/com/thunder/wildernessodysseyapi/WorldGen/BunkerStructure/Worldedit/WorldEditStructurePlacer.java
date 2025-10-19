@@ -12,6 +12,7 @@ import com.sk89q.worldedit.world.block.BlockType;
 import com.sk89q.worldedit.world.block.BlockTypes;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.CryoSpawnData;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.PlayerSpawnHandler;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.WorldSpawnHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.TerrainBlockReplacer;
 import com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager;
 import net.neoforged.fml.ModList;
@@ -178,6 +179,7 @@ public class WorldEditStructurePlacer {
                 CryoSpawnData data = CryoSpawnData.get(world);
                 data.addAll(cryoTubes);
                 PlayerSpawnHandler.setSpawnBlocks(data.getPositions());
+                WorldSpawnHandler.refreshWorldSpawn(world);
             }
             return bounds;
         } catch (Throwable e) {
