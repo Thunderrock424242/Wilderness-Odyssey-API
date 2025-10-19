@@ -6,6 +6,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -26,6 +27,12 @@ public class HardwareRequirementScreen extends Screen {
     private final HardwareRequirementChecker checker;
     private HardwareRequirementChecker.HardwareSnapshot snapshot;
     private EnumMap<HardwareRequirementConfig.Tier, HardwareRequirementChecker.TierEvaluation> evaluations;
+    private double scrollOffset;
+    private int contentHeight;
+    private int contentTop;
+    private int contentBottom;
+    private int contentLeft;
+    private int contentRight;
 
     public HardwareRequirementScreen(HardwareRequirementChecker checker) {
         super(Component.translatable("screen.wildernessodyssey.hardware.title"));
@@ -47,10 +54,31 @@ public class HardwareRequirementScreen extends Screen {
         this.renderBackground(graphics, mouseX, mouseY, partialTick);
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 20, 0xFFFFFF);
 
-        int y = 50;
+        this.contentLeft = 20;
+        this.contentRight = this.width - 20;
+        this.contentTop = 48;
+        this.contentBottom = this.height - 60;
+
+        if (this.contentBottom <= this.contentTop) {
+            this.contentBottom = this.contentTop + 1;
+        }
+
+        graphics.enableScissor(this.contentLeft, this.contentTop, this.contentRight, this.contentBottom);
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0, -this.scrollOffset, 0.0);
+
+        int y = this.contentTop;
         y = renderCurrentHardware(graphics, y);
         y += 12;
-        renderTierStatuses(graphics, y);
+        y = renderTierStatuses(graphics, y);
+
+        graphics.pose().popPose();
+        graphics.disableScissor();
+
+        this.contentHeight = y - this.contentTop;
+        clampScrollOffset();
+
+        renderScrollBar(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 
@@ -79,7 +107,7 @@ public class HardwareRequirementScreen extends Screen {
         return y + this.font.lineHeight;
     }
 
-    private void renderTierStatuses(GuiGraphics graphics, int y) {
+    private int renderTierStatuses(GuiGraphics graphics, int y) {
         graphics.drawString(this.font, Component.translatable("screen.wildernessodyssey.hardware.section.requirements"), 20, y, 0xFFFFFF);
         y += this.font.lineHeight + 4;
 
@@ -120,6 +148,48 @@ public class HardwareRequirementScreen extends Screen {
 
             y += 6;
         }
+        return y;
+    }
+
+    private void renderScrollBar(GuiGraphics graphics) {
+        int viewHeight = getViewHeight();
+        if (this.contentHeight <= viewHeight || viewHeight <= 4) {
+            return;
+        }
+
+        int scrollbarHeight = (int) Math.max(32.0, (double) viewHeight * viewHeight / this.contentHeight);
+        scrollbarHeight = Math.min(scrollbarHeight, viewHeight - 4);
+        int scrollbarTravel = viewHeight - scrollbarHeight;
+        int scrollbarTop = this.contentTop + (int) (this.scrollOffset * scrollbarTravel / (this.contentHeight - viewHeight));
+        int scrollbarRight = this.contentRight - 2;
+        int scrollbarLeft = scrollbarRight - 4;
+
+        graphics.fill(scrollbarLeft, this.contentTop, scrollbarRight, this.contentBottom, 0x66000000);
+        graphics.fill(scrollbarLeft, scrollbarTop, scrollbarRight, scrollbarTop + scrollbarHeight, 0xCCFFFFFF);
+    }
+
+    private int getViewHeight() {
+        return Math.max(1, this.contentBottom - this.contentTop);
+    }
+
+    private void clampScrollOffset() {
+        int viewHeight = getViewHeight();
+        int maxScroll = Math.max(0, this.contentHeight - viewHeight);
+        this.scrollOffset = Mth.clamp(this.scrollOffset, 0.0, maxScroll);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
+        if (isMouseOverContent(mouseX, mouseY) && this.contentHeight > getViewHeight()) {
+            double scrollDelta = deltaY != 0.0 ? deltaY : deltaX;
+            this.scrollOffset = Mth.clamp(this.scrollOffset - scrollDelta * 10, 0.0, Math.max(0, this.contentHeight - getViewHeight()));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY);
+    }
+
+    private boolean isMouseOverContent(double mouseX, double mouseY) {
+        return mouseX >= this.contentLeft && mouseX <= this.contentRight && mouseY >= this.contentTop && mouseY <= this.contentBottom;
     }
 
     private List<Component> buildRequirementSummary(HardwareRequirementConfig.HardwareRequirementTier requirements) {
