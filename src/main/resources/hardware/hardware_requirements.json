@@ -1,0 +1,38 @@
+{
+  "low": {
+    "cpu": {
+      "cores": 4
+    },
+    "ramMB": 8192,
+    "vramMB": 2048,
+    "shaderPack": "Complementary Shaders - Low Performance Preset",
+    "gpu": {
+      "vendorKeywords": ["nvidia", "amd", "intel"],
+      "rendererKeywords": []
+    }
+  },
+  "medium": {
+    "cpu": {
+      "cores": 6
+    },
+    "ramMB": 12288,
+    "vramMB": 4096,
+    "shaderPack": "Complementary Shaders - Balanced Preset",
+    "gpu": {
+      "vendorKeywords": ["nvidia", "amd"],
+      "rendererKeywords": []
+    }
+  },
+  "high": {
+    "cpu": {
+      "cores": 8
+    },
+    "ramMB": 16384,
+    "vramMB": 6144,
+    "shaderPack": "Complementary Shaders - Cinematic Preset",
+    "gpu": {
+      "vendorKeywords": ["nvidia", "amd"],
+      "rendererKeywords": []
+    }
+  }
+}
