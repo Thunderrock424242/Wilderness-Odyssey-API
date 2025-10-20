@@ -39,12 +39,33 @@ public final class AutoShaderCommand {
 
         HardwareRequirementConfig.Tier tier = maybeTier.get();
         Optional<HardwareRequirementConfig.HardwareRequirementTier> tierConfig = checker.config().getTier(tier);
-        if (tierConfig.isEmpty() || tierConfig.get().shaderPack().isEmpty()) {
+        if (tierConfig.isEmpty()) {
             source.sendFailure(Component.translatable("command.wildernessodyssey.autoshader.no_shader", tierComponent(tier)));
             return 0;
         }
 
-        String desiredShaderPack = tierConfig.get().shaderPack().orElseThrow();
+        return applyShaderPack(source, tier, tierConfig.get());
+    }
+
+    public static int execute(CommandSourceStack source, HardwareRequirementChecker checker, HardwareRequirementConfig.Tier tier) {
+        Optional<HardwareRequirementConfig.HardwareRequirementTier> tierConfig = checker.config().getTier(tier);
+        if (tierConfig.isEmpty()) {
+            source.sendFailure(Component.translatable("command.wildernessodyssey.autoshader.no_shader", tierComponent(tier)));
+            return 0;
+        }
+
+        return applyShaderPack(source, tier, tierConfig.get());
+    }
+
+    private static int applyShaderPack(CommandSourceStack source, HardwareRequirementConfig.Tier tier,
+                                       HardwareRequirementConfig.HardwareRequirementTier tierConfig) {
+        Optional<String> shaderPack = tierConfig.shaderPack();
+        if (shaderPack.isEmpty()) {
+            source.sendFailure(Component.translatable("command.wildernessodyssey.autoshader.no_shader", tierComponent(tier)));
+            return 0;
+        }
+
+        String desiredShaderPack = shaderPack.orElseThrow();
         ResolvedShaderPack resolved = resolveShaderPack(desiredShaderPack);
 
         try {
@@ -55,7 +76,7 @@ public final class AutoShaderCommand {
             return 0;
         }
 
-        ModConstants.LOGGER.info("Auto shader command selected '{}' for tier {}", resolved.fileName(), tier.name());
+        ModConstants.LOGGER.info("Auto shader command set '{}' for tier {}", resolved.fileName(), tier.name());
         source.sendSuccess(() -> Component.translatable("command.wildernessodyssey.autoshader.success",
             resolved.fileName(), tierComponent(tier)), false);
 

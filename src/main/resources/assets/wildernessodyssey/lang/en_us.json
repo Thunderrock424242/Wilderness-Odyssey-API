@@ -28,5 +28,6 @@
   "command.wildernessodyssey.autoshader.no_match": "Unable to determine a compatible hardware tier; Iris shaders were not changed.",
   "command.wildernessodyssey.autoshader.no_shader": "No shader recommendation is configured for the %s tier.",
   "command.wildernessodyssey.autoshader.write_error": "Failed to update Iris configuration: %s",
-  "command.wildernessodyssey.autoshader.pack_missing": "Recommended shader pack '%s' is not installed; saved preference anyway."
+  "command.wildernessodyssey.autoshader.pack_missing": "Recommended shader pack '%s' is not installed; saved preference anyway.",
+  "command.wildernessodyssey.autoshader.unknown_tier": "Unknown shader tier '%s'. Valid options: %s."
 }
