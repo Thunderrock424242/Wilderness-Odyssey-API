@@ -13,6 +13,7 @@ import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Reads the client's hardware information and compares it with the configured requirements.
@@ -51,6 +52,19 @@ public final class HardwareRequirementChecker {
 
     public EnumMap<HardwareRequirementConfig.Tier, TierEvaluation> evaluateAll() {
         return evaluateAll(getSnapshot());
+    }
+
+    public Optional<HardwareRequirementConfig.Tier> selectHighestMeetingTier(
+        EnumMap<HardwareRequirementConfig.Tier, TierEvaluation> evaluations) {
+        HardwareRequirementConfig.Tier[] tiers = HardwareRequirementConfig.Tier.values();
+        for (int i = tiers.length - 1; i >= 0; i--) {
+            HardwareRequirementConfig.Tier tier = tiers[i];
+            TierEvaluation evaluation = evaluations.get(tier);
+            if (evaluation != null && evaluation.meets()) {
+                return Optional.of(tier);
+            }
+        }
+        return Optional.empty();
     }
 
     private TierEvaluation evaluateTier(HardwareSnapshot snapshot, HardwareRequirementConfig.HardwareRequirementTier tier) {
