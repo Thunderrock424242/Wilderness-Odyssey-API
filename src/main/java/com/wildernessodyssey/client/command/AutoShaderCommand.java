@@ -31,7 +31,7 @@ public final class AutoShaderCommand {
         EnumMap<HardwareRequirementConfig.Tier, HardwareRequirementChecker.TierEvaluation> evaluations =
             checker.evaluateAll(checker.getSnapshot());
 
-        Optional<HardwareRequirementConfig.Tier> maybeTier = selectTier(evaluations);
+        Optional<HardwareRequirementConfig.Tier> maybeTier = checker.selectHighestMeetingTier(evaluations);
         if (maybeTier.isEmpty()) {
             source.sendFailure(Component.translatable("command.wildernessodyssey.autoshader.no_match"));
             return 0;
@@ -85,19 +85,6 @@ public final class AutoShaderCommand {
         }
 
         return 1;
-    }
-
-    private static Optional<HardwareRequirementConfig.Tier> selectTier(
-        EnumMap<HardwareRequirementConfig.Tier, HardwareRequirementChecker.TierEvaluation> evaluations) {
-        HardwareRequirementConfig.Tier[] tiers = HardwareRequirementConfig.Tier.values();
-        for (int i = tiers.length - 1; i >= 0; i--) {
-            HardwareRequirementConfig.Tier tier = tiers[i];
-            HardwareRequirementChecker.TierEvaluation evaluation = evaluations.get(tier);
-            if (evaluation != null && evaluation.meets()) {
-                return Optional.of(tier);
-            }
-        }
-        return Optional.empty();
     }
 
     private static ResolvedShaderPack resolveShaderPack(String desiredShaderPack) {
