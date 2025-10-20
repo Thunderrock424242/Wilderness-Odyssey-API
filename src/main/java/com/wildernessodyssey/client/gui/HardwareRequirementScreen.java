@@ -84,6 +84,11 @@ public class HardwareRequirementScreen extends Screen {
     }
 
     @Override
+    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        graphics.fillGradient(0, 0, this.width, this.height, 0xCC101010, 0xCC101010);
+    }
+
+    @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (this.shouldCloseOnEsc() && keyCode == InputConstants.KEY_ESCAPE) {
             this.onClose();
