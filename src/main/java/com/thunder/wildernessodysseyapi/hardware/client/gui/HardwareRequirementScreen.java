@@ -1,8 +1,8 @@
-package com.wildernessodyssey.client.gui;
+package com.thunder.wildernessodysseyapi.hardware.client.gui;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import com.wildernessodyssey.client.hardware.HardwareRequirementChecker;
-import com.wildernessodyssey.client.hardware.HardwareRequirementConfig;
+import com.thunder.wildernessodysseyapi.hardware.client.hardware.HardwareRequirementChecker;
+import com.thunder.wildernessodysseyapi.hardware.client.hardware.HardwareRequirementConfig;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;

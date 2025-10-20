@@ -1,8 +1,8 @@
-package com.wildernessodyssey.client.command;
+package com.thunder.wildernessodysseyapi.hardware.client.command;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
-import com.wildernessodyssey.client.hardware.HardwareRequirementChecker;
-import com.wildernessodyssey.client.hardware.HardwareRequirementConfig;
+import com.thunder.wildernessodysseyapi.hardware.client.hardware.HardwareRequirementChecker;
+import com.thunder.wildernessodysseyapi.hardware.client.hardware.HardwareRequirementConfig;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
 import net.neoforged.fml.loading.FMLPaths;

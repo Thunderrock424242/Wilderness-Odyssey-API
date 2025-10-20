@@ -1,4 +1,4 @@
-package com.wildernessodyssey.client.hardware;
+package com.thunder.wildernessodysseyapi.hardware.client.hardware;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

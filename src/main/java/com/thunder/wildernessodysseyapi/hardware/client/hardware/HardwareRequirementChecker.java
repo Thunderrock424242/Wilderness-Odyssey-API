@@ -1,4 +1,4 @@
-package com.wildernessodyssey.client.hardware;
+package com.thunder.wildernessodysseyapi.hardware.client.hardware;
 
 import net.minecraft.util.Mth;
 import org.apache.logging.log4j.LogManager;
