@@ -14,6 +14,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -23,6 +24,7 @@ public class HardwareRequirementScreen extends Screen {
     private static final int COLOR_OK = 0x4CAF50;
     private static final int COLOR_WARN = 0xFF5555;
     private static final int COLOR_UNKNOWN = 0xFFA000;
+    private static final int COLOR_INFO = 0x64B5F6;
 
     private final HardwareRequirementChecker checker;
     private HardwareRequirementChecker.HardwareSnapshot snapshot;
@@ -126,6 +128,22 @@ public class HardwareRequirementScreen extends Screen {
         graphics.drawString(this.font, Component.translatable("screen.wildernessodyssey.hardware.section.requirements"), 20, y, 0xFFFFFF);
         y += this.font.lineHeight + 4;
 
+        Optional<HardwareRequirementConfig.Tier> bestTier = checker.selectHighestMeetingTier(evaluations);
+        Component bestTierLabel = bestTier
+            .map(tier -> Component.translatable("hardware.wildernessodyssey.tier." + tier.name().toLowerCase()))
+            .orElse(null);
+
+        if (bestTier.isPresent()) {
+            graphics.drawString(this.font,
+                Component.translatable("screen.wildernessodyssey.hardware.best_tier", bestTierLabel),
+                20, y, COLOR_OK);
+        } else {
+            graphics.drawString(this.font,
+                Component.translatable("screen.wildernessodyssey.hardware.best_tier.unknown"),
+                20, y, COLOR_WARN);
+        }
+        y += this.font.lineHeight + 6;
+
         for (Map.Entry<HardwareRequirementConfig.Tier, HardwareRequirementChecker.TierEvaluation> entry : evaluations.entrySet()) {
             HardwareRequirementConfig.Tier tier = entry.getKey();
             HardwareRequirementChecker.TierEvaluation evaluation = entry.getValue();
@@ -144,6 +162,10 @@ public class HardwareRequirementScreen extends Screen {
                 String issues = unknown.stream().map(this::describeMetric).collect(Collectors.joining(", "));
                 message = Component.translatable("hardware.wildernessodyssey.status.partial", tierLabel, issues);
                 color = COLOR_UNKNOWN;
+            } else if (bestTier.isPresent() && bestTier.get() != tier && bestTierLabel != null
+                && bestTier.get().ordinal() > tier.ordinal()) {
+                message = Component.translatable("hardware.wildernessodyssey.status.exceeds", tierLabel, bestTierLabel);
+                color = COLOR_INFO;
             } else {
                 message = Component.translatable("hardware.wildernessodyssey.status.ok", tierLabel);
                 color = COLOR_OK;

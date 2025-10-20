@@ -20,13 +20,17 @@
   "hardware.wildernessodyssey.tier.medium": "medium",
   "hardware.wildernessodyssey.tier.high": "high",
   "hardware.wildernessodyssey.status.ok": "Your system meets the %s requirements.",
+  "hardware.wildernessodyssey.status.exceeds": "Your system exceeds the %s requirements (qualifies for %s).",
   "hardware.wildernessodyssey.status.partial": "Unable to fully verify the %s requirements (%s).",
   "hardware.wildernessodyssey.status.warning": "Your system does not meet the %s requirements (%s).",
+  "screen.wildernessodyssey.hardware.best_tier": "Detected tier: %s",
+  "screen.wildernessodyssey.hardware.best_tier.unknown": "Unable to determine your tier; see detailed checks below.",
   "screen.wildernessodyssey.hardware.requirement.shaderpack": "\u2022 Recommended Iris shader pack: %s",
   "command.wildernessodyssey.hardware.open": "Opened the hardware requirement summary",
   "command.wildernessodyssey.autoshader.success": "Enabled Iris shaders using %s for the %s tier.",
   "command.wildernessodyssey.autoshader.no_match": "Unable to determine a compatible hardware tier; Iris shaders were not changed.",
   "command.wildernessodyssey.autoshader.no_shader": "No shader recommendation is configured for the %s tier.",
   "command.wildernessodyssey.autoshader.write_error": "Failed to update Iris configuration: %s",
-  "command.wildernessodyssey.autoshader.pack_missing": "Recommended shader pack '%s' is not installed; saved preference anyway."
+  "command.wildernessodyssey.autoshader.pack_missing": "Recommended shader pack '%s' is not installed; saved preference anyway.",
+  "command.wildernessodyssey.autoshader.unknown_tier": "Unknown shader tier '%s'. Valid options: %s."
 }
