@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.World
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
@@ -25,6 +26,7 @@ import net.minecraft.tags.BiomeTags;
 import java.util.Set;
 import net.neoforged.fml.ModList;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -56,6 +58,7 @@ public class MeteorStructureSpawner {
     private static final Set<Long> forcedChunks = new HashSet<>();
     private static final Map<ResourceKey<Level>, Integer> retryAttempts = new HashMap<>();
     private static boolean missingWorldEditLogged = false;
+    private static final ArrayDeque<Runnable> scheduledTasks = new ArrayDeque<>();
 
     public static void tryPlace(ServerLevel level) {
         tryPlace(level, 0);
@@ -67,6 +70,17 @@ public class MeteorStructureSpawner {
         worldEditCountdownExpiryTick = -1L;
         retryAttempts.clear();
         missingWorldEditLogged = false;
+        scheduledTasks.clear();
+    }
+
+    public static void tick(MinecraftServer server) {
+        int tasksToRun = scheduledTasks.size();
+        for (int i = 0; i < tasksToRun; i++) {
+            Runnable task = scheduledTasks.poll();
+            if (task != null) {
+                task.run();
+            }
+        }
     }
 
     private static void tryPlace(ServerLevel level, int attempt) {
@@ -152,7 +166,7 @@ public class MeteorStructureSpawner {
             return;
         }
         retryAttempts.put(dimension, nextAttempt);
-        level.getServer().execute(() -> tryPlace(level, nextAttempt));
+        enqueueTask(level, () -> tryPlace(level, nextAttempt));
     }
 
     private static BlockPos placeMeteorSite(ServerLevel level, BlockPos origin,
@@ -218,7 +232,7 @@ public class MeteorStructureSpawner {
         forceChunk(level, bunkerChunk);
 
         if (!WorldEditStructurePlacer.isWorldEditReady()) {
-            scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, tracker, impactData, 0);
+            scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, 0);
             return PlacementState.DEFERRED;
         }
 
@@ -233,20 +247,22 @@ public class MeteorStructureSpawner {
             return PlacementState.SUCCESS;
         }
 
-        scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, tracker, impactData, 1);
+        scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, 1);
         return PlacementState.DEFERRED;
     }
 
     private static void scheduleDeferredPlacement(ServerLevel level, BlockPos bunkerPos,
-                                                  ChunkPos bunkerChunk,
-                                                  StructureSpawnTracker tracker,
-                                                  MeteorImpactData impactData, int attempt) {
-        level.getServer().execute(() -> {
+                                                  ChunkPos bunkerChunk, int attempt) {
+        enqueueTask(level, () -> {
             if (isCountdownExpired(level)) {
                 releaseForcedChunk(level, bunkerChunk);
                 scheduleRetry(level, attempt + 1);
                 return;
             }
+
+            StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
+            MeteorImpactData impactData = MeteorImpactData.get(level);
+
             if (tracker.hasSpawnedAt(bunkerPos)) {
                 impactData.setBunkerPos(bunkerPos);
                 WorldSpawnHandler.refreshWorldSpawn(level);
@@ -263,7 +279,7 @@ public class MeteorStructureSpawner {
                     );
                 }
                 if (attempt < MAX_DEFERRED_ATTEMPTS) {
-                    scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, tracker, impactData, attempt + 1);
+                    scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, attempt + 1);
                 } else {
                     releaseForcedChunk(level, bunkerChunk);
                     scheduleRetry(level, attempt + 1);
@@ -281,12 +297,20 @@ public class MeteorStructureSpawner {
                 markPlacementComplete(level);
             } else if (attempt < MAX_DEFERRED_ATTEMPTS) {
                 // Placement failed even though WorldEdit reported ready; try again next tick.
-                scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, tracker, impactData, attempt + 1);
+                scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, attempt + 1);
             } else {
                 releaseForcedChunk(level, bunkerChunk);
                 scheduleRetry(level, attempt + 1);
             }
         });
+    }
+
+    private static void enqueueTask(ServerLevel level, Runnable task) {
+        if (level.getServer().isSameThread()) {
+            scheduledTasks.add(task);
+        } else {
+            level.getServer().execute(() -> scheduledTasks.add(task));
+        }
     }
 
     private static void forceChunk(ServerLevel level, ChunkPos chunkPos) {
