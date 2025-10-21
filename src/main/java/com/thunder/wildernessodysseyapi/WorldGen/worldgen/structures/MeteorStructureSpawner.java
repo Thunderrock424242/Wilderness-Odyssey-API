@@ -54,9 +54,7 @@ public class MeteorStructureSpawner {
 
     public static void tryPlace(ServerLevel level) {
         MeteorImpactData impactData = MeteorImpactData.get(level);
-        if (impactData.getBunkerPos() != null) {
-            placed = true;
-        }
+        placed = impactData.getBunkerPos() != null;
 
         if (placed) {
             return;
@@ -88,6 +86,12 @@ public class MeteorStructureSpawner {
         }
 
         placed = impactData.getBunkerPos() != null;
+    }
+
+    public static void resetState() {
+        placed = false;
+        forcedChunks.clear();
+        worldEditCountdownExpiryTick = -1L;
     }
 
     private static BlockPos placeMeteorSite(ServerLevel level, BlockPos origin) {
