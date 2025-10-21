@@ -15,6 +15,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
@@ -25,8 +26,10 @@ import java.util.Set;
 import net.neoforged.fml.ModList;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
@@ -51,20 +54,48 @@ public class MeteorStructureSpawner {
 
     private static boolean placed = false;
     private static final Set<Long> forcedChunks = new HashSet<>();
+    private static final Map<ResourceKey<Level>, Integer> retryAttempts = new HashMap<>();
+    private static boolean missingWorldEditLogged = false;
 
     public static void tryPlace(ServerLevel level) {
-        MeteorImpactData impactData = MeteorImpactData.get(level);
-        placed = impactData.getBunkerPos() != null;
+        tryPlace(level, 0);
+    }
 
+    public static void resetState() {
+        placed = false;
+        forcedChunks.clear();
+        worldEditCountdownExpiryTick = -1L;
+        retryAttempts.clear();
+        missingWorldEditLogged = false;
+    }
+
+    private static void tryPlace(ServerLevel level, int attempt) {
         if (placed) {
+            retryAttempts.remove(level.dimension());
+            return;
+        }
+
+        MeteorImpactData impactData = MeteorImpactData.get(level);
+        if (impactData.getBunkerPos() != null) {
+            markPlacementComplete(level);
             return;
         }
 
         if (isCountdownExpired(level)) {
-            placed = true;
+            markPlacementComplete(level);
             return;
         }
-        RandomSource random = RandomSource.create(level.getSeed());
+
+        boolean worldEditLoaded = ModList.get().isLoaded("worldedit");
+        boolean worldEditReady = !worldEditLoaded || WorldEditStructurePlacer.isWorldEditReady();
+
+        if (worldEditLoaded && !worldEditReady) {
+            scheduleRetry(level, attempt + 1);
+            return;
+        }
+
+        long seed = level.getSeed() ^ (31L * attempt + 0x9E3779B97F4A7C15L);
+        RandomSource random = RandomSource.create(seed);
         BlockPos spawn = level.getSharedSpawnPos();
 
         List<BlockPos> storedSites = new ArrayList<>(impactData.getImpactPositions());
@@ -72,7 +103,11 @@ public class MeteorStructureSpawner {
 
         for (int i = storedSites.size(); i < IMPACT_SITE_COUNT; i++) {
             BlockPos origin = findImpactOrigin(level, random, spawn, storedSites);
-            BlockPos impactPos = placeMeteorSite(level, origin);
+            BlockPos impactPos = placeMeteorSite(level, origin, worldEditLoaded, worldEditReady);
+            if (impactPos == null) {
+                scheduleRetry(level, attempt + 1);
+                return;
+            }
             storedSites.add(impactPos);
         }
 
@@ -82,20 +117,50 @@ public class MeteorStructureSpawner {
 
         if (impactData.getBunkerPos() == null && !storedSites.isEmpty()) {
             BlockPos bunkerAnchor = storedSites.get(random.nextInt(storedSites.size()));
-            placeBunker(level, bunkerAnchor, impactData);
+            PlacementState bunkerState = placeBunker(level, bunkerAnchor, impactData);
+            if (bunkerState == PlacementState.SUCCESS) {
+                markPlacementComplete(level);
+                return;
+            }
+            if (bunkerState == PlacementState.DEFERRED) {
+                return;
+            }
         }
 
-        placed = impactData.getBunkerPos() != null;
+        if (impactData.getBunkerPos() != null) {
+            markPlacementComplete(level);
+        } else if (worldEditLoaded) {
+            scheduleRetry(level, attempt + 1);
+        }
     }
 
-    public static void resetState() {
-        placed = false;
-        forcedChunks.clear();
-        worldEditCountdownExpiryTick = -1L;
+    private static void markPlacementComplete(ServerLevel level) {
+        placed = true;
+        retryAttempts.remove(level.dimension());
     }
 
-    private static BlockPos placeMeteorSite(ServerLevel level, BlockPos origin) {
-        if (ModList.get().isLoaded("worldedit")) {
+    private static void scheduleRetry(ServerLevel level, int nextAttempt) {
+        if (placed) {
+            return;
+        }
+        if (nextAttempt > MAX_DEFERRED_ATTEMPTS) {
+            return;
+        }
+        ResourceKey<Level> dimension = level.dimension();
+        int current = retryAttempts.getOrDefault(dimension, 0);
+        if (current >= nextAttempt) {
+            return;
+        }
+        retryAttempts.put(dimension, nextAttempt);
+        level.getServer().execute(() -> tryPlace(level, nextAttempt));
+    }
+
+    private static BlockPos placeMeteorSite(ServerLevel level, BlockPos origin,
+                                            boolean worldEditLoaded, boolean worldEditReady) {
+        if (worldEditLoaded) {
+            if (!worldEditReady) {
+                return null;
+            }
             AABB bounds = METEOR_SITE_PLACER.placeStructure(level, origin);
             if (bounds != null) {
                 return BlockPos.containing(bounds.getCenter());
@@ -119,13 +184,23 @@ public class MeteorStructureSpawner {
         return spawnPos;
     }
 
-    private static void placeBunker(ServerLevel level, BlockPos impactPos, MeteorImpactData impactData) {
+    private enum PlacementState {
+        SUCCESS,
+        DEFERRED,
+        FAILED
+    }
+
+    private static PlacementState placeBunker(ServerLevel level, BlockPos impactPos, MeteorImpactData impactData) {
         if (!ModList.get().isLoaded("worldedit")) {
-            return;
+            if (!missingWorldEditLogged) {
+                ModConstants.LOGGER.warn("WorldEdit is required to place the bunker structure; skipping placement");
+                missingWorldEditLogged = true;
+            }
+            return PlacementState.FAILED;
         }
 
         if (isCountdownExpired(level)) {
-            return;
+            return PlacementState.FAILED;
         }
 
         BlockPos bunkerPos = impactPos.offset(32, 0, 0);
@@ -135,7 +210,8 @@ public class MeteorStructureSpawner {
         if (tracker.hasSpawnedAt(bunkerPos)) {
             impactData.setBunkerPos(bunkerPos);
             WorldSpawnHandler.refreshWorldSpawn(level);
-            return;
+            markPlacementComplete(level);
+            return PlacementState.SUCCESS;
         }
 
         ChunkPos bunkerChunk = new ChunkPos(bunkerPos);
@@ -143,7 +219,7 @@ public class MeteorStructureSpawner {
 
         if (!WorldEditStructurePlacer.isWorldEditReady()) {
             scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, tracker, impactData, 0);
-            return;
+            return PlacementState.DEFERRED;
         }
 
         AABB bounds = BUNKER_PLACER.placeStructure(level, bunkerPos);
@@ -153,9 +229,12 @@ public class MeteorStructureSpawner {
             impactData.setBunkerPos(bunkerPos);
             WorldSpawnHandler.refreshWorldSpawn(level);
             releaseForcedChunk(level, bunkerChunk);
-        } else {
-            scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, tracker, impactData, 1);
+            markPlacementComplete(level);
+            return PlacementState.SUCCESS;
         }
+
+        scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, tracker, impactData, 1);
+        return PlacementState.DEFERRED;
     }
 
     private static void scheduleDeferredPlacement(ServerLevel level, BlockPos bunkerPos,
@@ -165,12 +244,14 @@ public class MeteorStructureSpawner {
         level.getServer().execute(() -> {
             if (isCountdownExpired(level)) {
                 releaseForcedChunk(level, bunkerChunk);
+                scheduleRetry(level, attempt + 1);
                 return;
             }
             if (tracker.hasSpawnedAt(bunkerPos)) {
                 impactData.setBunkerPos(bunkerPos);
                 WorldSpawnHandler.refreshWorldSpawn(level);
                 releaseForcedChunk(level, bunkerChunk);
+                markPlacementComplete(level);
                 return;
             }
 
@@ -185,6 +266,7 @@ public class MeteorStructureSpawner {
                     scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, tracker, impactData, attempt + 1);
                 } else {
                     releaseForcedChunk(level, bunkerChunk);
+                    scheduleRetry(level, attempt + 1);
                 }
                 return;
             }
@@ -196,11 +278,13 @@ public class MeteorStructureSpawner {
                 impactData.setBunkerPos(bunkerPos);
                 WorldSpawnHandler.refreshWorldSpawn(level);
                 releaseForcedChunk(level, bunkerChunk);
+                markPlacementComplete(level);
             } else if (attempt < MAX_DEFERRED_ATTEMPTS) {
                 // Placement failed even though WorldEdit reported ready; try again next tick.
                 scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, tracker, impactData, attempt + 1);
             } else {
                 releaseForcedChunk(level, bunkerChunk);
+                scheduleRetry(level, attempt + 1);
             }
         });
     }
