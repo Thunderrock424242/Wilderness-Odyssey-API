@@ -211,6 +211,7 @@ public class WildernessOdysseyAPIMainModClass {
         // Every server tick event
         // This is equivalent to the old "END" phase.
         MinecraftServer server = event.getServer();
+        MeteorStructureSpawner.tick(server);
         if (!event.hasTime()) return;
 
         if (++serverTickCounter >= LOG_INTERVAL) {
