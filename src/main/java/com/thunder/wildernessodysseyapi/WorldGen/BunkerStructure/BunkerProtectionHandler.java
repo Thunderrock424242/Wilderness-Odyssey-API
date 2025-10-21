@@ -41,6 +41,13 @@ public class BunkerProtectionHandler {
     }
 
     /**
+     * Clears all tracked bunker bounds. Intended for lifecycle resets.
+     */
+    public static void clear() {
+        bunkerBounds.clear();
+    }
+
+    /**
      * @return immutable view of all known bunker bounds.
      */
     public static List<AABB> getBunkerBounds() {
