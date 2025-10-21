@@ -29,6 +29,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorStructureSpawner;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.fml.ModList;
@@ -137,7 +138,8 @@ public class WildernessOdysseyAPIMainModClass {
      */
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
-
+        MeteorStructureSpawner.resetState();
+        BunkerProtectionHandler.clear();
     }
 
     /**
@@ -194,7 +196,8 @@ public class WildernessOdysseyAPIMainModClass {
      */
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
-
+        MeteorStructureSpawner.resetState();
+        BunkerProtectionHandler.clear();
     }
 
     private void onLoadComplete(FMLLoadCompleteEvent event) {
