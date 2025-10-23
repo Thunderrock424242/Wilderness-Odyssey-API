@@ -157,7 +157,7 @@ public final class HardwareRequirementChecker {
         try {
             com.sun.management.OperatingSystemMXBean osBean =
                 (com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-            long totalBytes = osBean.getTotalPhysicalMemorySize();
+            long totalBytes = osBean.getTotalMemorySize();
             return totalBytes > 0 ? totalBytes / (1024L * 1024L) : -1L;
         } catch (ClassCastException | LinkageError ex) {
             long maxMemory = Runtime.getRuntime().maxMemory();

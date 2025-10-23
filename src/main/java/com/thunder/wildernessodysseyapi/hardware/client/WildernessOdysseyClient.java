@@ -1,11 +1,11 @@
-package com.wildernessodyssey.client;
+package com.thunder.wildernessodysseyapi.hardware.client;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import com.wildernessodyssey.client.command.AutoShaderCommand;
-import com.wildernessodyssey.client.gui.HardwareRequirementScreen;
-import com.wildernessodyssey.client.hardware.HardwareRequirementChecker;
-import com.wildernessodyssey.client.hardware.HardwareRequirementConfig;
+import com.thunder.wildernessodysseyapi.hardware.client.command.AutoShaderCommand;
+import com.thunder.wildernessodysseyapi.hardware.client.gui.HardwareRequirementScreen;
+import com.thunder.wildernessodysseyapi.hardware.client.hardware.HardwareRequirementChecker;
+import com.thunder.wildernessodysseyapi.hardware.client.hardware.HardwareRequirementConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
