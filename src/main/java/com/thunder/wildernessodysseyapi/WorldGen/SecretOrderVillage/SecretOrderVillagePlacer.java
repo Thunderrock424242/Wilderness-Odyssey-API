@@ -13,6 +13,7 @@ import com.sk89q.worldedit.session.ClipboardHolder;
 import com.sk89q.worldedit.world.World;
 import com.sk89q.worldedit.world.block.BlockType;
 import com.sk89q.worldedit.world.block.BlockTypes;
+import com.sk89q.worldedit.neoforge.NeoForgeAdapter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
@@ -89,7 +90,8 @@ public class SecretOrderVillagePlacer {
 
             BlockPos basePos = world.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, position);
 
-            try (EditSession editSession = WorldEdit.getInstance().newEditSession((World) world)) {
+            World adaptedWorld = NeoForgeAdapter.adapt(world);
+            try (EditSession editSession = WorldEdit.getInstance().newEditSession(adaptedWorld)) {
                 ClipboardHolder holder = new ClipboardHolder(clipboard);
                 holder.createPaste(editSession)
                         .to(BlockVector3.at(basePos.getX(), basePos.getY(), basePos.getZ()))
