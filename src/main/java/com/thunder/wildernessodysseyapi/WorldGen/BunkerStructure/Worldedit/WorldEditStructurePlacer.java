@@ -10,6 +10,7 @@ import com.sk89q.worldedit.session.ClipboardHolder;
 import com.sk89q.worldedit.world.World;
 import com.sk89q.worldedit.world.block.BlockType;
 import com.sk89q.worldedit.world.block.BlockTypes;
+import com.sk89q.worldedit.neoforge.NeoForgeAdapter;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.CryoSpawnData;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.PlayerSpawnHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.WorldSpawnHandler;
@@ -141,7 +142,8 @@ public class WorldEditStructurePlacer {
                     max.x() + surfacePos.getX(), max.y() + surfacePos.getY(), max.z() + surfacePos.getZ()
             );
 
-            try (final EditSession editSession = WorldEdit.getInstance().newEditSession((World) world)) {
+            World adaptedWorld = NeoForgeAdapter.adapt(world);
+            try (final EditSession editSession = WorldEdit.getInstance().newEditSession(adaptedWorld)) {
                 ClipboardHolder holder = new ClipboardHolder(clipboard);
 
                 // Iterate through the clipboard's region and replace placeholder blocks

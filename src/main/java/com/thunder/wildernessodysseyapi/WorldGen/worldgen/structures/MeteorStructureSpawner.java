@@ -175,9 +175,16 @@ public class MeteorStructureSpawner {
             if (!worldEditReady) {
                 return null;
             }
-            AABB bounds = METEOR_SITE_PLACER.placeStructure(level, origin);
-            if (bounds != null) {
-                return BlockPos.containing(bounds.getCenter());
+
+            ChunkPos impactChunk = new ChunkPos(origin);
+            forceChunk(level, impactChunk);
+            try {
+                AABB bounds = METEOR_SITE_PLACER.placeStructure(level, origin);
+                if (bounds != null) {
+                    return BlockPos.containing(bounds.getCenter());
+                }
+            } finally {
+                releaseForcedChunk(level, impactChunk);
             }
         }
 
