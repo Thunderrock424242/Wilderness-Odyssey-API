@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure;
 import com.thunder.ticktoklib.TickTokHelper;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
+import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -14,14 +15,25 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.fml.ModList;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Generates bunker structures when suitable chunks load.
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public class BunkerStructureGenerator {
     private static final int DEFAULT_MIN_DISTANCE_CHUNKS = 32;
+    private static final int INITIAL_PLACEMENT_DELAY_TICKS = 20 * 5;
+    private static final int RETRY_DELAY_TICKS = 1;
+    private static final int MAX_DEFERRED_ATTEMPTS = 100;
     private static final long WORLD_EDIT_GRACE_PERIOD_TICKS = TickTokHelper.duration(0,2,0,0);
     private static long worldEditCountdownExpiryTick = -1L;
+    private static final Set<Long> scheduledPositions = new HashSet<>();
+
+    public static void resetDeferredState() {
+        scheduledPositions.clear();
+    }
 
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
@@ -45,48 +57,62 @@ public class BunkerStructureGenerator {
         if (tracker.getSpawnCount() >= maxCount) return;
         if (!tracker.isFarEnough(surfacePos, minChunks)) return;
 
-        if (!WorldEditStructurePlacer.isWorldEditReady()) {
-            scheduleDeferredPlacement(level, surfacePos, tracker, minChunks, maxCount, 0);
-            return;
-        }
+        long key = surfacePos.asLong();
+        if (!scheduledPositions.add(key)) return;
 
-        // Load from data packs if available, else fall back to bundled schematic
-        WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
-        AABB bounds = placer.placeStructure(level, surfacePos);
-        if (bounds != null) {
-            tracker.addSpawnPos(surfacePos);
-            BunkerProtectionHandler.addBunkerBounds(bounds);
-        }
+        scheduleDeferredPlacement(level, surfacePos, tracker, minChunks, maxCount, 0, INITIAL_PLACEMENT_DELAY_TICKS);
     }
 
     private static void scheduleDeferredPlacement(ServerLevel level, BlockPos surfacePos, StructureSpawnTracker tracker,
                                                   int minChunks, int maxCount, int attempt) {
-        level.getServer().execute(() -> {
-            if (isCountdownExpired(level)) return;
-            if (tracker.hasSpawnedAt(surfacePos)) return;
-            if (tracker.getSpawnCount() >= maxCount) return;
-            if (!tracker.isFarEnough(surfacePos, minChunks)) return;
+        scheduleDeferredPlacement(level, surfacePos, tracker, minChunks, maxCount, attempt, RETRY_DELAY_TICKS);
+    }
+
+    private static void scheduleDeferredPlacement(ServerLevel level, BlockPos surfacePos, StructureSpawnTracker tracker,
+                                                  int minChunks, int maxCount, int attempt, int delayTicks) {
+        DeferredTaskScheduler.schedule(level, () -> {
+            long key = surfacePos.asLong();
+
+            if (isCountdownExpired(level) || tracker.hasSpawnedAt(surfacePos)) {
+                scheduledPositions.remove(key);
+                return;
+            }
+
+            if (tracker.getSpawnCount() >= maxCount || !tracker.isFarEnough(surfacePos, minChunks)) {
+                scheduledPositions.remove(key);
+                return;
+            }
 
             if (!WorldEditStructurePlacer.isWorldEditReady()) {
                 if (attempt == 40) {
                     ModConstants.LOGGER.warn("WorldEdit still initializing; bunker placement at {} delayed", surfacePos);
                 }
-                if (attempt < 100) {
+                if (attempt < MAX_DEFERRED_ATTEMPTS) {
                     scheduleDeferredPlacement(level, surfacePos, tracker, minChunks, maxCount, attempt + 1);
+                } else {
+                    scheduledPositions.remove(key);
                 }
                 return;
             }
 
-            if (isCountdownExpired(level)) return;
+            if (isCountdownExpired(level)) {
+                scheduledPositions.remove(key);
+                return;
+            }
 
             WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
             AABB bounds = placer.placeStructure(level, surfacePos);
             if (bounds != null) {
                 tracker.addSpawnPos(surfacePos);
                 BunkerProtectionHandler.addBunkerBounds(bounds);
+                scheduledPositions.remove(key);
+            } else if (attempt < MAX_DEFERRED_ATTEMPTS) {
+                scheduleDeferredPlacement(level, surfacePos, tracker, minChunks, maxCount, attempt + 1);
+            } else {
+                scheduledPositions.remove(key);
             }
-        });
-}
+        }, Math.max(1, delayTicks));
+    }
 
     private static boolean isCountdownExpired(ServerLevel level) {
         if (!WorldEditStructurePlacer.isWorldEditReady()) {

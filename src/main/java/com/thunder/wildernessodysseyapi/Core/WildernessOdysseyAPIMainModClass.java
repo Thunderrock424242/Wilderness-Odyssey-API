@@ -30,7 +30,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerStructureGenerator;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorStructureSpawner;
+import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.config.ModConfig;
@@ -140,6 +142,7 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStarting(ServerStartingEvent event){
         MeteorStructureSpawner.resetState();
         BunkerProtectionHandler.clear();
+        BunkerStructureGenerator.resetDeferredState();
     }
 
     /**
@@ -198,6 +201,7 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStopping(ServerStoppingEvent event) {
         MeteorStructureSpawner.resetState();
         BunkerProtectionHandler.clear();
+        BunkerStructureGenerator.resetDeferredState();
     }
 
     private void onLoadComplete(FMLLoadCompleteEvent event) {
@@ -211,7 +215,7 @@ public class WildernessOdysseyAPIMainModClass {
         // Every server tick event
         // This is equivalent to the old "END" phase.
         MinecraftServer server = event.getServer();
-        MeteorStructureSpawner.tick(server);
+        DeferredTaskScheduler.tick();
         if (!event.hasTime()) return;
 
         if (++serverTickCounter >= LOG_INTERVAL) {
