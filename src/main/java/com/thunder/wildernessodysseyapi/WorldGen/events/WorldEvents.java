@@ -12,8 +12,8 @@ public class WorldEvents {
     @SubscribeEvent
     public void onWorldLoad(LevelEvent.Load event) {
         if (event.getLevel() instanceof ServerLevel level) {
-            // Place the meteor impact zone and bunker when the world loads
-            MeteorStructureSpawner.tryPlace(level);
+            // Schedule the meteor impact zone and bunker shortly after the first player joins
+            MeteorStructureSpawner.scheduleInitialPlacement(level);
         }
     }
 }
