@@ -5,10 +5,10 @@ import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectio
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.StructureSpawnTracker;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.WorldSpawnHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
+import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
@@ -26,7 +26,6 @@ import net.minecraft.tags.BiomeTags;
 import java.util.Set;
 import net.neoforged.fml.ModList;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -58,7 +57,9 @@ public class MeteorStructureSpawner {
     private static final Set<Long> forcedChunks = new HashSet<>();
     private static final Map<ResourceKey<Level>, Integer> retryAttempts = new HashMap<>();
     private static boolean missingWorldEditLogged = false;
-    private static final ArrayDeque<Runnable> scheduledTasks = new ArrayDeque<>();
+    private static final Set<ResourceKey<Level>> initialPlacementScheduled = new HashSet<>();
+    private static final int INITIAL_PLACEMENT_DELAY_TICKS = 20 * 5; // 5 seconds
+    private static final int BUNKER_PLACEMENT_DELAY_TICKS = INITIAL_PLACEMENT_DELAY_TICKS;
 
     public static void tryPlace(ServerLevel level) {
         tryPlace(level, 0);
@@ -70,17 +71,25 @@ public class MeteorStructureSpawner {
         worldEditCountdownExpiryTick = -1L;
         retryAttempts.clear();
         missingWorldEditLogged = false;
-        scheduledTasks.clear();
+        DeferredTaskScheduler.clear();
+        initialPlacementScheduled.clear();
     }
 
-    public static void tick(MinecraftServer server) {
-        int tasksToRun = scheduledTasks.size();
-        for (int i = 0; i < tasksToRun; i++) {
-            Runnable task = scheduledTasks.poll();
-            if (task != null) {
-                task.run();
-            }
+    public static void scheduleInitialPlacement(ServerLevel level) {
+        scheduleInitialPlacement(level, INITIAL_PLACEMENT_DELAY_TICKS);
+    }
+
+    public static void scheduleInitialPlacement(ServerLevel level, int delayTicks) {
+        if (placed) {
+            return;
         }
+
+        ResourceKey<Level> dimension = level.dimension();
+        if (!initialPlacementScheduled.add(dimension)) {
+            return;
+        }
+
+        enqueueTask(level, () -> tryPlace(level), Math.max(1, delayTicks));
     }
 
     private static void tryPlace(ServerLevel level, int attempt) {
@@ -238,28 +247,17 @@ public class MeteorStructureSpawner {
         ChunkPos bunkerChunk = new ChunkPos(bunkerPos);
         forceChunk(level, bunkerChunk);
 
-        if (!WorldEditStructurePlacer.isWorldEditReady()) {
-            scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, 0);
-            return PlacementState.DEFERRED;
-        }
-
-        AABB bounds = BUNKER_PLACER.placeStructure(level, bunkerPos);
-        if (bounds != null) {
-            BunkerProtectionHandler.addBunkerBounds(bounds);
-            tracker.addSpawnPos(bunkerPos);
-            impactData.setBunkerPos(bunkerPos);
-            WorldSpawnHandler.refreshWorldSpawn(level);
-            releaseForcedChunk(level, bunkerChunk);
-            markPlacementComplete(level);
-            return PlacementState.SUCCESS;
-        }
-
-        scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, 1);
+        scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, 0, BUNKER_PLACEMENT_DELAY_TICKS);
         return PlacementState.DEFERRED;
     }
 
     private static void scheduleDeferredPlacement(ServerLevel level, BlockPos bunkerPos,
                                                   ChunkPos bunkerChunk, int attempt) {
+        scheduleDeferredPlacement(level, bunkerPos, bunkerChunk, attempt, 1);
+    }
+
+    private static void scheduleDeferredPlacement(ServerLevel level, BlockPos bunkerPos,
+                                                  ChunkPos bunkerChunk, int attempt, int delayTicks) {
         enqueueTask(level, () -> {
             if (isCountdownExpired(level)) {
                 releaseForcedChunk(level, bunkerChunk);
@@ -309,15 +307,15 @@ public class MeteorStructureSpawner {
                 releaseForcedChunk(level, bunkerChunk);
                 scheduleRetry(level, attempt + 1);
             }
-        });
+        }, Math.max(1, delayTicks));
     }
 
     private static void enqueueTask(ServerLevel level, Runnable task) {
-        if (level.getServer().isSameThread()) {
-            scheduledTasks.add(task);
-        } else {
-            level.getServer().execute(() -> scheduledTasks.add(task));
-        }
+        enqueueTask(level, task, 1);
+    }
+
+    private static void enqueueTask(ServerLevel level, Runnable task, int delayTicks) {
+        DeferredTaskScheduler.schedule(level, task, delayTicks);
     }
 
     private static void forceChunk(ServerLevel level, ChunkPos chunkPos) {

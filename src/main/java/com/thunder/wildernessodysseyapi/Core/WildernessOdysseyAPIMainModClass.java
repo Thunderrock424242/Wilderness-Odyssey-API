@@ -26,11 +26,13 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerStructureGenerator;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorStructureSpawner;
+import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.config.ModConfig;
@@ -40,7 +42,7 @@ import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
-import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -140,6 +142,7 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStarting(ServerStartingEvent event){
         MeteorStructureSpawner.resetState();
         BunkerProtectionHandler.clear();
+        BunkerStructureGenerator.resetDeferredState();
     }
 
     /**
@@ -161,15 +164,15 @@ public class WildernessOdysseyAPIMainModClass {
     }
 
     /**
-     * On world load.
+     * Schedule meteor and bunker placement shortly after the first player joins.
      *
-     * @param event the event
+     * @param event the login event
      */
     @SubscribeEvent
-    public void onWorldLoad(LevelEvent.Load event) {
-        if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
+    public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
-        MeteorStructureSpawner.tryPlace(serverLevel);
+        MeteorStructureSpawner.scheduleInitialPlacement(player.serverLevel());
     }
     /**
      * On mob spawn.
@@ -198,6 +201,7 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStopping(ServerStoppingEvent event) {
         MeteorStructureSpawner.resetState();
         BunkerProtectionHandler.clear();
+        BunkerStructureGenerator.resetDeferredState();
     }
 
     private void onLoadComplete(FMLLoadCompleteEvent event) {
@@ -211,7 +215,7 @@ public class WildernessOdysseyAPIMainModClass {
         // Every server tick event
         // This is equivalent to the old "END" phase.
         MinecraftServer server = event.getServer();
-        MeteorStructureSpawner.tick(server);
+        DeferredTaskScheduler.tick();
         if (!event.hasTime()) return;
 
         if (++serverTickCounter >= LOG_INTERVAL) {
