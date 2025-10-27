@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.StructureSpawnT
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.WorldSpawnHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
+import com.thunder.wildernessodysseyapi.WorldGen.util.WorldEditCompat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
@@ -24,8 +25,6 @@ import net.minecraft.core.Holder;
 import net.minecraft.tags.BiomeTags;
 
 import java.util.Set;
-import net.neoforged.fml.ModList;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -109,7 +108,7 @@ public class MeteorStructureSpawner {
             return;
         }
 
-        boolean worldEditLoaded = ModList.get().isLoaded("worldedit");
+        boolean worldEditLoaded = WorldEditCompat.isInstalled();
         boolean worldEditReady = !worldEditLoaded || WorldEditStructurePlacer.isWorldEditReady();
 
         if (worldEditLoaded && !worldEditReady) {
@@ -221,7 +220,7 @@ public class MeteorStructureSpawner {
     }
 
     private static PlacementState placeBunker(ServerLevel level, BlockPos impactPos, MeteorImpactData impactData) {
-        if (!ModList.get().isLoaded("worldedit")) {
+        if (!WorldEditCompat.isInstalled()) {
             if (!missingWorldEditLogged) {
                 ModConstants.LOGGER.warn("WorldEdit is required to place the bunker structure; skipping placement");
                 missingWorldEditLogged = true;

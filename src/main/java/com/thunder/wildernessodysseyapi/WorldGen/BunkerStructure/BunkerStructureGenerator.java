@@ -4,6 +4,7 @@ import com.thunder.ticktoklib.TickTokHelper;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
+import com.thunder.wildernessodysseyapi.WorldGen.util.WorldEditCompat;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -13,8 +14,6 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.ChunkEvent;
-import net.neoforged.fml.ModList;
-
 import java.util.HashSet;
 import java.util.Set;
 
@@ -37,7 +36,7 @@ public class BunkerStructureGenerator {
 
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
-        if (!ModList.get().isLoaded("worldedit")) return;
+        if (!WorldEditCompat.isInstalled()) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         if (!(event.getChunk() instanceof LevelChunk chunk)) return;
         if (isCountdownExpired(level)) return;
