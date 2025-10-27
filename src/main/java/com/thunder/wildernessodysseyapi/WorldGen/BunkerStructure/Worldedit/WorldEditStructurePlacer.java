@@ -16,7 +16,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.Play
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.WorldSpawnHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.TerrainBlockReplacer;
 import com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager;
-import net.neoforged.fml.ModList;
+import com.thunder.wildernessodysseyapi.WorldGen.util.WorldEditCompat;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -197,7 +197,7 @@ public class WorldEditStructurePlacer {
         if (worldEditReady) {
             return true;
         }
-        if (!ModList.get().isLoaded("worldedit")) {
+        if (!WorldEditCompat.isInstalled()) {
             return false;
         }
         if (isBlockRegistryReady()) {

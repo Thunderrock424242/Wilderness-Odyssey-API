@@ -31,6 +31,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerStructureGenerator;
+import com.thunder.wildernessodysseyapi.WorldGen.util.WorldEditCompat;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorStructureSpawner;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import net.minecraft.world.phys.AABB;
@@ -118,7 +119,7 @@ public class WildernessOdysseyAPIMainModClass {
             // ready, causing a NoClassDefFoundError and preventing WorldEdit from
             // loading later on. Simply log a message and allow WorldEdit to finish
             // bootstrapping naturally.
-            if (ModList.get().isLoaded("worldedit")) {
+            if (WorldEditCompat.isInstalled()) {
                 LOGGER.debug("WorldEdit detected; deferring BlockTypes usage until after startup");
             }
         });
