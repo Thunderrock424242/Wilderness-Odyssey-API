@@ -123,7 +123,7 @@ repositories {
 dependencies {
     implementation "curse.maven:worldedit-225608:5830452"
     implementation "curse.maven:tick-tok-lib-1298954:7127991"
-    implementation "curse.maven:create-328085:6641610"
+    implementation "curse.maven:create-328085:7149903"
     implementation "curse.maven:regions-unexplored-659110:6273893"
     implementation "curse.maven:terrablender-neoforge-940057:6054947"
     implementation "curse.maven:geckolib-388172:7023453"
