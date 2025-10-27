@@ -9,6 +9,7 @@ import com.sk89q.worldedit.world.block.BlockType;
 import com.sk89q.worldedit.world.block.BlockTypes;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.StructureSpawnTracker;
 import com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager;
+import com.thunder.wildernessodysseyapi.WorldGen.util.WorldEditCompat;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorImpactData;
 import net.minecraft.core.BlockPos;
@@ -16,7 +17,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
@@ -143,7 +143,7 @@ public class WorldSpawnHandler {
     }
 
     private static List<BlockPos> rebuildSpawnCache(ServerLevel world) {
-        if (!ModList.get().isLoaded("worldedit")) {
+        if (!WorldEditCompat.isInstalled()) {
             return Collections.emptyList();
         }
 
