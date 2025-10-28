@@ -31,7 +31,6 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerStructureGenerator;
-import com.thunder.wildernessodysseyapi.WorldGen.util.WorldEditCompat;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorStructureSpawner;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import net.minecraft.world.phys.AABB;
@@ -112,17 +111,7 @@ public class WildernessOdysseyAPIMainModClass {
 
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> {
-            System.out.println("Wilderness Odyssey setup complete!");
-            // WorldEdit performs internal initialization asynchronously. Referencing
-            // BlockTypes here can trigger its static initialiser before WorldEdit is
-            // ready, causing a NoClassDefFoundError and preventing WorldEdit from
-            // loading later on. Simply log a message and allow WorldEdit to finish
-            // bootstrapping naturally.
-            if (WorldEditCompat.isInstalled()) {
-                LOGGER.debug("WorldEdit detected; deferring BlockTypes usage until after startup");
-            }
-        });
+        event.enqueueWork(() -> System.out.println("Wilderness Odyssey setup complete!"));
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
         UncaughtExceptionLogger.init();
@@ -233,6 +222,5 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onReload(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
-        event.addListener(com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager.INSTANCE);
     }
 }

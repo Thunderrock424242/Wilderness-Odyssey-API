@@ -2,19 +2,22 @@ package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure;
 
 import com.thunder.ticktoklib.TickTokHelper;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
-import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Worldedit.WorldEditStructurePlacer;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.CryoSpawnData;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.PlayerSpawnHandler;
+import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.WorldSpawnHandler;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
-import com.thunder.wildernessodysseyapi.WorldGen.util.WorldEditCompat;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.ChunkEvent;
+
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -25,9 +28,11 @@ public class BunkerStructureGenerator {
     private static final int DEFAULT_MIN_DISTANCE_CHUNKS = 32;
     private static final int INITIAL_PLACEMENT_DELAY_TICKS = 20 * 5;
     private static final int RETRY_DELAY_TICKS = 1;
-    private static final int MAX_DEFERRED_ATTEMPTS = 100;
-    private static final long WORLD_EDIT_GRACE_PERIOD_TICKS = TickTokHelper.duration(0,2,0,0);
-    private static long worldEditCountdownExpiryTick = -1L;
+    private static final int MAX_DEFERRED_ATTEMPTS = TickTokHelper.duration(0, 2, 0, 0);
+
+    private static final NBTStructurePlacer BUNKER_PLACER =
+            new NBTStructurePlacer(ModConstants.MOD_ID, "bunker");
+
     private static final Set<Long> scheduledPositions = new HashSet<>();
 
     public static void resetDeferredState() {
@@ -36,17 +41,13 @@ public class BunkerStructureGenerator {
 
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
-        if (!WorldEditCompat.isInstalled()) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         if (!(event.getChunk() instanceof LevelChunk chunk)) return;
-        if (isCountdownExpired(level)) return;
 
         BlockPos chunkPos = chunk.getPos().getWorldPosition();
         BlockPos surfacePos = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, chunkPos);
 
         StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
-
-        // Skip if a bunker has already spawned at this position
         if (tracker.hasSpawnedAt(surfacePos)) return;
 
         int minDist = StructureConfig.BUNKER_MIN_DISTANCE.get();
@@ -72,7 +73,7 @@ public class BunkerStructureGenerator {
         DeferredTaskScheduler.schedule(level, () -> {
             long key = surfacePos.asLong();
 
-            if (isCountdownExpired(level) || tracker.hasSpawnedAt(surfacePos)) {
+            if (tracker.hasSpawnedAt(surfacePos)) {
                 scheduledPositions.remove(key);
                 return;
             }
@@ -82,28 +83,19 @@ public class BunkerStructureGenerator {
                 return;
             }
 
-            if (!WorldEditStructurePlacer.isWorldEditReady()) {
-                if (attempt == 40) {
-                    ModConstants.LOGGER.warn("WorldEdit still initializing; bunker placement at {} delayed", surfacePos);
-                }
-                if (attempt < MAX_DEFERRED_ATTEMPTS) {
-                    scheduleDeferredPlacement(level, surfacePos, tracker, minChunks, maxCount, attempt + 1);
-                } else {
-                    scheduledPositions.remove(key);
-                }
-                return;
-            }
-
-            if (isCountdownExpired(level)) {
-                scheduledPositions.remove(key);
-                return;
-            }
-
-            WorldEditStructurePlacer placer = new WorldEditStructurePlacer(ModConstants.MOD_ID, "bunker.schem");
-            AABB bounds = placer.placeStructure(level, surfacePos);
-            if (bounds != null) {
+            NBTStructurePlacer.PlacementResult result = BUNKER_PLACER.place(level, surfacePos);
+            if (result != null) {
                 tracker.addSpawnPos(surfacePos);
-                BunkerProtectionHandler.addBunkerBounds(bounds);
+                BunkerProtectionHandler.addBunkerBounds(result.bounds());
+
+                List<BlockPos> cryoPositions = result.cryoPositions();
+                if (!cryoPositions.isEmpty()) {
+                    CryoSpawnData data = CryoSpawnData.get(level);
+                    data.replaceAll(cryoPositions);
+                    PlayerSpawnHandler.setSpawnBlocks(cryoPositions);
+                    WorldSpawnHandler.refreshWorldSpawn(level);
+                }
+
                 scheduledPositions.remove(key);
             } else if (attempt < MAX_DEFERRED_ATTEMPTS) {
                 scheduleDeferredPlacement(level, surfacePos, tracker, minChunks, maxCount, attempt + 1);
@@ -111,17 +103,5 @@ public class BunkerStructureGenerator {
                 scheduledPositions.remove(key);
             }
         }, Math.max(1, delayTicks));
-    }
-
-    private static boolean isCountdownExpired(ServerLevel level) {
-        if (!WorldEditStructurePlacer.isWorldEditReady()) {
-            worldEditCountdownExpiryTick = -1L;
-            return false;
-        }
-        if (worldEditCountdownExpiryTick < 0L) {
-            worldEditCountdownExpiryTick = level.getGameTime() + WORLD_EDIT_GRACE_PERIOD_TICKS;
-            return false;
-        }
-        return level.getGameTime() > worldEditCountdownExpiryTick;
     }
 }

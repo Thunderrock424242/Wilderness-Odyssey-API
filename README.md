@@ -52,31 +52,29 @@ World Generation
 The bunker now spawns via the normal world generation pipeline. Two config options
 control its frequency:
 `bunker.spawnDistanceChunks` sets the minimum chunk distance between bunkers and
-`bunker.maxSpawnCount` limits how many bunkers can generate per world. Bunker schematics are
+`bunker.maxSpawnCount` limits how many bunkers can generate per world. Bunker structure templates are
 validated to ensure at least one cryo tube is present, and any missing tubes are restored after placement.
 
 Multiple meteor impact zones are generated the first time a new world loads, each roughly 1,000 chunks (16,000 blocks) apart to encourage long-range exploration. A single bunker is placed adjacent to one of these craters to serve as the player's first destination.
-Secret Order villages may rarely appear in jungle biomes, using the bundled schematic.
+Secret Order villages may rarely appear in jungle biomes, using the bundled structure template.
 
-Using Data Pack Schematics
--------------------------
-The mod now supports loading WorldEdit `.schem` files from data packs in the same
-way vanilla handles structure NBTs. Place your schematics under
-`data/<namespace>/structures/` inside a data pack. Referencing the structure by
-its namespace and path (without the `.schem` extension) will cause it to be
-loaded from the data pack when structures generate. If a matching data pack file
-is not found, the bundled schematic under
-`assets/<namespace>/schematics/` is used instead.
+Using Data Pack Structures
+--------------------------
+The mod now loads vanilla structure templates from data packs using the
+standard `data/<namespace>/structures/<path>.nbt` layout. Reference the
+structure by its namespace and path (without the `.nbt` extension) to have it
+placed during world generation. If no data pack override exists, the bundled
+templates under `data/<namespace>/structures/` in the mod resources are used.
 
 The meteor impact site looks for the `wildernessodysseyapi:impact_zone`
-schematic. Drop your finished WorldEdit build at
-`data/wildernessodysseyapi/structures/impact_zone.schem` (or bundle it under
-`assets/wildernessodysseyapi/schematics/`) so the crash craters are pasted
-before the bunker generates.
+template. Drop your finished build at
+`data/wildernessodysseyapi/structures/impact_zone.nbt` so the crash craters are
+pasted before the bunker generates, or bundle a structure in another namespace
+and update the configuration to match.
 
-Loot tables defined inside schematics work the same way as with vanilla
-`nbt` structures. The scanner now detects loot table references in both
-`.nbt` and `.schem` files so datapacks can supply their own chest contents.
+Loot tables defined inside the structure templates work the same way as vanilla
+NBT structures. The scanner now reads loot table references directly from the
+template data so datapacks can supply their own chest contents.
 
 World Generation Diagnostics
 --------------------------

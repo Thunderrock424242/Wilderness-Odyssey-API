@@ -27,9 +27,9 @@ public class CustomBiomeModifier implements BiomeModifier {
 // Define the Codec for serialization/deserialization
     public static final Codec<CustomBiomeModifier> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    ResourceKey.codec(Registries.PLACED_FEATURE).fieldOf("bunker.schem").forGetter(modifier -> modifier.structure),
-                    ResourceKey.codec(Registries.BIOME).fieldOf("Plains").forGetter(modifier -> modifier.targetBiome),
-                    Codec.INT.fieldOf("whats the min biome sise?").forGetter(modifier -> modifier.minBiomeSize)
+                    ResourceKey.codec(Registries.PLACED_FEATURE).fieldOf("structure").forGetter(modifier -> modifier.structure),
+                    ResourceKey.codec(Registries.BIOME).fieldOf("target_biome").forGetter(modifier -> modifier.targetBiome),
+                    Codec.INT.fieldOf("min_biome_size").forGetter(modifier -> modifier.minBiomeSize)
             ).apply(instance, CustomBiomeModifier::new)
     );
 

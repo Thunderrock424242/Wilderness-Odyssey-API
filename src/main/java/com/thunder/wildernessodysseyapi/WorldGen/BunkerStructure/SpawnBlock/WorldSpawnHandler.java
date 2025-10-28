@@ -1,15 +1,7 @@
 package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock;
 
-import com.sk89q.worldedit.extent.clipboard.Clipboard;
-import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormat;
-import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats;
-import com.sk89q.worldedit.extent.clipboard.io.ClipboardReader;
-import com.sk89q.worldedit.math.BlockVector3;
-import com.sk89q.worldedit.world.block.BlockType;
-import com.sk89q.worldedit.world.block.BlockTypes;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.StructureSpawnTracker;
-import com.thunder.wildernessodysseyapi.WorldGen.schematic.SchematicManager;
-import com.thunder.wildernessodysseyapi.WorldGen.util.WorldEditCompat;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorImpactData;
 import net.minecraft.core.BlockPos;
@@ -20,12 +12,10 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import java.util.stream.Collectors;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
@@ -37,6 +27,7 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 public class WorldSpawnHandler {
 
     private static final ResourceLocation BUNKER_ID = ResourceLocation.tryBuild(MOD_ID, "bunker");
+    private static final NBTStructurePlacer BUNKER_PLACER = new NBTStructurePlacer(BUNKER_ID);
 
     /**
      * On world load.
@@ -91,7 +82,7 @@ public class WorldSpawnHandler {
                 final double maxDist = 400.0; // radius squared (20 blocks)
                 filteredPositions = spawnBlockPositions.stream()
                         .filter(p -> p.distSqr(closest) <= maxDist)
-                        .collect(Collectors.toList());
+                        .toList();
                 spawnBlockPos = closest;
             } else {
                 Random random = new Random();
@@ -143,39 +134,12 @@ public class WorldSpawnHandler {
     }
 
     private static List<BlockPos> rebuildSpawnCache(ServerLevel world) {
-        if (!WorldEditCompat.isInstalled()) {
-            return Collections.emptyList();
-        }
-
         StructureSpawnTracker tracker = StructureSpawnTracker.get(world);
         if (!tracker.hasSpawned()) {
             return Collections.emptyList();
         }
 
-        Clipboard clipboard = loadBunkerClipboard();
-        if (clipboard == null) {
-            return Collections.emptyList();
-        }
-
-        BlockType cryoType;
-        try {
-            cryoType = BlockTypes.get(MOD_ID + ":cryo_tube");
-        } catch (Exception e) {
-            return Collections.emptyList();
-        }
-
-        BlockVector3 origin = clipboard.getOrigin();
-        List<BlockPos> relative = new ArrayList<>();
-        for (BlockVector3 vec : clipboard.getRegion()) {
-            if (clipboard.getFullBlock(vec).getBlockType().equals(cryoType)) {
-                relative.add(new BlockPos(
-                        vec.x() - origin.x(),
-                        vec.y() - origin.y(),
-                        vec.z() - origin.z()
-                ));
-            }
-        }
-
+        List<BlockPos> relative = BUNKER_PLACER.getCryoOffsets(world);
         if (relative.isEmpty()) {
             return Collections.emptyList();
         }
@@ -187,29 +151,5 @@ public class WorldSpawnHandler {
             }
         }
         return absolute;
-    }
-
-    private static Clipboard loadBunkerClipboard() {
-        Clipboard clipboard = SchematicManager.INSTANCE.get(BUNKER_ID);
-        if (clipboard != null) {
-            return clipboard;
-        }
-
-        try (InputStream schemStream = WorldSpawnHandler.class.getResourceAsStream(
-                "/assets/" + BUNKER_ID.getNamespace() + "/schematics/" + BUNKER_ID.getPath() + ".schem")) {
-            if (schemStream == null) {
-                return null;
-            }
-            ClipboardFormat format = ClipboardFormats.findByAlias("schem");
-            if (format == null) {
-                return null;
-            }
-            try (ClipboardReader reader = format.getReader(schemStream)) {
-                return reader.read();
-            }
-        } catch (Exception e) {
-            LOGGER.error("Failed to load bunker schematic for spawn reconstruction", e);
-            return null;
-        }
     }
 }
