@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -39,8 +40,9 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
     @Shadow @org.jetbrains.annotations.Nullable private String structureName;
 
     @Shadow public abstract StructureMode getMode();
+    @Shadow public abstract ResourceLocation getStructureName();
     @Shadow public abstract void setMode(StructureMode mode);
-    @Shadow public abstract void setStructureName(String name);
+    @Shadow public abstract void setStructureName(ResourceLocation name);
 
     protected StructureBlockEntityMixin(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -258,8 +260,8 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
 
     @Unique
     private void wildernessodysseyapi$placeCornerBlocks(ServerLevel serverLevel, BlockPos structureBlockPos, BlockPos minCorner, Vec3i size) {
-        String structureName = this.structureName;
-        if (structureName == null || structureName.isEmpty()) {
+        ResourceLocation structureName = this.getStructureName();
+        if (structureName == null) {
             return;
         }
 
