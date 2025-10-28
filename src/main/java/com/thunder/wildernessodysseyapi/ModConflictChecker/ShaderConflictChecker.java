@@ -5,7 +5,6 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.moddiscovery.ModFile;
 
 import java.io.IOException;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
