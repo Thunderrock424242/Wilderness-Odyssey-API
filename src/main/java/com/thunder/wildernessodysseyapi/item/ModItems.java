@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.item;
 
+import com.thunder.wildernessodysseyapi.cloak.CloakItem;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
