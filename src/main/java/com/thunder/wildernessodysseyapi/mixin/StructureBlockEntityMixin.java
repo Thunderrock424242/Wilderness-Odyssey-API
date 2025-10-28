@@ -59,30 +59,74 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
         }
-        if (this.getMode() != StructureMode.SAVE) {
+        this.wildernessodysseyapi$fitStructureToContent(serverLevel, false);
+    }
+
+    @Inject(method = "detectSize", at = @At("HEAD"), cancellable = true)
+    private void wildernessodysseyapi$improvedDetect(CallbackInfoReturnable<Boolean> cir) {
+        Level level = this.level;
+        if (!(level instanceof ServerLevel serverLevel)) {
             return;
         }
+        if (this.wildernessodysseyapi$fitStructureToContent(serverLevel, true)) {
+            cir.setReturnValue(true);
+            cir.cancel();
+        }
+    }
 
-        if (this.structureSize.getX() <= 0 || this.structureSize.getY() <= 0 || this.structureSize.getZ() <= 0) {
-            return;
+    @Unique
+    private boolean wildernessodysseyapi$fitStructureToContent(ServerLevel serverLevel, boolean allowFallback) {
+        if (this.getMode() != StructureMode.SAVE) {
+            return false;
         }
 
         BlockPos blockPos = this.getBlockPos();
-        BlockPos start = blockPos.offset(this.structurePos);
-        BlockPos end = start.offset(this.structureSize.getX() - 1, this.structureSize.getY() - 1, this.structureSize.getZ() - 1);
+
+        boolean hasDefinedSize = this.structureSize.getX() > 0 && this.structureSize.getY() > 0 && this.structureSize.getZ() > 0;
+        BlockPos start;
+        BlockPos end;
+
+        if (hasDefinedSize) {
+            start = blockPos.offset(this.structurePos);
+            end = start.offset(this.structureSize.getX() - 1, this.structureSize.getY() - 1, this.structureSize.getZ() - 1);
+        } else {
+            if (!allowFallback) {
+                return false;
+            }
+            int radius = StructureBlockSettings.DEFAULT_DETECTION_RADIUS;
+            start = blockPos.offset(-radius, -radius, -radius);
+            end = blockPos.offset(radius, radius, radius);
+        }
+
+        int minX = Math.min(start.getX(), end.getX());
+        int minY = Math.min(start.getY(), end.getY());
+        int minZ = Math.min(start.getZ(), end.getZ());
+        int maxX = Math.max(start.getX(), end.getX());
+        int maxY = Math.max(start.getY(), end.getY());
+        int maxZ = Math.max(start.getZ(), end.getZ());
+
+        int levelMinY = serverLevel.getMinBuildHeight();
+        int levelMaxY = serverLevel.getMaxBuildHeight() - 1;
+
+        minY = Math.max(minY, levelMinY);
+        maxY = Math.min(maxY, levelMaxY);
+
+        if (minY > maxY) {
+            return false;
+        }
 
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         boolean found = false;
-        int minX = Integer.MAX_VALUE;
-        int minY = Integer.MAX_VALUE;
-        int minZ = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE;
-        int maxY = Integer.MIN_VALUE;
-        int maxZ = Integer.MIN_VALUE;
+        int detectedMinX = Integer.MAX_VALUE;
+        int detectedMinY = Integer.MAX_VALUE;
+        int detectedMinZ = Integer.MAX_VALUE;
+        int detectedMaxX = Integer.MIN_VALUE;
+        int detectedMaxY = Integer.MIN_VALUE;
+        int detectedMaxZ = Integer.MIN_VALUE;
 
-        for (int x = start.getX(); x <= end.getX(); x++) {
-            for (int y = start.getY(); y <= end.getY(); y++) {
-                for (int z = start.getZ(); z <= end.getZ(); z++) {
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
                     cursor.set(x, y, z);
                     if (!StructureBlockSettings.isStructureContent(serverLevel.getBlockState(cursor))) {
                         continue;
@@ -91,34 +135,34 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
                         continue;
                     }
                     found = true;
-                    if (x < minX) {
-                        minX = x;
+                    if (x < detectedMinX) {
+                        detectedMinX = x;
                     }
-                    if (y < minY) {
-                        minY = y;
+                    if (y < detectedMinY) {
+                        detectedMinY = y;
                     }
-                    if (z < minZ) {
-                        minZ = z;
+                    if (z < detectedMinZ) {
+                        detectedMinZ = z;
                     }
-                    if (x > maxX) {
-                        maxX = x;
+                    if (x > detectedMaxX) {
+                        detectedMaxX = x;
                     }
-                    if (y > maxY) {
-                        maxY = y;
+                    if (y > detectedMaxY) {
+                        detectedMaxY = y;
                     }
-                    if (z > maxZ) {
-                        maxZ = z;
+                    if (z > detectedMaxZ) {
+                        detectedMaxZ = z;
                     }
                 }
             }
         }
 
         if (!found) {
-            return;
+            return false;
         }
 
-        BlockPos newStart = new BlockPos(minX, minY, minZ);
-        BlockPos newSize = new BlockPos(maxX - minX + 1, maxY - minY + 1, maxZ - minZ + 1);
+        BlockPos newStart = new BlockPos(detectedMinX, detectedMinY, detectedMinZ);
+        BlockPos newSize = new BlockPos(detectedMaxX - detectedMinX + 1, detectedMaxY - detectedMinY + 1, detectedMaxZ - detectedMinZ + 1);
         BlockPos relativePos = newStart.subtract(blockPos);
 
         if (!relativePos.equals(this.structurePos)) {
@@ -127,5 +171,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         if (!newSize.equals(this.structureSize)) {
             this.setStructureSize(newSize);
         }
+
+        return true;
     }
 }
