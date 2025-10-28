@@ -40,7 +40,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
     @Shadow @org.jetbrains.annotations.Nullable private String structureName;
 
     @Shadow public abstract StructureMode getMode();
-    @Shadow public abstract ResourceLocation getStructureName();
+    @Shadow @org.jetbrains.annotations.Nullable public abstract String getStructureName();
     @Shadow public abstract void setMode(StructureMode mode);
     @Shadow public abstract void setStructureName(ResourceLocation name);
 
@@ -260,7 +260,12 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
 
     @Unique
     private void wildernessodysseyapi$placeCornerBlocks(ServerLevel serverLevel, BlockPos structureBlockPos, BlockPos minCorner, Vec3i size) {
-        ResourceLocation structureName = this.getStructureName();
+        String structureNameRaw = this.getStructureName();
+        if (structureNameRaw == null || structureNameRaw.isEmpty()) {
+            return;
+        }
+
+        ResourceLocation structureName = ResourceLocation.tryParse(structureNameRaw);
         if (structureName == null) {
             return;
         }
