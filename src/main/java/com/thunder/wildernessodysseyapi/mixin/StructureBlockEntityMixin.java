@@ -75,6 +75,8 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         }
 
         BlockPos blockPos = this.getBlockPos();
+        ResourceLocation structureName = this.getStructureName();
+        String structureNameKey = structureName == null ? null : structureName.toString();
         BlockPos currentOffset = this.structurePos == null ? BlockPos.ZERO : this.structurePos;
         Vec3i currentSize = this.structureSize == null ? Vec3i.ZERO : this.structureSize;
 
@@ -95,25 +97,43 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         int maxYBound = Math.min(serverLevel.getMaxBuildHeight() - 1, blockPos.getY() + detectionRadius);
 
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        boolean found = false;
-        int minX = Integer.MAX_VALUE;
-        int minY = Integer.MAX_VALUE;
-        int minZ = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE;
-        int maxY = Integer.MIN_VALUE;
-        int maxZ = Integer.MIN_VALUE;
+        boolean hasBounds = false;
+        java.util.List<BlockPos> cornerMarkers = new java.util.ArrayList<>();
+        int minX = 0;
+        int minY = 0;
+        int minZ = 0;
+        int maxX = 0;
+        int maxY = 0;
+        int maxZ = 0;
 
         for (int x = minXBound; x <= maxXBound; x++) {
             for (int y = minYBound; y <= maxYBound; y++) {
                 for (int z = minZBound; z <= maxZBound; z++) {
                     cursor.set(x, y, z);
-                    if (!StructureBlockSettings.isStructureContent(serverLevel.getBlockState(cursor))) {
+                    BlockState blockState = serverLevel.getBlockState(cursor);
+                    if (structureNameKey != null && blockState.is(Blocks.STRUCTURE_BLOCK)) {
+                        BlockEntity entity = serverLevel.getBlockEntity(cursor);
+                        if (entity instanceof StructureBlockEntity structureBlockEntity
+                                && structureBlockEntity.getMode() == StructureMode.CORNER) {
+                            String otherName = structureBlockEntity.getStructureName();
+                            if (otherName != null && otherName.equals(structureNameKey)) {
+                                cornerMarkers.add(cursor.immutable());
+                            }
+                        }
+                    }
+                    if (!StructureBlockSettings.isStructureContent(blockState)) {
                         continue;
                     }
                     if (cursor.equals(blockPos)) {
                         continue;
                     }
-                    found = true;
+                    if (!hasBounds) {
+                        hasBounds = true;
+                        minX = maxX = x;
+                        minY = maxY = y;
+                        minZ = maxZ = z;
+                        continue;
+                    }
                     if (x < minX) {
                         minX = x;
                     }
@@ -136,7 +156,43 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
             }
         }
 
-        if (!found) {
+        if (!cornerMarkers.isEmpty()) {
+            for (BlockPos corner : cornerMarkers) {
+                if (corner.equals(blockPos)) {
+                    continue;
+                }
+                int x = corner.getX();
+                int y = corner.getY();
+                int z = corner.getZ();
+                if (!hasBounds) {
+                    hasBounds = true;
+                    minX = maxX = x;
+                    minY = maxY = y;
+                    minZ = maxZ = z;
+                    continue;
+                }
+                if (x < minX) {
+                    minX = x;
+                }
+                if (y < minY) {
+                    minY = y;
+                }
+                if (z < minZ) {
+                    minZ = z;
+                }
+                if (x > maxX) {
+                    maxX = x;
+                }
+                if (y > maxY) {
+                    maxY = y;
+                }
+                if (z > maxZ) {
+                    maxZ = z;
+                }
+            }
+        }
+
+        if (!hasBounds) {
             return;
         }
 
