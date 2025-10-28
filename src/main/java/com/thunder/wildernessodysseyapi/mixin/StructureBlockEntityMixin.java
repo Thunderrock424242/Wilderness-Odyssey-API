@@ -54,7 +54,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
     }
 
     @Inject(method = "saveStructure", at = @At("HEAD"))
-    private void wildernessodysseyapi$autoFitStructure(boolean keepAir, CallbackInfoReturnable<Boolean> cir) {
+    private void wildernessodysseyapi$autoFitStructure(CallbackInfoReturnable<Boolean> cir) {
         Level level = this.level;
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
