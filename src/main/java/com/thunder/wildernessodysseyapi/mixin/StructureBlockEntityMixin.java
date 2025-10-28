@@ -1,10 +1,12 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
+import java.util.Objects;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.StructureBlockEntity;
@@ -35,6 +37,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
     @Shadow public abstract void setStructurePos(BlockPos pos);
     @Shadow public abstract void setStructureSize(Vec3i size);
     @Shadow public abstract StructureMode getMode();
+    @Shadow public abstract String getStructureName();
 
     protected StructureBlockEntityMixin(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -59,7 +62,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
         }
-        this.wildernessodysseyapi$fitStructureToContent(serverLevel, false);
+        this.wildernessodysseyapi$fitStructureToContent(serverLevel);
     }
 
     @Inject(method = "detectSize", at = @At("HEAD"), cancellable = true)
@@ -68,35 +71,30 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
         }
-        if (this.wildernessodysseyapi$fitStructureToContent(serverLevel, true)) {
-            cir.setReturnValue(true);
+        if (!this.wildernessodysseyapi$configureFromCorner(serverLevel)) {
+            cir.setReturnValue(false);
             cir.cancel();
+            return;
         }
+        this.wildernessodysseyapi$fitStructureToContent(serverLevel);
+        cir.setReturnValue(true);
+        cir.cancel();
     }
 
     @Unique
-    private boolean wildernessodysseyapi$fitStructureToContent(ServerLevel serverLevel, boolean allowFallback) {
+    private boolean wildernessodysseyapi$fitStructureToContent(ServerLevel serverLevel) {
         if (this.getMode() != StructureMode.SAVE) {
             return false;
         }
 
         BlockPos blockPos = this.getBlockPos();
 
-        boolean hasDefinedSize = this.structureSize.getX() > 0 && this.structureSize.getY() > 0 && this.structureSize.getZ() > 0;
-        BlockPos start;
-        BlockPos end;
-
-        if (hasDefinedSize) {
-            start = blockPos.offset(this.structurePos);
-            end = start.offset(this.structureSize.getX() - 1, this.structureSize.getY() - 1, this.structureSize.getZ() - 1);
-        } else {
-            if (!allowFallback) {
-                return false;
-            }
-            int radius = StructureBlockSettings.DEFAULT_DETECTION_RADIUS;
-            start = blockPos.offset(-radius, -radius, -radius);
-            end = blockPos.offset(radius, radius, radius);
+        if (this.structureSize.getX() <= 0 || this.structureSize.getY() <= 0 || this.structureSize.getZ() <= 0) {
+            return false;
         }
+
+        BlockPos start = blockPos.offset(this.structurePos);
+        BlockPos end = start.offset(this.structureSize.getX() - 1, this.structureSize.getY() - 1, this.structureSize.getZ() - 1);
 
         int minX = Math.min(start.getX(), end.getX());
         int minY = Math.min(start.getY(), end.getY());
@@ -170,6 +168,72 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         }
         if (!newSize.equals(this.structureSize)) {
             this.setStructureSize(newSize);
+        }
+
+        return true;
+    }
+
+    @Unique
+    private boolean wildernessodysseyapi$configureFromCorner(ServerLevel serverLevel) {
+        if (this.getMode() != StructureMode.SAVE) {
+            return false;
+        }
+
+        BlockPos origin = this.getBlockPos();
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        StructureBlockEntity bestCorner = null;
+        int bestDistance = Integer.MAX_VALUE;
+
+        int radius = StructureBlockSettings.CORNER_SEARCH_RADIUS;
+        String targetName = this.getStructureName();
+        for (int dx = 1; dx <= radius; dx++) {
+            for (int dy = 1; dy <= radius; dy++) {
+                for (int dz = 1; dz <= radius; dz++) {
+                    cursor.set(origin.getX() + dx, origin.getY() + dy, origin.getZ() + dz);
+                    if (!serverLevel.isInWorldBounds(cursor)) {
+                        continue;
+                    }
+                    BlockState state = serverLevel.getBlockState(cursor);
+                    if (!state.is(Blocks.STRUCTURE_BLOCK)) {
+                        continue;
+                    }
+                    BlockEntity blockEntity = serverLevel.getBlockEntity(cursor);
+                    if (!(blockEntity instanceof StructureBlockEntity corner)) {
+                        continue;
+                    }
+                    if (corner.getMode() != StructureMode.CORNER) {
+                        continue;
+                    }
+                    if (!Objects.equals(corner.getStructureName(), targetName)) {
+                        continue;
+                    }
+                    int manhattan = dx + dy + dz;
+                    if (manhattan < bestDistance) {
+                        bestCorner = corner;
+                        bestDistance = manhattan;
+                    }
+                }
+            }
+        }
+
+        if (bestCorner == null) {
+            return false;
+        }
+
+        BlockPos cornerPos = bestCorner.getBlockPos();
+        BlockPos relative = cornerPos.subtract(origin);
+
+        if (relative.getX() <= 0 || relative.getY() <= 0 || relative.getZ() <= 0) {
+            return false;
+        }
+
+        BlockPos size = new BlockPos(relative.getX() + 1, relative.getY() + 1, relative.getZ() + 1);
+
+        if (!BlockPos.ZERO.equals(this.structurePos)) {
+            this.setStructurePos(BlockPos.ZERO);
+        }
+        if (!size.equals(this.structureSize)) {
+            this.setStructureSize(size);
         }
 
         return true;
