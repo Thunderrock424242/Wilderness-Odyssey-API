@@ -8,7 +8,6 @@
       "CampfireBlockMixin",
       "DayNightCycleMixin",
       "EntityAccessor",
-      "WaterFluidMixin",
       "StructureBlockEntityMixin"
   ],
   "injectors": {
@@ -17,7 +16,6 @@
     "client": [
         "DebugMixin",
         "MixinWorldCreationUiState",
-        "ParticleEngineMixin",
-        "CloakRenderMixin"
+        "ParticleEngineMixin"
     ]
 }
