@@ -26,6 +26,13 @@ public final class StructureBlockSettings {
      */
     public static final int DEFAULT_DETECTION_RADIUS = 64;
 
+    /**
+     * Maximum diagonal search distance when looking for a corner block that defines the opposite corner of the
+     * structure. The requirement keeps the detection step deterministic without forcing players to place more than one
+     * helper block.
+     */
+    public static final int CORNER_SEARCH_RADIUS = 64;
+
     private StructureBlockSettings() {
     }
 
