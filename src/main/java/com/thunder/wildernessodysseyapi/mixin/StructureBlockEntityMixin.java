@@ -37,6 +37,8 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
 
     @Shadow public abstract void setStructurePos(BlockPos pos);
     @Shadow public abstract void setStructureSize(Vec3i size);
+    @Shadow @org.jetbrains.annotations.Nullable private String structureName;
+
     @Shadow public abstract StructureMode getMode();
     @Shadow public abstract ResourceLocation getStructureName();
     @Shadow public abstract void setMode(StructureMode mode);
