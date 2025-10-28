@@ -20,6 +20,13 @@ public final class StructureBlockSettings {
     public static final int MAX_STRUCTURE_OFFSET = 512;
 
     /**
+     * Default radius used when the detect button runs without an existing bounding box. Scanning a generous
+     * 64-block radius keeps the operation responsive while still covering most medium-sized builds. Players can
+     * expand the configured size manually before detecting if their structure exceeds this area.
+     */
+    public static final int DEFAULT_DETECTION_RADIUS = 64;
+
+    /**
      * Maximum diagonal search distance when looking for a corner block that defines the opposite corner of the
      * structure. The requirement keeps the detection step deterministic without forcing players to place more than one
      * helper block.
