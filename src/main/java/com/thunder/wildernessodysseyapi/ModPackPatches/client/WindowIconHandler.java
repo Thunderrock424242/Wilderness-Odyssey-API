@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.Client;
+package com.thunder.wildernessodysseyapi.ModPackPatches.client;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.platform.Window;
