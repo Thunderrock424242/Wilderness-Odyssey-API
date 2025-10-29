@@ -35,6 +35,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
     @Shadow private BlockPos structurePos;
     @Shadow private Vec3i structureSize;
     @Shadow @org.jetbrains.annotations.Nullable private ResourceLocation structureName;
+    @Shadow @org.jetbrains.annotations.Nullable public abstract String getStructureName();
 
     @Shadow public abstract void setStructurePos(BlockPos pos);
     @Shadow public abstract void setStructureSize(Vec3i size);
@@ -74,8 +75,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         }
 
         BlockPos blockPos = this.getBlockPos();
-        ResourceLocation structureName = this.getStructureName();
-        String structureNameKey = structureName == null ? null : structureName.toString();
+        String structureNameKey = this.getStructureName();
         BlockPos currentOffset = this.structurePos == null ? BlockPos.ZERO : this.structurePos;
         Vec3i currentSize = this.structureSize == null ? Vec3i.ZERO : this.structureSize;
 
