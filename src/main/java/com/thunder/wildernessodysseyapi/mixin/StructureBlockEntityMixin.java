@@ -149,6 +149,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         int cornerBoundMaxY = structureY;
         int cornerBoundMinZ = structureZ;
         int cornerBoundMaxZ = structureZ;
+        boolean cornerHasVerticalExtent = false;
 
         for (BlockPos corner : cornerMarkers) {
             if (corner.equals(blockPos)) {
@@ -170,12 +171,20 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
             if (cornerY > cornerBoundMaxY) {
                 cornerBoundMaxY = cornerY;
             }
+            if (cornerY != structureY) {
+                cornerHasVerticalExtent = true;
+            }
             if (cornerZ < cornerBoundMinZ) {
                 cornerBoundMinZ = cornerZ;
             }
             if (cornerZ > cornerBoundMaxZ) {
                 cornerBoundMaxZ = cornerZ;
             }
+        }
+
+        if (restrictToCornerBounds && !cornerHasVerticalExtent) {
+            cornerBoundMinY = minYBound;
+            cornerBoundMaxY = maxYBound;
         }
 
         java.util.Set<BlockPos> visited = new java.util.HashSet<>();
