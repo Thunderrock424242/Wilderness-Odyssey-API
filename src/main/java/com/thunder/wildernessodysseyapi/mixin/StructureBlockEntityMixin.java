@@ -90,6 +90,9 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         }
 
         BlockPos blockPos = this.getBlockPos();
+        int structureX = blockPos.getX();
+        int structureY = blockPos.getY();
+        int structureZ = blockPos.getZ();
         String structureNameKey = this.getStructureName();
         BlockPos currentOffset = this.structurePos == null ? BlockPos.ZERO : this.structurePos;
         Vec3i currentSize = this.structureSize == null ? Vec3i.ZERO : this.structureSize;
@@ -137,6 +140,44 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
             }
         }
 
+        wildernessodysseyapi$collectFarCorners(serverLevel, blockPos, structureNameKey, cornerMarkers, detectionRadius);
+
+        boolean restrictToCornerBounds = false;
+        int cornerBoundMinX = structureX;
+        int cornerBoundMaxX = structureX;
+        int cornerBoundMinY = structureY;
+        int cornerBoundMaxY = structureY;
+        int cornerBoundMinZ = structureZ;
+        int cornerBoundMaxZ = structureZ;
+
+        for (BlockPos corner : cornerMarkers) {
+            if (corner.equals(blockPos)) {
+                continue;
+            }
+            restrictToCornerBounds = true;
+            int cornerX = corner.getX();
+            int cornerY = corner.getY();
+            int cornerZ = corner.getZ();
+            if (cornerX < cornerBoundMinX) {
+                cornerBoundMinX = cornerX;
+            }
+            if (cornerX > cornerBoundMaxX) {
+                cornerBoundMaxX = cornerX;
+            }
+            if (cornerY < cornerBoundMinY) {
+                cornerBoundMinY = cornerY;
+            }
+            if (cornerY > cornerBoundMaxY) {
+                cornerBoundMaxY = cornerY;
+            }
+            if (cornerZ < cornerBoundMinZ) {
+                cornerBoundMinZ = cornerZ;
+            }
+            if (cornerZ > cornerBoundMaxZ) {
+                cornerBoundMaxZ = cornerZ;
+            }
+        }
+
         java.util.Set<BlockPos> visited = new java.util.HashSet<>();
         java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
         boolean hasBounds = false;
@@ -158,6 +199,17 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
             if (neighbor.getZ() < minZBound || neighbor.getZ() > maxZBound) {
                 continue;
             }
+            if (restrictToCornerBounds) {
+                if (neighbor.getX() < cornerBoundMinX || neighbor.getX() > cornerBoundMaxX) {
+                    continue;
+                }
+                if (neighbor.getY() < cornerBoundMinY || neighbor.getY() > cornerBoundMaxY) {
+                    continue;
+                }
+                if (neighbor.getZ() < cornerBoundMinZ || neighbor.getZ() > cornerBoundMaxZ) {
+                    continue;
+                }
+            }
             BlockState neighborState = serverLevel.getBlockState(neighbor);
             if (!StructureBlockSettings.isStructureContent(neighborState)) {
                 continue;
@@ -168,11 +220,34 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
             queue.addLast(neighbor.immutable());
         }
 
+        boolean contentBelowX = false;
+        boolean contentAboveX = false;
+        boolean contentBelowY = false;
+        boolean contentAboveY = false;
+        boolean contentBelowZ = false;
+        boolean contentAboveZ = false;
+
         while (!queue.isEmpty()) {
             BlockPos current = queue.removeFirst();
             int x = current.getX();
             int y = current.getY();
             int z = current.getZ();
+
+            if (x < structureX) {
+                contentBelowX = true;
+            } else if (x > structureX) {
+                contentAboveX = true;
+            }
+            if (y < structureY) {
+                contentBelowY = true;
+            } else if (y > structureY) {
+                contentAboveY = true;
+            }
+            if (z < structureZ) {
+                contentBelowZ = true;
+            } else if (z > structureZ) {
+                contentAboveZ = true;
+            }
             if (!hasBounds) {
                 hasBounds = true;
                 minX = maxX = x;
@@ -209,6 +284,17 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
                         || Math.abs(next.getZ() - blockPos.getZ()) > detectionRadius) {
                     continue;
                 }
+                if (restrictToCornerBounds) {
+                    if (next.getX() < cornerBoundMinX || next.getX() > cornerBoundMaxX) {
+                        continue;
+                    }
+                    if (next.getY() < cornerBoundMinY || next.getY() > cornerBoundMaxY) {
+                        continue;
+                    }
+                    if (next.getZ() < cornerBoundMinZ || next.getZ() > cornerBoundMaxZ) {
+                        continue;
+                    }
+                }
                 if (next.getY() < minYBound || next.getY() > maxYBound) {
                     continue;
                 }
@@ -223,7 +309,12 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
             }
         }
 
-        wildernessodysseyapi$collectFarCorners(serverLevel, blockPos, structureNameKey, cornerMarkers, detectionRadius);
+        boolean cornerBelowX = false;
+        boolean cornerAboveX = false;
+        boolean cornerBelowY = false;
+        boolean cornerAboveY = false;
+        boolean cornerBelowZ = false;
+        boolean cornerAboveZ = false;
 
         if (!cornerMarkers.isEmpty()) {
             for (BlockPos corner : cornerMarkers) {
@@ -233,6 +324,22 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
                 int x = corner.getX();
                 int y = corner.getY();
                 int z = corner.getZ();
+
+                if (x < structureX) {
+                    cornerBelowX = true;
+                } else if (x > structureX) {
+                    cornerAboveX = true;
+                }
+                if (y < structureY) {
+                    cornerBelowY = true;
+                } else if (y > structureY) {
+                    cornerAboveY = true;
+                }
+                if (z < structureZ) {
+                    cornerBelowZ = true;
+                } else if (z > structureZ) {
+                    cornerAboveZ = true;
+                }
                 if (!hasBounds) {
                     hasBounds = true;
                     minX = maxX = x;
@@ -261,10 +368,25 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
             }
         }
 
+        if (hasBounds && !cornerMarkers.isEmpty()) {
+            if (!cornerBelowX && cornerAboveX && !contentBelowX) {
+                minX = structureX;
+            } else if (!cornerAboveX && cornerBelowX && !contentAboveX) {
+                maxX = structureX;
+            }
+            if (!cornerBelowY && cornerAboveY && !contentBelowY) {
+                minY = structureY;
+            } else if (!cornerAboveY && cornerBelowY && !contentAboveY) {
+                maxY = structureY;
+            }
+            if (!cornerBelowZ && cornerAboveZ && !contentBelowZ) {
+                minZ = structureZ;
+            } else if (!cornerAboveZ && cornerBelowZ && !contentAboveZ) {
+                maxZ = structureZ;
+            }
+        }
+
         if (hasBounds) {
-            int structureX = blockPos.getX();
-            int structureY = blockPos.getY();
-            int structureZ = blockPos.getZ();
             if (structureX < minX) {
                 minX = structureX;
             }
