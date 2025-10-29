@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.util;
 
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -7,33 +8,46 @@ import net.minecraft.world.level.block.state.BlockState;
  * Shared configuration for structure block enhancements.
  */
 public final class StructureBlockSettings {
-    /**
-     * Expanded limit for structure block dimensions. Vanilla uses 48 blocks per axis which is too restrictive for
-     * the large set pieces shipped with the modpack, so we greatly increase the limit.
-     */
-    public static final int MAX_STRUCTURE_SIZE = 512;
 
-    /**
-     * Expanded limit for the offset from the structure block when capturing structures. Matching the size limit keeps
-     * the UI experience consistent and allows placing the controller block outside of large builds.
-     */
-    public static final int MAX_STRUCTURE_OFFSET = 512;
-
-    /**
-     * Default radius used when the detect button runs without an existing bounding box. Scanning a generous
-     * 64-block radius keeps the operation responsive while still covering most medium-sized builds. Players can
-     * expand the configured size manually before detecting if their structure exceeds this area.
-     */
-    public static final int DEFAULT_DETECTION_RADIUS = 64;
-
-    /**
-     * Maximum diagonal search distance when looking for a corner block that defines the opposite corner of the
-     * structure. Matching the expanded offset limit allows lone corner markers to seed the bounding box anywhere inside
-     * the 512-block cube around the save block.
-     */
-    public static final int CORNER_SEARCH_RADIUS = 512;
-
+    /** Maximum allowed capture size per axis when working with structure blocks. */
+    private static final int MAX_STRUCTURE_SIZE = 512;
+    /** Maximum offset permitted between the structure block and its captured area. */
+    private static final int MAX_STRUCTURE_OFFSET = 512;
+    /** Default radius scanned when pressing the Detect button without existing bounds. */
+    private static final int DEFAULT_DETECTION_RADIUS = 64;
+    /** Maximum range used when searching for matching corner structure blocks. */
+    private static final int CORNER_SEARCH_RADIUS = 512;
     private StructureBlockSettings() {
+    }
+
+    /**
+     * @return Maximum allowed structure size per axis, sanitized from the configuration file.
+     */
+    public static int getMaxStructureSize() {
+        return MAX_STRUCTURE_SIZE;
+    }
+
+    /**
+     * @return Maximum offset allowed between the structure block and the captured structure.
+     */
+    public static int getMaxStructureOffset() {
+        return MAX_STRUCTURE_OFFSET;
+    }
+
+    /**
+     * @return Default detection radius, clamped so it never exceeds the offset limit.
+     */
+    public static int getDefaultDetectionRadius() {
+        int radius = Math.max(0, DEFAULT_DETECTION_RADIUS);
+        return Mth.clamp(radius, 0, getMaxStructureOffset());
+    }
+
+    /**
+     * @return Maximum search range for corner structure blocks, limited to the offset limit to avoid chunk thrashing.
+     */
+    public static int getCornerSearchRadius() {
+        int radius = Math.max(0, CORNER_SEARCH_RADIUS);
+        return Math.min(radius, getMaxStructureOffset());
     }
 
     /**

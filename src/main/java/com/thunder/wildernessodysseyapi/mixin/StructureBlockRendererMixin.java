@@ -50,7 +50,7 @@ public abstract class StructureBlockRendererMixin {
 
     @Inject(method = "getViewDistance", at = @At("HEAD"), cancellable = true)
     private void wildernessodysseyapi$extendViewDistance(CallbackInfoReturnable<Integer> cir) {
-        int axisRange = StructureBlockSettings.MAX_STRUCTURE_OFFSET + StructureBlockSettings.MAX_STRUCTURE_SIZE;
+        int axisRange = StructureBlockSettings.getMaxStructureOffset() + StructureBlockSettings.getMaxStructureSize();
         int extended = Math.max(512, (int) Math.ceil(Math.sqrt(3.0D) * axisRange));
         cir.setReturnValue(extended);
         cir.cancel();
@@ -85,7 +85,7 @@ public abstract class StructureBlockRendererMixin {
 
     @Unique
     private static double wildernessodysseyapi$getMaxOverlayDistance() {
-        return StructureBlockSettings.MAX_STRUCTURE_OFFSET + StructureBlockSettings.MAX_STRUCTURE_SIZE;
+        return StructureBlockSettings.getMaxStructureOffset() + StructureBlockSettings.getMaxStructureSize();
     }
 
     @Unique

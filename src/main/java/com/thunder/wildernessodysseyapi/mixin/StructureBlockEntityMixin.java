@@ -54,28 +54,27 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
     }
 
     @Unique
-    private static boolean wildernessodysseyapi$limitsExpanded;
-
-    @Unique
     private final java.util.Set<BlockPos> wildernessodysseyapi$cornerMarkers = new java.util.HashSet<>();
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void wildernessodysseyapi$expandLimits(BlockPos pos, BlockState state, CallbackInfo ci) {
-        if (wildernessodysseyapi$limitsExpanded) {
-            return;
+        int configuredSize = StructureBlockSettings.getMaxStructureSize();
+        int configuredOffset = StructureBlockSettings.getMaxStructureOffset();
+        if (MAX_SIZE_PER_AXIS != configuredSize) {
+            MAX_SIZE_PER_AXIS = configuredSize;
         }
-        wildernessodysseyapi$limitsExpanded = true;
-        MAX_SIZE_PER_AXIS = StructureBlockSettings.MAX_STRUCTURE_SIZE;
-        MAX_OFFSET_PER_AXIS = StructureBlockSettings.MAX_STRUCTURE_OFFSET;
+        if (MAX_OFFSET_PER_AXIS != configuredOffset) {
+            MAX_OFFSET_PER_AXIS = configuredOffset;
+        }
     }
 
     @Redirect(method = "loadAdditional", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Mth;clamp(III)I"))
     private int wildernessodysseyapi$expandClampRange(int value, int min, int max) {
         if (min < 0) {
-            int limit = StructureBlockSettings.MAX_STRUCTURE_OFFSET;
+            int limit = StructureBlockSettings.getMaxStructureOffset();
             return Mth.clamp(value, -limit, limit);
         }
-        int limit = StructureBlockSettings.MAX_STRUCTURE_SIZE;
+        int limit = StructureBlockSettings.getMaxStructureSize();
         return Mth.clamp(value, 0, limit);
     }
 
@@ -97,11 +96,11 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         BlockPos currentOffset = this.structurePos == null ? BlockPos.ZERO : this.structurePos;
         Vec3i currentSize = this.structureSize == null ? Vec3i.ZERO : this.structureSize;
 
-        int detectionRadius = StructureBlockSettings.DEFAULT_DETECTION_RADIUS;
+        int detectionRadius = StructureBlockSettings.getDefaultDetectionRadius();
         detectionRadius = Math.max(detectionRadius, wildernessodysseyapi$computeRadiusForAxis(currentOffset.getX(), currentSize.getX()));
         detectionRadius = Math.max(detectionRadius, wildernessodysseyapi$computeRadiusForAxis(currentOffset.getY(), currentSize.getY()));
         detectionRadius = Math.max(detectionRadius, wildernessodysseyapi$computeRadiusForAxis(currentOffset.getZ(), currentSize.getZ()));
-        detectionRadius = Math.min(detectionRadius, StructureBlockSettings.MAX_STRUCTURE_OFFSET);
+        detectionRadius = Math.min(detectionRadius, StructureBlockSettings.getMaxStructureOffset());
         if (detectionRadius <= 0) {
             return;
         }
@@ -545,8 +544,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
             return;
         }
 
-        int searchRadius = StructureBlockSettings.CORNER_SEARCH_RADIUS;
-        searchRadius = Math.min(searchRadius, StructureBlockSettings.MAX_STRUCTURE_OFFSET);
+        int searchRadius = StructureBlockSettings.getCornerSearchRadius();
         if (searchRadius <= scannedRadius) {
             return;
         }
