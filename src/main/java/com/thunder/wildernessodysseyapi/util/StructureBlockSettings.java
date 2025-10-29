@@ -28,10 +28,10 @@ public final class StructureBlockSettings {
 
     /**
      * Maximum diagonal search distance when looking for a corner block that defines the opposite corner of the
-     * structure. The requirement keeps the detection step deterministic without forcing players to place more than one
-     * helper block.
+     * structure. Matching the expanded offset limit allows lone corner markers to seed the bounding box anywhere inside
+     * the 512-block cube around the save block.
      */
-    public static final int CORNER_SEARCH_RADIUS = 64;
+    public static final int CORNER_SEARCH_RADIUS = 512;
 
     private StructureBlockSettings() {
     }

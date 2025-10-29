@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -13,6 +14,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.StructureBlock;
 import net.minecraft.world.level.block.state.properties.StructureMode;
+import net.minecraft.world.level.chunk.LevelChunk;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -154,6 +156,8 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
                 }
             }
         }
+
+        wildernessodysseyapi$collectFarCorners(serverLevel, blockPos, structureNameKey, cornerMarkers, detectionRadius);
 
         if (!cornerMarkers.isEmpty()) {
             for (BlockPos corner : cornerMarkers) {
@@ -311,6 +315,74 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         int start = offset;
         int end = offset + size - 1;
         return Math.max(Math.abs(start), Math.abs(end));
+    }
+
+    @Unique
+    private void wildernessodysseyapi$collectFarCorners(ServerLevel serverLevel, BlockPos origin, String structureNameKey,
+            java.util.List<BlockPos> cornerMarkers, int scannedRadius) {
+        if (structureNameKey == null) {
+            return;
+        }
+
+        int searchRadius = StructureBlockSettings.CORNER_SEARCH_RADIUS;
+        searchRadius = Math.min(searchRadius, StructureBlockSettings.MAX_STRUCTURE_OFFSET);
+        if (searchRadius <= scannedRadius) {
+            return;
+        }
+
+        ServerChunkCache chunkSource = serverLevel.getChunkSource();
+        int minX = origin.getX() - searchRadius;
+        int maxX = origin.getX() + searchRadius;
+        int minZ = origin.getZ() - searchRadius;
+        int maxZ = origin.getZ() + searchRadius;
+        int minY = Math.max(serverLevel.getMinBuildHeight(), origin.getY() - searchRadius);
+        int maxY = Math.min(serverLevel.getMaxBuildHeight() - 1, origin.getY() + searchRadius);
+
+        int minChunkX = minX >> 4;
+        int maxChunkX = maxX >> 4;
+        int minChunkZ = minZ >> 4;
+        int maxChunkZ = maxZ >> 4;
+
+        java.util.Set<BlockPos> knownCorners = new java.util.HashSet<>(cornerMarkers);
+
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                LevelChunk chunk = chunkSource.getChunkNow(chunkX, chunkZ);
+                if (chunk == null) {
+                    continue;
+                }
+                java.util.Collection<BlockEntity> blockEntities = chunk.getBlockEntities().values();
+                if (blockEntities.isEmpty()) {
+                    continue;
+                }
+                for (BlockEntity blockEntity : blockEntities) {
+                    if (!(blockEntity instanceof StructureBlockEntity structureBlockEntity)) {
+                        continue;
+                    }
+                    if (structureBlockEntity.getMode() != StructureMode.CORNER) {
+                        continue;
+                    }
+                    String otherName = structureBlockEntity.getStructureName();
+                    if (otherName == null || !otherName.equals(structureNameKey)) {
+                        continue;
+                    }
+                    BlockPos pos = blockEntity.getBlockPos();
+                    if (pos.equals(origin)) {
+                        continue;
+                    }
+                    if (pos.getY() < minY || pos.getY() > maxY) {
+                        continue;
+                    }
+                    if (pos.getX() < minX || pos.getX() > maxX || pos.getZ() < minZ || pos.getZ() > maxZ) {
+                        continue;
+                    }
+                    BlockPos immutablePos = pos.immutable();
+                    if (knownCorners.add(immutablePos)) {
+                        cornerMarkers.add(immutablePos);
+                    }
+                }
+            }
+        }
     }
 
     @Unique
