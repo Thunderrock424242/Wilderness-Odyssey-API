@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerChunkCache;
@@ -98,8 +99,35 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         int maxYBound = Math.min(serverLevel.getMaxBuildHeight() - 1, blockPos.getY() + detectionRadius);
 
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        boolean hasBounds = false;
         java.util.List<BlockPos> cornerMarkers = new java.util.ArrayList<>();
+        if (structureNameKey != null) {
+            for (int x = minXBound; x <= maxXBound; x++) {
+                for (int y = minYBound; y <= maxYBound; y++) {
+                    for (int z = minZBound; z <= maxZBound; z++) {
+                        cursor.set(x, y, z);
+                        BlockState blockState = serverLevel.getBlockState(cursor);
+                        if (!blockState.is(Blocks.STRUCTURE_BLOCK)) {
+                            continue;
+                        }
+                        BlockEntity entity = serverLevel.getBlockEntity(cursor);
+                        if (!(entity instanceof StructureBlockEntity structureBlockEntity)) {
+                            continue;
+                        }
+                        if (structureBlockEntity.getMode() != StructureMode.CORNER) {
+                            continue;
+                        }
+                        String otherName = structureBlockEntity.getStructureName();
+                        if (otherName != null && otherName.equals(structureNameKey)) {
+                            cornerMarkers.add(cursor.immutable());
+                        }
+                    }
+                }
+            }
+        }
+
+        java.util.Set<BlockPos> visited = new java.util.HashSet<>();
+        java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
+        boolean hasBounds = false;
         int minX = 0;
         int minY = 0;
         int minZ = 0;
@@ -107,53 +135,79 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         int maxY = 0;
         int maxZ = 0;
 
-        for (int x = minXBound; x <= maxXBound; x++) {
-            for (int y = minYBound; y <= maxYBound; y++) {
-                for (int z = minZBound; z <= maxZBound; z++) {
-                    cursor.set(x, y, z);
-                    BlockState blockState = serverLevel.getBlockState(cursor);
-                    if (structureNameKey != null && blockState.is(Blocks.STRUCTURE_BLOCK)) {
-                        BlockEntity entity = serverLevel.getBlockEntity(cursor);
-                        if (entity instanceof StructureBlockEntity structureBlockEntity
-                                && structureBlockEntity.getMode() == StructureMode.CORNER) {
-                            String otherName = structureBlockEntity.getStructureName();
-                            if (otherName != null && otherName.equals(structureNameKey)) {
-                                cornerMarkers.add(cursor.immutable());
-                            }
-                        }
-                    }
-                    if (!StructureBlockSettings.isStructureContent(blockState)) {
-                        continue;
-                    }
-                    if (cursor.equals(blockPos)) {
-                        continue;
-                    }
-                    if (!hasBounds) {
-                        hasBounds = true;
-                        minX = maxX = x;
-                        minY = maxY = y;
-                        minZ = maxZ = z;
-                        continue;
-                    }
-                    if (x < minX) {
-                        minX = x;
-                    }
-                    if (y < minY) {
-                        minY = y;
-                    }
-                    if (z < minZ) {
-                        minZ = z;
-                    }
-                    if (x > maxX) {
-                        maxX = x;
-                    }
-                    if (y > maxY) {
-                        maxY = y;
-                    }
-                    if (z > maxZ) {
-                        maxZ = z;
-                    }
+        for (Direction direction : Direction.values()) {
+            BlockPos neighbor = blockPos.relative(direction);
+            if (neighbor.getX() < minXBound || neighbor.getX() > maxXBound) {
+                continue;
+            }
+            if (neighbor.getY() < minYBound || neighbor.getY() > maxYBound) {
+                continue;
+            }
+            if (neighbor.getZ() < minZBound || neighbor.getZ() > maxZBound) {
+                continue;
+            }
+            BlockState neighborState = serverLevel.getBlockState(neighbor);
+            if (!StructureBlockSettings.isStructureContent(neighborState)) {
+                continue;
+            }
+            if (!visited.add(neighbor.immutable())) {
+                continue;
+            }
+            queue.addLast(neighbor.immutable());
+        }
+
+        while (!queue.isEmpty()) {
+            BlockPos current = queue.removeFirst();
+            int x = current.getX();
+            int y = current.getY();
+            int z = current.getZ();
+            if (!hasBounds) {
+                hasBounds = true;
+                minX = maxX = x;
+                minY = maxY = y;
+                minZ = maxZ = z;
+            } else {
+                if (x < minX) {
+                    minX = x;
                 }
+                if (y < minY) {
+                    minY = y;
+                }
+                if (z < minZ) {
+                    minZ = z;
+                }
+                if (x > maxX) {
+                    maxX = x;
+                }
+                if (y > maxY) {
+                    maxY = y;
+                }
+                if (z > maxZ) {
+                    maxZ = z;
+                }
+            }
+
+            for (Direction direction : Direction.values()) {
+                BlockPos next = current.relative(direction);
+                if (next.equals(blockPos)) {
+                    continue;
+                }
+                if (Math.abs(next.getX() - blockPos.getX()) > detectionRadius
+                        || Math.abs(next.getY() - blockPos.getY()) > detectionRadius
+                        || Math.abs(next.getZ() - blockPos.getZ()) > detectionRadius) {
+                    continue;
+                }
+                if (next.getY() < minYBound || next.getY() > maxYBound) {
+                    continue;
+                }
+                if (!visited.add(next.immutable())) {
+                    continue;
+                }
+                BlockState state = serverLevel.getBlockState(next);
+                if (!StructureBlockSettings.isStructureContent(state)) {
+                    continue;
+                }
+                queue.addLast(next.immutable());
             }
         }
 
