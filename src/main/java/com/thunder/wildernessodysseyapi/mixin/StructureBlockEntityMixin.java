@@ -261,6 +261,30 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
             }
         }
 
+        if (hasBounds) {
+            int structureX = blockPos.getX();
+            int structureY = blockPos.getY();
+            int structureZ = blockPos.getZ();
+            if (structureX < minX) {
+                minX = structureX;
+            }
+            if (structureY < minY) {
+                minY = structureY;
+            }
+            if (structureZ < minZ) {
+                minZ = structureZ;
+            }
+            if (structureX > maxX) {
+                maxX = structureX;
+            }
+            if (structureY > maxY) {
+                maxY = structureY;
+            }
+            if (structureZ > maxZ) {
+                maxZ = structureZ;
+            }
+        }
+
         if (!hasBounds) {
             return;
         }
