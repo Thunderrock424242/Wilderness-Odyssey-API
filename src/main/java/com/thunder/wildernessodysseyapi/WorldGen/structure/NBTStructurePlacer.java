@@ -58,6 +58,13 @@ public class NBTStructurePlacer {
             return null;
         }
 
+        LargeStructurePlacementOptimizer.preparePlacement(level, origin, data.size());
+        if (LargeStructurePlacementOptimizer.exceedsStructureBlockLimit(data.size())) {
+            int estimated = LargeStructurePlacementOptimizer.estimateAffectedBlocks(data.size());
+            ModConstants.LOGGER.warn("Placing structure {} will touch approximately {} blocks, exceeding the recommended limit of {}.",
+                    id, estimated, StructureUtils.STRUCTURE_BLOCK_LIMIT);
+        }
+
         List<BlockState> sampledTerrain = new ArrayList<>(data.terrainOffsets().size());
         for (BlockPos offset : data.terrainOffsets()) {
             BlockPos worldPos = origin.offset(offset);
@@ -81,17 +88,14 @@ public class NBTStructurePlacer {
         }
 
         Vec3i size = data.size();
-        BlockPos max = origin.offset(size.getX() - 1, size.getY() - 1, size.getZ() - 1);
-        AABB bounds = new AABB(
-                origin.getX(), origin.getY(), origin.getZ(),
-                max.getX() + 1, max.getY() + 1, max.getZ() + 1
-        );
+        AABB bounds = LargeStructurePlacementOptimizer.createBounds(origin, size);
+        List<AABB> chunkSlices = LargeStructurePlacementOptimizer.computeChunkSlices(origin, size);
 
         List<BlockPos> cryoPositions = data.cryoOffsets().stream()
                 .map(origin::offset)
                 .collect(Collectors.toUnmodifiableList());
 
-        return new PlacementResult(bounds, cryoPositions);
+        return new PlacementResult(bounds, cryoPositions, List.copyOf(chunkSlices));
     }
 
     /**
@@ -161,9 +165,10 @@ public class NBTStructurePlacer {
     }
 
     /**
-     * Result of placing a structure.
+     * Result of placing a structure, exposing the overall bounds, any detected cryo tubes and
+     * chunk-aligned slices that callers can use for follow-up processing.
      */
-    public record PlacementResult(AABB bounds, List<BlockPos> cryoPositions) {}
+    public record PlacementResult(AABB bounds, List<BlockPos> cryoPositions, List<AABB> chunkSlices) {}
 
     private record TemplateData(StructureTemplate template,
                                 List<BlockPos> cryoOffsets,
