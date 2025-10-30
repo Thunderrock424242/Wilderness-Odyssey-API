@@ -5,6 +5,9 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.BugFixes.InfiniteSourceHa
 import com.thunder.wildernessodysseyapi.ErrorLog.UncaughtExceptionLogger;
 import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqReloadListener;
+import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCache;
+import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheCommand;
+import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheConfig;
 import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffCommand;
@@ -43,6 +46,7 @@ import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -103,6 +107,7 @@ public class WildernessOdysseyAPIMainModClass {
         ModItems.register(modEventBus);
 
         container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);
+        container.registerConfig(ModConfig.Type.COMMON, ModDataCacheConfig.CONFIG_SPEC);
         // Previously registered client-only events have been removed
         container.registerConfig(ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC);
         DonationReminderConfig.validateVersion();
@@ -111,7 +116,10 @@ public class WildernessOdysseyAPIMainModClass {
 
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> System.out.println("Wilderness Odyssey setup complete!"));
+        event.enqueueWork(() -> {
+            System.out.println("Wilderness Odyssey setup complete!");
+            ModDataCache.initialize();
+        });
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
         UncaughtExceptionLogger.init();
@@ -148,6 +156,7 @@ public class WildernessOdysseyAPIMainModClass {
         MemCheckCommand.register(event.getDispatcher());
         StructureInfoCommand.register(event.getDispatcher());
         FaqCommand.register(event.getDispatcher());
+        ModDataCacheCommand.register(dispatcher);
         DonateCommand.register(event.getDispatcher());
         DoorLockCommand.register(event.getDispatcher());
         WorldGenScanCommand.register(event.getDispatcher());
@@ -222,5 +231,19 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onReload(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
+    }
+
+    @SubscribeEvent
+    public void onConfigLoaded(ModConfigEvent.Loading event) {
+        if (event.getConfig().getSpec() == ModDataCacheConfig.CONFIG_SPEC) {
+            ModDataCache.initialize();
+        }
+    }
+
+    @SubscribeEvent
+    public void onConfigReloaded(ModConfigEvent.Reloading event) {
+        if (event.getConfig().getSpec() == ModDataCacheConfig.CONFIG_SPEC) {
+            ModDataCache.initialize();
+        }
     }
 }
