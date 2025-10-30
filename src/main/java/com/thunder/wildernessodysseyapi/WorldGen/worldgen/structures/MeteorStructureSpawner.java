@@ -321,7 +321,7 @@ public class MeteorStructureSpawner {
     }
 
     private static boolean shouldSkipForExistingWorld(ServerLevel level) {
-        ServerLevelData data = level.getLevelData();
+        ServerLevelData data = (ServerLevelData) level.getLevelData();
         if (!data.isInitialized()) {
             return false;
         }
