@@ -20,6 +20,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.storage.ServerLevelData;
 import net.minecraft.tags.TagKey;
 
 import java.util.ArrayList;
@@ -76,6 +77,11 @@ public class MeteorStructureSpawner {
 
         ResourceKey<Level> dimension = level.dimension();
         if (!initialPlacementScheduled.add(dimension)) {
+            return;
+        }
+
+        if (shouldSkipForExistingWorld(level)) {
+            placed = true;
             return;
         }
 
@@ -312,5 +318,20 @@ public class MeteorStructureSpawner {
                 || biomeHolder.is(Biomes.SAVANNA_PLATEAU)
                 || biomeHolder.is(Biomes.WINDSWEPT_SAVANNA)
                 || biomeHolder.is(Biomes.SNOWY_PLAINS);
+    }
+
+    private static boolean shouldSkipForExistingWorld(ServerLevel level) {
+        ServerLevelData data = level.getLevelData();
+        if (!data.isInitialized()) {
+            return false;
+        }
+
+        long gameTime = data.getGameTime();
+        long dayTime = data.getDayTime();
+        if (gameTime <= INITIAL_PLACEMENT_DELAY_TICKS && dayTime <= INITIAL_PLACEMENT_DELAY_TICKS) {
+            return false;
+        }
+
+        return true;
     }
 }
