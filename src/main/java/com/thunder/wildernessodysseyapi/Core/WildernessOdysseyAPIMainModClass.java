@@ -236,14 +236,14 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onConfigLoaded(ModConfigEvent.Loading event) {
         if (event.getConfig().getSpec() == ModDataCacheConfig.CONFIG_SPEC) {
-            ModDataCache.applyConfiguration();
+            ModDataCache.initialize();
         }
     }
 
     @SubscribeEvent
     public void onConfigReloaded(ModConfigEvent.Reloading event) {
         if (event.getConfig().getSpec() == ModDataCacheConfig.CONFIG_SPEC) {
-            ModDataCache.applyConfiguration();
+            ModDataCache.initialize();
         }
     }
 }
