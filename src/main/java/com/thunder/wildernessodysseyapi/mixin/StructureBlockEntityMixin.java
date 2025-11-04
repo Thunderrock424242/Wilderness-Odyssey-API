@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
+import com.thunder.wildernessodysseyapi.bridge.StructureBlockCornerCacheBridge;
 import com.thunder.wildernessodysseyapi.util.StructureBlockCornerCache;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import net.minecraft.core.BlockPos;
@@ -34,8 +35,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /**
  * Expands the structure block capture size and automatically snaps the save area to the occupied blocks.
  */
-import com.thunder.wildernessodysseyapi.mixin.bridge.StructureBlockCornerCacheBridge;
-
 @Mixin(StructureBlockEntity.class)
 public abstract class StructureBlockEntityMixin extends BlockEntity implements StructureBlockCornerCacheBridge {
 

@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.mixin.bridge;
+package com.thunder.wildernessodysseyapi.bridge;
 
 /**
  * Provides hooks for structure block corner cache synchronization when lifecycle events occur on the
