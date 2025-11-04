@@ -67,7 +67,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
     @Unique
     private @org.jetbrains.annotations.Nullable ServerLevel wildernessodysseyapi$cachedCornerLevel;
 
-    @Inject(method = "load", at = @At("TAIL"))
+    @Inject(method = "loadAdditional", at = @At("TAIL"))
     private void wildernessodysseyapi$handleLoad(CompoundTag tag, HolderLookup.Provider lookupProvider, CallbackInfo ci) {
         wildernessodysseyapi$syncCornerCache();
     }
@@ -77,7 +77,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         wildernessodysseyapi$syncCornerCache();
     }
 
-    @Inject(method = "setStructureName", at = @At("TAIL"))
+    @Inject(method = "setStructureName(Lnet/minecraft/resources/ResourceLocation;)V", at = @At("TAIL"))
     private void wildernessodysseyapi$handleNameUpdate(@org.jetbrains.annotations.Nullable ResourceLocation name,
             CallbackInfo ci) {
         wildernessodysseyapi$syncCornerCache();
