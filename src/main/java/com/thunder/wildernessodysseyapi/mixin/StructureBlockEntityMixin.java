@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.util.StructureBlockCornerCache;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerChunkCache;
@@ -67,7 +68,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
     private @org.jetbrains.annotations.Nullable ServerLevel wildernessodysseyapi$cachedCornerLevel;
 
     @Inject(method = "load", at = @At("TAIL"))
-    private void wildernessodysseyapi$handleLoad(CompoundTag tag, CallbackInfo ci) {
+    private void wildernessodysseyapi$handleLoad(CompoundTag tag, HolderLookup.Provider lookupProvider, CallbackInfo ci) {
         wildernessodysseyapi$syncCornerCache();
     }
 
