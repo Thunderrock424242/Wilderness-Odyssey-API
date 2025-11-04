@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.util.StructureBlockCornerCache;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerChunkCache;
@@ -18,6 +19,7 @@ import net.minecraft.world.level.block.StructureBlock;
 import net.minecraft.world.level.block.state.properties.StructureMode;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.util.Mth;
+import net.minecraft.nbt.CompoundTag;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -32,8 +34,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /**
  * Expands the structure block capture size and automatically snaps the save area to the occupied blocks.
  */
+import com.thunder.wildernessodysseyapi.mixin.bridge.StructureBlockCornerCacheBridge;
+
 @Mixin(StructureBlockEntity.class)
-public abstract class StructureBlockEntityMixin extends BlockEntity {
+public abstract class StructureBlockEntityMixin extends BlockEntity implements StructureBlockCornerCacheBridge {
 
     @Shadow @Final @Mutable private static int MAX_OFFSET_PER_AXIS;
     @Shadow @Final @Mutable private static int MAX_SIZE_PER_AXIS;
@@ -63,19 +67,9 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
     @Unique
     private @org.jetbrains.annotations.Nullable ServerLevel wildernessodysseyapi$cachedCornerLevel;
 
-    @Inject(method = "onLoad", at = @At("TAIL"))
-    private void wildernessodysseyapi$registerOnLoad(CallbackInfo ci) {
+    @Inject(method = "load", at = @At("TAIL"))
+    private void wildernessodysseyapi$handleLoad(CompoundTag tag, HolderLookup.Provider lookupProvider, CallbackInfo ci) {
         wildernessodysseyapi$syncCornerCache();
-    }
-
-    @Inject(method = "setLevel", at = @At("TAIL"))
-    private void wildernessodysseyapi$handleLevelSet(Level level, CallbackInfo ci) {
-        wildernessodysseyapi$syncCornerCache();
-    }
-
-    @Inject(method = "setRemoved", at = @At("HEAD"))
-    private void wildernessodysseyapi$handleRemoval(CallbackInfo ci) {
-        wildernessodysseyapi$removeCornerFromCache();
     }
 
     @Inject(method = "setMode", at = @At("TAIL"))
@@ -770,6 +764,16 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         this.wildernessodysseyapi$cacheRegistered = false;
         this.wildernessodysseyapi$cachedCornerName = null;
         this.wildernessodysseyapi$cachedCornerLevel = null;
+    }
+
+    @Override
+    public void wildernessodysseyapi$bridge$syncCornerCache() {
+        wildernessodysseyapi$syncCornerCache();
+    }
+
+    @Override
+    public void wildernessodysseyapi$bridge$removeCornerFromCache() {
+        wildernessodysseyapi$removeCornerFromCache();
     }
 
     @Unique
