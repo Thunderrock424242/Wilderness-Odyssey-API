@@ -33,8 +33,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /**
  * Expands the structure block capture size and automatically snaps the save area to the occupied blocks.
  */
+import com.thunder.wildernessodysseyapi.mixin.bridge.StructureBlockCornerCacheBridge;
+
 @Mixin(StructureBlockEntity.class)
-public abstract class StructureBlockEntityMixin extends BlockEntity {
+public abstract class StructureBlockEntityMixin extends BlockEntity implements StructureBlockCornerCacheBridge {
 
     @Shadow @Final @Mutable private static int MAX_OFFSET_PER_AXIS;
     @Shadow @Final @Mutable private static int MAX_SIZE_PER_AXIS;
@@ -67,16 +69,6 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
     @Inject(method = "load", at = @At("TAIL"))
     private void wildernessodysseyapi$handleLoad(CompoundTag tag, CallbackInfo ci) {
         wildernessodysseyapi$syncCornerCache();
-    }
-
-    @Inject(method = "setLevel", at = @At("TAIL"))
-    private void wildernessodysseyapi$handleLevelSet(Level level, CallbackInfo ci) {
-        wildernessodysseyapi$syncCornerCache();
-    }
-
-    @Inject(method = "setRemoved", at = @At("HEAD"))
-    private void wildernessodysseyapi$handleRemoval(CallbackInfo ci) {
-        wildernessodysseyapi$removeCornerFromCache();
     }
 
     @Inject(method = "setMode", at = @At("TAIL"))
@@ -771,6 +763,16 @@ public abstract class StructureBlockEntityMixin extends BlockEntity {
         this.wildernessodysseyapi$cacheRegistered = false;
         this.wildernessodysseyapi$cachedCornerName = null;
         this.wildernessodysseyapi$cachedCornerLevel = null;
+    }
+
+    @Override
+    public void wildernessodysseyapi$bridge$syncCornerCache() {
+        wildernessodysseyapi$syncCornerCache();
+    }
+
+    @Override
+    public void wildernessodysseyapi$bridge$removeCornerFromCache() {
+        wildernessodysseyapi$removeCornerFromCache();
     }
 
     @Unique
