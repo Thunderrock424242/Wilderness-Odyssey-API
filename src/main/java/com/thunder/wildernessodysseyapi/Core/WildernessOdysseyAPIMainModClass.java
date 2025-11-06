@@ -94,6 +94,8 @@ public class WildernessOdysseyAPIMainModClass {
         LOGGER.info("WildernessOdysseyAPI initialized. I will also start to track mod conflicts");
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(this::onConfigLoaded);
+        modEventBus.addListener(this::onConfigReloaded);
         ModCreativeTabs.register(modEventBus);
 
         // Register global events
@@ -233,14 +235,12 @@ public class WildernessOdysseyAPIMainModClass {
         event.addListener(new FaqReloadListener());
     }
 
-    @SubscribeEvent
     public void onConfigLoaded(ModConfigEvent.Loading event) {
         if (event.getConfig().getSpec() == ModDataCacheConfig.CONFIG_SPEC) {
             ModDataCache.initialize();
         }
     }
 
-    @SubscribeEvent
     public void onConfigReloaded(ModConfigEvent.Reloading event) {
         if (event.getConfig().getSpec() == ModDataCacheConfig.CONFIG_SPEC) {
             ModDataCache.initialize();
