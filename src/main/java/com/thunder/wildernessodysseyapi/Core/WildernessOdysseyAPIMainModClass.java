@@ -61,6 +61,7 @@ import net.minecraft.world.item.CreativeModeTabs;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
@@ -227,7 +228,7 @@ public class WildernessOdysseyAPIMainModClass {
             // Use the dynamic mod count
             int recommendedMB = MemoryUtils.calculateRecommendedRAM(usedMB, dynamicModCount);
 
-            LOGGER.info("[ResourceManager] Memory usage: {}MB / {}MB. Recommended ~{}MB for {} loaded mods.", usedMB, totalMB, recommendedMB, dynamicModCount);
+            LOGGER.info("[ResourceManager] Memory usage: {}MB / {}MB. Recommended ~{}MB for {} loaded mods.", (Object) Optional.of(usedMB), (Object) totalMB, (Object) recommendedMB, (Object) dynamicModCount);
         }
     }
     @SubscribeEvent
