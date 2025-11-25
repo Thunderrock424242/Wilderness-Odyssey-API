@@ -109,8 +109,8 @@ public class WildernessOdysseyAPIMainModClass {
         TerrainReplacerBlock.register(modEventBus);
         ModItems.register(modEventBus);
 
-        container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC);
-        container.registerConfig(ModConfig.Type.COMMON, ModDataCacheConfig.CONFIG_SPEC);
+        container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC, "wildernessodysseyapi-structures.toml");
+        container.registerConfig(ModConfig.Type.COMMON, ModDataCacheConfig.CONFIG_SPEC, "wildernessodysseyapi-cache.toml");
         // Previously registered client-only events have been removed
         container.registerConfig(ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC);
         DonationReminderConfig.validateVersion();
