@@ -43,6 +43,10 @@ public class ShaderConflictChecker {
         Map<String, List<String>> shaderUsageMap = new HashMap<>();
 
         for (var mod : ModList.get().getMods()) {
+            // NeoForge is the mod loader and should not be treated as a mod when scanning for conflicts
+            if ("neoforge".equals(mod.getModId())) {
+                continue;
+            }
             ModFile file = (ModFile) mod.getOwningFile().getFile();
             if (file == null || !file.getFilePath().toString().endsWith(".jar")) continue;
 

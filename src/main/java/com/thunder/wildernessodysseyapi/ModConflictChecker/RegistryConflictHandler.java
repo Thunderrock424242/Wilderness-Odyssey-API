@@ -20,8 +20,6 @@ import java.util.Map;
 public class RegistryConflictHandler {
 
     // Track the original sources of registered items
-    private static final Map<ResourceLocation, String> structureRegistry = new HashMap<>();
-    private static final Map<ResourceLocation, String> poiRegistry = new HashMap<>();
     private static final Map<ResourceLocation, String> biomeRegistry = new HashMap<>();
     private static final Map<ResourceLocation, String> recipeRegistry = new HashMap<>();
 
@@ -35,8 +33,8 @@ public class RegistryConflictHandler {
         var registryAccess = server.registryAccess();
 
         // Check for conflicts in structures, POIs, and biomes
-        checkRegistryConflicts(registryAccess.registryOrThrow(Registries.STRUCTURE), structureRegistry, "Structure");
-        checkRegistryConflicts(registryAccess.registryOrThrow(Registries.POINT_OF_INTEREST_TYPE), poiRegistry, "POI");
+        StructureConflictChecker.checkStructureConflicts(registryAccess.registryOrThrow(Registries.STRUCTURE));
+        StructureConflictChecker.checkPoiConflicts(registryAccess.registryOrThrow(Registries.POINT_OF_INTEREST_TYPE));
         checkRegistryConflicts(registryAccess.registryOrThrow(Registries.BIOME), biomeRegistry, "Biome");
 
         // Check for crafting recipe conflicts
