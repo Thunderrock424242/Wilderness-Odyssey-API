@@ -20,6 +20,7 @@ import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.doorlock.DoorLockEvents;
 import com.thunder.wildernessodysseyapi.command.DoorLockCommand;
 import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
+import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
@@ -109,10 +110,13 @@ public class WildernessOdysseyAPIMainModClass {
         TerrainReplacerBlock.register(modEventBus);
         ModItems.register(modEventBus);
 
-        container.registerConfig(ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC, "wildernessodysseyapi-structures.toml");
-        container.registerConfig(ModConfig.Type.COMMON, ModDataCacheConfig.CONFIG_SPEC, "wildernessodysseyapi-cache.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC,
+                "wildernessodysseyapi-structures.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, ModDataCacheConfig.CONFIG_SPEC,
+                "wildernessodysseyapi-cache.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC,
+                "wildernessodysseyapi-donations-client.toml");
         // Previously registered client-only events have been removed
-        container.registerConfig(ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC);
         DonationReminderConfig.validateVersion();
 
     }
