@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.ai;
+package com.thunder.wildernessodysseyapi.AI_perf;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;

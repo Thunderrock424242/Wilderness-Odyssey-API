@@ -24,9 +24,9 @@ import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
-import com.thunder.wildernessodysseyapi.ai.AIClient;
-import com.thunder.wildernessodysseyapi.ai.PerformanceAdvisor;
-import com.thunder.wildernessodysseyapi.ai.PerformanceAdvisoryRequest;
+import com.thunder.wildernessodysseyapi.AI_perf.requestperfadvice;
+import com.thunder.wildernessodysseyapi.AI_perf.PerformanceAdvisor;
+import com.thunder.wildernessodysseyapi.AI_perf.PerformanceAdvisoryRequest;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
@@ -86,7 +86,7 @@ public class WildernessOdysseyAPIMainModClass {
 
     private long lastTickTimeNanos = 0L;
     private long worstTickTimeNanos = 0L;
-    private final AIClient aiClient = new AIClient();
+    private final requestperfadvice requestperfadvice = new requestperfadvice();
 
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
 
@@ -252,7 +252,7 @@ public class WildernessOdysseyAPIMainModClass {
             worstTickTimeNanos = 0L;
             if (worstTickMillis > PerformanceAdvisor.DEFAULT_TICK_BUDGET_MS) {
                 PerformanceAdvisoryRequest request = PerformanceAdvisor.observe(server, worstTickMillis);
-                String advisory = aiClient.requestPerformanceAdvice(request);
+                String advisory = requestperfadvice.requestPerformanceAdvice(request);
                 LOGGER.info("[AI Advisor] {}", advisory);
             }
         }

@@ -35,7 +35,7 @@ public class RegistryConflictHandler {
         // Check for conflicts in structures, POIs, and biomes
         StructureConflictChecker.checkStructureConflicts(registryAccess.registryOrThrow(Registries.STRUCTURE));
         StructureConflictChecker.checkPoiConflicts(registryAccess.registryOrThrow(Registries.POINT_OF_INTEREST_TYPE));
-        checkRegistryConflicts(registryAccess.registryOrThrow(Registries.BIOME), biomeRegistry, "Biome");
+        checkRegistryConflicts(registryAccess.registryOrThrow(Registries.BIOME));
 
         // Check for crafting recipe conflicts
         checkRecipeConflicts(server);
@@ -47,28 +47,26 @@ public class RegistryConflictHandler {
     /**
      * Detects and logs conflicts in a specific registry.
      *
-     * @param registry        The registry to check.
-     * @param trackedRegistry A map tracking registered items and their sources.
-     * @param type            The type of registry (e.g., "Structure", "POI", "Biome").
-     * @param <T>             The type of elements in the registry.
+     * @param <T>      The type of elements in the registry.
+     * @param registry The registry to check.
      */
-    private static <T> void checkRegistryConflicts(Registry<T> registry, Map<ResourceLocation, String> trackedRegistry, String type) {
+    private static <T> void checkRegistryConflicts(Registry<T> registry) {
         registry.keySet().forEach(key -> {
             String modSource = key.getNamespace();
-            if (trackedRegistry.containsKey(key)) {
-                String originalMod = trackedRegistry.get(key);
+            if (RegistryConflictHandler.biomeRegistry.containsKey(key)) {
+                String originalMod = RegistryConflictHandler.biomeRegistry.get(key);
 
                 // Log conflict if detected
                 if (!originalMod.equals(modSource)) {
                     LoggerUtil.log(ConflictSeverity.ERROR, String.format(
                             "Conflict detected: %s '%s' was originally registered by '%s' but has been overwritten by '%s'.",
-                            type, key, originalMod, modSource), false);
+                            "Biome", key, originalMod, modSource), false);
                 }
             } else {
                 // Log successful registration
-                trackedRegistry.put(key, modSource);
+                RegistryConflictHandler.biomeRegistry.put(key, modSource);
                 LoggerUtil.log(ConflictSeverity.INFO, String.format(
-                        "%s '%s' registered by '%s'.", type, key, modSource), false);
+                        "%s '%s' registered by '%s'.", "Biome", key, modSource), false);
             }
         });
     }

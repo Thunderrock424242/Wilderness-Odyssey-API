@@ -9,14 +9,15 @@
     "CampfireBlockMixin",
     "DayNightCycleMixin",
     "EntityAccessor",
-    "StructureBlockEntityMixin",
-    "ServerboundSetStructureBlockPacketMixin"
+    "ServerboundSetStructureBlockPacketMixin",
+    "StructureBlockEntityMixin"
   ],
   "injectors": {
     "defaultRequire": 1
   },
   "client": [
     "DebugMixin",
+    "LoadingOverlayMixin",
     "MixinWorldCreationUiState",
     "ParticleEngineMixin",
     "StructureBlockRendererMixin"

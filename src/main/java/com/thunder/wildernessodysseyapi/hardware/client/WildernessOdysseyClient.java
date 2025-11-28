@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 /**
  * Client entry point for Wilderness Odyssey specific features.
  */
-@EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public final class WildernessOdysseyClient {
     private static HardwareRequirementChecker checker;
 
