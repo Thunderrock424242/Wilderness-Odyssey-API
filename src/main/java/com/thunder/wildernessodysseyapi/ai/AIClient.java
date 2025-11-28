@@ -62,5 +62,21 @@ public class AIClient {
         String prefix = story.isEmpty() ? "" : story.get(0) + " ";
         return prefix + "You said: " + message;
     }
+
+    /**
+     * Builds a formatted advisory request for performance-heavy systems and returns a
+     * deterministic response. This keeps AI usage optional while providing a consistent
+     * prompt format for future networked helpers.
+     *
+     * @param request snapshot of the heavy systems
+     * @return canned advisory response
+     */
+    public String requestPerformanceAdvice(PerformanceAdvisoryRequest request) {
+        String prompt = PerformanceAdvisor.buildPrompt(request);
+        String reply = PerformanceAdvisor.buildLocalAdvice(request);
+        memoryStore.addMessage("server", prompt);
+        memoryStore.addMessage("server", reply);
+        return reply;
+    }
 }
 
