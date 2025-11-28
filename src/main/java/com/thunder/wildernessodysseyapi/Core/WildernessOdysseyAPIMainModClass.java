@@ -78,6 +78,7 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
 public class WildernessOdysseyAPIMainModClass {
 
     public static int dynamicModCount = 0;
+    private static final String CONFIG_FOLDER = ModConstants.MOD_ID + "/";
 
     private static AABB structureBoundingBox;
 
@@ -119,11 +120,11 @@ public class WildernessOdysseyAPIMainModClass {
         ModItems.register(modEventBus);
 
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC,
-                "wildernessodysseyapi-structures.toml");
+                CONFIG_FOLDER + "wildernessodysseyapi-structures.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, ModDataCacheConfig.CONFIG_SPEC,
-                "wildernessodysseyapi-cache.toml");
+                CONFIG_FOLDER + "wildernessodysseyapi-cache.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC,
-                "wildernessodysseyapi-donations-client.toml");
+                CONFIG_FOLDER + "wildernessodysseyapi-donations-client.toml");
         // Previously registered client-only events have been removed
         DonationReminderConfig.validateVersion();
 

@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.Play
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.WorldSpawnHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
+import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
@@ -94,6 +95,11 @@ public class MeteorStructureSpawner {
             return;
         }
 
+        if (StructureConfig.DEBUG_DISABLE_IMPACT_SITES.get()) {
+            markPlacementComplete(level);
+            return;
+        }
+
         MeteorImpactData impactData = MeteorImpactData.get(level);
         if (impactData.getBunkerPos() != null) {
             markPlacementComplete(level);
@@ -119,6 +125,11 @@ public class MeteorStructureSpawner {
 
         if (storedSites.size() != originalCount) {
             impactData.setImpactPositions(storedSites);
+        }
+
+        if (StructureConfig.DEBUG_DISABLE_BUNKER_SPAWNS.get()) {
+            markPlacementComplete(level);
+            return;
         }
 
         if (impactData.getBunkerPos() == null && !storedSites.isEmpty()) {

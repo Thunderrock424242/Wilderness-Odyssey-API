@@ -19,6 +19,10 @@ public class StructureConfig {
     public static final ModConfigSpec.IntValue BUNKER_MAX_COUNT;
     /** Debug toggle to bypass cryo tube spawning */
     public static final ModConfigSpec.BooleanValue DEBUG_IGNORE_CRYO_TUBE;
+    /** Debug toggle to skip bunker placement entirely */
+    public static final ModConfigSpec.BooleanValue DEBUG_DISABLE_BUNKER_SPAWNS;
+    /** Debug toggle to skip meteor impact site placement */
+    public static final ModConfigSpec.BooleanValue DEBUG_DISABLE_IMPACT_SITES;
 
     private static final HashMap<String, BooleanValue> STRUCTURES = new HashMap<>();
     private static final HashMap<String, BooleanValue> POIS = new HashMap<>();
@@ -34,6 +38,17 @@ public class StructureConfig {
                         "If true, players spawn at a random position inside the bunker instead of inside cryo tubes."
                 )
                 .define("debugIgnoreCryoTubeSpawns", false);
+        DEBUG_DISABLE_BUNKER_SPAWNS = BUILDER.comment(
+                        "If true, the bunker structure will not be spawned during world generation."
+                )
+                .define("debugDisableBunkerSpawns", false);
+        BUILDER.pop();
+
+        BUILDER.push("impactSites");
+        DEBUG_DISABLE_IMPACT_SITES = BUILDER.comment(
+                        "If true, meteor impact sites will not be generated."
+                )
+                .define("debugDisableImpactSites", false);
         BUILDER.pop();
 
         registerAll();
