@@ -24,6 +24,9 @@ import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
+import com.thunder.wildernessodysseyapi.ai.AIClient;
+import com.thunder.wildernessodysseyapi.ai.PerformanceAdvisor;
+import com.thunder.wildernessodysseyapi.ai.PerformanceAdvisoryRequest;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
@@ -63,6 +66,7 @@ import net.minecraft.world.item.CreativeModeTabs;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
@@ -79,6 +83,10 @@ public class WildernessOdysseyAPIMainModClass {
 
     private int serverTickCounter = 0;
     private static final int LOG_INTERVAL = 600;
+
+    private long lastTickTimeNanos = 0L;
+    private long worstTickTimeNanos = 0L;
+    private final AIClient aiClient = new AIClient();
 
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
 
@@ -221,6 +229,12 @@ public class WildernessOdysseyAPIMainModClass {
         // Every server tick event
         // This is equivalent to the old "END" phase.
         MinecraftServer server = event.getServer();
+        long now = System.nanoTime();
+        if (lastTickTimeNanos != 0L) {
+            long duration = now - lastTickTimeNanos;
+            worstTickTimeNanos = Math.max(worstTickTimeNanos, duration);
+        }
+        lastTickTimeNanos = now;
         DeferredTaskScheduler.tick();
         if (!event.hasTime()) return;
 
@@ -233,6 +247,14 @@ public class WildernessOdysseyAPIMainModClass {
             int recommendedMB = MemoryUtils.calculateRecommendedRAM(usedMB, dynamicModCount);
 
             LOGGER.info("[ResourceManager] Memory usage: {}MB / {}MB. Recommended ~{}MB for {} loaded mods.", (Object) Optional.of(usedMB), (Object) totalMB, (Object) recommendedMB, (Object) dynamicModCount);
+
+            long worstTickMillis = TimeUnit.NANOSECONDS.toMillis(worstTickTimeNanos);
+            worstTickTimeNanos = 0L;
+            if (worstTickMillis > PerformanceAdvisor.DEFAULT_TICK_BUDGET_MS) {
+                PerformanceAdvisoryRequest request = PerformanceAdvisor.observe(server, worstTickMillis);
+                String advisory = aiClient.requestPerformanceAdvice(request);
+                LOGGER.info("[AI Advisor] {}", advisory);
+            }
         }
     }
     @SubscribeEvent
