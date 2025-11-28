@@ -3,18 +3,18 @@ package com.thunder.wildernessodysseyapi.AI_perf;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.world.entity.Mob;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 /**
  * Performs lightweight, main-thread throttles once an action is approved.
  */
-@Mod.EventBusSubscriber(modid = ModConstants.MOD_ID)
+@EventBusSubscriber(modid = ModConstants.MOD_ID)
 public class PerformanceMitigationHandler {
 
     @SubscribeEvent
-    public static void onLivingTick(LivingEvent.LivingTickEvent event) {
+    public static void onLivingTick(LivingEvent event) {
         if (!(event.getEntity() instanceof Mob mob)) return;
         if (!(mob.level() instanceof net.minecraft.server.level.ServerLevel serverLevel)) return;
 
@@ -34,7 +34,7 @@ public class PerformanceMitigationHandler {
     }
 
     @SubscribeEvent
-    public static void onLevelTick(TickEvent.LevelTickEvent event) {
+    public static void onLevelTick(LevelTickEvent event) {
         if (event.level().isClientSide()) return;
         if (event.phase != TickEvent.Phase.END) return;
         if (event.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {

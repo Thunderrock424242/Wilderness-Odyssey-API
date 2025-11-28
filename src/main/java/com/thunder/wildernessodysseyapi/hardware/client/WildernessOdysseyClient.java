@@ -49,7 +49,7 @@ public final class WildernessOdysseyClient {
         minecraft.setScreen(new HardwareRequirementScreen(getOrCreateChecker()));
     }
 
-    @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.GAME)
+    @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
     public static final class ClientEvents {
         private ClientEvents() {
         }

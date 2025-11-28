@@ -70,19 +70,19 @@ public final class PerformanceMitigationController {
                         "Throttle pathfinding for dense clusters (every 3 ticks).",
                         load.evidence(),
                         DEFAULT_DURATION_SECONDS,
-                        load.observedValue()));
+                        (int) load.observedValue()));
                 case "entity-ticking" -> proposals.add(new PerformanceAction(
                         subsystem,
                         "Lower idle mob tick rate to ease behavior costs.",
                         load.evidence(),
                         DEFAULT_DURATION_SECONDS,
-                        load.observedValue()));
+                        (int) load.observedValue()));
                 case "chunk-processing" -> proposals.add(new PerformanceAction(
                         subsystem,
                         "Temporarily shrink simulation distance to ease chunk queues.",
                         load.evidence(),
                         DEFAULT_DURATION_SECONDS,
-                        load.observedValue()));
+                        (int) load.observedValue()));
                 default -> {
                 }
             }
