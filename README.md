@@ -19,10 +19,19 @@ in the Minecraft codebase. These names are covered by a specific license. All mo
 license. For the latest license text, refer to the mapping file itself, or the reference copy here:
 https://github.com/NeoForged/NeoForm/blob/main/Mojang.md
 
-Additional Resources: 
+Additional Resources:
 ==========
-Community Documentation: https://docs.neoforged.net/  
+Community Documentation: https://docs.neoforged.net/
 NeoForged Discord: https://discord.neoforged.net/
+
+AI Helper Dependencies (Optional):
+-------------------------
+The build already includes lightweight HTTP/JSON and fault-tolerance libraries for optional AI advisors:
+- OkHttp (HTTP client)
+- Moshi (JSON serialization)
+- Resilience4j Circuit Breaker
+
+These are pulled from Maven Central and can be used by any local or sidecar AI helper you run alongside the mod. The game still runs normally if you choose not to enable an AI helper.
 Secrets:
 -------
 For local development, copy `.env.example` to `.env` and fill in required tokens.

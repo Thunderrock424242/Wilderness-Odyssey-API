@@ -21,6 +21,7 @@ group = "com.thunder.wildernessodysseyapi"
 
 repositories {
     mavenLocal()
+    mavenCentral()
 }
 
 base {
@@ -136,6 +137,11 @@ dependencies {
     implementation "curse.maven:spark-361579:6225208"
     implementation "curse.maven:sodium-394468:6382651"
     implementation "curse.maven:irisshaders-455508:6661598"
+
+    // AI advisory helpers (HTTP client, JSON, and fault tolerance)
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.moshi:moshi:1.15.1'
+    implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
