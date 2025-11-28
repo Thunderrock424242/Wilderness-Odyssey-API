@@ -34,10 +34,12 @@ public class PerformanceMitigationHandler {
     }
 
     @SubscribeEvent
-    public static void onLevelTick(LevelTickEvent event) {
-        if (event.level().isClientSide()) return;
-        if (event.phase != TickEvent.Phase.END) return;
-        if (event.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+    public static void onLevelTick(LevelTickEvent.Post event) {
+        var level = event.getLevel();
+
+        if (level.isClientSide()) return;
+
+        if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
             if (PerformanceMitigationController.isEntityTickThrottled(serverLevel)) {
                 PerformanceMitigationController.thawNearbyPlayers(serverLevel);
             }
