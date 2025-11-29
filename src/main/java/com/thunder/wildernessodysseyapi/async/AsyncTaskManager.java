@@ -87,10 +87,14 @@ public final class AsyncTaskManager {
 
         Objects.requireNonNull(taskPayload, "taskPayload");
         try {
-            CompletableFuture<Boolean> future = CompletableFuture.supplyAsync(() -> {
+            AtomicBoolean timedOut = new AtomicBoolean(false);
+            CompletableFuture<Boolean> workerFuture = CompletableFuture.supplyAsync(() -> {
                 try {
                     Optional<MainThreadTask> result = taskPayload.createResult();
-                    return result.filter(task -> enqueueMainThreadTask(label, task)).isPresent();
+                    if (timedOut.get()) {
+                        return false;
+                    }
+                    return result.filter(task -> !timedOut.get() && enqueueMainThreadTask(label, task)).isPresent();
                 } catch (Exception e) {
                     ModConstants.LOGGER.error("[Async] Task '{}' failed", label, e);
                     return false;
@@ -98,9 +102,11 @@ public final class AsyncTaskManager {
             }, executor);
 
             if (configValues.taskTimeoutMs() > 0) {
-                future = future.orTimeout(configValues.taskTimeoutMs(), TimeUnit.MILLISECONDS)
+                return workerFuture.orTimeout(configValues.taskTimeoutMs(), TimeUnit.MILLISECONDS)
                         .exceptionally(ex -> {
                             if (ex instanceof TimeoutException) {
+                                timedOut.set(true);
+                                workerFuture.cancel(true);
                                 ModConstants.LOGGER.warn("[Async] Task '{}' timed out after {} ms", label, configValues.taskTimeoutMs());
                             } else {
                                 ModConstants.LOGGER.error("[Async] Task '{}' failed", label, ex);
@@ -108,7 +114,7 @@ public final class AsyncTaskManager {
                             return false;
                         });
             }
-            return future;
+            return workerFuture;
         } catch (RejectedExecutionException ex) {
             int rejected = REJECTED.incrementAndGet();
             ModConstants.LOGGER.warn("[Async] Rejected task '{}' ({} queued, total rejections: {}).", label, executor.getQueue().size(), rejected);
