@@ -9,12 +9,22 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
+
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.Ingredient;
 
 /**
  * Offline story helper that mixes the configured lore with recent
@@ -160,6 +170,21 @@ public class AIClient {
         }
     }
 
+    public synchronized void scanGameData(MinecraftServer server) {
+        if (server == null) {
+            return;
+        }
+        craftingHints.clear();
+        moddedAdvice.clear();
+
+        captureRecipes(server);
+        captureModdedItems(server);
+
+        if (craftingHints.isEmpty()) {
+            seedFallbackLore();
+        }
+    }
+
     private void parseKeyValue(String raw, Map<String, String> target) {
         int colon = raw.indexOf(":");
         if (colon == -1) {
@@ -200,6 +225,57 @@ public class AIClient {
             moddedAdvice.put("compressed cobblestone", "Craft cobblestone in a full 3x3 to save space; great for automation mods.");
             moddedAdvice.put("glider", "Leather wings plus sticks form a glide frame—perfect for drifting between islands.");
         }
+    }
+
+    private void captureRecipes(MinecraftServer server) {
+        server.getRecipeManager().getRecipes().forEach(recipeHolder -> {
+            ResourceLocation recipeId = recipeHolder.id();
+            var recipe = recipeHolder.value();
+            ItemStack output = recipe.getResultItem(server.registryAccess());
+            String outputName = output.getHoverName().getString();
+            if (outputName.isBlank()) {
+                outputName = recipeId.getPath().replace("_", " ");
+            }
+
+            String key = outputName.toLowerCase(Locale.ROOT);
+            String fallbackKey = recipeId.getPath().toLowerCase(Locale.ROOT).replace("_", " ");
+            String ingredients = recipe.getIngredients().stream()
+                    .map(this::summarizeIngredient)
+                    .filter(s -> !s.isBlank())
+                    .distinct()
+                    .limit(6)
+                    .collect(Collectors.joining(", "));
+            if (ingredients.isBlank()) {
+                ingredients = "Check the in-game recipe book for slot layout.";
+            }
+
+            String description = "Detected in-world recipe: " + outputName + " uses " + ingredients + ".";
+            craftingHints.putIfAbsent(key, description);
+            craftingHints.putIfAbsent(fallbackKey, description);
+        });
+    }
+
+    private String summarizeIngredient(Ingredient ingredient) {
+        Set<String> names = new LinkedHashSet<>();
+        for (ItemStack stack : ingredient.getItems()) {
+            String display = stack.getHoverName().getString();
+            if (!display.isBlank()) {
+                names.add(display);
+            }
+        }
+        return String.join(" or ", names);
+    }
+
+    private void captureModdedItems(MinecraftServer server) {
+        Registry<Item> itemRegistry = server.registryAccess().registryOrThrow(Registries.ITEM);
+        itemRegistry.keySet().forEach(key -> {
+            if (!"minecraft".equals(key.getNamespace())) {
+                String prettyName = key.getPath().replace("_", " ");
+                String hint = "Modded item from " + key.getNamespace() + ": " + prettyName + " detected."
+                        + " Ask me for its recipe or check the recipe book.";
+                moddedAdvice.putIfAbsent(prettyName.toLowerCase(Locale.ROOT), hint);
+            }
+        });
     }
 
     private void parseSetting(String line) {
@@ -294,7 +370,8 @@ public class AIClient {
         String buildResponse(String world, String player, String message, List<String> story, String context) {
             String cleanMessage = message == null ? "" : message.trim();
             if (!activated && !mentionsWakeWord(cleanMessage)) {
-                return "Hi, I'm Atlas. Say \"" + wakeWord + "\" to get me chatting, and we can plan this world together.";
+                return "Hey, I'm Atlas—your chat buddy and co-pilot here. Say \"" + wakeWord
+                        + "\" or just keep talking and I'll riff with you while we plan this world.";
             }
             activated = activated || mentionsWakeWord(cleanMessage);
             String loreHook = selectLoreHook(story);
@@ -335,13 +412,13 @@ public class AIClient {
 
             for (Map.Entry<String, String> entry : craftingHints.entrySet()) {
                 if (lower.contains(entry.getKey())) {
-                    return "Recipe for " + entry.getKey() + ": " + entry.getValue();
+                    return "I just scanned the world—" + entry.getValue();
                 }
             }
 
             for (Map.Entry<String, String> entry : moddedAdvice.entrySet()) {
                 if (lower.contains(entry.getKey())) {
-                    return "Mod item tip — " + entry.getKey() + ": " + entry.getValue();
+                    return "Spotted a modded find: " + entry.getValue();
                 }
             }
 
