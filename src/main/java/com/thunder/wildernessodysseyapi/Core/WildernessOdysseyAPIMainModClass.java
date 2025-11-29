@@ -15,6 +15,7 @@ import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListVersionCo
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
+import com.thunder.wildernessodysseyapi.command.AiAdvisorCommand;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.doorlock.DoorLockEvents;
@@ -27,6 +28,7 @@ import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.AI_perf.requestperfadvice;
 import com.thunder.wildernessodysseyapi.AI_perf.PerformanceAdvisor;
 import com.thunder.wildernessodysseyapi.AI_perf.PerformanceAdvisoryRequest;
+import com.thunder.wildernessodysseyapi.AI_perf.PerformanceMitigationController;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
@@ -176,6 +178,7 @@ public class WildernessOdysseyAPIMainModClass {
         DonateCommand.register(event.getDispatcher());
         DoorLockCommand.register(event.getDispatcher());
         WorldGenScanCommand.register(event.getDispatcher());
+        AiAdvisorCommand.register(event.getDispatcher());
     }
 
     /**
@@ -236,6 +239,7 @@ public class WildernessOdysseyAPIMainModClass {
             worstTickTimeNanos = Math.max(worstTickTimeNanos, duration);
         }
         lastTickTimeNanos = now;
+        PerformanceMitigationController.tick(server);
         DeferredTaskScheduler.tick();
         if (!event.hasTime()) return;
 

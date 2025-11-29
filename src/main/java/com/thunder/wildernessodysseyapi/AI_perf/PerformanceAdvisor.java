@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.StreamSupport;
 
 /**
  * Builds advisory prompts for performance-heavy systems so an AI helper can suggest
@@ -22,7 +23,7 @@ public final class PerformanceAdvisor {
 
     public static PerformanceAdvisoryRequest observe(MinecraftServer server, long worstTickMillis) {
         int playerCount = server.getPlayerCount();
-        int dimensionCount = server.getAllLevels().size();
+        int dimensionCount = (int) StreamSupport.stream(server.getAllLevels().spliterator(), false).count();
 
         int heaviestMobCluster = 0;
         int maxLoadedChunks = 0;

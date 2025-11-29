@@ -3,6 +3,8 @@ package com.thunder.wildernessodysseyapi.AI_perf;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.thunder.wildernessodysseyapi.AI_perf.PerformanceMitigationController;
+
 /**
  * Simple client that reads lore from {@code ai_config.yaml} and
  * echoes player messages. This acts as a placeholder for a future
