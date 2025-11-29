@@ -5,4 +5,5 @@ story:
 settings:
   voice_enabled: true
   speech_recognition: false
-  model: "gpt-4o-mini"
+  wake_word: "atlas"
+  model: "local-story-engine"
