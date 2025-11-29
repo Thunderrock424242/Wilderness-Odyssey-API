@@ -15,7 +15,10 @@ import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListVersionCo
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
+import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
+import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.command.AiAdvisorCommand;
+import com.thunder.wildernessodysseyapi.command.AsyncStatsCommand;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.doorlock.DoorLockEvents;
@@ -127,6 +130,8 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-cache.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-donations-client.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-async.toml");
         // Previously registered client-only events have been removed
         DonationReminderConfig.validateVersion();
 
@@ -159,6 +164,7 @@ public class WildernessOdysseyAPIMainModClass {
         MeteorStructureSpawner.resetState();
         BunkerProtectionHandler.clear();
         BunkerStructureGenerator.resetDeferredState();
+        AsyncTaskManager.initialize(AsyncThreadingConfig.values());
     }
 
     /**
@@ -179,6 +185,7 @@ public class WildernessOdysseyAPIMainModClass {
         DoorLockCommand.register(event.getDispatcher());
         WorldGenScanCommand.register(event.getDispatcher());
         AiAdvisorCommand.register(event.getDispatcher());
+        AsyncStatsCommand.register(dispatcher);
     }
 
     /**
@@ -220,6 +227,7 @@ public class WildernessOdysseyAPIMainModClass {
         MeteorStructureSpawner.resetState();
         BunkerProtectionHandler.clear();
         BunkerStructureGenerator.resetDeferredState();
+        AsyncTaskManager.shutdown();
     }
 
     private void onLoadComplete(FMLLoadCompleteEvent event) {
@@ -239,6 +247,7 @@ public class WildernessOdysseyAPIMainModClass {
             worstTickTimeNanos = Math.max(worstTickTimeNanos, duration);
         }
         lastTickTimeNanos = now;
+        AsyncTaskManager.drainMainThreadQueue(server);
         PerformanceMitigationController.tick(server);
         DeferredTaskScheduler.tick();
         if (!event.hasTime()) return;
@@ -271,11 +280,17 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == ModDataCacheConfig.CONFIG_SPEC) {
             ModDataCache.initialize();
         }
+        if (event.getConfig().getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
+            AsyncTaskManager.initialize(AsyncThreadingConfig.values());
+        }
     }
 
     public void onConfigReloaded(ModConfigEvent.Reloading event) {
         if (event.getConfig().getSpec() == ModDataCacheConfig.CONFIG_SPEC) {
             ModDataCache.initialize();
+        }
+        if (event.getConfig().getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
+            AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         }
     }
 }
