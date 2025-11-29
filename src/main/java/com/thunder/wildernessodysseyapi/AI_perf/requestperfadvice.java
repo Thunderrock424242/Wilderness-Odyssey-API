@@ -26,9 +26,10 @@ public class requestperfadvice {
     public String requestPerformanceAdvice(PerformanceAdvisoryRequest request) {
         String prompt = PerformanceAdvisor.buildPrompt(request);
         String reply = PerformanceAdvisor.buildLocalAdvice(request);
-        memoryStore.addMessage("server", prompt);
-        memoryStore.addMessage("server", reply);
-        PerformanceMitigationController.buildActionsFromRequest(request);
+        String worldKey = "server";
+        String assistantId = "advisor";
+        memoryStore.addMessage(worldKey, assistantId, prompt);
+        memoryStore.addMessage(worldKey, assistantId, reply);
         return reply;
     }
 }
