@@ -35,6 +35,10 @@ public class AIClient {
         loadStory();
     }
 
+    public String getWakeWord() {
+        return settings.getWakeWord();
+    }
+
     private void loadStory() {
         try (InputStream in = requestperfadvice.class.getClassLoader().getResourceAsStream("ai_config.yaml")) {
             if (in == null) {
