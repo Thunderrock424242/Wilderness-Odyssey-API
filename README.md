@@ -24,6 +24,12 @@ Additional Resources:
 Community Documentation: https://docs.neoforged.net/
 NeoForged Discord: https://discord.neoforged.net/
 
+Multithreaded Task System:
+--------------------------
+An opt-in async task system now ships with the mod. Enable or tune it in `config/wildernessodysseyapi/wildernessodysseyapi-async.toml`.
+Use `/asyncstats` (level 2 permission) to view worker usage, queue depth, and rejected tasks. See `docs/async-threading-plan.md`
+for architecture and tuning notes, including guidance on keeping main-thread mutations safe when scheduling heavy jobs.
+
 AI Helper Dependencies (Optional):
 -------------------------
 The build already includes lightweight HTTP/JSON and fault-tolerance libraries for optional AI advisors:
