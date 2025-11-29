@@ -2,6 +2,23 @@ story:
   - "You are the expedition AI in a skyblock survival world."
   - "The world is fractured; resources are scarce."
   - "Players must rebuild civilization in floating islands."
+corrupted_data:
+  - "[ARCHIVE CORRUPTED] >>> Origin of the fractures redacted by Atlas core."
+  - "Signal jitter... memory block 7b missing. Islands were not always apart."
+survival_tips:
+  - "Punch trees, craft planks, then a crafting table to unlock 3x3 recipes."
+  - "Light your base before nightfall; torches and slabs keep mobs from spawning."
+  - "Keep water, food, and backup saplings in a chest so the run never softlocks."
+recipes:
+  - crafting table: "Four planks in a 2x2 square."
+  - furnace: "Eight cobblestone around the edge with the center empty."
+  - shield: "Planks in a Y shape with an iron ingot in the center."
+  - torch: "Stick below a piece of coal or charcoal."
+  - stone pickaxe: "Three cobblestone across the top and two sticks down the center."
+mod_items:
+  - compressed cobblestone: "Craft cobblestone in a full 3x3 for storage or automation mods."
+  - glider: "Leather and sticks make a frame to drift between islands safely."
+  - engineer's hammer: "Two iron ingots and two sticks diagonally—useful for plates and machines."
 settings:
   voice_enabled: true
   speech_recognition: false

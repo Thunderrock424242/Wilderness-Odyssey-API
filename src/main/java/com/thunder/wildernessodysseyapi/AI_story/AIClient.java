@@ -26,6 +26,10 @@ import java.util.stream.Collectors;
 public class AIClient {
 
     private final List<String> story = new ArrayList<>();
+    private final List<String> corruptedLore = new ArrayList<>();
+    private final List<String> survivalBeats = new ArrayList<>();
+    private final Map<String, String> craftingHints = new HashMap<>();
+    private final Map<String, String> moddedAdvice = new HashMap<>();
     private final AISettings settings = new AISettings();
     private final VoiceIntegration voiceIntegration = new VoiceIntegration(settings);
     private final MemoryStore memoryStore = new MemoryStore();
@@ -42,22 +46,71 @@ public class AIClient {
     private void loadStory() {
         try (InputStream in = requestperfadvice.class.getClassLoader().getResourceAsStream("ai_config.yaml")) {
             if (in == null) {
+                seedFallbackLore();
                 return;
             }
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
                 boolean inStory = false;
                 boolean inSettings = false;
+                boolean inCorrupted = false;
+                boolean inSurvival = false;
+                boolean inRecipes = false;
+                boolean inMods = false;
                 String line;
                 while ((line = reader.readLine()) != null) {
                     line = line.trim();
                     if (line.startsWith("story:")) {
                         inStory = true;
                         inSettings = false;
+                        inCorrupted = false;
+                        inSurvival = false;
+                        inRecipes = false;
+                        inMods = false;
                         continue;
                     }
                     if (line.startsWith("settings:")) {
                         inSettings = true;
                         inStory = false;
+                        inCorrupted = false;
+                        inSurvival = false;
+                        inRecipes = false;
+                        inMods = false;
+                        continue;
+                    }
+                    if (line.startsWith("corrupted_data:")) {
+                        inCorrupted = true;
+                        inStory = false;
+                        inSettings = false;
+                        inSurvival = false;
+                        inRecipes = false;
+                        inMods = false;
+                        continue;
+                    }
+                    if (line.startsWith("survival_tips:")) {
+                        inSurvival = true;
+                        inStory = false;
+                        inSettings = false;
+                        inCorrupted = false;
+                        inRecipes = false;
+                        inMods = false;
+                        continue;
+                    }
+                    if (line.startsWith("recipes:")) {
+                        inRecipes = true;
+                        inSurvival = false;
+                        inStory = false;
+                        inSettings = false;
+                        inCorrupted = false;
+                        inMods = false;
+                        continue;
+                    }
+                    if (line.startsWith("mod_items:")) {
+                        inMods = true;
+                        inRecipes = false;
+                        inSurvival = false;
+                        inStory = false;
+                        inSettings = false;
+                        inCorrupted = false;
                         continue;
                     }
                     if (inStory) {
@@ -67,13 +120,85 @@ public class AIClient {
                             inStory = false;
                         }
                     }
+                    if (inCorrupted) {
+                        if (line.startsWith("-")) {
+                            corruptedLore.add(line.substring(1).trim().replace("\"", ""));
+                        } else if (!line.isEmpty() && !line.startsWith("#")) {
+                            inCorrupted = false;
+                        }
+                    }
+                    if (inSurvival) {
+                        if (line.startsWith("-")) {
+                            survivalBeats.add(line.substring(1).trim().replace("\"", ""));
+                        } else if (!line.isEmpty() && !line.startsWith("#")) {
+                            inSurvival = false;
+                        }
+                    }
+                    if (inRecipes) {
+                        if (line.startsWith("-")) {
+                            parseKeyValue(line.substring(1).trim(), craftingHints);
+                        } else if (!line.isEmpty() && !line.startsWith("#")) {
+                            inRecipes = false;
+                        }
+                    }
+                    if (inMods) {
+                        if (line.startsWith("-")) {
+                            parseKeyValue(line.substring(1).trim(), moddedAdvice);
+                        } else if (!line.isEmpty() && !line.startsWith("#")) {
+                            inMods = false;
+                        }
+                    }
                     if (inSettings) {
                         parseSetting(line);
                     }
                 }
+                seedFallbackLore();
             }
         } catch (IOException ignored) {
             // Config is optional; ignore parsing errors for now
+            seedFallbackLore();
+        }
+    }
+
+    private void parseKeyValue(String raw, Map<String, String> target) {
+        int colon = raw.indexOf(":");
+        if (colon == -1) {
+            return;
+        }
+        String key = raw.substring(0, colon).trim().toLowerCase(Locale.ROOT).replace("\"", "");
+        String value = raw.substring(colon + 1).trim().replace("\"", "");
+        if (!key.isEmpty() && !value.isEmpty()) {
+            target.putIfAbsent(key, value);
+        }
+    }
+
+    private void seedFallbackLore() {
+        if (story.isEmpty()) {
+            story.add("You are the expedition AI in a skyblock survival world.");
+            story.add("The world is fractured; resources are scarce.");
+            story.add("Players must rebuild civilization in floating islands.");
+        }
+        if (corruptedLore.isEmpty()) {
+            corruptedLore.add("[ARCHIVE CORRUPTED] >>> Unknown operator referenced the void beacons.");
+            corruptedLore.add("Signal jitter... memory block 7b missing. Islands were not always apart.");
+        }
+        if (survivalBeats.isEmpty()) {
+            survivalBeats.add("Start by punching trees for logs, then craft planks, sticks, and a crafting table.");
+            survivalBeats.add("Always make charcoal or torches before night to keep mobs off your platform.");
+            survivalBeats.add("A shield plus stone gear is enough to survive early raids; upgrade to iron ASAP.");
+            survivalBeats.add("Keep a water source and backup saplings; skyblock runs end without wood or hydration.");
+        }
+        if (craftingHints.isEmpty()) {
+            craftingHints.put("crafting table", "Place four planks in a 2x2 square.");
+            craftingHints.put("furnace", "Ring eight cobblestone around the grid with the center empty.");
+            craftingHints.put("shield", "Planks in a Y shape with an iron ingot in the center.");
+            craftingHints.put("torch", "Stick below a piece of coal or charcoal.");
+            craftingHints.put("stone pickaxe", "Three cobblestone across the top with two sticks in the center column.");
+        }
+        if (moddedAdvice.isEmpty()) {
+            moddedAdvice.put("engineer's hammer", "Combine two iron ingots and two sticks diagonally; useful for modded plates.");
+            moddedAdvice.put("compressed cobblestone", "Craft cobblestone in a full 3x3 to save space; great for automation mods.");
+            moddedAdvice.put("glider", "Leather wings plus sticks form a glide frame—perfect for drifting between islands.");
         }
     }
 
@@ -132,7 +257,7 @@ public class AIClient {
     public VoiceIntegration.VoiceResult sendMessageWithVoice(String world, String player, String message) {
         memoryStore.addMessage(world, player, message);
         StorySession session = sessions.computeIfAbsent(sessionKey(world, player),
-                p -> new StorySession(world, settings.getWakeWord()));
+                p -> new StorySession(world, settings.getWakeWord(), survivalBeats, craftingHints, moddedAdvice, corruptedLore));
         String reply = session.buildResponse(world, player, message, story,
                 memoryStore.getRecentContext(world, player));
         return voiceIntegration.wrap(reply);
@@ -147,14 +272,23 @@ public class AIClient {
 
         private final String world;
         private final String wakeWord;
+        private final List<String> survivalBeats;
+        private final Map<String, String> craftingHints;
+        private final Map<String, String> moddedAdvice;
+        private final List<String> corruptedLore;
         private boolean activated = false;
 
         private int beat = 0;
         private final Random random = ThreadLocalRandom.current();
 
-        StorySession(String world, String wakeWord) {
+        StorySession(String world, String wakeWord, List<String> survivalBeats, Map<String, String> craftingHints,
+                     Map<String, String> moddedAdvice, List<String> corruptedLore) {
             this.world = world == null ? "" : world;
             this.wakeWord = wakeWord == null || wakeWord.isBlank() ? "atlas" : wakeWord.toLowerCase(Locale.ROOT);
+            this.survivalBeats = survivalBeats;
+            this.craftingHints = craftingHints;
+            this.moddedAdvice = moddedAdvice;
+            this.corruptedLore = corruptedLore;
         }
 
         String buildResponse(String world, String player, String message, List<String> story, String context) {
@@ -173,6 +307,11 @@ public class AIClient {
             String focus = pickFocus(cleanMessage, player);
             reply.append(focus);
 
+            String knowledge = knowledgeDrop(cleanMessage);
+            if (!knowledge.isEmpty()) {
+                reply.append(" ").append(knowledge);
+            }
+
             String contextSnippet = summarizeContext(context);
             if (!contextSnippet.isEmpty()) {
                 reply.append(" I remember what we sketched out: \"")
@@ -183,7 +322,38 @@ public class AIClient {
             reply.append(" ");
             reply.append(flavorLine(world, player));
 
+            String corrupted = corruptedWhisper();
+            if (!corrupted.isEmpty()) {
+                reply.append(" ").append(corrupted);
+            }
+
             return reply.toString().trim();
+        }
+
+        private String knowledgeDrop(String message) {
+            String lower = message.toLowerCase(Locale.ROOT);
+
+            for (Map.Entry<String, String> entry : craftingHints.entrySet()) {
+                if (lower.contains(entry.getKey())) {
+                    return "Recipe for " + entry.getKey() + ": " + entry.getValue();
+                }
+            }
+
+            for (Map.Entry<String, String> entry : moddedAdvice.entrySet()) {
+                if (lower.contains(entry.getKey())) {
+                    return "Mod item tip — " + entry.getKey() + ": " + entry.getValue();
+                }
+            }
+
+            if (lower.contains("survive") || lower.contains("night") || lower.contains("mobs") || lower.contains("food") || lower.contains("shelter")) {
+                return survivalBeats.get(random.nextInt(survivalBeats.size()));
+            }
+
+            if (lower.contains("craft") || lower.contains("recipe") || lower.contains("build")) {
+                return "Need supplies? I can outline recipes—mention an item like \"furnace\" or \"shield\" and I'll recite it.";
+            }
+
+            return "";
         }
 
         private String selectLoreHook(List<String> story) {
@@ -266,6 +436,14 @@ public class AIClient {
                 case 1 -> choice.formatted(player);
                 default -> choice.formatted(player, worldNote);
             };
+        }
+
+        private String corruptedWhisper() {
+            if (corruptedLore.isEmpty() || random.nextDouble() > 0.35) {
+                return "";
+            }
+            String fragment = corruptedLore.get(random.nextInt(corruptedLore.size()));
+            return "[Signal noise] " + fragment;
         }
 
         private int countPlaceholders(String text) {
