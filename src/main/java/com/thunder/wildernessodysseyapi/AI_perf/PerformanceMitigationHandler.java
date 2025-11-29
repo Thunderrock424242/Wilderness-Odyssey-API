@@ -14,7 +14,7 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 public class PerformanceMitigationHandler {
 
     @SubscribeEvent
-    public static void onLivingTick(LivingEvent event) {
+    public static void onLivingTick(LivingTickEvent event) {
         if (!(event.getEntity() instanceof Mob mob)) return;
         if (!(mob.level() instanceof net.minecraft.server.level.ServerLevel serverLevel)) return;
 

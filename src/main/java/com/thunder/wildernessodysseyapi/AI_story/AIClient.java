@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 /**
  * Offline story helper that mixes the configured lore with recent
  * player context to build lightweight, deterministic responses.
- *
+ * <p>
  * All data is loaded from resources at startup so no external
  * service or hosting is required.
  */
