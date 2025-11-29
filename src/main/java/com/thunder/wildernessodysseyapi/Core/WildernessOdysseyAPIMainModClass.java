@@ -27,6 +27,7 @@ import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
+import com.thunder.wildernessodysseyapi.AI_story.AIChatListener;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.AI_perf.requestperfadvice;
 import com.thunder.wildernessodysseyapi.AI_perf.PerformanceAdvisor;
@@ -119,6 +120,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(BlacklistChecker.class);
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
         NeoForge.EVENT_BUS.register(DoorLockEvents.class);
+        NeoForge.EVENT_BUS.register(AIChatListener.class);
 
         CryoTubeBlock.register(modEventBus);
         TerrainReplacerBlock.register(modEventBus);
