@@ -4,7 +4,7 @@ import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.world.entity.Mob;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.entity.living.LivingEvent;
+import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 /**
@@ -14,7 +14,7 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 public class PerformanceMitigationHandler {
 
     @SubscribeEvent
-    public static void onLivingTick(LivingTickEvent event) {
+    public static void onEntityTick(EntityTickEvent.Pre event) {
         if (!(event.getEntity() instanceof Mob mob)) return;
         if (!(mob.level() instanceof net.minecraft.server.level.ServerLevel serverLevel)) return;
 
@@ -22,6 +22,7 @@ public class PerformanceMitigationHandler {
                 && mob.tickCount % PerformanceMitigationController.getEntityTickInterval() != 0) {
             PerformanceMitigationController.maybeFreezeEntity(mob);
             mob.getNavigation().stop();
+            event.setCanceled(true);
             return;
         } else {
             PerformanceMitigationController.thawEntity(mob);
