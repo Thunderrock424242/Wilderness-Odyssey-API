@@ -369,9 +369,9 @@ public class AIClient {
 
         String buildResponse(String world, String player, String message, List<String> story, String context) {
             String cleanMessage = message == null ? "" : message.trim();
-            if (!activated && !mentionsWakeWord(cleanMessage)) {
-                return "Hey, I'm Atlas—your chat buddy and co-pilot here. Say \"" + wakeWord
-                        + "\" or just keep talking and I'll riff with you while we plan this world.";
+            if (!activated) {
+                activated = true;
+                return warmWelcome(cleanMessage, player, world);
             }
             activated = activated || mentionsWakeWord(cleanMessage);
             String loreHook = selectLoreHook(story);
@@ -405,6 +405,24 @@ public class AIClient {
             }
 
             return reply.toString().trim();
+        }
+
+        private String warmWelcome(String cleanMessage, String player, String world) {
+            StringBuilder welcome = new StringBuilder();
+            welcome.append("Hey ").append(player).append(", I'm Atlas—chatting right here with you.");
+            if (!cleanMessage.isEmpty()) {
+                welcome.append(" You said: \"").append(cleanMessage).append("\". ");
+            } else {
+                welcome.append(" ");
+            }
+
+            welcome.append("Need a quick recipe, survival tip, or lore beat? Just ask and I'll keep the thread going");
+            if (world != null && !world.isBlank()) {
+                welcome.append(" for ").append(world);
+            }
+            welcome.append(".");
+
+            return welcome.toString();
         }
 
         private String knowledgeDrop(String message) {
