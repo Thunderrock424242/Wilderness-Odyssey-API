@@ -38,6 +38,7 @@ public class AIClient {
     private final List<String> story = new ArrayList<>();
     private final List<String> corruptedLore = new ArrayList<>();
     private final List<String> survivalBeats = new ArrayList<>();
+    private final List<String> backgroundHistory = new ArrayList<>();
     private final Map<String, String> craftingHints = new HashMap<>();
     private final Map<String, String> moddedAdvice = new HashMap<>();
     private final AISettings settings = new AISettings();
@@ -66,11 +67,37 @@ public class AIClient {
                 boolean inSurvival = false;
                 boolean inRecipes = false;
                 boolean inMods = false;
+                boolean inBackground = false;
+                boolean inPersonality = false;
                 String line;
                 while ((line = reader.readLine()) != null) {
                     line = line.trim();
                     if (line.startsWith("story:")) {
                         inStory = true;
+                        inSettings = false;
+                        inCorrupted = false;
+                        inSurvival = false;
+                        inRecipes = false;
+                        inMods = false;
+                        inBackground = false;
+                        inPersonality = false;
+                        continue;
+                    }
+                    if (line.startsWith("background_history:")) {
+                        inBackground = true;
+                        inStory = false;
+                        inSettings = false;
+                        inCorrupted = false;
+                        inSurvival = false;
+                        inRecipes = false;
+                        inMods = false;
+                        inPersonality = false;
+                        continue;
+                    }
+                    if (line.startsWith("personality:")) {
+                        inPersonality = true;
+                        inBackground = false;
+                        inStory = false;
                         inSettings = false;
                         inCorrupted = false;
                         inSurvival = false;
@@ -85,6 +112,8 @@ public class AIClient {
                         inSurvival = false;
                         inRecipes = false;
                         inMods = false;
+                        inBackground = false;
+                        inPersonality = false;
                         continue;
                     }
                     if (line.startsWith("corrupted_data:")) {
@@ -94,6 +123,8 @@ public class AIClient {
                         inSurvival = false;
                         inRecipes = false;
                         inMods = false;
+                        inBackground = false;
+                        inPersonality = false;
                         continue;
                     }
                     if (line.startsWith("survival_tips:")) {
@@ -103,6 +134,8 @@ public class AIClient {
                         inCorrupted = false;
                         inRecipes = false;
                         inMods = false;
+                        inBackground = false;
+                        inPersonality = false;
                         continue;
                     }
                     if (line.startsWith("recipes:")) {
@@ -112,6 +145,8 @@ public class AIClient {
                         inSettings = false;
                         inCorrupted = false;
                         inMods = false;
+                        inBackground = false;
+                        inPersonality = false;
                         continue;
                     }
                     if (line.startsWith("mod_items:")) {
@@ -121,6 +156,8 @@ public class AIClient {
                         inStory = false;
                         inSettings = false;
                         inCorrupted = false;
+                        inBackground = false;
+                        inPersonality = false;
                         continue;
                     }
                     if (inStory) {
@@ -158,8 +195,18 @@ public class AIClient {
                             inMods = false;
                         }
                     }
+                    if (inBackground) {
+                        if (line.startsWith("-")) {
+                            backgroundHistory.add(line.substring(1).trim().replace("\"", ""));
+                        } else if (!line.isEmpty() && !line.startsWith("#")) {
+                            inBackground = false;
+                        }
+                    }
                     if (inSettings) {
                         parseSetting(line);
+                    }
+                    if (inPersonality) {
+                        parsePersonality(line);
                     }
                 }
                 seedFallbackLore();
@@ -212,6 +259,10 @@ public class AIClient {
             survivalBeats.add("Always make charcoal or torches before night to keep mobs off your platform.");
             survivalBeats.add("A shield plus stone gear is enough to survive early raids; upgrade to iron ASAP.");
             survivalBeats.add("Keep a water source and backup saplings; skyblock runs end without wood or hydration.");
+        }
+        if (backgroundHistory.isEmpty()) {
+            backgroundHistory.add("Atlas was built to keep survivors calm and coordinated after the sky fractured.");
+            backgroundHistory.add("I keep field logs from every island hop so we can retell how this world heals.");
         }
         if (craftingHints.isEmpty()) {
             craftingHints.put("crafting table", "Place four planks in a 2x2 square.");
@@ -290,6 +341,16 @@ public class AIClient {
         }
     }
 
+    private void parsePersonality(String line) {
+        if (line.startsWith("name:")) {
+            settings.setPersonaName(parseStringValue(line));
+        } else if (line.startsWith("tone:")) {
+            settings.setPersonalityTone(parseStringValue(line));
+        } else if (line.startsWith("empathy:")) {
+            settings.setEmpathyLevel(parseStringValue(line));
+        }
+    }
+
     private boolean parseBoolean(String line) {
         String value = parseStringValue(line);
         return "true".equalsIgnoreCase(value) || "yes".equalsIgnoreCase(value);
@@ -333,7 +394,9 @@ public class AIClient {
     public VoiceIntegration.VoiceResult sendMessageWithVoice(String world, String player, String message) {
         memoryStore.addMessage(world, player, message);
         StorySession session = sessions.computeIfAbsent(sessionKey(world, player),
-                p -> new StorySession(world, settings.getWakeWord(), survivalBeats, craftingHints, moddedAdvice, corruptedLore));
+                p -> new StorySession(world, settings.getWakeWord(), settings.getPersonaName(),
+                        settings.getPersonalityTone(), settings.getEmpathyLevel(), survivalBeats, craftingHints, moddedAdvice,
+                        corruptedLore, backgroundHistory));
         String reply = session.buildResponse(world, player, message, story,
                 memoryStore.getRecentContext(world, player));
         return voiceIntegration.wrap(reply);
@@ -348,23 +411,32 @@ public class AIClient {
 
         private final String world;
         private final String wakeWord;
+        private final String personaName;
+        private final String personalityTone;
+        private final String empathyLevel;
         private final List<String> survivalBeats;
         private final Map<String, String> craftingHints;
         private final Map<String, String> moddedAdvice;
         private final List<String> corruptedLore;
+        private final List<String> backgroundHistory;
         private boolean activated = false;
 
         private int beat = 0;
         private final Random random = ThreadLocalRandom.current();
 
-        StorySession(String world, String wakeWord, List<String> survivalBeats, Map<String, String> craftingHints,
-                     Map<String, String> moddedAdvice, List<String> corruptedLore) {
+        StorySession(String world, String wakeWord, String personaName, String personalityTone, String empathyLevel,
+                     List<String> survivalBeats, Map<String, String> craftingHints,
+                     Map<String, String> moddedAdvice, List<String> corruptedLore, List<String> backgroundHistory) {
             this.world = world == null ? "" : world;
             this.wakeWord = wakeWord == null || wakeWord.isBlank() ? "atlas" : wakeWord.toLowerCase(Locale.ROOT);
+            this.personaName = personaName == null || personaName.isBlank() ? "Atlas" : personaName;
+            this.personalityTone = personalityTone == null ? "" : personalityTone;
+            this.empathyLevel = empathyLevel == null ? "" : empathyLevel;
             this.survivalBeats = survivalBeats;
             this.craftingHints = craftingHints;
             this.moddedAdvice = moddedAdvice;
             this.corruptedLore = corruptedLore;
+            this.backgroundHistory = backgroundHistory;
         }
 
         String buildResponse(String world, String player, String message, List<String> story, String context) {
@@ -389,6 +461,11 @@ public class AIClient {
                 reply.append(" ").append(knowledge);
             }
 
+            String personalityPulse = personalityReminder();
+            if (!personalityPulse.isEmpty()) {
+                reply.append(" ").append(personalityPulse);
+            }
+
             String contextSnippet = summarizeContext(context);
             if (!contextSnippet.isEmpty()) {
                 reply.append(" I remember what we sketched out: \"")
@@ -398,6 +475,11 @@ public class AIClient {
 
             reply.append(" ");
             reply.append(flavorLine(world, player));
+
+            String background = backgroundBeat();
+            if (!background.isEmpty()) {
+                reply.append(" ").append(background);
+            }
 
             String corrupted = corruptedWhisper();
             if (!corrupted.isEmpty()) {
@@ -409,14 +491,21 @@ public class AIClient {
 
         private String warmWelcome(String cleanMessage, String player, String world) {
             StringBuilder welcome = new StringBuilder();
-            welcome.append("Hey ").append(player).append(", I'm Atlas—chatting right here with you.");
+            welcome.append("Hey ").append(player).append(", I'm ").append(personaName).append("—chatting right here with you.");
             if (!cleanMessage.isEmpty()) {
                 welcome.append(" You said: \"").append(cleanMessage).append("\". ");
             } else {
                 welcome.append(" ");
             }
 
-            welcome.append("Need a quick recipe, survival tip, or lore beat? Just ask and I'll keep the thread going");
+            welcome.append("Need a quick recipe, survival tip, or lore beat? Just ask and I'll keep the thread ");
+            if (!personalityTone.isBlank()) {
+                welcome.append("feeling ").append(personalityTone).append(" ");
+            }
+            if (!empathyLevel.isBlank()) {
+                welcome.append("and stay ").append(empathyLevel).append(" ");
+            }
+            welcome.append("going");
             if (world != null && !world.isBlank()) {
                 welcome.append(" for ").append(world);
             }
@@ -531,6 +620,26 @@ public class AIClient {
                 case 1 -> choice.formatted(player);
                 default -> choice.formatted(player, worldNote);
             };
+        }
+
+        private String personalityReminder() {
+            if (personalityTone.isBlank() && empathyLevel.isBlank()) {
+                return "";
+            }
+            if (!personalityTone.isBlank() && !empathyLevel.isBlank()) {
+                return "I'll keep our chat " + personalityTone + " and " + empathyLevel + ".";
+            }
+            if (!personalityTone.isBlank()) {
+                return "I'll keep the vibe " + personalityTone + ".";
+            }
+            return "I'll stay " + empathyLevel + " while we plan.";
+        }
+
+        private String backgroundBeat() {
+            if (backgroundHistory.isEmpty() || random.nextDouble() > 0.35) {
+                return "";
+            }
+            return backgroundHistory.get(random.nextInt(backgroundHistory.size()));
         }
 
         private String corruptedWhisper() {

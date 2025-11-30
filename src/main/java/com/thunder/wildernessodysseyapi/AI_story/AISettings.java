@@ -9,6 +9,9 @@ public class AISettings {
     private boolean speechRecognition = false;
     private String modelName = "local-story-engine";
     private String wakeWord = "atlas";
+    private String personaName = "Atlas";
+    private String personalityTone = "warm and conversational";
+    private String empathyLevel = "balanced";
 
     public boolean isVoiceEnabled() {
         return voiceEnabled;
@@ -41,6 +44,36 @@ public class AISettings {
     public void setWakeWord(String wakeWord) {
         if (wakeWord != null && !wakeWord.isBlank()) {
             this.wakeWord = wakeWord.trim().toLowerCase();
+        }
+    }
+
+    public String getPersonaName() {
+        return personaName;
+    }
+
+    public void setPersonaName(String personaName) {
+        if (personaName != null && !personaName.isBlank()) {
+            this.personaName = personaName.trim();
+        }
+    }
+
+    public String getPersonalityTone() {
+        return personalityTone;
+    }
+
+    public void setPersonalityTone(String personalityTone) {
+        if (personalityTone != null && !personalityTone.isBlank()) {
+            this.personalityTone = personalityTone.trim();
+        }
+    }
+
+    public String getEmpathyLevel() {
+        return empathyLevel;
+    }
+
+    public void setEmpathyLevel(String empathyLevel) {
+        if (empathyLevel != null && !empathyLevel.isBlank()) {
+            this.empathyLevel = empathyLevel.trim();
         }
     }
 }
