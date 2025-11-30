@@ -13,8 +13,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Listens for chat messages that include the Atlas wake word and sends back
- * lightweight AI replies using {@link AIClient}.
+ * Listens for chat messages that include the Atlas wake word or otherwise look
+ * conversational and sends back lightweight AI replies using {@link AIClient}.
  */
 public class AIChatListener {
 
@@ -33,7 +33,9 @@ public class AIChatListener {
         boolean mentionsWakeWord = message.toLowerCase(Locale.ROOT).contains(wakeWord);
         boolean sessionActive = ACTIVE_SESSIONS.contains(player.getUUID());
 
-        if (!mentionsWakeWord && !sessionActive) {
+        boolean conversational = isConversational(message);
+
+        if (!mentionsWakeWord && !sessionActive && !conversational) {
             return;
         }
 
@@ -54,5 +56,19 @@ public class AIChatListener {
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         CLIENT.scanGameData(event.getServer());
+    }
+
+    private static boolean isConversational(String message) {
+        String lower = message.toLowerCase(Locale.ROOT);
+        return message.endsWith("?")
+                || lower.startsWith("hey")
+                || lower.startsWith("hi")
+                || lower.contains("help")
+                || lower.contains("you")
+                || lower.contains("can i")
+                || lower.contains("can you")
+                || lower.contains("should i")
+                || lower.contains("what")
+                || lower.contains("how");
     }
 }
