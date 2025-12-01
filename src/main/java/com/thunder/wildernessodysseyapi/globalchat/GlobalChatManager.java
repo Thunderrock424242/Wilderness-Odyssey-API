@@ -117,6 +117,14 @@ public class GlobalChatManager {
         if (server == null) {
             return;
         }
+        if (packet.type == GlobalChatPacket.Type.ADMIN) {
+            Component admin = Component.literal("[GlobalChat Admin] " + packet.message);
+            server.sendSystemMessage(admin);
+            server.getPlayerList().getPlayers().stream()
+                    .filter(p -> p.hasPermissions(2))
+                    .forEach(p -> p.sendSystemMessage(admin));
+            return;
+        }
         if (packet.type == GlobalChatPacket.Type.CHAT || packet.type == GlobalChatPacket.Type.SYSTEM) {
             Component chat = Component.literal("[Global] " + packet.sender + ": " + packet.message);
             broadcastToOptedIn(chat);

@@ -193,7 +193,7 @@ public class GlobalChatRelayServer {
 
     private void handleModeration(GlobalChatPacket packet, ClientState state) {
         if (packet.moderationToken == null || !packet.moderationToken.equals(moderationToken)) {
-            sendSystemMessage(state, "Moderation token invalid; action rejected.");
+            sendAdminMessage(state, "Moderation token invalid; action rejected.");
             return;
         }
 
@@ -202,43 +202,43 @@ public class GlobalChatRelayServer {
                 clients.values().stream()
                         .filter(client -> packet.target != null && packet.target.equals(client.serverId))
                         .forEach(ClientState::mute);
-                broadcastSystem("Server " + packet.target + " muted by moderator.");
+                sendAdminMessage(state, "Server " + packet.target + " muted by moderator.");
             }
             case "unmute" -> {
                 clients.values().stream()
                         .filter(client -> packet.target != null && packet.target.equals(client.serverId))
                         .forEach(ClientState::unmute);
-                broadcastSystem("Server " + packet.target + " unmuted by moderator.");
+                sendAdminMessage(state, "Server " + packet.target + " unmuted by moderator.");
             }
             case "ban" -> {
                 bansByName.put(packet.target, BanEntry.create(packet.durationSeconds, packet.reason));
-                broadcastSystem("User " + packet.target + " banned from global chat." + formatDuration(packet.durationSeconds));
+                sendAdminMessage(state, "User " + packet.target + " banned from global chat." + formatDuration(packet.durationSeconds));
             }
             case "unban" -> {
                 bansByName.remove(packet.target);
                 bansByIp.remove(packet.target);
-                sendSystemMessage(state, "Removed ban for target " + packet.target);
+                sendAdminMessage(state, "Removed ban for target " + packet.target);
             }
             case "timeout" -> {
                 bansByName.put(packet.target, BanEntry.create(packet.durationSeconds, packet.reason));
-                sendSystemMessage(state, "Timed out " + packet.target + formatDuration(packet.durationSeconds));
+                sendAdminMessage(state, "Timed out " + packet.target + formatDuration(packet.durationSeconds));
             }
             case "list" -> sendConnectionList(state, packet.includeIp);
             case "ipban" -> {
                 if (packet.ip != null) {
                     bansByIp.put(packet.ip, BanEntry.create(packet.durationSeconds, packet.reason));
-                    sendSystemMessage(state, "IP banned: " + packet.ip + formatDuration(packet.durationSeconds));
+                    sendAdminMessage(state, "IP banned: " + packet.ip + formatDuration(packet.durationSeconds));
                 }
             }
             case "ipunban" -> {
                 if (packet.ip != null) {
                     bansByIp.remove(packet.ip);
-                    sendSystemMessage(state, "IP ban cleared: " + packet.ip);
+                    sendAdminMessage(state, "IP ban cleared: " + packet.ip);
                 }
             }
             case "role" -> {
                 if (!state.fromRelayHost) {
-                    sendSystemMessage(state, "Role assignments can only be issued from the relay host.");
+                    sendAdminMessage(state, "Role assignments can only be issued from the relay host.");
                     return;
                 }
                 if (packet.target != null && packet.role != null) {
@@ -246,10 +246,10 @@ public class GlobalChatRelayServer {
                             .filter(client -> packet.target.equals(client.serverId))
                             .findFirst()
                             .ifPresent(client -> client.role = packet.role);
-                    sendSystemMessage(state, "Updated role for " + packet.target + " to " + packet.role);
+                    sendAdminMessage(state, "Updated role for " + packet.target + " to " + packet.role);
                 }
             }
-            default -> sendSystemMessage(state, "Unknown moderation action: " + packet.moderationAction);
+            default -> sendAdminMessage(state, "Unknown moderation action: " + packet.moderationAction);
         }
     }
 
@@ -263,7 +263,7 @@ public class GlobalChatRelayServer {
                     .append(includeIp ? " ip=" + client.remoteAddress : "")
                     .append("] ");
         });
-        sendSystemMessage(state, builder.toString());
+        sendAdminMessage(state, builder.toString());
     }
 
     private boolean isBanned(String sender, String remoteAddress) {
@@ -301,6 +301,15 @@ public class GlobalChatRelayServer {
         system.message = message;
         system.timestamp = System.currentTimeMillis();
         state.writer.println(ADAPTER.toJson(system));
+    }
+
+    private void sendAdminMessage(ClientState state, String message) {
+        GlobalChatPacket admin = new GlobalChatPacket();
+        admin.type = GlobalChatPacket.Type.ADMIN;
+        admin.sender = "relay";
+        admin.message = message;
+        admin.timestamp = System.currentTimeMillis();
+        state.writer.println(ADAPTER.toJson(admin));
     }
 
     public void stop() {

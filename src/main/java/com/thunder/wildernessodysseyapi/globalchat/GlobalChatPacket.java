@@ -10,6 +10,7 @@ public class GlobalChatPacket {
         STATUS_REQUEST,
         STATUS_RESPONSE,
         MOD_ACTION,
+        ADMIN,
         SYSTEM
     }
 
