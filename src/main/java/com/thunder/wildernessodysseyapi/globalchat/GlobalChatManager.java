@@ -76,6 +76,7 @@ public class GlobalChatManager {
             socket = new Socket(settings.host(), settings.port());
             writer = new PrintWriter(socket.getOutputStream(), true);
             reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            sendHandshake();
             connected.set(true);
             lastConnectedAt = Instant.now();
             sendSystemToPlayers("Connected to global chat relay at " + settings.host() + ":" + settings.port());
@@ -177,6 +178,18 @@ public class GlobalChatManager {
         packet.moderationToken = settings.moderationToken();
         packet.timestamp = System.currentTimeMillis();
         writer.println(ADAPTER.toJson(packet));
+    }
+
+    private void sendHandshake() {
+        if (writer == null) {
+            return;
+        }
+        GlobalChatPacket hello = new GlobalChatPacket();
+        hello.type = GlobalChatPacket.Type.HELLO;
+        hello.clientType = "minecraft";
+        hello.sender = server != null ? server.getMotd() : "minecraft";
+        hello.timestamp = System.currentTimeMillis();
+        writer.println(ADAPTER.toJson(hello));
     }
 
     public boolean isConnected() {

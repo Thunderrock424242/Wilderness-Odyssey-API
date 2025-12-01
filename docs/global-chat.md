@@ -55,7 +55,18 @@ Moderation commands require a valid token (set via `/globalchat moderationtoken 
 - Connection visibility:
   - `/globalchat mod list` (omit IPs) or `/globalchat mod list withip` (includes IPs; permission level 3)
 - Roles:
-  - `/globalchat mod role <serverId> <role>` to tag a connected server with a custom role label.
+- `/globalchat mod role <serverId> <role>` to tag a connected server with a custom role label. Role assignments are only accepted from connections originating on the relay host itself, keeping admin registration centralized on the main server.
+
+### Connection trust and whitelisting
+- The relay only accepts Minecraft clients by default. Each client performs a handshake declaring itself as a Minecraft node and is rejected if it skips this step.
+- If you need to let a non-Minecraft tool (for example, an external bot) talk in global chat, start the relay with a comma-separated whitelist of trusted IPs:
+  ```bash
+  java -Dwilderness.globalchat.token=<moderationToken> \
+       -Dwilderness.globalchat.whitelist=192.0.2.10,198.51.100.8 \
+       -cp <path-to-mod-jar-or-classpath> \
+       com.thunder.wildernessodysseyapi.globalchat.server.GlobalChatRelayServer <port>
+  ```
+  Non-Minecraft clients must connect from a whitelisted IP and identify as `external` during the handshake or they will be dropped.
 
 ## Persisted settings
 `config/wildernessodysseyapi/global-chat.json` stores:

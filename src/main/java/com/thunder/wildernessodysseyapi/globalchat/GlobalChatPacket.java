@@ -5,6 +5,7 @@ package com.thunder.wildernessodysseyapi.globalchat;
  */
 public class GlobalChatPacket {
     public enum Type {
+        HELLO,
         CHAT,
         STATUS_REQUEST,
         STATUS_RESPONSE,
@@ -17,6 +18,7 @@ public class GlobalChatPacket {
     public String message;
     public String serverId;
     public long timestamp;
+    public String clientType;
     public String moderationAction;
     public String target;
     public String moderationToken;

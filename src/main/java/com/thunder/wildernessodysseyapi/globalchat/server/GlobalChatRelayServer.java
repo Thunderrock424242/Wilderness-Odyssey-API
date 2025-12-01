@@ -14,9 +14,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.net.InetSocketAddress;
 import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -40,10 +42,12 @@ public class GlobalChatRelayServer {
     private final Map<String, BanEntry> bansByIp = new ConcurrentHashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final String moderationToken;
+    private final Set<String> externalWhitelist = new HashSet<>();
 
     public GlobalChatRelayServer(int port, String moderationToken) throws IOException {
         this.serverSocket = new ServerSocket(port);
         this.moderationToken = moderationToken;
+        loadWhitelist();
     }
 
     public void start() {
@@ -92,13 +96,40 @@ public class GlobalChatRelayServer {
         if (state == null) {
             return;
         }
+        if (!state.authenticated && packet.type != GlobalChatPacket.Type.HELLO) {
+            sendSystemMessage(state, "Handshake required before communication.");
+            closeQuietly(socket);
+            return;
+        }
         switch (packet.type) {
+            case HELLO -> handleHello(packet, socket, state);
             case CHAT -> handleChat(packet, state);
             case STATUS_REQUEST -> sendStatus(writer, state, packet);
             case MOD_ACTION -> handleModeration(packet, state);
             default -> {
             }
         }
+    }
+
+    private void handleHello(GlobalChatPacket packet, Socket socket, ClientState state) {
+        String type = packet.clientType == null ? "" : packet.clientType.toLowerCase();
+        if ("minecraft".equals(type)) {
+            state.authenticated = true;
+            state.role = "server";
+            return;
+        }
+        if ("external".equals(type)) {
+            if (externalWhitelist.contains(state.remoteAddress)) {
+                state.authenticated = true;
+                state.role = "external";
+                return;
+            }
+            sendSystemMessage(state, "External connections must be whitelisted.");
+            closeQuietly(socket);
+            return;
+        }
+        sendSystemMessage(state, "Unknown client type; connection rejected.");
+        closeQuietly(socket);
     }
 
     private void sendStatus(PrintWriter writer, ClientState state, GlobalChatPacket request) {
@@ -109,6 +140,16 @@ public class GlobalChatRelayServer {
         status.timestamp = System.currentTimeMillis();
         status.pingMillis = System.currentTimeMillis() - request.timestamp;
         writer.println(Objects.requireNonNull(ADAPTER.toJson(status)));
+    }
+
+    private void loadWhitelist() {
+        String raw = System.getProperty("wilderness.globalchat.whitelist", "");
+        for (String entry : raw.split(",")) {
+            String trimmed = entry.trim();
+            if (!trimmed.isEmpty()) {
+                externalWhitelist.add(trimmed);
+            }
+        }
     }
 
     private void handleChat(GlobalChatPacket packet, ClientState state) {
@@ -186,6 +227,10 @@ public class GlobalChatRelayServer {
                 }
             }
             case "role" -> {
+                if (!state.fromRelayHost) {
+                    sendSystemMessage(state, "Role assignments can only be issued from the relay host.");
+                    return;
+                }
                 if (packet.target != null && packet.role != null) {
                     clients.values().stream()
                             .filter(client -> packet.target.equals(client.serverId))
@@ -257,6 +302,13 @@ public class GlobalChatRelayServer {
         executor.shutdownNow();
     }
 
+    private void closeQuietly(Socket socket) {
+        try {
+            socket.close();
+        } catch (IOException ignored) {
+        }
+    }
+
     private static class BanEntry {
         private final Instant expiresAt;
         private final String reason;
@@ -289,6 +341,8 @@ public class GlobalChatRelayServer {
         private boolean muted = false;
         private final String remoteAddress;
         private String role = "user";
+        private boolean authenticated = false;
+        private final boolean fromRelayHost;
 
         ClientState(Socket socket) throws IOException {
             this.socket = socket;
@@ -296,6 +350,7 @@ public class GlobalChatRelayServer {
             this.remoteAddress = socket.getRemoteSocketAddress() instanceof InetSocketAddress inet
                     ? inet.getAddress().getHostAddress()
                     : "unknown";
+            this.fromRelayHost = socket.getInetAddress().isLoopbackAddress();
         }
 
         boolean tryConsumeQuota() {
