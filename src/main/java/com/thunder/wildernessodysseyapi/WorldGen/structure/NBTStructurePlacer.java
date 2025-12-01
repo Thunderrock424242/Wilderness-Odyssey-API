@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.thunder.wildernessodysseyapi.util.NbtParsingUtils;
+
 /**
  * Places vanilla structure templates loaded from NBT files and exposes metadata used by the mod.
  */
@@ -155,6 +157,7 @@ public class NBTStructurePlacer {
 
         Resource resource = resourceOpt.get();
         try (InputStream in = resource.open()) {
+            NbtParsingUtils.extendNbtParseTimeout();
             CompoundTag tag = NbtIo.readCompressed(in, NbtAccounter.unlimitedHeap());
             ListTag palette = tag.getList("palette", Tag.TAG_COMPOUND);
             List<String> paletteNames = new ArrayList<>(palette.size());
