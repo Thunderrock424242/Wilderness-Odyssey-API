@@ -22,7 +22,6 @@ import com.thunder.wildernessodysseyapi.command.AiAdvisorCommand;
 import com.thunder.wildernessodysseyapi.command.AsyncStatsCommand;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
-import com.thunder.wildernessodysseyapi.doorlock.DoorLockEvents;
 import com.thunder.wildernessodysseyapi.command.DoorLockCommand;
 import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
