@@ -113,6 +113,9 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 // "optional", meaning it will not be pulled by dependents of this mod.
 configurations {
     runtimeClasspath.extendsFrom localRuntime
+
+    // Libraries that must be bundled directly into the mod jar so they are available at runtime.
+    bundledLibs
 }
 
 repositories {
@@ -142,6 +145,11 @@ dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.squareup.moshi:moshi:1.15.1'
     implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
+
+    // Bundle third-party libraries into the final mod jar to avoid missing-class errors at runtime.
+    bundledLibs 'com.squareup.okhttp3:okhttp:4.12.0'
+    bundledLibs 'com.squareup.moshi:moshi:1.15.1'
+    bundledLibs 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
@@ -202,6 +210,15 @@ tasks.register('obfuscateFiles', JavaExec) {
 
     // The more traditional way to set the classpath in build.gradle (Groovy DSL):
     classpath = sourceSets.main.runtimeClasspath
+}
+
+// Package bundled libraries directly into the mod jar so they are available when Minecraft loads the mod.
+tasks.named('jar', Jar).configure {
+    from {
+        configurations.bundledLibs.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    // Prevent duplicate resources when merging jars.
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 publishing {
