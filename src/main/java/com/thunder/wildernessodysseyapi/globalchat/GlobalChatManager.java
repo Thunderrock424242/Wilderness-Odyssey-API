@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.globalchat;
 
-import com.squareup.moshi.JsonAdapter;
-import com.squareup.moshi.Moshi;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,8 +24,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class GlobalChatManager {
 
-    private static final Moshi MOSHI = new Moshi.Builder().build();
-    private static final JsonAdapter<GlobalChatPacket> ADAPTER = MOSHI.adapter(GlobalChatPacket.class);
+    // Serialize nulls to maintain parity with the former Moshi behavior used by the relay.
+    private static final Gson GSON = new GsonBuilder().serializeNulls().create();
 
     private static final GlobalChatManager INSTANCE = new GlobalChatManager();
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -94,7 +94,7 @@ public class GlobalChatManager {
         try {
             String line;
             while (connected.get() && (line = reader.readLine()) != null) {
-                GlobalChatPacket packet = ADAPTER.fromJson(line);
+                GlobalChatPacket packet = GSON.fromJson(line, GlobalChatPacket.class);
                 if (packet == null) {
                     continue;
                 }
@@ -141,7 +141,7 @@ public class GlobalChatManager {
         packet.sender = sender;
         packet.message = message;
         packet.timestamp = System.currentTimeMillis();
-        writer.println(ADAPTER.toJson(packet));
+        writer.println(GSON.toJson(packet));
     }
 
     public void requestStatus() {
@@ -151,7 +151,7 @@ public class GlobalChatManager {
         GlobalChatPacket packet = new GlobalChatPacket();
         packet.type = GlobalChatPacket.Type.STATUS_REQUEST;
         packet.timestamp = System.currentTimeMillis();
-        writer.println(ADAPTER.toJson(packet));
+        writer.println(GSON.toJson(packet));
     }
 
     public void bind(String host, int port) {
@@ -200,7 +200,7 @@ public class GlobalChatManager {
         packet.reason = reason;
         packet.moderationToken = settings.moderationToken();
         packet.timestamp = System.currentTimeMillis();
-        writer.println(ADAPTER.toJson(packet));
+        writer.println(GSON.toJson(packet));
     }
 
     private void sendHandshake() {
@@ -213,7 +213,7 @@ public class GlobalChatManager {
         hello.clusterToken = settings != null ? settings.clusterToken() : "";
         hello.sender = server != null ? server.getMotd() : "minecraft";
         hello.timestamp = System.currentTimeMillis();
-        writer.println(ADAPTER.toJson(hello));
+        writer.println(GSON.toJson(hello));
     }
 
     public boolean isConnected() {
