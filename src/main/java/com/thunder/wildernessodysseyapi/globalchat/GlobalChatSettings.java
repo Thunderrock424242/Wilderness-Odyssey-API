@@ -17,12 +17,15 @@ import java.util.Objects;
  */
 public class GlobalChatSettings {
 
+    public static final String DEFAULT_RELAY_HOST = "198.51.100.77";
+    public static final int DEFAULT_RELAY_PORT = 39876;
+
     private static final Moshi MOSHI = new Moshi.Builder().build();
     private static final JsonAdapter<GlobalChatSettings> ADAPTER = MOSHI.adapter(GlobalChatSettings.class);
 
-    private String host = "";
-    private int port = 0;
-    private boolean enabled = false;
+    private String host = DEFAULT_RELAY_HOST;
+    private int port = DEFAULT_RELAY_PORT;
+    private boolean enabled = true;
     private List<String> downtimeHistory = new ArrayList<>();
     private boolean allowServerAutostart = false;
     private String moderationToken = "";
@@ -34,6 +37,7 @@ public class GlobalChatSettings {
                 String raw = Files.readString(file);
                 GlobalChatSettings settings = ADAPTER.fromJson(raw);
                 if (settings != null) {
+                    settings.applyDefaultRelayIfUnset();
                     return settings;
                 }
             } catch (IOException ignored) {
@@ -110,5 +114,20 @@ public class GlobalChatSettings {
 
     public void setClusterToken(String clusterToken) {
         this.clusterToken = clusterToken == null ? "" : clusterToken;
+    }
+
+    public void applyDefaultRelayIfUnset() {
+        if (host == null || host.isEmpty()) {
+            host = DEFAULT_RELAY_HOST;
+        }
+        if (port <= 0) {
+            port = DEFAULT_RELAY_PORT;
+        }
+    }
+
+    public void anchorToDefaultRelay() {
+        host = DEFAULT_RELAY_HOST;
+        port = DEFAULT_RELAY_PORT;
+        enabled = true;
     }
 }

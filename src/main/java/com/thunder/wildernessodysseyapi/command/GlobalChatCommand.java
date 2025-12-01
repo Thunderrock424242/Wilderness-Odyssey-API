@@ -9,6 +9,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatOptIn;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatServerProcess;
+import com.thunder.wildernessodysseyapi.globalchat.GlobalChatSettings;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -34,6 +35,9 @@ public class GlobalChatCommand {
                 .then(Commands.literal("optin")
                         .then(Commands.argument("enabled", BoolArgumentType.bool())
                                 .executes(GlobalChatCommand::optIn)))
+                .then(Commands.literal("anchorrelay")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(GlobalChatCommand::anchorRelay))
                 .then(Commands.literal("send")
                         .then(Commands.argument("message", StringArgumentType.greedyString())
                                 .executes(GlobalChatCommand::send)))
@@ -150,6 +154,15 @@ public class GlobalChatCommand {
         boolean enabled = BoolArgumentType.getBool(ctx, "enabled");
         GlobalChatOptIn.setOptIn(player, enabled);
         ctx.getSource().sendSuccess(() -> Component.literal("Global chat opt-in set to " + (enabled ? "enabled" : "disabled")), false);
+        return 1;
+    }
+
+    private static int anchorRelay(CommandContext<CommandSourceStack> ctx) {
+        GlobalChatManager.getInstance().anchorToDefaultRelay();
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "Anchored to central relay at "
+                        + GlobalChatSettings.DEFAULT_RELAY_HOST + ":" + GlobalChatSettings.DEFAULT_RELAY_PORT
+                        + " and auto-connect enabled."), true);
         return 1;
     }
 

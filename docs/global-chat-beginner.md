@@ -15,15 +15,15 @@ This guide walks through the minimum steps to host the central relay on one dedi
 
 ## Step 1: Start the relay on the host server
 1. Copy the mod jar to the host machine.
-2. On that machine, start the relay once with your secrets (replace the values):
+2. On that machine, start the relay once with your secrets (replace the values) on the hard-coded endpoint the clients expect (`198.51.100.77:39876`):
    ```bash
    java -Dwilderness.globalchat.token=YOUR_MODERATION_TOKEN \
         -Dwilderness.globalchat.clustertoken=YOUR_CLUSTER_TOKEN \
         -cp <path-to-mod-jar-or-classpath> \
         com.thunder.wildernessodysseyapi.globalchat.server.GlobalChatRelayServer 39876
    ```
-   - `39876` is the default port; change it if needed.
-   - Only this host should run the relay. Other servers will connect to it.
+   - `39876` is the default port; keep it in sync with the built-in client default.
+   - Only this host should run the relay. Other servers will connect to it at `198.51.100.77:39876`.
 3. (Optional) Allow the relay to auto-start alongside this server if you prefer the built-in sidecar:
    ```
    /globalchat allowautostart true
@@ -32,17 +32,16 @@ This guide walks through the minimum steps to host the central relay on one dedi
    /globalchat startserver
    ```
 
-## Step 2: Bind each Minecraft server to the relay
+## Step 2: Anchor each Minecraft server to the relay
 Run these commands in-game or from the server console on **every** participating server (including the host):
-``` 
+```
 /globalchat clustertoken YOUR_CLUSTER_TOKEN
 /globalchat moderationtoken YOUR_MODERATION_TOKEN
-/globalchat bind <relay-hostname-or-ip> 39876
-/globalchat enable true
+/globalchat anchorrelay
 ```
-- `bind` saves the host/port to `config/wildernessodysseyapi/global-chat.json` and immediately connects.
-- `enable true` lets the client reconnect automatically after restarts.
+- `anchorrelay` pins the client to `198.51.100.77:39876`, saves the endpoint to `config/wildernessodysseyapi/global-chat.json`, and immediately connects.
 - Keep `/globalchat startserver` **disabled** on all non-host servers to avoid duplicate relays.
+- Use `/globalchat bind <relay-hostname-or-ip> <port>` only for short-term testing if you need a non-default endpoint.
 
 ## Step 3: Players opt in and chat
 - Players must opt in once per player:

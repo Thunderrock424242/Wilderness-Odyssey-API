@@ -8,25 +8,26 @@ The global chat system lets multiple Wilderness Odyssey servers share messages t
 - **Commands**: Registered under `/globalchat` for binding, status checks, opt-in, messaging, relay lifecycle, and moderation.
 
 ## Anchoring the relay to a dedicated host
-1. Pick the Minecraft server that should host the central relay. On that machine, launch the relay directly:
+1. Pick the Minecraft server that should host the central relay. On that machine, launch the relay directly, pinned to the hard-coded endpoint the clients expect (`198.51.100.77:39876`):
    ```bash
    java -Dwilderness.globalchat.token=<moderationToken> \
         -Dwilderness.globalchat.clustertoken=<clusterSecret> \
         -cp <path-to-mod-jar-or-classpath> \
         com.thunder.wildernessodysseyapi.globalchat.server.GlobalChatRelayServer <port>
    ```
-   - Replace `<port>` with the TCP port you want the relay to listen on (defaults to `39876` if omitted).
+   - Replace `<port>` with the TCP port you want the relay to listen on (defaults to `39876` if omitted) and match the hard-coded client port.
    - The `wilderness.globalchat.token` system property must match the moderation token you configure on each participating server.
    - (Optional but recommended) Set `wilderness.globalchat.clustertoken` to a shared secret that every server must present during the handshake. Connections without the matching token are dropped before the relay will process messages.
 2. On every other server, **keep relay autostart disabled** (the default) so the `startserver` command is blocked and the relay stays anchored to your chosen host.
 3. If you explicitly want a server to be allowed to spawn the relay sidecar, run `/globalchat allowautostart true` as an operator on that server.
 
 ## Connecting a server to the relay
-1. As an operator, bind the server to the relay host and port:
+1. As an operator, anchor the server to the shared relay endpoint:
    ```
-   /globalchat bind <host> <port>
+   /globalchat anchorrelay
    ```
-   This persists to `config/wildernessodysseyapi/global-chat.json` and immediately attempts a connection.
+   This pins the client to `198.51.100.77:39876`, persists to `config/wildernessodysseyapi/global-chat.json`, and immediately attempts a connection.
+   If you need to override the endpoint for testing, `/globalchat bind <host> <port>` is still available but production clusters should stick to the anchored IP/port.
 2. Verify connectivity and latency:
    ```
    /globalchat status

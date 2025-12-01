@@ -52,6 +52,7 @@ public class GlobalChatManager {
         this.server = server;
         this.settingsFile = configDir.resolve("wildernessodysseyapi/global-chat.json");
         this.settings = GlobalChatSettings.load(settingsFile);
+        this.settings.save(settingsFile);
         if (settings.enabled() && !settings.host().isEmpty() && settings.port() > 0) {
             connect();
         }
@@ -157,6 +158,12 @@ public class GlobalChatManager {
         settings.setHost(host);
         settings.setPort(port);
         settings.setEnabled(true);
+        settings.save(settingsFile);
+        connect();
+    }
+
+    public void anchorToDefaultRelay() {
+        settings.anchorToDefaultRelay();
         settings.save(settingsFile);
         connect();
     }
