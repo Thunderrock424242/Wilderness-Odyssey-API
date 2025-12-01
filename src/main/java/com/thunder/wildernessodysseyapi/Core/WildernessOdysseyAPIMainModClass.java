@@ -28,6 +28,7 @@ import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.AI_story.AIChatListener;
+import com.thunder.wildernessodysseyapi.AntiCheat.AntiCheatConfig;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.AI_perf.requestperfadvice;
 import com.thunder.wildernessodysseyapi.AI_perf.PerformanceAdvisor;
@@ -136,6 +137,8 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-donations-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-async.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, AntiCheatConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-anticheat-server.toml");
         // Previously registered client-only events have been removed
         DonationReminderConfig.validateVersion();
 
