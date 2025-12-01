@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.WorldGen.structure;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtAccounter;
@@ -13,6 +14,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
@@ -31,6 +34,8 @@ import java.util.stream.Collectors;
 public class NBTStructurePlacer {
     private static final String TERRAIN_REPLACER_NAME = "wildernessodysseyapi:terrain_replacer";
     private static final String CRYO_TUBE_NAME = "wildernessodysseyapi:cryo_tube";
+    private static final String LEVELING_MARKER_NAME =
+            BuiltInRegistries.BLOCK.getKey(Blocks.BLUE_WOOL).toString();
 
     private final ResourceLocation id;
     private final ResourceLocation structurePath;
@@ -58,7 +63,18 @@ public class NBTStructurePlacer {
             return null;
         }
 
-        LargeStructurePlacementOptimizer.preparePlacement(level, origin, data.size());
+        BlockPos placementOrigin = origin;
+        BlockState levelingReplacement = null;
+        BlockPos levelingOffset = data.levelingOffset();
+        if (levelingOffset != null) {
+            int x = origin.getX() + levelingOffset.getX();
+            int z = origin.getZ() + levelingOffset.getZ();
+            SurfaceSample sample = wildernessodysseyapi$findSurface(level, x, z);
+            placementOrigin = new BlockPos(origin.getX(), sample.y() - levelingOffset.getY(), origin.getZ());
+            levelingReplacement = sample.state();
+        }
+
+        LargeStructurePlacementOptimizer.preparePlacement(level, placementOrigin, data.size());
         if (LargeStructurePlacementOptimizer.exceedsStructureBlockLimit(data.size())) {
             int estimated = LargeStructurePlacementOptimizer.estimateAffectedBlocks(data.size());
             ModConstants.LOGGER.warn("Placing structure {} will touch approximately {} blocks, exceeding the recommended limit of {}.",
@@ -67,7 +83,7 @@ public class NBTStructurePlacer {
 
         List<BlockState> sampledTerrain = new ArrayList<>(data.terrainOffsets().size());
         for (BlockPos offset : data.terrainOffsets()) {
-            BlockPos worldPos = origin.offset(offset);
+            BlockPos worldPos = placementOrigin.offset(offset);
             BlockState state = level.getBlockState(worldPos);
             if (state.isAir()) {
                 state = level.getBlockState(worldPos.below());
@@ -76,23 +92,28 @@ public class NBTStructurePlacer {
         }
 
         StructurePlaceSettings settings = new StructurePlaceSettings();
-        boolean placed = data.template().placeInWorld(level, origin, origin, settings, level.random, 2);
+        boolean placed = data.template().placeInWorld(level, placementOrigin, placementOrigin, settings, level.random, 2);
         if (!placed) {
             return null;
         }
 
         for (int i = 0; i < data.terrainOffsets().size(); i++) {
-            BlockPos worldPos = origin.offset(data.terrainOffsets().get(i));
+            BlockPos worldPos = placementOrigin.offset(data.terrainOffsets().get(i));
             BlockState replacement = sampledTerrain.get(i);
             level.setBlock(worldPos, replacement, 2);
         }
 
+        if (levelingOffset != null && levelingReplacement != null) {
+            BlockPos markerWorldPos = placementOrigin.offset(levelingOffset);
+            level.setBlock(markerWorldPos, levelingReplacement, 2);
+        }
+
         Vec3i size = data.size();
-        AABB bounds = LargeStructurePlacementOptimizer.createBounds(origin, size);
-        List<AABB> chunkSlices = LargeStructurePlacementOptimizer.computeChunkSlices(origin, size);
+        AABB bounds = LargeStructurePlacementOptimizer.createBounds(placementOrigin, size);
+        List<AABB> chunkSlices = LargeStructurePlacementOptimizer.computeChunkSlices(placementOrigin, size);
 
         List<BlockPos> cryoPositions = data.cryoOffsets().stream()
-                .map(origin::offset)
+                .map(placementOrigin::offset)
                 .collect(Collectors.toUnmodifiableList());
 
         return new PlacementResult(bounds, cryoPositions, List.copyOf(chunkSlices));
@@ -122,6 +143,7 @@ public class NBTStructurePlacer {
 
         List<BlockPos> cryoOffsets = new ArrayList<>();
         List<BlockPos> terrainOffsets = new ArrayList<>();
+        BlockPos levelingOffset = null;
         Vec3i size = template.getSize();
 
         ResourceManager resourceManager = level.getServer().getResourceManager();
@@ -152,6 +174,8 @@ public class NBTStructurePlacer {
                     cryoOffsets.add(offset);
                 } else if (TERRAIN_REPLACER_NAME.equals(blockName)) {
                     terrainOffsets.add(offset);
+                } else if (LEVELING_MARKER_NAME.equals(blockName) && levelingOffset == null) {
+                    levelingOffset = offset;
                 }
             }
         } catch (IOException e) {
@@ -159,7 +183,8 @@ public class NBTStructurePlacer {
             return null;
         }
 
-        TemplateData data = new TemplateData(template, List.copyOf(cryoOffsets), List.copyOf(terrainOffsets), size);
+        TemplateData data = new TemplateData(template, List.copyOf(cryoOffsets), List.copyOf(terrainOffsets), size,
+                levelingOffset);
         cachedData = data;
         return data;
     }
@@ -173,5 +198,25 @@ public class NBTStructurePlacer {
     private record TemplateData(StructureTemplate template,
                                 List<BlockPos> cryoOffsets,
                                 List<BlockPos> terrainOffsets,
-                                Vec3i size) {}
+                                Vec3i size,
+                                BlockPos levelingOffset) {}
+
+    private record SurfaceSample(int y, BlockState state) {}
+
+    private SurfaceSample wildernessodysseyapi$findSurface(ServerLevel level, int x, int z) {
+        int topY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+        int minY = level.getMinBuildHeight();
+        int maxY = Math.min(topY, level.getMaxBuildHeight() - 1);
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos(x, maxY, z);
+
+        for (int y = maxY; y >= minY; y--) {
+            cursor.setY(y);
+            BlockState state = level.getBlockState(cursor);
+            if (!state.isAir()) {
+                return new SurfaceSample(y, state);
+            }
+        }
+
+        return new SurfaceSample(topY, Blocks.AIR.defaultBlockState());
+    }
 }
