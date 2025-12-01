@@ -19,6 +19,7 @@ public class GlobalChatPacket {
     public String serverId;
     public long timestamp;
     public String clientType;
+    public String clusterToken;
     public String moderationAction;
     public String target;
     public String moderationToken;

@@ -26,6 +26,7 @@ public class GlobalChatSettings {
     private List<String> downtimeHistory = new ArrayList<>();
     private boolean allowServerAutostart = false;
     private String moderationToken = "";
+    private String clusterToken = "";
 
     public static GlobalChatSettings load(Path file) {
         if (Files.exists(file)) {
@@ -101,5 +102,13 @@ public class GlobalChatSettings {
 
     public void setModerationToken(String moderationToken) {
         this.moderationToken = moderationToken == null ? "" : moderationToken;
+    }
+
+    public String clusterToken() {
+        return clusterToken;
+    }
+
+    public void setClusterToken(String clusterToken) {
+        this.clusterToken = clusterToken == null ? "" : clusterToken;
     }
 }

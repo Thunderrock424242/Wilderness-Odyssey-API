@@ -42,11 +42,13 @@ public class GlobalChatRelayServer {
     private final Map<String, BanEntry> bansByIp = new ConcurrentHashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final String moderationToken;
+    private final String clusterToken;
     private final Set<String> externalWhitelist = new HashSet<>();
 
-    public GlobalChatRelayServer(int port, String moderationToken) throws IOException {
+    public GlobalChatRelayServer(int port, String moderationToken, String clusterToken) throws IOException {
         this.serverSocket = new ServerSocket(port);
         this.moderationToken = moderationToken;
+        this.clusterToken = clusterToken;
         loadWhitelist();
     }
 
@@ -112,6 +114,14 @@ public class GlobalChatRelayServer {
     }
 
     private void handleHello(GlobalChatPacket packet, Socket socket, ClientState state) {
+        if (clusterToken != null && !clusterToken.isEmpty()) {
+            String provided = packet.clusterToken == null ? "" : packet.clusterToken;
+            if (!clusterToken.equals(provided)) {
+                sendSystemMessage(state, "Cluster token mismatch; connection rejected.");
+                closeQuietly(socket);
+                return;
+            }
+        }
         String type = packet.clientType == null ? "" : packet.clientType.toLowerCase();
         if ("minecraft".equals(type)) {
             state.authenticated = true;
@@ -382,7 +392,8 @@ public class GlobalChatRelayServer {
     public static void main(String[] args) throws Exception {
         int port = args.length > 0 ? Integer.parseInt(args[0]) : 39876;
         String token = System.getProperty("wilderness.globalchat.token", "changeme");
-        GlobalChatRelayServer server = new GlobalChatRelayServer(port, token);
+        String clusterToken = System.getProperty("wilderness.globalchat.clustertoken", "");
+        GlobalChatRelayServer server = new GlobalChatRelayServer(port, token, clusterToken);
         Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
         server.start();
     }

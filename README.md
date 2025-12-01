@@ -26,7 +26,7 @@ NeoForged Discord: https://discord.neoforged.net/
 
 Global Chat:
 ------------
-See `docs/global-chat.md` for how to anchor the relay to a dedicated host, bind participating servers, opt players in, and run moderation commands.
+See `docs/global-chat.md` for how to anchor the relay to a dedicated host, bind participating servers, opt players in, secure membership with a cluster token, and run moderation commands.
 
 Multithreaded Task System:
 --------------------------

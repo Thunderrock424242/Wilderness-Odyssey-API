@@ -161,6 +161,14 @@ public class GlobalChatManager {
         settings.save(settingsFile);
     }
 
+    public void setClusterToken(String token) {
+        if (settings == null) {
+            return;
+        }
+        settings.setClusterToken(token);
+        settings.save(settingsFile);
+    }
+
     public void sendModerationAction(String action, String target, long durationSeconds, boolean includeIp,
                                      String role, String ip, String reason) {
         if (!connected.get() || settings == null || settings.moderationToken().isEmpty()) {
@@ -187,6 +195,7 @@ public class GlobalChatManager {
         GlobalChatPacket hello = new GlobalChatPacket();
         hello.type = GlobalChatPacket.Type.HELLO;
         hello.clientType = "minecraft";
+        hello.clusterToken = settings != null ? settings.clusterToken() : "";
         hello.sender = server != null ? server.getMotd() : "minecraft";
         hello.timestamp = System.currentTimeMillis();
         writer.println(ADAPTER.toJson(hello));

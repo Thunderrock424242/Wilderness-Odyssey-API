@@ -9,12 +9,15 @@ public class GlobalChatServerProcess {
 
     private Process process;
 
-    public void start(int port) throws IOException {
+    public void start(int port, String moderationToken, String clusterToken) throws IOException {
         if (process != null && process.isAlive()) {
             return;
         }
         String classpath = System.getProperty("java.class.path");
-        ProcessBuilder builder = new ProcessBuilder("java", "-cp", classpath,
+        ProcessBuilder builder = new ProcessBuilder("java",
+                "-Dwilderness.globalchat.token=" + moderationToken,
+                "-Dwilderness.globalchat.clustertoken=" + clusterToken,
+                "-cp", classpath,
                 "com.thunder.wildernessodysseyapi.globalchat.server.GlobalChatRelayServer",
                 String.valueOf(port));
         builder.redirectErrorStream(true);

@@ -11,11 +11,13 @@ The global chat system lets multiple Wilderness Odyssey servers share messages t
 1. Pick the Minecraft server that should host the central relay. On that machine, launch the relay directly:
    ```bash
    java -Dwilderness.globalchat.token=<moderationToken> \
+        -Dwilderness.globalchat.clustertoken=<clusterSecret> \
         -cp <path-to-mod-jar-or-classpath> \
         com.thunder.wildernessodysseyapi.globalchat.server.GlobalChatRelayServer <port>
    ```
    - Replace `<port>` with the TCP port you want the relay to listen on (defaults to `39876` if omitted).
    - The `wilderness.globalchat.token` system property must match the moderation token you configure on each participating server.
+   - (Optional but recommended) Set `wilderness.globalchat.clustertoken` to a shared secret that every server must present during the handshake. Connections without the matching token are dropped before the relay will process messages.
 2. On every other server, **keep relay autostart disabled** (the default) so the `startserver` command is blocked and the relay stays anchored to your chosen host.
 3. If you explicitly want a server to be allowed to spawn the relay sidecar, run `/globalchat allowautostart true` as an operator on that server.
 
@@ -56,6 +58,11 @@ Moderation commands require a valid token (set via `/globalchat moderationtoken 
   - `/globalchat mod list` (omit IPs) or `/globalchat mod list withip` (includes IPs; permission level 3)
 - Roles:
 - `/globalchat mod role <serverId> <role>` to tag a connected server with a custom role label. Role assignments are only accepted from connections originating on the relay host itself, keeping admin registration centralized on the main server.
+
+## Cluster secret for trusted membership
+- Use `/globalchat clustertoken <token>` on every server to persist the shared secret to `config/wildernessodysseyapi/global-chat.json`.
+- Restart or run `/globalchat startserver` on the relay host after updating the token so the sidecar process receives the new value via JVM args.
+- During the handshake, the relay rejects clients whose `HELLO` packets lack the matching `clusterToken`, ensuring only authorized servers and whitelisted external IPs can participate.
 
 ### Connection trust and whitelisting
 - The relay only accepts Minecraft clients by default. Each client performs a handshake declaring itself as a Minecraft node and is rejected if it skips this step.

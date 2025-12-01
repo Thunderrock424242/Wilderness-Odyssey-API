@@ -48,6 +48,10 @@ public class GlobalChatCommand {
                         .requires(source -> source.hasPermission(2))
                         .then(Commands.argument("token", StringArgumentType.string())
                                 .executes(GlobalChatCommand::setModerationToken)))
+                .then(Commands.literal("clustertoken")
+                        .requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("token", StringArgumentType.string())
+                                .executes(GlobalChatCommand::setClusterToken)))
                 .then(Commands.literal("allowautostart")
                         .requires(source -> source.hasPermission(2))
                         .then(Commands.argument("enabled", BoolArgumentType.bool())
@@ -109,6 +113,8 @@ public class GlobalChatCommand {
         ctx.getSource().sendSuccess(() -> Component.literal("Global chat status: " + (connected ? "connected" : "disconnected")), false);
         ctx.getSource().sendSuccess(() -> Component.literal("Ping: " + ping), false);
         ctx.getSource().sendSuccess(() -> Component.literal("Last up: " + lastConnected + " | Last down: " + lastDisconnected), false);
+        boolean clusterTokenSet = manager.getSettings() != null && !manager.getSettings().clusterToken().isEmpty();
+        ctx.getSource().sendSuccess(() -> Component.literal("Cluster token configured: " + (clusterTokenSet ? "yes" : "no")), false);
         manager.getSettings().downtimeHistory().forEach(entry ->
                 ctx.getSource().sendSuccess(() -> Component.literal("Downtime: " + entry), false));
         ServerPlayer player = ctx.getSource().getPlayer();
@@ -155,7 +161,10 @@ public class GlobalChatCommand {
             return 0;
         }
         try {
-            SERVER_PROCESS.start(port);
+            GlobalChatManager manager = GlobalChatManager.getInstance();
+            String moderationToken = manager.getSettings() != null ? manager.getSettings().moderationToken() : "";
+            String clusterToken = manager.getSettings() != null ? manager.getSettings().clusterToken() : "";
+            SERVER_PROCESS.start(port, moderationToken, clusterToken);
             ctx.getSource().sendSuccess(() -> Component.literal("Started relay server on port " + port), true);
             return 1;
         } catch (Exception e) {
@@ -174,6 +183,13 @@ public class GlobalChatCommand {
         String token = StringArgumentType.getString(ctx, "token");
         GlobalChatManager.getInstance().setModerationToken(token);
         ctx.getSource().sendSuccess(() -> Component.literal("Updated moderation token for global chat."), true);
+        return 1;
+    }
+
+    private static int setClusterToken(CommandContext<CommandSourceStack> ctx) {
+        String token = StringArgumentType.getString(ctx, "token");
+        GlobalChatManager.getInstance().setClusterToken(token);
+        ctx.getSource().sendSuccess(() -> Component.literal("Updated cluster token for global chat."), true);
         return 1;
     }
 
