@@ -122,7 +122,6 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(BlacklistChecker.class);
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
-        NeoForge.EVENT_BUS.register(DoorLockEvents.class);
         NeoForge.EVENT_BUS.register(AIChatListener.class);
 
         CryoTubeBlock.register(modEventBus);
