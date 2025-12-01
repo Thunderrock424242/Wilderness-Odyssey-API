@@ -4,14 +4,15 @@
   "package": "com.thunder.wildernessodysseyapi.mixin",
   "compatibilityLevel": "JAVA_17",
   "refmap": "mixins.wildernessodysseyapi.refmap.json",
-  "mixins": [
-    "BlockEntityMixin",
-    "CampfireBlockMixin",
-    "DayNightCycleMixin",
-    "EntityAccessor",
-    "ServerboundSetStructureBlockPacketMixin",
-    "StructureBlockEntityMixin"
-  ],
+    "mixins": [
+      "BlockEntityMixin",
+      "CampfireBlockMixin",
+      "DayNightCycleMixin",
+      "EntityAccessor",
+      "NbtIoMixin",
+      "ServerboundSetStructureBlockPacketMixin",
+      "StructureBlockEntityMixin"
+    ],
   "injectors": {
     "defaultRequire": 1
   },
