@@ -114,6 +114,11 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 configurations {
     runtimeClasspath.extendsFrom localRuntime
 
+    // Ensure bundled libraries are also available on the dev runtime classpath.
+    // Without this, running from compiled classes (not the shaded jar) can miss
+    // dependencies like Moshi and OkHttp, leading to NoClassDefFoundError at startup.
+    runtimeClasspath.extendsFrom bundledLibs
+
     // Libraries that must be bundled directly into the mod jar so they are available at runtime.
     bundledLibs
 }
