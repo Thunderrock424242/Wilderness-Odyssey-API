@@ -123,6 +123,13 @@ configurations {
     bundledLibs
 }
 
+// Make sure Gradle run configurations (JavaExec tasks) also see bundled libraries when
+// launching directly from compiled classes, matching the crash log path
+// `/build/classes/java/main/`.
+tasks.withType(JavaExec).configureEach {
+    classpath += configurations.bundledLibs
+}
+
 repositories {
     maven {
         url "https://cursemaven.com"
