@@ -12,6 +12,7 @@ import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListVersionCommand;
+import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
@@ -34,6 +35,7 @@ import com.thunder.wildernessodysseyapi.AI_perf.PerformanceAdvisor;
 import com.thunder.wildernessodysseyapi.AI_perf.PerformanceAdvisoryRequest;
 import com.thunder.wildernessodysseyapi.AI_perf.PerformanceMitigationController;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
+import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -96,6 +98,7 @@ public class WildernessOdysseyAPIMainModClass {
     private final requestperfadvice requestperfadvice = new requestperfadvice();
 
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
+    private final GlobalChatManager globalChatManager = GlobalChatManager.getInstance();
 
     private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader,
                                                                  IPayloadHandler<T> handler) {
@@ -167,6 +170,7 @@ public class WildernessOdysseyAPIMainModClass {
         BunkerProtectionHandler.clear();
         BunkerStructureGenerator.resetDeferredState();
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
+        globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
     }
 
     /**
@@ -188,6 +192,7 @@ public class WildernessOdysseyAPIMainModClass {
         WorldGenScanCommand.register(event.getDispatcher());
         AiAdvisorCommand.register(event.getDispatcher());
         AsyncStatsCommand.register(dispatcher);
+        GlobalChatCommand.register(dispatcher);
     }
 
     /**
@@ -226,6 +231,7 @@ public class WildernessOdysseyAPIMainModClass {
      */
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
+        globalChatManager.shutdown();
         MeteorStructureSpawner.resetState();
         BunkerProtectionHandler.clear();
         BunkerStructureGenerator.resetDeferredState();

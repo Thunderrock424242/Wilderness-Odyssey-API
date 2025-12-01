@@ -24,6 +24,11 @@ Additional Resources:
 Community Documentation: https://docs.neoforged.net/
 NeoForged Discord: https://discord.neoforged.net/
 
+Global Chat:
+------------
+See `docs/global-chat-beginner.md` for a quickstart on hosting the relay, binding servers, and getting players talking.
+Read `docs/global-chat.md` for the full operations guide (anchoring, cluster tokens, moderation, opt-in controls, and whitelisting external tools).
+
 Multithreaded Task System:
 --------------------------
 An opt-in async task system now ships with the mod. Enable or tune it in `config/wildernessodysseyapi/wildernessodysseyapi-async.toml`.
