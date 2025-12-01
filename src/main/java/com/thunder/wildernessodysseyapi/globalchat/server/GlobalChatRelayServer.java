@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.globalchat.server;
 
-import com.squareup.moshi.JsonAdapter;
-import com.squareup.moshi.Moshi;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatPacket;
 
 import java.io.BufferedReader;
@@ -31,8 +31,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class GlobalChatRelayServer {
 
-    private static final Moshi MOSHI = new Moshi.Builder().build();
-    private static final JsonAdapter<GlobalChatPacket> ADAPTER = MOSHI.adapter(GlobalChatPacket.class);
+    // Serialize nulls to mirror the previous Moshi-based payloads and keep the wire format stable.
+    private static final Gson GSON = new GsonBuilder().serializeNulls().create();
     private static final int MAX_MESSAGES_PER_MINUTE = 20;
 
     private final ServerSocket serverSocket;
@@ -76,7 +76,7 @@ public class GlobalChatRelayServer {
              PrintWriter writer = new PrintWriter(socket.getOutputStream(), true)) {
             String line;
             while ((line = reader.readLine()) != null) {
-                GlobalChatPacket packet = ADAPTER.fromJson(line);
+                GlobalChatPacket packet = GSON.fromJson(line, GlobalChatPacket.class);
                 if (packet == null) {
                     continue;
                 }
@@ -149,7 +149,7 @@ public class GlobalChatRelayServer {
         status.sender = "relay";
         status.timestamp = System.currentTimeMillis();
         status.pingMillis = System.currentTimeMillis() - request.timestamp;
-        writer.println(Objects.requireNonNull(ADAPTER.toJson(status)));
+        writer.println(Objects.requireNonNull(GSON.toJson(status)));
     }
 
     private void loadWhitelist() {
@@ -181,7 +181,7 @@ public class GlobalChatRelayServer {
     private void broadcast(GlobalChatPacket packet, ClientState origin) {
         packet.serverId = origin.serverId;
         packet.timestamp = System.currentTimeMillis();
-        String json = ADAPTER.toJson(packet);
+        String json = GSON.toJson(packet);
         for (Map.Entry<Socket, ClientState> entry : clients.entrySet()) {
             try {
                 PrintWriter writer = entry.getValue().writer;
@@ -290,7 +290,7 @@ public class GlobalChatRelayServer {
         system.sender = "relay";
         system.message = message;
         system.timestamp = System.currentTimeMillis();
-        String json = ADAPTER.toJson(system);
+        String json = GSON.toJson(system);
         clients.values().forEach(client -> client.writer.println(json));
     }
 
@@ -300,7 +300,7 @@ public class GlobalChatRelayServer {
         system.sender = "relay";
         system.message = message;
         system.timestamp = System.currentTimeMillis();
-        state.writer.println(ADAPTER.toJson(system));
+        state.writer.println(GSON.toJson(system));
     }
 
     private void sendAdminMessage(ClientState state, String message) {
@@ -309,7 +309,7 @@ public class GlobalChatRelayServer {
         admin.sender = "relay";
         admin.message = message;
         admin.timestamp = System.currentTimeMillis();
-        state.writer.println(ADAPTER.toJson(admin));
+        state.writer.println(GSON.toJson(admin));
     }
 
     public void stop() {

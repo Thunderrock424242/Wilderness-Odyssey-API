@@ -153,15 +153,13 @@ dependencies {
     implementation "curse.maven:sodium-394468:6382651"
     implementation "curse.maven:irisshaders-455508:6661598"
 
-    // AI advisory helpers (HTTP client, JSON, and fault tolerance)
+    // AI advisory helpers (HTTP client and fault tolerance)
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    implementation 'com.squareup.moshi:moshi:1.15.1'
     implementation 'com.squareup.okio:okio:3.9.0'
     implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
 
     // Bundle third-party libraries into the final mod jar to avoid missing-class errors at runtime.
     bundledLibs 'com.squareup.okhttp3:okhttp:4.12.0'
-    bundledLibs 'com.squareup.moshi:moshi:1.15.1'
     bundledLibs 'com.squareup.okio:okio:3.9.0'
     bundledLibs 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
 

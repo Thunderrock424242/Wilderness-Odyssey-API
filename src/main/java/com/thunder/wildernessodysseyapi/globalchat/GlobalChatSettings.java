@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.globalchat;
 
-import com.squareup.moshi.JsonAdapter;
-import com.squareup.moshi.Moshi;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,8 +20,7 @@ public class GlobalChatSettings {
     public static final String DEFAULT_RELAY_HOST = "198.51.100.77";
     public static final int DEFAULT_RELAY_PORT = 39876;
 
-    private static final Moshi MOSHI = new Moshi.Builder().build();
-    private static final JsonAdapter<GlobalChatSettings> ADAPTER = MOSHI.adapter(GlobalChatSettings.class);
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private String host = DEFAULT_RELAY_HOST;
     private int port = DEFAULT_RELAY_PORT;
@@ -35,7 +34,7 @@ public class GlobalChatSettings {
         if (Files.exists(file)) {
             try {
                 String raw = Files.readString(file);
-                GlobalChatSettings settings = ADAPTER.fromJson(raw);
+                GlobalChatSettings settings = GSON.fromJson(raw, GlobalChatSettings.class);
                 if (settings != null) {
                     settings.applyDefaultRelayIfUnset();
                     return settings;
@@ -50,7 +49,7 @@ public class GlobalChatSettings {
     public void save(Path file) {
         try {
             Files.createDirectories(Objects.requireNonNull(file.getParent()));
-            Files.writeString(file, Objects.requireNonNull(ADAPTER.toJson(this)));
+            Files.writeString(file, Objects.requireNonNull(GSON.toJson(this)));
         } catch (IOException ignored) {
             // Configuration saves are best-effort; failures will be logged by callers.
         }
