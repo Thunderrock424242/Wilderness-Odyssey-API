@@ -74,13 +74,8 @@ public abstract class StructureBlockRendererMixin {
         }
 
         Vec3 playerPos = player.position();
-        if (wildernessodysseyapi$isPlayerInsideBoundingBox(blockEntity, playerPos)) {
-            return true;
-        }
-
-        double maxDistance = wildernessodysseyapi$getMaxOverlayDistance();
-        Vec3 blockCenter = Vec3.atCenterOf(blockEntity.getBlockPos());
-        return playerPos.distanceToSqr(blockCenter) <= maxDistance * maxDistance;
+        return wildernessodysseyapi$isPlayerNearBoundingBox(blockEntity, playerPos)
+                || wildernessodysseyapi$isPlayerNearStructureBlock(blockEntity, playerPos);
     }
 
     @Unique
@@ -89,9 +84,15 @@ public abstract class StructureBlockRendererMixin {
     }
 
     @Unique
-    private static boolean wildernessodysseyapi$isPlayerInsideBoundingBox(StructureBlockEntity blockEntity, Vec3 playerPos) {
+    private static boolean wildernessodysseyapi$isPlayerNearBoundingBox(StructureBlockEntity blockEntity, Vec3 playerPos) {
         AABB boundingBox = wildernessodysseyapi$getBoundingBox(blockEntity);
-        return boundingBox != null && boundingBox.contains(playerPos);
+        if (boundingBox == null) {
+            return false;
+        }
+
+        double distanceSqr = wildernessodysseyapi$getDistanceSqrToBox(boundingBox, playerPos);
+        double maxDistance = wildernessodysseyapi$getMaxOverlayDistance();
+        return distanceSqr <= maxDistance * maxDistance;
     }
 
     @Unique
@@ -117,5 +118,20 @@ public abstract class StructureBlockRendererMixin {
         int maxZ = Math.max(minCorner.getZ(), maxCorner.getZ());
 
         return new AABB(minX, minY, minZ, maxX + 1.0D, maxY + 1.0D, maxZ + 1.0D);
+    }
+
+    @Unique
+    private static boolean wildernessodysseyapi$isPlayerNearStructureBlock(StructureBlockEntity blockEntity, Vec3 playerPos) {
+        double maxDistance = wildernessodysseyapi$getMaxOverlayDistance();
+        Vec3 blockCenter = Vec3.atCenterOf(blockEntity.getBlockPos());
+        return playerPos.distanceToSqr(blockCenter) <= maxDistance * maxDistance;
+    }
+
+    @Unique
+    private static double wildernessodysseyapi$getDistanceSqrToBox(AABB box, Vec3 point) {
+        double dx = Math.max(0.0D, Math.max(box.minX - point.x, point.x - box.maxX));
+        double dy = Math.max(0.0D, Math.max(box.minY - point.y, point.y - box.maxY));
+        double dz = Math.max(0.0D, Math.max(box.minZ - point.z, point.z - box.maxZ));
+        return dx * dx + dy * dy + dz * dz;
     }
 }
