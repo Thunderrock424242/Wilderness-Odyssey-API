@@ -28,6 +28,7 @@ import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
+import com.thunder.wildernessodysseyapi.util.NbtParsingUtils;
 import com.thunder.wildernessodysseyapi.AI_story.AIChatListener;
 import com.thunder.wildernessodysseyapi.AntiCheat.AntiCheatConfig;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
@@ -114,6 +115,9 @@ public class WildernessOdysseyAPIMainModClass {
      */
     public WildernessOdysseyAPIMainModClass(IEventBus modEventBus, ModContainer container) {
         LOGGER.info("WildernessOdysseyAPI initialized. I will also start to track mod conflicts");
+
+        // Ensure large prefab NBT files can parse before any structures or UI attempt to load them.
+        NbtParsingUtils.extendNbtParseTimeout();
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::onConfigLoaded);
