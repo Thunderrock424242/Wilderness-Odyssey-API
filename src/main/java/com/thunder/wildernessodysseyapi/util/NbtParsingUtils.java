@@ -18,6 +18,13 @@ public final class NbtParsingUtils {
     }
 
     /**
+     * Returns the timeout the mod would like vanilla to use when parsing large NBT payloads.
+     */
+    public static int getDesiredTimeoutMillis() {
+        return DESIRED_TIMEOUT_MS;
+    }
+
+    /**
      * Attempts to extend the vanilla NBT parse timeout so large prefab files
      * don't trip the default 10 second limit.
      */
