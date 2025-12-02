@@ -5,6 +5,8 @@ import net.minecraft.nbt.TagParser;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
@@ -16,5 +18,10 @@ public abstract class TagParserMixin {
     @Inject(method = "<clinit>", at = @At("TAIL"))
     private static void wildernessodysseyapi$extendParseTimeout(CallbackInfo ci) {
         NbtParsingUtils.extendNbtParseTimeout();
+    }
+
+    @ModifyConstant(method = "<clinit>", constant = @Constant(intValue = 10_000))
+    private static int wildernessodysseyapi$raiseTimeoutConstant(int original) {
+        return Math.max(original, NbtParsingUtils.getDesiredTimeoutMillis());
     }
 }
