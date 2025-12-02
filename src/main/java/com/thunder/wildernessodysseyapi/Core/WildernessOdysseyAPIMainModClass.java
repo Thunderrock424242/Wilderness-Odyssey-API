@@ -279,6 +279,7 @@ public class WildernessOdysseyAPIMainModClass {
             worstTickTimeNanos = 0L;
             if (worstTickMillis > PerformanceAdvisor.DEFAULT_TICK_BUDGET_MS) {
                 PerformanceAdvisoryRequest request = PerformanceAdvisor.observe(server, worstTickMillis);
+                PerformanceMitigationController.buildActionsFromRequest(request);
                 String advisory = requestperfadvice.requestPerformanceAdvice(request);
                 LOGGER.info("[AI Advisor] {}", advisory);
             }
