@@ -148,8 +148,6 @@ public class WildernessOdysseyAPIMainModClass {
         // Previously registered client-only events have been removed
         DonationReminderConfig.validateVersion();
 
-        StructureBlockSettings.reloadFromConfig();
-
     }
 
 
