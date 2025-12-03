@@ -38,7 +38,7 @@ import java.util.function.Supplier;
  */
 public class MeteorStructureSpawner {
     private static final TagKey<Biome> IS_PLAINS_TAG =
-            TagKey.create(Registries.BIOME, ResourceLocation.parse("minecraft:is_plains"));
+            TagKey.create(Registries.BIOME, ResourceLocation.parse("c:is_plains"));
     private static final int IMPACT_SITE_COUNT = 3;
     private static final int MIN_CHUNK_SEPARATION = 32;
     private static final int MIN_BLOCK_SEPARATION = MIN_CHUNK_SEPARATION * 16;
@@ -122,6 +122,11 @@ public class MeteorStructureSpawner {
 
         for (int i = storedSites.size(); i < IMPACT_SITE_COUNT; i++) {
             BlockPos origin = findImpactOrigin(level, random, spawn, storedSites, failedOrigins);
+            if (origin == null) {
+                ModConstants.LOGGER.info("Delaying meteor impact placement; no plains biome found near {} yet", spawn);
+                scheduleRetry(level, attempt + 1);
+                return;
+            }
             BlockPos impactPos = placeMeteorSite(level, origin);
             if (impactPos == null) {
                 failedOrigins.add(origin.asLong());
@@ -276,6 +281,7 @@ public class MeteorStructureSpawner {
                                              List<BlockPos> existing, Set<Long> failedOrigins) {
         long minDistanceSq = (long) MIN_BLOCK_SEPARATION * (long) MIN_BLOCK_SEPARATION;
         int positionAttempts = getAdaptivePositionAttempts();
+        Map<Long, Boolean> plainsCache = new HashMap<>();
         int plainsHits = 0;
         int attemptsUsed = 0;
         double baseAngle = random.nextDouble() * Math.PI * 2.0D;
@@ -302,7 +308,7 @@ public class MeteorStructureSpawner {
 
             if (farEnough && !failedOrigins.contains(candidate.asLong())) {
                 BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, candidate);
-                if (isPlains(level, surface)) {
+                if (isPlains(level, surface, plainsCache)) {
                     plainsHits++;
                     updatePlainsHitRate(plainsHits, attemptsUsed);
                     return surface;
@@ -312,19 +318,23 @@ public class MeteorStructureSpawner {
 
         updatePlainsHitRate(plainsHits, attemptsUsed);
 
-        for (int attempt = 0; attempt < 4; attempt++) {
-            int offsetMultiplier = existing.size() + 1 + attempt;
-            BlockPos fallback = reference.offset(MIN_BLOCK_SEPARATION * offsetMultiplier, 0, 0);
+        int[] searchMultipliers = new int[] {existing.size() + 1, existing.size() + 2, existing.size() + 3};
+        for (int multiplier : searchMultipliers) {
+            BlockPos fallback = reference.offset(MIN_BLOCK_SEPARATION * multiplier, 0, 0);
             BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, fallback);
-            BlockPos plains = findNearbyPlains(level, surface, MIN_BLOCK_SEPARATION * 2);
-            BlockPos candidate = plains != null ? plains : surface;
-            if (!failedOrigins.contains(candidate.asLong())) {
-                return candidate;
+            BlockPos plains = findNearbyPlains(level, surface, MIN_BLOCK_SEPARATION * 3, plainsCache);
+            if (plains != null && !failedOrigins.contains(plains.asLong())) {
+                return plains;
             }
         }
 
         BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, reference);
-        return surface;
+        BlockPos plains = findNearbyPlains(level, surface, MIN_BLOCK_SEPARATION * 4, plainsCache);
+        if (plains != null && !failedOrigins.contains(plains.asLong())) {
+            return plains;
+        }
+
+        return null;
     }
 
     private static BlockPos ensurePlainsSurface(ServerLevel level, BlockPos position, Map<Long, Boolean> plainsCache) {
