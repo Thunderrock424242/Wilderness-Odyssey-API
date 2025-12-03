@@ -39,5 +39,6 @@
   "command.wildernessodyssey.autoshader.no_shader": "No shader recommendation is configured for the %s tier.",
   "command.wildernessodyssey.autoshader.write_error": "Failed to update Iris configuration: %s",
   "command.wildernessodyssey.autoshader.pack_missing": "Recommended shader pack '%s' is not installed; saved preference anyway.",
-  "command.wildernessodyssey.autoshader.unknown_tier": "Unknown shader tier '%s'. Valid options: %s."
+  "command.wildernessodyssey.autoshader.unknown_tier": "Unknown shader tier '%s'. Valid options: %s.",
+  "pack.wildernessodysseyapi.plains_spawn.title": "Wilderness Odyssey Plains Spawn"
 }
