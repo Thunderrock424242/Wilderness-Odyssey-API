@@ -27,9 +27,12 @@ public class BuiltinDataPackRegistrations {
             return;
         }
 
-        Path packPath = ModList.get().getModFileById(ModConstants.MOD_ID)
-                .getFile()
-                .findResource(PLAINS_PACK_PATH);
+        var modFileInfo = ModList.get().getModFileById(ModConstants.MOD_ID);
+        if (modFileInfo == null) {
+            return;
+        }
+
+        Path packPath = modFileInfo.getFile().findResource(PLAINS_PACK_PATH);
 
         PackLocationInfo packLocationInfo = new PackLocationInfo(
                 PLAINS_SPAWN_PACK_ID,
