@@ -42,8 +42,10 @@ import java.nio.file.Files;
 @Mixin(StructureBlockEntity.class)
 public abstract class StructureBlockEntityMixin extends BlockEntity implements StructureBlockCornerCacheBridge {
 
-    @Shadow @Final @Mutable private static int MAX_OFFSET_PER_AXIS;
-    @Shadow @Final @Mutable private static int MAX_SIZE_PER_AXIS;
+    @Shadow @Final @Mutable
+    public static int MAX_OFFSET_PER_AXIS;
+    @Shadow @Final @Mutable
+    public static int MAX_SIZE_PER_AXIS;
 
     @Shadow private BlockPos structurePos;
     @Shadow private Vec3i structureSize;
