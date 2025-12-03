@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.worldgen.datapack;
+package com.thunder.wildernessodysseyapi.WorldGen.datapack;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.network.chat.Component;
@@ -16,7 +16,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import java.nio.file.Path;
 import java.util.Optional;
 
-@EventBusSubscriber(modid = ModConstants.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber
 public class BuiltinDataPackRegistrations {
     private static final String PLAINS_SPAWN_PACK_ID = ModConstants.MOD_ID + ":plains_spawn_pack";
     private static final String PLAINS_PACK_PATH = "builtin/plains_spawn";
