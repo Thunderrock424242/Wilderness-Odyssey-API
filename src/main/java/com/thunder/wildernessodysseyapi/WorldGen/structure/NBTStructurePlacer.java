@@ -123,7 +123,6 @@ public class NBTStructurePlacer {
             return cachedData;
         }
 
-        NbtParsingUtils.extendNbtParseTimeout();
 
         StructureTemplateManager manager = level.getStructureManager();
         StructureTemplate template;
