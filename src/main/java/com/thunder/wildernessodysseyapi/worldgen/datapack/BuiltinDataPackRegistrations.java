@@ -4,16 +4,17 @@ import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.PathPackResources;
-import net.minecraft.server.packs.Pack;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.PackSelectionConfig;
+import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackSource;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.AddPackFindersEvent;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.loading.moddiscovery.ModFile;
 
 import java.nio.file.Path;
-import java.util.function.Supplier;
+import java.util.Optional;
 
 @EventBusSubscriber(modid = ModConstants.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 public class BuiltinDataPackRegistrations {
@@ -26,20 +27,34 @@ public class BuiltinDataPackRegistrations {
             return;
         }
 
-        ModFile modFile = ModList.get().getModFileById(ModConstants.MOD_ID).getFile();
-        Path packPath = modFile.findResource(PLAINS_PACK_PATH);
+        Path packPath = ModList.get().getModFileById(ModConstants.MOD_ID)
+                .getFile()
+                .findResource(PLAINS_PACK_PATH);
 
-        Supplier<PathPackResources> supplier = () -> new PathPackResources(PLAINS_SPAWN_PACK_ID, true, packPath);
-
-        Pack pack = Pack.readMetaAndCreate(
+        PackLocationInfo packLocationInfo = new PackLocationInfo(
                 PLAINS_SPAWN_PACK_ID,
                 Component.translatable("pack.%s.plains_spawn.title".formatted(ModConstants.MOD_ID)),
-                false,
+                PackSource.BUILT_IN,
+                Optional.empty()
+        );
+
+        Pack.ResourcesSupplier supplier = new Pack.ResourcesSupplier() {
+            @Override
+            public PathPackResources openPrimary(PackLocationInfo location) {
+                return new PathPackResources(location, packPath);
+            }
+
+            @Override
+            public PathPackResources openFull(PackLocationInfo location, Pack.Metadata metadata) {
+                return new PathPackResources(location, packPath);
+            }
+        };
+
+        Pack pack = Pack.readMetaAndCreate(
+                packLocationInfo,
                 supplier,
                 event.getPackType(),
-                Pack.Position.BOTTOM,
-                PackSource.BUILT_IN,
-                false
+                new PackSelectionConfig(false, Pack.Position.BOTTOM, false)
         );
 
         if (pack != null) {
