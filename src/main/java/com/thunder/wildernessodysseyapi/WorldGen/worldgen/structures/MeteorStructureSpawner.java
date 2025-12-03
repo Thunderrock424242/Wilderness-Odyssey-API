@@ -55,6 +55,7 @@ public class MeteorStructureSpawner {
 
     private static boolean placed = false;
     private static final Set<Long> forcedChunks = new HashSet<>();
+    private static final Map<ResourceKey<Level>, Set<Long>> failedImpactPositions = new HashMap<>();
     private static final Map<ResourceKey<Level>, Integer> retryAttempts = new HashMap<>();
     private static final Set<ResourceKey<Level>> initialPlacementScheduled = new HashSet<>();
     private static final int INITIAL_PLACEMENT_DELAY_TICKS = 20 * 5; // 5 seconds
@@ -66,6 +67,7 @@ public class MeteorStructureSpawner {
     public static void resetState() {
         placed = false;
         forcedChunks.clear();
+        failedImpactPositions.clear();
         retryAttempts.clear();
         DeferredTaskScheduler.clear();
         initialPlacementScheduled.clear();
@@ -113,14 +115,16 @@ public class MeteorStructureSpawner {
         long seed = level.getSeed() ^ (31L * attempt + 0x9E3779B97F4A7C15L);
         RandomSource random = RandomSource.create(seed);
         BlockPos spawn = level.getSharedSpawnPos();
+        Set<Long> failedOrigins = failedImpactPositions.computeIfAbsent(level.dimension(), dim -> new HashSet<>());
 
         List<BlockPos> storedSites = new ArrayList<>(impactData.getImpactPositions());
         int originalCount = storedSites.size();
 
         for (int i = storedSites.size(); i < IMPACT_SITE_COUNT; i++) {
-            BlockPos origin = findImpactOrigin(level, random, spawn, storedSites);
+            BlockPos origin = findImpactOrigin(level, random, spawn, storedSites, failedOrigins);
             BlockPos impactPos = placeMeteorSite(level, origin);
             if (impactPos == null) {
+                failedOrigins.add(origin.asLong());
                 scheduleRetry(level, attempt + 1);
                 return;
             }
@@ -269,7 +273,7 @@ public class MeteorStructureSpawner {
     }
 
     private static BlockPos findImpactOrigin(ServerLevel level, RandomSource random, BlockPos reference,
-                                             List<BlockPos> existing) {
+                                             List<BlockPos> existing, Set<Long> failedOrigins) {
         long minDistanceSq = (long) MIN_BLOCK_SEPARATION * (long) MIN_BLOCK_SEPARATION;
         int positionAttempts = getAdaptivePositionAttempts();
         int plainsHits = 0;
@@ -296,7 +300,7 @@ public class MeteorStructureSpawner {
                 }
             }
 
-            if (farEnough) {
+            if (farEnough && !failedOrigins.contains(candidate.asLong())) {
                 BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, candidate);
                 if (isPlains(level, surface)) {
                     plainsHits++;
@@ -308,10 +312,19 @@ public class MeteorStructureSpawner {
 
         updatePlainsHitRate(plainsHits, attemptsUsed);
 
-        BlockPos fallback = reference.offset(MIN_BLOCK_SEPARATION * (existing.size() + 1), 0, 0);
-        BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, fallback);
-        BlockPos plains = findNearbyPlains(level, surface, MIN_BLOCK_SEPARATION * 2);
-        return plains != null ? plains : surface;
+        for (int attempt = 0; attempt < 4; attempt++) {
+            int offsetMultiplier = existing.size() + 1 + attempt;
+            BlockPos fallback = reference.offset(MIN_BLOCK_SEPARATION * offsetMultiplier, 0, 0);
+            BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, fallback);
+            BlockPos plains = findNearbyPlains(level, surface, MIN_BLOCK_SEPARATION * 2);
+            BlockPos candidate = plains != null ? plains : surface;
+            if (!failedOrigins.contains(candidate.asLong())) {
+                return candidate;
+            }
+        }
+
+        BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, reference);
+        return surface;
     }
 
     private static BlockPos ensurePlainsSurface(ServerLevel level, BlockPos position, Map<Long, Boolean> plainsCache) {
