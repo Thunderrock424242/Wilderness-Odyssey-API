@@ -49,9 +49,9 @@ public class MeteorStructureSpawner {
     private static double plainsHitRate = 0.5D;
 
     private static final NBTStructurePlacer METEOR_SITE_PLACER =
-            new NBTStructurePlacer(ModConstants.MOD_ID, "impact_zone");
+            new NBTStructurePlacer(ModConstants.MOD_ID, "impact_zone.nbt");
     private static final NBTStructurePlacer BUNKER_PLACER =
-            new NBTStructurePlacer(ModConstants.MOD_ID, "bunker");
+            new NBTStructurePlacer(ModConstants.MOD_ID, "bunker.nbt");
 
     private static boolean placed = false;
     private static final Set<Long> forcedChunks = new HashSet<>();
