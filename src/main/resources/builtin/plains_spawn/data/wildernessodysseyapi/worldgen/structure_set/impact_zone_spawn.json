@@ -1,0 +1,15 @@
+{
+  "structures": [
+    {
+      "structure": "wildernessodysseyapi:impact_zone",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:concentric_rings",
+    "distance": 16,
+    "spread": 2,
+    "count": 3,
+    "preferred_biomes": "#wildernessodysseyapi:spawn_in_plains"
+  }
+}
