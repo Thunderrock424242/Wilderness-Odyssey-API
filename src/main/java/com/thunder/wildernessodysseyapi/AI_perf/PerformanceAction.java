@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.AI_perf;
 
 import java.time.Instant;
 import java.util.Objects;
-import java.util.UUID;
+import java.util.Optional;
 
 /**
  * Represents a concrete, human-approvable performance action derived from AI advice.
@@ -16,14 +16,16 @@ public class PerformanceAction {
     private final int severity;
     private PerformanceActionStatus status;
     private final Instant createdAt;
+    private final String rollbackOfId;
 
-    public PerformanceAction(String subsystem, String summary, String detail, int durationSeconds, int severity) {
-        this(UUID.randomUUID().toString(), subsystem, summary, detail, durationSeconds, severity,
-                PerformanceActionStatus.PENDING, Instant.now());
+    public PerformanceAction(String id, String subsystem, String summary, String detail, int durationSeconds,
+                             int severity) {
+        this(id, subsystem, summary, detail, durationSeconds, severity,
+                PerformanceActionStatus.PENDING, Instant.now(), null);
     }
 
     public PerformanceAction(String id, String subsystem, String summary, String detail, int durationSeconds,
-                             int severity, PerformanceActionStatus status, Instant createdAt) {
+                             int severity, PerformanceActionStatus status, Instant createdAt, String rollbackOfId) {
         this.id = Objects.requireNonNull(id, "id");
         this.subsystem = Objects.requireNonNull(subsystem, "subsystem");
         this.summary = Objects.requireNonNull(summary, "summary");
@@ -32,6 +34,7 @@ public class PerformanceAction {
         this.severity = severity;
         this.status = Objects.requireNonNull(status, "status");
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt");
+        this.rollbackOfId = rollbackOfId;
     }
 
     public String getId() {
@@ -64,6 +67,14 @@ public class PerformanceAction {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public boolean isRollback() {
+        return rollbackOfId != null;
+    }
+
+    public Optional<String> getRollbackOfId() {
+        return Optional.ofNullable(rollbackOfId);
     }
 
     public void markApproved() {

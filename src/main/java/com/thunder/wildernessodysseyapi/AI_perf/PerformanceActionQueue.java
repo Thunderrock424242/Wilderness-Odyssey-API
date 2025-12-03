@@ -14,8 +14,8 @@ import java.util.stream.Collectors;
 public class PerformanceActionQueue {
     private final List<PerformanceAction> actions = new ArrayList<>();
 
-    public synchronized void replacePending(List<PerformanceAction> proposals) {
-        actions.removeIf(action -> action.getStatus() == PerformanceActionStatus.PENDING);
+    public synchronized void replacePendingMitigations(List<PerformanceAction> proposals) {
+        actions.removeIf(action -> action.getStatus() == PerformanceActionStatus.PENDING && !action.isRollback());
         actions.addAll(proposals);
     }
 
@@ -37,12 +37,24 @@ public class PerformanceActionQueue {
                 .findFirst();
     }
 
-    public synchronized boolean hasPendingOrActive(String subsystem) {
+    public synchronized boolean hasPendingOrActiveMitigation(String subsystem) {
         return actions.stream()
                 .anyMatch(action -> action.getSubsystem().equals(subsystem)
+                        && !action.isRollback()
                         && (action.getStatus() == PerformanceActionStatus.PENDING
                         || action.getStatus() == PerformanceActionStatus.APPROVED
                         || action.getStatus() == PerformanceActionStatus.APPLIED));
+    }
+
+    public synchronized boolean hasPendingRollback(String subsystem) {
+        return actions.stream()
+                .anyMatch(action -> action.getSubsystem().equals(subsystem)
+                        && action.isRollback()
+                        && action.getStatus() == PerformanceActionStatus.PENDING);
+    }
+
+    public synchronized void enqueueRollbacks(List<PerformanceAction> rollbacks) {
+        actions.addAll(rollbacks);
     }
 
     public synchronized void markExpired(List<String> ids) {
