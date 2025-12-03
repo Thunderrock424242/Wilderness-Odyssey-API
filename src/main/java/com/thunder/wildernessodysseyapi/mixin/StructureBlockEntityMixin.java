@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.bridge.StructureBlockCornerCacheBridge;
 import com.thunder.wildernessodysseyapi.util.StructureBlockCornerCache;
+import com.thunder.wildernessodysseyapi.util.NbtCompressionUtils;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -21,6 +22,7 @@ import net.minecraft.world.level.block.state.properties.StructureMode;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.util.Mth;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.LevelResource;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -31,6 +33,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.nio.file.Files;
 
 /**
  * Expands the structure block capture size and automatically snaps the save area to the occupied blocks.
@@ -137,6 +141,8 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         int maxZBound = blockPos.getZ() + detectionRadius;
         int minYBound = Math.max(serverLevel.getMinBuildHeight(), blockPos.getY() - detectionRadius);
         int maxYBound = Math.min(serverLevel.getMaxBuildHeight() - 1, blockPos.getY() + detectionRadius);
+
+        wildernessodysseyapi$warmupChunks(serverLevel, minXBound, maxXBound, minZBound, maxZBound);
 
         java.util.List<BlockPos> cornerMarkers = new java.util.ArrayList<>();
         java.util.Set<BlockPos> knownCorners = new java.util.HashSet<>();
@@ -721,6 +727,66 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
                 }
             }
         }
+    }
+
+    @Unique
+    private void wildernessodysseyapi$warmupChunks(ServerLevel serverLevel, int minX, int maxX, int minZ, int maxZ) {
+        int budget = StructureBlockSettings.getChunkWarmupBudget();
+        if (budget <= 0) {
+            return;
+        }
+
+        ServerChunkCache chunkSource = serverLevel.getChunkSource();
+        int minChunkX = minX >> 4;
+        int maxChunkX = maxX >> 4;
+        int minChunkZ = minZ >> 4;
+        int maxChunkZ = maxZ >> 4;
+        int warmed = 0;
+
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                if (chunkSource.getChunkNow(chunkX, chunkZ) != null) {
+                    continue;
+                }
+                serverLevel.getChunk(chunkX, chunkZ);
+                if (++warmed >= budget) {
+                    return;
+                }
+            }
+        }
+    }
+
+    @Inject(method = "saveStructure", at = @At("RETURN"))
+    private void wildernessodysseyapi$recompressStructureFile(CallbackInfoReturnable<Boolean> cir) {
+        if (!cir.getReturnValue()) {
+            return;
+        }
+
+        Level currentLevel = this.level;
+        if (!(currentLevel instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        String structureName = this.getStructureName();
+        if (structureName == null || structureName.isBlank()) {
+            return;
+        }
+        int compressionLevel = StructureBlockSettings.getStructureCompressionLevel();
+        if (compressionLevel <= 0) {
+            return;
+        }
+
+        ResourceLocation location = ResourceLocation.tryParse(structureName);
+        if (location == null) {
+            return;
+        }
+
+        java.nio.file.Path structurePath = serverLevel.getServer().getWorldPath(LevelResource.GENERATED_DIR)
+                .resolve(location.getNamespace()).resolve("structures").resolve(location.getPath() + ".nbt");
+        if (!Files.exists(structurePath)) {
+            return;
+        }
+
+        NbtCompressionUtils.rewriteCompressed(structurePath, compressionLevel);
     }
 
     @Unique

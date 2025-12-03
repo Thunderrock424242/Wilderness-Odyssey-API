@@ -11,8 +11,8 @@ import java.util.Locale;
  * Helpers for working around vanilla's NBT parsing safeguards.
  */
 public final class NbtParsingUtils {
-    private static final int DESIRED_TIMEOUT_MS = 30_000;
     private static boolean attemptedAdjustment = false;
+    private static int lastAppliedTimeout = -1;
 
     private NbtParsingUtils() {
     }
@@ -21,7 +21,7 @@ public final class NbtParsingUtils {
      * Returns the timeout the mod would like vanilla to use when parsing large NBT payloads.
      */
     public static int getDesiredTimeoutMillis() {
-        return DESIRED_TIMEOUT_MS;
+        return StructureBlockSettings.getNbtParseTimeoutMillis();
     }
 
     /**
@@ -29,7 +29,8 @@ public final class NbtParsingUtils {
      * don't trip the default 10 second limit.
      */
     public static synchronized void extendNbtParseTimeout() {
-        if (attemptedAdjustment) {
+        int desiredTimeout = getDesiredTimeoutMillis();
+        if (attemptedAdjustment && desiredTimeout == lastAppliedTimeout) {
             return;
         }
 
@@ -58,7 +59,7 @@ public final class NbtParsingUtils {
 
                     field.setAccessible(true);
                     long value = field.getType() == int.class ? field.getInt(null) : field.getLong(null);
-                    if (value >= 5_000 && value <= DESIRED_TIMEOUT_MS) {
+                    if (value >= 5_000 && value <= desiredTimeout) {
                         target = field;
                         break;
                     }
@@ -73,21 +74,22 @@ public final class NbtParsingUtils {
             target.setAccessible(true);
             if (target.getType() == int.class) {
                 int previous = target.getInt(null);
-                if (DESIRED_TIMEOUT_MS > previous) {
-                    target.setInt(null, DESIRED_TIMEOUT_MS);
-                    ModConstants.LOGGER.info("Raised NBT parse timeout from {}ms to {}ms via {}", previous, DESIRED_TIMEOUT_MS,
+                if (desiredTimeout > previous) {
+                    target.setInt(null, desiredTimeout);
+                    ModConstants.LOGGER.info("Raised NBT parse timeout from {}ms to {}ms via {}", previous, desiredTimeout,
                             target.getName());
                 }
             } else if (target.getType() == long.class) {
                 long previous = target.getLong(null);
-                if (DESIRED_TIMEOUT_MS > previous) {
-                    target.setLong(null, DESIRED_TIMEOUT_MS);
-                    ModConstants.LOGGER.info("Raised NBT parse timeout from {}ms to {}ms via {}", previous, DESIRED_TIMEOUT_MS,
+                if (desiredTimeout > previous) {
+                    target.setLong(null, desiredTimeout);
+                    ModConstants.LOGGER.info("Raised NBT parse timeout from {}ms to {}ms via {}", previous, desiredTimeout,
                             target.getName());
                 }
             }
 
             attemptedAdjustment = true;
+            lastAppliedTimeout = desiredTimeout;
         } catch (Exception e) {
             ModConstants.LOGGER.debug("Failed to adjust NBT parse timeout; continuing with defaults", e);
         }
