@@ -9,7 +9,6 @@
       "CampfireBlockMixin",
       "DayNightCycleMixin",
       "EntityAccessor",
-      "TagParserMixin",
       "ServerboundSetStructureBlockPacketMixin",
       "StructureBlockEntityMixin"
     ],

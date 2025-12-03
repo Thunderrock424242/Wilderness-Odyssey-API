@@ -6,7 +6,6 @@ import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 
-import com.thunder.wildernessodysseyapi.util.NbtParsingUtils;
 import net.minecraft.resources.ResourceLocation;
 
 import java.io.IOException;
@@ -38,7 +37,6 @@ public class StructureLootScanner {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(structuresDir, "*.nbt")) {
             for (Path path : stream) {
                 try {
-                    NbtParsingUtils.extendNbtParseTimeout();
                     CompoundTag nbt = NbtIo.readCompressed(path, NbtAccounter.unlimitedHeap());
                     scanTemplate(nbt, foundLootTables);
                 } catch (Exception e) {

@@ -21,8 +21,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import com.thunder.wildernessodysseyapi.util.NbtParsingUtils;
-
 /**
  * Places vanilla structure templates loaded from NBT files and exposes metadata used by the mod.
  */
