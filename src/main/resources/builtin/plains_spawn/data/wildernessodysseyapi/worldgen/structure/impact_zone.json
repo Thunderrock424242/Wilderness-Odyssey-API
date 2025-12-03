@@ -4,7 +4,7 @@
   "step": "surface_structures",
   "spawn_overrides": {},
   "terrain_adaptation": "none",
-  "start_pool": "wildernessodysseyapi:impact_zone/start_pool",
+  "start_pool": "wildernessodysseyapi:impact_zone",
   "size": 1,
   "start_height": {
     "type": "minecraft:world_surface"
