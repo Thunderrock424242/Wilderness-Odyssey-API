@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 
 /**
@@ -42,7 +43,10 @@ public class MeteorStructureSpawner {
     private static final int MIN_CHUNK_SEPARATION = 32;
     private static final int MIN_BLOCK_SEPARATION = MIN_CHUNK_SEPARATION * 16;
     private static final int POSITION_ATTEMPTS = 64;
+    private static final int MIN_POSITION_ATTEMPTS = 16;
     private static final int MAX_DEFERRED_ATTEMPTS = 20 * 60 * 5; // five minutes worth of retries
+    private static final double GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+    private static double plainsHitRate = 0.5D;
 
     private static final NBTStructurePlacer METEOR_SITE_PLACER =
             new NBTStructurePlacer(ModConstants.MOD_ID, "impact_zone");
@@ -187,42 +191,53 @@ public class MeteorStructureSpawner {
     }
 
     private static PlacementState placeBunker(ServerLevel level, BlockPos impactPos, MeteorImpactData impactData) {
-        BlockPos bunkerPos = impactPos.offset(32, 0, 0);
-        bunkerPos = ensurePlainsSurface(level, bunkerPos);
-
+        Map<Long, Boolean> plainsCache = new HashMap<>();
         StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
-        if (tracker.hasSpawnedAt(bunkerPos)) {
-            impactData.setBunkerPos(bunkerPos);
-            WorldSpawnHandler.refreshWorldSpawn(level);
-            markPlacementComplete(level);
-            return PlacementState.SUCCESS;
-        }
+        int minDistanceBlocks = Math.max(MIN_BLOCK_SEPARATION, StructureConfig.BUNKER_MIN_DISTANCE.get() * 16);
 
-        ChunkPos bunkerChunk = new ChunkPos(bunkerPos);
-        forceChunk(level, bunkerChunk);
-        try {
-            NBTStructurePlacer.PlacementResult result = BUNKER_PLACER.place(level, bunkerPos);
-            if (result == null) {
-                ModConstants.LOGGER.error("Failed to place bunker structure at {}", bunkerPos);
-                return PlacementState.FAILED;
+        List<Supplier<BlockPos>> bunkerCandidates = buildBunkerCandidates(impactPos, minDistanceBlocks);
+        for (Supplier<BlockPos> candidateSupplier : bunkerCandidates) {
+            BlockPos bunkerPos = ensurePlainsSurface(level, candidateSupplier.get(), plainsCache);
+
+            if (!tracker.isFarEnough(bunkerPos, StructureConfig.BUNKER_MIN_DISTANCE.get())) {
+                continue;
             }
 
-            BunkerProtectionHandler.addBunkerBounds(result.bounds());
-            tracker.addSpawnPos(bunkerPos);
-            impactData.setBunkerPos(bunkerPos);
-
-            List<BlockPos> cryoPositions = result.cryoPositions();
-            if (!cryoPositions.isEmpty()) {
-                CryoSpawnData data = CryoSpawnData.get(level);
-                data.replaceAll(cryoPositions);
-                PlayerSpawnHandler.setSpawnBlocks(cryoPositions);
+            if (tracker.hasSpawnedAt(bunkerPos)) {
+                impactData.setBunkerPos(bunkerPos);
+                WorldSpawnHandler.refreshWorldSpawn(level);
+                markPlacementComplete(level);
+                return PlacementState.SUCCESS;
             }
 
-            WorldSpawnHandler.refreshWorldSpawn(level);
-            return PlacementState.SUCCESS;
-        } finally {
-            releaseForcedChunk(level, bunkerChunk);
+            ChunkPos bunkerChunk = new ChunkPos(bunkerPos);
+            forceChunk(level, bunkerChunk);
+            try {
+                NBTStructurePlacer.PlacementResult result = BUNKER_PLACER.place(level, bunkerPos);
+                if (result == null) {
+                    ModConstants.LOGGER.error("Failed to place bunker structure at {}", bunkerPos);
+                    continue;
+                }
+
+                BunkerProtectionHandler.addBunkerBounds(result.bounds());
+                tracker.addSpawnPos(bunkerPos);
+                impactData.setBunkerPos(bunkerPos);
+
+                List<BlockPos> cryoPositions = result.cryoPositions();
+                if (!cryoPositions.isEmpty()) {
+                    CryoSpawnData data = CryoSpawnData.get(level);
+                    data.replaceAll(cryoPositions);
+                    PlayerSpawnHandler.setSpawnBlocks(cryoPositions);
+                }
+
+                WorldSpawnHandler.refreshWorldSpawn(level);
+                return PlacementState.SUCCESS;
+            } finally {
+                releaseForcedChunk(level, bunkerChunk);
+            }
         }
+
+        return PlacementState.FAILED;
     }
 
     private static void enqueueTask(ServerLevel level, Runnable task) {
@@ -256,14 +271,20 @@ public class MeteorStructureSpawner {
     private static BlockPos findImpactOrigin(ServerLevel level, RandomSource random, BlockPos reference,
                                              List<BlockPos> existing) {
         long minDistanceSq = (long) MIN_BLOCK_SEPARATION * (long) MIN_BLOCK_SEPARATION;
+        int positionAttempts = getAdaptivePositionAttempts();
+        int plainsHits = 0;
+        int attemptsUsed = 0;
+        double baseAngle = random.nextDouble() * Math.PI * 2.0D;
 
-        for (int attempt = 0; attempt < POSITION_ATTEMPTS; attempt++) {
-            int distance = MIN_BLOCK_SEPARATION + random.nextInt(MIN_BLOCK_SEPARATION / 2);
-            double angle = random.nextDouble() * Math.PI * 2.0D;
+        for (int attempt = 0; attempt < positionAttempts; attempt++) {
+            double angle = baseAngle + attempt * GOLDEN_ANGLE;
+            double distanceLerp = (double) attempt / Math.max(1, positionAttempts - 1);
+            double distance = MIN_BLOCK_SEPARATION + distanceLerp * (MIN_BLOCK_SEPARATION * 0.5D);
             int x = reference.getX() + (int) Math.round(Math.cos(angle) * distance);
             int z = reference.getZ() + (int) Math.round(Math.sin(angle) * distance);
 
             BlockPos candidate = new BlockPos(x, 0, z);
+            attemptsUsed++;
             boolean farEnough = true;
             for (BlockPos existingPos : existing) {
                 long dx = (long) candidate.getX() - existingPos.getX();
@@ -278,10 +299,14 @@ public class MeteorStructureSpawner {
             if (farEnough) {
                 BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, candidate);
                 if (isPlains(level, surface)) {
+                    plainsHits++;
+                    updatePlainsHitRate(plainsHits, attemptsUsed);
                     return surface;
                 }
             }
         }
+
+        updatePlainsHitRate(plainsHits, attemptsUsed);
 
         BlockPos fallback = reference.offset(MIN_BLOCK_SEPARATION * (existing.size() + 1), 0, 0);
         BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, fallback);
@@ -289,16 +314,20 @@ public class MeteorStructureSpawner {
         return plains != null ? plains : surface;
     }
 
-    private static BlockPos ensurePlainsSurface(ServerLevel level, BlockPos position) {
+    private static BlockPos ensurePlainsSurface(ServerLevel level, BlockPos position, Map<Long, Boolean> plainsCache) {
         BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, position);
-        if (isPlains(level, surface)) {
+        if (isPlains(level, surface, plainsCache)) {
             return surface;
         }
-        BlockPos plains = findNearbyPlains(level, surface, MIN_BLOCK_SEPARATION);
+        BlockPos plains = findNearbyPlains(level, surface, MIN_BLOCK_SEPARATION, plainsCache);
         return plains != null ? plains : surface;
     }
 
     private static BlockPos findNearbyPlains(ServerLevel level, BlockPos center, int radius) {
+        return findNearbyPlains(level, center, radius, new HashMap<>());
+    }
+
+    private static BlockPos findNearbyPlains(ServerLevel level, BlockPos center, int radius, Map<Long, Boolean> plainsCache) {
         int chunkRadius = Math.max(0, radius >> 4);
         ChunkPos originChunk = new ChunkPos(center);
         BlockPos closestLand = null;
@@ -308,7 +337,7 @@ public class MeteorStructureSpawner {
             for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
                 ChunkPos chunkPos = new ChunkPos(originChunk.x + dx, originChunk.z + dz);
                 BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, chunkPos.getWorldPosition());
-                if (isPlains(level, surface)) {
+                if (isPlains(level, surface, plainsCache)) {
                     double distSq = surface.distSqr(center);
                     if (distSq < closestLandDistSq) {
                         closestLandDistSq = distSq;
@@ -320,15 +349,64 @@ public class MeteorStructureSpawner {
         return closestLand;
     }
 
+    private static List<Supplier<BlockPos>> buildBunkerCandidates(BlockPos impactPos, int minDistanceBlocks) {
+        List<Supplier<BlockPos>> candidates = new ArrayList<>();
+        RandomSource random = RandomSource.create(impactPos.asLong());
+
+        int baseRadius = Math.max(minDistanceBlocks, 32);
+        int[] radii = new int[] {baseRadius, baseRadius + 8, baseRadius + 16};
+        int[] angles = new int[] {0, 45, 90, 135, 180, 225, 270, 315};
+
+        for (int radius : radii) {
+            for (int angle : angles) {
+                double radians = Math.toRadians(angle);
+                int xOffset = (int) Math.round(Math.cos(radians) * radius);
+                int zOffset = (int) Math.round(Math.sin(radians) * radius);
+                candidates.add(() -> impactPos.offset(xOffset, 0, zOffset));
+            }
+        }
+
+        candidates.add(() -> impactPos.offset(minDistanceBlocks, 0, 0));
+        java.util.Collections.shuffle(candidates, new java.util.Random(random.nextLong()));
+        return candidates;
+    }
+
+    private static int getAdaptivePositionAttempts() {
+        double effortFactor = 1.0D - Math.min(0.6D, plainsHitRate * 0.6D);
+        int attempts = (int) Math.round(MIN_POSITION_ATTEMPTS
+                + (POSITION_ATTEMPTS - MIN_POSITION_ATTEMPTS) * effortFactor);
+        return Math.max(MIN_POSITION_ATTEMPTS, Math.min(POSITION_ATTEMPTS, attempts));
+    }
+
+    private static void updatePlainsHitRate(int plainsHits, int attemptsUsed) {
+        if (attemptsUsed <= 0) {
+            return;
+        }
+        double sampleRate = (double) plainsHits / attemptsUsed;
+        plainsHitRate = (plainsHitRate * 0.75D) + (sampleRate * 0.25D);
+    }
+
     private static boolean isPlains(ServerLevel level, BlockPos pos) {
+        return isPlains(level, pos, new HashMap<>());
+    }
+
+    private static boolean isPlains(ServerLevel level, BlockPos pos, Map<Long, Boolean> plainsCache) {
+        long key = pos.asLong();
+        Boolean cached = plainsCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+
         Holder<Biome> biomeHolder = level.getBiome(pos);
-        return biomeHolder.is(IS_PLAINS_TAG)
+        boolean result = biomeHolder.is(IS_PLAINS_TAG)
                 || biomeHolder.is(Biomes.PLAINS)
                 || biomeHolder.is(Biomes.SUNFLOWER_PLAINS)
                 || biomeHolder.is(Biomes.SAVANNA)
                 || biomeHolder.is(Biomes.SAVANNA_PLATEAU)
                 || biomeHolder.is(Biomes.WINDSWEPT_SAVANNA)
                 || biomeHolder.is(Biomes.SNOWY_PLAINS);
+        plainsCache.put(key, result);
+        return result;
     }
 
     private static boolean shouldSkipForExistingWorld(ServerLevel level) {

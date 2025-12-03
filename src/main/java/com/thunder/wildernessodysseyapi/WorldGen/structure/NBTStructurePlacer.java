@@ -180,13 +180,35 @@ public class NBTStructurePlacer {
     }
 
     private BlockPos findLevelingOffset(StructureTemplate template) {
+        // Multiple wool markers can exist in a template; prefer the deepest one to better match terrain when
+        // burying the structure, and fall back to the closest-to-center marker to avoid edge anchors.
         StructurePlaceSettings identitySettings = new StructurePlaceSettings();
         List<StructureBlockInfo> markers = template.filterBlocks(BlockPos.ZERO, identitySettings, Blocks.BLUE_WOOL);
         if (markers.isEmpty()) {
             return null;
         }
 
-        return markers.get(0).pos();
+        Vec3i size = template.getSize();
+        double centerX = size.getX() / 2.0D;
+        double centerZ = size.getZ() / 2.0D;
+
+        return markers.stream()
+                .min((a, b) -> {
+                    int yCompare = Integer.compare(a.pos().getY(), b.pos().getY());
+                    if (yCompare != 0) {
+                        return yCompare; // prefer markers lower in the template for ground embedding
+                    }
+
+                    double aDx = a.pos().getX() - centerX;
+                    double aDz = a.pos().getZ() - centerZ;
+                    double bDx = b.pos().getX() - centerX;
+                    double bDz = b.pos().getZ() - centerZ;
+                    double aDist = (aDx * aDx) + (aDz * aDz);
+                    double bDist = (bDx * bDx) + (bDz * bDz);
+                    return Double.compare(aDist, bDist);
+                })
+                .map(StructureBlockInfo::pos)
+                .orElse(null);
     }
 
     private Block resolveBlock(String name, String description) {
