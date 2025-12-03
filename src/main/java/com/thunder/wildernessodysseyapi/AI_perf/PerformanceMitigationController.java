@@ -22,6 +22,7 @@ public final class PerformanceMitigationController {
     private static final int MIN_SEVERITY_FOR_ACTION = 2;
     private static final int PENDING_TTL_SECONDS = 120;
 
+    private static final PerformanceActionIdGenerator ID_GENERATOR = new PerformanceActionIdGenerator();
     private static final PerformanceActionQueue ACTION_QUEUE = new PerformanceActionQueue();
 
     private static volatile int pathfindingThrottleInterval = 1;
@@ -86,9 +87,12 @@ public final class PerformanceMitigationController {
         }
         for (PerformanceAction active : ACTION_QUEUE.getActive()) {
             boolean subsystemStillHot = loads.stream()
-                    .map(load -> normalizeSubsystemId(load.id()))
-                    .anyMatch(normalized -> normalized != null && normalized.equals(active.getSubsystem())
-                            && load.observedValue() >= MIN_SEVERITY_FOR_ACTION);
+                    .anyMatch(load -> {
+                        String normalized = normalizeSubsystemId(load.id());
+                        return normalized != null
+                                && normalized.equals(active.getSubsystem())
+                                && load.observedValue() >= MIN_SEVERITY_FOR_ACTION;
+                    });
             if (!subsystemStillHot && !ACTION_QUEUE.hasPendingRollback(active.getSubsystem()) && !active.isRollback()) {
                 String rollbackId = ID_GENERATOR.nextRollbackId(active.getId());
                 rollbackProposals.add(new PerformanceAction(
