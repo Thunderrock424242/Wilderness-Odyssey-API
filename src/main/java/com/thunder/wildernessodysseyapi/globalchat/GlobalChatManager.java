@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -28,7 +29,7 @@ public class GlobalChatManager {
     private static final Gson GSON = new GsonBuilder().serializeNulls().create();
 
     private static final GlobalChatManager INSTANCE = new GlobalChatManager();
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final AtomicReference<ExecutorService> executor = new AtomicReference<>(Executors.newSingleThreadExecutor());
     private final AtomicBoolean connected = new AtomicBoolean(false);
 
     private MinecraftServer server;
@@ -61,14 +62,27 @@ public class GlobalChatManager {
     public void shutdown() {
         connected.set(false);
         closeSocket();
-        executor.shutdownNow();
+        executor.get().shutdownNow();
     }
 
     public void connect() {
         if (settings == null || settings.host().isEmpty() || settings.port() <= 0) {
             return;
         }
-        executor.submit(this::runConnectionLoop);
+        getExecutor().submit(this::runConnectionLoop);
+    }
+
+    private ExecutorService getExecutor() {
+        ExecutorService current = executor.get();
+        if (current.isShutdown() || current.isTerminated()) {
+            ExecutorService replacement = Executors.newSingleThreadExecutor();
+            if (executor.compareAndSet(current, replacement)) {
+                current = replacement;
+            } else {
+                current = executor.get();
+            }
+        }
+        return current;
     }
 
     private void runConnectionLoop() {
