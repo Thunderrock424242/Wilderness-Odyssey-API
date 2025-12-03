@@ -14,7 +14,7 @@ public class WorldVersionWarningScreen extends Screen {
     private final String updateType;
 
     public WorldVersionWarningScreen(String oldVersion, String newVersion, Runnable onProceed, Runnable onCancel) {
-        super(Component.literal("World Version Warning"));
+        super(Component.translatable("screen.wildernessodysseyapi.world_version.title"));
         this.oldVersion = oldVersion;
         this.newVersion = newVersion;
         this.onProceed = onProceed;
@@ -34,7 +34,7 @@ public class WorldVersionWarningScreen extends Screen {
         int buttonY = boxY + boxHeight - buttonHeight - margin;
 
         this.addRenderableWidget(Button.builder(
-                Component.literal("Proceed (Return to Play)"),
+                Component.translatable("screen.wildernessodysseyapi.world_version.proceed"),
                 b -> {
                     if (onProceed != null) {
                         LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "[WorldVersionWarningScreen] User chose to proceed and continue playing.");
@@ -44,7 +44,7 @@ public class WorldVersionWarningScreen extends Screen {
         ).bounds(boxX + margin, buttonY, buttonWidth, buttonHeight).build());
 
         this.addRenderableWidget(Button.builder(
-                Component.literal("Cancel (Return to Title)"),
+                Component.translatable("screen.wildernessodysseyapi.world_version.cancel"),
                 button -> {
                     if (onCancel != null) {
                         LoggerUtil.log(LoggerUtil.ConflictSeverity.INFO, "[WorldVersionWarningScreen] User chose to cancel and return to title screen.");
@@ -63,15 +63,15 @@ public class WorldVersionWarningScreen extends Screen {
         int boxY = (this.height - boxHeight) / 2;
 
 
-        gfx.drawCenteredString(this.font, Component.literal("World Version Warning!"), this.width / 2, boxY + 16, 0xFFFFFFFF);
-        gfx.drawCenteredString(this.font, Component.literal(updateType + " Update Detected"), this.width / 2, boxY + 35, 0xFFFFFFFF);
-        gfx.drawCenteredString(this.font, Component.literal("World Version: " + oldVersion + " → " + newVersion), this.width / 2, boxY + 52, 0xFFFFFFFF);
-        gfx.drawCenteredString(this.font, Component.literal("Your world is outdated and needs updating."), this.width / 2, boxY + 70, 0xFFEEEEEE);
-        gfx.drawCenteredString(this.font, Component.literal("BACKUP YOUR WORLD BEFORE PROCEEDING"), this.width / 2, boxY + 87, 0xFFFF4444);
-        gfx.drawCenteredString(this.font, Component.literal("Only operators can update the world version."), this.width / 2, boxY + 104, 0xFFDDDDDD);
-        gfx.drawCenteredString(this.font, Component.literal("Run /updateworldversion in chat if you are an operator."), this.width / 2, boxY + 121, 0xFFDDDDDD);
-        gfx.drawCenteredString(this.font, Component.literal("World generation and structures may change."), this.width / 2, boxY + 138, 0xFFDDDDDD);
-        gfx.drawCenteredString(this.font, Component.literal("For bugs, test in a fresh world before reporting."), this.width / 2, boxY + 155, 0xFFDDDDDD);
+        gfx.drawCenteredString(this.font, Component.translatable("screen.wildernessodysseyapi.world_version.banner"), this.width / 2, boxY + 16, 0xFFFFFFFF);
+        gfx.drawCenteredString(this.font, Component.translatable("screen.wildernessodysseyapi.world_version.update_detected", updateType), this.width / 2, boxY + 35, 0xFFFFFF);
+        gfx.drawCenteredString(this.font, Component.translatable("screen.wildernessodysseyapi.world_version.version", oldVersion, newVersion), this.width / 2, boxY + 52, 0xFFFFFFFF);
+        gfx.drawCenteredString(this.font, Component.translatable("screen.wildernessodysseyapi.world_version.outdated"), this.width / 2, boxY + 70, 0xFFEEEEEE);
+        gfx.drawCenteredString(this.font, Component.translatable("screen.wildernessodysseyapi.world_version.backup"), this.width / 2, boxY + 87, 0xFFFF4444);
+        gfx.drawCenteredString(this.font, Component.translatable("screen.wildernessodysseyapi.world_version.ops_only"), this.width / 2, boxY + 104, 0xFFDDDDDD);
+        gfx.drawCenteredString(this.font, Component.translatable("screen.wildernessodysseyapi.world_version.command"), this.width / 2, boxY + 121, 0xFFDDDDDD);
+        gfx.drawCenteredString(this.font, Component.translatable("screen.wildernessodysseyapi.world_version.worldgen_warning"), this.width / 2, boxY + 138, 0xFFDDDDDD);
+        gfx.drawCenteredString(this.font, Component.translatable("screen.wildernessodysseyapi.world_version.bug_tip"), this.width / 2, boxY + 155, 0xFFDDDDDD);
     }
 
     @Override
@@ -94,7 +94,7 @@ public class WorldVersionWarningScreen extends Screen {
 
     @Override
     public boolean shouldCloseOnEsc() {
-            return false;
+        return false;
     }
 
     @Override
