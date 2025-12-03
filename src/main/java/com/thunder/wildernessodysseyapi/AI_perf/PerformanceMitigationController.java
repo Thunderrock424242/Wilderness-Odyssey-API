@@ -45,39 +45,36 @@ public final class PerformanceMitigationController {
 
     public static List<PerformanceAction> buildActionsFromRequest(PerformanceAdvisoryRequest request) {
         List<PerformanceAction> proposals = new ArrayList<>();
-        for (PerformanceAdvisoryRequest.SubsystemLoad load : request.subsystemLoads()) {
+        List<PerformanceAction> rollbackProposals = new ArrayList<>();
+        List<PerformanceAdvisoryRequest.SubsystemLoad> loads = request.subsystemLoads();
+        for (PerformanceAdvisoryRequest.SubsystemLoad load : loads) {
             if (load.observedValue() < MIN_SEVERITY_FOR_ACTION) {
                 continue;
             }
-            String subsystem = load.id();
-            switch (load.id()) {
-                case "entity-pathfinding" -> subsystem = "entity-pathfinding";
-                case "entity-behavior" -> subsystem = "entity-ticking";
-                case "chunk-processing" -> subsystem = "chunk-processing";
-                default -> {
-                    subsystem = null;
-                }
-            }
+            String subsystem = normalizeSubsystemId(load.id());
             if (subsystem == null) {
                 continue;
             }
-            if (ACTION_QUEUE.hasPendingOrActive(subsystem)) {
+            if (ACTION_QUEUE.hasPendingOrActiveMitigation(subsystem)) {
                 continue;
             }
             switch (subsystem) {
                 case "entity-pathfinding" -> proposals.add(new PerformanceAction(
+                        ID_GENERATOR.nextBaseId(),
                         subsystem,
                         "Throttle pathfinding for dense clusters (every 3 ticks).",
                         load.evidence(),
                         DEFAULT_DURATION_SECONDS,
                         (int) load.observedValue()));
                 case "entity-ticking" -> proposals.add(new PerformanceAction(
+                        ID_GENERATOR.nextBaseId(),
                         subsystem,
                         "Lower idle mob tick rate to ease behavior costs.",
                         load.evidence(),
                         DEFAULT_DURATION_SECONDS,
                         (int) load.observedValue()));
                 case "chunk-processing" -> proposals.add(new PerformanceAction(
+                        ID_GENERATOR.nextBaseId(),
                         subsystem,
                         "Temporarily shrink simulation distance to ease chunk queues.",
                         load.evidence(),
@@ -87,12 +84,37 @@ public final class PerformanceMitigationController {
                 }
             }
         }
-        ACTION_QUEUE.replacePending(proposals);
+        for (PerformanceAction active : ACTION_QUEUE.getActive()) {
+            boolean subsystemStillHot = loads.stream()
+                    .map(load -> normalizeSubsystemId(load.id()))
+                    .anyMatch(normalized -> normalized != null && normalized.equals(active.getSubsystem())
+                            && load.observedValue() >= MIN_SEVERITY_FOR_ACTION);
+            if (!subsystemStillHot && !ACTION_QUEUE.hasPendingRollback(active.getSubsystem()) && !active.isRollback()) {
+                String rollbackId = ID_GENERATOR.nextRollbackId(active.getId());
+                rollbackProposals.add(new PerformanceAction(
+                        rollbackId,
+                        active.getSubsystem(),
+                        "Undo mitigation for " + active.getSubsystem(),
+                        "Subsystem load normalized; revert action " + active.getId(),
+                        DEFAULT_DURATION_SECONDS,
+                        active.getSeverity(),
+                        PerformanceActionStatus.PENDING,
+                        Instant.now(),
+                        active.getId()));
+            }
+        }
+        ACTION_QUEUE.replacePendingMitigations(proposals);
+        ACTION_QUEUE.enqueueRollbacks(rollbackProposals);
         return proposals;
     }
 
     public static void approveAndApply(MinecraftServer server, PerformanceAction action) {
         action.markApproved();
+        if (action.isRollback()) {
+            applyRollback(server, action);
+            action.markApplied();
+            return;
+        }
         switch (action.getSubsystem()) {
             case "entity-pathfinding" -> applyPathfindingThrottle(server, 3, action.getDurationSeconds());
             case "entity-ticking" -> applyEntityTickThrottle(server, 3, action.getDurationSeconds());
@@ -128,6 +150,29 @@ public final class PerformanceMitigationController {
             expired.addAll(stalePending.stream().map(PerformanceAction::getId).toList());
         }
         ACTION_QUEUE.markExpired(expired);
+        ACTION_QUEUE.cleanupExpired();
+    }
+
+    private static void applyRollback(MinecraftServer server, PerformanceAction action) {
+        switch (action.getSubsystem()) {
+            case "entity-pathfinding" -> {
+                pathfindingThrottleInterval = 1;
+                pathfindingThrottleUntil = 0L;
+            }
+            case "entity-ticking" -> {
+                entityTickInterval = 1;
+                entityTickUntil = 0L;
+            }
+            case "chunk-processing" -> {
+                rollbackChunkMitigation(server);
+                chunkDistanceUntil = 0L;
+            }
+            default -> ModConstants.LOGGER.warn("Unknown rollback subsystem {} for action {}", action.getSubsystem(), action.getId());
+        }
+        action.getRollbackOfId()
+                .flatMap(ACTION_QUEUE::findActive)
+                .ifPresent(PerformanceAction::markExpired);
+        action.markExpired();
         ACTION_QUEUE.cleanupExpired();
     }
 
@@ -205,5 +250,14 @@ public final class PerformanceMitigationController {
         for (ServerPlayer ignored : level.players()) {
             // Players visiting the level thaw nearby mobs by ticking them again
         }
+    }
+
+    private static String normalizeSubsystemId(String rawId) {
+        return switch (rawId) {
+            case "entity-pathfinding" -> "entity-pathfinding";
+            case "entity-behavior" -> "entity-ticking";
+            case "chunk-processing" -> "chunk-processing";
+            default -> null;
+        };
     }
 }

@@ -7,6 +7,8 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.thunder.wildernessodysseyapi.AI_perf.PerformanceAction;
 import com.thunder.wildernessodysseyapi.AI_perf.PerformanceActionQueue;
 import com.thunder.wildernessodysseyapi.AI_perf.PerformanceMitigationController;
+import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -39,8 +41,7 @@ public class AiAdvisorCommand {
         }
 
         String display = actions.stream()
-                .map(action -> action.getId() + " [" + action.getSubsystem() + "] " + action.getStatus()
-                        + " -> " + action.getSummary())
+                .map(AiAdvisorCommand::formatActionLine)
                 .collect(Collectors.joining("\n"));
         ctx.getSource().sendSuccess(() -> Component.literal(display), false);
         return 1;
@@ -52,11 +53,15 @@ public class AiAdvisorCommand {
         PerformanceActionQueue queue = PerformanceMitigationController.getActionQueue();
         Optional<PerformanceAction> action = queue.findPending(id);
         if (action.isEmpty()) {
-            ctx.getSource().sendFailure(Component.literal("No pending AI advisor action with id " + id));
+            ctx.getSource().sendFailure(Component.literal(ChatFormatting.RED + "No pending AI advisor action with id " + id + ChatFormatting.RESET));
             return 0;
         }
         PerformanceMitigationController.approveAndApply(player.serverLevel().getServer(), action.get());
-        ctx.getSource().sendSuccess(() -> Component.literal("Approved and applied action " + id), true);
+        ModConstants.LOGGER.info("AI advisor approval: {} approved {} ({})", ctx.getSource().getTextName(),
+                action.get().getId(), action.get().getSubsystem());
+        ctx.getSource().sendSuccess(() -> Component.literal(ChatFormatting.GREEN + "Approved and applied action "
+                + ChatFormatting.BOLD + id + ChatFormatting.RESET + ChatFormatting.DARK_GRAY + " ["
+                + ChatFormatting.GOLD + action.get().getSubsystem() + ChatFormatting.DARK_GRAY + "]"), true);
         return 1;
     }
 
@@ -64,7 +69,35 @@ public class AiAdvisorCommand {
         String id = StringArgumentType.getString(ctx, "id");
         PerformanceActionQueue queue = PerformanceMitigationController.getActionQueue();
         queue.reject(id);
-        ctx.getSource().sendSuccess(() -> Component.literal("Rejected action " + id), true);
+        ModConstants.LOGGER.info("AI advisor rejection: {} rejected {}", ctx.getSource().getTextName(), id);
+        ctx.getSource().sendSuccess(() -> Component.literal(ChatFormatting.RED + "Rejected action "
+                + ChatFormatting.BOLD + id + ChatFormatting.RESET), true);
         return 1;
+    }
+
+    private static String formatActionLine(PerformanceAction action) {
+        String statusColor = switch (action.getStatus()) {
+            case PENDING -> ChatFormatting.YELLOW.toString();
+            case APPROVED -> ChatFormatting.GREEN.toString();
+            case APPLIED -> ChatFormatting.DARK_GREEN.toString();
+            case REJECTED -> ChatFormatting.RED.toString();
+            case EXPIRED -> ChatFormatting.DARK_RED.toString();
+        };
+
+        String idColor = action.isRollback() ? ChatFormatting.LIGHT_PURPLE.toString() : ChatFormatting.AQUA.toString();
+        String idLabel = ChatFormatting.BOLD + "ID: " + idColor + action.getId();
+        if (action.isRollback()) {
+            idLabel += ChatFormatting.DARK_GRAY + " (undo " + ChatFormatting.GRAY
+                    + action.getRollbackOfId().orElse("?") + ChatFormatting.DARK_GRAY + ")";
+        }
+
+        String statusLabel = statusColor + action.getStatus().name();
+        String subsystemLabel = ChatFormatting.GOLD + action.getSubsystem();
+        String summaryLabel = ChatFormatting.WHITE + action.getSummary();
+
+        return ChatFormatting.DARK_GRAY + " • " + ChatFormatting.RESET + idLabel + ChatFormatting.RESET
+                + ChatFormatting.DARK_GRAY + " [" + subsystemLabel + ChatFormatting.DARK_GRAY + "] "
+                + statusLabel + ChatFormatting.RESET + ChatFormatting.DARK_GRAY + " -> "
+                + summaryLabel + ChatFormatting.RESET;
     }
 }
