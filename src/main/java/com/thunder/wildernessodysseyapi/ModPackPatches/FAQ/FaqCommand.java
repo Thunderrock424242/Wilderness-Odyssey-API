@@ -25,9 +25,15 @@ public class FaqCommand {
                                     String id = StringArgumentType.getString(ctx, "id");
                                     FaqEntry entry = FaqManager.get(id);
                                     if (entry != null) {
-                                        ctx.getSource().sendSuccess(() -> Component.literal("[" + entry.category() + "] " + entry.question() + ": " + entry.answer()), false);
+                                        ctx.getSource().sendSuccess(() -> Component.translatable(
+                                                "command.wildernessodysseyapi.faq.view",
+                                                entry.category(),
+                                                entry.question(),
+                                                entry.answer()), false);
                                     } else {
-                                        ctx.getSource().sendFailure(Component.literal("FAQ not found for id: " + id));
+                                        ctx.getSource().sendFailure(Component.translatable(
+                                                "command.wildernessodysseyapi.faq.not_found",
+                                                id));
                                     }
                                     return 1;
                                 })))
@@ -38,10 +44,14 @@ public class FaqCommand {
                                     List<FaqEntry> results = FaqManager.search(query);
                                     results.sort(Comparator.comparing(FaqEntry::id));
                                     if (results.isEmpty()) {
-                                        ctx.getSource().sendFailure(Component.literal("No FAQs found."));
+                                        ctx.getSource().sendFailure(Component.translatable("command.wildernessodysseyapi.faq.no_results"));
                                     } else {
                                         for (FaqEntry entry : results) {
-                                            ctx.getSource().sendSuccess(() -> Component.literal("- [" + entry.category() + "] " + entry.id() + ": " + entry.question()), false);
+                                            ctx.getSource().sendSuccess(() -> Component.translatable(
+                                                    "command.wildernessodysseyapi.faq.search_result",
+                                                    entry.category(),
+                                                    entry.id(),
+                                                    entry.question()), false);
                                         }
                                     }
                                     return 1;
@@ -49,9 +59,14 @@ public class FaqCommand {
                 .then(Commands.literal("list")
                         .executes(ctx -> {
                             for (String cat : FaqManager.getCategories()) {
-                                ctx.getSource().sendSuccess(() -> Component.literal("Category: " + cat), false);
+                                ctx.getSource().sendSuccess(() -> Component.translatable(
+                                        "command.wildernessodysseyapi.faq.list_category",
+                                        cat), false);
                                 for (FaqEntry entry : FaqManager.getByCategory(cat)) {
-                                    ctx.getSource().sendSuccess(() -> Component.literal("- " + entry.id() + ": " + entry.question()), false);
+                                    ctx.getSource().sendSuccess(() -> Component.translatable(
+                                            "command.wildernessodysseyapi.faq.list_entry",
+                                            entry.id(),
+                                            entry.question()), false);
                                 }
                             }
                             return 1;

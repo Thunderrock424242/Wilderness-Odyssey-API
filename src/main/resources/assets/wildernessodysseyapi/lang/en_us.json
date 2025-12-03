@@ -3,8 +3,10 @@
   "message.wildernessodysseyapi.wake_up": "Waking from cryostasis...",
   "message.wildernessodysseyapi.cryo_tube_locked": "The cryo tube can no longer be used.",
   "block.wildernessodysseyapi.cryo_tube": "Cryo Tube",
+  "block.wildernessodysseyapi.terrain_replacer": "Terrain Replacer",
   "item.wildernessodysseyapi.cloak_item": "Handheld Cloak",
   "item.wildernessodysseyapi.sky_torch_staff": "Sky Torch Staff",
+  "item.wildernessodysseyapi.terrain_replacer": "Terrain Replacer",
 
   "screen.wildernessodyssey.hardware.title": "Hardware Requirements",
   "screen.wildernessodyssey.hardware.section.current": "Detected hardware",
@@ -39,5 +41,25 @@
   "command.wildernessodyssey.autoshader.no_shader": "No shader recommendation is configured for the %s tier.",
   "command.wildernessodyssey.autoshader.write_error": "Failed to update Iris configuration: %s",
   "command.wildernessodyssey.autoshader.pack_missing": "Recommended shader pack '%s' is not installed; saved preference anyway.",
-  "command.wildernessodyssey.autoshader.unknown_tier": "Unknown shader tier '%s'. Valid options: %s."
+  "command.wildernessodyssey.autoshader.unknown_tier": "Unknown shader tier '%s'. Valid options: %s.",
+
+  "command.wildernessodysseyapi.faq.view": "[%s] %s: %s",
+  "command.wildernessodysseyapi.faq.not_found": "FAQ not found for id: %s",
+  "command.wildernessodysseyapi.faq.no_results": "No FAQs found.",
+  "command.wildernessodysseyapi.faq.search_result": "- [%s] %s: %s",
+  "command.wildernessodysseyapi.faq.list_category": "Category: %s",
+  "command.wildernessodysseyapi.faq.list_entry": "- %s: %s",
+
+  "screen.wildernessodysseyapi.world_version.title": "World Version Warning",
+  "screen.wildernessodysseyapi.world_version.proceed": "Proceed (Return to Play)",
+  "screen.wildernessodysseyapi.world_version.cancel": "Cancel (Return to Title)",
+  "screen.wildernessodysseyapi.world_version.banner": "World Version Warning!",
+  "screen.wildernessodysseyapi.world_version.update_detected": "%s Update Detected",
+  "screen.wildernessodysseyapi.world_version.version": "World Version: %s → %s",
+  "screen.wildernessodysseyapi.world_version.outdated": "Your world is outdated and needs updating.",
+  "screen.wildernessodysseyapi.world_version.backup": "BACKUP YOUR WORLD BEFORE PROCEEDING",
+  "screen.wildernessodysseyapi.world_version.ops_only": "Only operators can update the world version.",
+  "screen.wildernessodysseyapi.world_version.command": "Run /updateworldversion in chat if you are an operator.",
+  "screen.wildernessodysseyapi.world_version.worldgen_warning": "World generation and structures may change.",
+  "screen.wildernessodysseyapi.world_version.bug_tip": "For bugs, test in a fresh world before reporting."
 }
