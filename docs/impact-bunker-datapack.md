@@ -6,6 +6,10 @@ The current worldgen pipeline already looks up `impact_zone.nbt` and `bunker.nbt
 - **Impact sites:** `MeteorStructureSpawner` always targets three sites and enforces at least 32 chunks (512 blocks) between crater anchors. This keeps each cluster far apart while still letting you tune the exact shape in your datapack.
 - **Bunkers:** One bunker is placed adjacent to a random impact site by default, but you can raise `bunker.maxSpawnCount` in `config/wildernessodysseyapi/wildernessodysseyapi-common.toml` to allow up to three bunkers (one per crater) while keeping a minimum spacing set by `bunker.spawnDistanceChunks`.
 
+## Where to put your datapack
+- Bundle the structures directly in the mod so they travel with the jar: place `data/<namespace>/structures/impact_zone.nbt` and `data/<namespace>/structures/bunker.nbt` under `src/main/resources/` (e.g., `src/main/resources/data/wildernessodysseyapi/structures/impact_zone.nbt`). Gradle will package them into the final mod and they will load before the fallback templates.
+- If you prefer a drop-in override later, you can still ship the same files as a normal datapack (`world/datapacks/<name>.zip`); datapack assets will override the built-in ones at runtime. Keeping the canonical copy in the mod ensures every server sees your custom crater and bunker without managing extra downloads.
+
 ## Building with wool height guides
 - Build the crater and bunker shells in a flat world, then add wool "survey" pillars at the points where you need to measure surface offsets. The `NBTStructurePlacer` preserves these blocks, so you can read them in-game after placement to verify that the terrain alignment matches your expectations.
 - Use different wool colors for key landmarks (e.g., crater rim, bunker doorway, roof corners) to make vertical deltas obvious when the structure is pasted onto varied terrain.
