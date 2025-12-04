@@ -9,6 +9,7 @@
     "type": "minecraft:concentric_rings",
     "distance": 16,
     "spread": 2,
+    "salt": 1968124935,
     "count": 3,
     "preferred_biomes": "#wildernessodysseyapi:spawn_in_plains"
   }
