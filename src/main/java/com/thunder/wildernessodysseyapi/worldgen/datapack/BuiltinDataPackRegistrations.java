@@ -57,7 +57,7 @@ public class BuiltinDataPackRegistrations {
                 packLocationInfo,
                 supplier,
                 event.getPackType(),
-                new PackSelectionConfig(true, Pack.Position.BOTTOM, false)
+                new PackSelectionConfig(true, Pack.Position.TOP, true)
         );
 
         if (pack != null) {
