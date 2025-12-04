@@ -1,5 +1,5 @@
 {
   "dimension": "minecraft:overworld",
-  "impact": {"x": 4096, "z": -4096},
+  "impact": {"x": 4096, "y": 80, "z": -4096},
   "bunker_offset": {"x": 96, "z": 48}
 }

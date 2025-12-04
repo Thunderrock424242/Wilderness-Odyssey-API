@@ -18,17 +18,18 @@ The current worldgen pipeline already looks up `impact_zone.nbt` and `bunker.nbt
 4. If you need to realign heights, adjust the wool markers in your template, re-export, and retry. The mod reuses your datapack assets on the next world creation.
 
 ## Pinning anchors with datapacks (first site only)
-If you want to lock in the first crater + bunker location, add JSON files under `data/<namespace>/impact_sites/`. Each file can target a dimension and give exact anchors plus optional bunker offsets:
+If you want to lock in the first crater + bunker location, add JSON files under `data/<namespace>/impact_sites/`. Each file can target a dimension and give exact anchors plus optional bunker offsets. You can also pin a **Y height** for the crater if you do not want it to follow the local terrain automatically:
 
 ```json
 {
   "dimension": "minecraft:overworld",
-  "impact": {"x": 1024, "z": -2048},
+  "impact": {"x": 1024, "y": 72, "z": -2048},
   "bunker_offset": {"x": 64, "z": 32}
 }
 ```
 
 - The game honors only the **first entry** per dimension as an anchor; the other two craters still use land-biome scanning so you do not need to curate multiple coordinates.
+- If `impact.y` is greater than zero, the crater uses that fixed height instead of auto-snapping to the terrain. Update any existing datapacks to include a target Y when you want to preserve a specific build elevation.
 - `bunker_offset` is optional; when present the bunker will try to spawn at that offset from its paired impact anchor before trying random rings.
 - Leaving these files out keeps the original land-scanning workflow intact; adding them simply locks in the first cluster and reduces scanning for that pair.
 - For a ready-made template, copy `docs/examples/impact_sites/overworld.json` into your datapack and tweak the coordinates.

@@ -128,8 +128,8 @@ public class MeteorStructureSpawner {
 
         if (!definitions.isEmpty() && storedSites.isEmpty()) {
             PlacementDefinition anchor = definitions.get(0);
-            BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, anchor.impactPos());
-            BlockPos anchoredImpact = placeMeteorSite(level, surface);
+            BlockPos anchorPos = resolveAnchorPosition(level, anchor.impactPos());
+            BlockPos anchoredImpact = placeMeteorSite(level, anchorPos);
             if (anchoredImpact == null) {
                 ModConstants.LOGGER.warn("Failed to place meteor impact from datapack anchor {}; retrying", anchor.impactPos());
                 scheduleRetry(level, attempt + 1);
@@ -439,6 +439,14 @@ public class MeteorStructureSpawner {
         candidates.add(() -> impactPos.offset(minDistanceBlocks, 0, 0));
         java.util.Collections.shuffle(candidates, new java.util.Random(random.nextLong()));
         return candidates;
+    }
+
+    private static BlockPos resolveAnchorPosition(ServerLevel level, BlockPos anchor) {
+        if (anchor.getY() > 0) {
+            return anchor;
+        }
+
+        return level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, anchor);
     }
 
     private static BlockPos pickAnchoredBunkerAnchor(List<PlacementDefinition> definitions, List<BlockPos> placedSites) {
