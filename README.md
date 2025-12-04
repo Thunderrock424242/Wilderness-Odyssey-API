@@ -90,6 +90,11 @@ structure by its namespace and path (without the `.nbt` extension) to have it
 placed during world generation. If no data pack override exists, the bundled
 templates under `data/<namespace>/structures/` in the mod resources are used.
 
+For a datapack-only workflow that still keeps the wool height markers you
+mentioned, see `docs/impact-bunker-datapack.md`. It outlines how the mod's
+built-in three impact sites and nearby bunkers interact with your custom
+templates and how to space each cluster far apart without changing code.
+
 The meteor impact site looks for the `wildernessodysseyapi:impact_zone`
 template. Drop your finished build at
 `data/wildernessodysseyapi/structures/impact_zone.nbt` so the crash craters are
