@@ -226,6 +226,9 @@ tasks.register('obfuscateFiles', JavaExec) {
 
 // Package bundled libraries directly into the mod jar so they are available when Minecraft loads the mod.
 tasks.named('jar', Jar).configure {
+    // Ensure all mod resources (including built-in datapacks) are packaged into the jar.
+    from(sourceSets.main.resources)
+
     from {
         configurations.bundledLibs.collect { it.isDirectory() ? it : zipTree(it) }
     }

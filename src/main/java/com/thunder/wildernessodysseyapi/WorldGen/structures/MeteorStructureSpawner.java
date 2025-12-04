@@ -40,6 +40,7 @@ public class MeteorStructureSpawner {
     private static final TagKey<Biome> IS_PLAINS_TAG =
             TagKey.create(Registries.BIOME, ResourceLocation.parse("c:is_plains"));
     private static final int IMPACT_SITE_COUNT = 3;
+    private static final int SPAWN_PLAINS_SEARCH_RADIUS = 256;
     private static final int MIN_CHUNK_SEPARATION = 32;
     private static final int MIN_BLOCK_SEPARATION = MIN_CHUNK_SEPARATION * 16;
     private static final int POSITION_ATTEMPTS = 64;
@@ -119,6 +120,18 @@ public class MeteorStructureSpawner {
 
         List<BlockPos> storedSites = new ArrayList<>(impactData.getImpactPositions());
         int originalCount = storedSites.size();
+
+        if (storedSites.isEmpty()) {
+            BlockPos spawnPlains = findSpawnPlains(level, spawn);
+            if (spawnPlains != null) {
+                BlockPos anchor = placeMeteorSite(level, spawnPlains);
+                if (anchor != null) {
+                    storedSites.add(anchor);
+                } else {
+                    failedOrigins.add(spawnPlains.asLong());
+                }
+            }
+        }
 
         for (int i = storedSites.size(); i < IMPACT_SITE_COUNT; i++) {
             BlockPos origin = findImpactOrigin(level, random, spawn, storedSites, failedOrigins);
@@ -275,6 +288,16 @@ public class MeteorStructureSpawner {
         if (forcedChunks.remove(key)) {
             level.setChunkForced(chunkPos.x, chunkPos.z, false);
         }
+    }
+
+    private static BlockPos findSpawnPlains(ServerLevel level, BlockPos spawn) {
+        Map<Long, Boolean> plainsCache = new HashMap<>();
+        BlockPos surfaceSpawn = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, spawn);
+        if (isPlains(level, surfaceSpawn, plainsCache)) {
+            return surfaceSpawn;
+        }
+
+        return findNearbyPlains(level, surfaceSpawn, SPAWN_PLAINS_SEARCH_RADIUS, plainsCache);
     }
 
     private static BlockPos findImpactOrigin(ServerLevel level, RandomSource random, BlockPos reference,
