@@ -6,7 +6,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.Cryo
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.PlayerSpawnHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock.WorldSpawnHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
-import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
+import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.LevelAccessor;

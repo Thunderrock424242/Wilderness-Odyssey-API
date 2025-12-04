@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable;
+package com.thunder.wildernessodysseyapi.WorldGen.configurable;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;

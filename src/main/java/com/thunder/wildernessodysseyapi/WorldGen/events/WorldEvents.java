@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.WorldGen.events;
 
-import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorStructureSpawner;
+import com.thunder.wildernessodysseyapi.WorldGen.structures.MeteorStructureSpawner;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;

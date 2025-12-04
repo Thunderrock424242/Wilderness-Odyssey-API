@@ -2,8 +2,8 @@ package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock;
 
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.StructureSpawnTracker;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
-import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
-import com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures.MeteorImpactData;
+import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
+import com.thunder.wildernessodysseyapi.WorldGen.structures.MeteorImpactData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;

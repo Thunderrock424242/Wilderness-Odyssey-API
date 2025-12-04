@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.WorldGen.worldgen.structures;
+package com.thunder.wildernessodysseyapi.WorldGen.structures;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;

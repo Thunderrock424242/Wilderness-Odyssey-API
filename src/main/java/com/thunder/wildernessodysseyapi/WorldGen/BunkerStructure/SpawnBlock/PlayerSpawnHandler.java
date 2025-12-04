@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock;
 
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
-import com.thunder.wildernessodysseyapi.WorldGen.worldgen.configurable.StructureConfig;
+import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.BlockPos.MutableBlockPos;
 import net.minecraft.nbt.CompoundTag;
