@@ -16,7 +16,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import java.nio.file.Path;
 import java.util.Optional;
 
-@EventBusSubscriber
+@EventBusSubscriber(modid = ModConstants.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 public class BuiltinDataPackRegistrations {
     private static final String PLAINS_SPAWN_PACK_ID = ModConstants.MOD_ID + ":plains_spawn_pack";
     private static final String PLAINS_PACK_PATH = "builtin/plains_spawn";
@@ -57,7 +57,7 @@ public class BuiltinDataPackRegistrations {
                 packLocationInfo,
                 supplier,
                 event.getPackType(),
-                new PackSelectionConfig(false, Pack.Position.BOTTOM, false)
+                new PackSelectionConfig(true, Pack.Position.BOTTOM, false)
         );
 
         if (pack != null) {
