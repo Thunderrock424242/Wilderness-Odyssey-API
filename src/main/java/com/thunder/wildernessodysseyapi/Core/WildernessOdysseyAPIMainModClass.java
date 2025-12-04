@@ -50,6 +50,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerStructureGenerator;
+import com.thunder.wildernessodysseyapi.WorldGen.datapack.ImpactSitePlacementLoader;
 import com.thunder.wildernessodysseyapi.WorldGen.structures.MeteorStructureSpawner;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import net.minecraft.world.phys.AABB;
@@ -293,6 +294,7 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onReload(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
+        event.addListener(new ImpactSitePlacementLoader());
     }
 
     public void onConfigLoaded(ModConfigEvent.Loading event) {
