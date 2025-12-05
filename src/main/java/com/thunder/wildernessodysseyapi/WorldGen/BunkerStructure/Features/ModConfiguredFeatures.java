@@ -3,7 +3,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
-import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 
 import java.util.Objects;
 
@@ -19,11 +18,10 @@ public class ModConfiguredFeatures {
             Objects.requireNonNull(ResourceLocation.tryParse("wildernessodyssey:custom_structure")) // Use tryParse to create the ResourceLocation
     );
 
-    /**
-     * The constant CUSTOM_STRUCTURE.
-     */
-    public static final ConfiguredFeature<?, ?> CUSTOM_STRUCTURE = new ConfiguredFeature<>(
-            ModFeatures.BUNKER_FEATURE.get(),
-            NoneFeatureConfiguration.INSTANCE
-    );
+    private ModConfiguredFeatures() {
+    }
+
+    public static ConfiguredFeature<?, ?> getCustomStructure() {
+        return ModFeatures.CUSTOM_STRUCTURE.get();
+    }
 }
