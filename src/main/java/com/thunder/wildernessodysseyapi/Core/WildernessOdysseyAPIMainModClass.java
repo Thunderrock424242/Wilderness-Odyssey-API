@@ -14,6 +14,8 @@ import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffComma
 import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatOptToggleCommand;
+import com.thunder.wildernessodysseyapi.analytics.AnalyticsTracker;
+import com.thunder.wildernessodysseyapi.command.AnalyticsCommand;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
@@ -186,6 +188,7 @@ public class WildernessOdysseyAPIMainModClass {
         BunkerStructureGenerator.resetDeferredState();
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
+        AnalyticsTracker.initialize(event.getServer(), event.getServer().getFile("config"));
     }
 
     /**
@@ -207,6 +210,7 @@ public class WildernessOdysseyAPIMainModClass {
         WorldGenScanCommand.register(event.getDispatcher());
         AiAdvisorCommand.register(event.getDispatcher());
         AsyncStatsCommand.register(dispatcher);
+        AnalyticsCommand.register(dispatcher);
         GlobalChatCommand.register(dispatcher);
         GlobalChatOptToggleCommand.register(dispatcher);
     }
@@ -253,6 +257,7 @@ public class WildernessOdysseyAPIMainModClass {
         BunkerProtectionHandler.clear();
         BunkerStructureGenerator.resetDeferredState();
         AsyncTaskManager.shutdown();
+        AnalyticsTracker.shutdown();
     }
 
     private void onLoadComplete(FMLLoadCompleteEvent event) {

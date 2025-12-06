@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.globalchat;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.thunder.wildernessodysseyapi.analytics.AnalyticsSnapshot;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -129,6 +130,10 @@ public class GlobalChatManager {
             lastPing = Duration.ofMillis(packet.pingMillis);
             return;
         }
+        if (packet.type == GlobalChatPacket.Type.ANALYTICS) {
+            // Analytics packets are intended for external tools; ignore them in-game.
+            return;
+        }
         if (server == null) {
             return;
         }
@@ -155,6 +160,18 @@ public class GlobalChatManager {
         packet.sender = sender;
         packet.message = message;
         packet.timestamp = System.currentTimeMillis();
+        writer.println(GSON.toJson(packet));
+    }
+
+    public void sendAnalyticsSnapshot(AnalyticsSnapshot snapshot) {
+        if (!connected.get()) {
+            return;
+        }
+        GlobalChatPacket packet = new GlobalChatPacket();
+        packet.type = GlobalChatPacket.Type.ANALYTICS;
+        packet.sender = server != null ? server.getMotd() : "minecraft";
+        packet.timestamp = System.currentTimeMillis();
+        packet.analytics = snapshot;
         writer.println(GSON.toJson(packet));
     }
 

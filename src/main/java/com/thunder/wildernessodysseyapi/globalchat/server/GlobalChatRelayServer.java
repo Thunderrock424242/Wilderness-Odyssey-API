@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.globalchat.server;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.thunder.wildernessodysseyapi.analytics.AnalyticsSnapshot;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatPacket;
 
 import java.io.BufferedReader;
@@ -24,6 +25,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * Lightweight relay server for the global chat network. It is intentionally small
@@ -44,12 +47,14 @@ public class GlobalChatRelayServer {
     private final String moderationToken;
     private final String clusterToken;
     private final Set<String> externalWhitelist = new HashSet<>();
+    private final Path analyticsDir = Path.of("analytics");
 
     public GlobalChatRelayServer(int port, String moderationToken, String clusterToken) throws IOException {
         this.serverSocket = new ServerSocket(port);
         this.moderationToken = moderationToken;
         this.clusterToken = clusterToken;
         loadWhitelist();
+        Files.createDirectories(analyticsDir);
     }
 
     public void start() {
@@ -108,6 +113,7 @@ public class GlobalChatRelayServer {
             case CHAT -> handleChat(packet, state);
             case STATUS_REQUEST -> sendStatus(writer, state, packet);
             case MOD_ACTION -> handleModeration(packet, state);
+            case ANALYTICS -> handleAnalytics(packet, state);
             default -> {
             }
         }
@@ -253,6 +259,44 @@ public class GlobalChatRelayServer {
         }
     }
 
+    private void handleAnalytics(GlobalChatPacket packet, ClientState state) {
+        if (!"server".equals(state.role)) {
+            sendSystemMessage(state, "Analytics packets must originate from a server client.");
+            return;
+        }
+        persistAnalytics(packet, state);
+        broadcast(packet, state);
+    }
+
+    private void persistAnalytics(GlobalChatPacket packet, ClientState state) {
+        if (packet.analytics == null || packet.analytics.players == null) {
+            return;
+        }
+        packet.analytics.players.forEach(player -> {
+            PlayerAnalyticsRecord record = new PlayerAnalyticsRecord();
+            record.serverId = state.serverId;
+            record.timestampMillis = packet.analytics.timestampMillis;
+            record.player = player;
+            record.playerCount = packet.analytics.playerCount;
+            record.maxPlayers = packet.analytics.maxPlayers;
+            record.usedMemoryMb = packet.analytics.usedMemoryMb;
+            record.totalMemoryMb = packet.analytics.totalMemoryMb;
+            record.peakMemoryMb = packet.analytics.peakMemoryMb;
+            record.recommendedMemoryMb = packet.analytics.recommendedMemoryMb;
+            record.worstTickMillis = packet.analytics.worstTickMillis;
+            record.cpuLoad = packet.analytics.cpuLoad;
+            record.overloaded = packet.analytics.overloaded;
+            record.overloadedReason = packet.analytics.overloadedReason;
+            try {
+                Path file = analyticsDir.resolve(player.uuid + ".json");
+                Files.writeString(file, GSON.toJson(record));
+            } catch (IOException e) {
+                System.err.println("[GlobalChatRelayServer] Failed to persist analytics for player " + player.uuid
+                        + ": " + e.getMessage());
+            }
+        });
+    }
+
     private void sendConnectionList(ClientState state, boolean includeIp) {
         StringBuilder builder = new StringBuilder("Connected clients: ");
         clients.values().forEach(client -> {
@@ -349,6 +393,22 @@ public class GlobalChatRelayServer {
         Optional<String> reason() {
             return Optional.ofNullable(reason);
         }
+    }
+
+    private static class PlayerAnalyticsRecord {
+        private long timestampMillis;
+        private String serverId;
+        private AnalyticsSnapshot.PlayerStats player;
+        private int playerCount;
+        private int maxPlayers;
+        private long usedMemoryMb;
+        private long totalMemoryMb;
+        private long peakMemoryMb;
+        private int recommendedMemoryMb;
+        private long worstTickMillis;
+        private double cpuLoad;
+        private boolean overloaded;
+        private String overloadedReason;
     }
 
     private static class ClientState {

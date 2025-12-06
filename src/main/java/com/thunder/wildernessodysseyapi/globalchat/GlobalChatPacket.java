@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.globalchat;
 
+import com.thunder.wildernessodysseyapi.analytics.AnalyticsSnapshot;
+
 /**
  * Simple line-delimited message exchanged between clients and the relay server.
  */
@@ -11,7 +13,8 @@ public class GlobalChatPacket {
         STATUS_RESPONSE,
         MOD_ACTION,
         ADMIN,
-        SYSTEM
+        SYSTEM,
+        ANALYTICS
     }
 
     public Type type;
@@ -31,4 +34,5 @@ public class GlobalChatPacket {
     public String role;
     public boolean muted;
     public long pingMillis;
+    public AnalyticsSnapshot analytics;
 }
