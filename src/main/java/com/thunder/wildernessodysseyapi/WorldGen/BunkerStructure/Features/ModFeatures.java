@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Features;
 
-import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.placement.PlacementUtils;
 import net.minecraft.resources.ResourceKey;
@@ -50,25 +49,21 @@ public class ModFeatures {
     );
 
     // Configured feature using the bunker feature
-    public static final ConfiguredFeature<?, ?> CUSTOM_STRUCTURE = new ConfiguredFeature<>(
-            BUNKER_FEATURE.get(),
-            NoneFeatureConfiguration.INSTANCE
+    public static final DeferredHolder<ConfiguredFeature<?, ?>, ConfiguredFeature<NoneFeatureConfiguration, ?>> CUSTOM_STRUCTURE = CONFIGURED_FEATURES.register(
+            "custom_structure",
+            () -> new ConfiguredFeature<>(
+                    BUNKER_FEATURE.get(),
+                    NoneFeatureConfiguration.INSTANCE
+            )
     );
 
-    static {
-        CONFIGURED_FEATURES.register(
-                "custom_structure",
-                () -> CUSTOM_STRUCTURE
-        );
-
-        PLACED_FEATURES.register(
-                "custom_structure",
-                () -> new PlacedFeature(
-                        Holder.direct(CUSTOM_STRUCTURE), // Use direct holder for ConfiguredFeature
-                        List.of(PlacementUtils.HEIGHTMAP_WORLD_SURFACE) // Define placement rules
-                )
-        );
-    }
+    public static final DeferredHolder<PlacedFeature, PlacedFeature> CUSTOM_STRUCTURE_PLACED = PLACED_FEATURES.register(
+            "custom_structure",
+            () -> new PlacedFeature(
+                    CUSTOM_STRUCTURE.getHolder().orElseThrow(() -> new IllegalStateException("Custom structure not registered")),
+                    List.of(PlacementUtils.HEIGHTMAP_WORLD_SURFACE) // Define placement rules
+            )
+    );
 
     /**
      * The constant CUSTOM_STRUCTURE_PLACED_KEY.
