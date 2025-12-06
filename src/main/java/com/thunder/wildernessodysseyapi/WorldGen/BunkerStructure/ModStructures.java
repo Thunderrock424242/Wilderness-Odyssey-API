@@ -22,25 +22,25 @@ public final class ModStructures {
     /** Resource key for the bunker structure (data defined). */
     public static final ResourceKey<Structure> BUNKER = ResourceKey.create(
             Registries.STRUCTURE,
-            new ResourceLocation(MOD_ID, "bunker")
+            ResourceLocation.fromNamespaceAndPath(MOD_ID, "bunker")
     );
 
     /** Resource key for the bunker structure set (data defined). */
     public static final ResourceKey<StructureSet> BUNKER_SET = ResourceKey.create(
             Registries.STRUCTURE_SET,
-            new ResourceLocation(MOD_ID, "bunker")
+            ResourceLocation.fromNamespaceAndPath(MOD_ID, "bunker")
     );
 
     /** Resource key for the impact zone structure (data defined). */
     public static final ResourceKey<Structure> IMPACT_ZONE = ResourceKey.create(
             Registries.STRUCTURE,
-            new ResourceLocation(MOD_ID, "impact_zone")
+            ResourceLocation.fromNamespaceAndPath(MOD_ID, "impact_zone")
     );
 
     /** Resource key for the impact zone structure set (data defined). */
     public static final ResourceKey<StructureSet> IMPACT_ZONE_SET = ResourceKey.create(
             Registries.STRUCTURE_SET,
-            new ResourceLocation(MOD_ID, "impact_zone")
+            ResourceLocation.fromNamespaceAndPath(MOD_ID, "impact_zone")
     );
 
     private ModStructures() {
