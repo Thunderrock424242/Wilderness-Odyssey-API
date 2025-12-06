@@ -5,7 +5,9 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.placement.PlacementUtils;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+import net.minecraft.world.level.levelgen.placement.PlacementModifier;
 
 import java.util.List;
 import java.util.Objects;
@@ -22,11 +24,16 @@ public class ModPlacedFeatures {
             Objects.requireNonNull(ResourceLocation.tryParse("wildernessodyssey:custom_structure")) // Use tryParse to create ResourceLocation
     );
 
-    /**
-     * The constant CUSTOM_STRUCTURE_PLACED.
-     */
-    public static final PlacedFeature CUSTOM_STRUCTURE_PLACED = new PlacedFeature(
-            Holder.direct(ModConfiguredFeatures.CUSTOM_STRUCTURE),
-            List.of(PlacementUtils.HEIGHTMAP_WORLD_SURFACE) // Define placement rules here
-    );
+    private ModPlacedFeatures() {
+    }
+
+    public static PlacedFeature customStructurePlaced() {
+        Holder<ConfiguredFeature<?, ?>> configuredHolder = ModFeatures.CUSTOM_STRUCTURE.getHolder()
+                .orElseThrow(() -> new IllegalStateException("Custom structure not registered"));
+
+        return new PlacedFeature(
+                configuredHolder,
+                List.<PlacementModifier>of(PlacementUtils.HEIGHTMAP_WORLD_SURFACE) // Define placement rules here
+        );
+    }
 }
