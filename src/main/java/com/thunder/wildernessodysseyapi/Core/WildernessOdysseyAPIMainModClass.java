@@ -19,6 +19,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.biome.ModBiomeModifiers;
+import com.thunder.wildernessodysseyapi.WorldGen.processor.ModProcessors;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.command.AiAdvisorCommand;
@@ -51,9 +52,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
-import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerStructureGenerator;
 import com.thunder.wildernessodysseyapi.WorldGen.datapack.ImpactSitePlacementLoader;
-import com.thunder.wildernessodysseyapi.WorldGen.structures.MeteorStructureSpawner;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.fml.ModList;
@@ -128,6 +127,7 @@ public class WildernessOdysseyAPIMainModClass {
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
         ModFeatures.PLACED_FEATURES.register(modEventBus);
         ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
+        ModProcessors.PROCESSORS.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
 
         // Register global events
@@ -181,9 +181,7 @@ public class WildernessOdysseyAPIMainModClass {
      */
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
-        MeteorStructureSpawner.resetState();
         BunkerProtectionHandler.clear();
-        BunkerStructureGenerator.resetDeferredState();
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
     }
@@ -220,7 +218,6 @@ public class WildernessOdysseyAPIMainModClass {
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
-        MeteorStructureSpawner.scheduleInitialPlacement(player.serverLevel());
         player.sendSystemMessage(Component.literal("[GlobalChat] Global chat is opt-in. Use /globalchatoptin to join or /globalchatoptout to leave."));
     }
     /**
@@ -249,9 +246,7 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         globalChatManager.shutdown();
-        MeteorStructureSpawner.resetState();
         BunkerProtectionHandler.clear();
-        BunkerStructureGenerator.resetDeferredState();
         AsyncTaskManager.shutdown();
     }
 
