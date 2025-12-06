@@ -28,8 +28,7 @@ public class ModPlacedFeatures {
     }
 
     public static PlacedFeature customStructurePlaced() {
-        Holder<ConfiguredFeature<?, ?>> configuredHolder = ModFeatures.CUSTOM_STRUCTURE.getHolder()
-                .orElseThrow(() -> new IllegalStateException("Custom structure not registered"));
+        Holder<ConfiguredFeature<?, ?>> configuredHolder = Holder.direct(ModFeatures.CUSTOM_STRUCTURE.get());
 
         return new PlacedFeature(
                 configuredHolder,
