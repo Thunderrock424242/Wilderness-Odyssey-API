@@ -79,8 +79,9 @@ control its frequency:
 `bunker.maxSpawnCount` limits how many bunkers can generate per world. Bunker structure templates are
 validated to ensure at least one cryo tube is present, and any missing tubes are restored after placement.
 
-Multiple meteor impact zones are generated the first time a new world loads, each roughly 1,000 chunks (16,000 blocks) apart to encourage long-range exploration. A single bunker is placed adjacent to one of these craters to serve as the player's first destination.
-Secret Order villages may rarely appear in jungle biomes, using the bundled structure template.
+Both the crater (`impact_zone`) and bunker structures are fully registered with template pools and structure sets under `data/wildernessodysseyapi/worldgen/`, so datapacks can override spacing, salts, or biome filters without code changes.
+
+A single meteor impact zone is generated near spawn, and one bunker is anchored a short distance from that crater (default ~8 chunks / 128 blocks away) so players can find shelter quickly without the structures overlapping. Secret Order villages may rarely appear in jungle biomes, using the bundled structure template.
 
 Using Data Pack Structures
 --------------------------
@@ -91,9 +92,9 @@ placed during world generation. If no data pack override exists, the bundled
 templates under `data/<namespace>/structures/` in the mod resources are used.
 
 For a datapack-only workflow that still keeps the wool height markers you
-mentioned, see `docs/impact-bunker-datapack.md`. It outlines how the mod's
-built-in three impact sites and nearby bunkers interact with your custom
-templates and how to space each cluster far apart without changing code.
+mentioned, see `docs/impact-bunker-datapack.md`. It outlines how the bundled
+impact site and nearby bunker interact with your custom templates and how to
+adjust spacing without changing code.
 
 The meteor impact site looks for the `wildernessodysseyapi:impact_zone`
 template. Drop your finished build at

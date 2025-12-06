@@ -37,9 +37,9 @@ import java.util.function.Supplier;
  * Handles initial meteor impact site and bunker placement when a world is created.
  */
 public class MeteorStructureSpawner {
-    private static final int IMPACT_SITE_COUNT = 3;
+    private static final int IMPACT_SITE_COUNT = 1;
     private static final int SPAWN_LAND_SEARCH_RADIUS = 256;
-    private static final int MIN_CHUNK_SEPARATION = 32;
+    private static final int MIN_CHUNK_SEPARATION = 8;
     private static final int MIN_BLOCK_SEPARATION = MIN_CHUNK_SEPARATION * 16;
     private static final int POSITION_ATTEMPTS = 64;
     private static final int MIN_POSITION_ATTEMPTS = 16;

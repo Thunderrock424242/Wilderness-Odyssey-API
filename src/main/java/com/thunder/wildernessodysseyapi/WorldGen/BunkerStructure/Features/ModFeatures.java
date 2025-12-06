@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Features;
 
+import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.placement.PlacementUtils;
@@ -23,13 +24,13 @@ public class ModFeatures {
     /** Registry for bunker feature */
     public static final DeferredRegister<Feature<?>> FEATURES = DeferredRegister.create(
             Registries.FEATURE,
-            "wildernessodyssey"
+            ModConstants.MOD_ID
     );
 
     /** Configured features */
     public static final DeferredRegister<ConfiguredFeature<?, ?>> CONFIGURED_FEATURES = DeferredRegister.create(
             Registries.CONFIGURED_FEATURE,
-            "wildernessodyssey"
+            ModConstants.MOD_ID
     );
 
     /**
@@ -37,7 +38,7 @@ public class ModFeatures {
      */
     public static final DeferredRegister<PlacedFeature> PLACED_FEATURES = DeferredRegister.create(
             Registries.PLACED_FEATURE,
-            "wildernessodyssey"
+            ModConstants.MOD_ID
     );
 
     /**
@@ -72,6 +73,6 @@ public class ModFeatures {
 // Expose CUSTOM_STRUCTURE_PLACED
     public static final ResourceKey<PlacedFeature> CUSTOM_STRUCTURE_PLACED_KEY = ResourceKey.create(
             Registries.PLACED_FEATURE,
-            Objects.requireNonNull(ResourceLocation.tryParse("wildernessodyssey:custom_structure"))
+            Objects.requireNonNull(ResourceLocation.tryParse(ModConstants.MOD_ID + ":custom_structure"))
     );
 }
