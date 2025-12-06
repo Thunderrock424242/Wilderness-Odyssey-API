@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Features;
 
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.placement.PlacementUtils;
 import net.minecraft.resources.ResourceKey;
@@ -60,7 +61,7 @@ public class ModFeatures {
     public static final DeferredHolder<PlacedFeature, PlacedFeature> CUSTOM_STRUCTURE_PLACED = PLACED_FEATURES.register(
             "custom_structure",
             () -> new PlacedFeature(
-                    CUSTOM_STRUCTURE.getHolder().orElseThrow(() -> new IllegalStateException("Custom structure not registered")),
+                    Holder.direct(CUSTOM_STRUCTURE.get()),
                     List.of(PlacementUtils.HEIGHTMAP_WORLD_SURFACE) // Define placement rules
             )
     );
