@@ -3,13 +3,13 @@ package com.thunder.wildernessodysseyapi.WorldGen.processor;
 import com.mojang.serialization.MapCodec;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceContext;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessor;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessorType;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 
 /**
@@ -26,9 +26,12 @@ public class TerrainSurveyProcessor extends StructureProcessor {
     }
 
     @Override
-    public StructureTemplate.StructureBlockInfo process(StructurePlaceContext context,
-                                                        StructureTemplate.StructureBlockInfo raw,
-                                                        StructureTemplate.StructureBlockInfo placed) {
+    public StructureTemplate.StructureBlockInfo processBlock(LevelReader level,
+                                                             BlockPos pos,
+                                                             BlockPos pivot,
+                                                             StructureTemplate.StructureBlockInfo raw,
+                                                             StructureTemplate.StructureBlockInfo placed,
+                                                             StructurePlaceSettings settings) {
         BlockState state = placed.state();
 
         // Remove wool survey pillars once the structure has been aligned to the terrain heightmap.
@@ -38,7 +41,6 @@ public class TerrainSurveyProcessor extends StructureProcessor {
 
         // Replace terrain markers with the local surface block to blend the footprint into the biome.
         if (state.is(TerrainReplacerBlock.TERRAIN_REPLACER.get())) {
-            LevelAccessor level = context.level();
             BlockPos target = placed.pos();
             int surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, target.getX(), target.getZ()) - 1;
             BlockPos surfacePos = new BlockPos(target.getX(), surfaceY, target.getZ());
