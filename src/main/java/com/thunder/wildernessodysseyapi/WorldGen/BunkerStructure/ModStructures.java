@@ -1,40 +1,48 @@
 package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure;
 
-import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
-import net.minecraft.world.level.levelgen.feature.Feature;
-import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
-import net.minecraft.world.level.levelgen.placement.PlacedFeature;
-import net.neoforged.neoforge.registries.DeferredHolder;
-import net.neoforged.neoforge.registries.DeferredRegister;
-
-import java.util.List;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureSet;
 
 /**
- * The type Mod structures.
+ * Data-driven structure registration helpers.
+ * <p>
+ * Minecraft 1.21+ loads structures entirely from data packs, so the bunker and impact zone
+ * structures are registered via JSON in {@code data/wildernessodysseyapi/worldgen/structure}
+ * and {@code data/wildernessodysseyapi/worldgen/structure_set}. No {@code DeferredRegister}
+ * or code-side registration is required when using the built-in {@code minecraft:jigsaw}
+ * structure type.
  */
-public class ModStructures {
-    /**
-     * The constant PLACED_FEATURES.
-     */
-    public static final DeferredRegister<PlacedFeature> PLACED_FEATURES = DeferredRegister.create(
-            Registries.PLACED_FEATURE,
-            "wildernessodyssey"
+public final class ModStructures {
+    /** Mod id used by the structure and structure set JSON files. */
+    public static final String MOD_ID = "wildernessodysseyapi";
+
+    /** Resource key for the bunker structure (data defined). */
+    public static final ResourceKey<Structure> BUNKER = ResourceKey.create(
+            Registries.STRUCTURE,
+            new ResourceLocation(MOD_ID, "bunker")
     );
 
-    /**
-     * The constant CUSTOM_STRUCTURE.
-     */
-// Register the custom BunkerStructure as a PlacedFeature
-    public static final DeferredHolder<PlacedFeature, PlacedFeature> CUSTOM_STRUCTURE = PLACED_FEATURES.register(
-            "custom_structure",
-            () -> new PlacedFeature(
-                    Holder.direct(new ConfiguredFeature<>(
-                            Feature.NO_OP, // Replace with your feature
-                            NoneFeatureConfiguration.INSTANCE
-                    )),
-                    List.of() // Placement modifiers (empty for now)
-            )
+    /** Resource key for the bunker structure set (data defined). */
+    public static final ResourceKey<StructureSet> BUNKER_SET = ResourceKey.create(
+            Registries.STRUCTURE_SET,
+            new ResourceLocation(MOD_ID, "bunker")
     );
+
+    /** Resource key for the impact zone structure (data defined). */
+    public static final ResourceKey<Structure> IMPACT_ZONE = ResourceKey.create(
+            Registries.STRUCTURE,
+            new ResourceLocation(MOD_ID, "impact_zone")
+    );
+
+    /** Resource key for the impact zone structure set (data defined). */
+    public static final ResourceKey<StructureSet> IMPACT_ZONE_SET = ResourceKey.create(
+            Registries.STRUCTURE_SET,
+            new ResourceLocation(MOD_ID, "impact_zone")
+    );
+
+    private ModStructures() {
+    }
 }

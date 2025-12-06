@@ -7,9 +7,9 @@
   "start_pool": "wildernessodysseyapi:impact_zone/start",
   "size": 1,
   "start_height": {
-    "type": "minecraft:heightmap",
-    "heightmap": "WORLD_SURFACE_WG"
+    "absolute": 0
   },
   "project_start_to_heightmap": "WORLD_SURFACE_WG",
-  "max_distance_from_center": 112
+  "max_distance_from_center": 112,
+  "use_expansion_hack": false
 }
