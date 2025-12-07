@@ -32,6 +32,10 @@ public class BunkerFeature extends Feature<NoneFeatureConfiguration> {
         LevelAccessor levelAccessor = context.level();
         if (!(levelAccessor instanceof ServerLevel level)) return false;
 
+        if (StructureConfig.DEBUG_DISABLE_BUNKER_SPAWNS.get()) {
+            return false;
+        }
+
         BlockPos origin = context.origin();
         StructureSpawnTracker tracker = StructureSpawnTracker.get(level);
 
