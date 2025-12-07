@@ -1,8 +1,7 @@
 {
-  "type": "neoforge:add_features",
+  "type": "neoforge:add_structures",
   "biomes": "#minecraft:is_overworld",
-  "features": [
+  "structures": [
     "wildernessodysseyapi:bunker"
-  ],
-  "step": "surface_structures"
+  ]
 }
