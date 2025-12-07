@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.client;
 
-import com.thunder.wildernessodysseyapi.ModConflictChecker.Util.LoggerUtil;
+import com.thunder.wildernessodysseyapi.ModPackPatches.ModConflictChecker.Util.LoggerUtil;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;

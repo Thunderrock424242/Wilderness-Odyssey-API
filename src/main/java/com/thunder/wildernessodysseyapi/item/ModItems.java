@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.item;
 
-import com.thunder.wildernessodysseyapi.cloak.CloakItem;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -17,11 +16,6 @@ public class ModItems {
      * The constant ITEMS.
      */
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MOD_ID);
-    /**
-     * Handheld cloak item used to toggle cloaking on allowed entities.
-     */
-    public static final DeferredItem<CloakItem> CLOAK_ITEM =
-            ITEMS.register("cloak_item", () -> new CloakItem(new Item.Properties().stacksTo(1)));
 
 
     // No standalone items needed, as the unbreakable block's BlockItem is automatically registered.

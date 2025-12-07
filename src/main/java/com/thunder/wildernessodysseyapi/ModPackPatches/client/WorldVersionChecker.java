@@ -3,7 +3,7 @@ package com.thunder.wildernessodysseyapi.ModPackPatches.client;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.thunder.wildernessodysseyapi.ModConflictChecker.Util.LoggerUtil;
+import com.thunder.wildernessodysseyapi.ModPackPatches.ModConflictChecker.Util.LoggerUtil;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;

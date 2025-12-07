@@ -2,7 +2,6 @@ package com.thunder.wildernessodysseyapi.Core;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.ModPackPatches.BugFixes.InfiniteSourceHandler;
-import com.thunder.wildernessodysseyapi.ErrorLog.UncaughtExceptionLogger;
 import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqReloadListener;
 import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCache;
@@ -10,8 +9,8 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheCommand
 import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheConfig;
 import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
-import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListDiffCommand;
-import com.thunder.wildernessodysseyapi.ModListTracker.commands.ModListVersionCommand;
+import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListDiffCommand;
+import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatOptToggleCommand;
 import com.thunder.wildernessodysseyapi.analytics.AnalyticsTracker;
@@ -34,13 +33,13 @@ import com.thunder.wildernessodysseyapi.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
-import com.thunder.wildernessodysseyapi.AI_story.AIChatListener;
+import com.thunder.wildernessodysseyapi.AI.AI_story.AIChatListener;
 import com.thunder.wildernessodysseyapi.AntiCheat.AntiCheatConfig;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
-import com.thunder.wildernessodysseyapi.AI_perf.requestperfadvice;
-import com.thunder.wildernessodysseyapi.AI_perf.PerformanceAdvisor;
-import com.thunder.wildernessodysseyapi.AI_perf.PerformanceAdvisoryRequest;
-import com.thunder.wildernessodysseyapi.AI_perf.PerformanceMitigationController;
+import com.thunder.wildernessodysseyapi.AI.AI_perf.requestperfadvice;
+import com.thunder.wildernessodysseyapi.AI.AI_perf.PerformanceAdvisor;
+import com.thunder.wildernessodysseyapi.AI.AI_perf.PerformanceAdvisoryRequest;
+import com.thunder.wildernessodysseyapi.AI.AI_perf.PerformanceMitigationController;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import net.minecraft.commands.CommandSourceStack;
@@ -165,7 +164,6 @@ public class WildernessOdysseyAPIMainModClass {
         });
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
-        UncaughtExceptionLogger.init();
         dynamicModCount = ModList.get().getMods().size();
     }
   

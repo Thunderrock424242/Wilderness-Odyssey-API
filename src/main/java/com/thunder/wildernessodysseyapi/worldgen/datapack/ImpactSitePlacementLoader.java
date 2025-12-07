@@ -15,6 +15,7 @@ import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -27,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class ImpactSitePlacementLoader extends SimpleJsonResourceReloadListener {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final String DIRECTORY = "impact_sites";
+    private static final String DIRECTORY = "impact_zone";
 
     private static final Map<ResourceKey<Level>, List<PlacementDefinition>> DEFINITIONS = new ConcurrentHashMap<>();
     private static volatile boolean loaded = false;
@@ -37,7 +38,7 @@ public class ImpactSitePlacementLoader extends SimpleJsonResourceReloadListener 
     }
 
     @Override
-    protected void apply(Map<ResourceLocation, JsonElement> entries, ResourceManager resourceManager, ProfilerFiller profiler) {
+    protected void apply(Map<ResourceLocation, JsonElement> entries, @NotNull ResourceManager resourceManager, @NotNull ProfilerFiller profiler) {
         DEFINITIONS.clear();
         loaded = false;
 

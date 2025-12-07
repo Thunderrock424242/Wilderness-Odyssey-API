@@ -2,7 +2,7 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.client;
 
 import com.mojang.realmsclient.RealmsMainScreen;
-import com.thunder.wildernessodysseyapi.ModConflictChecker.Util.LoggerUtil;
+import com.thunder.wildernessodysseyapi.ModPackPatches.ModConflictChecker.Util.LoggerUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.GenericMessageScreen;
 import net.minecraft.client.gui.screens.TitleScreen;

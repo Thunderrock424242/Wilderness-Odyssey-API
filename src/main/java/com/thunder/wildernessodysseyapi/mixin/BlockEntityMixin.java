@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.bridge.StructureBlockCornerCacheBridge;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.bridge.StructureBlockCornerCacheBridge;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.spongepowered.asm.mixin.Mixin;

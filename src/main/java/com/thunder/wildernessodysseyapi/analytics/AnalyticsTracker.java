@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.analytics;
 
 import com.sun.management.OperatingSystemMXBean;
-import com.thunder.wildernessodysseyapi.AI_perf.PerformanceAdvisor;
+import com.thunder.wildernessodysseyapi.AI.AI_perf.PerformanceAdvisor;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.Core.WildernessOdysseyAPIMainModClass;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;

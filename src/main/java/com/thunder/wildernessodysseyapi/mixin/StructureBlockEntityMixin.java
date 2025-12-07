@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.bridge.StructureBlockCornerCacheBridge;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.bridge.StructureBlockCornerCacheBridge;
 import com.thunder.wildernessodysseyapi.util.StructureBlockCornerCache;
 import com.thunder.wildernessodysseyapi.util.NbtCompressionUtils;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
