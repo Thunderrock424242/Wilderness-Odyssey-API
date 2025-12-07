@@ -20,7 +20,6 @@ import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Features.ModFeatures;
-import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.biome.ModBiomeModifiers;
 import com.thunder.wildernessodysseyapi.WorldGen.processor.ModProcessors;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
@@ -128,7 +127,6 @@ public class WildernessOdysseyAPIMainModClass {
         ModFeatures.FEATURES.register(modEventBus);
         ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
         ModFeatures.PLACED_FEATURES.register(modEventBus);
-        ModBiomeModifiers.BIOME_MODIFIERS.register(modEventBus);
         ModProcessors.PROCESSORS.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
 
