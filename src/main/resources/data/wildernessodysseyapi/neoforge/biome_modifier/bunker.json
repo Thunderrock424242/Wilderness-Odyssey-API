@@ -1,7 +1,0 @@
-{
-  "type": "neoforge:add_structures",
-  "biomes": "#minecraft:is_overworld",
-  "structures": [
-    "wildernessodysseyapi:bunker"
-  ]
-}
