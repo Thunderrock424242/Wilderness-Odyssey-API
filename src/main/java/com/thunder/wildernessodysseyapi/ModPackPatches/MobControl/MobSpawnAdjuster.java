@@ -35,7 +35,7 @@ public class MobSpawnAdjuster {
     public static void onSpawnPlacementCheck(SpawnPlacementCheck event) {
         // 1) Only throttle NATURAL spawns
         if (event.getSpawnType() != MobSpawnType.NATURAL) {
-            LOGGER.debug("Ignoring non-natural spawn type: {}", event.getSpawnType());
+            LOGGER.trace("Ignoring non-natural spawn type: {}", event.getSpawnType());
             return;
         }
 
@@ -43,7 +43,7 @@ public class MobSpawnAdjuster {
 
         // 2) Must be on the server side
         if (!(event.getLevel() instanceof ServerLevel world)) {
-            LOGGER.debug("Spawn event not on server level for entity: {}", type);
+            LOGGER.trace("Spawn event not on server level for entity: {}", type);
             return;
         }
 
@@ -56,7 +56,7 @@ public class MobSpawnAdjuster {
         // 4) Only for monsters
         if (type.getCategory() != MobCategory.MONSTER) {
             if (LOGGED_NON_MONSTERS.add(type)) {
-                LOGGER.debug("Ignoring non-monster entity: {}", type);
+                LOGGER.trace("Ignoring non-monster entity: {}", type);
             }
             return;
         }
