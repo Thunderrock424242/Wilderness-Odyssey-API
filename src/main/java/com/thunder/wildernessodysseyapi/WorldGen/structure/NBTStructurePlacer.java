@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.WorldGen.structure;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -61,7 +62,18 @@ public class NBTStructurePlacer {
             int x = origin.getX() + levelingOffset.getX();
             int z = origin.getZ() + levelingOffset.getZ();
             SurfaceSample sample = wildernessodysseyapi$findSurface(level, x, z);
-            placementOrigin = new BlockPos(origin.getX(), sample.y() - levelingOffset.getY(), origin.getZ());
+            int desiredY = sample.y() - levelingOffset.getY();
+            int maxDepth = StructureConfig.MAX_LEVELING_DEPTH.get();
+            if (maxDepth >= 0) {
+                int clampedY = Math.max(desiredY, sample.y() - maxDepth);
+                if (clampedY != desiredY) {
+                    ModConstants.LOGGER.warn("Clamping leveling depth for structure {}. Desired bury depth {} exceeds limit {} at marker {}.",
+                            id, sample.y() - desiredY, maxDepth, levelingOffset);
+                    desiredY = clampedY;
+                }
+            }
+
+            placementOrigin = new BlockPos(origin.getX(), desiredY, origin.getZ());
             levelingReplacement = sample.state();
         }
 
@@ -72,14 +84,21 @@ public class NBTStructurePlacer {
                     id, estimated, StructureUtils.STRUCTURE_BLOCK_LIMIT);
         }
 
-        List<BlockState> sampledTerrain = new ArrayList<>(data.terrainOffsets().size());
-        for (BlockPos offset : data.terrainOffsets()) {
-            BlockPos worldPos = placementOrigin.offset(offset);
-            BlockState state = level.getBlockState(worldPos);
-            if (state.isAir()) {
-                state = level.getBlockState(worldPos.below());
+        boolean enableTerrainReplacer = StructureConfig.ENABLE_TERRAIN_REPLACER.get();
+        List<BlockPos> terrainOffsets = enableTerrainReplacer ? data.terrainOffsets() : List.of();
+
+        List<BlockState> sampledTerrain = new ArrayList<>(terrainOffsets.size());
+        if (enableTerrainReplacer) {
+            for (BlockPos offset : terrainOffsets) {
+                BlockPos worldPos = placementOrigin.offset(offset);
+                BlockState state = level.getBlockState(worldPos);
+                if (state.isAir()) {
+                    state = level.getBlockState(worldPos.below());
+                }
+                sampledTerrain.add(state);
             }
-            sampledTerrain.add(state);
+        } else if (!data.terrainOffsets().isEmpty()) {
+            ModConstants.LOGGER.info("Terrain replacer markers are present in {} but replacement is disabled via config.", id);
         }
 
         StructurePlaceSettings settings = new StructurePlaceSettings();
@@ -88,8 +107,8 @@ public class NBTStructurePlacer {
             return null;
         }
 
-        for (int i = 0; i < data.terrainOffsets().size(); i++) {
-            BlockPos worldPos = placementOrigin.offset(data.terrainOffsets().get(i));
+        for (int i = 0; i < terrainOffsets.size(); i++) {
+            BlockPos worldPos = placementOrigin.offset(terrainOffsets.get(i));
             BlockState replacement = sampledTerrain.get(i);
             level.setBlock(worldPos, replacement, 2);
         }
@@ -138,7 +157,7 @@ public class NBTStructurePlacer {
         BlockPos levelingOffset = null;
         Vec3i size = template.getSize();
 
-        collectOffsets(template, cryoOffsets, terrainOffsets);
+        collectOffsets(template, cryoOffsets, terrainOffsets, size);
         levelingOffset = findLevelingOffset(template);
 
         TemplateData data = new TemplateData(template, List.copyOf(cryoOffsets), List.copyOf(terrainOffsets), size,
@@ -161,7 +180,8 @@ public class NBTStructurePlacer {
 
     private record SurfaceSample(int y, BlockState state) {}
 
-    private void collectOffsets(StructureTemplate template, List<BlockPos> cryoOffsets, List<BlockPos> terrainOffsets) {
+    private void collectOffsets(StructureTemplate template, List<BlockPos> cryoOffsets, List<BlockPos> terrainOffsets,
+                                Vec3i size) {
         StructurePlaceSettings identitySettings = new StructurePlaceSettings();
 
         Block cryoTube = resolveBlock(CRYO_TUBE_NAME, "cryo tube");
@@ -176,6 +196,28 @@ public class NBTStructurePlacer {
             for (StructureBlockInfo info : template.filterBlocks(BlockPos.ZERO, identitySettings, terrainReplacer)) {
                 terrainOffsets.add(info.pos());
             }
+
+            warnIfTerrainReplacerDominates(size, terrainOffsets.size());
+        }
+    }
+
+    private void warnIfTerrainReplacerDominates(Vec3i size, int terrainCount) {
+        if (terrainCount <= 0) {
+            return;
+        }
+
+        double volume = (double) size.getX() * size.getY() * size.getZ();
+        if (volume <= 0) {
+            return;
+        }
+
+        double ratio = terrainCount / volume;
+        double warningThreshold = StructureConfig.TERRAIN_REPLACER_WARNING_THRESHOLD.get();
+        if (ratio >= warningThreshold && warningThreshold > 0) {
+            double percent = Math.round(ratio * 10000.0D) / 100.0D;
+            ModConstants.LOGGER.warn(
+                    "Structure {} uses terrain replacer markers for {}% of its volume ({} of ~{} blocks).",
+                    id, percent, terrainCount, (int) volume);
         }
     }
 
