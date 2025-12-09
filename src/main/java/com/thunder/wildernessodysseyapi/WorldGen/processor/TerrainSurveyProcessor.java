@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.WorldGen.processor;
 
 import com.mojang.serialization.MapCodec;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
+import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Blocks;
@@ -40,6 +41,10 @@ public class TerrainSurveyProcessor extends StructureProcessor {
         }
 
         // Replace terrain markers with the local surface block to blend the footprint into the biome.
+        if (!StructureConfig.ENABLE_TERRAIN_REPLACER.get()) {
+            return placed;
+        }
+
         if (state.is(TerrainReplacerBlock.TERRAIN_REPLACER.get())) {
             BlockPos target = placed.pos();
             int surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, target.getX(), target.getZ()) - 1;
