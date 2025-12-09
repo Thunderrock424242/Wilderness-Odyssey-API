@@ -23,6 +23,12 @@ public class StructureConfig {
     public static final ModConfigSpec.BooleanValue DEBUG_DISABLE_BUNKER_SPAWNS;
     /** Debug toggle to skip meteor impact site placement */
     public static final ModConfigSpec.BooleanValue DEBUG_DISABLE_IMPACT_SITES;
+    /** Toggle for replacing terrain marker blocks with sampled terrain */
+    public static final ModConfigSpec.BooleanValue ENABLE_TERRAIN_REPLACER;
+    /** Warn when terrain replacer usage exceeds this fraction of the template volume */
+    public static final ModConfigSpec.DoubleValue TERRAIN_REPLACER_WARNING_THRESHOLD;
+    /** Maximum depth (blocks) the leveling marker may sit below the sampled surface; -1 disables clamping */
+    public static final ModConfigSpec.IntValue MAX_LEVELING_DEPTH;
 
     private static final HashMap<String, BooleanValue> STRUCTURES = new HashMap<>();
     private static final HashMap<String, BooleanValue> POIS = new HashMap<>();
@@ -49,6 +55,24 @@ public class StructureConfig {
                         "If true, meteor impact sites will not be generated."
                 )
                 .define("debugDisableImpactSites", false);
+        BUILDER.pop();
+
+        BUILDER.push("placement");
+        ENABLE_TERRAIN_REPLACER = BUILDER.comment(
+                        "If false, terrain replacer markers are ignored and left as-is when structures are placed."
+                )
+                .define("enableTerrainReplacer", true);
+        TERRAIN_REPLACER_WARNING_THRESHOLD = BUILDER.comment(
+                        "Warn when more than this fraction of a template's volume is tagged as terrain replacer blocks."
+                                + " Helps catch mistakenly-exported templates that would be overwritten by terrain."
+                )
+                .defineInRange("terrainReplacerWarningThreshold", 0.35D, 0.0D, 1.0D);
+        MAX_LEVELING_DEPTH = BUILDER.comment(
+                        "Maximum number of blocks the leveling marker may be placed below the sampled surface."
+                                + " Prevents tall templates from being buried when the blue wool marker sits high above the"
+                                + " intended ground contact point. Set to -1 to disable clamping."
+                )
+                .defineInRange("maxLevelingDepth", 12, -1, 256);
         BUILDER.pop();
 
         registerAll();
