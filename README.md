@@ -109,3 +109,5 @@ template data so datapacks can supply their own chest contents.
 World Generation Diagnostics
 --------------------------
 Use `/worldgenscan <radius>` to count nearby structures, features, and biomes and identify which mods add them.
+
+For a roadmap on chunk lifecycle, async I/O, and networking improvements, see `docs/chunk-system-improvements.md`.

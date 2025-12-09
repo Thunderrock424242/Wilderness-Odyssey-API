@@ -24,6 +24,7 @@ import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.command.AiAdvisorCommand;
 import com.thunder.wildernessodysseyapi.command.AsyncStatsCommand;
+import com.thunder.wildernessodysseyapi.command.ChunkStatsCommand;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.command.DoorLockCommand;
@@ -54,6 +55,9 @@ import net.minecraft.world.entity.MobCategory;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.datapack.ImpactSitePlacementLoader;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
+import com.thunder.wildernessodysseyapi.chunk.ChunkStreamManager;
+import com.thunder.wildernessodysseyapi.chunk.ChunkStreamingConfig;
+import com.thunder.wildernessodysseyapi.chunk.DiskChunkStorageAdapter;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.config.ModConfig;
@@ -77,6 +81,7 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraft.world.item.CreativeModeTabs;
 
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -95,6 +100,7 @@ public class WildernessOdysseyAPIMainModClass {
     private static final String CONFIG_FOLDER = ModConstants.MOD_ID + "/";
 
     private static AABB structureBoundingBox;
+    private Path chunkStorageRoot;
 
     private int serverTickCounter = 0;
     private static final int LOG_INTERVAL = 600;
@@ -147,6 +153,8 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-donations-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-async.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, ChunkStreamingConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-chunk-streaming.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, AntiCheatConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-anticheat-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,
@@ -181,6 +189,9 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStarting(ServerStartingEvent event){
         BunkerProtectionHandler.clear();
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
+        ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
+        chunkStorageRoot = event.getServer().getFile("config/" + CONFIG_FOLDER + "chunk-cache").toPath();
+        ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
         AnalyticsTracker.initialize(event.getServer(), event.getServer().getFile("config"));
     }
@@ -204,6 +215,7 @@ public class WildernessOdysseyAPIMainModClass {
         WorldGenScanCommand.register(event.getDispatcher());
         AiAdvisorCommand.register(event.getDispatcher());
         AsyncStatsCommand.register(dispatcher);
+        ChunkStatsCommand.register(dispatcher);
         AnalyticsCommand.register(dispatcher);
         GlobalChatCommand.register(dispatcher);
         GlobalChatOptToggleCommand.register(dispatcher);
@@ -248,6 +260,7 @@ public class WildernessOdysseyAPIMainModClass {
         globalChatManager.shutdown();
         BunkerProtectionHandler.clear();
         AsyncTaskManager.shutdown();
+        ChunkStreamManager.shutdown();
         AnalyticsTracker.shutdown();
     }
 
@@ -269,6 +282,9 @@ public class WildernessOdysseyAPIMainModClass {
         }
         lastTickTimeNanos = now;
         AsyncTaskManager.drainMainThreadQueue(server);
+        if (server.overworld() != null) {
+            ChunkStreamManager.tick(server.overworld().getGameTime());
+        }
         PerformanceMitigationController.tick(server);
         DeferredTaskScheduler.tick();
         if (!event.hasTime()) return;
@@ -306,6 +322,10 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
             AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         }
+        if (event.getConfig().getSpec() == ChunkStreamingConfig.CONFIG_SPEC && chunkStorageRoot != null) {
+            ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
+            ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
+        }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
         }
@@ -317,6 +337,10 @@ public class WildernessOdysseyAPIMainModClass {
         }
         if (event.getConfig().getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
             AsyncTaskManager.initialize(AsyncThreadingConfig.values());
+        }
+        if (event.getConfig().getSpec() == ChunkStreamingConfig.CONFIG_SPEC && chunkStorageRoot != null) {
+            ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
+            ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
         }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
