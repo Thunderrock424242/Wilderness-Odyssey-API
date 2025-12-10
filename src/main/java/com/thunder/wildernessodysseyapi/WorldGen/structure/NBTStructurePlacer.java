@@ -55,6 +55,11 @@ public class NBTStructurePlacer {
             return null;
         }
 
+        if (!data.hasStructureBlocks()) {
+            ModConstants.LOGGER.warn("Skipping placement for {} because the template contains no structure blocks.", id);
+            return null;
+        }
+
         BlockPos placementOrigin = origin;
         BlockState levelingReplacement = null;
         BlockPos levelingOffset = data.levelingOffset();
@@ -166,12 +171,14 @@ public class NBTStructurePlacer {
         BlockPos levelingOffset = null;
         Vec3i size = template.getSize();
 
-        boolean disableTerrainReplacement = collectOffsets(template, cryoOffsets, terrainOffsets, size);
+        CollectionResult collectionResult = collectOffsets(template, cryoOffsets, terrainOffsets, size);
+        boolean disableTerrainReplacement = collectionResult.disableTerrainReplacement();
+        boolean hasStructureBlocks = collectionResult.hasStructureBlocks();
         LevelingMarkerData levelingData = findLevelingMarker(template);
         levelingOffset = levelingData.offset();
 
         TemplateData data = new TemplateData(template, List.copyOf(cryoOffsets), List.copyOf(terrainOffsets), size,
-                levelingOffset, disableTerrainReplacement, levelingData.present());
+                levelingOffset, disableTerrainReplacement, levelingData.present(), hasStructureBlocks);
         cachedData = data;
         return data;
     }
@@ -188,14 +195,17 @@ public class NBTStructurePlacer {
                                 Vec3i size,
                                 BlockPos levelingOffset,
                                 boolean disableTerrainReplacement,
-                                boolean hasMarkerWool) {}
+                                boolean hasMarkerWool,
+                                boolean hasStructureBlocks) {}
+
+    private record CollectionResult(boolean disableTerrainReplacement, boolean hasStructureBlocks) {}
 
     private record LevelingMarkerData(BlockPos offset, boolean present) {}
 
     private record SurfaceSample(int y, BlockState state) {}
 
-    private boolean collectOffsets(StructureTemplate template, List<BlockPos> cryoOffsets, List<BlockPos> terrainOffsets,
-                                   Vec3i size) {
+    private CollectionResult collectOffsets(StructureTemplate template, List<BlockPos> cryoOffsets, List<BlockPos> terrainOffsets,
+                                            Vec3i size) {
         StructurePlaceSettings identitySettings = new StructurePlaceSettings();
 
         boolean disableTerrainReplacement = false;
@@ -216,7 +226,17 @@ public class NBTStructurePlacer {
             disableTerrainReplacement = warnIfTerrainReplacerDominates(size, terrainOffsets.size());
         }
 
-        return disableTerrainReplacement;
+        boolean hasStructureBlocks = template.filterBlocks(BlockPos.ZERO, identitySettings, info -> true)
+                .stream()
+                .map(StructureBlockInfo::state)
+                .map(BlockState::getBlock)
+                .anyMatch(block -> block != Blocks.AIR
+                        && block != Blocks.BLUE_WOOL
+                        && block != terrainReplacer
+                        && block != cryoTube
+                        && block != Blocks.STRUCTURE_VOID);
+
+        return new CollectionResult(disableTerrainReplacement, hasStructureBlocks);
     }
 
     private boolean warnIfTerrainReplacerDominates(Vec3i size, int terrainCount) {
