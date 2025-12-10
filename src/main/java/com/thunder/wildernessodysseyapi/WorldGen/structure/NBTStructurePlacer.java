@@ -2,6 +2,10 @@ package com.thunder.wildernessodysseyapi.WorldGen.structure;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.StructurePlacementDebugger.PlacementAttempt;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine.SurfaceSample;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine.TerrainReplacementPlan;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -10,7 +14,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
@@ -49,63 +52,47 @@ public class NBTStructurePlacer {
      * @return placement result containing bounds and cryo tube positions, or {@code null} on failure
      */
     public PlacementResult place(ServerLevel level, BlockPos origin) {
+        return place(level, origin, null);
+    }
+
+    /**
+     * Places the structure and reports progress to the provided debug attempt when available.
+     */
+    public PlacementResult place(ServerLevel level, BlockPos origin, PlacementAttempt debugAttempt) {
         TemplateData data = load(level);
         if (data == null) {
+            StructurePlacementDebugger.markFailure(debugAttempt, "template missing");
             return null;
         }
 
+        PlacementAttempt attempt = debugAttempt != null
+                ? debugAttempt
+                : StructurePlacementDebugger.startAttempt(level, id, data.size(), origin);
+
         if (!data.hasStructureBlocks()) {
+            StructurePlacementDebugger.markFailure(attempt, "template is empty");
             ModConstants.LOGGER.warn("Skipping placement for {} because the template contains no structure blocks.", id);
             return null;
         }
 
-        BlockPos placementOrigin = origin;
-        BlockState levelingReplacement = null;
-        BlockPos levelingOffset = data.levelingOffset();
-        if (levelingOffset != null) {
-            int x = origin.getX() + levelingOffset.getX();
-            int z = origin.getZ() + levelingOffset.getZ();
-            SurfaceSample sample = wildernessodysseyapi$findSurface(level, x, z);
-            int desiredY = sample.y() - levelingOffset.getY();
-            int maxDepth = StructureConfig.MAX_LEVELING_DEPTH.get();
-            if (maxDepth >= 0) {
-                int clampedY = Math.max(desiredY, sample.y() - maxDepth);
-                if (clampedY != desiredY) {
-                    ModConstants.LOGGER.warn("Clamping leveling depth for structure {}. Desired bury depth {} exceeds limit {} at marker {}.",
-                            id, sample.y() - desiredY, maxDepth, levelingOffset);
-                    desiredY = clampedY;
-                }
-            }
-
-            placementOrigin = new BlockPos(origin.getX(), desiredY, origin.getZ());
-            levelingReplacement = sample.state();
+        PlacementFoundation foundation = resolvePlacementOrigin(level, origin, data.levelingOffset());
+        if (foundation == null) {
+            StructurePlacementDebugger.markFailure(attempt, "unable to find terrain anchor");
+            return null;
         }
 
-        LargeStructurePlacementOptimizer.preparePlacement(level, placementOrigin, data.size());
+        LargeStructurePlacementOptimizer.preparePlacement(level, foundation.origin(), data.size());
         if (LargeStructurePlacementOptimizer.exceedsStructureBlockLimit(data.size())) {
             int estimated = LargeStructurePlacementOptimizer.estimateAffectedBlocks(data.size());
             ModConstants.LOGGER.warn("Placing structure {} will touch approximately {} blocks, exceeding the recommended limit of {}.",
                     id, estimated, StructureUtils.STRUCTURE_BLOCK_LIMIT);
         }
 
-        boolean terrainReplacerEnabledInConfig = StructureConfig.ENABLE_TERRAIN_REPLACER.get();
-        boolean enableTerrainReplacer = terrainReplacerEnabledInConfig
-                && !data.disableTerrainReplacement()
-                && data.hasMarkerWool();
-        List<BlockPos> terrainOffsets = enableTerrainReplacer ? data.terrainOffsets() : List.of();
-
-        List<BlockState> sampledTerrain = new ArrayList<>(terrainOffsets.size());
-        if (enableTerrainReplacer) {
-            for (BlockPos offset : terrainOffsets) {
-                BlockPos worldPos = placementOrigin.offset(offset);
-                BlockState state = level.getBlockState(worldPos);
-                if (state.isAir()) {
-                    state = level.getBlockState(worldPos.below());
-                }
-                sampledTerrain.add(state);
-            }
-        } else if (!data.terrainOffsets().isEmpty()) {
-            if (!terrainReplacerEnabledInConfig) {
+        boolean enableTerrainReplacer = shouldEnableTerrainReplacer(data);
+        TerrainReplacementPlan replacementPlan = TerrainReplacerEngine.planReplacement(
+                level, foundation.origin(), data.terrainOffsets(), enableTerrainReplacer);
+        if (!replacementPlan.enabled() && !data.terrainOffsets().isEmpty()) {
+            if (!StructureConfig.ENABLE_TERRAIN_REPLACER.get()) {
                 ModConstants.LOGGER.info("Terrain replacer markers are present in {} but replacement is disabled via config.", id);
             } else if (!data.hasMarkerWool()) {
                 ModConstants.LOGGER.info("Terrain replacer markers are present in {} but no wool markers were found; skipping replacement.", id);
@@ -115,31 +102,84 @@ public class NBTStructurePlacer {
         }
 
         StructurePlaceSettings settings = new StructurePlaceSettings();
-        boolean placed = data.template().placeInWorld(level, placementOrigin, placementOrigin, settings, level.random, 2);
+        boolean placed = data.template().placeInWorld(level, foundation.origin(), foundation.origin(), settings, level.random, 2);
         if (!placed) {
+            StructurePlacementDebugger.markFailure(attempt, "template refused placement");
             return null;
         }
 
-        for (int i = 0; i < terrainOffsets.size(); i++) {
-            BlockPos worldPos = placementOrigin.offset(terrainOffsets.get(i));
-            BlockState replacement = sampledTerrain.get(i);
-            level.setBlock(worldPos, replacement, 2);
-        }
+        int replaced = applyTerrainReplacement(level, foundation.origin(), data.terrainOffsets(), replacementPlan);
 
-        if (levelingOffset != null && levelingReplacement != null) {
-            BlockPos markerWorldPos = placementOrigin.offset(levelingOffset);
-            level.setBlock(markerWorldPos, levelingReplacement, 2);
+        if (data.levelingOffset() != null && foundation.levelingReplacement() != null) {
+            BlockPos markerWorldPos = foundation.origin().offset(data.levelingOffset());
+            level.setBlock(markerWorldPos, foundation.levelingReplacement(), 2);
         }
 
         Vec3i size = data.size();
-        AABB bounds = LargeStructurePlacementOptimizer.createBounds(placementOrigin, size);
-        List<AABB> chunkSlices = LargeStructurePlacementOptimizer.computeChunkSlices(placementOrigin, size);
+        AABB bounds = LargeStructurePlacementOptimizer.createBounds(foundation.origin(), size);
+        List<AABB> chunkSlices = LargeStructurePlacementOptimizer.computeChunkSlices(foundation.origin(), size);
 
         List<BlockPos> cryoPositions = data.cryoOffsets().stream()
-                .map(placementOrigin::offset)
+                .map(foundation.origin()::offset)
                 .toList();
 
+        StructurePlacementDebugger.markSuccess(attempt,
+                "placed with %s terrain samples and %s cryo tubes".formatted(replaced, cryoPositions.size()));
+
         return new PlacementResult(bounds, cryoPositions, List.copyOf(chunkSlices));
+    }
+
+    /** Returns the template id used by this placer. */
+    public ResourceLocation id() {
+        return id;
+    }
+
+    /** Returns the template size if known, or {@link Vec3i#ZERO} when loading failed. */
+    public Vec3i peekSize(ServerLevel level) {
+        TemplateData data = load(level);
+        return data == null ? Vec3i.ZERO : data.size();
+    }
+
+    private PlacementFoundation resolvePlacementOrigin(ServerLevel level, BlockPos origin, BlockPos levelingOffset) {
+        if (levelingOffset == null) {
+            return new PlacementFoundation(origin, null);
+        }
+
+        SurfaceSample sample = TerrainReplacerEngine.sampleSurface(level, origin.offset(levelingOffset.getX(), 0, levelingOffset.getZ()));
+        int desiredY = sample.y() - levelingOffset.getY();
+        int maxDepth = StructureConfig.MAX_LEVELING_DEPTH.get();
+        if (maxDepth >= 0) {
+            int clampedY = Math.max(desiredY, sample.y() - maxDepth);
+            if (clampedY != desiredY) {
+                ModConstants.LOGGER.warn("Clamping leveling depth for structure {}. Desired bury depth {} exceeds limit {} at marker {}.",
+                        id, sample.y() - desiredY, maxDepth, levelingOffset);
+                desiredY = clampedY;
+            }
+        }
+
+        BlockPos placementOrigin = new BlockPos(origin.getX(), desiredY, origin.getZ());
+        return new PlacementFoundation(placementOrigin, sample.state());
+    }
+
+    private boolean shouldEnableTerrainReplacer(TemplateData data) {
+        return StructureConfig.ENABLE_TERRAIN_REPLACER.get()
+                && !data.disableTerrainReplacement()
+                && data.hasMarkerWool();
+    }
+
+    private int applyTerrainReplacement(ServerLevel level, BlockPos origin, List<BlockPos> offsets, TerrainReplacementPlan plan) {
+        if (!plan.enabled()) {
+            return 0;
+        }
+
+        int applied = 0;
+        for (int i = 0; i < offsets.size() && i < plan.samples().size(); i++) {
+            BlockPos worldPos = origin.offset(offsets.get(i));
+            level.setBlock(worldPos, plan.samples().get(i), 2);
+            applied++;
+        }
+
+        return applied;
     }
 
     /**
@@ -201,7 +241,7 @@ public class NBTStructurePlacer {
 
     private record LevelingMarkerData(BlockPos offset, boolean present) {}
 
-    private record SurfaceSample(int y, BlockState state) {}
+    private record PlacementFoundation(BlockPos origin, BlockState levelingReplacement) {}
 
     private CollectionResult collectOffsets(StructureTemplate template, List<BlockPos> cryoOffsets, List<BlockPos> terrainOffsets,
                                             Vec3i size) {
@@ -303,20 +343,4 @@ public class NBTStructurePlacer {
         return block;
     }
 
-    private SurfaceSample wildernessodysseyapi$findSurface(ServerLevel level, int x, int z) {
-        int topY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
-        int minY = level.getMinBuildHeight();
-        int maxY = Math.min(topY, level.getMaxBuildHeight() - 1);
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos(x, maxY, z);
-
-        for (int y = maxY; y >= minY; y--) {
-            cursor.setY(y);
-            BlockState state = level.getBlockState(cursor);
-            if (!state.isAir()) {
-                return new SurfaceSample(y, state);
-            }
-        }
-
-        return new SurfaceSample(topY, Blocks.AIR.defaultBlockState());
-    }
 }

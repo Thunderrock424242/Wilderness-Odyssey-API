@@ -3,11 +3,11 @@ package com.thunder.wildernessodysseyapi.WorldGen.processor;
 import com.mojang.serialization.MapCodec;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessor;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessorType;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
@@ -46,20 +46,8 @@ public class TerrainSurveyProcessor extends StructureProcessor {
         }
 
         if (state.is(TerrainReplacerBlock.TERRAIN_REPLACER.get())) {
-            BlockPos target = placed.pos();
-            int surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, target.getX(), target.getZ()) - 1;
-            BlockPos surfacePos = new BlockPos(target.getX(), surfaceY, target.getZ());
-            BlockState sampled = level.getBlockState(surfacePos);
-
-            if (sampled.isAir() && surfaceY > level.getMinBuildHeight()) {
-                sampled = level.getBlockState(surfacePos.below());
-            }
-
-            if (sampled.isAir()) {
-                sampled = Blocks.DIRT.defaultBlockState();
-            }
-
-            return new StructureTemplate.StructureBlockInfo(target, sampled, placed.nbt());
+            BlockState sampled = TerrainReplacerEngine.sampleSurfaceBlock(level, placed.pos());
+            return new StructureTemplate.StructureBlockInfo(placed.pos(), sampled, placed.nbt());
         }
 
         return placed;
