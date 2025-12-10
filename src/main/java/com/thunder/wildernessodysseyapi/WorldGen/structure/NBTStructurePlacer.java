@@ -84,7 +84,10 @@ public class NBTStructurePlacer {
                     id, estimated, StructureUtils.STRUCTURE_BLOCK_LIMIT);
         }
 
-        boolean enableTerrainReplacer = StructureConfig.ENABLE_TERRAIN_REPLACER.get();
+        boolean terrainReplacerEnabledInConfig = StructureConfig.ENABLE_TERRAIN_REPLACER.get();
+        boolean enableTerrainReplacer = terrainReplacerEnabledInConfig
+                && !data.disableTerrainReplacement()
+                && data.hasMarkerWool();
         List<BlockPos> terrainOffsets = enableTerrainReplacer ? data.terrainOffsets() : List.of();
 
         List<BlockState> sampledTerrain = new ArrayList<>(terrainOffsets.size());
@@ -98,7 +101,13 @@ public class NBTStructurePlacer {
                 sampledTerrain.add(state);
             }
         } else if (!data.terrainOffsets().isEmpty()) {
-            ModConstants.LOGGER.info("Terrain replacer markers are present in {} but replacement is disabled via config.", id);
+            if (!terrainReplacerEnabledInConfig) {
+                ModConstants.LOGGER.info("Terrain replacer markers are present in {} but replacement is disabled via config.", id);
+            } else if (!data.hasMarkerWool()) {
+                ModConstants.LOGGER.info("Terrain replacer markers are present in {} but no wool markers were found; skipping replacement.", id);
+            } else {
+                ModConstants.LOGGER.info("Terrain replacer markers are present in {} but replacement is disabled due to template safety checks.", id);
+            }
         }
 
         StructurePlaceSettings settings = new StructurePlaceSettings();
@@ -157,11 +166,12 @@ public class NBTStructurePlacer {
         BlockPos levelingOffset = null;
         Vec3i size = template.getSize();
 
-        collectOffsets(template, cryoOffsets, terrainOffsets, size);
-        levelingOffset = findLevelingOffset(template);
+        boolean disableTerrainReplacement = collectOffsets(template, cryoOffsets, terrainOffsets, size);
+        LevelingMarkerData levelingData = findLevelingMarker(template);
+        levelingOffset = levelingData.offset();
 
         TemplateData data = new TemplateData(template, List.copyOf(cryoOffsets), List.copyOf(terrainOffsets), size,
-                levelingOffset);
+                levelingOffset, disableTerrainReplacement, levelingData.present());
         cachedData = data;
         return data;
     }
@@ -176,13 +186,19 @@ public class NBTStructurePlacer {
                                 List<BlockPos> cryoOffsets,
                                 List<BlockPos> terrainOffsets,
                                 Vec3i size,
-                                BlockPos levelingOffset) {}
+                                BlockPos levelingOffset,
+                                boolean disableTerrainReplacement,
+                                boolean hasMarkerWool) {}
+
+    private record LevelingMarkerData(BlockPos offset, boolean present) {}
 
     private record SurfaceSample(int y, BlockState state) {}
 
-    private void collectOffsets(StructureTemplate template, List<BlockPos> cryoOffsets, List<BlockPos> terrainOffsets,
-                                Vec3i size) {
+    private boolean collectOffsets(StructureTemplate template, List<BlockPos> cryoOffsets, List<BlockPos> terrainOffsets,
+                                   Vec3i size) {
         StructurePlaceSettings identitySettings = new StructurePlaceSettings();
+
+        boolean disableTerrainReplacement = false;
 
         Block cryoTube = resolveBlock(CRYO_TUBE_NAME, "cryo tube");
         if (cryoTube != Blocks.AIR) {
@@ -197,18 +213,20 @@ public class NBTStructurePlacer {
                 terrainOffsets.add(info.pos());
             }
 
-            warnIfTerrainReplacerDominates(size, terrainOffsets.size());
+            disableTerrainReplacement = warnIfTerrainReplacerDominates(size, terrainOffsets.size());
         }
+
+        return disableTerrainReplacement;
     }
 
-    private void warnIfTerrainReplacerDominates(Vec3i size, int terrainCount) {
+    private boolean warnIfTerrainReplacerDominates(Vec3i size, int terrainCount) {
         if (terrainCount <= 0) {
-            return;
+            return false;
         }
 
         double volume = (double) size.getX() * size.getY() * size.getZ();
         if (volume <= 0) {
-            return;
+            return false;
         }
 
         double ratio = terrainCount / volume;
@@ -218,16 +236,21 @@ public class NBTStructurePlacer {
             ModConstants.LOGGER.warn(
                     "Structure {} uses terrain replacer markers for {}% of its volume ({} of ~{} blocks).",
                     id, percent, terrainCount, (int) volume);
+            ModConstants.LOGGER.warn(
+                    "Skipping terrain replacement for {} to avoid filling the template with sampled ground blocks.", id);
+            return true;
         }
+
+        return false;
     }
 
-    private BlockPos findLevelingOffset(StructureTemplate template) {
+    private LevelingMarkerData findLevelingMarker(StructureTemplate template) {
         // Multiple wool markers can exist in a template; prefer the deepest one to better match terrain when
         // burying the structure, and fall back to the closest-to-center marker to avoid edge anchors.
         StructurePlaceSettings identitySettings = new StructurePlaceSettings();
         List<StructureBlockInfo> markers = template.filterBlocks(BlockPos.ZERO, identitySettings, Blocks.BLUE_WOOL);
         if (markers.isEmpty()) {
-            return null;
+            return new LevelingMarkerData(null, false);
         }
 
         Vec3i size = template.getSize();
@@ -250,7 +273,8 @@ public class NBTStructurePlacer {
                     return Double.compare(aDist, bDist);
                 })
                 .map(StructureBlockInfo::pos)
-                .orElse(null);
+                .map(pos -> new LevelingMarkerData(pos, true))
+                .orElse(new LevelingMarkerData(null, true));
     }
 
     private Block resolveBlock(String name, String description) {
