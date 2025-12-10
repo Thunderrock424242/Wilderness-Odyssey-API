@@ -23,6 +23,8 @@ public class StructureConfig {
     public static final ModConfigSpec.BooleanValue DEBUG_DISABLE_BUNKER_SPAWNS;
     /** Debug toggle to skip meteor impact site placement */
     public static final ModConfigSpec.BooleanValue DEBUG_DISABLE_IMPACT_SITES;
+    /** Emit detailed structure placement logs and retain a short history for debugging. */
+    public static final ModConfigSpec.BooleanValue DEBUG_LOG_PLACEMENTS;
     /** Toggle for replacing terrain marker blocks with sampled terrain */
     public static final ModConfigSpec.BooleanValue ENABLE_TERRAIN_REPLACER;
     /** Warn when terrain replacer usage exceeds this fraction of the template volume */
@@ -55,6 +57,13 @@ public class StructureConfig {
                         "If true, meteor impact sites will not be generated."
                 )
                 .define("debugDisableImpactSites", false);
+        BUILDER.pop();
+
+        BUILDER.push("debug");
+        DEBUG_LOG_PLACEMENTS = BUILDER.comment(
+                        "If true, every structure placement attempt is recorded and logged for troubleshooting."
+                )
+                .define("debugLogPlacements", false);
         BUILDER.pop();
 
         BUILDER.push("placement");

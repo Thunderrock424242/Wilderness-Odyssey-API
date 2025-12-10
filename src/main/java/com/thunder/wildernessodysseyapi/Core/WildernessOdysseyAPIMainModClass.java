@@ -29,6 +29,7 @@ import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.command.DoorLockCommand;
 import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
+import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
@@ -213,6 +214,7 @@ public class WildernessOdysseyAPIMainModClass {
         DonateCommand.register(event.getDispatcher());
         DoorLockCommand.register(event.getDispatcher());
         WorldGenScanCommand.register(event.getDispatcher());
+        StructurePlacementDebugCommand.register(event.getDispatcher());
         AiAdvisorCommand.register(event.getDispatcher());
         AsyncStatsCommand.register(dispatcher);
         ChunkStatsCommand.register(dispatcher);
