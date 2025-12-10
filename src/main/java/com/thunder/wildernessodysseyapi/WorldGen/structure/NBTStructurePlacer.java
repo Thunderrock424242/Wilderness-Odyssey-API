@@ -20,7 +20,6 @@ import net.minecraft.world.phys.AABB;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Places vanilla structure templates loaded from NBT files and exposes metadata used by the mod.
