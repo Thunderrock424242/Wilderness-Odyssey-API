@@ -190,7 +190,7 @@ public class WildernessOdysseyAPIMainModClass {
         BunkerProtectionHandler.clear();
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
-        chunkStorageRoot = event.getServer().getFile("config/" + CONFIG_FOLDER + "chunk-cache").toPath();
+        chunkStorageRoot = event.getServer().getFile("config/" + CONFIG_FOLDER + "chunk-cache");
         ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
         AnalyticsTracker.initialize(event.getServer(), event.getServer().getFile("config"));
