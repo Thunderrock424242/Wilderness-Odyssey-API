@@ -226,15 +226,7 @@ public class NBTStructurePlacer {
             disableTerrainReplacement = warnIfTerrainReplacerDominates(size, terrainOffsets.size());
         }
 
-        boolean hasStructureBlocks = template.filterBlocks(BlockPos.ZERO, identitySettings, info -> true)
-                .stream()
-                .map(StructureBlockInfo::state)
-                .map(BlockState::getBlock)
-                .anyMatch(block -> block != Blocks.AIR
-                        && block != Blocks.BLUE_WOOL
-                        && block != terrainReplacer
-                        && block != cryoTube
-                        && block != Blocks.STRUCTURE_VOID);
+        boolean hasStructureBlocks = size.getX() > 0 && size.getY() > 0 && size.getZ() > 0;
 
         return new CollectionResult(disableTerrainReplacement, hasStructureBlocks);
     }
