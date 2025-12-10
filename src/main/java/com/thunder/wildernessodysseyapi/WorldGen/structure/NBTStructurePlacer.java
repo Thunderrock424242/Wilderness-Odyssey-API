@@ -124,7 +124,7 @@ public class NBTStructurePlacer {
 
         List<BlockPos> cryoPositions = data.cryoOffsets().stream()
                 .map(placementOrigin::offset)
-                .collect(Collectors.toUnmodifiableList());
+                .toList();
 
         return new PlacementResult(bounds, cryoPositions, List.copyOf(chunkSlices));
     }
