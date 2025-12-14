@@ -107,7 +107,7 @@ public class NBTStructurePlacer {
                 // Supplying the bounds up-front prevents the vanilla placer from bailing out when it cannot
                 // infer them (which resulted in the template refusing to place while terrain markers still
                 // ran).
-                .setBoundingBox(LargeStructurePlacementOptimizer.createBounds(foundation.origin(), data.size()));
+                .setBoundingBox(LargeStructurePlacementOptimizer.createPlacementBox(foundation.origin(), data.size()));
         boolean placed = data.template().placeInWorld(level, foundation.origin(), foundation.origin(), settings, level.random, 2);
         if (!placed) {
             StructurePlacementDebugger.markFailure(attempt, "template refused placement");
