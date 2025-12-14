@@ -70,7 +70,7 @@ public class StructureConfig {
         ENABLE_TERRAIN_REPLACER = BUILDER.comment(
                         "If false, terrain replacer markers are ignored and left as-is when structures are placed."
                 )
-                .define("enableTerrainReplacer", true);
+                .define("enableTerrainReplacer", false);
         TERRAIN_REPLACER_WARNING_THRESHOLD = BUILDER.comment(
                         "Warn when more than this fraction of a template's volume is tagged as terrain replacer blocks."
                                 + " Helps catch mistakenly-exported templates that would be overwritten by terrain."
