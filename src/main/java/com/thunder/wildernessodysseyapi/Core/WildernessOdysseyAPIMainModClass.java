@@ -53,6 +53,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.levelgen.GenerationStep;
 import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
 import com.thunder.wildernessodysseyapi.WorldGen.datapack.ImpactSitePlacementLoader;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
@@ -64,6 +66,7 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.level.BiomeLoadingEvent;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -195,6 +198,21 @@ public class WildernessOdysseyAPIMainModClass {
         ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
         AnalyticsTracker.initialize(event.getServer(), event.getServer().getFile("config"));
+    }
+
+    /**
+     * Inject bunker placement into overworld biomes while biome modifiers are unavailable.
+     */
+    @SubscribeEvent
+    public void addBunkerToBiomes(BiomeLoadingEvent event) {
+        Biome.BiomeCategory category = event.getCategory();
+        if (category == Biome.BiomeCategory.NETHER || category == Biome.BiomeCategory.THEEND) {
+            return;
+        }
+
+        ModFeatures.BUNKER_PLACED.getHolder().ifPresent(feature ->
+                event.getGeneration().addFeature(GenerationStep.Decoration.SURFACE_STRUCTURES, feature)
+        );
     }
 
     /**
