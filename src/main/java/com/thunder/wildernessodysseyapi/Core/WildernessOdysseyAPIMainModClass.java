@@ -30,6 +30,7 @@ import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.command.DoorLockCommand;
 import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
+import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
 import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
@@ -44,6 +45,8 @@ import com.thunder.wildernessodysseyapi.AI.AI_perf.PerformanceAdvisoryRequest;
 import com.thunder.wildernessodysseyapi.AI.AI_perf.PerformanceMitigationController;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
+import com.thunder.wildernessodysseyapi.tide.TideConfig;
+import com.thunder.wildernessodysseyapi.tide.TideManager;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -160,6 +163,8 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-anticheat-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TideConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-tides-server.toml");
         // Previously registered client-only events have been removed
         DonationReminderConfig.validateVersion();
 
@@ -221,6 +226,7 @@ public class WildernessOdysseyAPIMainModClass {
         AnalyticsCommand.register(dispatcher);
         GlobalChatCommand.register(dispatcher);
         GlobalChatOptToggleCommand.register(dispatcher);
+        TideInfoCommand.register(dispatcher);
     }
 
     /**
@@ -331,6 +337,9 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
         }
+        if (event.getConfig().getSpec() == TideConfig.CONFIG_SPEC) {
+            TideManager.reloadConfig();
+        }
     }
 
     public void onConfigReloaded(ModConfigEvent.Reloading event) {
@@ -346,6 +355,9 @@ public class WildernessOdysseyAPIMainModClass {
         }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
+        }
+        if (event.getConfig().getSpec() == TideConfig.CONFIG_SPEC) {
+            TideManager.reloadConfig();
         }
     }
 }
