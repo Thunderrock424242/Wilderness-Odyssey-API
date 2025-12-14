@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.WorldGen.structure;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.AABB;
 
 import java.util.ArrayList;
@@ -55,6 +56,19 @@ public final class LargeStructurePlacementOptimizer {
         return new AABB(
                 origin.getX(), origin.getY(), origin.getZ(),
                 max.getX() + 1, max.getY() + 1, max.getZ() + 1
+        );
+    }
+
+    /**
+     * Computes the levelgen {@link BoundingBox} occupied by a structure that starts at {@code origin}.
+     * The resulting bounds are inclusive of all blocks touched by the template and mirror the extents
+     * used by {@link #createBounds(BlockPos, Vec3i)}.
+     */
+    public static BoundingBox createPlacementBox(BlockPos origin, Vec3i size) {
+        BlockPos max = origin.offset(Math.max(0, size.getX() - 1), Math.max(0, size.getY() - 1), Math.max(0, size.getZ() - 1));
+        return new BoundingBox(
+                origin.getX(), origin.getY(), origin.getZ(),
+                max.getX(), max.getY(), max.getZ()
         );
     }
 
