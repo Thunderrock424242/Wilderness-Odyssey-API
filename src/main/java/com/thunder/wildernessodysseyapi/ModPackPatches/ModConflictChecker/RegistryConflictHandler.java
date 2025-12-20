@@ -29,6 +29,8 @@ public class RegistryConflictHandler {
 
         MinecraftServer server = event.getServer();
 
+        DedicatedConflictDetector.start();
+
         // Fetch registry access
         var registryAccess = server.registryAccess();
 
