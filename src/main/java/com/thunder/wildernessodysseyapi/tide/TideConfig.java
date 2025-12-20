@@ -58,6 +58,20 @@ public final class TideConfig {
     }
 
     /**
+     * Returns configuration defaults without requiring the config file to be loaded.
+     */
+    public static TideConfigValues defaultValues() {
+        return new TideConfigValues(
+                ENABLED.getDefault(),
+                CYCLE_MINUTES.getDefault(),
+                OCEAN_AMPLITUDE_BLOCKS.getDefault(),
+                RIVER_AMPLITUDE_BLOCKS.getDefault(),
+                PHASE_OFFSET_MINUTES.getDefault(),
+                CURRENT_STRENGTH.getDefault()
+        );
+    }
+
+    /**
      * Convenience record used to avoid repeated config lookups every tick.
      */
     public record TideConfigValues(

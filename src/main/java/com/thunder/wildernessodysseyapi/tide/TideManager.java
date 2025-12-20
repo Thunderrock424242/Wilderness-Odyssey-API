@@ -30,7 +30,7 @@ import static java.lang.Math.PI;
 public final class TideManager {
     private static final Map<ResourceKey<Level>, TideState> TIDE_STATES = new ConcurrentHashMap<>();
 
-    private static TideConfig.TideConfigValues cachedConfig = TideConfig.values();
+    private static TideConfig.TideConfigValues cachedConfig = TideConfig.defaultValues();
 
     private TideManager() {
     }
@@ -39,7 +39,7 @@ public final class TideManager {
      * Called when config reloads to refresh cached values.
      */
     public static void reloadConfig() {
-        cachedConfig = TideConfig.values();
+        cachedConfig = loadConfigWithFallback();
     }
 
     /**
@@ -67,7 +67,7 @@ public final class TideManager {
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         TIDE_STATES.clear();
-        cachedConfig = TideConfig.values();
+        cachedConfig = loadConfigWithFallback();
     }
 
     @SubscribeEvent
@@ -90,6 +90,15 @@ public final class TideManager {
             long dayTime = level.getDayTime();
             double newHeight = computeNormalizedHeight(dayTime, cachedConfig);
             state.update(dayTime, newHeight);
+        }
+    }
+
+    private static TideConfig.TideConfigValues loadConfigWithFallback() {
+        try {
+            return TideConfig.values();
+        } catch (IllegalStateException e) {
+            ModConstants.LOGGER.warn("Tide config accessed before load; using defaults instead. ({})", e.getMessage());
+            return TideConfig.defaultValues();
         }
     }
 
