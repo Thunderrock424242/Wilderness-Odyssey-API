@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.WorldGen.spawn;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -31,6 +32,10 @@ public class WorldSpawnHandler {
     }
 
     private static void configureWorldSpawn(ServerLevel world) {
+        if (!world.dimension().equals(Level.OVERWORLD)) {
+            return;
+        }
+
         CryoSpawnData data = CryoSpawnData.get(world);
         List<BlockPos> spawnBlockPositions = new ArrayList<>(data.getPositions());
 
