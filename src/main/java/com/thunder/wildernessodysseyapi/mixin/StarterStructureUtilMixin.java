@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
+import com.natamus.starterstructure_common_neoforge.util.Util;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureTerrainAdapter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -8,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(targets = "com.natamus.starterstructure.util.Util", remap = false)
+@Mixin(value = Util.class, remap = false)
 public class StarterStructureUtilMixin {
     @Inject(method = "generateSchematic", at = @At("RETURN"))
     private static void wildernessOdysseyApi$triggerTerrainReplacer(ServerLevel serverLevel, CallbackInfoReturnable<BlockPos> cir) {
