@@ -13,14 +13,6 @@ import java.util.HashMap;
 public class StructureConfig {
     public static final ModConfigSpec CONFIG_SPEC;
 
-    /** Minimum chunk distance between bunker spawns */
-    public static final ModConfigSpec.IntValue BUNKER_MIN_DISTANCE;
-    /** Maximum bunkers allowed in a world */
-    public static final ModConfigSpec.IntValue BUNKER_MAX_COUNT;
-    /** Debug toggle to bypass cryo tube spawning */
-    public static final ModConfigSpec.BooleanValue DEBUG_IGNORE_CRYO_TUBE;
-    /** Debug toggle to skip bunker placement entirely */
-    public static final ModConfigSpec.BooleanValue DEBUG_DISABLE_BUNKER_SPAWNS;
     /** Debug toggle to skip meteor impact site placement */
     public static final ModConfigSpec.BooleanValue DEBUG_DISABLE_IMPACT_SITES;
     /** Emit detailed structure placement logs and retain a short history for debugging. */
@@ -37,21 +29,6 @@ public class StructureConfig {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
     static {
-        BUILDER.push("bunker");
-        BUNKER_MIN_DISTANCE = BUILDER.comment("Minimum distance in chunks between bunkers")
-                .defineInRange("spawnDistanceChunks", 8, 1, Integer.MAX_VALUE);
-        BUNKER_MAX_COUNT = BUILDER.comment("Maximum number of bunkers generated per world")
-                .defineInRange("maxSpawnCount", 1, 0, Integer.MAX_VALUE);
-        DEBUG_IGNORE_CRYO_TUBE = BUILDER.comment(
-                        "If true, players spawn at a random position inside the bunker instead of inside cryo tubes."
-                )
-                .define("debugIgnoreCryoTubeSpawns", false);
-        DEBUG_DISABLE_BUNKER_SPAWNS = BUILDER.comment(
-                        "If true, the bunker structure will not be spawned during world generation."
-                )
-                .define("debugDisableBunkerSpawns", false);
-        BUILDER.pop();
-
         BUILDER.push("impactSites");
         DEBUG_DISABLE_IMPACT_SITES = BUILDER.comment(
                         "If true, meteor impact sites will not be generated."

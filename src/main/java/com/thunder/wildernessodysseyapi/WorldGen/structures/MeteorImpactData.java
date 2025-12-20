@@ -19,7 +19,6 @@ import java.util.List;
 public class MeteorImpactData extends SavedData {
     private static final String DATA_NAME = "wo_meteor_location";
     private final List<Long> impactPositions = new ArrayList<>();
-    private long bunkerPos = Long.MIN_VALUE;
 
     public MeteorImpactData() {}
 
@@ -33,17 +32,11 @@ public class MeteorImpactData extends SavedData {
             impactPositions.add(tag.getLong("pos"));
         }
 
-        if (tag.contains("bunker")) {
-            bunkerPos = tag.getLong("bunker");
-        }
     }
 
     @Override
     public @NotNull CompoundTag save(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         tag.putLongArray("positions", impactPositions.stream().mapToLong(Long::longValue).toArray());
-        if (bunkerPos != Long.MIN_VALUE) {
-            tag.putLong("bunker", bunkerPos);
-        }
         return tag;
     }
 
@@ -74,18 +67,6 @@ public class MeteorImpactData extends SavedData {
         return !impactPositions.isEmpty();
     }
 
-    /** Store the bunker location and mark the data dirty. */
-    public void setBunkerPos(BlockPos pos) {
-        bunkerPos = pos.asLong();
-        setDirty();
-    }
-
-    /**
-     * @return the stored bunker position or {@code null} if not yet set.
-     */
-    public BlockPos getBunkerPos() {
-        return bunkerPos == Long.MIN_VALUE ? null : BlockPos.of(bunkerPos);
-    }
 
     /** Retrieve the data instance for the given world. */
     public static MeteorImpactData get(ServerLevel level) {

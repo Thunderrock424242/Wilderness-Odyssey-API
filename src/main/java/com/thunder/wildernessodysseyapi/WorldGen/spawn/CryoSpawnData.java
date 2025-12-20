@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.SpawnBlock;
+package com.thunder.wildernessodysseyapi.WorldGen.spawn;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -9,7 +9,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -39,26 +38,33 @@ public class CryoSpawnData extends SavedData {
 
     /**
      * Adds a cryo tube position to the saved data.
+     *
+     * @return {@code true} if the position was newly added
      */
-    public void add(BlockPos pos) {
+    public boolean add(BlockPos pos) {
         if (cryoPositions.add(pos.asLong())) {
             setDirty();
+            return true;
         }
+        return false;
     }
 
     /**
      * Adds multiple cryo tube positions.
+     *
+     * @return {@code true} if any entry was newly added
      */
-    public void addAll(Collection<BlockPos> positions) {
-        boolean changed = false;
+    public boolean addAll(Collection<BlockPos> positions) {
+        boolean added = false;
         for (BlockPos pos : positions) {
             if (cryoPositions.add(pos.asLong())) {
-                changed = true;
+                added = true;
             }
         }
-        if (changed) {
+        if (added) {
             setDirty();
         }
+        return added;
     }
 
     /**
@@ -77,15 +83,18 @@ public class CryoSpawnData extends SavedData {
      */
     public List<BlockPos> getPositions() {
         if (cryoPositions.isEmpty()) {
-            return Collections.emptyList();
+            return List.of();
         }
         List<BlockPos> positions = new ArrayList<>(cryoPositions.size());
         for (long entry : cryoPositions) {
             positions.add(BlockPos.of(entry));
         }
-        return positions;
+        return List.copyOf(positions);
     }
 
+    /**
+     * Retrieve the data instance for the given world.
+     */
     public static CryoSpawnData get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
                 new SavedData.Factory<>(CryoSpawnData::new, CryoSpawnData::new),
