@@ -11,6 +11,8 @@
       "EntityAccessor",
       "ForwardExtentCopyMixin",
       "ServerboundSetStructureBlockPacketMixin",
+      "StarterStructureConfigMixin",
+      "StarterStructureUtilMixin",
       "StructureBlockEntityMixin"
     ],
   "injectors": {
