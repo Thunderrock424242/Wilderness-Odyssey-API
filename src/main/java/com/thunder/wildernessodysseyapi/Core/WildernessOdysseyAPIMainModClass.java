@@ -18,8 +18,8 @@ import com.thunder.wildernessodysseyapi.command.AnalyticsCommand;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
-import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.Features.ModFeatures;
 import com.thunder.wildernessodysseyapi.WorldGen.processor.ModProcessors;
+import com.thunder.wildernessodysseyapi.WorldGen.spawn.WorldSpawnHandler;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.command.AiAdvisorCommand;
@@ -58,13 +58,10 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.GenerationStep;
-import com.thunder.wildernessodysseyapi.WorldGen.BunkerStructure.BunkerProtectionHandler;
-import com.thunder.wildernessodysseyapi.WorldGen.datapack.ImpactSitePlacementLoader;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamManager;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamingConfig;
 import com.thunder.wildernessodysseyapi.chunk.DiskChunkStorageAdapter;
-import net.minecraft.world.phys.AABB;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
@@ -105,7 +102,6 @@ public class WildernessOdysseyAPIMainModClass {
     public static int dynamicModCount = 0;
     private static final String CONFIG_FOLDER = ModConstants.MOD_ID + "/";
 
-    private static AABB structureBoundingBox;
     private Path chunkStorageRoot;
 
     private int serverTickCounter = 0;
@@ -135,9 +131,6 @@ public class WildernessOdysseyAPIMainModClass {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::onConfigLoaded);
         modEventBus.addListener(this::onConfigReloaded);
-        ModFeatures.FEATURES.register(modEventBus);
-        ModFeatures.CONFIGURED_FEATURES.register(modEventBus);
-        ModFeatures.PLACED_FEATURES.register(modEventBus);
         ModProcessors.PROCESSORS.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
 
@@ -195,7 +188,6 @@ public class WildernessOdysseyAPIMainModClass {
      */
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
-        BunkerProtectionHandler.clear();
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
         chunkStorageRoot = event.getServer().getFile("config/" + CONFIG_FOLDER + "chunk-cache");
@@ -232,7 +224,7 @@ public class WildernessOdysseyAPIMainModClass {
     }
 
     /**
-     * Schedule meteor and bunker placement shortly after the first player joins.
+     * Inform players about opt-in global chat on login.
      *
      * @param event the login event
      */
@@ -243,24 +235,6 @@ public class WildernessOdysseyAPIMainModClass {
         player.sendSystemMessage(Component.literal("[GlobalChat] Global chat is opt-in. Use /globalchatoptin to join or /globalchatoptout to leave."));
     }
     /**
-     * On mob spawn.
-     *
-     * @param event the event
-     */
-    @SubscribeEvent
-    public void onMobSpawn(EntityJoinLevelEvent event) {
-        if (event.getEntity() instanceof Mob mob) {
-            if (mob.getType().getCategory() == MobCategory.MONSTER && structureBoundingBox != null) {
-                if (structureBoundingBox.contains(mob.blockPosition().getX(), mob.blockPosition().getY(), mob.blockPosition().getZ())) {
-                    event.setCanceled(true); // Prevent mob spawn
-                }
-            }
-        }
-    }
-
-
-
-    /**
      * On server stopping.
      *
      * @param event the event
@@ -268,7 +242,6 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         globalChatManager.shutdown();
-        BunkerProtectionHandler.clear();
         AsyncTaskManager.shutdown();
         ChunkStreamManager.shutdown();
         AnalyticsTracker.shutdown();
@@ -322,7 +295,6 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onReload(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
-        event.addListener(new ImpactSitePlacementLoader());
     }
 
     public void onConfigLoaded(ModConfigEvent.Loading event) {

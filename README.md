@@ -62,8 +62,7 @@ Spawn Behavior:
 ----------
 Players spawn inside a cryo tube when joining the world for the first time. Leaving the tube prevents re-entry.
 An introductory title sequence plays as they wake, which can be replaced with a custom cinematic in the future.
-Set `bunker.debugIgnoreCryoTubeSpawns` to `true` in the common config when testing to bypass the cryo tubes and drop
-players at a random safe location inside the bunker instead.
+On first join, each player is assigned a random cryo tube and teleported directly into it.
 
 Custom Assets
 -------------
@@ -73,15 +72,9 @@ You can replace the placeholder cryo tube files with your own to customize the l
 
 World Generation
 ----------------
-The bunker now spawns via the normal world generation pipeline. Two config options
-control its frequency:
-`bunker.spawnDistanceChunks` sets the minimum chunk distance between bunkers and
-`bunker.maxSpawnCount` limits how many bunkers can generate per world. Bunker structure templates are
-validated to ensure at least one cryo tube is present, and any missing tubes are restored after placement.
+Impact zones are fully data pack driven. The bundled `impact_zone` structure, structure set, and template pool live under `data/wildernessodysseyapi/worldgen/`, and you can drop additional impact zone structures or tweak spacing in a datapack without any Java hooks.
 
-Both the crater (`impact_zone`) and bunker structures are fully registered with template pools and structure sets under `data/wildernessodysseyapi/worldgen/`, so datapacks can override spacing, salts, or biome filters without code changes.
-
-A single meteor impact zone is generated near spawn, and one bunker is anchored a short distance from that crater (default ~8 chunks / 128 blocks away) so players can find shelter quickly without the structures overlapping. Secret Order villages may rarely appear in jungle biomes, using the bundled structure template.
+Multiple impact zones can now exist—add more structure set entries via datapack to control how many spawn and where.
 
 Using Data Pack Structures
 --------------------------
@@ -92,15 +85,11 @@ placed during world generation. If no data pack override exists, the bundled
 templates under `data/<namespace>/structures/` in the mod resources are used.
 
 For a datapack-only workflow that still keeps the wool height markers you
-mentioned, see `docs/impact-bunker-datapack.md`. It outlines how the bundled
-impact site and nearby bunker interact with your custom templates and how to
-adjust spacing without changing code.
+mentioned, drop replacement structures under `data/<namespace>/structures/` in your datapack and override the bundled `impact_zone` worldgen JSON.
 
 The meteor impact site looks for the `wildernessodysseyapi:impact_zone`
 template. Drop your finished build at
-`data/wildernessodysseyapi/structures/impact_zone.nbt` so the crash craters are
-pasted before the bunker generates, or bundle a structure in another namespace
-and update the configuration to match.
+`data/wildernessodysseyapi/structures/impact_zone.nbt` or ship additional impact zone structures in another namespace and update the structure set JSON to include them.
 
 Loot tables defined inside the structure templates work the same way as vanilla
 NBT structures. The scanner now reads loot table references directly from the
