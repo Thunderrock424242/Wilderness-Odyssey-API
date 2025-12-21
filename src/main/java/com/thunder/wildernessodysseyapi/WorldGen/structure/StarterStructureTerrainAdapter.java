@@ -24,9 +24,6 @@ public final class StarterStructureTerrainAdapter {
      * Schedule post-processing for the starter structure to replace marker blocks with sampled terrain.
      */
     public static void scheduleTerrainReplacement(ServerLevel level, BlockPos structureOrigin) {
-        if (!StructureConfig.ENABLE_TERRAIN_REPLACER.get()) {
-            return;
-        }
         if (!StructureConfig.ENABLE_STARTER_STRUCTURE_TERRAIN_REPLACER.get()) {
             return;
         }
