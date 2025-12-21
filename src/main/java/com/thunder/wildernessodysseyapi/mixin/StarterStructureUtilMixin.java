@@ -33,8 +33,8 @@ public class StarterStructureUtilMixin {
                                                                   File schematicFile,
                                                                   boolean automaticCenter,
                                                                   BlockPos structurePos,
-                                                                  FileInputStream fileInputStream,
-                                                                  ParsedSchematicObject parsedSchematicObject) {
+                                                                  ParsedSchematicObject parsedSchematicObject,
+                                                                  FileInputStream fileInputStream) {
         Path schematicPath = schematicFile.toPath();
         SchematicEntityRestorer.backfillEntitiesFromSchem(serverLevel, schematicPath, schematicFile.getName().endsWith(".nbt"),
                 structurePos, parsedSchematicObject);
