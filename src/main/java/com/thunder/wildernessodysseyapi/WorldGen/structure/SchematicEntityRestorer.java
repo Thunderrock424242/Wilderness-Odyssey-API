@@ -30,7 +30,10 @@ public final class SchematicEntityRestorer {
 
     public static void backfillEntitiesFromSchem(ServerLevel level, Path schematicPath, boolean isNbtFormat,
                                                  BlockPos structurePos, ParsedSchematicObject parsed) {
-        if (parsed == null || parsed.entities == null || !parsed.entities.isEmpty()) {
+        if (parsed == null) {
+            return;
+        }
+        if (parsed.entities != null && !parsed.entities.isEmpty()) {
             return;
         }
         if (isNbtFormat || schematicPath == null) {
