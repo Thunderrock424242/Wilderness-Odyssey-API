@@ -43,13 +43,31 @@ public final class AsyncThreadingConfig {
     }
 
     public static AsyncConfigValues values() {
+        try {
+            return new AsyncConfigValues(
+                    ENABLED.get(),
+                    MAX_THREADS.get(),
+                    QUEUE_SIZE.get(),
+                    APPLY_PER_TICK.get(),
+                    TASK_TIMEOUT_MS.get(),
+                    DEBUG_LOGGING.get()
+            );
+        } catch (IllegalStateException ex) {
+            return defaultValues();
+        }
+    }
+
+    /**
+     * Returns configuration defaults without requiring the config file to be loaded.
+     */
+    public static AsyncConfigValues defaultValues() {
         return new AsyncConfigValues(
-                ENABLED.get(),
-                MAX_THREADS.get(),
-                QUEUE_SIZE.get(),
-                APPLY_PER_TICK.get(),
-                TASK_TIMEOUT_MS.get(),
-                DEBUG_LOGGING.get()
+                ENABLED.getDefault(),
+                MAX_THREADS.getDefault(),
+                QUEUE_SIZE.getDefault(),
+                APPLY_PER_TICK.getDefault(),
+                TASK_TIMEOUT_MS.getDefault(),
+                DEBUG_LOGGING.getDefault()
         );
     }
 

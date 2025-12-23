@@ -107,35 +107,75 @@ public final class ChunkStreamingConfig {
     }
 
     public static ChunkConfigValues values() {
+        try {
+            return new ChunkConfigValues(
+                    ENABLED.get(),
+                    HOT_CACHE_LIMIT.get(),
+                    WARM_CACHE_LIMIT.get(),
+                    SPLIT_WARM_CACHE.get(),
+                    SAVE_DEBOUNCE_TICKS.get(),
+                    PLAYER_TICKET_TTL.get(),
+                    ENTITY_TICKET_TTL.get(),
+                    REDSTONE_TICKET_TTL.get(),
+                    STRUCTURE_TICKET_TTL.get(),
+                    MAX_PARALLEL_IO.get(),
+                    COMPRESSION_LEVEL.get(),
+                    COMPRESSION_CODEC.get(),
+                    PER_DIMENSION_EXECUTORS.get(),
+                    IO_THREADS.get(),
+                    IO_QUEUE_SIZE.get(),
+                    BUFFER_SLICE_BYTES.get(),
+                    BUFFER_SLICES_PER_THREAD.get(),
+                    SKIP_WARM_CACHE_TICKING.get(),
+                    FLUID_REDSTONE_THROTTLE_RADIUS.get(),
+                    FLUID_REDSTONE_THROTTLE_INTERVAL.get(),
+                    RANDOM_TICK_MIN_SCALE.get(),
+                    RANDOM_TICK_MAX_SCALE.get(),
+                    MOVEMENT_SPEED_FOR_MAX_SCALE.get(),
+                    RANDOM_TICK_PLAYER_BAND.get(),
+                    SLICE_INTERN_LIMIT.get(),
+                    DELTA_CHANGE_BUDGET.get(),
+                    LIGHT_COMPRESSION_LEVEL.get(),
+                    WRITE_FLUSH_INTERVAL_TICKS.get()
+            );
+        } catch (IllegalStateException ex) {
+            return defaultValues();
+        }
+    }
+
+    /**
+     * Returns configuration defaults without requiring the config file to be loaded.
+     */
+    public static ChunkConfigValues defaultValues() {
         return new ChunkConfigValues(
-                ENABLED.get(),
-                HOT_CACHE_LIMIT.get(),
-                WARM_CACHE_LIMIT.get(),
-                SPLIT_WARM_CACHE.get(),
-                SAVE_DEBOUNCE_TICKS.get(),
-                PLAYER_TICKET_TTL.get(),
-                ENTITY_TICKET_TTL.get(),
-                REDSTONE_TICKET_TTL.get(),
-                STRUCTURE_TICKET_TTL.get(),
-                MAX_PARALLEL_IO.get(),
-                COMPRESSION_LEVEL.get(),
-                COMPRESSION_CODEC.get(),
-                PER_DIMENSION_EXECUTORS.get(),
-                IO_THREADS.get(),
-                IO_QUEUE_SIZE.get(),
-                BUFFER_SLICE_BYTES.get(),
-                BUFFER_SLICES_PER_THREAD.get(),
-                SKIP_WARM_CACHE_TICKING.get(),
-                FLUID_REDSTONE_THROTTLE_RADIUS.get(),
-                FLUID_REDSTONE_THROTTLE_INTERVAL.get(),
-                RANDOM_TICK_MIN_SCALE.get(),
-                RANDOM_TICK_MAX_SCALE.get(),
-                MOVEMENT_SPEED_FOR_MAX_SCALE.get(),
-                RANDOM_TICK_PLAYER_BAND.get(),
-                SLICE_INTERN_LIMIT.get(),
-                DELTA_CHANGE_BUDGET.get(),
-                LIGHT_COMPRESSION_LEVEL.get(),
-                WRITE_FLUSH_INTERVAL_TICKS.get()
+                ENABLED.getDefault(),
+                HOT_CACHE_LIMIT.getDefault(),
+                WARM_CACHE_LIMIT.getDefault(),
+                SPLIT_WARM_CACHE.getDefault(),
+                SAVE_DEBOUNCE_TICKS.getDefault(),
+                PLAYER_TICKET_TTL.getDefault(),
+                ENTITY_TICKET_TTL.getDefault(),
+                REDSTONE_TICKET_TTL.getDefault(),
+                STRUCTURE_TICKET_TTL.getDefault(),
+                MAX_PARALLEL_IO.getDefault(),
+                COMPRESSION_LEVEL.getDefault(),
+                COMPRESSION_CODEC.getDefault(),
+                PER_DIMENSION_EXECUTORS.getDefault(),
+                IO_THREADS.getDefault(),
+                IO_QUEUE_SIZE.getDefault(),
+                BUFFER_SLICE_BYTES.getDefault(),
+                BUFFER_SLICES_PER_THREAD.getDefault(),
+                SKIP_WARM_CACHE_TICKING.getDefault(),
+                FLUID_REDSTONE_THROTTLE_RADIUS.getDefault(),
+                FLUID_REDSTONE_THROTTLE_INTERVAL.getDefault(),
+                RANDOM_TICK_MIN_SCALE.getDefault(),
+                RANDOM_TICK_MAX_SCALE.getDefault(),
+                MOVEMENT_SPEED_FOR_MAX_SCALE.getDefault(),
+                RANDOM_TICK_PLAYER_BAND.getDefault(),
+                SLICE_INTERN_LIMIT.getDefault(),
+                DELTA_CHANGE_BUDGET.getDefault(),
+                LIGHT_COMPRESSION_LEVEL.getDefault(),
+                WRITE_FLUSH_INTERVAL_TICKS.getDefault()
         );
     }
 
