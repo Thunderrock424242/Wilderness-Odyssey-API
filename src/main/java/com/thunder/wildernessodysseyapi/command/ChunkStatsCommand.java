@@ -31,9 +31,15 @@ public final class ChunkStatsCommand {
         source.sendSuccess(() -> Component.literal(ChatFormatting.AQUA + "Chunk streaming"), false);
         source.sendSuccess(() -> Component.literal(" - Tracked: " + stats.trackedChunks()), false);
         source.sendSuccess(() -> Component.literal(" - Hot cache: " + stats.hotCached()), false);
-        source.sendSuccess(() -> Component.literal(" - Warm cache: " + stats.warmCached()), false);
+        source.sendSuccess(() -> Component.literal(" - Warm cache: " + stats.warmCached() + " (hit rate: " + formatPercent(stats.warmCacheHitRate()) + ")"), false);
         source.sendSuccess(() -> Component.literal(" - In-flight I/O: " + stats.inFlightIo()), false);
-        source.sendSuccess(() -> Component.literal(" - Pending saves: " + stats.pendingSaves()), false);
+        source.sendSuccess(() -> Component.literal(" - Pending saves: " + stats.pendingSaves() + " (queue depth: " + stats.ioQueueDepth() + ")"), false);
+        source.sendSuccess(() -> Component.literal(" - Tickets: " + stats.totalTickets() + " " + stats.ticketCounts()), false);
+        source.sendSuccess(() -> Component.literal(" - States: " + stats.stateCounts()), false);
         return 1;
+    }
+
+    private static String formatPercent(double rate) {
+        return String.format("%.1f%%", rate * 100.0D);
     }
 }

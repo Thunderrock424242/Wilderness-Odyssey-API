@@ -19,6 +19,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class ChunkStreamManager {
     private static final ConcurrentMap<ChunkPos, ChunkStatusEntry> STATE = new ConcurrentHashMap<>();
+    private static final java.util.concurrent.atomic.AtomicLong WARM_CACHE_HITS = new java.util.concurrent.atomic.AtomicLong();
+    private static final java.util.concurrent.atomic.AtomicLong WARM_CACHE_MISSES = new java.util.concurrent.atomic.AtomicLong();
     private static final LinkedHashMap<ChunkPos, CompoundTag> WARM_CACHE = new LinkedHashMap<>(128, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<ChunkPos, CompoundTag> eldest) {
@@ -47,6 +49,8 @@ public final class ChunkStreamManager {
         config = values;
         storageAdapter = adapter;
         STATE.clear();
+        WARM_CACHE_HITS.set(0L);
+        WARM_CACHE_MISSES.set(0L);
         WARM_CACHE.clear();
         HOT_CACHE.clear();
         ioController = new ChunkIoController(() -> config, () -> storageAdapter);
@@ -56,6 +60,8 @@ public final class ChunkStreamManager {
 
     public static synchronized void shutdown() {
         STATE.clear();
+        WARM_CACHE_HITS.set(0L);
+        WARM_CACHE_MISSES.set(0L);
         WARM_CACHE.clear();
         HOT_CACHE.clear();
         ioController = new ChunkIoController(() -> config, () -> storageAdapter);
@@ -67,7 +73,7 @@ public final class ChunkStreamManager {
         }
         ChunkStatusEntry entry = STATE.computeIfAbsent(pos, ignored -> new ChunkStatusEntry());
         entry.touch(gameTime);
-        entry.upsertTicket(ticketType, gameTime + ticketType.resolveTtl(config));
+        entry.upsertTicket(pos, ticketType, gameTime + ticketType.resolveTtl(config));
         promoteHot(pos);
 
         CompoundTag warmPayload;
@@ -75,12 +81,17 @@ public final class ChunkStreamManager {
             warmPayload = WARM_CACHE.remove(pos);
         }
         if (warmPayload != null) {
+            WARM_CACHE_HITS.incrementAndGet();
+            if (ModConstants.LOGGER.isTraceEnabled()) {
+                ModConstants.LOGGER.trace("[ChunkStream][{}] Served from warm cache.", pos);
+            }
             return CompletableFuture.completedFuture(new ChunkLoadResult(pos, warmPayload, true));
         }
+        WARM_CACHE_MISSES.incrementAndGet();
 
-        entry.setState(ChunkState.QUEUED);
-        return ioController.loadChunk(pos).thenApply(payload -> {
-            entry.setState(ChunkState.READY);
+        entry.setState(pos, ChunkState.QUEUED);
+        return ioController.loadChunk(pos, () -> entry.setState(pos, ChunkState.LOADING)).thenApply(payload -> {
+            entry.setState(pos, ChunkState.READY);
             return new ChunkLoadResult(pos, payload.orElseGet(CompoundTag::new), false);
         });
     }
@@ -91,7 +102,7 @@ public final class ChunkStreamManager {
         }
         ChunkStatusEntry entry = STATE.computeIfAbsent(pos, ignored -> new ChunkStatusEntry());
         entry.touch(gameTime);
-        entry.setState(ChunkState.ACTIVE);
+        entry.setState(pos, ChunkState.ACTIVE);
         synchronized (WARM_CACHE) {
             WARM_CACHE.put(pos, payload.copy());
         }
@@ -104,7 +115,7 @@ public final class ChunkStreamManager {
         }
         ChunkStatusEntry entry = STATE.computeIfAbsent(pos, ignored -> new ChunkStatusEntry());
         entry.touch(gameTime);
-        entry.setState(ChunkState.ACTIVE);
+        entry.setState(pos, ChunkState.ACTIVE);
         promoteHot(pos);
     }
 
@@ -117,21 +128,45 @@ public final class ChunkStreamManager {
     }
 
     public static ChunkStreamStats snapshot() {
+        Map<ChunkState, Integer> stateCounts = new EnumMap<>(ChunkState.class);
+        Map<ChunkTicketType, Integer> ticketCounts = new EnumMap<>(ChunkTicketType.class);
+        java.util.concurrent.atomic.AtomicInteger totalTickets = new java.util.concurrent.atomic.AtomicInteger();
+
+        STATE.forEach((pos, entry) -> {
+            stateCounts.merge(entry.state, 1, Integer::sum);
+            for (ChunkTicket ticket : entry.tickets.values()) {
+                ticketCounts.merge(ticket.type(), 1, Integer::sum);
+                totalTickets.incrementAndGet();
+            }
+        });
+
         return new ChunkStreamStats(
                 config.enabled(),
                 STATE.size(),
                 HOT_CACHE.size(),
                 WARM_CACHE.size(),
                 ioController.inFlightLoads(),
-                ioController.pendingSaves()
+                ioController.pendingSaves(),
+                stateCounts,
+                ticketCounts,
+                totalTickets.get(),
+                ioController.pendingSaves(),
+                WARM_CACHE_HITS.get(),
+                WARM_CACHE_MISSES.get()
         );
     }
 
     private static void expireTickets(long gameTime) {
         STATE.forEach((pos, entry) -> {
-            entry.tickets.entrySet().removeIf(ticket -> ticket.getValue().isExpired(gameTime));
+            entry.tickets.entrySet().removeIf(ticket -> {
+                boolean expired = ticket.getValue().isExpired(gameTime);
+                if (expired && ModConstants.LOGGER.isTraceEnabled()) {
+                    ModConstants.LOGGER.trace("[ChunkStream][{}] Ticket {} expired at tick {}.", pos, ticket.getKey(), gameTime);
+                }
+                return expired;
+            });
             if (entry.tickets.isEmpty()) {
-                entry.setState(ChunkState.UNLOADING);
+                entry.setState(pos, ChunkState.UNLOADING);
                 synchronized (WARM_CACHE) {
                     CompoundTag cached = WARM_CACHE.remove(pos);
                     if (cached != null) {
@@ -165,12 +200,22 @@ public final class ChunkStreamManager {
         private final Map<ChunkTicketType, ChunkTicket> tickets = new EnumMap<>(ChunkTicketType.class);
         private volatile long lastTouched;
 
-        void upsertTicket(ChunkTicketType type, long expiryTick) {
+        void upsertTicket(ChunkPos pos, ChunkTicketType type, long expiryTick) {
             tickets.put(type, new ChunkTicket(type, expiryTick));
+            if (ModConstants.LOGGER.isTraceEnabled()) {
+                ModConstants.LOGGER.trace("[ChunkStream][{}] Upserted ticket {} expiring at tick {}.", pos, type, expiryTick);
+            }
         }
 
-        void setState(ChunkState newState) {
+        void setState(ChunkPos pos, ChunkState newState) {
+            if (state == newState) {
+                return;
+            }
+            ChunkState previous = state;
             state = newState;
+            if (ModConstants.LOGGER.isTraceEnabled()) {
+                ModConstants.LOGGER.trace("[ChunkStream][{}] State {} -> {}.", pos, previous, newState);
+            }
         }
 
         void touch(long gameTime) {
@@ -190,7 +235,7 @@ public final class ChunkStreamManager {
             this.adapterSupplier = adapterSupplier;
         }
 
-        CompletableFuture<Optional<CompoundTag>> loadChunk(ChunkPos pos) {
+        CompletableFuture<Optional<CompoundTag>> loadChunk(ChunkPos pos, Runnable onStart) {
             ChunkStreamingConfig.ChunkConfigValues values = configSupplier.get();
             if (inFlight.incrementAndGet() > values.maxParallelIo()) {
                 inFlight.decrementAndGet();
@@ -198,6 +243,13 @@ public final class ChunkStreamManager {
             }
 
             CompletableFuture<Optional<CompoundTag>> payloadFuture = new CompletableFuture<>();
+            if (onStart != null) {
+                try {
+                    onStart.run();
+                } catch (Exception e) {
+                    ModConstants.LOGGER.error("[ChunkStream] Failed to mark chunk {} as loading.", pos, e);
+                }
+            }
             AsyncTaskManager.submitIoTask("chunk-load-" + pos, () -> {
                         try {
                             ChunkStorageAdapter adapter = adapterSupplier.get();
