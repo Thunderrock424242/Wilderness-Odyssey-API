@@ -788,7 +788,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
             return;
         }
 
-        NbtCompressionUtils.rewriteCompressed(structurePath, compressionLevel);
+        NbtCompressionUtils.rewriteCompressedAsync(structurePath, compressionLevel, com.thunder.wildernessodysseyapi.io.CompressionCodec.VANILLA_GZIP);
     }
 
     @Unique

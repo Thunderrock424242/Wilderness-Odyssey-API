@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.chunk;
 
 import com.thunder.wildernessodysseyapi.util.NbtCompressionUtils;
+import com.thunder.wildernessodysseyapi.io.CompressionCodec;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 
@@ -15,10 +16,12 @@ import java.util.Optional;
 public class DiskChunkStorageAdapter implements ChunkStorageAdapter {
     private final Path root;
     private final int compressionLevel;
+    private final CompressionCodec compressionCodec;
 
-    public DiskChunkStorageAdapter(Path root, int compressionLevel) {
+    public DiskChunkStorageAdapter(Path root, int compressionLevel, CompressionCodec compressionCodec) {
         this.root = root;
         this.compressionLevel = compressionLevel;
+        this.compressionCodec = compressionCodec;
     }
 
     @Override
@@ -27,13 +30,13 @@ public class DiskChunkStorageAdapter implements ChunkStorageAdapter {
         if (!Files.exists(path)) {
             return Optional.empty();
         }
-        return Optional.of(NbtCompressionUtils.readCompressed(path));
+        return Optional.of(NbtCompressionUtils.readCompressed(path, compressionCodec));
     }
 
     @Override
     public void write(ChunkPos pos, CompoundTag tag) throws IOException {
         Path path = chunkPath(pos);
-        NbtCompressionUtils.writeCompressed(path, tag, compressionLevel);
+        NbtCompressionUtils.writeCompressed(path, tag, compressionLevel, compressionCodec);
     }
 
     private Path chunkPath(ChunkPos pos) {
