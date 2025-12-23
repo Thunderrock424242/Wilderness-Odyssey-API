@@ -18,6 +18,14 @@ public final class ChunkStreamingConfig {
     public static final ModConfigSpec.IntValue STRUCTURE_TICKET_TTL;
     public static final ModConfigSpec.IntValue MAX_PARALLEL_IO;
     public static final ModConfigSpec.IntValue COMPRESSION_LEVEL;
+    public static final ModConfigSpec.BooleanValue SKIP_WARM_CACHE_TICKING;
+    public static final ModConfigSpec.IntValue FLUID_REDSTONE_THROTTLE_RADIUS;
+    public static final ModConfigSpec.IntValue FLUID_REDSTONE_THROTTLE_INTERVAL;
+    public static final ModConfigSpec.DoubleValue RANDOM_TICK_MIN_SCALE;
+    public static final ModConfigSpec.DoubleValue RANDOM_TICK_MAX_SCALE;
+    public static final ModConfigSpec.DoubleValue MOVEMENT_SPEED_FOR_MAX_SCALE;
+    public static final ModConfigSpec.IntValue RANDOM_TICK_PLAYER_BAND;
+    public static final ModConfigSpec.IntValue SLICE_INTERN_LIMIT;
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
@@ -43,6 +51,22 @@ public final class ChunkStreamingConfig {
                 .defineInRange("maxParallelIo", 4, 1, 64);
         COMPRESSION_LEVEL = BUILDER.comment("GZIP compression level to use when writing chunk NBT.")
                 .defineInRange("compressionLevel", 6, 1, 9);
+        SKIP_WARM_CACHE_TICKING = BUILDER.comment("If true, block entity and random ticks are skipped for warm-cached chunks.")
+                .define("skipWarmCacheTicking", true);
+        FLUID_REDSTONE_THROTTLE_RADIUS = BUILDER.comment("Radius (in blocks) around players where fluid and redstone random ticks run at full speed. Set to 0 to disable throttling.")
+                .defineInRange("fluidRedstoneThrottleRadius", 96, 0, 512);
+        FLUID_REDSTONE_THROTTLE_INTERVAL = BUILDER.comment("Tick interval for throttled fluid/redstone random ticks outside the configured radius.")
+                .defineInRange("fluidRedstoneThrottleInterval", 4, 1, 40);
+        RANDOM_TICK_MIN_SCALE = BUILDER.comment("Minimum multiplier applied to random tick density in low-movement areas.")
+                .defineInRange("randomTickMinScale", 0.35D, 0.05D, 2.0D);
+        RANDOM_TICK_MAX_SCALE = BUILDER.comment("Maximum multiplier applied to random tick density around fast-moving players.")
+                .defineInRange("randomTickMaxScale", 1.25D, 0.25D, 3.0D);
+        MOVEMENT_SPEED_FOR_MAX_SCALE = BUILDER.comment("Player movement speed (blocks/tick) that triggers the maximum random tick multiplier.")
+                .defineInRange("movementSpeedForMaxScale", 0.28D, 0.05D, 0.8D);
+        RANDOM_TICK_PLAYER_BAND = BUILDER.comment("Radius (in blocks) where player movement influences random tick scaling.")
+                .defineInRange("randomTickPlayerBand", 128, 32, 256);
+        SLICE_INTERN_LIMIT = BUILDER.comment("Maximum number of cached biome/noise slice hashes to retain for interning.")
+                .defineInRange("sliceInternLimit", 384, 64, 2048);
         BUILDER.pop();
 
         CONFIG_SPEC = BUILDER.build();
@@ -62,7 +86,15 @@ public final class ChunkStreamingConfig {
                 REDSTONE_TICKET_TTL.get(),
                 STRUCTURE_TICKET_TTL.get(),
                 MAX_PARALLEL_IO.get(),
-                COMPRESSION_LEVEL.get()
+                COMPRESSION_LEVEL.get(),
+                SKIP_WARM_CACHE_TICKING.get(),
+                FLUID_REDSTONE_THROTTLE_RADIUS.get(),
+                FLUID_REDSTONE_THROTTLE_INTERVAL.get(),
+                RANDOM_TICK_MIN_SCALE.get(),
+                RANDOM_TICK_MAX_SCALE.get(),
+                MOVEMENT_SPEED_FOR_MAX_SCALE.get(),
+                RANDOM_TICK_PLAYER_BAND.get(),
+                SLICE_INTERN_LIMIT.get()
         );
     }
 
@@ -76,7 +108,15 @@ public final class ChunkStreamingConfig {
             int redstoneTicketTtl,
             int structureTicketTtl,
             int maxParallelIo,
-            int compressionLevel
+            int compressionLevel,
+            boolean skipWarmCacheTicking,
+            int fluidRedstoneThrottleRadius,
+            int fluidRedstoneThrottleInterval,
+            double randomTickMinScale,
+            double randomTickMaxScale,
+            double movementSpeedForMaxScale,
+            int randomTickPlayerBand,
+            int sliceInternLimit
     ) {
     }
 }

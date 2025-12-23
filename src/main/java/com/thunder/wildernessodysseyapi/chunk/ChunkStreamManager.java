@@ -25,6 +25,7 @@ public final class ChunkStreamManager {
             return size() > config.warmCacheLimit();
         }
     };
+    private static ChunkSliceCache sliceCache = new ChunkSliceCache(384);
     private static final LinkedHashMap<ChunkPos, Boolean> HOT_CACHE = new LinkedHashMap<>(128, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<ChunkPos, Boolean> eldest) {
@@ -49,6 +50,9 @@ public final class ChunkStreamManager {
         STATE.clear();
         WARM_CACHE.clear();
         HOT_CACHE.clear();
+        sliceCache = new ChunkSliceCache(values.sliceInternLimit());
+        sliceCache.reset();
+        ChunkTickThrottler.configure(values);
         ioController = new ChunkIoController(() -> config, () -> storageAdapter);
         ModConstants.LOGGER.info("[ChunkStream] Initialized (hot cache: {}, warm cache: {}, debounce: {} ticks)",
                 config.hotCacheLimit(), config.warmCacheLimit(), config.saveDebounceTicks());
@@ -81,7 +85,8 @@ public final class ChunkStreamManager {
         entry.setState(ChunkState.QUEUED);
         return ioController.loadChunk(pos).thenApply(payload -> {
             entry.setState(ChunkState.READY);
-            return new ChunkLoadResult(pos, payload.orElseGet(CompoundTag::new), false);
+            CompoundTag cooked = payload.map(tag -> sliceCache.dedupe(pos, tag)).orElseGet(CompoundTag::new);
+            return new ChunkLoadResult(pos, cooked, false);
         });
     }
 
@@ -89,13 +94,14 @@ public final class ChunkStreamManager {
         if (!config.enabled()) {
             return;
         }
+        CompoundTag sanitized = sliceCache.dedupe(pos, payload.copy());
         ChunkStatusEntry entry = STATE.computeIfAbsent(pos, ignored -> new ChunkStatusEntry());
         entry.touch(gameTime);
         entry.setState(ChunkState.ACTIVE);
         synchronized (WARM_CACHE) {
-            WARM_CACHE.put(pos, payload.copy());
+            WARM_CACHE.put(pos, sanitized.copy());
         }
-        ioController.enqueueSave(pos, payload, gameTime);
+        ioController.enqueueSave(pos, sanitized, gameTime);
     }
 
     public static void markActive(ChunkPos pos, long gameTime) {
@@ -157,6 +163,12 @@ public final class ChunkStreamManager {
             if (!WARM_CACHE.containsKey(pos)) {
                 WARM_CACHE.put(pos, new CompoundTag());
             }
+        }
+    }
+
+    public static boolean isWarmCached(ChunkPos pos) {
+        synchronized (WARM_CACHE) {
+            return WARM_CACHE.containsKey(pos);
         }
     }
 
