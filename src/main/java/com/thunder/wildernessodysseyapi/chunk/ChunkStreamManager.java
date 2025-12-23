@@ -3,6 +3,8 @@ package com.thunder.wildernessodysseyapi.chunk;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.EnumMap;
@@ -75,13 +77,16 @@ public final class ChunkStreamManager {
             warmPayload = WARM_CACHE.remove(pos);
         }
         if (warmPayload != null) {
+            entry.setLastPersisted(warmPayload.copy());
             return CompletableFuture.completedFuture(new ChunkLoadResult(pos, warmPayload, true));
         }
 
         entry.setState(ChunkState.QUEUED);
         return ioController.loadChunk(pos).thenApply(payload -> {
             entry.setState(ChunkState.READY);
-            return new ChunkLoadResult(pos, payload.orElseGet(CompoundTag::new), false);
+            CompoundTag resolved = payload.orElseGet(CompoundTag::new);
+            entry.setLastPersisted(resolved.copy());
+            return new ChunkLoadResult(pos, resolved, false);
         });
     }
 
@@ -92,10 +97,13 @@ public final class ChunkStreamManager {
         ChunkStatusEntry entry = STATE.computeIfAbsent(pos, ignored -> new ChunkStatusEntry());
         entry.touch(gameTime);
         entry.setState(ChunkState.ACTIVE);
+        CompoundTag snapshot = payload.copy();
         synchronized (WARM_CACHE) {
-            WARM_CACHE.put(pos, payload.copy());
+            WARM_CACHE.put(pos, snapshot.copy());
         }
-        ioController.enqueueSave(pos, payload, gameTime);
+        DirtySegmentSet diff = DirtySegmentSet.diff(entry.getLastPersisted(), snapshot);
+        entry.markDirty(diff);
+        ioController.enqueueSave(pos, snapshot, diff, gameTime);
     }
 
     public static void markActive(ChunkPos pos, long gameTime) {
@@ -164,6 +172,8 @@ public final class ChunkStreamManager {
         private volatile ChunkState state = ChunkState.UNLOADED;
         private final Map<ChunkTicketType, ChunkTicket> tickets = new EnumMap<>(ChunkTicketType.class);
         private volatile long lastTouched;
+        private volatile CompoundTag lastPersisted;
+        private volatile DirtySegmentSet dirtySegments = DirtySegmentSet.none();
 
         void upsertTicket(ChunkTicketType type, long expiryTick) {
             tickets.put(type, new ChunkTicket(type, expiryTick));
@@ -175,6 +185,25 @@ public final class ChunkStreamManager {
 
         void touch(long gameTime) {
             lastTouched = gameTime;
+        }
+
+        CompoundTag getLastPersisted() {
+            return lastPersisted;
+        }
+
+        void setLastPersisted(CompoundTag tag) {
+            lastPersisted = tag;
+            dirtySegments = DirtySegmentSet.none();
+        }
+
+        DirtySegmentSet consumeDirty() {
+            DirtySegmentSet current = dirtySegments;
+            dirtySegments = DirtySegmentSet.none();
+            return current;
+        }
+
+        void markDirty(DirtySegmentSet diff) {
+            dirtySegments = dirtySegments.mergedWith(diff);
         }
     }
 
@@ -225,8 +254,15 @@ public final class ChunkStreamManager {
             });
         }
 
-        void enqueueSave(ChunkPos pos, CompoundTag payload, long gameTime) {
-            pendingSaves.put(pos, new PendingSave(payload, gameTime + configSupplier.get().saveDebounceTicks()));
+        void enqueueSave(ChunkPos pos, CompoundTag payload, DirtySegmentSet dirtySegments, long gameTime) {
+            pendingSaves.merge(
+                    pos,
+                    new PendingSave(payload, dirtySegments, gameTime + configSupplier.get().saveDebounceTicks()),
+                    (existing, incoming) -> new PendingSave(
+                            incoming.payload(),
+                            existing.dirtySegments().mergedWith(incoming.dirtySegments()),
+                            incoming.scheduledTick())
+            );
         }
 
         void tick(long gameTime) {
@@ -240,10 +276,25 @@ public final class ChunkStreamManager {
                 }
                 inFlight.incrementAndGet();
                 ChunkPos pos = entry.getKey();
-                CompoundTag tag = entry.getValue().payload();
+                PendingSave save = entry.getValue();
                 AsyncTaskManager.submitIoTask("chunk-save-" + pos, () -> {
                             try {
-                                adapterSupplier.get().write(pos, tag);
+                                ChunkStatusEntry statusEntry = STATE.get(pos);
+                                if (statusEntry == null) {
+                                    return Optional.empty();
+                                }
+
+                                DirtySegmentSet dirty = save.dirtySegments();
+                                if (!dirty.hasEntries()) {
+                                    return Optional.empty();
+                                }
+
+                                CompoundTag merged = dirty.isFullChunkDirty()
+                                        ? save.payload().copy()
+                                        : mergeDirtySegments(statusEntry.getLastPersisted(), save.payload(), dirty);
+
+                                adapterSupplier.get().write(pos, merged);
+                                statusEntry.setLastPersisted(merged.copy());
                             } catch (Exception e) {
                                 ModConstants.LOGGER.error("[ChunkStream] Failed to write chunk {}", pos, e);
                             }
@@ -261,8 +312,48 @@ public final class ChunkStreamManager {
         int pendingSaves() {
             return pendingSaves.size();
         }
+
+        private CompoundTag mergeDirtySegments(CompoundTag baseline, CompoundTag latest, DirtySegmentSet dirty) {
+            CompoundTag merged = baseline == null ? new CompoundTag() : baseline.copy();
+
+            for (String key : dirty.topLevelKeys()) {
+                if (latest.contains(key)) {
+                    merged.put(key, latest.get(key).copy());
+                } else {
+                    merged.remove(key);
+                }
+            }
+
+            if (dirty.sectionYLevels().isEmpty()) {
+                return merged;
+            }
+
+            ListTag sections = merged.contains("sections", Tag.TAG_LIST) ? merged.getList("sections", Tag.TAG_COMPOUND) : new ListTag();
+            Map<Integer, CompoundTag> latestSections = DirtySegmentSet.indexSections(latest);
+
+            sections.removeIf(tag -> {
+                if (!(tag instanceof CompoundTag section) || !section.contains("Y")) {
+                    return false;
+                }
+                int y = section.getByte("Y");
+                if (!dirty.sectionYLevels().contains(y)) {
+                    return false;
+                }
+                return true;
+            });
+
+            for (Integer y : dirty.sectionYLevels()) {
+                CompoundTag updatedSection = latestSections.get(y);
+                if (updatedSection != null) {
+                    sections.add(updatedSection.copy());
+                }
+            }
+
+            merged.put("sections", sections);
+            return merged;
+        }
     }
 
-    private record PendingSave(CompoundTag payload, long scheduledTick) {
+    private record PendingSave(CompoundTag payload, DirtySegmentSet dirtySegments, long scheduledTick) {
     }
 }
