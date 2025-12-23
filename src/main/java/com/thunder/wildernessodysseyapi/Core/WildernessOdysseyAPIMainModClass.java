@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheCommand
 import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheConfig;
 import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
+import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
@@ -71,6 +72,7 @@ import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
@@ -131,6 +133,7 @@ public class WildernessOdysseyAPIMainModClass {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::onConfigLoaded);
         modEventBus.addListener(this::onConfigReloaded);
+        modEventBus.addListener(this::registerCapabilities);
         ModProcessors.PROCESSORS.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
 
@@ -174,6 +177,10 @@ public class WildernessOdysseyAPIMainModClass {
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
         dynamicModCount = ModList.get().getMods().size();
+    }
+
+    private void registerCapabilities(RegisterCapabilitiesEvent event) {
+        event.register(ChunkDataCapability.class);
     }
   
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
