@@ -31,8 +31,7 @@ public class DiskChunkStorageAdapter implements ChunkStorageAdapter {
         if (!Files.exists(path)) {
             return Optional.empty();
         }
-        return Optional.of(NbtCompressionUtils.readCompressed(path, compressionCodec));
-        CompoundTag payload = NbtCompressionUtils.readCompressed(path);
+        CompoundTag payload = NbtCompressionUtils.readCompressed(path, compressionCodec);
         NbtDataCompactor.expandModPayload(payload);
         return Optional.of(payload);
     }
@@ -40,10 +39,9 @@ public class DiskChunkStorageAdapter implements ChunkStorageAdapter {
     @Override
     public void write(ChunkPos pos, CompoundTag tag) throws IOException {
         Path path = chunkPath(pos);
-        NbtCompressionUtils.writeCompressed(path, tag, compressionLevel, compressionCodec);
         CompoundTag compacted = tag.copy();
         NbtDataCompactor.compactModPayload(compacted);
-        NbtCompressionUtils.writeCompressed(path, compacted, compressionLevel);
+        NbtCompressionUtils.writeCompressed(path, compacted, compressionLevel, compressionCodec);
     }
 
     private Path chunkPath(ChunkPos pos) {

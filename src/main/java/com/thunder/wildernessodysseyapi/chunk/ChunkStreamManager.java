@@ -4,9 +4,9 @@ import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.io.BufferPool;
 import com.thunder.wildernessodysseyapi.io.IoExecutors;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 
@@ -33,17 +33,16 @@ import java.util.stream.Collectors;
  */
 public final class ChunkStreamManager {
     private static final ConcurrentMap<ChunkPos, ChunkStatusEntry> STATE = new ConcurrentHashMap<>();
-    private static final LinkedHashMap<ChunkPos, CompoundTag> WARM_CACHE = new LinkedHashMap<>(128, 0.75f, true);
-    private static final LinkedHashMap<ChunkPos, Boolean> HOT_CACHE = new LinkedHashMap<>(128, 0.75f, true);
-    private static final java.util.concurrent.atomic.AtomicLong WARM_CACHE_HITS = new java.util.concurrent.atomic.AtomicLong();
-    private static final java.util.concurrent.atomic.AtomicLong WARM_CACHE_MISSES = new java.util.concurrent.atomic.AtomicLong();
+    private static final AtomicLong WARM_CACHE_HITS = new AtomicLong();
+    private static final AtomicLong WARM_CACHE_MISSES = new AtomicLong();
+    private static ChunkSliceCache sliceCache = new ChunkSliceCache(384);
+
     private static final LinkedHashMap<ChunkPos, CompoundTag> WARM_CACHE = new LinkedHashMap<>(128, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<ChunkPos, CompoundTag> eldest) {
             return size() > config.warmCacheLimit();
         }
     };
-    private static ChunkSliceCache sliceCache = new ChunkSliceCache(384);
     private static final LinkedHashMap<ChunkPos, Boolean> HOT_CACHE = new LinkedHashMap<>(128, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<ChunkPos, Boolean> eldest) {
@@ -58,7 +57,6 @@ public final class ChunkStreamManager {
     private static ChunkStreamingConfig.ChunkConfigValues config = ChunkStreamingConfig.values();
     private static ChunkStorageAdapter storageAdapter;
     private static ChunkIoController ioController = new ChunkIoController(() -> config, () -> storageAdapter, null);
-    private static ChunkIoController ioController = new ChunkIoController(() -> config, () -> storageAdapter);
     private static ScheduledExecutorService writeScheduler;
     private static ScheduledFuture<?> writeFlushTask;
     private static final AtomicLong lastGameTime = new AtomicLong();
@@ -70,16 +68,15 @@ public final class ChunkStreamManager {
         config = values;
         storageAdapter = adapter;
         BufferPool.configure(values);
+        ChunkTickThrottler.configure(values);
+        sliceCache = new ChunkSliceCache(values.sliceInternLimit());
+        sliceCache.reset();
         STATE.clear();
         WARM_CACHE_HITS.set(0L);
         WARM_CACHE_MISSES.set(0L);
         WARM_CACHE.clear();
         HOT_CACHE.clear();
         ioController = new ChunkIoController(() -> config, () -> storageAdapter, null);
-        sliceCache = new ChunkSliceCache(values.sliceInternLimit());
-        sliceCache.reset();
-        ChunkTickThrottler.configure(values);
-        ioController = new ChunkIoController(() -> config, () -> storageAdapter);
         scheduleWriteFlush();
         ModConstants.LOGGER.info("[ChunkStream] Initialized (hot cache: {}, warm cache: {}, debounce: {} ticks)",
                 config.hotCacheLimit(), config.warmCacheLimit(), config.saveDebounceTicks());
@@ -110,9 +107,8 @@ public final class ChunkStreamManager {
         lastGameTime.set(gameTime);
         ChunkStatusEntry entry = STATE.computeIfAbsent(pos, ignored -> new ChunkStatusEntry());
         entry.touch(gameTime);
-        entry.upsertTicket(ticketType, gameTime + ticketType.resolveTtl(config));
-        entry.transitionTo(ChunkState.QUEUED);
         entry.upsertTicket(pos, ticketType, gameTime + ticketType.resolveTtl(config));
+        entry.transitionTo(pos, ChunkState.QUEUED);
         promoteHot(pos);
 
         CompoundTag warmPayload;
@@ -120,32 +116,19 @@ public final class ChunkStreamManager {
             warmPayload = WARM_CACHE.remove(pos);
         }
         if (warmPayload != null) {
-            entry.transitionTo(ChunkState.READY);
             WARM_CACHE_HITS.incrementAndGet();
-            if (ModConstants.LOGGER.isTraceEnabled()) {
-                ModConstants.LOGGER.trace("[ChunkStream][{}] Served from warm cache.", pos);
-            }
+            entry.transitionTo(pos, ChunkState.READY);
             entry.setLastPersisted(warmPayload.copy());
             return CompletableFuture.completedFuture(new ChunkLoadResult(pos, warmPayload, true));
         }
         WARM_CACHE_MISSES.incrementAndGet();
 
-        entry.transitionTo(ChunkState.LOADING);
+        entry.transitionTo(pos, ChunkState.LOADING);
         ioController.cancelPendingSave(pos);
-        return ioController.loadChunk(pos).thenApply(payload -> {
-            entry.transitionTo(ChunkState.READY);
-            return new ChunkLoadResult(pos, payload.orElseGet(CompoundTag::new), false);
-        entry.setState(pos, ChunkState.QUEUED);
-        return ioController.loadChunk(pos, () -> entry.setState(pos, ChunkState.LOADING)).thenApply(payload -> {
-            entry.setState(pos, ChunkState.READY);
-            return new ChunkLoadResult(pos, payload.orElseGet(CompoundTag::new), false);
-        entry.setState(ChunkState.QUEUED);
         return ioController.loadChunk(pos, dimension).thenApply(payload -> {
-            entry.setState(ChunkState.READY);
-            CompoundTag cooked = payload.map(tag -> sliceCache.dedupe(pos, tag)).orElseGet(CompoundTag::new);
-            return new ChunkLoadResult(pos, cooked, false);
-            CompoundTag resolved = payload.orElseGet(CompoundTag::new);
+            CompoundTag resolved = payload.map(tag -> sliceCache.dedupe(pos, tag)).orElseGet(CompoundTag::new);
             entry.setLastPersisted(resolved.copy());
+            entry.transitionTo(pos, ChunkState.READY);
             return new ChunkLoadResult(pos, resolved, false);
         });
     }
@@ -166,22 +149,11 @@ public final class ChunkStreamManager {
         lastGameTime.set(gameTime);
         ChunkStatusEntry entry = STATE.computeIfAbsent(pos, ignored -> new ChunkStatusEntry());
         entry.touch(gameTime);
-        entry.transitionTo(ChunkState.ACTIVE);
-        cacheWarm(pos, payload);
-        ioController.enqueueSave(pos, payload, gameTime);
-        entry.setState(pos, ChunkState.ACTIVE);
-        entry.setState(ChunkState.ACTIVE);
-        CompoundTag snapshot = payload.copy();
-        synchronized (WARM_CACHE) {
-            WARM_CACHE.put(pos, sanitized.copy());
-        }
-        ioController.enqueueSave(pos, sanitized, gameTime);
-            WARM_CACHE.put(pos, snapshot.copy());
-        }
-        ioController.enqueueSave(pos, payload, gameTime, dimension);
-        DirtySegmentSet diff = DirtySegmentSet.diff(entry.getLastPersisted(), snapshot);
+        entry.transitionTo(pos, ChunkState.ACTIVE);
+        cacheWarm(pos, sanitized);
+        DirtySegmentSet diff = DirtySegmentSet.diff(entry.getLastPersisted(), sanitized);
         entry.markDirty(diff);
-        ioController.enqueueSave(pos, snapshot, diff, gameTime);
+        ioController.enqueueSave(pos, sanitized, diff, gameTime, dimension);
     }
 
     public static void markActive(ChunkPos pos, long gameTime) {
@@ -191,8 +163,7 @@ public final class ChunkStreamManager {
         lastGameTime.set(gameTime);
         ChunkStatusEntry entry = STATE.computeIfAbsent(pos, ignored -> new ChunkStatusEntry());
         entry.touch(gameTime);
-        entry.transitionTo(ChunkState.ACTIVE);
-        entry.setState(pos, ChunkState.ACTIVE);
+        entry.transitionTo(pos, ChunkState.ACTIVE);
         promoteHot(pos);
         removeWarm(pos);
     }
@@ -203,6 +174,7 @@ public final class ChunkStreamManager {
         }
         lastGameTime.set(gameTime);
         expireTickets(gameTime);
+        ioController.tick(gameTime);
     }
 
     /**
@@ -240,14 +212,14 @@ public final class ChunkStreamManager {
     public static ChunkStreamStats snapshot() {
         Map<ChunkState, Integer> stateCounts = new EnumMap<>(ChunkState.class);
         Map<ChunkTicketType, Integer> ticketCounts = new EnumMap<>(ChunkTicketType.class);
-        java.util.concurrent.atomic.AtomicInteger totalTickets = new java.util.concurrent.atomic.AtomicInteger();
+        AtomicInteger totalTickets = new AtomicInteger();
 
         STATE.forEach((pos, entry) -> {
             stateCounts.merge(entry.state, 1, Integer::sum);
-            for (ChunkTicket ticket : entry.tickets.values()) {
+            entry.tickets.values().forEach(ticket -> {
                 ticketCounts.merge(ticket.type(), 1, Integer::sum);
                 totalTickets.incrementAndGet();
-            }
+            });
         });
 
         return new ChunkStreamStats(
@@ -270,26 +242,15 @@ public final class ChunkStreamManager {
         List<ChunkPos> expired = new ArrayList<>();
         STATE.forEach((pos, entry) -> {
             entry.tickets.entrySet().removeIf(ticket -> {
-                boolean expired = ticket.getValue().isExpired(gameTime);
-                if (expired && ModConstants.LOGGER.isTraceEnabled()) {
+                boolean isExpired = ticket.getValue().isExpired(gameTime);
+                if (isExpired && ModConstants.LOGGER.isTraceEnabled()) {
                     ModConstants.LOGGER.trace("[ChunkStream][{}] Ticket {} expired at tick {}.", pos, ticket.getKey(), gameTime);
                 }
-                return expired;
+                return isExpired;
             });
             if (entry.tickets.isEmpty()) {
-                entry.transitionTo(ChunkState.UNLOADING);
+                entry.transitionTo(pos, ChunkState.UNLOADING);
                 expired.add(pos);
-                entry.setState(pos, ChunkState.UNLOADING);
-                synchronized (WARM_CACHE) {
-                    CompoundTag cached = WARM_CACHE.remove(pos);
-                    if (cached != null) {
-                        ModConstants.LOGGER.debug("[ChunkStream] Evicting warm chunk {} after ticket expiry.", pos);
-                    }
-                }
-                synchronized (HOT_CACHE) {
-                    HOT_CACHE.remove(pos);
-                }
-                STATE.remove(pos);
             }
         });
         for (ChunkPos pos : expired) {
@@ -307,7 +268,7 @@ public final class ChunkStreamManager {
     private static void demoteToWarm(ChunkPos pos) {
         ChunkStatusEntry entry = STATE.get(pos);
         if (entry != null) {
-            entry.transitionTo(ChunkState.READY);
+            entry.transitionTo(pos, ChunkState.READY);
         }
         cacheWarm(pos, new CompoundTag());
     }
@@ -399,6 +360,8 @@ public final class ChunkStreamManager {
     private static void dropChunkBuffers(ChunkPos pos) {
         // Placeholder for future mesh/light buffer cleanup hooks.
         ModConstants.LOGGER.trace("[ChunkStream] Dropping cached buffers for {}", pos);
+    }
+
     public static boolean isWarmCached(ChunkPos pos) {
         synchronized (WARM_CACHE) {
             return WARM_CACHE.containsKey(pos);
@@ -419,10 +382,17 @@ public final class ChunkStreamManager {
             }
         }
 
-        void transitionTo(ChunkState newState) {
+        void transitionTo(ChunkPos pos, ChunkState newState) {
+            if (state == newState) {
+                return;
+            }
             boolean allowDemotion = state == ChunkState.ACTIVE && newState == ChunkState.READY;
             if (newState == ChunkState.UNLOADED || newState.ordinal() >= state.ordinal() || allowDemotion) {
+                ChunkState previous = state;
                 state = newState;
+                if (ModConstants.LOGGER.isTraceEnabled()) {
+                    ModConstants.LOGGER.trace("[ChunkStream][{}] State {} -> {}.", pos, previous, newState);
+                }
             }
         }
 
@@ -432,15 +402,6 @@ public final class ChunkStreamManager {
                     .mapToInt(ChunkTicketType::priority)
                     .max()
                     .orElse(0);
-        void setState(ChunkPos pos, ChunkState newState) {
-            if (state == newState) {
-                return;
-            }
-            ChunkState previous = state;
-            state = newState;
-            if (ModConstants.LOGGER.isTraceEnabled()) {
-                ModConstants.LOGGER.trace("[ChunkStream][{}] State {} -> {}.", pos, previous, newState);
-            }
         }
 
         void touch(long gameTime) {
@@ -484,7 +445,6 @@ public final class ChunkStreamManager {
         }
 
         CompletableFuture<Optional<CompoundTag>> loadChunk(ChunkPos pos, ResourceKey<Level> requestedDimension) {
-        CompletableFuture<Optional<CompoundTag>> loadChunk(ChunkPos pos, Runnable onStart) {
             ChunkStreamingConfig.ChunkConfigValues values = configSupplier.get();
             if (inFlight.incrementAndGet() > values.maxParallelIo()) {
                 inFlight.decrementAndGet();
@@ -492,6 +452,7 @@ public final class ChunkStreamManager {
             }
 
             CompletableFuture<Optional<CompoundTag>> payloadFuture = new CompletableFuture<>();
+            loadTasks.put(pos, payloadFuture);
             IoExecutors.submit(requestedDimension != null ? requestedDimension : dimension, "chunk-load-" + pos, () -> {
                 try {
                     ChunkStorageAdapter adapter = adapterSupplier.get();
@@ -504,36 +465,13 @@ public final class ChunkStreamManager {
                 } catch (Exception e) {
                     payloadFuture.completeExceptionally(e);
                 }
-            })
-            loadTasks.put(pos, payloadFuture);
-            if (onStart != null) {
-                try {
-                    onStart.run();
-                } catch (Exception e) {
-                    ModConstants.LOGGER.error("[ChunkStream] Failed to mark chunk {} as loading.", pos, e);
+            }).whenComplete((ignored, throwable) -> {
+                if (throwable != null && !payloadFuture.isDone()) {
+                    payloadFuture.completeExceptionally(throwable);
                 }
-            }
-            AsyncTaskManager.submitIoTask("chunk-load-" + pos, () -> {
-                        try {
-                            ChunkStorageAdapter adapter = adapterSupplier.get();
-                            if (adapter == null) {
-                                payloadFuture.complete(Optional.empty());
-                                return Optional.empty();
-                            }
-                            Optional<CompoundTag> payload = adapter.read(pos);
-                            payloadFuture.complete(payload);
-                        } catch (Exception e) {
-                            payloadFuture.completeExceptionally(e);
-                        }
-                        return Optional.empty();
-                    })
-                    .whenComplete((ignored, throwable) -> {
-                        if (throwable != null && !payloadFuture.isDone()) {
-                            payloadFuture.completeExceptionally(throwable);
-                        }
-                        loadTasks.remove(pos);
-                        inFlight.decrementAndGet();
-                    });
+                loadTasks.remove(pos);
+                inFlight.decrementAndGet();
+            });
 
             return payloadFuture.exceptionally(ex -> {
                 ModConstants.LOGGER.error("[ChunkStream] Failed to read chunk {}", pos, ex);
@@ -541,17 +479,16 @@ public final class ChunkStreamManager {
             });
         }
 
-        void enqueueSave(ChunkPos pos, CompoundTag payload, long gameTime, ResourceKey<Level> requestedDimension) {
-            pendingSaves.put(pos, new PendingSave(payload, gameTime + configSupplier.get().saveDebounceTicks(),
-                    requestedDimension != null ? requestedDimension : dimension));
-        void enqueueSave(ChunkPos pos, CompoundTag payload, DirtySegmentSet dirtySegments, long gameTime) {
+        void enqueueSave(ChunkPos pos, CompoundTag payload, DirtySegmentSet dirtySegments, long gameTime, ResourceKey<Level> requestedDimension) {
             pendingSaves.merge(
                     pos,
-                    new PendingSave(payload, dirtySegments, gameTime + configSupplier.get().saveDebounceTicks()),
+                    new PendingSave(payload, dirtySegments, gameTime + configSupplier.get().saveDebounceTicks(),
+                            requestedDimension != null ? requestedDimension : dimension),
                     (existing, incoming) -> new PendingSave(
                             incoming.payload(),
                             existing.dirtySegments().mergedWith(incoming.dirtySegments()),
-                            incoming.scheduledTick())
+                            incoming.scheduledTick(),
+                            incoming.dimension())
             );
         }
 
@@ -584,53 +521,21 @@ public final class ChunkStreamManager {
             return CompletableFuture.allOf(snapshot.entrySet().stream()
                     .map(entry -> {
                         inFlight.incrementAndGet();
-                        return submitWrite(entry.getKey(), entry.getValue().payload());
+                        return submitWrite(entry.getKey(), entry.getValue());
                     })
                     .toArray(CompletableFuture[]::new));
-            pendingSaves.entrySet().removeIf(entry -> {
-                if (entry.getValue().scheduledTick() > gameTime) {
-                    return false;
-                }
-                if (inFlight.get() >= values.maxParallelIo()) {
-                    return false;
-                }
-                inFlight.incrementAndGet();
-                ChunkPos pos = entry.getKey();
-                CompoundTag tag = entry.getValue().payload();
-                IoExecutors.submit(entry.getValue().dimension(), "chunk-save-" + pos, () -> {
-                    try {
-                        adapterSupplier.get().write(pos, tag);
-                    } catch (Exception e) {
-                        ModConstants.LOGGER.error("[ChunkStream] Failed to write chunk {}", pos, e);
-                    }
-                })
-                PendingSave save = entry.getValue();
-                AsyncTaskManager.submitIoTask("chunk-save-" + pos, () -> {
-                            try {
-                                ChunkStatusEntry statusEntry = STATE.get(pos);
-                                if (statusEntry == null) {
-                                    return Optional.empty();
-                                }
+        }
 
-                                DirtySegmentSet dirty = save.dirtySegments();
-                                if (!dirty.hasEntries()) {
-                                    return Optional.empty();
-                                }
+        void flushChunk(ChunkPos pos) {
+            PendingSave save = pendingSaves.remove(pos);
+            if (save != null) {
+                writeImmediately(pos, save.payload(), save.dimension());
+            }
+        }
 
-                                CompoundTag merged = dirty.isFullChunkDirty()
-                                        ? save.payload().copy()
-                                        : mergeDirtySegments(statusEntry.getLastPersisted(), save.payload(), dirty);
-
-                                adapterSupplier.get().write(pos, merged);
-                                statusEntry.setLastPersisted(merged.copy());
-                            } catch (Exception e) {
-                                ModConstants.LOGGER.error("[ChunkStream] Failed to write chunk {}", pos, e);
-                            }
-                            return Optional.empty();
-                        })
-                        .whenComplete((ignored, throwable) -> inFlight.decrementAndGet());
-                return true;
-            });
+        void flushAll() {
+            pendingSaves.forEach((pos, save) -> writeImmediately(pos, save.payload(), save.dimension()));
+            pendingSaves.clear();
         }
 
         int inFlightLoads() {
@@ -649,35 +554,55 @@ public final class ChunkStreamManager {
                 return false;
             }
             inFlight.incrementAndGet();
-            submitWrite(pos, pending.payload());
+            submitWrite(pos, pending);
             return true;
         }
 
-        private CompletableFuture<Void> submitWrite(ChunkPos pos, CompoundTag tag) {
+        private CompletableFuture<Void> submitWrite(ChunkPos pos, PendingSave save) {
             CompletableFuture<Void> completion = new CompletableFuture<>();
-            AsyncTaskManager.submitIoTask("chunk-save-" + pos, () -> {
-                        try {
-                            ChunkStorageAdapter adapter = adapterSupplier.get();
-                            if (adapter == null) {
-                                completion.complete(null);
-                                return Optional.empty();
-                            }
-                            adapter.write(pos, tag);
-                        } catch (Exception e) {
-                            ModConstants.LOGGER.error("[ChunkStream] Failed to write chunk {}", pos, e);
-                            completion.completeExceptionally(e);
+            IoExecutors.submit(save.dimension(), "chunk-save-" + pos, () -> {
+                try {
+                    ChunkStorageAdapter adapter = adapterSupplier.get();
+                    if (adapter == null) {
+                        completion.complete(null);
+                        return;
+                    }
+
+                    DirtySegmentSet dirty = save.dirtySegments();
+                    CompoundTag payload = save.payload();
+                    if (dirty.hasEntries()) {
+                        if (dirty.isFullChunkDirty()) {
+                            payload = save.payload().copy();
+                        } else {
+                        ChunkStatusEntry statusEntry = STATE.get(pos);
+                        CompoundTag baseline = statusEntry != null ? statusEntry.getLastPersisted() : null;
+                        payload = mergeDirtySegments(baseline, payload, dirty);
+                        if (statusEntry != null) {
+                            statusEntry.setLastPersisted(payload.copy());
                         }
-                        return Optional.empty();
-                    })
-                    .whenComplete((ignored, throwable) -> {
-                        if (throwable != null && !completion.isDone()) {
-                            completion.completeExceptionally(throwable);
-                        } else if (!completion.isDone()) {
-                            completion.complete(null);
                         }
-                        inFlight.decrementAndGet();
-                    });
+                    }
+
+                    adapter.write(pos, payload);
+                    ChunkStatusEntry statusEntry = STATE.get(pos);
+                    if (statusEntry != null) {
+                        statusEntry.setLastPersisted(payload.copy());
+                    }
+                } catch (Exception e) {
+                    ModConstants.LOGGER.error("[ChunkStream] Failed to write chunk {}", pos, e);
+                    completion.completeExceptionally(e);
+                }
+            }).whenComplete((ignored, throwable) -> {
+                if (throwable != null && !completion.isDone()) {
+                    completion.completeExceptionally(throwable);
+                } else if (!completion.isDone()) {
+                    completion.complete(null);
+                }
+                inFlight.decrementAndGet();
+            });
             return completion;
+        }
+
         private CompoundTag mergeDirtySegments(CompoundTag baseline, CompoundTag latest, DirtySegmentSet dirty) {
             CompoundTag merged = baseline == null ? new CompoundTag() : baseline.copy();
 
@@ -701,10 +626,7 @@ public final class ChunkStreamManager {
                     return false;
                 }
                 int y = section.getByte("Y");
-                if (!dirty.sectionYLevels().contains(y)) {
-                    return false;
-                }
-                return true;
+                return dirty.sectionYLevels().contains(y);
             });
 
             for (Integer y : dirty.sectionYLevels()) {
@@ -716,19 +638,9 @@ public final class ChunkStreamManager {
 
             merged.put("sections", sections);
             return merged;
-        void flushChunk(ChunkPos pos) {
-            PendingSave save = pendingSaves.remove(pos);
-            if (save != null) {
-                writeImmediately(pos, save.payload());
-            }
         }
 
-        void flushAll() {
-            pendingSaves.forEach(this::writeImmediately);
-            pendingSaves.clear();
-        }
-
-        private void writeImmediately(ChunkPos pos, CompoundTag payload) {
+        private void writeImmediately(ChunkPos pos, CompoundTag payload, ResourceKey<Level> requestedDimension) {
             ChunkStorageAdapter adapter = adapterSupplier.get();
             if (adapter == null) {
                 return;
@@ -741,10 +653,9 @@ public final class ChunkStreamManager {
         }
     }
 
-    private record PendingSave(CompoundTag payload, DirtySegmentSet dirtySegments, long scheduledTick) {
+    private record PendingSave(CompoundTag payload, DirtySegmentSet dirtySegments, long scheduledTick, ResourceKey<Level> dimension) {
     }
 
-    private record PendingSave(CompoundTag payload, long scheduledTick, ResourceKey<Level> dimension) {
     private static synchronized void scheduleWriteFlush() {
         cancelScheduler();
         if (!config.enabled()) {
