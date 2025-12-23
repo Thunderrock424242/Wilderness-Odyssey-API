@@ -156,6 +156,17 @@ tasks.withType(JavaExec).configureEach {
     classpath += configurations.bundledLibs
 }
 
+// Generate the mixin refmap during compilation so runtime remapping succeeds.
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += [
+        "-AmixinConfigs=mixins.wildernessodysseyapi.json",
+        "-AoutRefMap=mixins.wildernessodysseyapi.refmap.json",
+        "-AdefaultObfuscationEnv=searge",
+        "-AdisableTargetValidator=true",
+        "-AignoreInvalidTargets=true"
+    ]
+}
+
 repositories {
     maven {
         url "https://cursemaven.com"
@@ -163,6 +174,9 @@ repositories {
 }
 
 dependencies {
+    // Generate the mixin refmap so shadowed members remap correctly at runtime.
+    annotationProcessor "org.spongepowered:mixin:0.8.7:processor"
+
     implementation "curse.maven:worldedit-225608:5830452"
     implementation "curse.maven:tick-tok-lib-1298954:7301543"
     implementation "curse.maven:create-328085:7149903"
