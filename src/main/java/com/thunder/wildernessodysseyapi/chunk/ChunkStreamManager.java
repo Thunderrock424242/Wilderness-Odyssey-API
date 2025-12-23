@@ -1,11 +1,14 @@
 package com.thunder.wildernessodysseyapi.chunk;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
-import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
+import com.thunder.wildernessodysseyapi.io.BufferPool;
+import com.thunder.wildernessodysseyapi.io.IoExecutors;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -54,6 +57,7 @@ public final class ChunkStreamManager {
 
     private static ChunkStreamingConfig.ChunkConfigValues config = ChunkStreamingConfig.values();
     private static ChunkStorageAdapter storageAdapter;
+    private static ChunkIoController ioController = new ChunkIoController(() -> config, () -> storageAdapter, null);
     private static ChunkIoController ioController = new ChunkIoController(() -> config, () -> storageAdapter);
     private static ScheduledExecutorService writeScheduler;
     private static ScheduledFuture<?> writeFlushTask;
@@ -65,11 +69,13 @@ public final class ChunkStreamManager {
     public static synchronized void initialize(ChunkStreamingConfig.ChunkConfigValues values, ChunkStorageAdapter adapter) {
         config = values;
         storageAdapter = adapter;
+        BufferPool.configure(values);
         STATE.clear();
         WARM_CACHE_HITS.set(0L);
         WARM_CACHE_MISSES.set(0L);
         WARM_CACHE.clear();
         HOT_CACHE.clear();
+        ioController = new ChunkIoController(() -> config, () -> storageAdapter, null);
         sliceCache = new ChunkSliceCache(values.sliceInternLimit());
         sliceCache.reset();
         ChunkTickThrottler.configure(values);
@@ -86,10 +92,18 @@ public final class ChunkStreamManager {
         WARM_CACHE_MISSES.set(0L);
         WARM_CACHE.clear();
         HOT_CACHE.clear();
-        ioController = new ChunkIoController(() -> config, () -> storageAdapter);
+        ioController = new ChunkIoController(() -> config, () -> storageAdapter, null);
+    }
+
+    public static CompletableFuture<ChunkLoadResult> requestChunk(ResourceKey<Level> dimension, ChunkPos pos, ChunkTicketType ticketType, long gameTime) {
+        return requestChunkInternal(dimension, pos, ticketType, gameTime);
     }
 
     public static CompletableFuture<ChunkLoadResult> requestChunk(ChunkPos pos, ChunkTicketType ticketType, long gameTime) {
+        return requestChunkInternal(null, pos, ticketType, gameTime);
+    }
+
+    private static CompletableFuture<ChunkLoadResult> requestChunkInternal(ResourceKey<Level> dimension, ChunkPos pos, ChunkTicketType ticketType, long gameTime) {
         if (!config.enabled()) {
             return CompletableFuture.completedFuture(new ChunkLoadResult(pos, null, false));
         }
@@ -126,7 +140,7 @@ public final class ChunkStreamManager {
             entry.setState(pos, ChunkState.READY);
             return new ChunkLoadResult(pos, payload.orElseGet(CompoundTag::new), false);
         entry.setState(ChunkState.QUEUED);
-        return ioController.loadChunk(pos).thenApply(payload -> {
+        return ioController.loadChunk(pos, dimension).thenApply(payload -> {
             entry.setState(ChunkState.READY);
             CompoundTag cooked = payload.map(tag -> sliceCache.dedupe(pos, tag)).orElseGet(CompoundTag::new);
             return new ChunkLoadResult(pos, cooked, false);
@@ -136,7 +150,15 @@ public final class ChunkStreamManager {
         });
     }
 
+    public static void scheduleSave(ResourceKey<Level> dimension, ChunkPos pos, CompoundTag payload, long gameTime) {
+        scheduleSaveInternal(dimension, pos, payload, gameTime);
+    }
+
     public static void scheduleSave(ChunkPos pos, CompoundTag payload, long gameTime) {
+        scheduleSaveInternal(null, pos, payload, gameTime);
+    }
+
+    private static void scheduleSaveInternal(ResourceKey<Level> dimension, ChunkPos pos, CompoundTag payload, long gameTime) {
         if (!config.enabled()) {
             return;
         }
@@ -156,6 +178,7 @@ public final class ChunkStreamManager {
         ioController.enqueueSave(pos, sanitized, gameTime);
             WARM_CACHE.put(pos, snapshot.copy());
         }
+        ioController.enqueueSave(pos, payload, gameTime, dimension);
         DirtySegmentSet diff = DirtySegmentSet.diff(entry.getLastPersisted(), snapshot);
         entry.markDirty(diff);
         ioController.enqueueSave(pos, snapshot, diff, gameTime);
@@ -450,13 +473,17 @@ public final class ChunkStreamManager {
         private final Map<ChunkPos, CompletableFuture<Optional<CompoundTag>>> loadTasks = new ConcurrentHashMap<>();
         private final java.util.function.Supplier<ChunkStreamingConfig.ChunkConfigValues> configSupplier;
         private final java.util.function.Supplier<ChunkStorageAdapter> adapterSupplier;
+        private final ResourceKey<Level> dimension;
 
         ChunkIoController(java.util.function.Supplier<ChunkStreamingConfig.ChunkConfigValues> configSupplier,
-                          java.util.function.Supplier<ChunkStorageAdapter> adapterSupplier) {
+                          java.util.function.Supplier<ChunkStorageAdapter> adapterSupplier,
+                          ResourceKey<Level> dimension) {
             this.configSupplier = configSupplier;
             this.adapterSupplier = adapterSupplier;
+            this.dimension = dimension;
         }
 
+        CompletableFuture<Optional<CompoundTag>> loadChunk(ChunkPos pos, ResourceKey<Level> requestedDimension) {
         CompletableFuture<Optional<CompoundTag>> loadChunk(ChunkPos pos, Runnable onStart) {
             ChunkStreamingConfig.ChunkConfigValues values = configSupplier.get();
             if (inFlight.incrementAndGet() > values.maxParallelIo()) {
@@ -465,6 +492,19 @@ public final class ChunkStreamManager {
             }
 
             CompletableFuture<Optional<CompoundTag>> payloadFuture = new CompletableFuture<>();
+            IoExecutors.submit(requestedDimension != null ? requestedDimension : dimension, "chunk-load-" + pos, () -> {
+                try {
+                    ChunkStorageAdapter adapter = adapterSupplier.get();
+                    if (adapter == null) {
+                        payloadFuture.complete(Optional.empty());
+                        return;
+                    }
+                    Optional<CompoundTag> payload = adapter.read(pos);
+                    payloadFuture.complete(payload);
+                } catch (Exception e) {
+                    payloadFuture.completeExceptionally(e);
+                }
+            })
             loadTasks.put(pos, payloadFuture);
             if (onStart != null) {
                 try {
@@ -501,6 +541,9 @@ public final class ChunkStreamManager {
             });
         }
 
+        void enqueueSave(ChunkPos pos, CompoundTag payload, long gameTime, ResourceKey<Level> requestedDimension) {
+            pendingSaves.put(pos, new PendingSave(payload, gameTime + configSupplier.get().saveDebounceTicks(),
+                    requestedDimension != null ? requestedDimension : dimension));
         void enqueueSave(ChunkPos pos, CompoundTag payload, DirtySegmentSet dirtySegments, long gameTime) {
             pendingSaves.merge(
                     pos,
@@ -553,6 +596,14 @@ public final class ChunkStreamManager {
                 }
                 inFlight.incrementAndGet();
                 ChunkPos pos = entry.getKey();
+                CompoundTag tag = entry.getValue().payload();
+                IoExecutors.submit(entry.getValue().dimension(), "chunk-save-" + pos, () -> {
+                    try {
+                        adapterSupplier.get().write(pos, tag);
+                    } catch (Exception e) {
+                        ModConstants.LOGGER.error("[ChunkStream] Failed to write chunk {}", pos, e);
+                    }
+                })
                 PendingSave save = entry.getValue();
                 AsyncTaskManager.submitIoTask("chunk-save-" + pos, () -> {
                             try {
@@ -693,6 +744,7 @@ public final class ChunkStreamManager {
     private record PendingSave(CompoundTag payload, DirtySegmentSet dirtySegments, long scheduledTick) {
     }
 
+    private record PendingSave(CompoundTag payload, long scheduledTick, ResourceKey<Level> dimension) {
     private static synchronized void scheduleWriteFlush() {
         cancelScheduler();
         if (!config.enabled()) {

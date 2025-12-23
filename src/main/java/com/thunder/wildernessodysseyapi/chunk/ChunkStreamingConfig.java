@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.chunk;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
+import com.thunder.wildernessodysseyapi.io.CompressionCodec;
 
 /**
  * Config entries for the chunk streaming pipeline and caches.
@@ -19,6 +20,12 @@ public final class ChunkStreamingConfig {
     public static final ModConfigSpec.IntValue STRUCTURE_TICKET_TTL;
     public static final ModConfigSpec.IntValue MAX_PARALLEL_IO;
     public static final ModConfigSpec.IntValue COMPRESSION_LEVEL;
+    public static final ModConfigSpec.EnumValue<CompressionCodec> COMPRESSION_CODEC;
+    public static final ModConfigSpec.BooleanValue PER_DIMENSION_EXECUTORS;
+    public static final ModConfigSpec.IntValue IO_THREADS;
+    public static final ModConfigSpec.IntValue IO_QUEUE_SIZE;
+    public static final ModConfigSpec.IntValue BUFFER_SLICE_BYTES;
+    public static final ModConfigSpec.IntValue BUFFER_SLICES_PER_THREAD;
     public static final ModConfigSpec.BooleanValue SKIP_WARM_CACHE_TICKING;
     public static final ModConfigSpec.IntValue FLUID_REDSTONE_THROTTLE_RADIUS;
     public static final ModConfigSpec.IntValue FLUID_REDSTONE_THROTTLE_INTERVAL;
@@ -55,8 +62,20 @@ public final class ChunkStreamingConfig {
                 .defineInRange("structureTicketTtl", 400, 40, 2400);
         MAX_PARALLEL_IO = BUILDER.comment("Maximum parallel chunk I/O operations submitted at once.")
                 .defineInRange("maxParallelIo", 4, 1, 64);
-        COMPRESSION_LEVEL = BUILDER.comment("GZIP compression level to use when writing chunk NBT.")
+        COMPRESSION_LEVEL = BUILDER.comment("Compression level to use when writing chunk NBT.")
                 .defineInRange("compressionLevel", 6, 1, 9);
+        COMPRESSION_CODEC = BUILDER.comment("Compression codec to use for chunk payloads.")
+                .defineEnum("compressionCodec", CompressionCodec.VANILLA_GZIP);
+        PER_DIMENSION_EXECUTORS = BUILDER.comment("Whether to spin up one I/O executor per dimension instead of sharing a global pool.")
+                .define("perDimensionExecutors", false);
+        IO_THREADS = BUILDER.comment("Worker count for dedicated chunk I/O executors.")
+                .defineInRange("ioThreads", Math.max(2, Runtime.getRuntime().availableProcessors() / 4), 1, 32);
+        IO_QUEUE_SIZE = BUILDER.comment("Maximum queued chunk I/O tasks per executor before new submissions are rejected.")
+                .defineInRange("ioQueueSize", 128, 16, 4096);
+        BUFFER_SLICE_BYTES = BUILDER.comment("Default slice size (in bytes) for pooled buffers used by NBT and mesh processing.")
+                .defineInRange("bufferSliceBytes", 16384, 1024, 262144);
+        BUFFER_SLICES_PER_THREAD = BUILDER.comment("Maximum number of pooled slices retained per worker thread.")
+                .defineInRange("bufferSlicesPerThread", 8, 1, 64);
         SKIP_WARM_CACHE_TICKING = BUILDER.comment("If true, block entity and random ticks are skipped for warm-cached chunks.")
                 .define("skipWarmCacheTicking", true);
         FLUID_REDSTONE_THROTTLE_RADIUS = BUILDER.comment("Radius (in blocks) around players where fluid and redstone random ticks run at full speed. Set to 0 to disable throttling.")
@@ -100,6 +119,12 @@ public final class ChunkStreamingConfig {
                 STRUCTURE_TICKET_TTL.get(),
                 MAX_PARALLEL_IO.get(),
                 COMPRESSION_LEVEL.get(),
+                COMPRESSION_CODEC.get(),
+                PER_DIMENSION_EXECUTORS.get(),
+                IO_THREADS.get(),
+                IO_QUEUE_SIZE.get(),
+                BUFFER_SLICE_BYTES.get(),
+                BUFFER_SLICES_PER_THREAD.get()
                 SKIP_WARM_CACHE_TICKING.get(),
                 FLUID_REDSTONE_THROTTLE_RADIUS.get(),
                 FLUID_REDSTONE_THROTTLE_INTERVAL.get(),
@@ -126,6 +151,12 @@ public final class ChunkStreamingConfig {
             int structureTicketTtl,
             int maxParallelIo,
             int compressionLevel,
+            CompressionCodec compressionCodec,
+            boolean perDimensionExecutors,
+            int ioThreads,
+            int ioQueueSize,
+            int bufferSliceBytes,
+            int bufferSlicesPerThread
             boolean skipWarmCacheTicking,
             int fluidRedstoneThrottleRadius,
             int fluidRedstoneThrottleInterval,
