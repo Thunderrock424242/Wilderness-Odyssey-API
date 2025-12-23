@@ -29,6 +29,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.EnumSet;
 
 /**
  * Lightweight relay server for the global chat network. It is intentionally small
@@ -52,11 +54,17 @@ public class GlobalChatRelayServer {
     private final Path analyticsDir = Path.of("analytics");
 
     public GlobalChatRelayServer(int port, String moderationToken, String clusterToken) throws IOException {
+        if (moderationToken == null || moderationToken.isBlank() || "changeme".equals(moderationToken)) {
+            throw new IllegalArgumentException("A non-default moderation token is required");
+        }
+        if (clusterToken == null || clusterToken.isBlank()) {
+            throw new IllegalArgumentException("A cluster token is required to start the relay");
+        }
         this.serverSocket = new ServerSocket(port);
         this.moderationToken = moderationToken;
         this.clusterToken = clusterToken;
         loadWhitelist();
-        Files.createDirectories(analyticsDir);
+        createDirectoriesSecure(analyticsDir);
     }
 
     public void start() {
@@ -134,16 +142,9 @@ public class GlobalChatRelayServer {
         if ("minecraft".equals(type)) {
             state.authenticated = true;
             state.role = "server";
-            return;
-        }
-        if ("external".equals(type)) {
-            if (externalWhitelist.contains(state.remoteAddress)) {
-                state.authenticated = true;
-                state.role = "external";
-                return;
+            if (packet.sender != null && !packet.sender.isBlank()) {
+                state.overrideServerId(packet.sender.trim());
             }
-            sendSystemMessage(state, "External connections must be whitelisted.");
-            closeQuietly(socket);
             return;
         }
         sendSystemMessage(state, "Unknown client type; connection rejected.");
@@ -267,7 +268,6 @@ public class GlobalChatRelayServer {
             return;
         }
         persistAnalytics(packet, state);
-        broadcast(packet, state);
     }
 
     private void persistAnalytics(GlobalChatPacket packet, ClientState state) {
@@ -295,7 +295,9 @@ public class GlobalChatRelayServer {
                 record.leftPlayerIds = packet.analyticsSync.leftPlayerIds;
             }
             try {
-                Path file = analyticsDir.resolve(player.uuid + ".json");
+                Path serverDir = analyticsDir.resolve(state.serverId);
+                createDirectoriesSecure(serverDir);
+                Path file = serverDir.resolve(player.uuid + ".json");
                 Files.writeString(file, GSON.toJson(record));
             } catch (IOException e) {
                 System.err.println("[GlobalChatRelayServer] Failed to persist analytics for player " + player.uuid
@@ -424,7 +426,7 @@ public class GlobalChatRelayServer {
     private static class ClientState {
         private final Socket socket;
         private final PrintWriter writer;
-        private final String serverId = UUID.randomUUID().toString();
+        private String serverId = UUID.randomUUID().toString();
         private Instant lastReset = Instant.now();
         private int messagesSent = 0;
         private boolean muted = false;
@@ -466,6 +468,12 @@ public class GlobalChatRelayServer {
         void unmute() {
             muted = false;
         }
+
+        void overrideServerId(String providedId) {
+            if (providedId != null && !providedId.isBlank()) {
+                this.serverId = providedId;
+            }
+        }
     }
 
     public static void main(String[] args) throws Exception {
@@ -475,5 +483,15 @@ public class GlobalChatRelayServer {
         GlobalChatRelayServer server = new GlobalChatRelayServer(port, token, clusterToken);
         Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
         server.start();
+    }
+
+    private void createDirectoriesSecure(Path dir) throws IOException {
+        Files.createDirectories(dir);
+        try {
+            Files.setPosixFilePermissions(dir, EnumSet.of(PosixFilePermission.OWNER_READ,
+                    PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE));
+        } catch (UnsupportedOperationException ignored) {
+            // Non-POSIX filesystems (e.g., Windows) will ignore permission tightening.
+        }
     }
 }
