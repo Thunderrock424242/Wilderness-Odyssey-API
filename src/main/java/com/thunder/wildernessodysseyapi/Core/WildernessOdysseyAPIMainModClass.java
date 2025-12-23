@@ -62,6 +62,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamManager;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamingConfig;
 import com.thunder.wildernessodysseyapi.chunk.DiskChunkStorageAdapter;
+import com.thunder.wildernessodysseyapi.chunk.ChunkDeltaTracker;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
@@ -192,6 +193,7 @@ public class WildernessOdysseyAPIMainModClass {
         ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
         chunkStorageRoot = event.getServer().getFile("config/" + CONFIG_FOLDER + "chunk-cache");
         ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
+        ChunkDeltaTracker.configure(chunkConfig);
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
         AnalyticsTracker.initialize(event.getServer(), event.getServer().getFile("config"));
     }
@@ -234,6 +236,13 @@ public class WildernessOdysseyAPIMainModClass {
 
         player.sendSystemMessage(Component.literal("[GlobalChat] Global chat is opt-in. Use /globalchatoptin to join or /globalchatoptout to leave."));
     }
+
+    @SubscribeEvent
+    public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            ChunkDeltaTracker.dropPlayer(player);
+        }
+    }
     /**
      * On server stopping.
      *
@@ -244,6 +253,7 @@ public class WildernessOdysseyAPIMainModClass {
         globalChatManager.shutdown();
         AsyncTaskManager.shutdown();
         ChunkStreamManager.shutdown();
+        ChunkDeltaTracker.shutdown();
         AnalyticsTracker.shutdown();
     }
 
@@ -307,6 +317,7 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == ChunkStreamingConfig.CONFIG_SPEC && chunkStorageRoot != null) {
             ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
             ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
+            ChunkDeltaTracker.configure(chunkConfig);
         }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
@@ -326,6 +337,7 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == ChunkStreamingConfig.CONFIG_SPEC && chunkStorageRoot != null) {
             ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
             ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
+            ChunkDeltaTracker.configure(chunkConfig);
         }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
