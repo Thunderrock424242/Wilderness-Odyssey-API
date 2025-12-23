@@ -241,6 +241,9 @@ public final class ChunkStreamManager {
     private static void expireTickets(long gameTime) {
         List<ChunkPos> expired = new ArrayList<>();
         STATE.forEach((pos, entry) -> {
+            if (entry.tickets.isEmpty()) {
+                return;
+            }
             entry.tickets.entrySet().removeIf(ticket -> {
                 boolean isExpired = ticket.getValue().isExpired(gameTime);
                 if (isExpired && ModConstants.LOGGER.isTraceEnabled()) {
