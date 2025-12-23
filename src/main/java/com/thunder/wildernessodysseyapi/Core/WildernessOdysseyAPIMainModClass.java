@@ -54,6 +54,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Mob;
@@ -64,6 +65,7 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamManager;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamingConfig;
+import com.thunder.wildernessodysseyapi.chunk.ChunkTickThrottler;
 import com.thunder.wildernessodysseyapi.chunk.DiskChunkStorageAdapter;
 import com.thunder.wildernessodysseyapi.chunk.ChunkDeltaTracker;
 import net.neoforged.fml.ModList;
@@ -287,6 +289,9 @@ public class WildernessOdysseyAPIMainModClass {
             worstTickTimeNanos = Math.max(worstTickTimeNanos, duration);
         }
         lastTickTimeNanos = now;
+        for (ServerLevel level : server.getAllLevels()) {
+            ChunkTickThrottler.tick(level);
+        }
         AsyncTaskManager.drainMainThreadQueue(server);
         if (server.overworld() != null) {
             ChunkStreamManager.tick(server.overworld().getGameTime());
