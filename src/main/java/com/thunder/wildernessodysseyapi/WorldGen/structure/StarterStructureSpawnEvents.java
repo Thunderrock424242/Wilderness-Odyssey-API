@@ -9,7 +9,7 @@ import net.minecraft.world.entity.MobCategory;
 import net.neoforged.bus.api.Event;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.entity.living.LivingSpawnEvent;
+import net.neoforged.neoforge.event.entity.living.MobSpawnEvent;
 
 /**
  * Denies hostile mob spawns inside the starter bunker immediately after placement.
@@ -20,7 +20,7 @@ public final class StarterStructureSpawnEvents {
     }
 
     @SubscribeEvent
-    public static void denyHostiles(LivingSpawnEvent.CheckSpawn event) {
+    public static void denyHostiles(MobSpawnEvent event) {
         if (!StructureConfig.PREVENT_STARTER_STRUCTURE_HOSTILES.get()) {
             return;
         }
