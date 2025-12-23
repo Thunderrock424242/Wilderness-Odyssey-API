@@ -49,5 +49,4 @@ public class StarterStructureUtilMixin {
     }
 }
 
-//todo make bunker defult starter structure so we can ship it like that
 //todo fix cryo tube glitch visual edit cryo tube welcoming screen
