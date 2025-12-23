@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -45,7 +46,7 @@ public final class ChunkWorkloadDriver {
         );
 
         Path root = Paths.get("build/profile/chunks");
-        DiskChunkStorageAdapter adapter = new DiskChunkStorageAdapter(root, config.compressionLevel());
+        DiskChunkStorageAdapter adapter = new DiskChunkStorageAdapter(root, config.compressionLevel(), config.compressionCodec());
 
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         ChunkStreamManager.initialize(config, adapter);
@@ -68,9 +69,11 @@ public final class ChunkWorkloadDriver {
 
             System.out.printf("Round %d/%d: loading chunks%n", round + 1, rounds);
             Instant loadStart = Instant.now();
+            AtomicLong loadGameTime = new AtomicLong(gameTime);
             List<CompletableFuture<ChunkLoadResult>> futures = positions.stream()
-                    .map(pos -> ChunkStreamManager.requestChunk(pos, ChunkTicketType.PLAYER, gameTime++))
+                    .map(pos -> ChunkStreamManager.requestChunk(pos, ChunkTicketType.PLAYER, loadGameTime.getAndIncrement()))
                     .toList();
+            gameTime = loadGameTime.get();
             for (CompletableFuture<ChunkLoadResult> future : futures) {
                 future.join();
             }

@@ -49,7 +49,7 @@ class ChunkStreamingIntegrationTest {
                 4,
                 6
         );
-        DiskChunkStorageAdapter adapter = new DiskChunkStorageAdapter(temp, config.compressionLevel());
+        DiskChunkStorageAdapter adapter = new DiskChunkStorageAdapter(temp, config.compressionLevel(), config.compressionCodec());
 
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         ChunkStreamManager.initialize(config, adapter);
