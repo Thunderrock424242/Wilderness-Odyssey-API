@@ -116,6 +116,27 @@ public final class ChunkStreamManager {
         ioController.tick(gameTime);
     }
 
+    public static void flushChunk(ChunkPos pos) {
+        if (!config.enabled()) {
+            return;
+        }
+        STATE.remove(pos);
+        synchronized (HOT_CACHE) {
+            HOT_CACHE.remove(pos);
+        }
+        synchronized (WARM_CACHE) {
+            WARM_CACHE.remove(pos);
+        }
+        ioController.flushChunk(pos);
+    }
+
+    public static void flushAll() {
+        if (!config.enabled()) {
+            return;
+        }
+        ioController.flushAll();
+    }
+
     public static ChunkStreamStats snapshot() {
         return new ChunkStreamStats(
                 config.enabled(),
@@ -260,6 +281,30 @@ public final class ChunkStreamManager {
 
         int pendingSaves() {
             return pendingSaves.size();
+        }
+
+        void flushChunk(ChunkPos pos) {
+            PendingSave save = pendingSaves.remove(pos);
+            if (save != null) {
+                writeImmediately(pos, save.payload());
+            }
+        }
+
+        void flushAll() {
+            pendingSaves.forEach(this::writeImmediately);
+            pendingSaves.clear();
+        }
+
+        private void writeImmediately(ChunkPos pos, CompoundTag payload) {
+            ChunkStorageAdapter adapter = adapterSupplier.get();
+            if (adapter == null) {
+                return;
+            }
+            try {
+                adapter.write(pos, payload);
+            } catch (Exception e) {
+                ModConstants.LOGGER.error("[ChunkStream] Failed to flush chunk {}", pos, e);
+            }
         }
     }
 
