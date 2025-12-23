@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.WorldGen.spawn;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 import org.jetbrains.annotations.NotNull;
@@ -18,20 +19,26 @@ import java.util.Set;
  */
 public class CryoSpawnData extends SavedData {
     private static final String DATA_NAME = "wildernessodyssey_cryo_spawn_data";
+    private static final String VERSION_KEY = "version";
+    private static final int CURRENT_VERSION = 2;
     private final Set<Long> cryoPositions = new HashSet<>();
+    private int version = CURRENT_VERSION;
 
     public CryoSpawnData() {
     }
 
     public CryoSpawnData(CompoundTag tag, HolderLookup.Provider registries) {
+        this.version = tag.contains(VERSION_KEY, Tag.TAG_INT) ? tag.getInt(VERSION_KEY) : 1;
         long[] entries = tag.getLongArray("cryo_positions");
         for (long entry : entries) {
             cryoPositions.add(entry);
         }
+        migrateIfNeeded();
     }
 
     @Override
     public @NotNull CompoundTag save(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
+        tag.putInt(VERSION_KEY, version);
         tag.putLongArray("cryo_positions", cryoPositions.stream().mapToLong(Long::longValue).toArray());
         return tag;
     }
@@ -42,11 +49,7 @@ public class CryoSpawnData extends SavedData {
      * @return {@code true} if the position was newly added
      */
     public boolean add(BlockPos pos) {
-        if (cryoPositions.add(pos.asLong())) {
-            setDirty();
-            return true;
-        }
-        return false;
+        return add(pos.asLong());
     }
 
     /**
@@ -57,12 +60,9 @@ public class CryoSpawnData extends SavedData {
     public boolean addAll(Collection<BlockPos> positions) {
         boolean added = false;
         for (BlockPos pos : positions) {
-            if (cryoPositions.add(pos.asLong())) {
+            if (add(pos.asLong())) {
                 added = true;
             }
-        }
-        if (added) {
-            setDirty();
         }
         return added;
     }
@@ -71,11 +71,15 @@ public class CryoSpawnData extends SavedData {
      * Replaces all stored cryo tube positions.
      */
     public void replaceAll(Collection<BlockPos> positions) {
-        cryoPositions.clear();
+        Set<Long> newPositions = new HashSet<>(positions.size());
         for (BlockPos pos : positions) {
-            cryoPositions.add(pos.asLong());
+            newPositions.add(pos.asLong());
         }
-        setDirty();
+        if (!cryoPositions.equals(newPositions)) {
+            cryoPositions.clear();
+            cryoPositions.addAll(newPositions);
+            setDirty();
+        }
     }
 
     /**
@@ -100,5 +104,20 @@ public class CryoSpawnData extends SavedData {
                 new SavedData.Factory<>(CryoSpawnData::new, CryoSpawnData::new),
                 DATA_NAME
         );
+    }
+
+    private boolean add(long position) {
+        if (cryoPositions.add(position)) {
+            setDirty();
+            return true;
+        }
+        return false;
+    }
+
+    private void migrateIfNeeded() {
+        if (version < CURRENT_VERSION) {
+            version = CURRENT_VERSION;
+            setDirty();
+        }
     }
 }

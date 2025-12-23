@@ -20,6 +20,7 @@ public final class ChunkStreamingConfig {
     public static final ModConfigSpec.IntValue COMPRESSION_LEVEL;
     public static final ModConfigSpec.IntValue DELTA_CHANGE_BUDGET;
     public static final ModConfigSpec.IntValue LIGHT_COMPRESSION_LEVEL;
+    public static final ModConfigSpec.IntValue WRITE_FLUSH_INTERVAL_TICKS;
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
@@ -49,6 +50,8 @@ public final class ChunkStreamingConfig {
                 .defineInRange("deltaChangeBudget", 256, 32, 4096);
         LIGHT_COMPRESSION_LEVEL = BUILDER.comment("Compression level to use when sending individual light bands to players.")
                 .defineInRange("lightCompressionLevel", 6, 1, 9);
+        WRITE_FLUSH_INTERVAL_TICKS = BUILDER.comment("Interval (in ticks) to batch dirty chunk writes using the scheduled flush task.")
+                .defineInRange("writeFlushIntervalTicks", 20, 1, 200);
         BUILDER.pop();
 
         CONFIG_SPEC = BUILDER.build();
@@ -71,6 +74,7 @@ public final class ChunkStreamingConfig {
                 COMPRESSION_LEVEL.get(),
                 DELTA_CHANGE_BUDGET.get(),
                 LIGHT_COMPRESSION_LEVEL.get()
+                WRITE_FLUSH_INTERVAL_TICKS.get()
         );
     }
 
@@ -87,6 +91,7 @@ public final class ChunkStreamingConfig {
             int compressionLevel,
             int deltaChangeBudget,
             int lightCompressionLevel
+            int writeFlushIntervalTicks
     ) {
     }
 }
