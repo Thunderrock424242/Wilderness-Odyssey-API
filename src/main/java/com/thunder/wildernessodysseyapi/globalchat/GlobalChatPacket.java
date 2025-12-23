@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.globalchat;
 
 import com.thunder.wildernessodysseyapi.analytics.AnalyticsSnapshot;
+import com.thunder.wildernessodysseyapi.analytics.AnalyticsSyncView;
 
 /**
  * Simple line-delimited message exchanged between clients and the relay server.
@@ -35,4 +36,5 @@ public class GlobalChatPacket {
     public boolean muted;
     public long pingMillis;
     public AnalyticsSnapshot analytics;
+    public AnalyticsSyncView analyticsSync;
 }

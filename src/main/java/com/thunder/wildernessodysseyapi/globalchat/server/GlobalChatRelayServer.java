@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.globalchat.server;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.thunder.wildernessodysseyapi.analytics.AnalyticsSnapshot;
+import com.thunder.wildernessodysseyapi.analytics.AnalyticsSyncView;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatPacket;
 
 import java.io.BufferedReader;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.net.InetSocketAddress;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -287,6 +289,11 @@ public class GlobalChatRelayServer {
             record.cpuLoad = packet.analytics.cpuLoad;
             record.overloaded = packet.analytics.overloaded;
             record.overloadedReason = packet.analytics.overloadedReason;
+            if (packet.analyticsSync != null) {
+                record.status = packet.analyticsSync.status;
+                record.joinedPlayerIds = packet.analyticsSync.joinedPlayerIds;
+                record.leftPlayerIds = packet.analyticsSync.leftPlayerIds;
+            }
             try {
                 Path file = analyticsDir.resolve(player.uuid + ".json");
                 Files.writeString(file, GSON.toJson(record));
@@ -409,6 +416,9 @@ public class GlobalChatRelayServer {
         private double cpuLoad;
         private boolean overloaded;
         private String overloadedReason;
+        private AnalyticsSyncView.HealthStatus status;
+        private List<String> joinedPlayerIds;
+        private List<String> leftPlayerIds;
     }
 
     private static class ClientState {

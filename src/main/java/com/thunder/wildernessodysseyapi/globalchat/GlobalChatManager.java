@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.globalchat;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.thunder.wildernessodysseyapi.analytics.AnalyticsSnapshot;
+import com.thunder.wildernessodysseyapi.analytics.AnalyticsSyncView;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -163,7 +164,7 @@ public class GlobalChatManager {
         writer.println(GSON.toJson(packet));
     }
 
-    public void sendAnalyticsSnapshot(AnalyticsSnapshot snapshot) {
+    public void sendAnalyticsSnapshot(AnalyticsSnapshot snapshot, AnalyticsSyncView syncView) {
         if (!connected.get()) {
             return;
         }
@@ -172,6 +173,7 @@ public class GlobalChatManager {
         packet.sender = server != null ? server.getMotd() : "minecraft";
         packet.timestamp = System.currentTimeMillis();
         packet.analytics = snapshot;
+        packet.analyticsSync = syncView;
         writer.println(GSON.toJson(packet));
     }
 

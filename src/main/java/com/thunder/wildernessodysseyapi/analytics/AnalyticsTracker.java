@@ -41,6 +41,7 @@ public class AnalyticsTracker {
     private static long lastTickTimeNanos = 0L;
     private static long worstTickTimeNanos = 0L;
     private static AnalyticsSnapshot lastSnapshot;
+    private static AnalyticsSnapshot previousSnapshot;
 
     public static void initialize(MinecraftServer minecraftServer, Path configDir) {
         server = minecraftServer;
@@ -52,6 +53,7 @@ public class AnalyticsTracker {
     public static void shutdown() {
         server = null;
         lastSnapshot = null;
+        previousSnapshot = null;
         tickCounter = 0;
         lastTickTimeNanos = 0L;
         worstTickTimeNanos = 0L;
@@ -114,8 +116,10 @@ public class AnalyticsTracker {
                 .collect(Collectors.toList());
 
         worstTickTimeNanos = 0L;
+        previousSnapshot = lastSnapshot;
         lastSnapshot = snapshot;
-        CHAT.sendAnalyticsSnapshot(snapshot);
+        AnalyticsSyncView syncView = AnalyticsSyncView.fromSnapshots(snapshot, previousSnapshot);
+        CHAT.sendAnalyticsSnapshot(snapshot, syncView);
         ModConstants.LOGGER.debug("[Analytics] Sent snapshot: players={}, cpuLoad={} tick={}ms", snapshot.playerCount,
                 snapshot.cpuLoad, snapshot.worstTickMillis);
     }
