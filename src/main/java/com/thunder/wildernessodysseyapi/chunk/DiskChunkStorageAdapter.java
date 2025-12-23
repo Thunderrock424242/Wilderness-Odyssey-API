@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.chunk;
 
 import com.thunder.wildernessodysseyapi.util.NbtCompressionUtils;
 import com.thunder.wildernessodysseyapi.io.CompressionCodec;
+import com.thunder.wildernessodysseyapi.util.NbtDataCompactor;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 
@@ -31,12 +32,18 @@ public class DiskChunkStorageAdapter implements ChunkStorageAdapter {
             return Optional.empty();
         }
         return Optional.of(NbtCompressionUtils.readCompressed(path, compressionCodec));
+        CompoundTag payload = NbtCompressionUtils.readCompressed(path);
+        NbtDataCompactor.expandModPayload(payload);
+        return Optional.of(payload);
     }
 
     @Override
     public void write(ChunkPos pos, CompoundTag tag) throws IOException {
         Path path = chunkPath(pos);
         NbtCompressionUtils.writeCompressed(path, tag, compressionLevel, compressionCodec);
+        CompoundTag compacted = tag.copy();
+        NbtDataCompactor.compactModPayload(compacted);
+        NbtCompressionUtils.writeCompressed(path, compacted, compressionLevel);
     }
 
     private Path chunkPath(ChunkPos pos) {
