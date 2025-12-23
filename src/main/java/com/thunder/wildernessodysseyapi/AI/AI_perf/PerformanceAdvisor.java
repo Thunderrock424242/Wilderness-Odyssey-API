@@ -152,7 +152,7 @@ public final class PerformanceAdvisor {
                     : "No behavior adjustments required based on current samples.";
             case "chunk-processing" -> {
                 ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
-                ChunkTuningSuggestion tuning = recommendTuning(chunkConfig, saturation(load.observedValue(), 1000), ChunkStreamManager.snapshot());
+                ChunkTuningSuggestion tuning = recommendTuning(chunkConfig, saturation((int) load.observedValue(), 1000), ChunkStreamManager.snapshot());
                 if (!chunkConfig.enabled()) {
                     yield "Chunk streaming is disabled; enable it or temporarily lower simulation distance to ease chunk churn.";
                 }

@@ -129,7 +129,7 @@ public class AnalyticsTracker {
         if (processLoad >= 0) {
             return processLoad;
         }
-        double systemLoad = OS_BEAN.getSystemCpuLoad();
+        double systemLoad = OS_BEAN.getCpuLoad();
         return Math.max(0, systemLoad);
     }
 }
