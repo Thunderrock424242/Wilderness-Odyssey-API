@@ -163,6 +163,7 @@ tasks.withType(JavaCompile).configureEach {
         "-AmixinConfigs=mixins.wildernessodysseyapi.json",
         "-AoutRefMap=mixins.wildernessodysseyapi.refmap.json",
         "-AdefaultObfuscationEnv=named:official",
+        "-AdefaultObfuscationEnv=searge",
         "-AdisableTargetValidator=true",
         "-AignoreInvalidTargets=true"
     ]
