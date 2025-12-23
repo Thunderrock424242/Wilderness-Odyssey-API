@@ -124,7 +124,7 @@ public final class ChunkStreamingConfig {
                 IO_THREADS.get(),
                 IO_QUEUE_SIZE.get(),
                 BUFFER_SLICE_BYTES.get(),
-                BUFFER_SLICES_PER_THREAD.get()
+                BUFFER_SLICES_PER_THREAD.get(),
                 SKIP_WARM_CACHE_TICKING.get(),
                 FLUID_REDSTONE_THROTTLE_RADIUS.get(),
                 FLUID_REDSTONE_THROTTLE_INTERVAL.get(),
@@ -132,9 +132,9 @@ public final class ChunkStreamingConfig {
                 RANDOM_TICK_MAX_SCALE.get(),
                 MOVEMENT_SPEED_FOR_MAX_SCALE.get(),
                 RANDOM_TICK_PLAYER_BAND.get(),
-                SLICE_INTERN_LIMIT.get()
+                SLICE_INTERN_LIMIT.get(),
                 DELTA_CHANGE_BUDGET.get(),
-                LIGHT_COMPRESSION_LEVEL.get()
+                LIGHT_COMPRESSION_LEVEL.get(),
                 WRITE_FLUSH_INTERVAL_TICKS.get()
         );
     }
@@ -156,7 +156,7 @@ public final class ChunkStreamingConfig {
             int ioThreads,
             int ioQueueSize,
             int bufferSliceBytes,
-            int bufferSlicesPerThread
+            int bufferSlicesPerThread,
             boolean skipWarmCacheTicking,
             int fluidRedstoneThrottleRadius,
             int fluidRedstoneThrottleInterval,
@@ -164,10 +164,51 @@ public final class ChunkStreamingConfig {
             double randomTickMaxScale,
             double movementSpeedForMaxScale,
             int randomTickPlayerBand,
-            int sliceInternLimit
+            int sliceInternLimit,
             int deltaChangeBudget,
-            int lightCompressionLevel
+            int lightCompressionLevel,
             int writeFlushIntervalTicks
     ) {
+        public ChunkConfigValues(boolean enabled,
+                                 int hotCacheLimit,
+                                 int warmCacheLimit,
+                                 int saveDebounceTicks,
+                                 int playerTicketTtl,
+                                 int entityTicketTtl,
+                                 int redstoneTicketTtl,
+                                 int structureTicketTtl,
+                                 int maxParallelIo,
+                                 int compressionLevel) {
+            this(
+                    enabled,
+                    hotCacheLimit,
+                    warmCacheLimit,
+                    true,
+                    saveDebounceTicks,
+                    playerTicketTtl,
+                    entityTicketTtl,
+                    redstoneTicketTtl,
+                    structureTicketTtl,
+                    maxParallelIo,
+                    compressionLevel,
+                    CompressionCodec.VANILLA_GZIP,
+                    false,
+                    Math.max(2, Runtime.getRuntime().availableProcessors() / 4),
+                    128,
+                    16384,
+                    8,
+                    true,
+                    96,
+                    4,
+                    0.35D,
+                    1.25D,
+                    0.28D,
+                    128,
+                    384,
+                    256,
+                    6,
+                    20
+            );
+        }
     }
 }
