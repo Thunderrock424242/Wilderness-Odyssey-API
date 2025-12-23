@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.natamus.starterstructure_common_neoforge.util.Util;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureTerrainAdapter;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.SchematicEntityRestorer;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureSpawnGuard;
 import com.natamus.collective_common_neoforge.schematic.ParsedSchematicObject;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -45,6 +46,7 @@ public class StarterStructureUtilMixin {
         BlockPos structureOrigin = cir.getReturnValue();
         if (structureOrigin != null) {
             StarterStructureTerrainAdapter.scheduleTerrainReplacement(serverLevel, structureOrigin);
+            StarterStructureSpawnGuard.registerSpawnDenyZone(serverLevel, structureOrigin);
         }
     }
 }
