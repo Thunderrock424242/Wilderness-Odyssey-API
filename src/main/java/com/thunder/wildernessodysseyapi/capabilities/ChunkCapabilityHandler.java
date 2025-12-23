@@ -24,10 +24,8 @@ public final class ChunkCapabilityHandler {
         if (!(event.getLevel() instanceof ServerLevel)) return;
         if (!(event.getChunk() instanceof LevelChunk chunk)) return;
 
-        chunk.getExistingData(ModAttachments.CHUNK_DATA).ifPresent(data -> {
-            // Clear dirty on load to avoid unnecessary saves after hydration.
-            data.clearDirty();
-        });
+        // Clear dirty on load to avoid unnecessary saves after hydration.
+        chunk.getExistingData(ModAttachments.CHUNK_DATA).ifPresent(ChunkDataCapability::clearDirty);
     }
 
     @SubscribeEvent
