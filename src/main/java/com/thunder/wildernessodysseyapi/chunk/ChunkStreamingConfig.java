@@ -12,6 +12,7 @@ public final class ChunkStreamingConfig {
     public static final ModConfigSpec.BooleanValue ENABLED;
     public static final ModConfigSpec.IntValue HOT_CACHE_LIMIT;
     public static final ModConfigSpec.IntValue WARM_CACHE_LIMIT;
+    public static final ModConfigSpec.BooleanValue SPLIT_WARM_CACHE;
     public static final ModConfigSpec.IntValue SAVE_DEBOUNCE_TICKS;
     public static final ModConfigSpec.IntValue PLAYER_TICKET_TTL;
     public static final ModConfigSpec.IntValue ENTITY_TICKET_TTL;
@@ -47,6 +48,8 @@ public final class ChunkStreamingConfig {
                 .defineInRange("hotCacheLimit", 128, 16, 4096);
         WARM_CACHE_LIMIT = BUILDER.comment("Maximum number of warm cached chunks to keep around without ticking.")
                 .defineInRange("warmCacheLimit", 256, 32, 8192);
+        SPLIT_WARM_CACHE = BUILDER.comment("Enable separate hot and warm caches (warm = non-ticking, hot = ticking/rendered).")
+                .define("splitWarmCache", true);
         SAVE_DEBOUNCE_TICKS = BUILDER.comment("Ticks to wait before flushing a chunk save so rapid edits can be coalesced.")
                 .defineInRange("saveDebounceTicks", 20, 0, 200);
         PLAYER_TICKET_TTL = BUILDER.comment("How long (in ticks) a player ticket should keep a chunk alive after the player leaves range.")
@@ -108,6 +111,7 @@ public final class ChunkStreamingConfig {
                 ENABLED.get(),
                 HOT_CACHE_LIMIT.get(),
                 WARM_CACHE_LIMIT.get(),
+                SPLIT_WARM_CACHE.get(),
                 SAVE_DEBOUNCE_TICKS.get(),
                 PLAYER_TICKET_TTL.get(),
                 ENTITY_TICKET_TTL.get(),
@@ -139,6 +143,7 @@ public final class ChunkStreamingConfig {
             boolean enabled,
             int hotCacheLimit,
             int warmCacheLimit,
+            boolean splitWarmCache,
             int saveDebounceTicks,
             int playerTicketTtl,
             int entityTicketTtl,
