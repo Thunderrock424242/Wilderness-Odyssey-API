@@ -29,6 +29,7 @@ import com.thunder.wildernessodysseyapi.command.ChunkStatsCommand;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.command.DoorLockCommand;
+import com.thunder.wildernessodysseyapi.command.DebugChunkCommand;
 import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
@@ -226,6 +227,7 @@ public class WildernessOdysseyAPIMainModClass {
         AiAdvisorCommand.register(event.getDispatcher());
         AsyncStatsCommand.register(dispatcher);
         ChunkStatsCommand.register(dispatcher);
+        DebugChunkCommand.register(dispatcher);
         AnalyticsCommand.register(dispatcher);
         GlobalChatCommand.register(dispatcher);
         GlobalChatOptToggleCommand.register(dispatcher);
