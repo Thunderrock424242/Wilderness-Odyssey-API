@@ -116,8 +116,8 @@ sourceSets {
     integrationTest {
         java.srcDir 'src/integrationTest/java'
         resources.srcDir 'src/integrationTest/resources'
-        compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
-        runtimeClasspath += output + compileClasspath
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath + sourceSets.main.runtimeClasspath
     }
     jmh {
         java.srcDir 'src/jmh/java'
@@ -142,8 +142,8 @@ configurations {
     // Libraries that must be bundled directly into the mod jar so they are available at runtime.
     bundledLibs
 
-    integrationTestImplementation.extendsFrom testImplementation
-    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+    integrationTestImplementation.extendsFrom implementation, testImplementation
+    integrationTestRuntimeOnly.extendsFrom runtimeOnly, testRuntimeOnly
 
     jmhImplementation.extendsFrom implementation
     jmhRuntimeOnly.extendsFrom runtimeOnly
