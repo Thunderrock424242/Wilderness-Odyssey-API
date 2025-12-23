@@ -18,35 +18,38 @@ import java.util.List;
  */
 public class MeteorImpactData extends SavedData {
     private static final String DATA_NAME = "wo_meteor_location";
+    private static final String VERSION_KEY = "version";
+    private static final int CURRENT_VERSION = 2;
     private final List<Long> impactPositions = new ArrayList<>();
+    private int version = CURRENT_VERSION;
 
     public MeteorImpactData() {}
 
     public MeteorImpactData(CompoundTag tag, HolderLookup.Provider registries) {
-        if (tag.contains("positions", Tag.TAG_LONG_ARRAY)) {
-            long[] arr = tag.getLongArray("positions");
-            for (long entry : arr) {
-                impactPositions.add(entry);
-            }
-        } else if (tag.contains("pos")) {
-            impactPositions.add(tag.getLong("pos"));
-        }
+        this.version = tag.contains(VERSION_KEY, Tag.TAG_INT) ? tag.getInt(VERSION_KEY) : 1;
+        loadPositions(tag);
+        migrateIfNeeded();
 
     }
 
     @Override
     public @NotNull CompoundTag save(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
+        tag.putInt(VERSION_KEY, version);
         tag.putLongArray("positions", impactPositions.stream().mapToLong(Long::longValue).toArray());
         return tag;
     }
 
     /** Set all known impact positions and mark the data dirty. */
     public void setImpactPositions(List<BlockPos> positions) {
-        impactPositions.clear();
+        List<Long> newPositions = new ArrayList<>(positions.size());
         for (BlockPos pos : positions) {
-            impactPositions.add(pos.asLong());
+            newPositions.add(pos.asLong());
         }
-        setDirty();
+        if (!impactPositions.equals(newPositions)) {
+            impactPositions.clear();
+            impactPositions.addAll(newPositions);
+            setDirty();
+        }
     }
 
     /**
@@ -74,5 +77,23 @@ public class MeteorImpactData extends SavedData {
                 new SavedData.Factory<>(MeteorImpactData::new, MeteorImpactData::new),
                 DATA_NAME
         );
+    }
+
+    private void loadPositions(CompoundTag tag) {
+        if (tag.contains("positions", Tag.TAG_LONG_ARRAY)) {
+            long[] arr = tag.getLongArray("positions");
+            for (long entry : arr) {
+                impactPositions.add(entry);
+            }
+        } else if (tag.contains("pos")) {
+            impactPositions.add(tag.getLong("pos"));
+        }
+    }
+
+    private void migrateIfNeeded() {
+        if (version < CURRENT_VERSION) {
+            version = CURRENT_VERSION;
+            setDirty();
+        }
     }
 }

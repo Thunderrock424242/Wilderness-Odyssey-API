@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheCommand
 import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheConfig;
 import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
+import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
@@ -28,6 +29,7 @@ import com.thunder.wildernessodysseyapi.command.ChunkStatsCommand;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.command.DoorLockCommand;
+import com.thunder.wildernessodysseyapi.command.DebugChunkCommand;
 import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
@@ -59,11 +61,13 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.GenerationStep;
+import net.neoforged.neoforge.event.level.LevelEvent;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamManager;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamingConfig;
 import com.thunder.wildernessodysseyapi.chunk.ChunkTickThrottler;
 import com.thunder.wildernessodysseyapi.chunk.DiskChunkStorageAdapter;
+import com.thunder.wildernessodysseyapi.chunk.ChunkDeltaTracker;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
@@ -73,6 +77,7 @@ import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
@@ -84,6 +89,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.server.level.ServerLevel;
 
 
 import java.nio.file.Path;
@@ -133,6 +139,7 @@ public class WildernessOdysseyAPIMainModClass {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::onConfigLoaded);
         modEventBus.addListener(this::onConfigReloaded);
+        modEventBus.addListener(this::registerCapabilities);
         ModProcessors.PROCESSORS.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
 
@@ -177,6 +184,10 @@ public class WildernessOdysseyAPIMainModClass {
         LOGGER.warn("This message is for development purposes only."); // Logs as info
         dynamicModCount = ModList.get().getMods().size();
     }
+
+    private void registerCapabilities(RegisterCapabilitiesEvent event) {
+        event.register(ChunkDataCapability.class);
+    }
   
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
@@ -194,6 +205,7 @@ public class WildernessOdysseyAPIMainModClass {
         ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
         chunkStorageRoot = event.getServer().getFile("config/" + CONFIG_FOLDER + "chunk-cache");
         ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
+        ChunkDeltaTracker.configure(chunkConfig);
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
         AnalyticsTracker.initialize(event.getServer(), event.getServer().getFile("config"));
     }
@@ -219,6 +231,7 @@ public class WildernessOdysseyAPIMainModClass {
         AiAdvisorCommand.register(event.getDispatcher());
         AsyncStatsCommand.register(dispatcher);
         ChunkStatsCommand.register(dispatcher);
+        DebugChunkCommand.register(dispatcher);
         AnalyticsCommand.register(dispatcher);
         GlobalChatCommand.register(dispatcher);
         GlobalChatOptToggleCommand.register(dispatcher);
@@ -236,6 +249,13 @@ public class WildernessOdysseyAPIMainModClass {
 
         player.sendSystemMessage(Component.literal("[GlobalChat] Global chat is opt-in. Use /globalchatoptin to join or /globalchatoptout to leave."));
     }
+
+    @SubscribeEvent
+    public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            ChunkDeltaTracker.dropPlayer(player);
+        }
+    }
     /**
      * On server stopping.
      *
@@ -244,8 +264,11 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         globalChatManager.shutdown();
+        long gameTime = event.getServer().overworld() != null ? event.getServer().overworld().getGameTime() : 0L;
+        ChunkStreamManager.flushAll(gameTime);
         AsyncTaskManager.shutdown();
         ChunkStreamManager.shutdown();
+        ChunkDeltaTracker.shutdown();
         AnalyticsTracker.shutdown();
     }
 
@@ -302,6 +325,13 @@ public class WildernessOdysseyAPIMainModClass {
         event.addListener(new FaqReloadListener());
     }
 
+    @SubscribeEvent
+    public void onWorldSave(LevelEvent.Save event) {
+        if (event.getLevel() instanceof ServerLevel serverLevel) {
+            ChunkStreamManager.flushAll(serverLevel.getGameTime());
+        }
+    }
+
     public void onConfigLoaded(ModConfigEvent.Loading event) {
         if (event.getConfig().getSpec() == ModDataCacheConfig.CONFIG_SPEC) {
             ModDataCache.initialize();
@@ -312,6 +342,7 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == ChunkStreamingConfig.CONFIG_SPEC && chunkStorageRoot != null) {
             ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
             ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
+            ChunkDeltaTracker.configure(chunkConfig);
         }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
@@ -331,6 +362,7 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == ChunkStreamingConfig.CONFIG_SPEC && chunkStorageRoot != null) {
             ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
             ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
+            ChunkDeltaTracker.configure(chunkConfig);
         }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();

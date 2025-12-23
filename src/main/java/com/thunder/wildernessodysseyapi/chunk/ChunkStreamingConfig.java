@@ -26,6 +26,9 @@ public final class ChunkStreamingConfig {
     public static final ModConfigSpec.DoubleValue MOVEMENT_SPEED_FOR_MAX_SCALE;
     public static final ModConfigSpec.IntValue RANDOM_TICK_PLAYER_BAND;
     public static final ModConfigSpec.IntValue SLICE_INTERN_LIMIT;
+    public static final ModConfigSpec.IntValue DELTA_CHANGE_BUDGET;
+    public static final ModConfigSpec.IntValue LIGHT_COMPRESSION_LEVEL;
+    public static final ModConfigSpec.IntValue WRITE_FLUSH_INTERVAL_TICKS;
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
@@ -67,6 +70,12 @@ public final class ChunkStreamingConfig {
                 .defineInRange("randomTickPlayerBand", 128, 32, 256);
         SLICE_INTERN_LIMIT = BUILDER.comment("Maximum number of cached biome/noise slice hashes to retain for interning.")
                 .defineInRange("sliceInternLimit", 384, 64, 2048);
+        DELTA_CHANGE_BUDGET = BUILDER.comment("Number of chunk changes that can be streamed as deltas before forcing a full sync.")
+                .defineInRange("deltaChangeBudget", 256, 32, 4096);
+        LIGHT_COMPRESSION_LEVEL = BUILDER.comment("Compression level to use when sending individual light bands to players.")
+                .defineInRange("lightCompressionLevel", 6, 1, 9);
+        WRITE_FLUSH_INTERVAL_TICKS = BUILDER.comment("Interval (in ticks) to batch dirty chunk writes using the scheduled flush task.")
+                .defineInRange("writeFlushIntervalTicks", 20, 1, 200);
         BUILDER.pop();
 
         CONFIG_SPEC = BUILDER.build();
@@ -95,6 +104,9 @@ public final class ChunkStreamingConfig {
                 MOVEMENT_SPEED_FOR_MAX_SCALE.get(),
                 RANDOM_TICK_PLAYER_BAND.get(),
                 SLICE_INTERN_LIMIT.get()
+                DELTA_CHANGE_BUDGET.get(),
+                LIGHT_COMPRESSION_LEVEL.get()
+                WRITE_FLUSH_INTERVAL_TICKS.get()
         );
     }
 
@@ -117,6 +129,9 @@ public final class ChunkStreamingConfig {
             double movementSpeedForMaxScale,
             int randomTickPlayerBand,
             int sliceInternLimit
+            int deltaChangeBudget,
+            int lightCompressionLevel
+            int writeFlushIntervalTicks
     ) {
     }
 }
