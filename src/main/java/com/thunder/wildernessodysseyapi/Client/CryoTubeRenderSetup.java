@@ -28,9 +28,15 @@ public class CryoTubeRenderSetup {
      */
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
+        // Allow both cutout and translucent layers. The base tube renders on
+        // cutout to avoid z-fighting when tubes touch, while the emissive
+        // overlay (texture slot #1 in the model) uses the translucent sheet so
+        // it can glow without being affected by lightmaps.
         event.enqueueWork(() ->
-                ItemBlockRenderTypes.setRenderLayer(CryoTubeBlock.CRYO_TUBE.get(), RenderType.translucent())
+                ItemBlockRenderTypes.setRenderLayer(
+                        CryoTubeBlock.CRYO_TUBE.get(),
+                        renderType -> renderType == RenderType.cutout() || renderType == RenderType.translucent()
+                )
         );
     }
 }
-
