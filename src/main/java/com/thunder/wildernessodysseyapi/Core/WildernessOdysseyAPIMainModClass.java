@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheCommand
 import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheConfig;
 import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
+import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
@@ -59,6 +60,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.GenerationStep;
+import net.neoforged.neoforge.event.level.LevelEvent;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamManager;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamingConfig;
@@ -72,6 +74,7 @@ import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
@@ -83,6 +86,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.server.level.ServerLevel;
 
 
 import java.nio.file.Path;
@@ -132,6 +136,7 @@ public class WildernessOdysseyAPIMainModClass {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::onConfigLoaded);
         modEventBus.addListener(this::onConfigReloaded);
+        modEventBus.addListener(this::registerCapabilities);
         ModProcessors.PROCESSORS.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
 
@@ -175,6 +180,10 @@ public class WildernessOdysseyAPIMainModClass {
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
         dynamicModCount = ModList.get().getMods().size();
+    }
+
+    private void registerCapabilities(RegisterCapabilitiesEvent event) {
+        event.register(ChunkDataCapability.class);
     }
   
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
@@ -244,6 +253,8 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         globalChatManager.shutdown();
+        long gameTime = event.getServer().overworld() != null ? event.getServer().overworld().getGameTime() : 0L;
+        ChunkStreamManager.flushAll(gameTime);
         AsyncTaskManager.shutdown();
         ChunkStreamManager.shutdown();
         AnalyticsTracker.shutdown();
@@ -297,6 +308,13 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onReload(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
+    }
+
+    @SubscribeEvent
+    public void onWorldSave(LevelEvent.Save event) {
+        if (event.getLevel() instanceof ServerLevel serverLevel) {
+            ChunkStreamManager.flushAll(serverLevel.getGameTime());
+        }
     }
 
     public void onConfigLoaded(ModConfigEvent.Loading event) {
