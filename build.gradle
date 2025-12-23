@@ -24,12 +24,6 @@ tasks.named('wrapper', Wrapper).configure {
 version = "3.1.0"
 group = "com.thunder.wildernessodysseyapi"
 
-repositories {
-    mavenLocal()
-    mavenCentral()
-    maven { url "https://maven.fabricmc.net/" }
-}
-
 base {
     archivesName = "wildernessodysseyapi"
 }
@@ -157,17 +151,6 @@ tasks.withType(JavaExec).configureEach {
     classpath += configurations.bundledLibs
 }
 
-// Generate the mixin refmap during compilation so runtime remapping succeeds.
-tasks.withType(JavaCompile).configureEach {
-    options.compilerArgs += [
-        "-AmixinConfigs=mixins.wildernessodysseyapi.json",
-        "-AoutRefMap=mixins.wildernessodysseyapi.refmap.json",
-        "-AdefaultObfuscationEnv=named:official",
-        "-AdefaultObfuscationEnv=searge",
-        "-AdisableTargetValidator=true",
-        "-AignoreInvalidTargets=true"
-    ]
-}
 
 repositories {
     maven {
@@ -176,10 +159,6 @@ repositories {
 }
 
 dependencies {
-    // Generate the mixin refmap so shadowed members remap correctly at runtime.
-    annotationProcessor "org.spongepowered:mixin:0.8.7:processor"
-    // Supply an obfuscation service that understands Mojang official names.
-    annotationProcessor "net.fabricmc:fabric-mixin-compile-extensions:0.3.1.5"
 
     implementation "curse.maven:worldedit-225608:5830452"
     implementation "curse.maven:tick-tok-lib-1298954:7301543"

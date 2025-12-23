@@ -20,7 +20,6 @@ import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.processor.ModProcessors;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureBundler;
-import com.thunder.wildernessodysseyapi.WorldGen.spawn.WorldSpawnHandler;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.command.AiAdvisorCommand;
@@ -50,7 +49,6 @@ import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import com.thunder.wildernessodysseyapi.tide.TideConfig;
 import com.thunder.wildernessodysseyapi.tide.TideManager;
 import com.thunder.wildernessodysseyapi.chunk.ChunkDeltaTracker;
-import com.thunder.wildernessodysseyapi.Core.ModAttachments;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -59,10 +57,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.MobCategory;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.levelgen.GenerationStep;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamManager;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamingConfig;
@@ -78,7 +72,6 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
@@ -91,7 +84,6 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraft.world.item.CreativeModeTabs;
-import net.minecraft.server.level.ServerLevel;
 
 
 import java.nio.file.Path;
@@ -378,4 +370,3 @@ public class WildernessOdysseyAPIMainModClass {
         }
     }
 }
-//todo fix warnings

@@ -48,4 +48,3 @@ public class StarterStructureUtilMixin {
         }
     }
 }
-//todo fix cryo tube glitch visual edit cryo tube welcoming screen
