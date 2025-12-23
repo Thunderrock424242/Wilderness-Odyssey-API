@@ -31,3 +31,5 @@ repo
 
 # local environment
 .env
+/logs/debug.log
+/logs/latest.log

@@ -51,5 +51,3 @@ public class StarterStructureUtilMixin {
 
 //todo make bunker defult starter structure so we can ship it like that
 //todo fix cryo tube glitch visual edit cryo tube welcoming screen
-//todo get terrian replacer working and try to set orange block as the leveling tool.
-//todo add save compat

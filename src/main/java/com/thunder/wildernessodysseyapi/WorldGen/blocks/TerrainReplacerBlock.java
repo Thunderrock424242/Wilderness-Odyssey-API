@@ -28,7 +28,7 @@ public class TerrainReplacerBlock {
 
     /** Terrain replacer placeholder block. */
     public static final DeferredBlock<Block> TERRAIN_REPLACER = registerBlock(
-            () -> new Block(BlockBehaviour.Properties.ofFullCopy(Blocks.WHITE_WOOL)
+            () -> new Block(BlockBehaviour.Properties.ofFullCopy(Blocks.ORANGE_WOOL)
                     .sound(SoundType.WOOL)));
 
     private static <T extends Block> DeferredBlock<T> registerBlock(Supplier<T> block) {
