@@ -12,7 +12,13 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 /**
  * Coordinates chunk ticket lifecycle, caching, and async I/O.
@@ -39,6 +45,9 @@ public final class ChunkStreamManager {
     private static ChunkStreamingConfig.ChunkConfigValues config = ChunkStreamingConfig.values();
     private static ChunkStorageAdapter storageAdapter;
     private static ChunkIoController ioController = new ChunkIoController(() -> config, () -> storageAdapter);
+    private static ScheduledExecutorService writeScheduler;
+    private static ScheduledFuture<?> writeFlushTask;
+    private static final AtomicLong lastGameTime = new AtomicLong();
 
     private ChunkStreamManager() {
     }
@@ -50,11 +59,13 @@ public final class ChunkStreamManager {
         WARM_CACHE.clear();
         HOT_CACHE.clear();
         ioController = new ChunkIoController(() -> config, () -> storageAdapter);
+        scheduleWriteFlush();
         ModConstants.LOGGER.info("[ChunkStream] Initialized (hot cache: {}, warm cache: {}, debounce: {} ticks)",
                 config.hotCacheLimit(), config.warmCacheLimit(), config.saveDebounceTicks());
     }
 
     public static synchronized void shutdown() {
+        cancelScheduler();
         STATE.clear();
         WARM_CACHE.clear();
         HOT_CACHE.clear();
@@ -65,6 +76,7 @@ public final class ChunkStreamManager {
         if (!config.enabled()) {
             return CompletableFuture.completedFuture(new ChunkLoadResult(pos, null, false));
         }
+        lastGameTime.set(gameTime);
         ChunkStatusEntry entry = STATE.computeIfAbsent(pos, ignored -> new ChunkStatusEntry());
         entry.touch(gameTime);
         entry.upsertTicket(ticketType, gameTime + ticketType.resolveTtl(config));
@@ -89,6 +101,7 @@ public final class ChunkStreamManager {
         if (!config.enabled()) {
             return;
         }
+        lastGameTime.set(gameTime);
         ChunkStatusEntry entry = STATE.computeIfAbsent(pos, ignored -> new ChunkStatusEntry());
         entry.touch(gameTime);
         entry.setState(ChunkState.ACTIVE);
@@ -102,6 +115,7 @@ public final class ChunkStreamManager {
         if (!config.enabled()) {
             return;
         }
+        lastGameTime.set(gameTime);
         ChunkStatusEntry entry = STATE.computeIfAbsent(pos, ignored -> new ChunkStatusEntry());
         entry.touch(gameTime);
         entry.setState(ChunkState.ACTIVE);
@@ -112,8 +126,19 @@ public final class ChunkStreamManager {
         if (!config.enabled()) {
             return;
         }
+        lastGameTime.set(gameTime);
         expireTickets(gameTime);
-        ioController.tick(gameTime);
+    }
+
+    /**
+     * Immediately flushes all pending chunk saves, ignoring debounce windows. Intended for world saves or shutdown.
+     */
+    public static void flushAll(long gameTime) {
+        if (!config.enabled()) {
+            return;
+        }
+        lastGameTime.set(gameTime);
+        ioController.flushAll(gameTime).join();
     }
 
     public static ChunkStreamStats snapshot() {
@@ -231,27 +256,24 @@ public final class ChunkStreamManager {
 
         void tick(long gameTime) {
             ChunkStreamingConfig.ChunkConfigValues values = configSupplier.get();
-            pendingSaves.entrySet().removeIf(entry -> {
-                if (entry.getValue().scheduledTick() > gameTime) {
-                    return false;
-                }
-                if (inFlight.get() >= values.maxParallelIo()) {
-                    return false;
-                }
-                inFlight.incrementAndGet();
-                ChunkPos pos = entry.getKey();
-                CompoundTag tag = entry.getValue().payload();
-                AsyncTaskManager.submitIoTask("chunk-save-" + pos, () -> {
-                            try {
-                                adapterSupplier.get().write(pos, tag);
-                            } catch (Exception e) {
-                                ModConstants.LOGGER.error("[ChunkStream] Failed to write chunk {}", pos, e);
-                            }
-                            return Optional.empty();
-                        })
-                        .whenComplete((ignored, throwable) -> inFlight.decrementAndGet());
-                return true;
-            });
+            pendingSaves.entrySet().removeIf(entry -> tryFlushEntry(entry.getKey(), entry.getValue(), values, gameTime));
+        }
+
+        CompletableFuture<Void> flushAll(long gameTime) {
+            Map<ChunkPos, PendingSave> snapshot = pendingSaves.entrySet()
+                    .stream()
+                    .filter(entry -> entry.getValue() != null)
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            pendingSaves.clear();
+            if (snapshot.isEmpty()) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return CompletableFuture.allOf(snapshot.entrySet().stream()
+                    .map(entry -> {
+                        inFlight.incrementAndGet();
+                        return submitWrite(entry.getKey(), entry.getValue().payload());
+                    })
+                    .toArray(CompletableFuture[]::new));
         }
 
         int inFlightLoads() {
@@ -261,8 +283,79 @@ public final class ChunkStreamManager {
         int pendingSaves() {
             return pendingSaves.size();
         }
+
+        private boolean tryFlushEntry(ChunkPos pos, PendingSave pending, ChunkStreamingConfig.ChunkConfigValues values, long gameTime) {
+            if (pending.scheduledTick() > gameTime) {
+                return false;
+            }
+            if (inFlight.get() >= values.maxParallelIo()) {
+                return false;
+            }
+            inFlight.incrementAndGet();
+            submitWrite(pos, pending.payload());
+            return true;
+        }
+
+        private CompletableFuture<Void> submitWrite(ChunkPos pos, CompoundTag tag) {
+            CompletableFuture<Void> completion = new CompletableFuture<>();
+            AsyncTaskManager.submitIoTask("chunk-save-" + pos, () -> {
+                        try {
+                            ChunkStorageAdapter adapter = adapterSupplier.get();
+                            if (adapter == null) {
+                                completion.complete(null);
+                                return Optional.empty();
+                            }
+                            adapter.write(pos, tag);
+                        } catch (Exception e) {
+                            ModConstants.LOGGER.error("[ChunkStream] Failed to write chunk {}", pos, e);
+                            completion.completeExceptionally(e);
+                        }
+                        return Optional.empty();
+                    })
+                    .whenComplete((ignored, throwable) -> {
+                        if (throwable != null && !completion.isDone()) {
+                            completion.completeExceptionally(throwable);
+                        } else if (!completion.isDone()) {
+                            completion.complete(null);
+                        }
+                        inFlight.decrementAndGet();
+                    });
+            return completion;
+        }
     }
 
     private record PendingSave(CompoundTag payload, long scheduledTick) {
+    }
+
+    private static synchronized void scheduleWriteFlush() {
+        cancelScheduler();
+        if (!config.enabled()) {
+            return;
+        }
+        writeScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "wildernessodyssey-chunk-writer");
+            t.setDaemon(true);
+            return t;
+        });
+        long intervalTicks = Math.max(1, config.writeFlushIntervalTicks());
+        long intervalMs = intervalTicks * 50L;
+        writeFlushTask = writeScheduler.scheduleAtFixedRate(() -> {
+            try {
+                ioController.tick(lastGameTime.get());
+            } catch (Exception e) {
+                ModConstants.LOGGER.error("[ChunkStream] Scheduled write flush failed", e);
+            }
+        }, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
+    }
+
+    private static synchronized void cancelScheduler() {
+        if (writeFlushTask != null) {
+            writeFlushTask.cancel(false);
+            writeFlushTask = null;
+        }
+        if (writeScheduler != null) {
+            writeScheduler.shutdownNow();
+            writeScheduler = null;
+        }
     }
 }

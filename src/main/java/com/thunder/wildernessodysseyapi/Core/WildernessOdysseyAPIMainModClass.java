@@ -58,6 +58,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.GenerationStep;
+import net.neoforged.neoforge.event.level.LevelEvent;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamManager;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamingConfig;
@@ -82,6 +83,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.server.level.ServerLevel;
 
 
 import java.nio.file.Path;
@@ -242,6 +244,8 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         globalChatManager.shutdown();
+        long gameTime = event.getServer().overworld() != null ? event.getServer().overworld().getGameTime() : 0L;
+        ChunkStreamManager.flushAll(gameTime);
         AsyncTaskManager.shutdown();
         ChunkStreamManager.shutdown();
         AnalyticsTracker.shutdown();
@@ -295,6 +299,13 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onReload(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
+    }
+
+    @SubscribeEvent
+    public void onWorldSave(LevelEvent.Save event) {
+        if (event.getLevel() instanceof ServerLevel serverLevel) {
+            ChunkStreamManager.flushAll(serverLevel.getGameTime());
+        }
     }
 
     public void onConfigLoaded(ModConfigEvent.Loading event) {
