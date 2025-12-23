@@ -18,6 +18,8 @@ public final class ChunkStreamingConfig {
     public static final ModConfigSpec.IntValue STRUCTURE_TICKET_TTL;
     public static final ModConfigSpec.IntValue MAX_PARALLEL_IO;
     public static final ModConfigSpec.IntValue COMPRESSION_LEVEL;
+    public static final ModConfigSpec.IntValue DELTA_CHANGE_BUDGET;
+    public static final ModConfigSpec.IntValue LIGHT_COMPRESSION_LEVEL;
     public static final ModConfigSpec.IntValue WRITE_FLUSH_INTERVAL_TICKS;
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
@@ -44,6 +46,10 @@ public final class ChunkStreamingConfig {
                 .defineInRange("maxParallelIo", 4, 1, 64);
         COMPRESSION_LEVEL = BUILDER.comment("GZIP compression level to use when writing chunk NBT.")
                 .defineInRange("compressionLevel", 6, 1, 9);
+        DELTA_CHANGE_BUDGET = BUILDER.comment("Number of chunk changes that can be streamed as deltas before forcing a full sync.")
+                .defineInRange("deltaChangeBudget", 256, 32, 4096);
+        LIGHT_COMPRESSION_LEVEL = BUILDER.comment("Compression level to use when sending individual light bands to players.")
+                .defineInRange("lightCompressionLevel", 6, 1, 9);
         WRITE_FLUSH_INTERVAL_TICKS = BUILDER.comment("Interval (in ticks) to batch dirty chunk writes using the scheduled flush task.")
                 .defineInRange("writeFlushIntervalTicks", 20, 1, 200);
         BUILDER.pop();
@@ -66,6 +72,8 @@ public final class ChunkStreamingConfig {
                 STRUCTURE_TICKET_TTL.get(),
                 MAX_PARALLEL_IO.get(),
                 COMPRESSION_LEVEL.get(),
+                DELTA_CHANGE_BUDGET.get(),
+                LIGHT_COMPRESSION_LEVEL.get()
                 WRITE_FLUSH_INTERVAL_TICKS.get()
         );
     }
@@ -81,6 +89,8 @@ public final class ChunkStreamingConfig {
             int structureTicketTtl,
             int maxParallelIo,
             int compressionLevel,
+            int deltaChangeBudget,
+            int lightCompressionLevel
             int writeFlushIntervalTicks
     ) {
     }
