@@ -3,9 +3,9 @@ package com.thunder.wildernessodysseyapi.chunk;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.level.ChunkDataEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
@@ -18,20 +18,16 @@ public final class ChunkStreamEvents {
     }
 
     @SubscribeEvent
-    public static void onChunkSave(ChunkEvent.Save event) {
+    public static void onChunkSave(ChunkDataEvent.Save event) {
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
-        if (!(event.getChunk() instanceof LevelChunk chunk)) return;
 
-        ChunkStreamManager.scheduleSave(chunk.getPos(), chunk.getPersistentData(), serverLevel.getGameTime());
+        ChunkStreamManager.scheduleSave(event.getChunk().getPos(), event.getData(), serverLevel.getGameTime());
     }
 
     @SubscribeEvent
     public static void onChunkUnload(ChunkEvent.Unload event) {
         if (!(event.getLevel() instanceof ServerLevel)) return;
-        if (!(event.getChunk() instanceof LevelChunk chunk)) return;
-
-        ChunkPos pos = chunk.getPos();
-        ChunkStreamManager.flushChunk(pos);
+        ChunkStreamManager.flushChunk(event.getChunk().getPos());
     }
 
     @SubscribeEvent

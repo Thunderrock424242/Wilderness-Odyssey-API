@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.capabilities;
 
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.neoforged.neoforge.common.util.INBTSerializable;
 
@@ -62,7 +63,7 @@ public class ChunkDataCapability implements INBTSerializable<CompoundTag> {
     }
 
     @Override
-    public CompoundTag serializeNBT() {
+    public CompoundTag serializeNBT(HolderLookup.Provider provider) {
         CompoundTag tag = new CompoundTag();
         tag.putInt(VISITS_TAG, visitCount);
         tag.putShort(FLAGS_TAG, stateFlags);
@@ -70,7 +71,7 @@ public class ChunkDataCapability implements INBTSerializable<CompoundTag> {
     }
 
     @Override
-    public void deserializeNBT(CompoundTag nbt) {
+    public void deserializeNBT(HolderLookup.Provider provider, CompoundTag nbt) {
         visitCount = nbt.getInt(VISITS_TAG);
         stateFlags = nbt.getShort(FLAGS_TAG);
         dirty = false;

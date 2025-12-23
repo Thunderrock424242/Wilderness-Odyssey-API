@@ -9,7 +9,6 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheCommand
 import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheConfig;
 import com.thunder.wildernessodysseyapi.MemUtils.MemCheckCommand;
 import com.thunder.wildernessodysseyapi.MemUtils.MemoryUtils;
-import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
@@ -49,6 +48,8 @@ import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import com.thunder.wildernessodysseyapi.tide.TideConfig;
 import com.thunder.wildernessodysseyapi.tide.TideManager;
+import com.thunder.wildernessodysseyapi.chunk.ChunkDeltaTracker;
+import com.thunder.wildernessodysseyapi.Core.ModAttachments;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -61,7 +62,6 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.GenerationStep;
-import net.neoforged.neoforge.event.level.LevelEvent;
 import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamManager;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamingConfig;
@@ -69,7 +69,7 @@ import com.thunder.wildernessodysseyapi.chunk.ChunkTickThrottler;
 import com.thunder.wildernessodysseyapi.chunk.DiskChunkStorageAdapter;
 import com.thunder.wildernessodysseyapi.io.BufferPool;
 import com.thunder.wildernessodysseyapi.io.IoExecutors;
-import com.thunder.wildernessodysseyapi.chunk.ChunkDeltaTracker;
+import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
@@ -79,7 +79,6 @@ import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
@@ -141,9 +140,9 @@ public class WildernessOdysseyAPIMainModClass {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::onConfigLoaded);
         modEventBus.addListener(this::onConfigReloaded);
-        modEventBus.addListener(this::registerCapabilities);
         ModProcessors.PROCESSORS.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
+        ModAttachments.ATTACHMENTS.register(modEventBus);
 
         // Register global events
         NeoForge.EVENT_BUS.register(this);
@@ -187,10 +186,6 @@ public class WildernessOdysseyAPIMainModClass {
         dynamicModCount = ModList.get().getMods().size();
     }
 
-    private void registerCapabilities(RegisterCapabilitiesEvent event) {
-        event.register(ChunkDataCapability.class);
-    }
-  
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(CryoTubeBlock.CRYO_TUBE.get());
@@ -209,7 +204,6 @@ public class WildernessOdysseyAPIMainModClass {
         IoExecutors.initialize(chunkConfig);
         chunkStorageRoot = event.getServer().getFile("config/" + CONFIG_FOLDER + "chunk-cache");
         ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel(), chunkConfig.compressionCodec()));
-        ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
         ChunkDeltaTracker.configure(chunkConfig);
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
         AnalyticsTracker.initialize(event.getServer(), event.getServer().getFile("config"));
@@ -350,7 +344,6 @@ public class WildernessOdysseyAPIMainModClass {
             BufferPool.configure(chunkConfig);
             IoExecutors.initialize(chunkConfig);
             ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel(), chunkConfig.compressionCodec()));
-            ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
             ChunkDeltaTracker.configure(chunkConfig);
         }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
@@ -373,7 +366,6 @@ public class WildernessOdysseyAPIMainModClass {
             BufferPool.configure(chunkConfig);
             IoExecutors.initialize(chunkConfig);
             ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel(), chunkConfig.compressionCodec()));
-            ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel()));
             ChunkDeltaTracker.configure(chunkConfig);
         }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
