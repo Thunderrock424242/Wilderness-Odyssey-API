@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -56,7 +55,7 @@ class ChunkStreamingIntegrationTest {
 
         List<ChunkPos> positions = IntStream.range(0, CHUNK_COUNT)
                 .mapToObj(i -> new ChunkPos(i, -i))
-                .collect(Collectors.toList());
+                .toList();
 
         long gameTime = 0;
         long saveStart = System.nanoTime();
