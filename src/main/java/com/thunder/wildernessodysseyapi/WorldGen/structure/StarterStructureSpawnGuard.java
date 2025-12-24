@@ -4,9 +4,9 @@ import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ServerLevelAccessor;
 
 import java.util.List;
 import java.util.Map;
@@ -23,12 +23,8 @@ public final class StarterStructureSpawnGuard {
     }
 
     public static void registerSpawnDenyZone(ServerLevel level, BlockPos origin) {
-        if (!StructureConfig.PREVENT_STARTER_STRUCTURE_HOSTILES.get()) {
-            return;
-        }
-        if (level == null || origin == null) {
-            return;
-        }
+        if (!StructureConfig.PREVENT_STARTER_STRUCTURE_HOSTILES.get()) return;
+        if (level == null || origin == null) return;
 
         int radius = Math.max(1, StructureConfig.STARTER_STRUCTURE_SPAWN_DENY_RADIUS.get());
         int halfHeight = Math.max(1, StructureConfig.STARTER_STRUCTURE_SPAWN_DENY_HEIGHT.get());
@@ -43,18 +39,17 @@ public final class StarterStructureSpawnGuard {
         }
     }
 
-    public static boolean isDenied(LevelAccessor level, BlockPos pos) {
-        List<SpawnDenyZone> zones = ZONES.get(level.dimension());
-        if (zones == null || zones.isEmpty()) {
-            return false;
-        }
+    public static boolean isDenied(ServerLevelAccessor level, BlockPos pos) {
+        if (level == null || pos == null) return false;
+
+        ResourceKey<Level> dim = level.getLevel().dimension();
+        List<SpawnDenyZone> zones = ZONES.get(dim);
+
+        if (zones == null || zones.isEmpty()) return false;
 
         for (SpawnDenyZone zone : zones) {
-            if (zone.contains(pos)) {
-                return true;
-            }
+            if (zone.contains(pos)) return true;
         }
-
         return false;
     }
 
