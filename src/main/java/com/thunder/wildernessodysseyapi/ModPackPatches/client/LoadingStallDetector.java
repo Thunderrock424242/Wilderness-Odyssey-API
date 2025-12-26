@@ -215,8 +215,8 @@ public final class LoadingStallDetector {
         int ticks = safeMillisToTicks(safeMillis);
 
         String base = ticks >= TickTokHelper.TICKS_PER_HOUR
-                ? TickTokHelper.formatTicksToHMS(ticks)
-                : TickTokHelper.formatTicksToMinSec(ticks);
+                ? formatTicksToHMS(ticks)
+                : formatTicksToMinSec(ticks);
 
         long remainderMillis = safeMillis % 1000;
         return base + String.format(".%03d", remainderMillis);
@@ -265,6 +265,21 @@ public final class LoadingStallDetector {
     private static Duration toDuration(int ticks) {
         long millis = Math.round(TickTokHelper.toSeconds(ticks) * 1000.0d);
         return Duration.ofMillis(millis);
+    }
+
+    private static String formatTicksToHMS(int ticks) {
+        long seconds = Math.max(0L, Math.round(TickTokHelper.toSeconds(ticks)));
+        long hours = seconds / 3600;
+        long minutes = (seconds % 3600) / 60;
+        long remainderSeconds = seconds % 60;
+        return String.format("%02d:%02d:%02d", hours, minutes, remainderSeconds);
+    }
+
+    private static String formatTicksToMinSec(int ticks) {
+        long seconds = Math.max(0L, Math.round(TickTokHelper.toSeconds(ticks)));
+        long minutes = seconds / 60;
+        long remainderSeconds = seconds % 60;
+        return String.format("%02d:%02d", minutes, remainderSeconds);
     }
 
     private static long parseColonTimeSeconds(String value) {
