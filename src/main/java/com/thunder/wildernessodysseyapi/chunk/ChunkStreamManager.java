@@ -452,6 +452,10 @@ public final class ChunkStreamManager {
 
         CompletableFuture<Optional<CompoundTag>> loadChunk(ChunkPos pos, ResourceKey<Level> requestedDimension) {
             ChunkStreamingConfig.ChunkConfigValues values = configSupplier.get();
+            CompletableFuture<Optional<CompoundTag>> inFlight = loadTasks.get(pos);
+            if (inFlight != null) {
+                return inFlight;
+            }
             LoadRequest request = new LoadRequest(
                     pos,
                     requestedDimension != null ? requestedDimension : dimension,
@@ -481,6 +485,9 @@ public final class ChunkStreamManager {
         }
 
         void enqueueSave(ChunkPos pos, CompoundTag payload, DirtySegmentSet dirtySegments, long gameTime, ResourceKey<Level> requestedDimension) {
+            if (!dirtySegments.hasEntries()) {
+                return;
+            }
             pendingSaves.merge(
                     pos,
                     new PendingSave(payload, dirtySegments, gameTime + configSupplier.get().saveDebounceTicks(),
