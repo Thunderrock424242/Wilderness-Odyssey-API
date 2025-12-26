@@ -29,7 +29,7 @@ public final class StarterStructureTerrainBlender {
 
         if (footprint == null || footprint.width() <= 0 || footprint.length() <= 0) {
             // Fall back to a conservative footprint if parsing failed.
-            footprint = new Footprint(origin, 32, 16, 32);
+            footprint = new Footprint(32, 16, 32);
         }
 
         int margin = Math.max(3, Math.min(8, Math.max(footprint.width(), footprint.length()) / 8));
