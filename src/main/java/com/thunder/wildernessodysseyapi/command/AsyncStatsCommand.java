@@ -35,6 +35,7 @@ public final class AsyncStatsCommand {
         source.sendSuccess(() -> Component.literal(" - Main-thread backlog: " + stats.mainThreadBacklog()), false);
         source.sendSuccess(() -> Component.literal(" - Applied last tick: " + stats.appliedLastTick()), false);
         source.sendSuccess(() -> Component.literal(" - Rejected tasks: " + stats.rejectedTasks()), false);
+        source.sendSuccess(() -> Component.literal(" - Caller-runs (backpressure): " + stats.callerRunsEvents()), false);
         return 1;
     }
 }
