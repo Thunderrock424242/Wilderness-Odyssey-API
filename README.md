@@ -24,6 +24,12 @@ Additional Resources:
 Community Documentation: https://docs.neoforged.net/
 NeoForged Discord: https://discord.neoforged.net/
 
+Loading Stall Detector:
+-----------------------
+If the loading screen stays up for 10+ minutes (common with 200+ mod packs), the mod now writes a snapshot to `logs/loading-stalls/`.
+Each report includes a thread dump and the active mod list so you can spot which thread/mod was executing when the hang occurred.
+Use `-Dwilderness.loadingstall.minutes=5` (for example) to lower the timeout; the suspects section lists the jar path for the top threads to speed up mod identification during loader hangs.
+
 Global Chat:
 ------------
 See `docs/global-chat-beginner.md` for a quickstart on hosting the relay, binding servers, and getting players talking.
