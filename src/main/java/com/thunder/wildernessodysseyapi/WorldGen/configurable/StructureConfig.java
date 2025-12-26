@@ -33,6 +33,8 @@ public class StructureConfig {
     public static final ModConfigSpec.IntValue STARTER_STRUCTURE_SCAN_HEIGHT;
     /** Delay (ticks) after the starter structure is scheduled before applying the terrain replacer */
     public static final ModConfigSpec.IntValue STARTER_STRUCTURE_DELAY_TICKS;
+    /** Additional layers of sampled terrain to place above the starter bunker roof to bury it */
+    public static final ModConfigSpec.IntValue STARTER_STRUCTURE_EXTRA_COVER_DEPTH;
     /** Horizontal radius where hostile mobs may not spawn around the placed starter bunker */
     public static final ModConfigSpec.IntValue STARTER_STRUCTURE_SPAWN_DENY_RADIUS;
     /** Vertical half-height where hostile mobs may not spawn around the placed starter bunker */
@@ -95,6 +97,11 @@ public class StructureConfig {
                                 + " Gives the placer time to finish setting blocks."
                 )
                 .defineInRange("starterStructureDelayTicks", 10, 1, 200);
+        STARTER_STRUCTURE_EXTRA_COVER_DEPTH = BUILDER.comment(
+                        "Number of extra layers of sampled terrain to place over the starter bunker roof after generation."
+                                + " Helps bury the oversized bunker under natural-looking ground."
+                )
+                .defineInRange("starterStructureExtraCoverDepth", 10, 0, 64);
         STARTER_STRUCTURE_SPAWN_DENY_RADIUS = BUILDER.comment(
                         "Horizontal radius (in blocks) around the starter bunker where hostile mob spawns are denied."
                 )
