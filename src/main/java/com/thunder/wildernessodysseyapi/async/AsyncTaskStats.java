@@ -11,5 +11,6 @@ public record AsyncTaskStats(
         int queuedWorkerTasks,
         int mainThreadBacklog,
         int appliedLastTick,
-        int rejectedTasks
+        int rejectedTasks,
+        int callerRunsEvents
 ) { }

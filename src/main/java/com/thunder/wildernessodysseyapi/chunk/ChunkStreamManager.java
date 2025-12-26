@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -435,6 +436,8 @@ public final class ChunkStreamManager {
         private final AtomicInteger inFlight = new AtomicInteger();
         private final Map<ChunkPos, PendingSave> pendingSaves = new ConcurrentHashMap<>();
         private final Map<ChunkPos, CompletableFuture<Optional<CompoundTag>>> loadTasks = new ConcurrentHashMap<>();
+        private final ConcurrentLinkedQueue<LoadRequest> pendingLoadQueue = new ConcurrentLinkedQueue<>();
+        private final AtomicInteger pendingLoadCount = new AtomicInteger();
         private final java.util.function.Supplier<ChunkStreamingConfig.ChunkConfigValues> configSupplier;
         private final java.util.function.Supplier<ChunkStorageAdapter> adapterSupplier;
         private final ResourceKey<Level> dimension;
@@ -449,34 +452,29 @@ public final class ChunkStreamManager {
 
         CompletableFuture<Optional<CompoundTag>> loadChunk(ChunkPos pos, ResourceKey<Level> requestedDimension) {
             ChunkStreamingConfig.ChunkConfigValues values = configSupplier.get();
-            if (inFlight.incrementAndGet() > values.maxParallelIo()) {
-                inFlight.decrementAndGet();
-                return CompletableFuture.completedFuture(Optional.empty());
+            LoadRequest request = new LoadRequest(
+                    pos,
+                    requestedDimension != null ? requestedDimension : dimension,
+                    new CompletableFuture<>(),
+                    System.nanoTime()
+            );
+            if (dispatchLoad(values, request)) {
+                return request.future().exceptionally(ex -> {
+                    ModConstants.LOGGER.error("[ChunkStream] Failed to read chunk {}", pos, ex);
+                    return Optional.empty();
+                });
             }
 
-            CompletableFuture<Optional<CompoundTag>> payloadFuture = new CompletableFuture<>();
-            loadTasks.put(pos, payloadFuture);
-            IoExecutors.submit(requestedDimension != null ? requestedDimension : dimension, "chunk-load-" + pos, () -> {
-                try {
-                    ChunkStorageAdapter adapter = adapterSupplier.get();
-                    if (adapter == null) {
-                        payloadFuture.complete(Optional.empty());
-                        return;
-                    }
-                    Optional<CompoundTag> payload = adapter.read(pos);
-                    payloadFuture.complete(payload);
-                } catch (Exception e) {
-                    payloadFuture.completeExceptionally(e);
-                }
-            }).whenComplete((ignored, throwable) -> {
-                if (throwable != null && !payloadFuture.isDone()) {
-                    payloadFuture.completeExceptionally(throwable);
-                }
-                loadTasks.remove(pos);
-                inFlight.decrementAndGet();
-            });
-
-            return payloadFuture.exceptionally(ex -> {
+            int queueLimit = loadQueueLimit(values);
+            int queued = pendingLoadCount.incrementAndGet();
+            if (queued > queueLimit) {
+                pendingLoadCount.decrementAndGet();
+                ModConstants.LOGGER.warn("[ChunkStream] Load queue full ({}); dropping request for {}", queueLimit, pos);
+                request.future().complete(Optional.empty());
+                return request.future();
+            }
+            pendingLoadQueue.offer(request);
+            return request.future().exceptionally(ex -> {
                 ModConstants.LOGGER.error("[ChunkStream] Failed to read chunk {}", pos, ex);
                 return Optional.empty();
             });
@@ -577,12 +575,12 @@ public final class ChunkStreamManager {
                         if (dirty.isFullChunkDirty()) {
                             payload = save.payload().copy();
                         } else {
-                        ChunkStatusEntry statusEntry = STATE.get(pos);
-                        CompoundTag baseline = statusEntry != null ? statusEntry.getLastPersisted() : null;
-                        payload = mergeDirtySegments(baseline, payload, dirty);
-                        if (statusEntry != null) {
-                            statusEntry.setLastPersisted(payload.copy());
-                        }
+                            ChunkStatusEntry statusEntry = STATE.get(pos);
+                            CompoundTag baseline = statusEntry != null ? statusEntry.getLastPersisted() : null;
+                            payload = mergeDirtySegments(baseline, payload, dirty);
+                            if (statusEntry != null) {
+                                statusEntry.setLastPersisted(payload.copy());
+                            }
                         }
                     }
 
@@ -602,8 +600,74 @@ public final class ChunkStreamManager {
                     completion.complete(null);
                 }
                 inFlight.decrementAndGet();
+                drainQueuedLoads();
             });
             return completion;
+        }
+
+        private boolean dispatchLoad(ChunkStreamingConfig.ChunkConfigValues values, LoadRequest request) {
+            if (inFlight.incrementAndGet() > values.maxParallelIo()) {
+                inFlight.decrementAndGet();
+                return false;
+            }
+            startLoad(request, values);
+            return true;
+        }
+
+        private void startLoad(LoadRequest request, ChunkStreamingConfig.ChunkConfigValues values) {
+            CompletableFuture<Optional<CompoundTag>> payloadFuture = request.future();
+            loadTasks.put(request.pos(), payloadFuture);
+            IoExecutors.submit(request.dimension(), "chunk-load-" + request.pos(), () -> {
+                try {
+                    ChunkStorageAdapter adapter = adapterSupplier.get();
+                    if (adapter == null) {
+                        payloadFuture.complete(Optional.empty());
+                        return;
+                    }
+                    Optional<CompoundTag> payload = adapter.read(request.pos());
+                    payloadFuture.complete(payload);
+                } catch (Exception e) {
+                    payloadFuture.completeExceptionally(e);
+                }
+            }).whenComplete((ignored, throwable) -> {
+                if (throwable != null && !payloadFuture.isDone()) {
+                    payloadFuture.completeExceptionally(throwable);
+                }
+                loadTasks.remove(request.pos());
+                inFlight.decrementAndGet();
+                long queuedDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - request.enqueuedAt());
+                if (ModConstants.LOGGER.isDebugEnabled() && queuedDurationMs > 0) {
+                    ModConstants.LOGGER.debug("[ChunkStream] Load {} waited {} ms before execution (queue size: {}).",
+                            request.pos(), queuedDurationMs, pendingLoadCount.get());
+                }
+                drainQueuedLoads(values);
+            });
+        }
+
+        private void drainQueuedLoads() {
+            drainQueuedLoads(configSupplier.get());
+        }
+
+        private void drainQueuedLoads(ChunkStreamingConfig.ChunkConfigValues values) {
+            while (true) {
+                if (inFlight.get() >= values.maxParallelIo()) {
+                    return;
+                }
+                LoadRequest next = pendingLoadQueue.poll();
+                if (next == null) {
+                    return;
+                }
+                pendingLoadCount.decrementAndGet();
+                if (!dispatchLoad(values, next)) {
+                    pendingLoadQueue.offer(next);
+                    pendingLoadCount.incrementAndGet();
+                    return;
+                }
+            }
+        }
+
+        private int loadQueueLimit(ChunkStreamingConfig.ChunkConfigValues values) {
+            return Math.max(values.maxParallelIo() * 4, Math.min(256, values.ioQueueSize()));
         }
 
         private CompoundTag mergeDirtySegments(CompoundTag baseline, CompoundTag latest, DirtySegmentSet dirty) {
@@ -657,6 +721,8 @@ public final class ChunkStreamManager {
     }
 
     private record PendingSave(CompoundTag payload, DirtySegmentSet dirtySegments, long scheduledTick, ResourceKey<Level> dimension) {
+    }
+    private record LoadRequest(ChunkPos pos, ResourceKey<Level> dimension, CompletableFuture<Optional<CompoundTag>> future, long enqueuedAt) {
     }
 
     private static synchronized void scheduleWriteFlush() {

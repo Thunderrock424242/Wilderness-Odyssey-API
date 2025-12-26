@@ -12,7 +12,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,6 +23,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Manages the lifecycle of the global chat client running inside the modded server JVM.
@@ -89,32 +92,56 @@ public class GlobalChatManager {
 
     private void runConnectionLoop() {
         closeSocket();
-        try {
-            socket = new Socket(settings.host(), settings.port());
-            writer = new PrintWriter(socket.getOutputStream(), true);
-            reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            sendHandshake();
-            connected.set(true);
-            lastConnectedAt = Instant.now();
-            sendSystemToPlayers("Connected to global chat relay at " + settings.host() + ":" + settings.port());
-            listenLoop();
-        } catch (IOException e) {
-            connected.set(false);
-            lastDisconnectedAt = Instant.now();
-            settings.recordDowntime("Connection failed: " + e.getMessage());
-            settings.save(settingsFile);
+        int attempt = 0;
+        while (settings.enabled() && !Thread.currentThread().isInterrupted()) {
+            try {
+                attempt++;
+                socket = new Socket();
+                socket.connect(new InetSocketAddress(settings.host(), settings.port()), 4000);
+                socket.setSoTimeout(4000);
+                writer = new PrintWriter(socket.getOutputStream(), true);
+                reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                sendHandshake();
+                connected.set(true);
+                lastConnectedAt = Instant.now();
+                sendSystemToPlayers("Connected to global chat relay at " + settings.host() + ":" + settings.port());
+                listenLoop();
+                attempt = 0;
+            } catch (IOException e) {
+                connected.set(false);
+                lastDisconnectedAt = Instant.now();
+                settings.recordDowntime("Connection failed: " + e.getMessage());
+                settings.save(settingsFile);
+                long backoffSeconds = Math.min(60, (long) Math.pow(2, Math.min(attempt, 6)));
+                if (server != null && attempt == 1) {
+                    sendSystemToPlayers("Global chat relay unavailable, retrying...");
+                }
+                try {
+                    TimeUnit.SECONDS.sleep(backoffSeconds);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
         }
     }
 
     private void listenLoop() {
         try {
-            String line;
-            while (connected.get() && (line = reader.readLine()) != null) {
-                GlobalChatPacket packet = GSON.fromJson(line, GlobalChatPacket.class);
-                if (packet == null) {
-                    continue;
+            while (connected.get()) {
+                try {
+                    String line = reader.readLine();
+                    if (line == null) {
+                        break;
+                    }
+                    GlobalChatPacket packet = GSON.fromJson(line, GlobalChatPacket.class);
+                    if (packet == null) {
+                        continue;
+                    }
+                    handlePacket(packet);
+                } catch (SocketTimeoutException e) {
+                    // Allow loop to re-check connection health and continue.
                 }
-                handlePacket(packet);
             }
         } catch (IOException e) {
             settings.recordDowntime("Read loop failed: " + e.getMessage());
