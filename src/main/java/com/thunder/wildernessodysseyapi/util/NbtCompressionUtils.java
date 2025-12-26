@@ -11,6 +11,7 @@ import net.minecraft.nbt.NbtIo;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.EnumSet;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import net.jpountz.lz4.LZ4BlockInputStream;
@@ -22,6 +23,8 @@ import com.github.luben.zstd.ZstdOutputStream;
  * Helpers for writing and rewriting NBT with configurable compression settings.
  */
 public final class NbtCompressionUtils {
+
+    private static final EnumSet<CompressionCodec> MISSING_CODEC_WARNED = EnumSet.noneOf(CompressionCodec.class);
 
     private NbtCompressionUtils() {
     }
@@ -104,27 +107,60 @@ public final class NbtCompressionUtils {
     }
 
     private static InputStream wrapDecompressor(CompressionCodec codec, InputStream inputStream) throws IOException {
-        return switch (codec) {
-            case VANILLA_GZIP -> new GZIPInputStream(inputStream);
-            case ZSTD -> new ZstdInputStream(inputStream);
-            case LZ4 -> new LZ4BlockInputStream(inputStream);
-        };
+        try {
+            return switch (codec) {
+                case VANILLA_GZIP -> new GZIPInputStream(inputStream);
+                case ZSTD -> new ZstdInputStream(inputStream);
+                case LZ4 -> new LZ4BlockInputStream(inputStream);
+            };
+        } catch (NoClassDefFoundError e) {
+            return fallbackDecompressor(codec, inputStream, e);
+        }
     }
 
     private static OutputStream wrapCompressor(CompressionCodec codec, OutputStream target, int compressionLevel) throws IOException {
-        return switch (codec) {
-            case VANILLA_GZIP -> new GZIPOutputStream(target) {
-                {
-                    this.def.setLevel(compressionLevel);
+        try {
+            return switch (codec) {
+                case VANILLA_GZIP -> new GZIPOutputStream(target) {
+                    {
+                        this.def.setLevel(compressionLevel);
+                    }
+                };
+                case ZSTD -> {
+                    ZstdOutputStream stream = new ZstdOutputStream(target);
+                    stream.setLevel(compressionLevel);
+                    yield stream;
                 }
+                case LZ4 -> new LZ4BlockOutputStream(target);
             };
-            case ZSTD -> {
-                ZstdOutputStream stream = new ZstdOutputStream(target);
-                stream.setLevel(compressionLevel);
-                yield stream;
+        } catch (NoClassDefFoundError e) {
+            return fallbackCompressor(codec, target, compressionLevel, e);
+        }
+    }
+
+    private static InputStream fallbackDecompressor(CompressionCodec codec, InputStream inputStream, NoClassDefFoundError missingCodec) throws IOException {
+        logMissingCodec(codec, missingCodec);
+        return new GZIPInputStream(inputStream);
+    }
+
+    private static OutputStream fallbackCompressor(CompressionCodec codec, OutputStream target, int compressionLevel, NoClassDefFoundError missingCodec) throws IOException {
+        logMissingCodec(codec, missingCodec);
+        return new GZIPOutputStream(target) {
+            {
+                this.def.setLevel(compressionLevel);
             }
-            case LZ4 -> new LZ4BlockOutputStream(target);
         };
+    }
+
+    private static void logMissingCodec(CompressionCodec codec, NoClassDefFoundError missingCodec) {
+        if (codec == CompressionCodec.VANILLA_GZIP) {
+            throw missingCodec;
+        }
+        synchronized (MISSING_CODEC_WARNED) {
+            if (MISSING_CODEC_WARNED.add(codec)) {
+                ModConstants.LOGGER.warn("Missing {} codec dependency on the runtime classpath; falling back to vanilla GZIP", codec, missingCodec);
+            }
+        }
     }
 
     private static void copyStream(InputStream in, OutputStream out, byte[] buffer) throws IOException {
