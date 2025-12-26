@@ -10,12 +10,14 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Manages worker threads and safe handoff to the logical server thread.
@@ -26,6 +28,7 @@ public final class AsyncTaskManager {
     private static final ConcurrentLinkedQueue<MainThreadTask> MAIN_THREAD_QUEUE = new ConcurrentLinkedQueue<>();
     private static final AtomicInteger MAIN_THREAD_BACKLOG = new AtomicInteger();
     private static final AtomicInteger REJECTED = new AtomicInteger();
+    private static final AtomicInteger CALLER_RUNS = new AtomicInteger();
 
     private static final int THREAD_KEEP_ALIVE_SECONDS = 45;
 
@@ -69,6 +72,7 @@ public final class AsyncTaskManager {
         MAIN_THREAD_QUEUE.clear();
         MAIN_THREAD_BACKLOG.set(0);
         appliedLastTick = 0;
+        CALLER_RUNS.set(0);
         INITIALIZED.set(false);
     }
 
@@ -178,7 +182,8 @@ public final class AsyncTaskManager {
                 workerQueue,
                 backlog,
                 appliedLastTick,
-                REJECTED.get()
+                REJECTED.get(),
+                CALLER_RUNS.get()
         );
     }
 
@@ -197,10 +202,33 @@ public final class AsyncTaskManager {
                 TimeUnit.SECONDS,
                 queue,
                 factory,
-                new ThreadPoolExecutor.AbortPolicy()
+                callerRunsWithBackoff(prefix)
         );
         executor.allowCoreThreadTimeOut(true);
         return executor;
+    }
+
+    private static RejectedExecutionHandler callerRunsWithBackoff(String prefix) {
+        AtomicLong lastLoggedNanos = new AtomicLong();
+        return (task, executor) -> {
+            int callerRuns = CALLER_RUNS.incrementAndGet();
+            long now = System.nanoTime();
+            long last = lastLoggedNanos.get();
+            if (now - last > TimeUnit.SECONDS.toNanos(5) && lastLoggedNanos.compareAndSet(last, now)) {
+                ModConstants.LOGGER.warn(
+                        "[Async] Executor '{}' saturated (active: {}, queued: {}). Running task on caller thread ({} total).",
+                        prefix,
+                        executor.getActiveCount(),
+                        executor.getQueue().size(),
+                        callerRuns);
+            }
+            try {
+                TimeUnit.MILLISECONDS.sleep(5);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            task.run();
+        };
     }
 
     private static void shutdownExecutor(ThreadPoolExecutor executor) {
