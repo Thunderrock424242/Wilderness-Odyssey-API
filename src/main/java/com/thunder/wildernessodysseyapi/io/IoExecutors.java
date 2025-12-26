@@ -11,10 +11,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Dedicated executors for disk/network I/O with optional per-dimension isolation.
@@ -56,8 +58,10 @@ public final class IoExecutors {
         try {
             return CompletableFuture.runAsync(task, executor);
         } catch (RejectedExecutionException ex) {
-            ModConstants.LOGGER.warn("[IO] Rejected task '{}' on executor '{}'", label, executor.getThreadFactory());
-            return CompletableFuture.failedFuture(ex);
+            ModConstants.LOGGER.warn("[IO] Executor '{}' rejected task '{}'; running synchronously.",
+                    executor.getThreadFactory(), label);
+            task.run();
+            return CompletableFuture.completedFuture(null);
         }
     }
 
@@ -75,12 +79,21 @@ public final class IoExecutors {
     }
 
     private static ThreadPoolExecutor buildExecutor(String prefix, int threads, int queueSize) {
-        ThreadFactory factory = runnable -> {
-            Thread thread = new Thread(runnable);
-            thread.setName(prefix + thread.getId());
-            thread.setDaemon(true);
-            return thread;
+        ThreadFactory factory = new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable runnable) {
+                Thread thread = new Thread(runnable);
+                thread.setName(prefix + thread.getId());
+                thread.setDaemon(true);
+                return thread;
+            }
+
+            @Override
+            public String toString() {
+                return prefix;
+            }
         };
+        RejectedExecutionHandler rejectionHandler = callerRunsWithLogging(prefix);
         ThreadPoolExecutor executor = new ThreadPoolExecutor(
                 threads,
                 threads,
@@ -88,10 +101,26 @@ public final class IoExecutors {
                 TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(queueSize),
                 factory,
-                new ThreadPoolExecutor.AbortPolicy()
+                rejectionHandler
         );
         executor.allowCoreThreadTimeOut(true);
         return executor;
+    }
+
+    private static RejectedExecutionHandler callerRunsWithLogging(String prefix) {
+        AtomicLong lastLoggedNanos = new AtomicLong();
+        return (task, executor) -> {
+            long now = System.nanoTime();
+            long last = lastLoggedNanos.get();
+            if (now - last > TimeUnit.SECONDS.toNanos(5) && lastLoggedNanos.compareAndSet(last, now)) {
+                ModConstants.LOGGER.warn(
+                        "[IO] Executor '{}' saturated (active: {}, queued: {}). Running tasks on caller thread.",
+                        prefix,
+                        executor.getActiveCount(),
+                        executor.getQueue().size());
+            }
+            task.run();
+        };
     }
 
     private static void shutdownExecutor(ThreadPoolExecutor executor) {
