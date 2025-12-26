@@ -191,7 +191,7 @@ public final class AsyncTaskManager {
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<>(queueSize);
         ThreadFactory factory = runnable -> {
             Thread t = new Thread(runnable);
-            t.setName(prefix + t.getId());
+            t.setName(prefix + t.threadId());
             t.setDaemon(true);
             return t;
         };
