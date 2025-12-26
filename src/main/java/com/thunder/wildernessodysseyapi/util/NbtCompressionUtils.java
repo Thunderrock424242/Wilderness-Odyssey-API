@@ -14,10 +14,6 @@ import java.nio.file.Path;
 import java.util.EnumSet;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
-import net.jpountz.lz4.LZ4BlockInputStream;
-import net.jpountz.lz4.LZ4BlockOutputStream;
-import com.github.luben.zstd.ZstdInputStream;
-import com.github.luben.zstd.ZstdOutputStream;
 
 /**
  * Helpers for writing and rewriting NBT with configurable compression settings.
@@ -110,11 +106,11 @@ public final class NbtCompressionUtils {
         try {
             return switch (codec) {
                 case VANILLA_GZIP -> new GZIPInputStream(inputStream);
-                case ZSTD -> new ZstdInputStream(inputStream);
-                case LZ4 -> new LZ4BlockInputStream(inputStream);
+                case ZSTD -> createZstdInputStream(inputStream);
+                case LZ4 -> createOptionalInputStream("net.jpountz.lz4.LZ4BlockInputStream", inputStream);
             };
-        } catch (NoClassDefFoundError e) {
-            return fallbackDecompressor(codec, inputStream, e);
+        } catch (NoClassDefFoundError missingCodec) {
+            return fallbackDecompressor(codec, inputStream, missingCodec);
         }
     }
 
@@ -126,15 +122,11 @@ public final class NbtCompressionUtils {
                         this.def.setLevel(compressionLevel);
                     }
                 };
-                case ZSTD -> {
-                    ZstdOutputStream stream = new ZstdOutputStream(target);
-                    stream.setLevel(compressionLevel);
-                    yield stream;
-                }
-                case LZ4 -> new LZ4BlockOutputStream(target);
+                case ZSTD -> createZstdOutputStream(target, compressionLevel);
+                case LZ4 -> createOptionalOutputStream("net.jpountz.lz4.LZ4BlockOutputStream", target);
             };
-        } catch (NoClassDefFoundError e) {
-            return fallbackCompressor(codec, target, compressionLevel, e);
+        } catch (NoClassDefFoundError missingCodec) {
+            return fallbackCompressor(codec, target, compressionLevel, missingCodec);
         }
     }
 
@@ -168,5 +160,47 @@ public final class NbtCompressionUtils {
         while ((read = in.read(buffer)) != -1) {
             out.write(buffer, 0, read);
         }
+    }
+
+    private static InputStream createZstdInputStream(InputStream source) throws IOException {
+        return createOptionalInputStream("com.github.luben.zstd.ZstdInputStream", source);
+    }
+
+    private static OutputStream createZstdOutputStream(OutputStream target, int compressionLevel) throws IOException {
+        OutputStream stream = createOptionalOutputStream("com.github.luben.zstd.ZstdOutputStream", target);
+        try {
+            stream.getClass().getMethod("setLevel", int.class).invoke(stream, compressionLevel);
+            return stream;
+        } catch (ReflectiveOperationException e) {
+            throw new IOException("Failed to configure Zstandard compression level", e);
+        }
+    }
+
+    private static InputStream createOptionalInputStream(String className, InputStream source) throws IOException {
+        try {
+            Class<?> codecClass = Class.forName(className);
+            return InputStream.class.cast(codecClass.getConstructor(InputStream.class).newInstance(source));
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            throw missingCodec(className, e);
+        } catch (ReflectiveOperationException e) {
+            throw new IOException("Failed to initialize " + className, e);
+        }
+    }
+
+    private static OutputStream createOptionalOutputStream(String className, OutputStream target) throws IOException {
+        try {
+            Class<?> codecClass = Class.forName(className);
+            return OutputStream.class.cast(codecClass.getConstructor(OutputStream.class).newInstance(target));
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            throw missingCodec(className, e);
+        } catch (ReflectiveOperationException e) {
+            throw new IOException("Failed to initialize " + className, e);
+        }
+    }
+
+    private static NoClassDefFoundError missingCodec(String className, Throwable cause) {
+        NoClassDefFoundError error = new NoClassDefFoundError(className);
+        error.initCause(cause);
+        return error;
     }
 }
