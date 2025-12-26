@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.WorldGen.structure;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
@@ -67,11 +68,63 @@ public final class StarterStructureTerrainBlender {
             }
         }
 
-        ModConstants.LOGGER.debug("[Starter Structure compat] Blended bunker edges with {} terrain blocks (margin {}).", blended, margin);
+        int coverDepth = Math.max(0, StructureConfig.STARTER_STRUCTURE_EXTRA_COVER_DEPTH.get());
+        int buried = coverDepth > 0
+                ? buryStructure(level, origin, footprint, coverDepth)
+                : 0;
+
+        ModConstants.LOGGER.debug(
+                "[Starter Structure compat] Blended bunker edges with {} terrain blocks (margin {}), added {} cover blocks (extra depth {}).",
+                blended, margin, buried, coverDepth);
     }
 
     private static boolean isInsideFootprint(int x, int z, BlockPos min, BlockPos max) {
         return x >= min.getX() && x <= max.getX() && z >= min.getZ() && z <= max.getZ();
+    }
+
+    private static int buryStructure(ServerLevel level, BlockPos origin, Footprint footprint, int coverDepth) {
+        BlockPos min = footprint.minCorner(origin);
+        BlockPos max = footprint.maxCorner(origin);
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+
+        int buried = 0;
+        for (int x = min.getX(); x <= max.getX(); x++) {
+            for (int z = min.getZ(); z <= max.getZ(); z++) {
+                int topSolidY = findHighestSolidY(level, x, min.getY(), max.getY(), z);
+                if (topSolidY < min.getY()) {
+                    continue;
+                }
+
+                TerrainReplacerEngine.SurfaceSample sample = TerrainReplacerEngine.sampleSurface(level, new BlockPos(x, origin.getY(), z));
+                BlockState coverState = sample.state();
+                int targetY = Math.max(sample.y(), topSolidY + coverDepth);
+
+                for (int y = topSolidY + 1; y <= targetY; y++) {
+                    cursor.set(x, y, z);
+                    BlockState existing = level.getBlockState(cursor);
+                    if (!existing.isAir() && existing.getFluidState().isEmpty()) {
+                        continue;
+                    }
+                    level.setBlock(cursor, coverState, 2);
+                    buried++;
+                }
+            }
+        }
+
+        return buried;
+    }
+
+    private static int findHighestSolidY(ServerLevel level, int x, int minY, int maxY, int z) {
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos(x, maxY, z);
+        for (int y = maxY; y >= minY; y--) {
+            cursor.setY(y);
+            BlockState state = level.getBlockState(cursor);
+            if (!state.isAir() && state.getFluidState().isEmpty()) {
+                return y;
+            }
+        }
+
+        return minY - 1;
     }
 
     /**

@@ -6,8 +6,10 @@ import com.thunder.wildernessodysseyapi.WorldGen.structure.SchematicEntityRestor
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureTerrainBlender;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureSpawnGuard;
 import com.natamus.collective_common_neoforge.schematic.ParsedSchematicObject;
+import com.mojang.datafixers.util.Pair;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -17,10 +19,13 @@ import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 import java.io.File;
 import java.io.FileInputStream;
 import java.nio.file.Path;
+import java.util.List;
 
 @Mixin(value = Util.class, remap = false)
 public class StarterStructureUtilMixin {
     private static final ThreadLocal<StarterStructureTerrainBlender.Footprint> wildernessOdysseyApi$footprint =
+            new ThreadLocal<>();
+    private static final ThreadLocal<List<Pair<BlockPos, Entity>>> wildernessOdysseyApi$restoredEntities =
             new ThreadLocal<>();
 
     @Inject(
@@ -42,8 +47,9 @@ public class StarterStructureUtilMixin {
                                                                     FileInputStream fileInputStream) {
         wildernessOdysseyApi$footprint.set(readFootprint(parsedSchematicObject));
         Path schematicPath = schematicFile.toPath();
-        SchematicEntityRestorer.backfillEntitiesFromSchem(serverLevel, schematicPath, schematicFile.getName().endsWith(".nbt"),
-                structurePos, parsedSchematicObject);
+        List<Pair<BlockPos, Entity>> restored = SchematicEntityRestorer.backfillEntitiesFromSchem(
+                serverLevel, schematicPath, schematicFile.getName().endsWith(".nbt"), structurePos, parsedSchematicObject);
+        wildernessOdysseyApi$restoredEntities.set(restored);
     }
 
     @Inject(method = "generateSchematic", at = @At("RETURN"))
@@ -54,8 +60,14 @@ public class StarterStructureUtilMixin {
             StarterStructureSpawnGuard.registerSpawnDenyZone(serverLevel, structureOrigin);
             StarterStructureTerrainBlender.blendPlacedStructure(serverLevel, structureOrigin,
                     wildernessOdysseyApi$footprint.get());
+
+            int spawned = SchematicEntityRestorer.spawnRestoredEntities(serverLevel, wildernessOdysseyApi$restoredEntities.get());
+            if (spawned == 0) {
+                ModConstants.LOGGER.debug("[Starter Structure compat] No missing schematic entities needed spawning.");
+            }
         }
         wildernessOdysseyApi$footprint.remove();
+        wildernessOdysseyApi$restoredEntities.remove();
     }
 
     private static StarterStructureTerrainBlender.Footprint readFootprint(ParsedSchematicObject parsed) {
