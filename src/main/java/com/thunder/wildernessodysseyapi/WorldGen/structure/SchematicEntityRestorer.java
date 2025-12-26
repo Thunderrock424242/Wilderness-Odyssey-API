@@ -13,6 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.phys.AABB;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -28,28 +29,25 @@ public final class SchematicEntityRestorer {
     private SchematicEntityRestorer() {
     }
 
-    public static void backfillEntitiesFromSchem(ServerLevel level, Path schematicPath, boolean isNbtFormat,
-                                                 BlockPos structurePos, ParsedSchematicObject parsed) {
-        if (parsed == null) {
-            return;
+    public static List<Pair<BlockPos, Entity>> backfillEntitiesFromSchem(ServerLevel level, Path schematicPath, boolean isNbtFormat,
+                                                                         BlockPos structurePos, ParsedSchematicObject parsed) {
+        if (parsed == null || isNbtFormat || schematicPath == null) {
+            return List.of();
         }
         if (parsed.entities != null && !parsed.entities.isEmpty()) {
-            return;
-        }
-        if (isNbtFormat || schematicPath == null) {
-            return;
+            return List.copyOf(parsed.entities);
         }
 
         String fileName = schematicPath.getFileName().toString().toLowerCase(Locale.ROOT);
         if (!fileName.endsWith(".schem")) {
-            return;
+            return List.of();
         }
 
         List<Pair<BlockPos, Entity>> restored = new ArrayList<>();
         try {
             CompoundTag root = NbtIo.readCompressed(schematicPath, NbtAccounter.unlimitedHeap());
             if (root == null) {
-                return;
+                return List.of();
             }
             if (root.contains("Schematic", Tag.TAG_COMPOUND)) {
                 root = root.getCompound("Schematic");
@@ -57,7 +55,7 @@ public final class SchematicEntityRestorer {
 
             ListTag entities = root.getList("Entities", Tag.TAG_COMPOUND);
             if (entities.isEmpty()) {
-                return;
+                return List.of();
             }
 
             for (Tag entry : entities) {
@@ -84,15 +82,60 @@ public final class SchematicEntityRestorer {
             }
         } catch (Exception e) {
             ModConstants.LOGGER.warn("[Starter Structure compat] Failed to backfill entities from schem {}.", schematicPath, e);
-            return;
+            return List.of();
         }
 
-        if (!restored.isEmpty()) {
-            parsed.entities = restored;
-            ModConstants.LOGGER.info(
-                    "[Starter Structure compat] Restored {} schematic entities from {} to preserve Create contraptions.",
-                    restored.size(), schematicPath.getFileName());
+        if (restored.isEmpty()) {
+            return List.of();
         }
+
+        List<Pair<BlockPos, Entity>> captured = List.copyOf(restored);
+        parsed.entities = new ArrayList<>(captured);
+        ModConstants.LOGGER.info(
+                "[Starter Structure compat] Restored {} schematic entities from {} to preserve Create contraptions.",
+                captured.size(), schematicPath.getFileName());
+
+        return captured;
+    }
+
+    public static int spawnRestoredEntities(ServerLevel level, List<Pair<BlockPos, Entity>> restored) {
+        if (level == null || restored == null || restored.isEmpty()) {
+            return 0;
+        }
+
+        int spawned = 0;
+        for (Pair<BlockPos, Entity> entry : restored) {
+            if (entry == null) {
+                continue;
+            }
+
+            BlockPos pos = entry.getFirst();
+            Entity entity = entry.getSecond();
+            if (pos == null || entity == null) {
+                continue;
+            }
+
+            if (!level.hasChunkAt(pos)) {
+                continue;
+            }
+
+            AABB bounds = entity.getBoundingBox().inflate(0.25D);
+            if (!level.getEntitiesOfClass(entity.getClass(), bounds).isEmpty()) {
+                continue;
+            }
+
+            if (level.tryAddFreshEntityWithPassengers(entity)) {
+                spawned++;
+            }
+        }
+
+        if (spawned > 0) {
+            ModConstants.LOGGER.info(
+                    "[Starter Structure compat] Spawned {} missing schematic entities to keep Create contraptions intact.",
+                    spawned);
+        }
+
+        return spawned;
     }
 
     private static BlockPos extractRelativePos(CompoundTag entityTag) {
