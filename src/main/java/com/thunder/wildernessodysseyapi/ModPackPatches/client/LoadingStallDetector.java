@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.client;
 
+import com.thunder.ticktoklib.TickTokHelper;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.LoadingOverlay;
@@ -20,6 +21,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
  * Watches the loading overlay and emits a detailed thread + mod snapshot
@@ -30,6 +32,7 @@ public final class LoadingStallDetector {
     private static final Duration STALL_THRESHOLD = Duration.ofMinutes(resolveThresholdMinutes());
     private static final Duration REMINDER_INTERVAL = Duration.ofMinutes(1);
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final long DEFAULT_THRESHOLD_MINUTES = 10L;
 
     private static long overlayStartedAt = 0L;
     private static long lastProgressAt = 0L;
@@ -207,23 +210,66 @@ public final class LoadingStallDetector {
     }
 
     private static String formatDuration(long millis) {
-        Duration duration = Duration.ofMillis(Math.max(millis, 0));
-        long minutes = duration.toMinutes();
-        long seconds = duration.minusMinutes(minutes).toSeconds();
-        long ms = duration.minusMinutes(minutes).minusSeconds(seconds).toMillis();
-        return String.format("%02dm %02ds %03dms", minutes, seconds, ms);
+        long safeMillis = Math.max(millis, 0);
+        int ticks = toTicks(safeMillis);
+
+        String base = ticks >= TickTokHelper.TICKS_PER_HOUR
+                ? TickTokHelper.formatTicksToHMS(ticks)
+                : TickTokHelper.formatTicksToMinSec(ticks);
+
+        long remainderMillis = safeMillis % 1000;
+        return base + String.format(".%03d", remainderMillis);
+    }
+
+    private static int toTicks(long millis) {
+        long ticks = Math.round(millis / 50.0d);
+        return (int) Math.min(ticks, Integer.MAX_VALUE);
     }
 
     private static long resolveThresholdMinutes() {
         String override = System.getProperty("wilderness.loadingstall.minutes", "").trim();
         if (override.isEmpty()) {
-            return 10L;
+            return DEFAULT_THRESHOLD_MINUTES;
+        }
+
+        return parseThresholdOverride(override).orElse(DEFAULT_THRESHOLD_MINUTES);
+    }
+
+    private static OptionalLong parseThresholdOverride(String override) {
+        try {
+            if (override.endsWith("t")) { // ticks suffix
+                int ticks = Integer.parseInt(override.substring(0, override.length() - 1));
+                long minutes = Math.round(TickTokHelper.toMinutes(ticks));
+                return minutes > 0 ? OptionalLong.of(minutes) : OptionalLong.empty();
+            }
+
+            if (override.contains(":")) { // mm:ss or hh:mm:ss
+                long seconds = parseColonTimeSeconds(override);
+                if (seconds > 0) {
+                    long minutes = Math.max(1L, Math.round(seconds / 60.0d));
+                    return OptionalLong.of(minutes);
+                }
+            }
+
+            long minutes = Long.parseLong(override);
+            return minutes > 0 ? OptionalLong.of(minutes) : OptionalLong.empty();
+        } catch (NumberFormatException ignored) {
+            return OptionalLong.empty();
+        }
+    }
+
+    private static long parseColonTimeSeconds(String value) {
+        String[] parts = value.split(":");
+        if (parts.length < 2 || parts.length > 3) {
+            return -1L;
         }
         try {
-            long minutes = Long.parseLong(override);
-            return minutes > 0 ? minutes : 10L;
+            long hours = parts.length == 3 ? Long.parseLong(parts[0]) : 0L;
+            long minutes = Long.parseLong(parts[parts.length - 2]);
+            long seconds = Long.parseLong(parts[parts.length - 1]);
+            return hours * 3600L + minutes * 60L + seconds;
         } catch (NumberFormatException ignored) {
-            return 10L;
+            return -1L;
         }
     }
 
