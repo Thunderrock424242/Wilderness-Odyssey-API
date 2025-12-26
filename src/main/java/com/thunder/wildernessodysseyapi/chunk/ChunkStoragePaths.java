@@ -18,8 +18,9 @@ public final class ChunkStoragePaths {
             folderName = "chunk-cache";
         }
         if (config.storeCacheInWorldConfig()) {
-            return server.getWorldPath(LevelResource.SERVERCONFIG).resolve(folderName);
+            Path worldConfig = server.getWorldPath(LevelResource.ROOT).resolve("serverconfig");
+            return worldConfig.resolve(folderName);
         }
-        return server.getFile("config/" + com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID + "/" + folderName).toPath();
+        return server.getFile("config/" + com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID + "/" + folderName);
     }
 }

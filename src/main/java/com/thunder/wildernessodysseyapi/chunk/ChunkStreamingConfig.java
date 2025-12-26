@@ -39,8 +39,6 @@ public final class ChunkStreamingConfig {
     public static final ModConfigSpec.IntValue WRITE_FLUSH_INTERVAL_TICKS;
     public static final ModConfigSpec.ConfigValue<String> CACHE_FOLDER_NAME;
     public static final ModConfigSpec.BooleanValue STORE_CACHE_IN_WORLD_CONFIG;
-    public static final ModConfigSpec.ConfigValue<String> CACHE_FOLDER_NAME;
-    public static final ModConfigSpec.BooleanValue STORE_CACHE_IN_WORLD_CONFIG;
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
