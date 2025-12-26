@@ -9,7 +9,6 @@ plugins {
 ext {
     junitVersion = '5.10.2'
     jmhVersion = '1.37'
-    zstdVersion = '1.5.7-6'
 }
 
 
@@ -179,7 +178,7 @@ dependencies {
     implementation "curse.maven:starter-structure-746391:6367235"
     implementation "curse.maven:collective-342584:7148969"
     implementation 'org.lz4:lz4-java:1.8.0'
-    implementation "com.github.luben:zstd-jni:${zstdVersion}"
+    implementation 'com.github.luben:zstd-jni:1.5.7-6'
 
     // AI advisory helpers (HTTP client and fault tolerance)
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
@@ -191,7 +190,7 @@ dependencies {
     bundledLibs 'com.squareup.okio:okio:3.9.0'
     bundledLibs 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
     bundledLibs 'org.lz4:lz4-java:1.8.0'
-    bundledLibs "com.github.luben:zstd-jni:${zstdVersion}"
+    bundledLibs 'com.github.luben:zstd-jni:1.5.7-6'
 
     testImplementation platform("org.junit:junit-bom:${junitVersion}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
