@@ -37,6 +37,8 @@ public final class ChunkStreamingConfig {
     public static final ModConfigSpec.IntValue DELTA_CHANGE_BUDGET;
     public static final ModConfigSpec.IntValue LIGHT_COMPRESSION_LEVEL;
     public static final ModConfigSpec.IntValue WRITE_FLUSH_INTERVAL_TICKS;
+    public static final ModConfigSpec.ConfigValue<String> CACHE_FOLDER_NAME;
+    public static final ModConfigSpec.BooleanValue STORE_CACHE_IN_WORLD_CONFIG;
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
@@ -98,6 +100,10 @@ public final class ChunkStreamingConfig {
                 .defineInRange("lightCompressionLevel", 6, 1, 9);
         WRITE_FLUSH_INTERVAL_TICKS = BUILDER.comment("Interval (in ticks) to batch dirty chunk writes using the scheduled flush task.")
                 .defineInRange("writeFlushIntervalTicks", 20, 1, 200);
+        CACHE_FOLDER_NAME = BUILDER.comment("Folder name used for chunk cache storage.")
+                .define("cacheFolderName", "chunk-cache");
+        STORE_CACHE_IN_WORLD_CONFIG = BUILDER.comment("If true, chunk cache data is stored under the world-specific config folder instead of the global config directory.")
+                .define("storeCacheInWorldConfig", true);
         BUILDER.pop();
 
         CONFIG_SPEC = BUILDER.build();
@@ -136,7 +142,9 @@ public final class ChunkStreamingConfig {
                     SLICE_INTERN_LIMIT.get(),
                     DELTA_CHANGE_BUDGET.get(),
                     LIGHT_COMPRESSION_LEVEL.get(),
-                    WRITE_FLUSH_INTERVAL_TICKS.get()
+                    WRITE_FLUSH_INTERVAL_TICKS.get(),
+                    CACHE_FOLDER_NAME.get(),
+                    STORE_CACHE_IN_WORLD_CONFIG.get()
             );
         } catch (IllegalStateException ex) {
             return defaultValues();
@@ -175,7 +183,9 @@ public final class ChunkStreamingConfig {
                 SLICE_INTERN_LIMIT.getDefault(),
                 DELTA_CHANGE_BUDGET.getDefault(),
                 LIGHT_COMPRESSION_LEVEL.getDefault(),
-                WRITE_FLUSH_INTERVAL_TICKS.getDefault()
+                WRITE_FLUSH_INTERVAL_TICKS.getDefault(),
+                CACHE_FOLDER_NAME.getDefault(),
+                STORE_CACHE_IN_WORLD_CONFIG.getDefault()
         );
     }
 
@@ -207,7 +217,9 @@ public final class ChunkStreamingConfig {
             int sliceInternLimit,
             int deltaChangeBudget,
             int lightCompressionLevel,
-            int writeFlushIntervalTicks
+            int writeFlushIntervalTicks,
+            String cacheFolderName,
+            boolean storeCacheInWorldConfig
     ) {
         public ChunkConfigValues(boolean enabled,
                                  int hotCacheLimit,
@@ -247,7 +259,9 @@ public final class ChunkStreamingConfig {
                     384,
                     256,
                     6,
-                    20
+                    20,
+                    "chunk-cache",
+                    true
             );
         }
     }

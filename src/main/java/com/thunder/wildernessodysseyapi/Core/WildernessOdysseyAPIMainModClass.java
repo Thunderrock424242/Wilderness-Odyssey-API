@@ -61,6 +61,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamManager;
 import com.thunder.wildernessodysseyapi.chunk.ChunkStreamingConfig;
 import com.thunder.wildernessodysseyapi.chunk.ChunkTickThrottler;
+import com.thunder.wildernessodysseyapi.chunk.ChunkStoragePaths;
 import com.thunder.wildernessodysseyapi.chunk.DiskChunkStorageAdapter;
 import com.thunder.wildernessodysseyapi.io.BufferPool;
 import com.thunder.wildernessodysseyapi.io.IoExecutors;
@@ -196,7 +197,7 @@ public class WildernessOdysseyAPIMainModClass {
         ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
         BufferPool.configure(chunkConfig);
         IoExecutors.initialize(chunkConfig);
-        chunkStorageRoot = event.getServer().getFile("config/" + CONFIG_FOLDER + "chunk-cache");
+        chunkStorageRoot = ChunkStoragePaths.resolveCacheRoot(event.getServer(), chunkConfig);
         ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel(), chunkConfig.compressionCodec()));
         ChunkDeltaTracker.configure(chunkConfig);
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));

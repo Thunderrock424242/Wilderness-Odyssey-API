@@ -39,6 +39,7 @@ public class DiskChunkStorageAdapter implements ChunkStorageAdapter {
     @Override
     public void write(ChunkPos pos, CompoundTag tag) throws IOException {
         Path path = chunkPath(pos);
+        Files.createDirectories(path.getParent());
         CompoundTag compacted = tag.copy();
         NbtDataCompactor.compactModPayload(compacted);
         NbtCompressionUtils.writeCompressed(path, compacted, compressionLevel, compressionCodec);
