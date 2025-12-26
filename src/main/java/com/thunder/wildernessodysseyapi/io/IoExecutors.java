@@ -83,7 +83,7 @@ public final class IoExecutors {
             @Override
             public Thread newThread(Runnable runnable) {
                 Thread thread = new Thread(runnable);
-                thread.setName(prefix + thread.getId());
+                thread.setName(prefix + thread.threadId());
                 thread.setDaemon(true);
                 return thread;
             }
