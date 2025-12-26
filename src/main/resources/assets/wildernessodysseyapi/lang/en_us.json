@@ -61,6 +61,6 @@
   "screen.wildernessodysseyapi.world_version.ops_only": "Only operators can update the world version.",
   "screen.wildernessodysseyapi.world_version.command": "Run /updateworldversion in chat if you are an operator.",
   "screen.wildernessodysseyapi.world_version.worldgen_warning": "World generation and structures may change.",
-  "screen.wildernessodysseyapi.world_version.bug_tip": "For bugs, test in a fresh world before reporting."
+  "screen.wildernessodysseyapi.world_version.bug_tip": "For bugs, test in a fresh world before reporting.",
   "pack.wildernessodysseyapi.plains_spawn.title": "Wilderness Odyssey Plains Spawn"
 }
