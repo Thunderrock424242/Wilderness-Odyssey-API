@@ -1,8 +1,9 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.natamus.starterstructure_common_neoforge.util.Util;
-import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureTerrainAdapter;
+import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.SchematicEntityRestorer;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureTerrainBlender;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureSpawnGuard;
 import com.natamus.collective_common_neoforge.schematic.ParsedSchematicObject;
 import net.minecraft.core.BlockPos;
@@ -19,6 +20,9 @@ import java.nio.file.Path;
 
 @Mixin(value = Util.class, remap = false)
 public class StarterStructureUtilMixin {
+    private static final ThreadLocal<StarterStructureTerrainBlender.Footprint> wildernessOdysseyApi$footprint =
+            new ThreadLocal<>();
+
     @Inject(
             method = "generateSchematic",
             at = @At(
@@ -31,11 +35,12 @@ public class StarterStructureUtilMixin {
                                                                   CallbackInfoReturnable<BlockPos> cir,
                                                                   java.util.List<File> listOfSchematicFiles,
                                                                   File[] listOfFiles,
-                                                                  File schematicFile,
-                                                                  boolean automaticCenter,
-                                                                  BlockPos structurePos,
-                                                                  ParsedSchematicObject parsedSchematicObject,
-                                                                  FileInputStream fileInputStream) {
+                                                                    File schematicFile,
+                                                                    boolean automaticCenter,
+                                                                    BlockPos structurePos,
+                                                                    ParsedSchematicObject parsedSchematicObject,
+                                                                    FileInputStream fileInputStream) {
+        wildernessOdysseyApi$footprint.set(readFootprint(parsedSchematicObject));
         Path schematicPath = schematicFile.toPath();
         SchematicEntityRestorer.backfillEntitiesFromSchem(serverLevel, schematicPath, schematicFile.getName().endsWith(".nbt"),
                 structurePos, parsedSchematicObject);
@@ -45,8 +50,49 @@ public class StarterStructureUtilMixin {
     private static void wildernessOdysseyApi$triggerTerrainReplacer(ServerLevel serverLevel, CallbackInfoReturnable<BlockPos> cir) {
         BlockPos structureOrigin = cir.getReturnValue();
         if (structureOrigin != null) {
-            StarterStructureTerrainAdapter.scheduleTerrainReplacement(serverLevel, structureOrigin);
+            ModConstants.LOGGER.debug("[Starter Structure compat] Bypassing terrain replacer for bunker; running blending pass instead.");
             StarterStructureSpawnGuard.registerSpawnDenyZone(serverLevel, structureOrigin);
+            StarterStructureTerrainBlender.blendPlacedStructure(serverLevel, structureOrigin,
+                    wildernessOdysseyApi$footprint.get());
         }
+        wildernessOdysseyApi$footprint.remove();
+    }
+
+    private static StarterStructureTerrainBlender.Footprint readFootprint(ParsedSchematicObject parsed) {
+        if (parsed == null) {
+            return null;
+        }
+        try {
+            int width = tryReadDimension(parsed, "getWidth", "width");
+            int height = tryReadDimension(parsed, "getHeight", "height");
+            int length = tryReadDimension(parsed, "getLength", "length");
+            if (width > 0 && height > 0 && length > 0) {
+                return new StarterStructureTerrainBlender.Footprint(width, height, length);
+            }
+        } catch (Exception e) {
+            ModConstants.LOGGER.debug("[Starter Structure compat] Failed to read schematic dimensions for blending.", e);
+        }
+        return null;
+    }
+
+    private static int tryReadDimension(ParsedSchematicObject parsed, String getterName, String fieldName) throws Exception {
+        try {
+            java.lang.reflect.Method getter = parsed.getClass().getMethod(getterName);
+            getter.setAccessible(true);
+            Object result = getter.invoke(parsed);
+            if (result instanceof Number number) {
+                return number.intValue();
+            }
+        } catch (NoSuchMethodException ignored) {
+            // Fall back to field lookup
+        }
+
+        java.lang.reflect.Field field = parsed.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        Object value = field.get(parsed);
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return -1;
     }
 }

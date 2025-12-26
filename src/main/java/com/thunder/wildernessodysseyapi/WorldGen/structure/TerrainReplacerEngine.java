@@ -20,7 +20,8 @@ public final class TerrainReplacerEngine {
 
     /**
      * Samples the surface block at the given world position, walking down through replaceable blocks
-     * and fluids until a solid block is found. Falls back to dirt when nothing solid is encountered.
+     * until a real surface is found. Fluids are now respected so lakes/rivers remain intact instead
+     * of being replaced with dirt when blending structures into the terrain.
      */
     public static BlockState sampleSurfaceBlock(LevelReader level, BlockPos target) {
         return sampleSurface(level, target).state();
@@ -37,6 +38,17 @@ public final class TerrainReplacerEngine {
         for (int y = surfaceY; y >= minY; y--) {
             cursor.setY(y);
             BlockState state = level.getBlockState(cursor);
+
+            if (state.isAir()) {
+                continue;
+            }
+
+            // Prefer the fluid itself when we encounter water/lava so we keep natural bodies of
+            // water instead of backfilling them with dirt around the starter structure.
+            if (!state.getFluidState().isEmpty()) {
+                return new SurfaceSample(y, state.getFluidState().createLegacyBlock());
+            }
+
             if (isSolidSurface(state)) {
                 return new SurfaceSample(y, state);
             }
@@ -63,7 +75,7 @@ public final class TerrainReplacerEngine {
     }
 
     private static boolean isSolidSurface(BlockState state) {
-        return !state.isAir() && state.getFluidState().isEmpty();
+        return !state.isAir();
     }
 
     /**
