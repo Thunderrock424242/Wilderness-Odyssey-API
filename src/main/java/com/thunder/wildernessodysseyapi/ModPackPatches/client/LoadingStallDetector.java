@@ -21,7 +21,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalLong;
+import java.util.OptionalInt;
 
 /**
  * Watches the loading overlay and emits a detailed thread + mod snapshot
@@ -29,10 +29,11 @@ import java.util.OptionalLong;
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public final class LoadingStallDetector {
-    private static final Duration STALL_THRESHOLD = Duration.ofMinutes(resolveThresholdMinutes());
-    private static final Duration REMINDER_INTERVAL = Duration.ofMinutes(1);
+    private static final int DEFAULT_THRESHOLD_MINUTES = 5;
+    private static final int STALL_THRESHOLD_MINUTES = resolveThresholdMinutes();
+    private static final Duration STALL_THRESHOLD = toDuration(TickTokHelper.toTicksMinutes(STALL_THRESHOLD_MINUTES));
+    private static final Duration REMINDER_INTERVAL = toDuration(TickTokHelper.toTicksMinutes(1));
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final long DEFAULT_THRESHOLD_MINUTES = TickTokHelper.duration(0,5,0,0);
 
     private static long overlayStartedAt = 0L;
     private static long lastProgressAt = 0L;
@@ -211,7 +212,7 @@ public final class LoadingStallDetector {
 
     private static String formatDuration(long millis) {
         long safeMillis = Math.max(millis, 0);
-        int ticks = toTicks(safeMillis);
+        int ticks = safeMillisToTicks(safeMillis);
 
         String base = ticks >= TickTokHelper.TICKS_PER_HOUR
                 ? TickTokHelper.formatTicksToHMS(ticks)
@@ -221,12 +222,12 @@ public final class LoadingStallDetector {
         return base + String.format(".%03d", remainderMillis);
     }
 
-    private static int toTicks(long millis) {
-        long ticks = Math.round(millis / 50.0d);
+    private static int safeMillisToTicks(long millis) {
+        double ticks = Math.round(Math.max(0L, millis) * TickTokHelper.TICKS_PER_SECOND / 1000.0d);
         return (int) Math.min(ticks, Integer.MAX_VALUE);
     }
 
-    private static long resolveThresholdMinutes() {
+    private static int resolveThresholdMinutes() {
         String override = System.getProperty("wilderness.loadingstall.minutes", "").trim();
         if (override.isEmpty()) {
             return DEFAULT_THRESHOLD_MINUTES;
@@ -235,27 +236,35 @@ public final class LoadingStallDetector {
         return parseThresholdOverride(override).orElse(DEFAULT_THRESHOLD_MINUTES);
     }
 
-    private static OptionalLong parseThresholdOverride(String override) {
+    private static OptionalInt parseThresholdOverride(String override) {
         try {
             if (override.endsWith("t")) { // ticks suffix
                 int ticks = Integer.parseInt(override.substring(0, override.length() - 1));
-                long minutes = Math.round(TickTokHelper.toMinutes(ticks));
-                return minutes > 0 ? OptionalLong.of(minutes) : OptionalLong.empty();
+                int minutes = (int) Math.ceil(TickTokHelper.toMinutes(ticks));
+                return minutes > 0 ? OptionalInt.of(minutes) : OptionalInt.empty();
             }
 
             if (override.contains(":")) { // mm:ss or hh:mm:ss
                 long seconds = parseColonTimeSeconds(override);
                 if (seconds > 0) {
-                    long minutes = Math.max(1L, Math.round(seconds / 60.0d));
-                    return OptionalLong.of(minutes);
+                    int minutes = (int) Math.max(1L, Math.ceil(seconds / 60.0d));
+                    return OptionalInt.of(minutes);
                 }
             }
 
             long minutes = Long.parseLong(override);
-            return minutes > 0 ? OptionalLong.of(minutes) : OptionalLong.empty();
+            if (minutes > 0 && minutes <= Integer.MAX_VALUE) {
+                return OptionalInt.of((int) minutes);
+            }
         } catch (NumberFormatException ignored) {
-            return OptionalLong.empty();
+            return OptionalInt.empty();
         }
+        return OptionalInt.empty();
+    }
+
+    private static Duration toDuration(int ticks) {
+        long millis = Math.round(TickTokHelper.toSeconds(ticks) * 1000.0d);
+        return Duration.ofMillis(millis);
     }
 
     private static long parseColonTimeSeconds(String value) {
