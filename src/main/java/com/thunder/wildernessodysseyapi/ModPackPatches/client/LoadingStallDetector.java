@@ -32,7 +32,7 @@ public final class LoadingStallDetector {
     private static final Duration STALL_THRESHOLD = Duration.ofMinutes(resolveThresholdMinutes());
     private static final Duration REMINDER_INTERVAL = Duration.ofMinutes(1);
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final long DEFAULT_THRESHOLD_MINUTES = 10L;
+    private static final long DEFAULT_THRESHOLD_MINUTES = TickTokHelper.duration(0,5,0,0);
 
     private static long overlayStartedAt = 0L;
     private static long lastProgressAt = 0L;
