@@ -177,7 +177,6 @@ dependencies {
     implementation "curse.maven:irisshaders-455508:6661598"
     implementation "curse.maven:starter-structure-746391:6367235"
     implementation "curse.maven:collective-342584:7148969"
-    implementation "curse.maven:world-icon-updater-1301553:6785271"
     implementation 'org.lz4:lz4-java:1.8.0'
     implementation 'com.github.luben:zstd-jni:1.5.7-6'
 
