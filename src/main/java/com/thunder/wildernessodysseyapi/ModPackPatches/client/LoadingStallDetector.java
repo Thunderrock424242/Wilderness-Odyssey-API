@@ -140,7 +140,7 @@ public final class LoadingStallDetector {
                     StackTraceElement[] stack = entry.getValue();
 
                     builder.append("\nThread: ").append(thread.getName())
-                            .append(" (id=").append(thread.getId()).append(", state=").append(thread.getState()).append(")\n");
+                            .append(" (id=").append(thread.threadId()).append(", state=").append(thread.getState()).append(")\n");
 
                     for (int i = 0; i < stack.length; i++) {
                         builder.append("    at ").append(stack[i]).append('\n');
