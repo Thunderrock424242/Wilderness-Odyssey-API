@@ -32,7 +32,8 @@ public class StarterStructureUtilMixin {
             method = "generateSchematic",
             at = @At(
                     value = "INVOKE_ASSIGN",
-                    target = "Lcom/natamus/collective_common_neoforge/schematic/ParseSchematicFile;getParsedSchematicObject(Ljava/io/InputStream;Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;IZZ)Lcom/natamus/collective_common_neoforge/schematic/ParsedSchematicObject;"
+                    target = "Lcom/natamus/collective_common_neoforge/schematic/ParseSchematicFile;getParsedSchematicObject(Ljava/io/InputStream;Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;IZZ)Lcom/natamus/collective_common_neoforge/schematic/ParsedSchematicObject;",
+                    shift = At.Shift.AFTER
             ),
             locals = LocalCapture.CAPTURE_FAILHARD
     )
