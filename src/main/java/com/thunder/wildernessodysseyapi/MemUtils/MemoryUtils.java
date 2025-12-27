@@ -45,12 +45,17 @@ public class MemoryUtils {
      * to avoid spamming the console on frequent calls.
      */
     private static long lastLoggedUsedMB = -1;
+    private static long lastUsedLogTimestampMs = 0;
+    // Throttle this debug log to avoid flooding the console when sampled every tick.
+    private static final long USED_LOG_INTERVAL_MS = 30000;
     public static long getUsedMemoryMB() {
         long free = RUNTIME.freeMemory();
         long total = RUNTIME.totalMemory();
         long used = (total - free) / MB;
-        if (used != lastLoggedUsedMB) {
+        long now = System.currentTimeMillis();
+        if (used != lastLoggedUsedMB && (now - lastUsedLogTimestampMs) >= USED_LOG_INTERVAL_MS) {
             lastLoggedUsedMB = used;
+            lastUsedLogTimestampMs = now;
             LOGGER.debug(
                     "Calculated used memory: {} MB (total={} MB, free={} MB)",
                     used,
