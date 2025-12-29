@@ -11,19 +11,15 @@ import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.session.ClipboardHolder;
 import com.sk89q.worldedit.session.PasteBuilder;
 import com.sk89q.worldedit.world.World;
-import com.sk89q.worldedit.world.registry.WorldData;
-import com.sk89q.worldedit.world.registry.WorldDataManager;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.fml.ModList;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
 
 /**
  * Places Starter Structure schematics using WorldEdit so Create contraptions and tile entities remain intact.
@@ -42,9 +38,10 @@ public final class StarterStructureWorldEditPlacer {
         if (serverLevel == null || schematicPath == null || !Files.isRegularFile(schematicPath)) return false;
 
         try {
-            ClipboardFormat format = isNbtFormat
-                    ? ClipboardFormats.findByAlias("schematic")
-                    : ClipboardFormats.findByFile(schematicPath.toFile());
+            ClipboardFormat format = ClipboardFormats.findByFile(schematicPath.toFile());
+            if (format == null && isNbtFormat) {
+                format = ClipboardFormats.findByAlias("schematic");
+            }
             if (format == null) {
                 ModConstants.LOGGER.warn("[Starter Structure compat] WorldEdit could not detect format for {}.", schematicPath.getFileName());
                 return false;
@@ -52,7 +49,7 @@ public final class StarterStructureWorldEditPlacer {
 
             try (InputStream in = Files.newInputStream(schematicPath);
                  ClipboardReader reader = format.getReader(in)) {
-                Clipboard clipboard = reader.read(resolveWorldData());
+                Clipboard clipboard = reader.read();
                 BlockVector3 destination = BlockVector3.at(origin.getX(), origin.getY(), origin.getZ());
                 World weWorld = com.sk89q.worldedit.neoforge.NeoForgeAdapter.adapt(serverLevel);
 
@@ -78,21 +75,5 @@ public final class StarterStructureWorldEditPlacer {
             ModConstants.LOGGER.warn("[Starter Structure compat] WorldEdit paste failed for {}.", schematicPath, e);
             return false;
         }
-    }
-
-    private static WorldData resolveWorldData() throws IOException {
-        WorldDataManager manager = WorldEdit.getInstance().getPlatformManager()
-                .queryCapability(WorldDataManager.class)
-                .orElse(null);
-        if (manager == null) {
-            return WorldEdit.getInstance().getPlatformManager().createWorldData();
-        }
-
-        Optional<WorldData> data = manager.getWorldData();
-        if (data.isPresent()) {
-            return data.get();
-        }
-
-        return WorldEdit.getInstance().getPlatformManager().createWorldData();
     }
 }
