@@ -38,7 +38,7 @@ public class StarterStructureGameTests {
     private static final String WORLD_EDIT_MOD_ID = "worldedit";
     private static final String CREATE_MOD_ID = "create";
 
-    @GameTest(templateNamespace = "minecraft", template = "empty", batch = BATCH, timeoutTicks = 400)
+    @GameTest(namespace = ModConstants.MOD_ID, templateNamespace = "minecraft", template = "empty", batch = BATCH, timeoutTicks = 400)
     public void bunkerSpawnsBlocks(GameTestHelper helper) {
         PlacementContext context = pasteBunker(helper);
         if (context == null) {
@@ -52,7 +52,7 @@ public class StarterStructureGameTests {
         });
     }
 
-    @GameTest(templateNamespace = "minecraft", template = "empty", batch = BATCH, timeoutTicks = 400)
+    @GameTest(namespace = ModConstants.MOD_ID, templateNamespace = "minecraft", template = "empty", batch = BATCH, timeoutTicks = 400)
     public void bunkerRetainsCreateMachines(GameTestHelper helper) {
         if (!ModList.get().isLoaded(CREATE_MOD_ID)) {
             helper.fail("Create mod is not loaded; cannot verify Create machines.");
