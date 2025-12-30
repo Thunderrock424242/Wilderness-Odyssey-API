@@ -39,7 +39,7 @@ public class StarterStructureGameTests {
     private static final String CREATE_MOD_ID = "create";
 
     @GameTest(templateNamespace = "minecraft", template = "empty", batch = BATCH, timeoutTicks = 400)
-    public void bunkerSpawnsBlocks(GameTestHelper helper) {
+    public static void bunkerSpawnsBlocks(GameTestHelper helper) {
         PlacementContext context = pasteBunker(helper);
         if (context == null) {
             return; // pasteBunker already reported failure
@@ -53,7 +53,7 @@ public class StarterStructureGameTests {
     }
 
     @GameTest(templateNamespace = "minecraft", template = "empty", batch = BATCH, timeoutTicks = 400)
-    public void bunkerRetainsCreateMachines(GameTestHelper helper) {
+    public static void bunkerRetainsCreateMachines(GameTestHelper helper) {
         if (!ModList.get().isLoaded(CREATE_MOD_ID)) {
             helper.fail("Create mod is not loaded; cannot verify Create machines.");
             return;
