@@ -39,6 +39,8 @@ public class StructureConfig {
     public static final ModConfigSpec.IntValue STARTER_STRUCTURE_SPAWN_DENY_RADIUS;
     /** Vertical half-height where hostile mobs may not spawn around the placed starter bunker */
     public static final ModConfigSpec.IntValue STARTER_STRUCTURE_SPAWN_DENY_HEIGHT;
+    /** Use WorldEdit to paste the starter bunker so Create machines are preserved */
+    public static final ModConfigSpec.BooleanValue STARTER_STRUCTURE_USE_WORLDEDIT;
 
     private static final HashMap<String, BooleanValue> STRUCTURES = new HashMap<>();
     private static final HashMap<String, BooleanValue> POIS = new HashMap<>();
@@ -110,6 +112,10 @@ public class StructureConfig {
                         "Vertical half-height (in blocks up and down) where hostile mob spawns are denied around the starter bunker."
                 )
                 .defineInRange("starterStructureSpawnDenyHeight", 12, 1, 128);
+        STARTER_STRUCTURE_USE_WORLDEDIT = BUILDER.comment(
+                        "When true and WorldEdit is present, paste the starter bunker using WorldEdit to preserve Create contraptions and machines."
+                )
+                .define("starterStructureUseWorldEdit", true);
         BUILDER.pop();
 
         registerAll();
