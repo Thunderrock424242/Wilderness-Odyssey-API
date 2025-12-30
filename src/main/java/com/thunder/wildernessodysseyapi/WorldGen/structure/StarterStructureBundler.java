@@ -47,4 +47,12 @@ public final class StarterStructureBundler {
             ModConstants.LOGGER.warn("[Starter Structure compat] Failed to install bundled starter bunker to {}.", TARGET_PATH.toAbsolutePath(), e);
         }
     }
+
+    /**
+     * Returns the target path where the bundled bunker schematic should live.
+     * Exposed for automated tests that need to inspect or paste the bunker.
+     */
+    public static Path getBundledBunkerPath() {
+        return TARGET_PATH;
+    }
 }
