@@ -14,7 +14,9 @@
       "ServerboundSetStructureBlockPacketMixin",
       "StarterStructureConfigMixin",
       "StarterStructureUtilMixin",
-      "StructureBlockEntityMixin"
+      "StructureBlockEntityMixin",
+      "GameTestStructureManagerMixin",
+      "StructureTemplateAccessor"
     ],
   "injectors": {
     "defaultRequire": 1
