@@ -121,6 +121,12 @@ sourceSets {
         compileClasspath += sourceSets.main.output + configurations.runtimeClasspath
         runtimeClasspath += output + compileClasspath
     }
+    schemTest {
+        java.srcDir 'src/schemTest/java'
+        resources.srcDir 'src/schemTest/resources'
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath + sourceSets.main.runtimeClasspath
+    }
 }
 
 // Sets up a dependency configuration called 'localRuntime'.
@@ -143,6 +149,9 @@ configurations {
 
     jmhImplementation.extendsFrom implementation
     jmhRuntimeOnly.extendsFrom runtimeOnly
+
+    schemTestImplementation.extendsFrom implementation, testImplementation
+    schemTestRuntimeOnly.extendsFrom runtimeOnly, testRuntimeOnly
 }
 
 // Make sure Gradle run configurations (JavaExec tasks) also see bundled libraries when
@@ -314,6 +323,14 @@ tasks.register('integrationTest', Test) {
     shouldRunAfter tasks.named('test')
 }
 
+tasks.register('schemTest', Test) {
+    description = 'Runs experimental GameTest schem scenarios in an isolated source set.'
+    group = 'verification'
+    testClassesDirs = sourceSets.schemTest.output.classesDirs
+    classpath = sourceSets.schemTest.runtimeClasspath
+    shouldRunAfter tasks.named('integrationTest')
+}
+
 tasks.register('jmh', JavaExec) {
     group = 'benchmark'
     description = 'Runs JMH benchmarks for NBT serialization/deserialization.'
@@ -349,6 +366,7 @@ tasks.register('profileChunkWorkload', JavaExec) {
 
 tasks.named('check').configure {
     dependsOn tasks.named('integrationTest')
+    dependsOn tasks.named('schemTest')
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.
