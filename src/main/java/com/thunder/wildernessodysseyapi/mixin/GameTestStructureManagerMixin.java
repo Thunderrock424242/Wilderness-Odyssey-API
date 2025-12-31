@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
+import com.thunder.wildernessodysseyapi.gametest.GameTestTemplateFallbacks;
 import com.thunder.wildernessodysseyapi.gametest.SchemGameTestStructureLoader;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -24,9 +25,15 @@ public abstract class GameTestStructureManagerMixin {
     @Inject(method = "loadFromResource", at = @At("HEAD"), cancellable = true)
     private void wildernessOdysseyApi$loadSchem(ResourceLocation id,
                                                CallbackInfoReturnable<Optional<StructureTemplate>> cir) {
-        Optional<StructureTemplate> fromSchem = SchemGameTestStructureLoader.tryLoad(this.resourceManager, id);
-        if (fromSchem.isPresent()) {
-            cir.setReturnValue(fromSchem);
+        Optional<StructureTemplate> schem = SchemGameTestStructureLoader.tryLoad(this.resourceManager, id);
+        if (schem.isPresent()) {
+            cir.setReturnValue(schem);
+            return;
+        }
+
+        Optional<StructureTemplate> empty = GameTestTemplateFallbacks.maybeEmptyTemplate(id);
+        if (empty.isPresent()) {
+            cir.setReturnValue(empty);
         }
     }
 }
