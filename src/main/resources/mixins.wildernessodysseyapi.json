@@ -8,14 +8,18 @@
       "BlockEntityMixin",
       "CampfireBlockMixin",
       "DayNightCycleMixin",
-      "EntityAccessor",
-      "ServerLevelMixin",
-      "ForwardExtentCopyMixin",
-      "ServerboundSetStructureBlockPacketMixin",
-      "StarterStructureConfigMixin",
-      "StarterStructureUtilMixin",
-      "StructureBlockEntityMixin"
-    ],
+    "EntityAccessor",
+    "ServerLevelMixin",
+    "ForwardExtentCopyMixin",
+    "ServerboundSetStructureBlockPacketMixin",
+    "StarterStructureConfigMixin",
+    "StarterStructureUtilMixin",
+    "StructureBlockEntityMixin",
+    "StructureTemplateAccessor",
+    "StructureTemplateManagerAccessor",
+    "StructureTemplatePaletteInvoker",
+    "StructureUtilsMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   },
