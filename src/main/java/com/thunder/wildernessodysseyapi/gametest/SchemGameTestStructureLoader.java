@@ -35,15 +35,9 @@ public final class SchemGameTestStructureLoader {
             }
 
             try (InputStream stream = resource.get().open()) {
-                ClipboardFormat format = pickFormat(extension);
-                if (format == null) {
-                    ModConstants.LOGGER.debug("Unknown schematic format for {}", schemLocation);
-                    continue;
-                }
-
-                try (ClipboardReader reader = format.getReader(stream)) {
-                    Clipboard clipboard = reader.read();
-                    return Optional.of(SchematicClipboardAdapter.toTemplate(clipboard));
+                Optional<StructureTemplate> template = loadFromStream(extension, stream);
+                if (template.isPresent()) {
+                    return template;
                 }
             } catch (IOException | RuntimeException e) {
                 ModConstants.LOGGER.warn("Failed to load schematic-backed test structure {}.", schemLocation, e);
@@ -51,6 +45,22 @@ public final class SchemGameTestStructureLoader {
         }
 
         return Optional.empty();
+    }
+
+    static Optional<StructureTemplate> loadFromStream(String extension, InputStream stream) {
+        ClipboardFormat format = pickFormat(extension);
+        if (format == null) {
+            ModConstants.LOGGER.debug("Unknown schematic format for extension {}.", extension);
+            return Optional.empty();
+        }
+
+        try (ClipboardReader reader = format.getReader(stream)) {
+            Clipboard clipboard = reader.read();
+            return Optional.of(SchematicClipboardAdapter.toTemplate(clipboard));
+        } catch (IOException | RuntimeException e) {
+            ModConstants.LOGGER.warn("Failed to read schematic content for extension {}.", extension, e);
+            return Optional.empty();
+        }
     }
 
     private static ClipboardFormat pickFormat(String extension) {
