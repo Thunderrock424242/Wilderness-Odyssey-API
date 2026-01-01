@@ -28,8 +28,6 @@ public final class SchematicClipboardAdapter {
 
     public static StructureTemplate toTemplate(Clipboard clipboard) {
         StructureTemplate template = new StructureTemplate();
-        StructureTemplateAccessor accessor = (StructureTemplateAccessor) template;
-
         Region region = clipboard.getRegion();
         BlockVector3 min = region.getMinimumPoint();
         BlockVector3 size = clipboard.getDimensions();
@@ -61,14 +59,18 @@ public final class SchematicClipboardAdapter {
             }
         }
 
-        StructureTemplate.Palette palette = StructureTemplateAccessor.wildernessOdysseyApi$createPalette(blocks);
-        accessor.getPalettes().add(palette);
-        accessor.setSize(new Vec3i(size.getX(), size.getY(), size.getZ()));
+        StructureTemplate.Palette palette = createPalette(blocks);
+        getPalettes(template).add(palette);
+        setSize(template, new Vec3i(size.getX(), size.getY(), size.getZ()));
 
         return template;
     }
 
     private static BlockState convertState(BlockStateHolder<?> holder) {
+        if (isMinecraftBootstrapMissing()) {
+            return null;
+        }
+
         ResourceLocation blockId = ResourceLocation.tryParse(holder.getBlockType().getId());
         if (blockId == null || !net.minecraft.core.registries.BuiltInRegistries.BLOCK.containsKey(blockId)) {
             return null;
@@ -98,6 +100,58 @@ public final class SchematicClipboardAdapter {
         } catch (ClassCastException e) {
             ModConstants.LOGGER.debug("Failed to apply property {}={} for {}.", property.getName(), value, state, e);
             return state;
+        }
+    }
+
+    private static boolean isMinecraftBootstrapMissing() {
+        try {
+            return net.neoforged.fml.loading.LoadingModList.get() == null;
+        } catch (NoClassDefFoundError ignored) {
+            return false;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<StructureTemplate.Palette> getPalettes(StructureTemplate template) {
+        if (template instanceof StructureTemplateAccessor accessor) {
+            return accessor.getPalettes();
+        }
+        try {
+            var field = StructureTemplate.class.getDeclaredField("palettes");
+            field.setAccessible(true);
+            return (List<StructureTemplate.Palette>) field.get(template);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Unable to access structure palettes", e);
+        }
+    }
+
+    private static void setSize(StructureTemplate template, Vec3i size) {
+        if (template instanceof StructureTemplateAccessor accessor) {
+            accessor.setSize(size);
+            return;
+        }
+        try {
+            var field = StructureTemplate.class.getDeclaredField("size");
+            field.setAccessible(true);
+            field.set(template, size);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Unable to set structure size", e);
+        }
+    }
+
+    private static StructureTemplate.Palette createPalette(List<StructureTemplate.StructureBlockInfo> blocks) {
+        try {
+            return StructureTemplateAccessor.wildernessOdysseyApi$createPalette(blocks);
+        } catch (Throwable ignored) {
+            // Mixin not applied in test environments; fall back to reflective construction.
+        }
+
+        try {
+            var constructor = StructureTemplate.Palette.class.getDeclaredConstructor(List.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(blocks);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Unable to create structure palette", e);
         }
     }
 }
