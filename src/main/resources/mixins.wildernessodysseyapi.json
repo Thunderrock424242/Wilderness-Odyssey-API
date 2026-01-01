@@ -16,7 +16,8 @@
       "StarterStructureUtilMixin",
       "StructureBlockEntityMixin",
       "GameTestStructureManagerMixin",
-      "StructureTemplateAccessor"
+      "StructureTemplateAccessor",
+      "StructureTemplatePaletteAccessor"
     ],
   "injectors": {
     "defaultRequire": 1

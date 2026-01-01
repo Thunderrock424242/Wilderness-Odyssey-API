@@ -17,9 +17,4 @@ public interface StructureTemplateAccessor {
 
     @Accessor("size")
     void setSize(Vec3i size);
-
-    @org.spongepowered.asm.mixin.gen.Invoker("<init>")
-    static StructureTemplate.Palette wildernessOdysseyApi$createPalette(List<StructureTemplate.StructureBlockInfo> blocks) {
-        throw new AssertionError();
-    }
 }

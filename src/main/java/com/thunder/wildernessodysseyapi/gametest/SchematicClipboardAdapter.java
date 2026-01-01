@@ -7,6 +7,7 @@ import com.sk89q.worldedit.world.block.BaseBlock;
 import com.sk89q.worldedit.world.block.BlockStateHolder;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.mixin.StructureTemplateAccessor;
+import com.thunder.wildernessodysseyapi.mixin.StructureTemplatePaletteAccessor;
 import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.state.BlockState;
@@ -141,7 +142,7 @@ public final class SchematicClipboardAdapter {
 
     private static StructureTemplate.Palette createPalette(List<StructureTemplate.StructureBlockInfo> blocks) {
         try {
-            return StructureTemplateAccessor.wildernessOdysseyApi$createPalette(blocks);
+            return StructureTemplatePaletteAccessor.wildernessOdysseyApi$createPalette(blocks);
         } catch (Throwable ignored) {
             // Mixin not applied in test environments; fall back to reflective construction.
         }
