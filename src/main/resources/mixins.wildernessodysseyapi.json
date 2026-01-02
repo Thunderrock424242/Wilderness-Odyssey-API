@@ -12,8 +12,6 @@
       "ServerLevelMixin",
       "ForwardExtentCopyMixin",
       "ServerboundSetStructureBlockPacketMixin",
-      "StarterStructureConfigMixin",
-      "StarterStructureUtilMixin",
       "StructureBlockEntityMixin",
       "GameTestStructureManagerMixin",
       "StructureTemplateAccessor",

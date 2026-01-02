@@ -56,6 +56,33 @@ public class NBTStructurePlacer {
     }
 
     /**
+     * Places the structure so that the leveling marker (or template origin if no marker exists)
+     * lines up with the provided {@code anchor} position.
+     */
+    public PlacementResult placeAnchored(ServerLevel level, BlockPos anchor) {
+        return placeAnchored(level, anchor, null);
+    }
+
+    /**
+     * Places the structure and reports progress to the provided debug attempt when available,
+     * aligning the template's anchor with the supplied world position.
+     */
+    public PlacementResult placeAnchored(ServerLevel level, BlockPos anchor, PlacementAttempt debugAttempt) {
+        TemplateData data = load(level);
+        if (data == null) {
+            StructurePlacementDebugger.markFailure(debugAttempt, "template missing");
+            return null;
+        }
+
+        BlockPos origin = anchor;
+        if (data.levelingOffset() != null) {
+            origin = anchor.subtract(data.levelingOffset());
+        }
+
+        return place(level, origin, debugAttempt);
+    }
+
+    /**
      * Places the structure and reports progress to the provided debug attempt when available.
      */
     public PlacementResult place(ServerLevel level, BlockPos origin, PlacementAttempt debugAttempt) {
@@ -132,7 +159,7 @@ public class NBTStructurePlacer {
         StructurePlacementDebugger.markSuccess(attempt,
                 "placed with %s terrain samples and %s cryo tubes".formatted(replaced, cryoPositions.size()));
 
-        return new PlacementResult(bounds, cryoPositions, List.copyOf(chunkSlices));
+        return new PlacementResult(foundation.origin(), bounds, cryoPositions, List.copyOf(chunkSlices));
     }
 
     /** Returns the template id used by this placer. */
@@ -232,7 +259,7 @@ public class NBTStructurePlacer {
      * Result of placing a structure, exposing the overall bounds, any detected cryo tubes and
      * chunk-aligned slices that callers can use for follow-up processing.
      */
-    public record PlacementResult(AABB bounds, List<BlockPos> cryoPositions, List<AABB> chunkSlices) {}
+    public record PlacementResult(BlockPos origin, AABB bounds, List<BlockPos> cryoPositions, List<AABB> chunkSlices) {}
 
     private record TemplateData(StructureTemplate template,
                                 List<BlockPos> cryoOffsets,

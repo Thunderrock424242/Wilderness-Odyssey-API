@@ -19,7 +19,6 @@ import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.processor.ModProcessors;
-import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureBundler;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.command.AiAdvisorCommand;
@@ -174,7 +173,6 @@ public class WildernessOdysseyAPIMainModClass {
         event.enqueueWork(() -> {
             System.out.println("Wilderness Odyssey setup complete!");
             ModDataCache.initialize();
-            StarterStructureBundler.ensureBundledBunkerPresent();
         });
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
