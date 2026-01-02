@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.chunk;
 
+import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -41,6 +42,10 @@ public final class ChunkTickThrottler {
 
     public static boolean shouldSkipWarmTicking(ChunkPos pos) {
         return config.skipWarmCacheTicking() && ChunkStreamManager.isWarmCached(pos);
+    }
+
+    public static boolean shouldBypassTickScaling(ServerLevel level) {
+        return level.getServer() instanceof GameTestServer;
     }
 
     public static int scaleRandomTickDensity(ServerLevel level, ChunkPos pos, int baseRandomTicks) {

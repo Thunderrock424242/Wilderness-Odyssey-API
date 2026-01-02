@@ -11,16 +11,16 @@ import java.util.Optional;
  * Provides minimal in-memory templates for GameTest scaffolding when no structure files exist.
  */
 public final class GameTestTemplateFallbacks {
-    public static final ResourceLocation VANILLA_EMPTY = ResourceLocation.parse("minecraft:empty");
+    private static final String EMPTY_TEMPLATE_PATH = "empty";
 
     private GameTestTemplateFallbacks() {
     }
 
     /**
-     * Returns an empty structure template for {@code minecraft:empty} when the file is missing.
+     * Returns an empty structure template for {@code <any_namespace>:empty} when the file is missing.
      */
     public static Optional<StructureTemplate> maybeEmptyTemplate(ResourceLocation id) {
-        if (!VANILLA_EMPTY.equals(id)) {
+        if (!EMPTY_TEMPLATE_PATH.equals(id.getPath())) {
             return Optional.empty();
         }
 

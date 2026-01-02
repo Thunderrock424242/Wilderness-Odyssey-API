@@ -38,21 +38,19 @@ public class StarterStructureGameTests {
     private static final String WORLD_EDIT_MOD_ID = "worldedit";
     private static final String CREATE_MOD_ID = "create";
 
-    @GameTest(templateNamespace = "minecraft", template = "empty", batch = BATCH, timeoutTicks = 400)
+    @GameTest(templateNamespace = ModConstants.MOD_ID, template = "empty", batch = BATCH, timeoutTicks = 400)
     public static void bunkerSpawnsBlocks(GameTestHelper helper) {
         PlacementContext context = pasteBunker(helper);
         if (context == null) {
             return; // pasteBunker already reported failure
         }
 
-        helper.runAtTickTime(2, () -> {
-            boolean hasBlocks = hasAnyBlock(helper.getLevel(), context.minCorner(), context.maxCorner());
-            helper.assertTrue(hasBlocks, "Bunker paste did not produce any non-air blocks in its footprint.");
-            helper.succeed();
-        });
+        boolean hasBlocks = hasAnyBlock(helper.getLevel(), context.minCorner(), context.maxCorner());
+        helper.assertTrue(hasBlocks, "Bunker paste did not produce any non-air blocks in its footprint.");
+        helper.succeed();
     }
 
-    @GameTest(templateNamespace = "minecraft", template = "empty", batch = BATCH, timeoutTicks = 400)
+    @GameTest(templateNamespace = ModConstants.MOD_ID, template = "empty", batch = BATCH, timeoutTicks = 400)
     public static void bunkerRetainsCreateMachines(GameTestHelper helper) {
         if (!ModList.get().isLoaded(CREATE_MOD_ID)) {
             helper.fail("Create mod is not loaded; cannot verify Create machines.");
@@ -64,11 +62,9 @@ public class StarterStructureGameTests {
             return; // pasteBunker already reported failure
         }
 
-        helper.runAtTickTime(4, () -> {
-            boolean foundCreateMachines = containsCreateBlockEntity(helper.getLevel(), context.minCorner(), context.maxCorner());
-            helper.assertTrue(foundCreateMachines, "No Create block entities were found inside the pasted bunker footprint.");
-            helper.succeed();
-        });
+        boolean foundCreateMachines = containsCreateBlockEntity(helper.getLevel(), context.minCorner(), context.maxCorner());
+        helper.assertTrue(foundCreateMachines, "No Create block entities were found inside the pasted bunker footprint.");
+        helper.succeed();
     }
 
     private static PlacementContext pasteBunker(GameTestHelper helper) {
@@ -89,19 +85,21 @@ public class StarterStructureGameTests {
             return null;
         }
 
-        BlockPos origin = helper.absolutePos(BlockPos.ZERO.above(64));
-        BlockPos min = translateVec(origin, clipboard.getMinimumPoint());
-        BlockPos max = translateVec(origin, clipboard.getMaximumPoint());
+        BlockPos destination = helper.absolutePos(BlockPos.ZERO.above(64));
+        BlockPos placementBase = destination.subtract(asBlockPos(clipboard.getOrigin()));
+        BlockPos min = translateVec(placementBase, clipboard.getMinimumPoint());
+        BlockPos max = translateVec(placementBase, clipboard.getMaximumPoint());
+        PlacementContext placement = PlacementContext.fromUnordered(min, max);
 
         ServerLevel level = helper.getLevel();
-        loadChunks(level, min, max);
-        boolean pasted = pasteWithWorldEdit(level, bunkerPath, origin, clipboard);
+        loadChunks(level, placement.minCorner(), placement.maxCorner());
+        boolean pasted = pasteWithWorldEdit(level, bunkerPath, destination, clipboard);
         if (!pasted) {
-            helper.fail("WorldEdit could not paste bunker schematic at " + origin);
+            helper.fail("WorldEdit could not paste bunker schematic at " + destination);
             return null;
         }
 
-        return new PlacementContext(min, max);
+        return placement;
     }
 
     private static Clipboard readClipboard(GameTestHelper helper, Path path) {
@@ -145,6 +143,10 @@ public class StarterStructureGameTests {
 
     private static BlockPos translateVec(BlockPos origin, BlockVector3 vec) {
         return origin.offset(vec.x(), vec.y(), vec.z());
+    }
+
+    private static BlockPos asBlockPos(BlockVector3 vec) {
+        return new BlockPos(vec.x(), vec.y(), vec.z());
     }
 
     private static void loadChunks(ServerLevel level, BlockPos min, BlockPos max) {
@@ -196,5 +198,16 @@ public class StarterStructureGameTests {
     }
 
     private record PlacementContext(BlockPos minCorner, BlockPos maxCorner) {
+        static PlacementContext fromUnordered(BlockPos first, BlockPos second) {
+            BlockPos min = new BlockPos(
+                    Math.min(first.getX(), second.getX()),
+                    Math.min(first.getY(), second.getY()),
+                    Math.min(first.getZ(), second.getZ()));
+            BlockPos max = new BlockPos(
+                    Math.max(first.getX(), second.getX()),
+                    Math.max(first.getY(), second.getY()),
+                    Math.max(first.getZ(), second.getZ()));
+            return new PlacementContext(min, max);
+        }
     }
 }

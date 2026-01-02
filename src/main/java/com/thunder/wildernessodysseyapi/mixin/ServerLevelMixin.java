@@ -13,6 +13,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class ServerLevelMixin {
     @Inject(method = "tickChunk", at = @At("HEAD"), cancellable = true)
     private void wildernessodysseyapi$skipWarmCached(LevelChunk chunk, int randomTickSpeed, CallbackInfo ci) {
+        ServerLevel level = (ServerLevel) (Object) this;
+        if (ChunkTickThrottler.shouldBypassTickScaling(level)) {
+            return;
+        }
         if (ChunkTickThrottler.shouldSkipWarmTicking(chunk.getPos())) {
             ci.cancel();
         }
@@ -20,6 +24,10 @@ public abstract class ServerLevelMixin {
 
     @ModifyVariable(method = "tickChunk", at = @At("HEAD"), argsOnly = true, ordinal = 0)
     private int wildernessodysseyapi$scaleRandomTicks(int randomTickSpeed, LevelChunk chunk) {
-        return ChunkTickThrottler.scaleRandomTickDensity((ServerLevel) (Object) this, chunk.getPos(), randomTickSpeed);
+        ServerLevel level = (ServerLevel) (Object) this;
+        if (ChunkTickThrottler.shouldBypassTickScaling(level)) {
+            return randomTickSpeed;
+        }
+        return ChunkTickThrottler.scaleRandomTickDensity(level, chunk.getPos(), randomTickSpeed);
     }
 }
