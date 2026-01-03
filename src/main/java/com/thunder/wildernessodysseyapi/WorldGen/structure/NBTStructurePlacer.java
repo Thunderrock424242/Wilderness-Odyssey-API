@@ -10,6 +10,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -18,6 +19,9 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlac
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.phys.AABB;
 
 import java.util.ArrayList;
@@ -230,12 +234,13 @@ public class NBTStructurePlacer {
 
 
         StructureTemplateManager manager = level.getStructureManager();
-        StructureTemplate template;
-        Optional<StructureTemplate> existing = manager.get(id);
-        if (existing.isPresent()) {
-            template = existing.get();
-        } else {
-            template = manager.getOrCreate(id);
+        StructureTemplate template = manager.get(id).orElse(null);
+        if (template == null || isTemplateEmpty(template)) {
+            manager.remove(id);
+            template = loadDirect(level, manager);
+            if (template == null || isTemplateEmpty(template)) {
+                return null;
+            }
         }
 
         List<BlockPos> cryoOffsets = new ArrayList<>();
@@ -251,8 +256,42 @@ public class NBTStructurePlacer {
 
         TemplateData data = new TemplateData(template, List.copyOf(cryoOffsets), List.copyOf(terrainOffsets), size,
                 levelingOffset, disableTerrainReplacement, levelingData.present(), hasStructureBlocks);
-        cachedData = data;
+
+        // Do not cache empty templates so that later placement attempts can retry once resources finish loading.
+        // The GameTest server asks for the bunker extremely early during startup, before data packs have been
+        // stitched. Caching the placeholder zero-sized template here would permanently mark the bunker as empty.
+        if (hasStructureBlocks) {
+            cachedData = data;
+        } else {
+            cachedData = null;
+            manager.remove(id);
+        }
+
         return data;
+    }
+
+    private StructureTemplate loadDirect(ServerLevel level, StructureTemplateManager manager) {
+        ResourceLocation resourcePath = ResourceLocation.fromNamespaceAndPath(
+                id.getNamespace(),
+                StructureTemplateManager.STRUCTURE_RESOURCE_DIRECTORY_NAME + "/" + id.getPath() + ".nbt");
+        Optional<Resource> resource = level.getServer().getResourceManager().getResource(resourcePath);
+        if (resource.isEmpty()) {
+            ModConstants.LOGGER.warn("Structure template {} not found at {}.", id, resourcePath);
+            return null;
+        }
+
+        try (var stream = resource.get().open()) {
+            CompoundTag tag = NbtIo.readCompressed(stream, NbtAccounter.unlimitedHeap());
+            return manager.readStructure(tag);
+        } catch (Exception e) {
+            ModConstants.LOGGER.warn("Failed to read structure template {} from resources.", id, e);
+            return null;
+        }
+    }
+
+    private boolean isTemplateEmpty(StructureTemplate template) {
+        Vec3i size = template.getSize();
+        return size.getX() <= 0 || size.getY() <= 0 || size.getZ() <= 0;
     }
 
     /**
