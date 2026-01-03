@@ -273,7 +273,7 @@ public class NBTStructurePlacer {
     private StructureTemplate loadDirect(ServerLevel level, StructureTemplateManager manager) {
         ResourceLocation resourcePath = ResourceLocation.fromNamespaceAndPath(
                 id.getNamespace(),
-                StructureTemplateManager.STRUCTURE_RESOURCE_DIRECTORY_NAME + "/" + id.getPath() + ".nbt");
+                "structures/" + id.getPath() + ".nbt");
         Optional<Resource> resource = level.getServer().getResourceManager().getResource(resourcePath);
         if (resource.isEmpty()) {
             ModConstants.LOGGER.warn("Structure template {} not found at {}.", id, resourcePath);
