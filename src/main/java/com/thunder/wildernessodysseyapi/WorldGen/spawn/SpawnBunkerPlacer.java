@@ -3,9 +3,6 @@ package com.thunder.wildernessodysseyapi.WorldGen.spawn;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureSpawnGuard;
-import com.thunder.wildernessodysseyapi.WorldGen.spawn.CryoSpawnData;
-import com.thunder.wildernessodysseyapi.WorldGen.spawn.PlayerSpawnHandler;
-import com.thunder.wildernessodysseyapi.WorldGen.spawn.WorldSpawnHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -23,7 +20,7 @@ import java.util.List;
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class SpawnBunkerPlacer {
-    private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "spawn_bunker");
+    private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "bunker");
     private static final NBTStructurePlacer BUNKER_PLACER = new NBTStructurePlacer(BUNKER_ID);
 
     private SpawnBunkerPlacer() {

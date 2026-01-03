@@ -18,7 +18,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @GameTestHolder(ModConstants.MOD_ID)
 @PrefixGameTestTemplate(false)
 public class SpawnBunkerGameTests {
-    private static final String BATCH = "spawn_bunker";
+    private static final String BATCH = "bunker";
 
     @GameTest(templateNamespace = "minecraft", template = "empty", batch = BATCH, timeoutTicks = 400)
     public static void bunkerSpawnsBlocks(GameTestHelper helper) {
@@ -53,7 +53,7 @@ public class SpawnBunkerGameTests {
         BlockPos anchor = helper.absolutePos(BlockPos.ZERO.above(64));
         NBTStructurePlacer.PlacementResult result = SpawnBunkerPlacer.placeBunker(level, anchor);
         if (result == null) {
-            helper.fail("Spawn bunker template '" + ModConstants.MOD_ID + ":spawn_bunker' is missing or empty.");
+            helper.fail(" Bunker template '" + ModConstants.MOD_ID + ":bunker' is missing or empty.");
             return null;
         }
 
