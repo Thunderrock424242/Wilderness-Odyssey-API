@@ -12,6 +12,7 @@ import com.sk89q.worldedit.session.ClipboardHolder;
 import com.sk89q.worldedit.session.PasteBuilder;
 import com.sk89q.worldedit.world.World;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureSchematic.Format;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -32,14 +33,20 @@ public final class StarterStructureWorldEditPlacer {
      * Attempts to paste the given schematic with WorldEdit. Returns {@code true} when WorldEdit successfully
      * performs the paste, {@code false} otherwise.
      */
-    public static boolean placeWithWorldEdit(ServerLevel serverLevel, Path schematicPath, BlockPos origin, boolean isNbtFormat) {
+    public static boolean placeWithWorldEdit(ServerLevel serverLevel, StarterStructureSchematic schematic, BlockPos origin) {
         if (!StructureConfig.STARTER_STRUCTURE_USE_WORLDEDIT.get()) return false;
         if (!ModList.get().isLoaded("worldedit")) return false;
-        if (serverLevel == null || schematicPath == null || !Files.isRegularFile(schematicPath)) return false;
+        if (serverLevel == null || schematic == null) return false;
+
+        Path schematicPath = schematic.path();
+        if (schematicPath == null || !Files.isRegularFile(schematicPath)) return false;
 
         try {
-            ClipboardFormat format = ClipboardFormats.findByFile(schematicPath.toFile());
-            if (format == null && isNbtFormat) {
+            ClipboardFormat format = schematic.clipboardFormat();
+            if (format == null) {
+                format = ClipboardFormats.findByFile(schematicPath.toFile());
+            }
+            if (format == null && schematic.format() == Format.NBT) {
                 format = ClipboardFormats.findByAlias("schematic");
             }
             if (format == null) {

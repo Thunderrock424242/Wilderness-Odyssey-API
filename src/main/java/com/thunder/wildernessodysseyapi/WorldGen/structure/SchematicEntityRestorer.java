@@ -98,6 +98,55 @@ public final class SchematicEntityRestorer {
         return captured;
     }
 
+    public static List<Pair<BlockPos, Entity>> extractEntitiesFromNbt(ServerLevel level, Path schematicPath, BlockPos structurePos) {
+        if (level == null || schematicPath == null || structurePos == null) {
+            return List.of();
+        }
+
+        try {
+            CompoundTag root = NbtIo.readCompressed(schematicPath, NbtAccounter.unlimitedHeap());
+            if (root == null) {
+                return List.of();
+            }
+
+            ListTag entities = root.contains("entities", Tag.TAG_LIST)
+                    ? root.getList("entities", Tag.TAG_COMPOUND)
+                    : root.getList("Entities", Tag.TAG_COMPOUND);
+            if (entities.isEmpty()) {
+                return List.of();
+            }
+
+            List<Pair<BlockPos, Entity>> restored = new ArrayList<>();
+            for (Tag entry : entities) {
+                if (!(entry instanceof CompoundTag entityTag)) {
+                    continue;
+                }
+
+                BlockPos relativePos = extractRelativePos(entityTag);
+                if (relativePos == null) {
+                    continue;
+                }
+
+                CompoundTag entityData = entityTag.contains("nbt", Tag.TAG_COMPOUND)
+                        ? entityTag.getCompound("nbt").copy()
+                        : entityTag.copy();
+                Entity entity = EntityType.create(entityData, level).orElse(null);
+                if (entity == null) {
+                    continue;
+                }
+
+                BlockPos worldPos = structurePos.offset(relativePos);
+                entity.setPos(worldPos.getX() + 0.5D, worldPos.getY(), worldPos.getZ() + 0.5D);
+                restored.add(Pair.of(worldPos, entity));
+            }
+
+            return List.copyOf(restored);
+        } catch (Exception e) {
+            ModConstants.LOGGER.warn("[Starter Structure compat] Failed to extract NBT entities from {}.", schematicPath, e);
+            return List.of();
+        }
+    }
+
     public static int spawnRestoredEntities(ServerLevel level, List<Pair<BlockPos, Entity>> restored) {
         if (level == null || restored == null || restored.isEmpty()) {
             return 0;
@@ -138,11 +187,25 @@ public final class SchematicEntityRestorer {
         return spawned;
     }
 
-    private static BlockPos extractRelativePos(CompoundTag entityTag) {
+    static BlockPos extractRelativePos(CompoundTag entityTag) {
         if (entityTag.contains("blockPos", Tag.TAG_LIST)) {
             ListTag blockPosList = entityTag.getList("blockPos", Tag.TAG_INT);
             if (blockPosList.size() == 3) {
                 return new BlockPos(blockPosList.getInt(0), blockPosList.getInt(1), blockPosList.getInt(2));
+            }
+        }
+
+        if (entityTag.contains("pos", Tag.TAG_LIST)) {
+            ListTag posList = entityTag.getList("pos", Tag.TAG_DOUBLE);
+            if (posList.isEmpty()) {
+                posList = entityTag.getList("pos", Tag.TAG_INT);
+            }
+            if (posList.size() == 3) {
+                return new BlockPos(
+                        Mth.floor(posList.getDouble(0)),
+                        Mth.floor(posList.getDouble(1)),
+                        Mth.floor(posList.getDouble(2))
+                );
             }
         }
 
