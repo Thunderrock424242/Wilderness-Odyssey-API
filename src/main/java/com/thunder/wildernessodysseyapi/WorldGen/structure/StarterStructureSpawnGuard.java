@@ -22,6 +22,11 @@ public final class StarterStructureSpawnGuard {
     private StarterStructureSpawnGuard() {
     }
 
+    /** Clears all tracked spawn deny zones. Primarily used by automated tests. */
+    public static void clearAll() {
+        ZONES.clear();
+    }
+
     public static void registerSpawnDenyZone(ServerLevel level, BlockPos origin) {
         if (!StructureConfig.PREVENT_STARTER_STRUCTURE_HOSTILES.get()) return;
         if (level == null || origin == null) return;
