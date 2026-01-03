@@ -64,8 +64,20 @@ neoForge {
         // The gametest system is also enabled by default for other run configs under the /test commands.
         gameTestServer {
             type = "gameTestServer"
-            // Empty = all namespaces; avoids filtering away tests during CI.
-            systemProperty 'neoforge.enabledGameTestNamespaces', ""
+            // Limit GameTests to our namespace by default so third-party mod tests do not fail the run.
+            // Either property can be overridden from the command line, e.g.
+            //   -Dforge.enabledGameTestNamespaces=
+            //   -Dneoforge.enabledGameTestNamespaces=
+            def forgeNamespaces = System.getProperty('forge.enabledGameTestNamespaces')
+            def neoforgeNamespaces = System.getProperty('neoforge.enabledGameTestNamespaces')
+            def enabledNamespaces = forgeNamespaces != null ? forgeNamespaces : neoforgeNamespaces
+            // Include the vanilla namespace by default because our tests rely on the built-in
+            // `minecraft:empty` template. Callers can still supply an empty string to run all tests.
+            if (enabledNamespaces == null) {
+                enabledNamespaces = "${project.mod_id},minecraft"
+            }
+            systemProperty 'forge.enabledGameTestNamespaces', enabledNamespaces
+            systemProperty 'neoforge.enabledGameTestNamespaces', enabledNamespaces
         }
 
         data {
