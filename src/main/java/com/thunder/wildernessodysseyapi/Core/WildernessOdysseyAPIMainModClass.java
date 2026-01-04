@@ -4,9 +4,6 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.ModPackPatches.BugFixes.InfiniteSourceHandler;
 import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.FAQ.FaqReloadListener;
-import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCache;
-import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheCommand;
-import com.thunder.wildernessodysseyapi.ModPackPatches.cache.ModDataCacheConfig;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
@@ -80,7 +77,6 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
 @Mod(ModConstants.MOD_ID)
 public class WildernessOdysseyAPIMainModClass {
 
-    public static int dynamicModCount = 0;
     private static final String CONFIG_FOLDER = ModConstants.MOD_ID + "/";
 
     private Path chunkStorageRoot;
@@ -88,9 +84,6 @@ public class WildernessOdysseyAPIMainModClass {
     private int serverTickCounter = 0;
     private static final int LOG_INTERVAL = 600;
 
-    private long lastTickTimeNanos = 0L;
-    private long worstTickTimeNanos = 0L;
-    private final requestperfadvice requestperfadvice = new requestperfadvice();
 
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
     private final GlobalChatManager globalChatManager = GlobalChatManager.getInstance();
@@ -128,14 +121,10 @@ public class WildernessOdysseyAPIMainModClass {
 
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-structures.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, ModDataCacheConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-cache.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-donations-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-async.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, ChunkStreamingConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-chunk-streaming.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, AntiCheatConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-anticheat-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,
@@ -151,11 +140,9 @@ public class WildernessOdysseyAPIMainModClass {
     private void commonSetup(final FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             System.out.println("Wilderness Odyssey setup complete!");
-            ModDataCache.initialize();
         });
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
-        dynamicModCount = ModList.get().getMods().size();
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
@@ -171,14 +158,7 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event){
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
-        ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
-        BufferPool.configure(chunkConfig);
-        IoExecutors.initialize(chunkConfig);
-        chunkStorageRoot = ChunkStoragePaths.resolveCacheRoot(event.getServer(), chunkConfig);
-        ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel(), chunkConfig.compressionCodec()));
-        ChunkDeltaTracker.configure(chunkConfig);
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
-        AnalyticsTracker.initialize(event.getServer(), event.getServer().getFile("config"));
     }
 
     /**
@@ -191,18 +171,11 @@ public class WildernessOdysseyAPIMainModClass {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
         ModListDiffCommand.register(dispatcher);
         ModListVersionCommand.register(dispatcher);
-        MemCheckCommand.register(event.getDispatcher());
         StructureInfoCommand.register(event.getDispatcher());
         FaqCommand.register(event.getDispatcher());
-        ModDataCacheCommand.register(dispatcher);
         DonateCommand.register(event.getDispatcher());
         WorldGenScanCommand.register(event.getDispatcher());
         StructurePlacementDebugCommand.register(event.getDispatcher());
-        AiAdvisorCommand.register(event.getDispatcher());
-        AsyncStatsCommand.register(dispatcher);
-        ChunkStatsCommand.register(dispatcher);
-        DebugChunkCommand.register(dispatcher);
-        AnalyticsCommand.register(dispatcher);
         GlobalChatCommand.register(dispatcher);
         GlobalChatOptToggleCommand.register(dispatcher);
         TideInfoCommand.register(dispatcher);
@@ -222,9 +195,6 @@ public class WildernessOdysseyAPIMainModClass {
 
     @SubscribeEvent
     public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) {
-            ChunkDeltaTracker.dropPlayer(player);
-        }
     }
     /**
      * On server stopping.
@@ -235,12 +205,7 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStopping(ServerStoppingEvent event) {
         globalChatManager.shutdown();
         long gameTime = event.getServer().overworld() != null ? event.getServer().overworld().getGameTime() : 0L;
-        ChunkStreamManager.flushAll(gameTime);
         AsyncTaskManager.shutdown();
-        ChunkStreamManager.shutdown();
-        IoExecutors.shutdown();
-        ChunkDeltaTracker.shutdown();
-        AnalyticsTracker.shutdown();
     }
 
     private void onLoadComplete(FMLLoadCompleteEvent event) {
@@ -248,74 +213,16 @@ public class WildernessOdysseyAPIMainModClass {
         //NeoForge.EVENT_BUS.register(new WorldEvents());
         /// i think we don't need this anymore ^ but keep for now.
     }
-
-    @SubscribeEvent
-    public void onServerTick(ServerTickEvent.Post event) {
-        // Every server tick event
-        // This is equivalent to the old "END" phase.
-        MinecraftServer server = event.getServer();
-        long now = System.nanoTime();
-        if (lastTickTimeNanos != 0L) {
-            long duration = now - lastTickTimeNanos;
-            worstTickTimeNanos = Math.max(worstTickTimeNanos, duration);
-        }
-        lastTickTimeNanos = now;
-        for (ServerLevel level : server.getAllLevels()) {
-            ChunkTickThrottler.tick(level);
-        }
-        AsyncTaskManager.drainMainThreadQueue(server);
-        if (server.overworld() != null) {
-            ChunkStreamManager.tick(server.overworld().getGameTime());
-        }
-        PerformanceMitigationController.tick(server);
-        DeferredTaskScheduler.tick();
-        if (!event.hasTime()) return;
-
-        if (++serverTickCounter >= LOG_INTERVAL) {
-            serverTickCounter = 0;
-            long usedMB = MemoryUtils.getUsedMemoryMB();
-            long totalMB = MemoryUtils.getTotalMemoryMB();
-
-            // Use the dynamic mod count
-            int recommendedMB = MemoryUtils.calculateRecommendedRAM(usedMB, dynamicModCount);
-
-            LOGGER.info("[ResourceManager] Memory usage: {}MB / {}MB. Recommended ~{}MB for {} loaded mods.", (Object) Optional.of(usedMB), (Object) totalMB, (Object) recommendedMB, (Object) dynamicModCount);
-
-            long worstTickMillis = TimeUnit.NANOSECONDS.toMillis(worstTickTimeNanos);
-            worstTickTimeNanos = 0L;
-            if (worstTickMillis > PerformanceAdvisor.DEFAULT_TICK_BUDGET_MS) {
-                PerformanceAdvisoryRequest request = PerformanceAdvisor.observe(server, worstTickMillis);
-                PerformanceMitigationController.buildActionsFromRequest(request);
-                String advisory = requestperfadvice.requestPerformanceAdvice(request);
-                LOGGER.info("[AI Advisor] {}", advisory);
-            }
-        }
-    }
     @SubscribeEvent
     public void onReload(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
     }
 
-    @SubscribeEvent
-    public void onWorldSave(LevelEvent.Save event) {
-        if (event.getLevel() instanceof ServerLevel serverLevel) {
-            ChunkStreamManager.flushAll(serverLevel.getGameTime());
-        }
-    }
 
     public void onConfigLoaded(ModConfigEvent.Loading event) {
-        if (event.getConfig().getSpec() == ModDataCacheConfig.CONFIG_SPEC) {
-            ModDataCache.initialize();
-        }
         if (event.getConfig().getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
             AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         }
-        if (event.getConfig().getSpec() == ChunkStreamingConfig.CONFIG_SPEC && chunkStorageRoot != null) {
-            ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
-            BufferPool.configure(chunkConfig);
-            IoExecutors.initialize(chunkConfig);
-            ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel(), chunkConfig.compressionCodec()));
-            ChunkDeltaTracker.configure(chunkConfig);
         }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
