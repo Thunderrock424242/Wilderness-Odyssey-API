@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.util;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.io.CompressionCodec;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
@@ -9,6 +10,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumSet;
+import java.util.concurrent.CompletableFuture;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -30,11 +32,10 @@ public final class NbtCompressionUtils {
             if (codec == CompressionCodec.VANILLA_GZIP) {
                 return NbtIo.readCompressed(fileStream, NbtAccounter.unlimitedHeap());
             }
-            try (InputStream decodedStream = wrapDecompressor(codec, fileStream);
-                 BufferPool.BufferSlice<byte[]> slice = BufferPool.heapSlice();
-                 BufferPool.PooledByteArrayOutputStream copy = BufferPool.byteArrayOutputStream()) {
-                copyStream(decodedStream, copy, slice.buffer());
-                try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(copy.directBuffer(), 0, copy.currentSize()))) {
+            try (InputStream decodedStream = wrapDecompressor(codec, fileStream)) {
+                ByteArrayOutputStream copy = new ByteArrayOutputStream();
+                copyStream(decodedStream, copy, new byte[8192]);
+                try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(copy.toByteArray()))) {
                     return NbtIo.read(in, NbtAccounter.unlimitedHeap());
                 }
             }
@@ -65,12 +66,13 @@ public final class NbtCompressionUtils {
         }
 
         try (OutputStream fileStream = Files.newOutputStream(target);
-             OutputStream compressor = wrapCompressor(codec, fileStream, compressionLevel);
-             BufferPool.PooledByteArrayOutputStream nbtBuffer = BufferPool.byteArrayOutputStream();
-             DataOutputStream nbtOut = new DataOutputStream(nbtBuffer)) {
-            NbtIo.write(tag, nbtOut);
-            nbtOut.flush();
-            compressor.write(nbtBuffer.directBuffer(), 0, nbtBuffer.currentSize());
+             OutputStream compressor = wrapCompressor(codec, fileStream, compressionLevel)) {
+            ByteArrayOutputStream nbtBuffer = new ByteArrayOutputStream();
+            try (DataOutputStream nbtOut = new DataOutputStream(nbtBuffer)) {
+                NbtIo.write(tag, nbtOut);
+                nbtOut.flush();
+            }
+            compressor.write(nbtBuffer.toByteArray());
         }
     }
 
@@ -96,7 +98,7 @@ public final class NbtCompressionUtils {
     }
 
     public static void rewriteCompressedAsync(Path target, int compressionLevel, CompressionCodec codec) {
-        IoExecutors.submit(null, "nbt-rewrite-" + target.getFileName(), () -> rewriteCompressed(target, compressionLevel, codec));
+        CompletableFuture.runAsync(() -> rewriteCompressed(target, compressionLevel, codec));
     }
 
     private static InputStream wrapDecompressor(CompressionCodec codec, InputStream inputStream) throws IOException {

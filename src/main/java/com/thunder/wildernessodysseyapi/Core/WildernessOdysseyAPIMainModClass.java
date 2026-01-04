@@ -223,7 +223,6 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
             AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         }
-        }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
         }
@@ -233,18 +232,8 @@ public class WildernessOdysseyAPIMainModClass {
     }
 
     public void onConfigReloaded(ModConfigEvent.Reloading event) {
-        if (event.getConfig().getSpec() == ModDataCacheConfig.CONFIG_SPEC) {
-            ModDataCache.initialize();
-        }
         if (event.getConfig().getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
             AsyncTaskManager.initialize(AsyncThreadingConfig.values());
-        }
-        if (event.getConfig().getSpec() == ChunkStreamingConfig.CONFIG_SPEC && chunkStorageRoot != null) {
-            ChunkStreamingConfig.ChunkConfigValues chunkConfig = ChunkStreamingConfig.values();
-            BufferPool.configure(chunkConfig);
-            IoExecutors.initialize(chunkConfig);
-            ChunkStreamManager.initialize(chunkConfig, new DiskChunkStorageAdapter(chunkStorageRoot, chunkConfig.compressionLevel(), chunkConfig.compressionCodec()));
-            ChunkDeltaTracker.configure(chunkConfig);
         }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
