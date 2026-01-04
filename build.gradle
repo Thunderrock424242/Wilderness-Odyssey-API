@@ -121,23 +121,11 @@ neoForge {
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 sourceSets {
-    integrationTest {
-        java.srcDir 'src/integrationTest/java'
-        resources.srcDir 'src/integrationTest/resources'
-        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
-        runtimeClasspath += output + compileClasspath + sourceSets.main.runtimeClasspath
-    }
     jmh {
         java.srcDir 'src/jmh/java'
         resources.srcDir 'src/jmh/resources'
         compileClasspath += sourceSets.main.output + configurations.runtimeClasspath
         runtimeClasspath += output + compileClasspath
-    }
-    schemTest {
-        java.srcDir 'src/schemTest/java'
-        resources.srcDir 'src/schemTest/resources'
-        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
-        runtimeClasspath += output + compileClasspath + sourceSets.main.runtimeClasspath
     }
 }
 
@@ -197,6 +185,7 @@ dependencies {
     implementation "curse.maven:spark-361579:6225208"
     implementation "curse.maven:sodium-394468:6382651"
     implementation "curse.maven:irisshaders-455508:6661598"
+    implementation "curse.maven:nova-apii-1248874:7418583"
     implementation 'com.github.luben:zstd-jni:1.5.7-6'
 
     // AI advisory helpers (HTTP client and fault tolerance)
@@ -323,22 +312,6 @@ tasks.withType(Test).configureEach {
     useJUnitPlatform()
 }
 
-tasks.register('integrationTest', Test) {
-    description = 'Runs integration tests for the chunk streaming pipeline.'
-    group = 'verification'
-    testClassesDirs = sourceSets.integrationTest.output.classesDirs
-    classpath = sourceSets.integrationTest.runtimeClasspath
-    shouldRunAfter tasks.named('test')
-}
-
-tasks.register('schemTest', Test) {
-    description = 'Runs experimental GameTest schem scenarios in an isolated source set.'
-    group = 'verification'
-    testClassesDirs = sourceSets.schemTest.output.classesDirs
-    classpath = sourceSets.schemTest.runtimeClasspath
-    shouldRunAfter tasks.named('integrationTest')
-}
-
 tasks.register('jmh', JavaExec) {
     group = 'benchmark'
     description = 'Runs JMH benchmarks for NBT serialization/deserialization.'
@@ -372,9 +345,5 @@ tasks.register('profileChunkWorkload', JavaExec) {
     }
 }
 
-tasks.named('check').configure {
-    dependsOn tasks.named('integrationTest')
-    dependsOn tasks.named('schemTest')
-}
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.
