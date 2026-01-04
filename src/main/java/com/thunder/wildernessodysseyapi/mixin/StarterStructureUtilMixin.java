@@ -10,6 +10,7 @@ import com.natamus.collective_common_neoforge.schematic.ParsedSchematicObject;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureWorldEditPlacer;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureCreateCannonPlacer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -51,7 +52,9 @@ public class StarterStructureUtilMixin {
         BlockPos structureOrigin = cir.getReturnValue();
         StarterStructureSchematic schematic = wildernessOdysseyApi$schematic.get();
         if (structureOrigin != null && schematic != null) {
-            boolean pastedWithWorldEdit = StarterStructureWorldEditPlacer.placeWithWorldEdit(
+            boolean pastedWithCreate = StarterStructureCreateCannonPlacer.placeWithSchematicannon(
+                    serverLevel, schematic, structureOrigin);
+            boolean pastedWithWorldEdit = pastedWithCreate ? false : StarterStructureWorldEditPlacer.placeWithWorldEdit(
                     serverLevel, schematic, structureOrigin);
 
             ModConstants.LOGGER.debug("[Starter Structure compat] Bypassing terrain replacer for bunker; running blending pass instead.");
@@ -66,7 +69,7 @@ public class StarterStructureUtilMixin {
                 ModConstants.LOGGER.debug("[Starter Structure compat] No missing schematic entities needed spawning.");
             }
 
-            if (pastedWithWorldEdit) {
+            if (pastedWithCreate || pastedWithWorldEdit) {
                 schematic.clearParsedAfterWorldEdit();
             }
         }
