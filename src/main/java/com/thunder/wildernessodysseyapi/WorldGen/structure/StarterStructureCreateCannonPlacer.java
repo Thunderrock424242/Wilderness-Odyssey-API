@@ -5,10 +5,12 @@ import com.simibubi.create.foundation.utility.CreatePaths;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
@@ -49,12 +51,16 @@ public final class StarterStructureCreateCannonPlacer {
             Files.copy(schematicPath, cannonPath, StandardCopyOption.REPLACE_EXISTING);
 
             ItemStack blueprint = SchematicItem.create(serverLevel, fileName, OWNER_NAMESPACE);
-            CompoundTag tag = blueprint.getOrCreateTag();
+            CustomData customData = blueprint.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+            CompoundTag tag = customData.copyTag();
+            if (tag == null) {
+                tag = new CompoundTag();
+            }
             tag.putBoolean("Deployed", true);
             tag.put("Anchor", NbtUtils.writeBlockPos(origin));
             tag.putString("Rotation", Rotation.NONE.name());
             tag.putString("Mirror", Mirror.NONE.name());
-            blueprint.setTag(tag);
+            blueprint.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 
             StructureTemplate template = SchematicItem.loadSchematic(serverLevel, blueprint);
             StructurePlaceSettings settings = SchematicItem.getSettings(blueprint, true);
