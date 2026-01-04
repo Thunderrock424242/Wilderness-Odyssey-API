@@ -9,7 +9,6 @@
       "CampfireBlockMixin",
       "DayNightCycleMixin",
       "EntityAccessor",
-      "ServerLevelMixin",
       "ForwardExtentCopyMixin",
       "ServerboundSetStructureBlockPacketMixin",
       "StructureBlockEntityMixin",
