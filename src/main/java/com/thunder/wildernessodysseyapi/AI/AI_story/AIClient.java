@@ -54,7 +54,7 @@ public class AIClient {
     }
 
     private void loadStory() {
-        try (InputStream in = requestperfadvice.class.getClassLoader().getResourceAsStream("ai_config.yaml")) {
+        try (InputStream in = AIClient.class.getClassLoader().getResourceAsStream("ai_config.yaml")) {
             if (in == null) {
                 seedFallbackLore();
                 return;
