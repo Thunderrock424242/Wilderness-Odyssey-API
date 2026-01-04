@@ -1,8 +1,5 @@
 package com.thunder.wildernessodysseyapi.globalchat;
 
-import com.thunder.wildernessodysseyapi.analytics.AnalyticsSnapshot;
-import com.thunder.wildernessodysseyapi.analytics.AnalyticsSyncView;
-
 /**
  * Simple line-delimited message exchanged between clients and the relay server.
  */

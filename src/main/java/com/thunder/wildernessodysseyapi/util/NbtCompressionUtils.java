@@ -1,9 +1,6 @@
 package com.thunder.wildernessodysseyapi.util;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
-import com.thunder.wildernessodysseyapi.io.BufferPool;
-import com.thunder.wildernessodysseyapi.io.CompressionCodec;
-import com.thunder.wildernessodysseyapi.io.IoExecutors;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;

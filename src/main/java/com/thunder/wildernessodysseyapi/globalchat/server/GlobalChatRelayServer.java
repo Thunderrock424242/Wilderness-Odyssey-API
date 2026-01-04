@@ -2,8 +2,6 @@ package com.thunder.wildernessodysseyapi.globalchat.server;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.thunder.wildernessodysseyapi.analytics.AnalyticsSnapshot;
-import com.thunder.wildernessodysseyapi.analytics.AnalyticsSyncView;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatPacket;
 
 import java.io.BufferedReader;

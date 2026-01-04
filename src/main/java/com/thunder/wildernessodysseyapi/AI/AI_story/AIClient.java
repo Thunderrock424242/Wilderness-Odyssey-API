@@ -1,7 +1,6 @@
 package com.thunder.wildernessodysseyapi.AI.AI_story;
 
 import com.thunder.wildernessodysseyapi.AI.AI_perf.MemoryStore;
-import com.thunder.wildernessodysseyapi.AI.AI_perf.requestperfadvice;
 
 import java.io.BufferedReader;
 import java.io.IOException;

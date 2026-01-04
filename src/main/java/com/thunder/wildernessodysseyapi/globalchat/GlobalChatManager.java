@@ -2,8 +2,6 @@ package com.thunder.wildernessodysseyapi.globalchat;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.thunder.wildernessodysseyapi.analytics.AnalyticsSnapshot;
-import com.thunder.wildernessodysseyapi.analytics.AnalyticsSyncView;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
