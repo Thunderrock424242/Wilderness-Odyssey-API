@@ -12,6 +12,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.processor.ModProcessors;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureCreateCannonPlacer;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
@@ -140,6 +141,7 @@ public class WildernessOdysseyAPIMainModClass {
     private void commonSetup(final FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             System.out.println("Wilderness Odyssey setup complete!");
+            StarterStructureCreateCannonPlacer.prepareUploadDirectory();
         });
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
