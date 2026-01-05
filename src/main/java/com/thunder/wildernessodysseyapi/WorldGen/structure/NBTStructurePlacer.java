@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.structure.StructurePlacementDeb
 import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine.SurfaceSample;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine.TerrainReplacementPlan;
+import com.thunder.wildernessodysseyapi.mixin.StructureTemplateAccessor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -15,6 +16,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
@@ -132,13 +134,15 @@ public class NBTStructurePlacer {
             }
         }
 
+        BoundingBox placementBox = expandPlacementBox(foundation.origin(), data.size(), data.template());
+
         StructurePlaceSettings settings = new StructurePlaceSettings()
                 // We already know the template dimensions, so skip the expensive shape discovery pass.
                 .setKnownShape(true)
                 // Supplying the bounds up-front prevents the vanilla placer from bailing out when it cannot
                 // infer them (which resulted in the template refusing to place while terrain markers still
                 // ran).
-                .setBoundingBox(LargeStructurePlacementOptimizer.createPlacementBox(foundation.origin(), data.size()))
+                .setBoundingBox(placementBox)
                 // Preserve entities baked into the template (e.g., Create super glue and contraptions) so
                 // complex machines such as elevators remain assembled after placement.
                 .setIgnoreEntities(false);
@@ -416,6 +420,27 @@ public class NBTStructurePlacer {
         }
 
         return block;
+    }
+
+    /**
+     * Ensures the placement bounding box encloses entities baked into the template, preventing contraptions that
+     * extend below the footprint (e.g., rope pulleys) from being discarded during placement.
+     */
+    private BoundingBox expandPlacementBox(BlockPos origin, Vec3i size, StructureTemplate template) {
+        BoundingBox baseBox = LargeStructurePlacementOptimizer.createPlacementBox(origin, size);
+        if (!(template instanceof StructureTemplateAccessor accessor)) {
+            return baseBox;
+        }
+
+        BoundingBox expanded = BoundingBox.fromCorners(
+                new BlockPos(baseBox.minX(), baseBox.minY(), baseBox.minZ()),
+                new BlockPos(baseBox.maxX(), baseBox.maxY(), baseBox.maxZ()));
+
+        for (StructureTemplate.StructureEntityInfo info : accessor.getEntityInfoList()) {
+            BlockPos entityPos = origin.offset(info.blockPos);
+            expanded.encapsulate(entityPos);
+        }
+        return expanded;
     }
 
 }
