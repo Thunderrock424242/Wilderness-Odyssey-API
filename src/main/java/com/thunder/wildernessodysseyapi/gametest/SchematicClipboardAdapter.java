@@ -1,18 +1,27 @@
 package com.thunder.wildernessodysseyapi.gametest;
 
+import com.sk89q.worldedit.entity.BaseEntity;
+import com.sk89q.worldedit.entity.Entity;
 import com.sk89q.worldedit.extent.clipboard.Clipboard;
 import com.sk89q.worldedit.math.BlockVector3;
+import com.sk89q.worldedit.math.Vector3;
 import com.sk89q.worldedit.regions.Region;
+import com.sk89q.worldedit.util.Location;
 import com.sk89q.worldedit.world.block.BaseBlock;
 import com.sk89q.worldedit.world.block.BlockStateHolder;
+import com.sk89q.worldedit.neoforge.internal.NBTConverter;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.mixin.StructureTemplateAccessor;
 import com.thunder.wildernessodysseyapi.mixin.StructureTemplatePaletteAccessor;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.phys.Vec3;
+import org.enginehub.linbus.tree.LinCompoundTag;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,9 +46,9 @@ public final class SchematicClipboardAdapter {
         Map<BlockState, Integer> paletteIndex = new HashMap<>();
         List<BlockState> paletteStates = new ArrayList<>();
 
-        for (int x = 0; x < size.getX(); x++) {
-            for (int y = 0; y < size.getY(); y++) {
-                for (int z = 0; z < size.getZ(); z++) {
+        for (int x = 0; x < size.x(); x++) {
+            for (int y = 0; y < size.y(); y++) {
+                for (int z = 0; z < size.z(); z++) {
                     BlockVector3 cursor = min.add(x, y, z);
                     BaseBlock baseBlock = clipboard.getFullBlock(cursor);
                     BlockState state = convertState(baseBlock);
@@ -62,7 +71,9 @@ public final class SchematicClipboardAdapter {
 
         StructureTemplate.Palette palette = createPalette(blocks);
         getPalettes(template).add(palette);
-        setSize(template, new Vec3i(size.getX(), size.getY(), size.getZ()));
+        setSize(template, new Vec3i(size.x(), size.y(), size.z()));
+
+        copyEntities(clipboard, template, min);
 
         return template;
     }
@@ -72,7 +83,7 @@ public final class SchematicClipboardAdapter {
             return null;
         }
 
-        ResourceLocation blockId = ResourceLocation.tryParse(holder.getBlockType().getId());
+        ResourceLocation blockId = ResourceLocation.tryParse(holder.getBlockType().id());
         if (blockId == null || !net.minecraft.core.registries.BuiltInRegistries.BLOCK.containsKey(blockId)) {
             return null;
         }
@@ -153,6 +164,66 @@ public final class SchematicClipboardAdapter {
             return constructor.newInstance(blocks);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Unable to create structure palette", e);
+        }
+    }
+
+    private static void copyEntities(Clipboard clipboard, StructureTemplate template, BlockVector3 min) {
+        List<StructureTemplate.StructureEntityInfo> entities = getEntityInfoList(template);
+        if (entities == null) {
+            return;
+        }
+
+        for (Entity entity : clipboard.getEntities()) {
+            if (entity == null) {
+                continue;
+            }
+
+            Location location = entity.getLocation();
+            BaseEntity state = entity.getState();
+            if (location == null || state == null || state.getType() == null) {
+                continue;
+            }
+
+            CompoundTag nbt = toNativeCompound(state.getNbtReference() != null ? state.getNbtReference().getValue() : null);
+            if (!nbt.contains("id")) {
+                nbt.putString("id", state.getType().id());
+            }
+
+            Vector3 position = location.toVector();
+            Vec3 relative = new Vec3(
+                    position.x() - min.x(),
+                    position.y() - min.y(),
+                    position.z() - min.z());
+            BlockPos blockPos = BlockPos.containing(relative);
+            entities.add(new StructureTemplate.StructureEntityInfo(relative, blockPos, nbt));
+        }
+    }
+
+    private static CompoundTag toNativeCompound(LinCompoundTag tag) {
+        if (tag == null) {
+            return new CompoundTag();
+        }
+
+        try {
+            return NBTConverter.toNative(tag);
+        } catch (Throwable t) {
+            ModConstants.LOGGER.warn("Failed to convert entity NBT from schematic clipboard.", t);
+            return new CompoundTag();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<StructureTemplate.StructureEntityInfo> getEntityInfoList(StructureTemplate template) {
+        if (template instanceof StructureTemplateAccessor accessor) {
+            return accessor.getEntityInfoList();
+        }
+        try {
+            var field = StructureTemplate.class.getDeclaredField("entityInfoList");
+            field.setAccessible(true);
+            return (List<StructureTemplate.StructureEntityInfo>) field.get(template);
+        } catch (ReflectiveOperationException e) {
+            ModConstants.LOGGER.warn("Unable to access structure entity list; schematic entities will be skipped.", e);
+            return null;
         }
     }
 }
