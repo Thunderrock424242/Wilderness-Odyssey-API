@@ -432,23 +432,15 @@ public class NBTStructurePlacer {
             return baseBox;
         }
 
-        int minX = baseBox.minX;
-        int minY = baseBox.minY;
-        int minZ = baseBox.minZ;
-        int maxX = baseBox.maxX;
-        int maxY = baseBox.maxY;
-        int maxZ = baseBox.maxZ;
+        BoundingBox expanded = BoundingBox.fromCorners(
+                new BlockPos(baseBox.minX(), baseBox.minY(), baseBox.minZ()),
+                new BlockPos(baseBox.maxX(), baseBox.maxY(), baseBox.maxZ()));
 
         for (StructureTemplate.StructureEntityInfo info : accessor.getEntityInfoList()) {
             BlockPos entityPos = origin.offset(info.blockPos);
-            minX = Math.min(minX, entityPos.getX());
-            minY = Math.min(minY, entityPos.getY());
-            minZ = Math.min(minZ, entityPos.getZ());
-            maxX = Math.max(maxX, entityPos.getX());
-            maxY = Math.max(maxY, entityPos.getY());
-            maxZ = Math.max(maxZ, entityPos.getZ());
+            expanded.encapsulate(entityPos);
         }
-        return new BoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
+        return expanded;
     }
 
 }
