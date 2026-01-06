@@ -16,6 +16,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
@@ -26,9 +27,11 @@ import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.phys.AABB;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import net.neoforged.fml.ModList;
 
 /**
  * Places vanilla structure templates loaded from NBT files and exposes metadata used by the mod.
@@ -36,6 +39,9 @@ import java.util.Optional;
 public class NBTStructurePlacer {
     private static final String TERRAIN_REPLACER_NAME = "wildernessodysseyapi:terrain_replacer";
     private static final String CRYO_TUBE_NAME = "wildernessodysseyapi:cryo_tube";
+    private static final String CREATE_ELEVATOR_PULLEY_NAME = "create:elevator_pulley";
+    private static final String CREATE_ELEVATOR_PULLEY_CLASS =
+            "com.simibubi.create.content.contraptions.elevator.ElevatorPulleyBlockEntity";
     private static final String LEVELING_MARKER_NAME =
             BuiltInRegistries.BLOCK.getKey(Blocks.BLUE_WOOL).toString();
 
@@ -163,6 +169,8 @@ public class NBTStructurePlacer {
         AABB bounds = LargeStructurePlacementOptimizer.createBounds(foundation.origin(), size);
         List<AABB> chunkSlices = LargeStructurePlacementOptimizer.computeChunkSlices(foundation.origin(), size);
 
+        activateCreateElevators(level, foundation.origin(), data.elevatorPulleyOffsets());
+
         List<BlockPos> cryoPositions = data.cryoOffsets().stream()
                 .map(foundation.origin()::offset)
                 .toList();
@@ -252,17 +260,19 @@ public class NBTStructurePlacer {
 
         List<BlockPos> cryoOffsets = new ArrayList<>();
         List<BlockPos> terrainOffsets = new ArrayList<>();
+        List<BlockPos> elevatorPulleyOffsets = new ArrayList<>();
         BlockPos levelingOffset = null;
         Vec3i size = template.getSize();
 
-        CollectionResult collectionResult = collectOffsets(template, cryoOffsets, terrainOffsets, size);
+        CollectionResult collectionResult = collectOffsets(template, cryoOffsets, terrainOffsets, elevatorPulleyOffsets, size);
         boolean disableTerrainReplacement = collectionResult.disableTerrainReplacement();
         boolean hasStructureBlocks = collectionResult.hasStructureBlocks();
         LevelingMarkerData levelingData = findLevelingMarker(template);
         levelingOffset = levelingData.offset();
 
-        TemplateData data = new TemplateData(template, List.copyOf(cryoOffsets), List.copyOf(terrainOffsets), size,
-                levelingOffset, disableTerrainReplacement, levelingData.present(), hasStructureBlocks);
+        TemplateData data = new TemplateData(template, List.copyOf(cryoOffsets), List.copyOf(terrainOffsets),
+                List.copyOf(elevatorPulleyOffsets), size, levelingOffset, disableTerrainReplacement,
+                levelingData.present(), hasStructureBlocks);
 
         // Do not cache empty templates so that later placement attempts can retry once resources finish loading.
         // The GameTest server asks for the bunker extremely early during startup, before data packs have been
@@ -310,6 +320,7 @@ public class NBTStructurePlacer {
     private record TemplateData(StructureTemplate template,
                                 List<BlockPos> cryoOffsets,
                                 List<BlockPos> terrainOffsets,
+                                List<BlockPos> elevatorPulleyOffsets,
                                 Vec3i size,
                                 BlockPos levelingOffset,
                                 boolean disableTerrainReplacement,
@@ -323,7 +334,7 @@ public class NBTStructurePlacer {
     private record PlacementFoundation(BlockPos origin, BlockState levelingReplacement) {}
 
     private CollectionResult collectOffsets(StructureTemplate template, List<BlockPos> cryoOffsets, List<BlockPos> terrainOffsets,
-                                            Vec3i size) {
+                                            List<BlockPos> elevatorOffsets, Vec3i size) {
         StructurePlaceSettings identitySettings = new StructurePlaceSettings();
 
         boolean disableTerrainReplacement = false;
@@ -342,6 +353,15 @@ public class NBTStructurePlacer {
             }
 
             disableTerrainReplacement = warnIfTerrainReplacerDominates(size, terrainOffsets.size());
+        }
+
+        if (ModList.get().isLoaded("create")) {
+            Block elevatorPulley = resolveBlock(CREATE_ELEVATOR_PULLEY_NAME, "Create elevator pulley");
+            if (elevatorPulley != Blocks.AIR) {
+                for (StructureBlockInfo info : template.filterBlocks(BlockPos.ZERO, identitySettings, elevatorPulley)) {
+                    elevatorOffsets.add(info.pos());
+                }
+            }
         }
 
         boolean hasStructureBlocks = size.getX() > 0 && size.getY() > 0 && size.getZ() > 0;
@@ -420,6 +440,31 @@ public class NBTStructurePlacer {
         }
 
         return block;
+    }
+
+    private void activateCreateElevators(ServerLevel level, BlockPos origin, List<BlockPos> pulleyOffsets) {
+        if (!ModList.get().isLoaded("create") || pulleyOffsets.isEmpty()) {
+            return;
+        }
+
+        // No mixin is required here: Create already exposes the assembly trigger on the block entity
+        // itself. Calling the same method that a player interaction would invoke keeps us aligned
+        // with Create's update flow without linking against its classes at compile time.
+        for (BlockPos offset : pulleyOffsets) {
+            BlockPos worldPos = origin.offset(offset);
+            BlockEntity blockEntity = level.getBlockEntity(worldPos);
+            if (blockEntity == null || !CREATE_ELEVATOR_PULLEY_CLASS.equals(blockEntity.getClass().getName())) {
+                continue;
+            }
+            try {
+                Method clicked = blockEntity.getClass().getMethod("clicked");
+                clicked.setAccessible(true);
+                clicked.invoke(blockEntity);
+                level.scheduleTick(worldPos, blockEntity.getBlockState().getBlock(), 1);
+            } catch (Exception e) {
+                ModConstants.LOGGER.warn("Failed to prime Create elevator pulley at {} for {}.", worldPos, id, e);
+            }
+        }
     }
 
     /**
