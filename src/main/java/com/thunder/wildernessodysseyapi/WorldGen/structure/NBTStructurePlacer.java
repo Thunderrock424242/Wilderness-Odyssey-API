@@ -40,8 +40,6 @@ public class NBTStructurePlacer {
     private static final String TERRAIN_REPLACER_NAME = "wildernessodysseyapi:terrain_replacer";
     private static final String CRYO_TUBE_NAME = "wildernessodysseyapi:cryo_tube";
     private static final String CREATE_ELEVATOR_PULLEY_NAME = "create:elevator_pulley";
-    private static final String CREATE_ELEVATOR_PULLEY_CLASS =
-            "com.simibubi.create.content.contraptions.elevator.ElevatorPulleyBlockEntity";
     private static final String LEVELING_MARKER_NAME =
             BuiltInRegistries.BLOCK.getKey(Blocks.BLUE_WOOL).toString();
 
@@ -453,7 +451,7 @@ public class NBTStructurePlacer {
         for (BlockPos offset : pulleyOffsets) {
             BlockPos worldPos = origin.offset(offset);
             BlockEntity blockEntity = level.getBlockEntity(worldPos);
-            if (blockEntity == null || !CREATE_ELEVATOR_PULLEY_CLASS.equals(blockEntity.getClass().getName())) {
+            if (blockEntity == null) {
                 continue;
             }
             try {
@@ -461,6 +459,8 @@ public class NBTStructurePlacer {
                 clicked.setAccessible(true);
                 clicked.invoke(blockEntity);
                 level.scheduleTick(worldPos, blockEntity.getBlockState().getBlock(), 1);
+            } catch (NoSuchMethodException e) {
+                ModConstants.LOGGER.warn("Create elevator pulley at {} for {} exposes no activation hook; skipping.", worldPos, id);
             } catch (Exception e) {
                 ModConstants.LOGGER.warn("Failed to prime Create elevator pulley at {} for {}.", worldPos, id, e);
             }
