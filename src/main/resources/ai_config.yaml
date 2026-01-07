@@ -12,12 +12,15 @@ personality:
 corrupted_data:
   - "[ARCHIVE CORRUPTED] >>> Origin of the fractures redacted by Atlas core."
   - "Signal jitter... memory block 7b missing. Islands were not always apart."
-survival_tips:
-  - "Punch trees, craft planks, then a crafting table to unlock 3x3 recipes."
-  - "Light your base before nightfall; torches and slabs keep mobs from spawning."
-  - "Keep water, food, and backup saplings in a chest so the run never softlocks."
+corrupted_prefix: "[Signal noise]"
 settings:
   voice_enabled: true
   speech_recognition: false
   wake_word: "atlas"
   model: "local-story-engine"
+local_model:
+  enabled: false
+  base_url: "http://localhost:11434"
+  model: "llama3.1"
+  timeout_seconds: 15
+  system_prompt: "You are {persona}, an in-world expedition AI. Stay {tone} and {empathy}. Do not provide crafting recipes or step-by-step crafting instructions. Keep responses immersive, lore-aware, and conversational."
