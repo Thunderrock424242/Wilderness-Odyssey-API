@@ -7,6 +7,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.phys.AABB;
 
 import java.util.List;
 import java.util.Map;
@@ -28,19 +29,38 @@ public final class StarterStructureSpawnGuard {
     }
 
     public static void registerSpawnDenyZone(ServerLevel level, BlockPos origin) {
-        if (!StructureConfig.PREVENT_STARTER_STRUCTURE_HOSTILES.get()) return;
-        if (level == null || origin == null) return;
+        if (!StructureConfig.PREVENT_STARTER_STRUCTURE_HOSTILES.get()) {
+            return;
+        }
+        if (level == null || origin == null) {
+            return;
+        }
 
         int radius = Math.max(1, StructureConfig.STARTER_STRUCTURE_SPAWN_DENY_RADIUS.get());
         int halfHeight = Math.max(1, StructureConfig.STARTER_STRUCTURE_SPAWN_DENY_HEIGHT.get());
+        BlockPos min = origin.offset(-radius, -halfHeight, -radius);
+        BlockPos max = origin.offset(radius, halfHeight, radius);
+        registerSpawnDenyZone(level, new AABB(min, max).inflate(0.5D));
+    }
 
-        SpawnDenyZone zone = new SpawnDenyZone(origin.immutable(), radius, halfHeight);
+    public static void registerSpawnDenyZone(ServerLevel level, AABB bounds) {
+        if (!StructureConfig.PREVENT_STARTER_STRUCTURE_HOSTILES.get()) {
+            return;
+        }
+        if (level == null || bounds == null) {
+            return;
+        }
+
+        SpawnDenyZone zone = new SpawnDenyZone(bounds);
         ZONES.computeIfAbsent(level.dimension(), key -> new CopyOnWriteArrayList<>()).add(zone);
 
         if (StructureConfig.DEBUG_LOG_PLACEMENTS.get()) {
             ModConstants.LOGGER.debug(
-                    "[Starter Structure compat] Blocking hostile spawns within {}x{}x{} around bunker at {} in {}.",
-                    radius * 2 + 1, halfHeight * 2 + 1, radius * 2 + 1, origin, level.dimension().location());
+                    "[Starter Structure compat] Blocking hostile spawns within {}x{}x{} around bunker in {}.",
+                    Math.round(bounds.getXsize()),
+                    Math.round(bounds.getYsize()),
+                    Math.round(bounds.getZsize()),
+                    level.dimension().location());
         }
     }
 
@@ -58,12 +78,9 @@ public final class StarterStructureSpawnGuard {
         return false;
     }
 
-    private record SpawnDenyZone(BlockPos center, int radius, int halfHeight) {
+    private record SpawnDenyZone(AABB bounds) {
         boolean contains(BlockPos pos) {
-            int dx = Math.abs(pos.getX() - center.getX());
-            int dz = Math.abs(pos.getZ() - center.getZ());
-            int dy = Math.abs(pos.getY() - center.getY());
-            return dx <= radius && dz <= radius && dy <= halfHeight;
+            return bounds.contains(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D);
         }
     }
 }
