@@ -3,7 +3,6 @@ package com.thunder.wildernessodysseyapi.WorldGen.structure;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StructurePlacementDebugger.PlacementAttempt;
-import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine.SurfaceSample;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine.TerrainReplacementPlan;
 import com.thunder.wildernessodysseyapi.mixin.StructureTemplateAccessor;
