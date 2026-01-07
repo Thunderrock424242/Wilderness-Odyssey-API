@@ -115,7 +115,7 @@ public final class SpawnBunkerPlacer {
 
     private static boolean isGrassBlock(BlockState state) {
         return state.is(Blocks.GRASS_BLOCK)
-                || state.is(Blocks.GRASS)
+                || state.is(Blocks.DIRT)
                 || state.is(Blocks.TALL_GRASS)
                 || state.is(Blocks.FERN)
                 || state.is(Blocks.LARGE_FERN);
