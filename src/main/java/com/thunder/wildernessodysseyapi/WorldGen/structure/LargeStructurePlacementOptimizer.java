@@ -107,12 +107,16 @@ public final class LargeStructurePlacementOptimizer {
             return Collections.emptyList();
         }
 
-        List<AABB> slices = new ArrayList<>();
         BlockPos max = origin.offset(size.getX() - 1, size.getY() - 1, size.getZ() - 1);
         int minChunkX = Math.floorDiv(origin.getX(), CHUNK_SIZE);
         int maxChunkX = Math.floorDiv(max.getX(), CHUNK_SIZE);
         int minChunkZ = Math.floorDiv(origin.getZ(), CHUNK_SIZE);
         int maxChunkZ = Math.floorDiv(max.getZ(), CHUNK_SIZE);
+        int chunkXCount = maxChunkX - minChunkX + 1;
+        int chunkZCount = maxChunkZ - minChunkZ + 1;
+        long estimatedSlices = (long) chunkXCount * chunkZCount;
+        int initialCapacity = (int) Math.min(Integer.MAX_VALUE, Math.max(0L, estimatedSlices));
+        List<AABB> slices = new ArrayList<>(initialCapacity);
 
         for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
             int chunkMinX = chunkX * CHUNK_SIZE;

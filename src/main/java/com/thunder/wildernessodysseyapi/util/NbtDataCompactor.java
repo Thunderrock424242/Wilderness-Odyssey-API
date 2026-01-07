@@ -21,9 +21,11 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
@@ -71,7 +73,8 @@ public final class NbtDataCompactor {
         pruneHistories(modData);
 
         List<String> rlTable = new ArrayList<>();
-        encodeResourceLocations(modData, rlTable);
+        Map<String, Integer> rlIndex = new HashMap<>();
+        encodeResourceLocations(modData, rlTable, rlIndex);
         if (!rlTable.isEmpty()) {
             ListTag tableTag = new ListTag();
             rlTable.forEach(id -> tableTag.add(StringTag.valueOf(id)));
@@ -151,15 +154,15 @@ public final class NbtDataCompactor {
         return -1;
     }
 
-    private static void encodeResourceLocations(CompoundTag tag, List<String> rlTable) {
+    private static void encodeResourceLocations(CompoundTag tag, List<String> rlTable, Map<String, Integer> rlIndex) {
         for (String key : new HashSet<>(tag.getAllKeys())) {
             Tag child = tag.get(key);
             if (child instanceof CompoundTag compound) {
-                encodeResourceLocations(compound, rlTable);
+                encodeResourceLocations(compound, rlTable, rlIndex);
             } else if (child instanceof ListTag list && list.getElementType() == Tag.TAG_COMPOUND) {
                 for (Tag element : list) {
                     if (element instanceof CompoundTag compoundElement) {
-                        encodeResourceLocations(compoundElement, rlTable);
+                        encodeResourceLocations(compoundElement, rlTable, rlIndex);
                     }
                 }
             } else if (child instanceof StringTag stringTag) {
@@ -171,10 +174,12 @@ public final class NbtDataCompactor {
                 if (rl == null) {
                     continue;
                 }
-                int idx = rlTable.indexOf(rl.toString());
-                if (idx == -1) {
-                    rlTable.add(rl.toString());
-                    idx = rlTable.size() - 1;
+                String id = rl.toString();
+                Integer idx = rlIndex.get(id);
+                if (idx == null) {
+                    idx = rlTable.size();
+                    rlTable.add(id);
+                    rlIndex.put(id, idx);
                 }
                 CompoundTag ref = new CompoundTag();
                 ref.putInt(RESOURCE_REF_KEY, idx);
