@@ -42,7 +42,7 @@ public final class StarterStructureSpawnGuard {
         BlockPos min = origin.offset(-radius, -halfHeight, -radius);
         BlockPos max = origin.offset(radius, halfHeight, radius);
         Vec3 minCorner = Vec3.atLowerCornerOf(min);
-        Vec3 maxCorner = Vec3.atUpperCornerOf(max);
+        Vec3 maxCorner = Vec3.atLowerCornerOf(max).add(1.0D, 1.0D, 1.0D);
         registerSpawnDenyZone(level, new AABB(minCorner, maxCorner).inflate(0.5D));
     }
 
