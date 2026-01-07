@@ -8,6 +8,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -74,8 +78,8 @@ public final class SpawnBunkerPlacer {
         BlockPos spawnTarget = pickSpawnTarget(result);
         level.setDefaultSpawnPos(spawnTarget, 0.0F);
 
-        BlockPos guardCenter = BlockPos.containing(result.bounds().getCenter());
-        StarterStructureSpawnGuard.registerSpawnDenyZone(level, guardCenter);
+        StarterStructureSpawnGuard.registerSpawnDenyZone(level, result.bounds());
+        clearGrassInBounds(level, result.bounds());
 
         ModConstants.LOGGER.info("Placed spawn bunker {} at {} with {} cryo tubes.", BUNKER_ID, result.origin(), cryoPositions.size());
     }
@@ -85,5 +89,35 @@ public final class SpawnBunkerPlacer {
             return result.cryoPositions().get(0);
         }
         return BlockPos.containing(result.bounds().getCenter());
+    }
+
+    private static void clearGrassInBounds(ServerLevel level, AABB bounds) {
+        int minX = Mth.floor(bounds.minX);
+        int minY = Mth.floor(bounds.minY);
+        int minZ = Mth.floor(bounds.minZ);
+        int maxX = Mth.ceil(bounds.maxX) - 1;
+        int maxY = Mth.ceil(bounds.maxY) - 1;
+        int maxZ = Mth.ceil(bounds.maxZ) - 1;
+
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    cursor.set(x, y, z);
+                    BlockState state = level.getBlockState(cursor);
+                    if (isGrassBlock(state)) {
+                        level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
+                    }
+                }
+            }
+        }
+    }
+
+    private static boolean isGrassBlock(BlockState state) {
+        return state.is(Blocks.GRASS_BLOCK)
+                || state.is(Blocks.GRASS)
+                || state.is(Blocks.TALL_GRASS)
+                || state.is(Blocks.FERN)
+                || state.is(Blocks.LARGE_FERN);
     }
 }
