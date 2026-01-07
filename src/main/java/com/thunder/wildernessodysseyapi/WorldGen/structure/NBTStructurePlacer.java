@@ -195,13 +195,14 @@ public class NBTStructurePlacer {
         }
 
         SurfaceSample sample = TerrainReplacerEngine.sampleSurface(level, origin.offset(levelingOffset.getX(), 0, levelingOffset.getZ()));
-        int desiredY = sample.y() - levelingOffset.getY();
+        int surfaceAnchorY = sample.y() + 1;
+        int desiredY = surfaceAnchorY - levelingOffset.getY();
         int maxDepth = StructureConfig.MAX_LEVELING_DEPTH.get();
         if (maxDepth >= 0) {
-            int clampedY = Math.max(desiredY, sample.y() - maxDepth);
+            int clampedY = Math.max(desiredY, surfaceAnchorY - maxDepth);
             if (clampedY != desiredY) {
                 ModConstants.LOGGER.warn("Clamping leveling depth for structure {}. Desired bury depth {} exceeds limit {} at marker {}.",
-                        id, sample.y() - desiredY, maxDepth, levelingOffset);
+                        id, surfaceAnchorY - desiredY, maxDepth, levelingOffset);
                 desiredY = clampedY;
             }
         }

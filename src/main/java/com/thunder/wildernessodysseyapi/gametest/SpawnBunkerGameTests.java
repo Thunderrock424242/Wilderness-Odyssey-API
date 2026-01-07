@@ -60,7 +60,7 @@ public class SpawnBunkerGameTests {
         }
 
         BlockPos guardCenter = BlockPos.containing(result.bounds().getCenter());
-        StarterStructureSpawnGuard.registerSpawnDenyZone(helper.getLevel(), guardCenter);
+        StarterStructureSpawnGuard.registerSpawnDenyZone(helper.getLevel(), result.bounds());
 
         helper.runAtTickTime(2, () -> {
             helper.assertTrue(StarterStructureSpawnGuard.isDenied(helper.getLevel(), guardCenter),
