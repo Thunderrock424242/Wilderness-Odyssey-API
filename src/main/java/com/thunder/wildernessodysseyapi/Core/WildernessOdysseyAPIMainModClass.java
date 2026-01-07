@@ -12,7 +12,6 @@ import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.TerrainReplacerBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.processor.ModProcessors;
-import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureCreateCannonPlacer;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
@@ -36,13 +35,8 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
-import com.thunder.wildernessodysseyapi.WorldGen.util.DeferredTaskScheduler;
-import net.neoforged.neoforge.event.level.LevelEvent;
-import net.neoforged.fml.ModList;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -53,7 +47,6 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -66,8 +59,6 @@ import net.minecraft.world.item.CreativeModeTabs;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
@@ -141,7 +132,6 @@ public class WildernessOdysseyAPIMainModClass {
     private void commonSetup(final FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             System.out.println("Wilderness Odyssey setup complete!");
-            StarterStructureCreateCannonPlacer.prepareUploadDirectory();
         });
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
