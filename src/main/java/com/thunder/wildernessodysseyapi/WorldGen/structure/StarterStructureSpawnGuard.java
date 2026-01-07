@@ -8,6 +8,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 import java.util.Map;
@@ -40,7 +41,9 @@ public final class StarterStructureSpawnGuard {
         int halfHeight = Math.max(1, StructureConfig.STARTER_STRUCTURE_SPAWN_DENY_HEIGHT.get());
         BlockPos min = origin.offset(-radius, -halfHeight, -radius);
         BlockPos max = origin.offset(radius, halfHeight, radius);
-        registerSpawnDenyZone(level, new AABB(min, max).inflate(0.5D));
+        Vec3 minCorner = Vec3.atLowerCornerOf(min);
+        Vec3 maxCorner = Vec3.atUpperCornerOf(max);
+        registerSpawnDenyZone(level, new AABB(minCorner, maxCorner).inflate(0.5D));
     }
 
     public static void registerSpawnDenyZone(ServerLevel level, AABB bounds) {
