@@ -2,6 +2,8 @@ package com.thunder.wildernessodysseyapi.AI.AI_story;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -28,6 +30,9 @@ public class AIChatListener {
         if (message.isEmpty()) {
             return;
         }
+        if (!isHoldingActivationItem(player)) {
+            return;
+        }
 
         String wakeWord = CLIENT.getWakeWord();
         boolean mentionsWakeWord = message.toLowerCase(Locale.ROOT).contains(wakeWord);
@@ -46,6 +51,9 @@ public class AIChatListener {
                 player.getName().getString(), message);
 
         player.sendSystemMessage(Component.literal("[Atlas] " + reply.text()));
+        if (reply.voiceQueued() && reply.voiceLine() != null && !reply.voiceLine().isBlank()) {
+            player.sendSystemMessage(Component.literal("[Atlas Voice] " + reply.voiceLine()));
+        }
     }
 
     @SubscribeEvent
@@ -70,5 +78,13 @@ public class AIChatListener {
                 || lower.contains("should i")
                 || lower.contains("what")
                 || lower.contains("how");
+    }
+
+    private static boolean isHoldingActivationItem(ServerPlayer player) {
+        return isRedWool(player.getMainHandItem()) || isRedWool(player.getOffhandItem());
+    }
+
+    private static boolean isRedWool(ItemStack stack) {
+        return !stack.isEmpty() && stack.is(Items.RED_WOOL);
     }
 }
