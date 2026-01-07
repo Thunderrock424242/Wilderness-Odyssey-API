@@ -13,13 +13,9 @@ import java.util.List;
 import java.util.Map;
 
 import net.neoforged.fml.loading.FMLPaths;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.error.YAMLException;
-
 public final class AIConfigLoader {
 
     private static final String CONFIG_NAME = "ai_config.yaml";
-    private static final Yaml YAML = new Yaml();
 
     private AIConfigLoader() {
     }
@@ -83,14 +79,11 @@ public final class AIConfigLoader {
         if (content == null || content.isBlank()) {
             return config;
         }
-        Object parsed;
-        try {
-            parsed = YAML.load(content);
-        } catch (YAMLException e) {
-            ModConstants.LOGGER.warn("Failed to parse AI config YAML.", e);
-            return config;
+        Map<?, ?> root = parseWithSnakeYaml(content);
+        if (root == null) {
+            root = parseSimpleYaml(content);
         }
-        if (!(parsed instanceof Map<?, ?> root)) {
+        if (root == null) {
             return config;
         }
 
@@ -117,6 +110,110 @@ public final class AIConfigLoader {
         config.getLocalModel().setTimeoutSeconds(readInteger(localModel.get("timeout_seconds")));
 
         return config;
+    }
+
+    private static Map<?, ?> parseWithSnakeYaml(String content) {
+        try {
+            Class<?> yamlClass = Class.forName("org.yaml.snakeyaml.Yaml");
+            Object yaml = yamlClass.getDeclaredConstructor().newInstance();
+            Object parsed = yamlClass.getMethod("load", String.class).invoke(yaml, content);
+            if (parsed instanceof Map<?, ?> map) {
+                return map;
+            }
+            return null;
+        } catch (ClassNotFoundException e) {
+            ModConstants.LOGGER.warn("SnakeYAML not found on the classpath; falling back to a minimal parser.");
+            return null;
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            ModConstants.LOGGER.warn("Failed to parse AI config YAML with SnakeYAML.", e);
+            return null;
+        }
+    }
+
+    private static Map<String, Object> parseSimpleYaml(String content) {
+        Map<String, Object> root = new LinkedHashMap<>();
+        String currentKey = null;
+        for (String line : content.split("\\R")) {
+            String trimmed = line.strip();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                continue;
+            }
+            int indent = countIndent(line);
+            if (indent == 0) {
+                int colonIndex = trimmed.indexOf(':');
+                if (colonIndex < 0) {
+                    continue;
+                }
+                currentKey = trimmed.substring(0, colonIndex).trim();
+                String valuePart = trimmed.substring(colonIndex + 1).trim();
+                if (!valuePart.isEmpty()) {
+                    root.put(currentKey, stripQuotes(valuePart));
+                }
+            } else if (currentKey != null) {
+                if (trimmed.startsWith("- ")) {
+                    Object existing = root.get(currentKey);
+                    List<String> list = existing instanceof List<?> ? castStringList(existing) : new ArrayList<>();
+                    list.add(stripQuotes(trimmed.substring(2).trim()));
+                    root.put(currentKey, list);
+                } else {
+                    int colonIndex = trimmed.indexOf(':');
+                    if (colonIndex < 0) {
+                        continue;
+                    }
+                    Object existing = root.get(currentKey);
+                    Map<String, Object> map = existing instanceof Map<?, ?> ? castStringMap(existing) : new LinkedHashMap<>();
+                    String key = trimmed.substring(0, colonIndex).trim();
+                    String valuePart = trimmed.substring(colonIndex + 1).trim();
+                    map.put(key, valuePart.isEmpty() ? "" : stripQuotes(valuePart));
+                    root.put(currentKey, map);
+                }
+            }
+        }
+        return root;
+    }
+
+    private static int countIndent(String line) {
+        int count = 0;
+        while (count < line.length() && line.charAt(count) == ' ') {
+            count++;
+        }
+        return count;
+    }
+
+    private static String stripQuotes(String value) {
+        if (value.length() < 2) {
+            return value;
+        }
+        char first = value.charAt(0);
+        char last = value.charAt(value.length() - 1);
+        if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
+    }
+
+    private static List<String> castStringList(Object value) {
+        List<String> results = new ArrayList<>();
+        if (value instanceof Iterable<?> items) {
+            for (Object entry : items) {
+                if (entry != null) {
+                    results.add(entry.toString());
+                }
+            }
+        }
+        return results;
+    }
+
+    private static Map<String, Object> castStringMap(Object value) {
+        Map<String, Object> results = new LinkedHashMap<>();
+        if (value instanceof Map<?, ?> map) {
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (entry.getKey() != null) {
+                    results.put(entry.getKey().toString(), entry.getValue());
+                }
+            }
+        }
+        return results;
     }
 
     private static List<String> readStringList(Object value) {
