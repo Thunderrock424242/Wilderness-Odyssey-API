@@ -41,6 +41,7 @@ public class NBTStructurePlacer {
     private static final String CREATE_ELEVATOR_PULLEY_NAME = "create:elevator_pulley";
     private static final String LEVELING_MARKER_NAME =
             BuiltInRegistries.BLOCK.getKey(Blocks.BLUE_WOOL).toString();
+    private static final int MIN_LEVELING_MARKER_Y = 64;
 
     private final ResourceLocation id;
     private TemplateData cachedData;
@@ -228,6 +229,14 @@ public class NBTStructurePlacer {
                         id, surfaceAnchorY - desiredY, maxDepth, levelingOffset);
                 desiredY = clampedY;
             }
+        }
+
+        int markerY = desiredY + levelingOffset.getY();
+        if (markerY < MIN_LEVELING_MARKER_Y) {
+            ModConstants.LOGGER.warn(
+                    "Raising structure {} so the leveling marker sits at y={} instead of y={}.",
+                    id, MIN_LEVELING_MARKER_Y, markerY);
+            desiredY = MIN_LEVELING_MARKER_Y - levelingOffset.getY();
         }
 
         BlockPos placementOrigin = new BlockPos(origin.getX(), desiredY, origin.getZ());
