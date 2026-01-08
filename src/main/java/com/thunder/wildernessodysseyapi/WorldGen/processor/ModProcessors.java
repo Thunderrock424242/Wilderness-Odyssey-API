@@ -19,6 +19,11 @@ public final class ModProcessors {
      */
     public static final DeferredHolder<StructureProcessorType<?>, StructureProcessorType<TerrainSurveyProcessor>> TERRAIN_SURVEY =
             PROCESSORS.register("terrain_survey", () -> () -> TerrainSurveyProcessor.CODEC);
+    /**
+     * Processor that prevents bunker placement from clearing non-dirt blocks when air is placed.
+     */
+    public static final DeferredHolder<StructureProcessorType<?>, StructureProcessorType<BunkerPlacementProcessor>> BUNKER_PLACEMENT =
+            PROCESSORS.register("bunker_placement", () -> () -> BunkerPlacementProcessor.CODEC);
 
     private ModProcessors() {
     }

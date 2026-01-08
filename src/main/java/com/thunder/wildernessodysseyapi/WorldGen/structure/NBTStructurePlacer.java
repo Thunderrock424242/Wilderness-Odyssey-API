@@ -18,6 +18,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessor;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
@@ -45,6 +46,7 @@ public class NBTStructurePlacer {
     private static final int MAX_LEVELING_MARKER_Y = 65;
 
     private final ResourceLocation id;
+    private final List<StructureProcessor> extraProcessors;
     private TemplateData cachedData;
 
     public NBTStructurePlacer(String namespace, String path) {
@@ -52,7 +54,12 @@ public class NBTStructurePlacer {
     }
 
     public NBTStructurePlacer(ResourceLocation id) {
+        this(id, List.of());
+    }
+
+    public NBTStructurePlacer(ResourceLocation id, List<StructureProcessor> extraProcessors) {
         this.id = id;
+        this.extraProcessors = List.copyOf(extraProcessors);
     }
 
     /**
@@ -174,6 +181,9 @@ public class NBTStructurePlacer {
                 // Preserve entities baked into the template (e.g., Create super glue and contraptions) so
                 // complex machines such as elevators remain assembled after placement.
                 .setIgnoreEntities(false);
+        for (StructureProcessor processor : extraProcessors) {
+            settings.addProcessor(processor);
+        }
         boolean placed = data.template().placeInWorld(level, foundation.origin(), foundation.origin(), settings, level.random, 2);
         if (!placed) {
             StructurePlacementDebugger.markFailure(attempt, "template refused placement");

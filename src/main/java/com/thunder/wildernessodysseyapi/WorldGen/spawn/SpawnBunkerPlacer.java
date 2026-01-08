@@ -1,17 +1,18 @@
 package com.thunder.wildernessodysseyapi.WorldGen.spawn;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.WorldGen.processor.BunkerPlacementProcessor;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureSpawnGuard;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.Fluids;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -27,7 +28,11 @@ import java.util.List;
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class SpawnBunkerPlacer {
     private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "bunker");
-    private static final NBTStructurePlacer BUNKER_PLACER = new NBTStructurePlacer(BUNKER_ID);
+    private static final int LAND_SEARCH_RADIUS = 512;
+    private static final int LAND_SEARCH_STEP = 16;
+    private static final NBTStructurePlacer BUNKER_PLACER = new NBTStructurePlacer(
+            BUNKER_ID,
+            List.of(new BunkerPlacementProcessor()));
 
     private SpawnBunkerPlacer() {
     }
@@ -61,9 +66,39 @@ public final class SpawnBunkerPlacer {
 
     private static BlockPos resolveAnchor(ServerLevel level) {
         BlockPos baseSpawn = level.getSharedSpawnPos();
+        return findLandAnchor(level, baseSpawn);
+    }
+
+    private static BlockPos findLandAnchor(ServerLevel level, BlockPos baseSpawn) {
         BlockPos surface = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                 new BlockPos(baseSpawn.getX(), level.getMinBuildHeight(), baseSpawn.getZ()));
-        return new BlockPos(surface.getX(), surface.getY(), surface.getZ());
+        if (isLandBiome(level, surface)) {
+            return surface;
+        }
+
+        int baseX = baseSpawn.getX();
+        int baseZ = baseSpawn.getZ();
+        for (int radius = LAND_SEARCH_STEP; radius <= LAND_SEARCH_RADIUS; radius += LAND_SEARCH_STEP) {
+            for (int dx = -radius; dx <= radius; dx += LAND_SEARCH_STEP) {
+                for (int dz = -radius; dz <= radius; dz += LAND_SEARCH_STEP) {
+                    if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
+                        continue;
+                    }
+
+                    int x = baseX + dx;
+                    int z = baseZ + dz;
+                    BlockPos candidate = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                            new BlockPos(x, level.getMinBuildHeight(), z));
+                    if (isLandBiome(level, candidate)) {
+                        return candidate;
+                    }
+                }
+            }
+        }
+
+        ModConstants.LOGGER.warn("Unable to locate a land biome within {} blocks of {}; using base spawn.",
+                LAND_SEARCH_RADIUS, baseSpawn);
+        return surface;
     }
 
     private static void applySpawnData(ServerLevel level, NBTStructurePlacer.PlacementResult result) {
@@ -112,31 +147,15 @@ public final class SpawnBunkerPlacer {
                 for (int y = maxY; y <= surfaceY; y++) {
                     cursor.set(x, y, z);
                     BlockState state = level.getBlockState(cursor);
-                    if (state.isAir() || !state.getFluidState().isEmpty() || isGrassBlock(state)) {
+                    if (state.isAir() || state.is(Blocks.DIRT)) {
                         level.setBlock(cursor, capState, 2);
-                    }
-                }
-            }
-        }
-
-        for (int x = minX; x <= maxX; x++) {
-            for (int y = minY; y <= maxY; y++) {
-                for (int z = minZ; z <= maxZ; z++) {
-                    cursor.set(x, y, z);
-                    BlockState state = level.getBlockState(cursor);
-                    if (state.getFluidState().is(Fluids.WATER)) {
-                        level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
                     }
                 }
             }
         }
     }
 
-    private static boolean isGrassBlock(BlockState state) {
-        return state.is(Blocks.GRASS_BLOCK)
-                || state.is(Blocks.DIRT)
-                || state.is(Blocks.TALL_GRASS)
-                || state.is(Blocks.FERN)
-                || state.is(Blocks.LARGE_FERN);
+    private static boolean isLandBiome(ServerLevel level, BlockPos pos) {
+        return !level.getBiome(pos).is(BiomeTags.IS_OCEAN);
     }
 }
