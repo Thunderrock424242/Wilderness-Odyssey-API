@@ -50,10 +50,7 @@ public class AIChatListener {
         VoiceIntegration.VoiceResult reply = CLIENT.sendMessageWithVoice(worldKey,
                 player.getName().getString(), message);
 
-        player.sendSystemMessage(Component.literal("[Atlas] " + reply.text()));
-        if (reply.voiceQueued() && reply.voiceLine() != null && !reply.voiceLine().isBlank()) {
-            player.sendSystemMessage(Component.literal("[Atlas Voice] " + reply.voiceLine()));
-        }
+        player.getServer().execute(() -> player.sendSystemMessage(Component.literal("[Atlas] " + reply.text())));
     }
 
     @SubscribeEvent
