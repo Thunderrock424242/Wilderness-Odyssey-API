@@ -11,7 +11,7 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProc
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 
 /**
- * Prevents the bunker template from clearing non-dirt blocks when placing air inside the structure.
+ * Prevents the bunker template from clearing anything other than dirt when placing air inside the structure.
  */
 public class BunkerPlacementProcessor extends StructureProcessor {
     public static final MapCodec<BunkerPlacementProcessor> CODEC = MapCodec.unit(BunkerPlacementProcessor::new);
@@ -34,7 +34,7 @@ public class BunkerPlacementProcessor extends StructureProcessor {
         }
 
         BlockState existing = level.getBlockState(placed.pos());
-        if (existing.isAir() || existing.is(Blocks.DIRT)) {
+        if (existing.is(Blocks.DIRT)) {
             return placed;
         }
 
