@@ -6,6 +6,7 @@ import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.material.Fluids;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,8 +21,8 @@ public final class TerrainReplacerEngine {
 
     /**
      * Samples the surface block at the given world position, walking down through replaceable blocks
-     * until a real surface is found. Fluids are now respected so lakes/rivers remain intact instead
-     * of being replaced with dirt when blending structures into the terrain.
+     * until a real surface is found. Excluded blocks (such as water) will be skipped so they do not
+     * overwrite terrain markers (e.g., grass blocks) during bunker placement.
      */
     public static BlockState sampleSurfaceBlock(LevelReader level, BlockPos target) {
         return sampleSurface(level, target).state();
@@ -43,13 +44,15 @@ public final class TerrainReplacerEngine {
                 continue;
             }
 
-            // Prefer the fluid itself when we encounter water/lava so we keep natural bodies of
-            // water instead of backfilling them with dirt around the starter structure.
             if (!state.getFluidState().isEmpty()) {
-                return new SurfaceSample(y, state.getFluidState().createLegacyBlock());
+                BlockState fluidState = state.getFluidState().createLegacyBlock();
+                if (isExcludedReplacement(fluidState)) {
+                    continue;
+                }
+                return new SurfaceSample(y, fluidState);
             }
 
-            if (isSolidSurface(state)) {
+            if (isSolidSurface(state) && !isExcludedReplacement(state)) {
                 return new SurfaceSample(y, state);
             }
         }
@@ -76,6 +79,14 @@ public final class TerrainReplacerEngine {
 
     private static boolean isSolidSurface(BlockState state) {
         return !state.isAir();
+    }
+
+    private static boolean isExcludedReplacement(BlockState state) {
+        return state.is(Blocks.WATER)
+                || state.is(Blocks.LAVA)
+                || state.is(Blocks.BUBBLE_COLUMN)
+                || state.getFluidState().is(Fluids.WATER)
+                || state.getFluidState().is(Fluids.LAVA);
     }
 
     /**
