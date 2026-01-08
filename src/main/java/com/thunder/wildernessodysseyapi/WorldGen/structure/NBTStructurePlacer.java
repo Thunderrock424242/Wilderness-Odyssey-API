@@ -190,11 +190,16 @@ public class NBTStructurePlacer {
             return null;
         }
 
-        int replaced = applyTerrainReplacement(level, foundation.origin(), data.terrainOffsets(), replacementPlan);
+        int replaced = applyTerrainReplacement(level, foundation.origin(), data.terrainOffsets(),
+                replacementPlan, data.levelingOffset());
 
         if (data.levelingOffset() != null && foundation.levelingReplacement() != null) {
             BlockPos markerWorldPos = foundation.origin().offset(data.levelingOffset());
-            level.setBlock(markerWorldPos, foundation.levelingReplacement(), 2);
+            BlockState markerReplacement = foundation.levelingReplacement();
+            if (shouldForceDirtLayer(data.levelingOffset())) {
+                markerReplacement = Blocks.DIRT.defaultBlockState();
+            }
+            level.setBlock(markerWorldPos, markerReplacement, 2);
         }
 
         Vec3i size = data.size();
@@ -303,15 +308,28 @@ public class NBTStructurePlacer {
                 && data.hasMarkerWool();
     }
 
-    private int applyTerrainReplacement(ServerLevel level, BlockPos origin, List<BlockPos> offsets, TerrainReplacementPlan plan) {
+    private int applyTerrainReplacement(ServerLevel level,
+                                        BlockPos origin,
+                                        List<BlockPos> offsets,
+                                        TerrainReplacementPlan plan,
+                                        BlockPos levelingOffset) {
         if (!plan.enabled()) {
             return 0;
         }
 
+        boolean forceDirtLayer = shouldForceDirtLayer(levelingOffset);
+        int dirtLayerY = forceDirtLayer ? levelingOffset.getY() : Integer.MIN_VALUE;
         int applied = 0;
         for (int i = 0; i < offsets.size() && i < plan.samples().size(); i++) {
-            BlockPos worldPos = origin.offset(offsets.get(i));
-            level.setBlock(worldPos, plan.samples().get(i), 2);
+            BlockPos offset = offsets.get(i);
+            if (forceDirtLayer && offset.getY() != dirtLayerY) {
+                continue;
+            }
+            BlockPos worldPos = origin.offset(offset);
+            BlockState replacement = forceDirtLayer
+                    ? Blocks.DIRT.defaultBlockState()
+                    : plan.samples().get(i);
+            level.setBlock(worldPos, replacement, 2);
             applied++;
         }
 
@@ -572,6 +590,12 @@ public class NBTStructurePlacer {
             expanded.encapsulate(entityPos);
         }
         return expanded;
+    }
+
+    private boolean shouldForceDirtLayer(BlockPos levelingOffset) {
+        return levelingOffset != null
+                && ModConstants.MOD_ID.equals(id.getNamespace())
+                && "bunker".equals(id.getPath());
     }
 
 }
