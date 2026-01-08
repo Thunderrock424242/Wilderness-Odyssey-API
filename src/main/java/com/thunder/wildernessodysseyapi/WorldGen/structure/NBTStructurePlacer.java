@@ -41,7 +41,8 @@ public class NBTStructurePlacer {
     private static final String CREATE_ELEVATOR_PULLEY_NAME = "create:elevator_pulley";
     private static final String LEVELING_MARKER_NAME =
             BuiltInRegistries.BLOCK.getKey(Blocks.BLUE_WOOL).toString();
-    private static final int MIN_LEVELING_MARKER_Y = 64;
+    private static final int MIN_LEVELING_MARKER_Y = 62;
+    private static final int MAX_LEVELING_MARKER_Y = 65;
 
     private final ResourceLocation id;
     private TemplateData cachedData;
@@ -237,6 +238,11 @@ public class NBTStructurePlacer {
                     "Raising structure {} so the leveling marker sits at y={} instead of y={}.",
                     id, MIN_LEVELING_MARKER_Y, markerY);
             desiredY = MIN_LEVELING_MARKER_Y - levelingOffset.getY();
+        } else if (markerY > MAX_LEVELING_MARKER_Y) {
+            ModConstants.LOGGER.warn(
+                    "Lowering structure {} so the leveling marker sits at y={} instead of y={}.",
+                    id, MAX_LEVELING_MARKER_Y, markerY);
+            desiredY = MAX_LEVELING_MARKER_Y - levelingOffset.getY();
         }
 
         BlockPos placementOrigin = new BlockPos(origin.getX(), desiredY, origin.getZ());
@@ -252,7 +258,33 @@ public class NBTStructurePlacer {
         }
 
         SurfaceSample sample = TerrainReplacerEngine.sampleSurface(level, anchor);
-        return new PlacementFoundation(origin, sample.state());
+        int surfaceAnchorY = sample.y() + 1;
+        int desiredY = anchor.getY() - levelingOffset.getY();
+        int maxDepth = StructureConfig.MAX_LEVELING_DEPTH.get();
+        if (maxDepth >= 0) {
+            int clampedY = Math.max(desiredY, surfaceAnchorY - maxDepth);
+            if (clampedY != desiredY) {
+                ModConstants.LOGGER.warn("Clamping leveling depth for structure {}. Desired bury depth {} exceeds limit {} at marker {}.",
+                        id, surfaceAnchorY - desiredY, maxDepth, levelingOffset);
+                desiredY = clampedY;
+            }
+        }
+
+        int markerY = desiredY + levelingOffset.getY();
+        if (markerY < MIN_LEVELING_MARKER_Y) {
+            ModConstants.LOGGER.warn(
+                    "Raising structure {} so the leveling marker sits at y={} instead of y={}.",
+                    id, MIN_LEVELING_MARKER_Y, markerY);
+            desiredY = MIN_LEVELING_MARKER_Y - levelingOffset.getY();
+        } else if (markerY > MAX_LEVELING_MARKER_Y) {
+            ModConstants.LOGGER.warn(
+                    "Lowering structure {} so the leveling marker sits at y={} instead of y={}.",
+                    id, MAX_LEVELING_MARKER_Y, markerY);
+            desiredY = MAX_LEVELING_MARKER_Y - levelingOffset.getY();
+        }
+
+        BlockPos placementOrigin = new BlockPos(origin.getX(), desiredY, origin.getZ());
+        return new PlacementFoundation(placementOrigin, sample.state());
     }
 
     private boolean shouldEnableTerrainReplacer(TemplateData data) {
