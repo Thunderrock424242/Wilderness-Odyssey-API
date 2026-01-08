@@ -15,10 +15,6 @@ public class VoiceIntegration {
     }
 
     public VoiceResult wrap(String text) {
-        if (!settings.isVoiceEnabled()) {
-            return new VoiceResult(text, null, false, settings.isSpeechRecognition());
-        }
-        String voice = "Atlas (voice): " + text;
-        return new VoiceResult(text, voice, true, settings.isSpeechRecognition());
+        return new VoiceResult(text, null, false, settings.isSpeechRecognition());
     }
 }

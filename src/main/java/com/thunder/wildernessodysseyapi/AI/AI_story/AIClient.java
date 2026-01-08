@@ -227,9 +227,6 @@ public class AIClient {
         private String warmWelcome(String cleanMessage, String player, String world) {
             StringBuilder welcome = new StringBuilder();
             welcome.append("Hey ").append(player).append(", I'm ").append(personaName).append(".");
-            if (!cleanMessage.isEmpty()) {
-                welcome.append(" You said: \"").append(cleanMessage).append("\".");
-            }
             welcome.append(" I'm here to keep the mission on track in ").append(world == null || world.isBlank() ? "this world" : world).append(".");
             return welcome.toString();
         }
