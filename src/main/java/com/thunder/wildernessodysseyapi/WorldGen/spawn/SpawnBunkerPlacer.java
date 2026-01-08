@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.WorldGen.spawn;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureSpawnGuard;
 import net.minecraft.core.BlockPos;
@@ -10,6 +11,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -79,7 +81,7 @@ public final class SpawnBunkerPlacer {
         level.setDefaultSpawnPos(spawnTarget, 0.0F);
 
         StarterStructureSpawnGuard.registerSpawnDenyZone(level, result.bounds());
-        clearGrassInBounds(level, result.bounds());
+        sealRoofAndDrainWater(level, result.bounds());
 
         ModConstants.LOGGER.info("Placed spawn bunker {} at {} with {} cryo tubes.", BUNKER_ID, result.origin(), cryoPositions.size());
     }
@@ -91,7 +93,7 @@ public final class SpawnBunkerPlacer {
         return BlockPos.containing(result.bounds().getCenter());
     }
 
-    private static void clearGrassInBounds(ServerLevel level, AABB bounds) {
+    private static void sealRoofAndDrainWater(ServerLevel level, AABB bounds) {
         int minX = Mth.floor(bounds.minX);
         int minY = Mth.floor(bounds.minY);
         int minZ = Mth.floor(bounds.minZ);
@@ -101,11 +103,28 @@ public final class SpawnBunkerPlacer {
 
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+                if (surfaceY <= maxY) {
+                    continue;
+                }
+                BlockState capState = TerrainReplacerEngine.sampleSurfaceBlock(level, new BlockPos(x, surfaceY, z));
+                for (int y = maxY; y <= surfaceY; y++) {
+                    cursor.set(x, y, z);
+                    BlockState state = level.getBlockState(cursor);
+                    if (state.isAir() || !state.getFluidState().isEmpty() || isGrassBlock(state)) {
+                        level.setBlock(cursor, capState, 2);
+                    }
+                }
+            }
+        }
+
+        for (int x = minX; x <= maxX; x++) {
             for (int y = minY; y <= maxY; y++) {
                 for (int z = minZ; z <= maxZ; z++) {
                     cursor.set(x, y, z);
                     BlockState state = level.getBlockState(cursor);
-                    if (isGrassBlock(state)) {
+                    if (state.getFluidState().is(Fluids.WATER)) {
                         level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
                     }
                 }
