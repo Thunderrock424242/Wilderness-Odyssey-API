@@ -88,7 +88,23 @@ public class NBTStructurePlacer {
             origin = anchor.subtract(data.levelingOffset());
         }
 
-        return place(level, origin, debugAttempt);
+        PlacementAttempt attempt = debugAttempt != null
+                ? debugAttempt
+                : StructurePlacementDebugger.startAttempt(level, id, data.size(), origin);
+
+        if (!data.hasStructureBlocks()) {
+            StructurePlacementDebugger.markFailure(attempt, "template is empty");
+            ModConstants.LOGGER.warn("Skipping placement for {} because the template contains no structure blocks.", id);
+            return null;
+        }
+
+        PlacementFoundation foundation = resolvePlacementOriginAnchored(level, origin, anchor, data.levelingOffset());
+        if (foundation == null) {
+            StructurePlacementDebugger.markFailure(attempt, "unable to find terrain anchor");
+            return null;
+        }
+
+        return placeWithFoundation(level, data, foundation, attempt);
     }
 
     /**
@@ -117,6 +133,13 @@ public class NBTStructurePlacer {
             return null;
         }
 
+        return placeWithFoundation(level, data, foundation, attempt);
+    }
+
+    private PlacementResult placeWithFoundation(ServerLevel level,
+                                                TemplateData data,
+                                                PlacementFoundation foundation,
+                                                PlacementAttempt attempt) {
         LargeStructurePlacementOptimizer.preparePlacement(level, foundation.origin(), data.size());
         if (LargeStructurePlacementOptimizer.exceedsStructureBlockLimit(data.size())) {
             int estimated = LargeStructurePlacementOptimizer.estimateAffectedBlocks(data.size());
@@ -209,6 +232,18 @@ public class NBTStructurePlacer {
 
         BlockPos placementOrigin = new BlockPos(origin.getX(), desiredY, origin.getZ());
         return new PlacementFoundation(placementOrigin, sample.state());
+    }
+
+    private PlacementFoundation resolvePlacementOriginAnchored(ServerLevel level,
+                                                               BlockPos origin,
+                                                               BlockPos anchor,
+                                                               BlockPos levelingOffset) {
+        if (levelingOffset == null) {
+            return new PlacementFoundation(origin, null);
+        }
+
+        SurfaceSample sample = TerrainReplacerEngine.sampleSurface(level, anchor);
+        return new PlacementFoundation(origin, sample.state());
     }
 
     private boolean shouldEnableTerrainReplacer(TemplateData data) {
