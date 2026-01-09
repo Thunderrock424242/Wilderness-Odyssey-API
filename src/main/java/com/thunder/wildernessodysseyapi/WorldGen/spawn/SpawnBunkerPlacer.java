@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.core.Vec3i;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -25,6 +26,9 @@ public final class SpawnBunkerPlacer {
     private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "bunker");
     private static final int LAND_SEARCH_RADIUS = 512;
     private static final int LAND_SEARCH_STEP = 16;
+    private static final int OCEAN_BUFFER_RADIUS = 128;
+    private static final int OCEAN_BUFFER_STEP = 16;
+    private static final int WATER_SAMPLE_STEP = 8;
     private static final NBTStructurePlacer BUNKER_PLACER = new NBTStructurePlacer(
             BUNKER_ID,
             List.of(new BunkerPlacementProcessor()));
@@ -61,13 +65,14 @@ public final class SpawnBunkerPlacer {
 
     private static BlockPos resolveAnchor(ServerLevel level) {
         BlockPos baseSpawn = level.getSharedSpawnPos();
-        return findLandAnchor(level, baseSpawn);
+        Vec3i bunkerSize = BUNKER_PLACER.peekSize(level);
+        return findLandAnchor(level, baseSpawn, bunkerSize);
     }
 
-    private static BlockPos findLandAnchor(ServerLevel level, BlockPos baseSpawn) {
+    private static BlockPos findLandAnchor(ServerLevel level, BlockPos baseSpawn, Vec3i bunkerSize) {
         BlockPos surface = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                 new BlockPos(baseSpawn.getX(), level.getMinBuildHeight(), baseSpawn.getZ()));
-        if (isLandBiome(level, surface)) {
+        if (isViableAnchor(level, surface, bunkerSize)) {
             return surface;
         }
 
@@ -84,7 +89,7 @@ public final class SpawnBunkerPlacer {
                     int z = baseZ + dz;
                     BlockPos candidate = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                             new BlockPos(x, level.getMinBuildHeight(), z));
-                    if (isLandBiome(level, candidate)) {
+                    if (isViableAnchor(level, candidate, bunkerSize)) {
                         return candidate;
                     }
                 }
@@ -124,5 +129,57 @@ public final class SpawnBunkerPlacer {
 
     private static boolean isLandBiome(ServerLevel level, BlockPos pos) {
         return !level.getBiome(pos).is(BiomeTags.IS_OCEAN);
+    }
+
+    private static boolean isViableAnchor(ServerLevel level, BlockPos surface, Vec3i bunkerSize) {
+        if (!isLandBiome(level, surface)) {
+            return false;
+        }
+        if (!isDrySurface(level, surface)) {
+            return false;
+        }
+        if (isNearOcean(level, surface, OCEAN_BUFFER_RADIUS, OCEAN_BUFFER_STEP)) {
+            return false;
+        }
+        return isAreaDry(level, surface, bunkerSize);
+    }
+
+    private static boolean isDrySurface(ServerLevel level, BlockPos surface) {
+        return level.getFluidState(surface).isEmpty();
+    }
+
+    private static boolean isNearOcean(ServerLevel level, BlockPos surface, int radius, int step) {
+        int baseX = surface.getX();
+        int baseZ = surface.getZ();
+        for (int dx = -radius; dx <= radius; dx += step) {
+            for (int dz = -radius; dz <= radius; dz += step) {
+                BlockPos sample = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                        new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
+                if (level.getBiome(sample).is(BiomeTags.IS_OCEAN)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isAreaDry(ServerLevel level, BlockPos surface, Vec3i bunkerSize) {
+        if (bunkerSize.getX() <= 0 || bunkerSize.getZ() <= 0) {
+            return true;
+        }
+        int radiusX = Math.max(1, bunkerSize.getX() / 2);
+        int radiusZ = Math.max(1, bunkerSize.getZ() / 2);
+        int baseX = surface.getX();
+        int baseZ = surface.getZ();
+        for (int dx = -radiusX; dx <= radiusX; dx += WATER_SAMPLE_STEP) {
+            for (int dz = -radiusZ; dz <= radiusZ; dz += WATER_SAMPLE_STEP) {
+                BlockPos sample = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                        new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
+                if (!level.getFluidState(sample).isEmpty()) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 }
