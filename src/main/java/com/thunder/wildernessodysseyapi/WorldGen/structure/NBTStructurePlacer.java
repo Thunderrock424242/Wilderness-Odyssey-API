@@ -330,12 +330,16 @@ public class NBTStructurePlacer {
             if (existing.isAir()) {
                 continue;
             }
-            if (forceDirtLayer && !existing.is(Blocks.GRASS_BLOCK)) {
+            if (forceDirtLayer) {
+                SurfaceSample sample = TerrainReplacerEngine.sampleSurface(level, worldPos);
+                if (sample.y() != worldPos.getY()) {
+                    continue;
+                }
+                level.setBlock(worldPos, Blocks.DIRT.defaultBlockState(), 2);
+                applied++;
                 continue;
             }
-            BlockState replacement = forceDirtLayer
-                    ? Blocks.DIRT.defaultBlockState()
-                    : plan.samples().get(i);
+            BlockState replacement = plan.samples().get(i);
             level.setBlock(worldPos, replacement, 2);
             applied++;
         }
