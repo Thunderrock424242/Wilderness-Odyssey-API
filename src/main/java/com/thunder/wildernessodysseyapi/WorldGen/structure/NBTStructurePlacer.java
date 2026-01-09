@@ -357,6 +357,10 @@ public class NBTStructurePlacer {
                 applied++;
                 continue;
             }
+            SurfaceSample surfaceSample = TerrainReplacerEngine.sampleSurface(level, worldPos);
+            if (surfaceSample.y() != worldPos.getY()) {
+                continue;
+            }
             BlockState replacement = plan.samples().get(i);
             level.setBlock(worldPos, replacement, 2);
             applied++;
