@@ -21,6 +21,12 @@ public class StructureConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_TERRAIN_REPLACER;
     /** Warn when terrain replacer usage exceeds this fraction of the template volume */
     public static final ModConfigSpec.DoubleValue TERRAIN_REPLACER_WARNING_THRESHOLD;
+    /** Fill gaps below structures even when no terrain markers are present. */
+    public static final ModConfigSpec.BooleanValue ENABLE_AUTO_TERRAIN_BLEND;
+    /** Maximum height (in blocks) to fill when auto-blending under structures. */
+    public static final ModConfigSpec.IntValue AUTO_TERRAIN_BLEND_MAX_DEPTH;
+    /** Horizontal radius (in blocks) to feather terrain around placed structures. */
+    public static final ModConfigSpec.IntValue AUTO_TERRAIN_BLEND_RADIUS;
     /** Maximum depth (blocks) the leveling marker may sit below the sampled surface; -1 disables clamping */
     public static final ModConfigSpec.IntValue MAX_LEVELING_DEPTH;
     /** Prevent hostile mob spawns inside the starter bunker immediately after placement */
@@ -59,6 +65,18 @@ public class StructureConfig {
                                 + " Helps catch mistakenly-exported templates that would be overwritten by terrain."
                 )
                 .defineInRange("terrainReplacerWarningThreshold", 0.35D, 0.0D, 1.0D);
+        ENABLE_AUTO_TERRAIN_BLEND = BUILDER.comment(
+                        "If true, structure placement will attempt to blend terrain even when no terrain marker blocks exist."
+                )
+                .define("enableAutoTerrainBlend", true);
+        AUTO_TERRAIN_BLEND_MAX_DEPTH = BUILDER.comment(
+                        "Maximum number of blocks to fill upward from the surface when auto-blending structures."
+                )
+                .defineInRange("autoTerrainBlendMaxDepth", 6, 1, 64);
+        AUTO_TERRAIN_BLEND_RADIUS = BUILDER.comment(
+                        "Horizontal radius to feather terrain around structures when auto-blending is enabled."
+                )
+                .defineInRange("autoTerrainBlendRadius", 2, 0, 8);
         MAX_LEVELING_DEPTH = BUILDER.comment(
                         "Maximum number of blocks the leveling marker may be placed below the sampled surface."
                                 + " Prevents tall templates from being buried when the blue wool marker sits high above the"
