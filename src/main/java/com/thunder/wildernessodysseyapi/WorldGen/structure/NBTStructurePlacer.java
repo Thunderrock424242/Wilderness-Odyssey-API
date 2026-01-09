@@ -190,10 +190,15 @@ public class NBTStructurePlacer {
             return null;
         }
 
-        int replaced = 0;
-        if (!isStarterBunker()) {
-            replaced = applyTerrainReplacement(level, foundation.origin(), data.terrainOffsets(),
-                    replacementPlan, data.levelingOffset());
+        int replaced = applyTerrainReplacement(level, foundation.origin(), data.terrainOffsets(),
+                replacementPlan, data.levelingOffset());
+        int autoBlended = 0;
+        if (replaced == 0
+                && data.terrainOffsets().isEmpty()
+                && StructureConfig.ENABLE_AUTO_TERRAIN_BLEND.get()) {
+            int maxDepth = StructureConfig.AUTO_TERRAIN_BLEND_MAX_DEPTH.get();
+            int radius = StructureConfig.AUTO_TERRAIN_BLEND_RADIUS.get();
+            autoBlended = TerrainReplacerEngine.applyAutoBlend(level, placementBox, maxDepth, radius);
         }
 
         if (data.levelingOffset() != null && foundation.levelingReplacement() != null && !isStarterBunker()) {
@@ -216,7 +221,8 @@ public class NBTStructurePlacer {
                 .toList();
 
         StructurePlacementDebugger.markSuccess(attempt,
-                "placed with %s terrain samples and %s cryo tubes".formatted(replaced, cryoPositions.size()));
+                "placed with %s terrain samples, %s auto-blended blocks, and %s cryo tubes"
+                        .formatted(replaced, autoBlended, cryoPositions.size()));
 
         return new PlacementResult(foundation.origin(), bounds, cryoPositions, List.copyOf(chunkSlices));
     }

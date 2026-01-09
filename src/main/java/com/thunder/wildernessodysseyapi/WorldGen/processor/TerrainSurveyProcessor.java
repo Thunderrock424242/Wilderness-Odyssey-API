@@ -46,7 +46,8 @@ public class TerrainSurveyProcessor extends StructureProcessor {
         }
 
         if (state.is(TerrainReplacerBlock.TERRAIN_REPLACER.get())) {
-            BlockState sampled = TerrainReplacerEngine.sampleSurfaceBlock(level, placed.pos());
+            var material = TerrainReplacerEngine.sampleSurfaceMaterial(level, placed.pos());
+            BlockState sampled = TerrainReplacerEngine.chooseReplacement(material, placed.pos().getY());
             return new StructureTemplate.StructureBlockInfo(placed.pos(), sampled, placed.nbt());
         }
 
