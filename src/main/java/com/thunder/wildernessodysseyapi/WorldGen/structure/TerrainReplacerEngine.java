@@ -112,11 +112,26 @@ public final class TerrainReplacerEngine {
      * Fills gaps between the terrain surface and the lowest structure block in each column of the bounds.
      */
     public static int applyAutoBlend(ServerLevel level, BoundingBox bounds, int maxFillDepth, int radius) {
+        return applyAutoBlend(level, bounds, maxFillDepth, radius, AutoBlendMask.allowAll());
+    }
+
+    /**
+     * Fills gaps between the terrain surface and the lowest structure block in each column of the bounds,
+     * skipping columns that are not marked as supported by the supplied mask.
+     */
+    public static int applyAutoBlend(ServerLevel level,
+                                     BoundingBox bounds,
+                                     int maxFillDepth,
+                                     int radius,
+                                     AutoBlendMask mask) {
         int applied = 0;
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         BoundingBox outerBounds = expandBounds(bounds, radius);
         for (int x = outerBounds.minX(); x <= outerBounds.maxX(); x++) {
             for (int z = outerBounds.minZ(); z <= outerBounds.maxZ(); z++) {
+                if (!mask.allows(x, z)) {
+                    continue;
+                }
                 int baseY = resolveBaseY(level, bounds, x, z);
                 if (baseY == Integer.MIN_VALUE) {
                     continue;
@@ -201,6 +216,28 @@ public final class TerrainReplacerEngine {
     public record TerrainReplacementPlan(boolean enabled, List<BlockState> samples) {
         public static TerrainReplacementPlan disabled() {
             return new TerrainReplacementPlan(false, List.of());
+        }
+    }
+
+    /**
+     * Column mask used to decide which columns can be filled during auto-blend.
+     */
+    public record AutoBlendMask(int originX, int originZ, int sizeX, int sizeZ, boolean[] supportedColumns) {
+        public static AutoBlendMask allowAll() {
+            return new AutoBlendMask(0, 0, 0, 0, null);
+        }
+
+        public boolean allows(int worldX, int worldZ) {
+            if (supportedColumns == null) {
+                return true;
+            }
+            if (sizeX <= 0 || sizeZ <= 0) {
+                return true;
+            }
+            int localX = clamp(worldX - originX, 0, sizeX - 1);
+            int localZ = clamp(worldZ - originZ, 0, sizeZ - 1);
+            int index = localX + (localZ * sizeX);
+            return supportedColumns[index];
         }
     }
 

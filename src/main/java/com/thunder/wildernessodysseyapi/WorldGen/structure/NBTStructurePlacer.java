@@ -27,8 +27,10 @@ import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.phys.AABB;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import net.neoforged.fml.ModList;
@@ -44,6 +46,8 @@ public class NBTStructurePlacer {
             BuiltInRegistries.BLOCK.getKey(Blocks.BLUE_WOOL).toString();
     private static final int MIN_LEVELING_MARKER_Y = 62;
     private static final int MAX_LEVELING_MARKER_Y = 65;
+    private static final String[] PALETTE_BLOCK_FIELD_NAMES = {"blocks", "blockInfos", "blockInfoList"};
+    private static boolean loggedPaletteFieldWarning = false;
 
     private final ResourceLocation id;
     private final List<StructureProcessor> extraProcessors;
@@ -198,7 +202,11 @@ public class NBTStructurePlacer {
                 && StructureConfig.ENABLE_AUTO_TERRAIN_BLEND.get()) {
             int maxDepth = StructureConfig.AUTO_TERRAIN_BLEND_MAX_DEPTH.get();
             int radius = StructureConfig.AUTO_TERRAIN_BLEND_RADIUS.get();
-            autoBlended = TerrainReplacerEngine.applyAutoBlend(level, placementBox, maxDepth, radius);
+            TerrainReplacerEngine.AutoBlendMask mask = TerrainReplacerEngine.AutoBlendMask.allowAll();
+            if (StructureConfig.ENABLE_SMART_AUTO_TERRAIN_BLEND.get()) {
+                mask = buildAutoBlendMask(data.template(), foundation.origin(), data.size());
+            }
+            autoBlended = TerrainReplacerEngine.applyAutoBlend(level, placementBox, maxDepth, radius, mask);
         }
 
         if (data.levelingOffset() != null && foundation.levelingReplacement() != null && !isStarterBunker()) {
@@ -622,4 +630,86 @@ public class NBTStructurePlacer {
                 && "bunker".equals(id.getPath());
     }
 
+    private TerrainReplacerEngine.AutoBlendMask buildAutoBlendMask(StructureTemplate template, BlockPos origin, Vec3i size) {
+        if (!(template instanceof StructureTemplateAccessor accessor)) {
+            return TerrainReplacerEngine.AutoBlendMask.allowAll();
+        }
+
+        int sizeX = size.getX();
+        int sizeZ = size.getZ();
+        if (sizeX <= 0 || sizeZ <= 0) {
+            return TerrainReplacerEngine.AutoBlendMask.allowAll();
+        }
+
+        int[] lowestY = new int[sizeX * sizeZ];
+        Arrays.fill(lowestY, Integer.MAX_VALUE);
+
+        boolean foundBlocks = false;
+        for (StructureTemplate.Palette palette : accessor.getPalettes()) {
+            List<StructureBlockInfo> blocks = resolvePaletteBlocks(palette);
+            if (blocks.isEmpty()) {
+                continue;
+            }
+            for (StructureBlockInfo info : blocks) {
+                if (info.state().isAir()) {
+                    continue;
+                }
+                int localX = info.pos().getX();
+                int localZ = info.pos().getZ();
+                if (localX < 0 || localX >= sizeX || localZ < 0 || localZ >= sizeZ) {
+                    continue;
+                }
+                int index = localX + (localZ * sizeX);
+                lowestY[index] = Math.min(lowestY[index], info.pos().getY());
+                foundBlocks = true;
+            }
+        }
+
+        if (!foundBlocks) {
+            return TerrainReplacerEngine.AutoBlendMask.allowAll();
+        }
+
+        boolean[] supported = new boolean[sizeX * sizeZ];
+        boolean anySupported = false;
+        for (int i = 0; i < lowestY.length; i++) {
+            if (lowestY[i] == 0) {
+                supported[i] = true;
+                anySupported = true;
+            }
+        }
+
+        if (!anySupported) {
+            return TerrainReplacerEngine.AutoBlendMask.allowAll();
+        }
+
+        return new TerrainReplacerEngine.AutoBlendMask(origin.getX(), origin.getZ(), sizeX, sizeZ, supported);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<StructureBlockInfo> resolvePaletteBlocks(StructureTemplate.Palette palette) {
+        if (palette == null) {
+            return List.of();
+        }
+        for (String fieldName : PALETTE_BLOCK_FIELD_NAMES) {
+            try {
+                Field field = palette.getClass().getDeclaredField(fieldName);
+                field.setAccessible(true);
+                Object value = field.get(palette);
+                if (value instanceof List<?> list) {
+                    return (List<StructureBlockInfo>) list;
+                }
+            } catch (NoSuchFieldException ignored) {
+                // try next candidate
+            } catch (IllegalAccessException e) {
+                ModConstants.LOGGER.warn("Unable to access structure palette blocks for {}.", id, e);
+                return List.of();
+            }
+        }
+
+        if (!loggedPaletteFieldWarning) {
+            loggedPaletteFieldWarning = true;
+            ModConstants.LOGGER.warn("Unable to locate structure palette block list for {}; auto-blend masking will be skipped.", id);
+        }
+        return List.of();
+    }
 }

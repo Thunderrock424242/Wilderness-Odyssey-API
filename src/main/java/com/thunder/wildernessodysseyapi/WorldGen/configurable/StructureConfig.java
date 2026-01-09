@@ -23,6 +23,8 @@ public class StructureConfig {
     public static final ModConfigSpec.DoubleValue TERRAIN_REPLACER_WARNING_THRESHOLD;
     /** Fill gaps below structures even when no terrain markers are present. */
     public static final ModConfigSpec.BooleanValue ENABLE_AUTO_TERRAIN_BLEND;
+    /** Skip auto-blend in columns where the structure does not touch the template's bottom layer. */
+    public static final ModConfigSpec.BooleanValue ENABLE_SMART_AUTO_TERRAIN_BLEND;
     /** Maximum height (in blocks) to fill when auto-blending under structures. */
     public static final ModConfigSpec.IntValue AUTO_TERRAIN_BLEND_MAX_DEPTH;
     /** Horizontal radius (in blocks) to feather terrain around placed structures. */
@@ -69,6 +71,11 @@ public class StructureConfig {
                         "If true, structure placement will attempt to blend terrain even when no terrain marker blocks exist."
                 )
                 .define("enableAutoTerrainBlend", true);
+        ENABLE_SMART_AUTO_TERRAIN_BLEND = BUILDER.comment(
+                        "If true, auto-blend will skip columns where the structure does not touch the template's bottom layer."
+                                + " Helps prevent terrain from filling structure interiors."
+                )
+                .define("enableSmartAutoTerrainBlend", true);
         AUTO_TERRAIN_BLEND_MAX_DEPTH = BUILDER.comment(
                         "Maximum number of blocks to fill upward from the surface when auto-blending structures."
                 )
