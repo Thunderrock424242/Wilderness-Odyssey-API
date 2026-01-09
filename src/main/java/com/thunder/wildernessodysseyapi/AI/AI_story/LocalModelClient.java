@@ -5,10 +5,12 @@ import com.google.gson.GsonBuilder;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -53,6 +55,12 @@ public class LocalModelClient {
                 return Optional.empty();
             }
             return Optional.of(parsed.response.trim());
+        } catch (ConnectException e) {
+            ModConstants.LOGGER.warn("Local model request failed: unable to connect to {}.", endpoint);
+            return Optional.empty();
+        } catch (HttpTimeoutException e) {
+            ModConstants.LOGGER.warn("Local model request timed out for {}.", endpoint);
+            return Optional.empty();
         } catch (IOException e) {
             ModConstants.LOGGER.warn("Local model request failed.", e);
             return Optional.empty();
