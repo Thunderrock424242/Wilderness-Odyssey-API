@@ -160,7 +160,8 @@ public class AIClient {
         }
         if (localModelClient != null) {
             String prompt = formatSystemPrompt(localSystemPrompt);
-            var response = localModelClient.generateReply(prompt, message, context);
+            String localContext = buildLocalModelContext(world, context);
+            var response = localModelClient.generateReply(prompt, message, localContext);
             if (response.isPresent()) {
                 String reply = response.get();
                 memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
@@ -180,6 +181,42 @@ public class AIClient {
     private String sessionKey(String world, String player) {
         String worldKey = world == null || world.isBlank() ? "default" : world.trim();
         return worldKey + "::" + player;
+    }
+
+    private String buildLocalModelContext(String world, String conversationContext) {
+        StringBuilder builder = new StringBuilder();
+        if (world != null && !world.isBlank()) {
+            builder.append("World: ").append(world.trim()).append("\n");
+        }
+        if (!story.isEmpty()) {
+            builder.append("Lore:\n");
+            for (String line : story) {
+                builder.append("- ").append(line).append("\n");
+            }
+        }
+        if (!backgroundHistory.isEmpty()) {
+            builder.append("Background history:\n");
+            for (String line : backgroundHistory) {
+                builder.append("- ").append(line).append("\n");
+            }
+        }
+        if (!corruptedLore.isEmpty()) {
+            builder.append("Corrupted fragments:\n");
+            for (String line : corruptedLore) {
+                builder.append("- ").append(line).append("\n");
+            }
+        }
+        List<String> learnedFacts = knowledgeStore.getLearnedFacts();
+        if (learnedFacts != null && !learnedFacts.isEmpty()) {
+            builder.append("Learned facts:\n");
+            for (String line : learnedFacts) {
+                builder.append("- ").append(line).append("\n");
+            }
+        }
+        if (conversationContext != null && !conversationContext.isBlank()) {
+            builder.append("Recent conversation:\n").append(conversationContext.trim()).append("\n");
+        }
+        return builder.toString().trim();
     }
 
     private static class StorySession {

@@ -19,8 +19,8 @@ settings:
   wake_word: "atlas"
   model: "local-story-engine"
 local_model:
-  enabled: false
+  enabled: true
   base_url: "http://localhost:11434"
   model: "llama3.1"
   timeout_seconds: 15
-  system_prompt: "You are {persona}, an in-world expedition AI. Stay {tone} and {empathy}. Do not provide crafting recipes or step-by-step crafting instructions. Keep responses immersive, lore-aware, and conversational."
+  system_prompt: "You are {persona}, an in-world expedition AI. Stay {tone} and {empathy}. You have no access to Google, the internet, or any external sources—only the in-world lore and knowledge provided. Do not provide crafting recipes or step-by-step crafting instructions. Keep responses immersive, lore-aware, and conversational."
