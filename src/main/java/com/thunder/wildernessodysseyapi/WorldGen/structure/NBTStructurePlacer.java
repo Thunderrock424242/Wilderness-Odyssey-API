@@ -326,6 +326,13 @@ public class NBTStructurePlacer {
                 continue;
             }
             BlockPos worldPos = origin.offset(offset);
+            BlockState existing = level.getBlockState(worldPos);
+            if (existing.isAir()) {
+                continue;
+            }
+            if (forceDirtLayer && !existing.is(Blocks.GRASS_BLOCK)) {
+                continue;
+            }
             BlockState replacement = forceDirtLayer
                     ? Blocks.DIRT.defaultBlockState()
                     : plan.samples().get(i);
