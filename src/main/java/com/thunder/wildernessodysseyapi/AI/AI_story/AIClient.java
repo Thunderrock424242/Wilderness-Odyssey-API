@@ -29,6 +29,7 @@ public class AIClient {
     private final AISettings settings = new AISettings();
     private final VoiceIntegration voiceIntegration = new VoiceIntegration(settings);
     private final MemoryStore memoryStore = new MemoryStore();
+    private final AIKnowledgeStore knowledgeStore = new AIKnowledgeStore();
     private final Map<String, StorySession> sessions = new HashMap<>();
     private LocalModelClient localModelClient;
     private String localSystemPrompt;
@@ -142,8 +143,21 @@ public class AIClient {
     }
 
     public VoiceIntegration.VoiceResult sendMessageWithVoice(String world, String player, String message) {
+        String learnedFact = knowledgeStore.extractLearnedFact(message);
+        if (learnedFact != null) {
+            boolean added = knowledgeStore.addFact(learnedFact);
+            String reply = added
+                    ? "Got it. I'll remember: " + learnedFact
+                    : "I already have that logged: " + learnedFact;
+            memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
+            return voiceIntegration.wrap(reply);
+        }
         memoryStore.addPlayerMessage(world, player, message);
         String context = memoryStore.getRecentContext(world, player);
+        String knowledgeContext = knowledgeStore.getContextSnippet();
+        if (!knowledgeContext.isBlank()) {
+            context = context.isBlank() ? knowledgeContext : context + "\n" + knowledgeContext;
+        }
         if (localModelClient != null) {
             String prompt = formatSystemPrompt(localSystemPrompt);
             var response = localModelClient.generateReply(prompt, message, context);
@@ -156,7 +170,7 @@ public class AIClient {
         StorySession session = sessions.computeIfAbsent(sessionKey(world, player),
                 p -> new StorySession(world, settings.getWakeWord(), settings.getPersonaName(),
                         settings.getPersonalityTone(), settings.getEmpathyLevel(), corruptedLore,
-                        backgroundHistory, corruptedPrefix));
+                        backgroundHistory, corruptedPrefix, knowledgeStore.getLearnedFacts()));
         String reply = session.buildResponse(world, player, message, story,
                 context);
         memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
@@ -178,13 +192,15 @@ public class AIClient {
         private final List<String> corruptedLore;
         private final List<String> backgroundHistory;
         private final String corruptedPrefix;
+        private final List<String> learnedFacts;
         private boolean activated = false;
 
         private int beat = 0;
         private final Random random = ThreadLocalRandom.current();
 
         StorySession(String world, String wakeWord, String personaName, String personalityTone, String empathyLevel,
-                     List<String> corruptedLore, List<String> backgroundHistory, String corruptedPrefix) {
+                     List<String> corruptedLore, List<String> backgroundHistory, String corruptedPrefix,
+                     List<String> learnedFacts) {
             this.world = world == null ? "" : world;
             this.wakeWord = wakeWord == null || wakeWord.isBlank() ? "atlas" : wakeWord.toLowerCase(Locale.ROOT);
             this.personaName = personaName == null || personaName.isBlank() ? "Atlas" : personaName;
@@ -193,6 +209,7 @@ public class AIClient {
             this.corruptedLore = corruptedLore;
             this.backgroundHistory = backgroundHistory;
             this.corruptedPrefix = corruptedPrefix == null ? "" : corruptedPrefix;
+            this.learnedFacts = learnedFacts == null ? List.of() : learnedFacts;
         }
 
         String buildResponse(String world, String player, String message, List<String> story, String context) {
@@ -214,6 +231,11 @@ public class AIClient {
             String background = backgroundBeat();
             if (!background.isEmpty()) {
                 reply.append(" ").append(background);
+            }
+
+            String learned = learnedFactBeat();
+            if (!learned.isEmpty()) {
+                reply.append(" ").append(learned);
             }
 
             String corrupted = corruptedWhisper();
@@ -285,6 +307,13 @@ public class AIClient {
             }
             int start = Math.max(0, size - 2);
             return String.join(" / ", lines.subList(start, size));
+        }
+
+        private String learnedFactBeat() {
+            if (learnedFacts.isEmpty() || random.nextDouble() > 0.5) {
+                return "";
+            }
+            return "I still remember: " + learnedFacts.get(random.nextInt(learnedFacts.size()));
         }
 
         private String backgroundBeat() {
