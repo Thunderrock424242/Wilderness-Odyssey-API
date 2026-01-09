@@ -201,7 +201,7 @@ public class NBTStructurePlacer {
             autoBlended = TerrainReplacerEngine.applyAutoBlend(level, placementBox, maxDepth, radius);
         }
 
-        if (data.levelingOffset() != null && foundation.levelingReplacement() != null) {
+        if (data.levelingOffset() != null && foundation.levelingReplacement() != null && !isStarterBunker()) {
             BlockPos markerWorldPos = foundation.origin().offset(data.levelingOffset());
             BlockState markerReplacement = foundation.levelingReplacement();
             if (shouldForceDirtLayer(data.levelingOffset())) {
@@ -313,6 +313,7 @@ public class NBTStructurePlacer {
 
     private boolean shouldEnableTerrainReplacer(TemplateData data) {
         return StructureConfig.ENABLE_TERRAIN_REPLACER.get()
+                && !isStarterBunker()
                 && !data.disableTerrainReplacement()
                 && data.hasMarkerWool();
     }
@@ -613,8 +614,11 @@ public class NBTStructurePlacer {
     }
 
     private boolean shouldForceDirtLayer(BlockPos levelingOffset) {
-        return levelingOffset != null
-                && ModConstants.MOD_ID.equals(id.getNamespace())
+        return levelingOffset != null && isStarterBunker();
+    }
+
+    private boolean isStarterBunker() {
+        return ModConstants.MOD_ID.equals(id.getNamespace())
                 && "bunker".equals(id.getPath());
     }
 

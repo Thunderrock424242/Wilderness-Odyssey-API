@@ -2,7 +2,6 @@ package com.thunder.wildernessodysseyapi.WorldGen.spawn;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.processor.BunkerPlacementProcessor;
-import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureSpawnGuard;
 import net.minecraft.core.BlockPos;
@@ -11,10 +10,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.util.Mth;
-import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -116,7 +111,6 @@ public final class SpawnBunkerPlacer {
         level.setDefaultSpawnPos(spawnTarget, 0.0F);
 
         StarterStructureSpawnGuard.registerSpawnDenyZone(level, result.bounds());
-        sealRoofAndDrainWater(level, result.bounds());
 
         ModConstants.LOGGER.info("Placed spawn bunker {} at {} with {} cryo tubes.", BUNKER_ID, result.origin(), cryoPositions.size());
     }
@@ -126,33 +120,6 @@ public final class SpawnBunkerPlacer {
             return result.cryoPositions().get(0);
         }
         return BlockPos.containing(result.bounds().getCenter());
-    }
-
-    private static void sealRoofAndDrainWater(ServerLevel level, AABB bounds) {
-        int minX = Mth.floor(bounds.minX);
-        int minY = Mth.floor(bounds.minY);
-        int minZ = Mth.floor(bounds.minZ);
-        int maxX = Mth.ceil(bounds.maxX) - 1;
-        int maxY = Mth.ceil(bounds.maxY) - 1;
-        int maxZ = Mth.ceil(bounds.maxZ) - 1;
-
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        for (int x = minX; x <= maxX; x++) {
-            for (int z = minZ; z <= maxZ; z++) {
-                int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
-                if (surfaceY <= maxY) {
-                    continue;
-                }
-                BlockState capState = TerrainReplacerEngine.sampleSurfaceBlock(level, new BlockPos(x, surfaceY, z));
-                for (int y = maxY; y <= surfaceY; y++) {
-                    cursor.set(x, y, z);
-                    BlockState state = level.getBlockState(cursor);
-                    if (state.isAir() || state.is(Blocks.DIRT)) {
-                        level.setBlock(cursor, capState, 2);
-                    }
-                }
-            }
-        }
     }
 
     private static boolean isLandBiome(ServerLevel level, BlockPos pos) {
