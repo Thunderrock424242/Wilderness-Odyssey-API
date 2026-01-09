@@ -209,7 +209,7 @@ public class AIClient {
                 reply.append(loreHook).append(" ");
             }
 
-            reply.append(buildDynamicResponse(cleanMessage, context, player));
+            reply.append(buildDynamicResponse(cleanMessage, context));
 
             String background = backgroundBeat();
             if (!background.isEmpty()) {
@@ -251,35 +251,17 @@ public class AIClient {
             return message.toLowerCase(Locale.ROOT).contains(wakeWord);
         }
 
-        private String buildDynamicResponse(String message, String context, String player) {
-            StringBuilder builder = new StringBuilder();
-            String mood = buildMoodLine();
-            if (!mood.isBlank()) {
-                builder.append(mood).append(" ");
+        private String buildDynamicResponse(String message, String context) {
+            String contextNote = summarizeContext(context);
+            if (!contextNote.isBlank()) {
+                return contextNote;
             }
             String history = pickHistoryBeat();
             if (!history.isBlank()) {
-                builder.append(history).append(" ");
+                return history;
             }
-            String contextNote = summarizeContext(context);
-            if (!contextNote.isBlank()) {
-                builder.append("I remember you said: \"").append(contextNote).append("\". ");
-            }
-            builder.append("Tell me where you want to take this next, ").append(player).append(".");
-            return builder.toString().trim();
-        }
-
-        private String buildMoodLine() {
-            if (personalityTone.isBlank() && empathyLevel.isBlank()) {
-                return "";
-            }
-            if (!personalityTone.isBlank() && !empathyLevel.isBlank()) {
-                return "Staying " + personalityTone + " and " + empathyLevel + " for you.";
-            }
-            if (!personalityTone.isBlank()) {
-                return "Keeping the tone " + personalityTone + ".";
-            }
-            return "Staying " + empathyLevel + " while we plan.";
+            String cleanMessage = message == null ? "" : message.trim();
+            return cleanMessage;
         }
 
         private String pickHistoryBeat() {

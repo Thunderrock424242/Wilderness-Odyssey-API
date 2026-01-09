@@ -2,17 +2,21 @@ package com.thunder.wildernessodysseyapi.AI.AI_story;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.Locale;
+import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * Listens for chat messages that include the Atlas wake word or otherwise look
@@ -22,6 +26,7 @@ public class AIChatListener {
 
     private static final AIClient CLIENT = new AIClient();
     private static final Set<UUID> ACTIVE_SESSIONS = ConcurrentHashMap.newKeySet();
+    private static final Queue<PendingReply> PENDING_REPLIES = new ConcurrentLinkedQueue<>();
 
     @SubscribeEvent
     public static void onChat(ServerChatEvent event) {
@@ -50,7 +55,7 @@ public class AIChatListener {
         VoiceIntegration.VoiceResult reply = CLIENT.sendMessageWithVoice(worldKey,
                 player.getName().getString(), message);
 
-        player.getServer().execute(() -> player.sendSystemMessage(Component.literal("[Atlas] " + reply.text())));
+        PENDING_REPLIES.add(new PendingReply(player.getUUID(), reply.text()));
     }
 
     @SubscribeEvent
@@ -61,6 +66,21 @@ public class AIChatListener {
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         CLIENT.scanGameData(event.getServer());
+    }
+
+    @SubscribeEvent
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (!event.hasTime() || PENDING_REPLIES.isEmpty()) {
+            return;
+        }
+        MinecraftServer server = event.getServer();
+        PendingReply pending;
+        while ((pending = PENDING_REPLIES.poll()) != null) {
+            ServerPlayer player = server.getPlayerList().getPlayer(pending.playerId());
+            if (player != null) {
+                player.sendSystemMessage(Component.literal("[Atlas] " + pending.message()));
+            }
+        }
     }
 
     private static boolean isConversational(String message) {
@@ -83,5 +103,8 @@ public class AIChatListener {
 
     private static boolean isRedWool(ItemStack stack) {
         return !stack.isEmpty() && stack.is(Items.RED_WOOL);
+    }
+
+    private record PendingReply(UUID playerId, String message) {
     }
 }
