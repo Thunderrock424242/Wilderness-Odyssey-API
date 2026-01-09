@@ -28,7 +28,7 @@ public final class SpawnBunkerPlacer {
     private static final int LAND_SEARCH_STEP = 16;
     private static final int OCEAN_BUFFER_RADIUS = 128;
     private static final int OCEAN_BUFFER_STEP = 16;
-    private static final int WATER_SAMPLE_STEP = 8;
+    private static final int WATER_SAMPLE_STEP = 4;
     private static final NBTStructurePlacer BUNKER_PLACER = new NBTStructurePlacer(
             BUNKER_ID,
             List.of(new BunkerPlacementProcessor()));
@@ -167,16 +167,25 @@ public final class SpawnBunkerPlacer {
         if (bunkerSize.getX() <= 0 || bunkerSize.getZ() <= 0) {
             return true;
         }
-        int radiusX = Math.max(1, bunkerSize.getX() / 2);
-        int radiusZ = Math.max(1, bunkerSize.getZ() / 2);
-        int baseX = surface.getX();
-        int baseZ = surface.getZ();
-        for (int dx = -radiusX; dx <= radiusX; dx += WATER_SAMPLE_STEP) {
-            for (int dz = -radiusZ; dz <= radiusZ; dz += WATER_SAMPLE_STEP) {
-                BlockPos sample = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                        new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
-                if (!level.getFluidState(sample).isEmpty()) {
-                    return false;
+        BlockPos levelingOffset = BUNKER_PLACER.peekLevelingOffset(level);
+        BlockPos origin = levelingOffset == null ? surface : surface.subtract(levelingOffset);
+        int minX = origin.getX();
+        int minZ = origin.getZ();
+        int maxX = minX + bunkerSize.getX() - 1;
+        int maxZ = minZ + bunkerSize.getZ() - 1;
+        int minY = origin.getY();
+        int maxY = origin.getY() + bunkerSize.getY() - 1;
+        int clampedMinY = Math.max(minY, level.getMinBuildHeight());
+        int clampedMaxY = Math.min(maxY, level.getMaxBuildHeight() - 1);
+
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int x = minX; x <= maxX; x += WATER_SAMPLE_STEP) {
+            for (int z = minZ; z <= maxZ; z += WATER_SAMPLE_STEP) {
+                for (int y = clampedMinY; y <= clampedMaxY; y++) {
+                    cursor.set(x, y, z);
+                    if (!level.getFluidState(cursor).isEmpty()) {
+                        return false;
+                    }
                 }
             }
         }
