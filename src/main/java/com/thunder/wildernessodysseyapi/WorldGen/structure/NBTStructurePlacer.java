@@ -661,7 +661,7 @@ public class NBTStructurePlacer {
                 continue;
             }
             for (StructureBlockInfo info : blocks) {
-                if (info.state().isAir()) {
+                if (info.state().isAir() || info.state().is(Blocks.STRUCTURE_VOID)) {
                     continue;
                 }
                 int localX = info.pos().getX();

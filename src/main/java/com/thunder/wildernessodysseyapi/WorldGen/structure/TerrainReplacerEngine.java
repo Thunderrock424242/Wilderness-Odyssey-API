@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.WorldGen.structure;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -17,6 +18,8 @@ import java.util.List;
  * Shared terrain replacement helpers used by structure placement and template processors.
  */
 public final class TerrainReplacerEngine {
+    private static final int MIN_DIRT_COLUMN = 3;
+
     private TerrainReplacerEngine() {
     }
 
@@ -138,6 +141,9 @@ public final class TerrainReplacerEngine {
                 }
 
                 SurfaceMaterial material = sampleSurfaceMaterial(level, new BlockPos(x, baseY, z));
+                if (!hasContiguousDirtColumn(level, x, z, material.surfaceY())) {
+                    continue;
+                }
                 int surfaceY = material.surfaceY();
                 if (baseY <= surfaceY + 1) {
                     continue;
@@ -158,6 +164,30 @@ public final class TerrainReplacerEngine {
         }
 
         return applied;
+    }
+
+    private static boolean hasContiguousDirtColumn(LevelReader level, int x, int z, int surfaceY) {
+        int minY = level.getMinBuildHeight();
+        int consecutive = 0;
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos(x, surfaceY, z);
+        for (int y = surfaceY; y >= minY; y--) {
+            cursor.setY(y);
+            BlockState state = level.getBlockState(cursor);
+            if (state.is(BlockTags.DIRT)) {
+                consecutive++;
+                if (consecutive >= MIN_DIRT_COLUMN) {
+                    return true;
+                }
+                continue;
+            }
+            if (state.is(Blocks.STONE) || state.is(Blocks.BEDROCK)) {
+                return false;
+            }
+            if (!state.isAir()) {
+                return false;
+            }
+        }
+        return false;
     }
 
     private static int findLowestStructureBlock(ServerLevel level, BoundingBox bounds, int x, int z) {
