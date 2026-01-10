@@ -71,11 +71,6 @@ public class WildernessOdysseyAPIMainModClass {
 
     private static final String CONFIG_FOLDER = ModConstants.MOD_ID + "/";
 
-    private Path chunkStorageRoot;
-
-    private int serverTickCounter = 0;
-    private static final int LOG_INTERVAL = 600;
-
 
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
     private final GlobalChatManager globalChatManager = GlobalChatManager.getInstance();
