@@ -187,6 +187,11 @@ public final class SpawnBunkerPlacer {
     }
 
     private static boolean isDrySurface(ServerLevel level, BlockPos surface) {
+        BlockPos worldSurface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE,
+                new BlockPos(surface.getX(), level.getMinBuildHeight(), surface.getZ()));
+        if (!level.getFluidState(worldSurface).isEmpty()) {
+            return false;
+        }
         return level.getFluidState(surface).isEmpty();
     }
 
