@@ -246,6 +246,12 @@ public class NBTStructurePlacer {
         return data == null ? Vec3i.ZERO : data.size();
     }
 
+    /** Returns the leveling marker offset when present, or {@code null} if the template lacks one. */
+    public BlockPos peekLevelingOffset(ServerLevel level) {
+        TemplateData data = load(level);
+        return data == null ? null : data.levelingOffset();
+    }
+
     private PlacementFoundation resolvePlacementOrigin(ServerLevel level, BlockPos origin, BlockPos levelingOffset) {
         if (levelingOffset == null) {
             return new PlacementFoundation(origin, null);
