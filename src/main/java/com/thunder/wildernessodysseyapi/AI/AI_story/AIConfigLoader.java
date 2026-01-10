@@ -104,9 +104,13 @@ public final class AIConfigLoader {
 
         Map<String, Object> localModel = readStringObjectMap(root.get("local_model"));
         config.getLocalModel().setEnabled(readBoolean(localModel.get("enabled")));
+        config.getLocalModel().setAutoStart(readBoolean(localModel.get("auto_start")));
         config.getLocalModel().setBaseUrl(readStringValue(localModel.get("base_url")));
         config.getLocalModel().setModel(readStringValue(localModel.get("model")));
         config.getLocalModel().setSystemPrompt(readStringValue(localModel.get("system_prompt")));
+        config.getLocalModel().setStartCommand(readStringValue(localModel.get("start_command")));
+        config.getLocalModel().setBundledServerResource(readStringValue(localModel.get("bundled_server_resource")));
+        config.getLocalModel().setBundledServerArgs(readStringValue(localModel.get("bundled_server_args")));
         config.getLocalModel().setTimeoutSeconds(readInteger(localModel.get("timeout_seconds")));
 
         return config;

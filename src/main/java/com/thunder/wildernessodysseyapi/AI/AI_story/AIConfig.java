@@ -47,9 +47,13 @@ public class AIConfig {
 
     public static class LocalModel {
         private Boolean enabled;
+        private Boolean autoStart;
         private String baseUrl;
         private String model;
         private String systemPrompt;
+        private String startCommand;
+        private String bundledServerResource;
+        private String bundledServerArgs;
         private Integer timeoutSeconds;
 
         public Boolean getEnabled() {
@@ -58,6 +62,14 @@ public class AIConfig {
 
         public void setEnabled(Boolean enabled) {
             this.enabled = enabled;
+        }
+
+        public Boolean getAutoStart() {
+            return autoStart;
+        }
+
+        public void setAutoStart(Boolean autoStart) {
+            this.autoStart = autoStart;
         }
 
         public String getBaseUrl() {
@@ -82,6 +94,30 @@ public class AIConfig {
 
         public void setSystemPrompt(String systemPrompt) {
             this.systemPrompt = systemPrompt;
+        }
+
+        public String getStartCommand() {
+            return startCommand;
+        }
+
+        public void setStartCommand(String startCommand) {
+            this.startCommand = startCommand;
+        }
+
+        public String getBundledServerResource() {
+            return bundledServerResource;
+        }
+
+        public void setBundledServerResource(String bundledServerResource) {
+            this.bundledServerResource = bundledServerResource;
+        }
+
+        public String getBundledServerArgs() {
+            return bundledServerArgs;
+        }
+
+        public void setBundledServerArgs(String bundledServerArgs) {
+            this.bundledServerArgs = bundledServerArgs;
         }
 
         public Integer getTimeoutSeconds() {
