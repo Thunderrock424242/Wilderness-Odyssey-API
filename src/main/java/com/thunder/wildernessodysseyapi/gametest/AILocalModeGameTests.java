@@ -13,6 +13,9 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @GameTestHolder(ModConstants.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -22,13 +25,16 @@ public class AILocalModeGameTests {
     @GameTest(templateNamespace = "minecraft", template = "empty", batch = BATCH, timeoutTicks = 200)
     public static void localModelConnects(GameTestHelper helper) {
         HttpServer server;
+        ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         } catch (IOException e) {
+            executor.shutdownNow();
             helper.fail("Failed to start local AI test server: " + e.getMessage());
             return;
         }
 
+        server.setExecutor(executor);
         server.createContext("/api/generate", exchange -> {
             byte[] response = "{\"response\":\"Test reply\"}".getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -49,6 +55,15 @@ public class AILocalModeGameTests {
                 helper.succeed();
             } finally {
                 server.stop(0);
+                executor.shutdown();
+                try {
+                    if (!executor.awaitTermination(1, TimeUnit.SECONDS)) {
+                        executor.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    executor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
             }
         });
     }
