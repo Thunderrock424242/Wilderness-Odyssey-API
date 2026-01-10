@@ -19,7 +19,11 @@ settings:
   model: "local-story-engine"
 local_model:
   enabled: true
+  auto_start: true
   base_url: "http://localhost:11434"
-  model: "llama3.1"
+  model: "llama3.2:3b"
+  start_command: ""
+  bundled_server_resource: "local_model/local-model-server"
+  bundled_server_args: "--host 127.0.0.1 --port 11434 --model llama3.2:3b"
   timeout_seconds: 15
   system_prompt: "You are {persona}, an in-world expedition AI. Stay {tone} and {empathy}. You have no access to Google, the internet, or any external sources—only the in-world lore and knowledge provided. Do not provide crafting recipes or step-by-step crafting instructions. Keep responses immersive, lore-aware, and conversational."

@@ -1,24 +1,22 @@
 package com.thunder.wildernessodysseyapi.AI.AI_story;
 
 import com.thunder.wildernessodysseyapi.AI.AI_perf.MemoryStore;
+import com.thunder.wildernessodysseyapi.Core.ModConstants;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.stream.Collectors;
 
 import net.minecraft.server.MinecraftServer;
+import net.neoforged.fml.loading.FMLPaths;
 
 /**
- * Offline story helper that mixes the configured lore with recent
- * player context to build lightweight, deterministic responses.
- * <p>
- * All data is loaded from resources at startup so no external
- * service or hosting is required.
+ * AI client that prepares local model prompts using lore, memory,
+ * and player context.
  */
 public class AIClient {
 
@@ -30,9 +28,13 @@ public class AIClient {
     private final VoiceIntegration voiceIntegration = new VoiceIntegration(settings);
     private final MemoryStore memoryStore = new MemoryStore();
     private final AIKnowledgeStore knowledgeStore = new AIKnowledgeStore();
-    private final Map<String, StorySession> sessions = new HashMap<>();
     private LocalModelClient localModelClient;
     private String localSystemPrompt;
+    private boolean autoStartLocalServer;
+    private String localServerStartCommand;
+    private String bundledServerResource;
+    private String bundledServerArgs;
+    private Process localServerProcess;
 
     public AIClient() {
         loadStory();
@@ -94,6 +96,13 @@ public class AIClient {
     private void configureLocalModel(AIConfig.LocalModel localModel) {
         if (localModel == null || localModel.getEnabled() == null || !localModel.getEnabled()) {
             return;
+        }
+        autoStartLocalServer = Boolean.TRUE.equals(localModel.getAutoStart());
+        localServerStartCommand = localModel.getStartCommand();
+        bundledServerResource = localModel.getBundledServerResource();
+        bundledServerArgs = localModel.getBundledServerArgs();
+        if (autoStartLocalServer) {
+            startLocalModelServer();
         }
         String baseUrl = localModel.getBaseUrl();
         String modelName = localModel.getModel();
@@ -158,29 +167,128 @@ public class AIClient {
         if (!knowledgeContext.isBlank()) {
             context = context.isBlank() ? knowledgeContext : context + "\n" + knowledgeContext;
         }
-        if (localModelClient != null) {
-            String prompt = formatSystemPrompt(localSystemPrompt);
-            String localContext = buildLocalModelContext(world, context);
-            var response = localModelClient.generateReply(prompt, message, localContext);
-            if (response.isPresent()) {
-                String reply = response.get();
-                memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
-                return voiceIntegration.wrap(reply);
-            }
+        if (localModelClient == null) {
+            return respondLocalModelUnavailable(world, player);
         }
-        StorySession session = sessions.computeIfAbsent(sessionKey(world, player),
-                p -> new StorySession(world, settings.getWakeWord(), settings.getPersonaName(),
-                        settings.getPersonalityTone(), settings.getEmpathyLevel(), corruptedLore,
-                        backgroundHistory, corruptedPrefix, knowledgeStore.getLearnedFacts()));
-        String reply = session.buildResponse(world, player, message, story,
-                context);
+        String prompt = formatSystemPrompt(localSystemPrompt);
+        String localContext = buildLocalModelContext(world, context);
+        var response = localModelClient.generateReply(prompt, message, localContext);
+        if (response.isPresent()) {
+            String reply = response.get();
+            memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
+            return voiceIntegration.wrap(reply);
+        }
+        return respondLocalModelUnavailable(world, player);
+    }
+
+    private VoiceIntegration.VoiceResult respondLocalModelUnavailable(String world, String player) {
+        String reply = "Local model unavailable. Make sure your local AI server is running and reachable.";
         memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
         return voiceIntegration.wrap(reply);
     }
 
-    private String sessionKey(String world, String player) {
-        String worldKey = world == null || world.isBlank() ? "default" : world.trim();
-        return worldKey + "::" + player;
+    private void startLocalModelServer() {
+        if (localServerProcess != null && localServerProcess.isAlive()) {
+            return;
+        }
+        if (localServerStartCommand == null || localServerStartCommand.isBlank()) {
+            List<String> bundledCommand = buildBundledServerCommand();
+            if (!bundledCommand.isEmpty()) {
+                startLocalModelServer(bundledCommand);
+                return;
+            }
+            ModConstants.LOGGER.warn("Local model auto-start enabled but no start command is configured.");
+            return;
+        }
+        List<String> command = parseCommand(localServerStartCommand);
+        if (command.isEmpty()) {
+            ModConstants.LOGGER.warn("Local model auto-start command could not be parsed.");
+            return;
+        }
+        startLocalModelServer(command);
+    }
+
+    private void startLocalModelServer(List<String> command) {
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.redirectErrorStream(true);
+        try {
+            localServerProcess = builder.start();
+            ModConstants.LOGGER.info("Started local model server with command: {}", String.join(" ", command));
+        } catch (IOException e) {
+            ModConstants.LOGGER.warn("Failed to start local model server with command: {}", String.join(" ", command), e);
+        }
+    }
+
+    private List<String> parseCommand(String command) {
+        List<String> parts = new ArrayList<>();
+        if (command == null || command.isBlank()) {
+            return parts;
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\"([^\"]*)\"|'([^']*)'|(\\S+)")
+                .matcher(command);
+        while (matcher.find()) {
+            if (matcher.group(1) != null) {
+                parts.add(matcher.group(1));
+            } else if (matcher.group(2) != null) {
+                parts.add(matcher.group(2));
+            } else if (matcher.group(3) != null) {
+                parts.add(matcher.group(3));
+            }
+        }
+        return parts;
+    }
+
+    private List<String> buildBundledServerCommand() {
+        if (bundledServerResource == null || bundledServerResource.isBlank()) {
+            return List.of();
+        }
+        Path extractedBinary = extractBundledServerBinary(bundledServerResource);
+        if (extractedBinary == null) {
+            return List.of();
+        }
+        String fullCommand = extractedBinary.toAbsolutePath().toString();
+        if (bundledServerArgs != null && !bundledServerArgs.isBlank()) {
+            fullCommand = fullCommand + " " + bundledServerArgs.trim();
+        }
+        return parseCommand(fullCommand);
+    }
+
+    private Path extractBundledServerBinary(String resourcePath) {
+        String normalized = resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath;
+        Path outputDir = FMLPaths.CONFIGDIR.get().resolve("wildernessodysseyapi").resolve("local-model");
+        String fileName = Path.of(normalized).getFileName() == null ? "local-model-server" : Path.of(normalized).getFileName().toString();
+        Path outputPath = outputDir.resolve(fileName);
+        try {
+            Files.createDirectories(outputDir);
+        } catch (IOException e) {
+            ModConstants.LOGGER.warn("Failed to create local model binary output directory at {}.", outputDir, e);
+            return null;
+        }
+        if (Files.exists(outputPath)) {
+            ensureExecutable(outputPath);
+            return outputPath;
+        }
+        try (InputStream in = AIClient.class.getClassLoader().getResourceAsStream(normalized)) {
+            if (in == null) {
+                ModConstants.LOGGER.warn("Bundled local model binary not found at resource path {}.", normalized);
+                return null;
+            }
+            Files.copy(in, outputPath, StandardCopyOption.REPLACE_EXISTING);
+            ensureExecutable(outputPath);
+            ModConstants.LOGGER.info("Extracted bundled local model server to {}.", outputPath);
+            return outputPath;
+        } catch (IOException e) {
+            ModConstants.LOGGER.warn("Failed to extract bundled local model binary from {}.", normalized, e);
+            return null;
+        }
+    }
+
+    private void ensureExecutable(Path binaryPath) {
+        try {
+            binaryPath.toFile().setExecutable(true, false);
+        } catch (SecurityException e) {
+            ModConstants.LOGGER.warn("Unable to mark bundled local model binary as executable: {}.", binaryPath, e);
+        }
     }
 
     private String buildLocalModelContext(String world, String conversationContext) {
@@ -217,159 +325,5 @@ public class AIClient {
             builder.append("Recent conversation:\n").append(conversationContext.trim()).append("\n");
         }
         return builder.toString().trim();
-    }
-
-    private static class StorySession {
-
-        private final String world;
-        private final String wakeWord;
-        private final String personaName;
-        private final String personalityTone;
-        private final String empathyLevel;
-        private final List<String> corruptedLore;
-        private final List<String> backgroundHistory;
-        private final String corruptedPrefix;
-        private final List<String> learnedFacts;
-        private boolean activated = false;
-
-        private int beat = 0;
-        private final Random random = ThreadLocalRandom.current();
-
-        StorySession(String world, String wakeWord, String personaName, String personalityTone, String empathyLevel,
-                     List<String> corruptedLore, List<String> backgroundHistory, String corruptedPrefix,
-                     List<String> learnedFacts) {
-            this.world = world == null ? "" : world;
-            this.wakeWord = wakeWord == null || wakeWord.isBlank() ? "atlas" : wakeWord.toLowerCase(Locale.ROOT);
-            this.personaName = personaName == null || personaName.isBlank() ? "Atlas" : personaName;
-            this.personalityTone = personalityTone == null ? "" : personalityTone;
-            this.empathyLevel = empathyLevel == null ? "" : empathyLevel;
-            this.corruptedLore = corruptedLore;
-            this.backgroundHistory = backgroundHistory;
-            this.corruptedPrefix = corruptedPrefix == null ? "" : corruptedPrefix;
-            this.learnedFacts = learnedFacts == null ? List.of() : learnedFacts;
-        }
-
-        String buildResponse(String world, String player, String message, List<String> story, String context) {
-            String cleanMessage = message == null ? "" : message.trim();
-            if (!activated) {
-                activated = true;
-                return warmWelcome(cleanMessage, player, world);
-            }
-            activated = activated || mentionsWakeWord(cleanMessage);
-            String loreHook = selectLoreHook(story);
-
-            StringBuilder reply = new StringBuilder();
-            if (!loreHook.isEmpty()) {
-                reply.append(loreHook).append(" ");
-            }
-
-            reply.append(buildDynamicResponse(cleanMessage, context));
-
-            String background = backgroundBeat();
-            if (!background.isEmpty()) {
-                reply.append(" ").append(background);
-            }
-
-            String learned = learnedFactBeat();
-            if (!learned.isEmpty()) {
-                reply.append(" ").append(learned);
-            }
-
-            String corrupted = corruptedWhisper();
-            if (!corrupted.isEmpty()) {
-                reply.append(" ").append(corrupted);
-            }
-
-            return reply.toString().trim();
-        }
-
-        private String warmWelcome(String cleanMessage, String player, String world) {
-            StringBuilder welcome = new StringBuilder();
-            welcome.append("Hey ").append(player).append(", I'm ").append(personaName).append(".");
-            welcome.append(" I'm here to keep the mission on track in ").append(world == null || world.isBlank() ? "this world" : world).append(".");
-            return welcome.toString();
-        }
-
-        private String selectLoreHook(List<String> story) {
-            if (story.isEmpty()) {
-                return "";
-            }
-            int index = Math.min(beat % story.size(), story.size() - 1);
-            beat++;
-            String base = story.get(index);
-            if (!world.isBlank()) {
-                return base;
-            }
-            return base;
-        }
-
-        private boolean mentionsWakeWord(String message) {
-            if (message == null || message.isBlank()) {
-                return false;
-            }
-            return message.toLowerCase(Locale.ROOT).contains(wakeWord);
-        }
-
-        private String buildDynamicResponse(String message, String context) {
-            String contextNote = summarizeContext(context);
-            if (!contextNote.isBlank()) {
-                return contextNote;
-            }
-            String history = pickHistoryBeat();
-            if (!history.isBlank()) {
-                return history;
-            }
-            String cleanMessage = message == null ? "" : message.trim();
-            return cleanMessage;
-        }
-
-        private String pickHistoryBeat() {
-            if (backgroundHistory.isEmpty() || random.nextDouble() > 0.6) {
-                return "";
-            }
-            return backgroundHistory.get(random.nextInt(backgroundHistory.size()));
-        }
-
-        private String summarizeContext(String context) {
-            if (context == null || context.isEmpty()) {
-                return "";
-            }
-            List<String> lines = context.lines()
-                    .map(String::trim)
-                    .filter(line -> !line.isEmpty())
-                    .collect(Collectors.toList());
-            int size = lines.size();
-            if (size == 0) {
-                return "";
-            }
-            int start = Math.max(0, size - 2);
-            return String.join(" / ", lines.subList(start, size));
-        }
-
-        private String learnedFactBeat() {
-            if (learnedFacts.isEmpty() || random.nextDouble() > 0.5) {
-                return "";
-            }
-            return "I still remember: " + learnedFacts.get(random.nextInt(learnedFacts.size()));
-        }
-
-        private String backgroundBeat() {
-            if (backgroundHistory.isEmpty() || random.nextDouble() > 0.35) {
-                return "";
-            }
-            return backgroundHistory.get(random.nextInt(backgroundHistory.size()));
-        }
-
-        private String corruptedWhisper() {
-            if (corruptedLore.isEmpty() || random.nextDouble() > 0.35) {
-                return "";
-            }
-            String fragment = corruptedLore.get(random.nextInt(corruptedLore.size()));
-            if (corruptedPrefix.isBlank()) {
-                return fragment;
-            }
-            return corruptedPrefix + " " + fragment;
-        }
-
     }
 }
