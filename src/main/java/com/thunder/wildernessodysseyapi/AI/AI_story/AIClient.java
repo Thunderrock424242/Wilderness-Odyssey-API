@@ -35,6 +35,8 @@ public class AIClient {
     private String bundledServerResource;
     private String bundledServerArgs;
     private Process localServerProcess;
+    private String localModelBaseUrl;
+    private String localModelName;
 
     public AIClient() {
         loadStory();
@@ -103,15 +105,18 @@ public class AIClient {
         bundledServerArgs = localModel.getBundledServerArgs();
         if (autoStartLocalServer) {
             startLocalModelServer();
+            stopLocalModelServer();
         }
         String baseUrl = localModel.getBaseUrl();
         String modelName = localModel.getModel();
         if (baseUrl == null || baseUrl.isBlank() || modelName == null || modelName.isBlank()) {
             return;
         }
+        localModelBaseUrl = baseUrl.trim();
+        localModelName = modelName.trim();
         int timeoutSeconds = localModel.getTimeoutSeconds() == null ? 15 : localModel.getTimeoutSeconds();
         localSystemPrompt = localModel.getSystemPrompt();
-        localModelClient = new LocalModelClient(baseUrl.trim(), modelName.trim(), java.time.Duration.ofSeconds(timeoutSeconds));
+        localModelClient = new LocalModelClient(localModelBaseUrl, localModelName, java.time.Duration.ofSeconds(timeoutSeconds));
     }
 
     private String formatSystemPrompt(String template) {
@@ -168,27 +173,95 @@ public class AIClient {
             context = context.isBlank() ? knowledgeContext : context + "\n" + knowledgeContext;
         }
         if (localModelClient == null) {
-            return respondLocalModelUnavailable(world, player);
+            return respondLocalModelUnavailable(world, player, false);
         }
         String prompt = formatSystemPrompt(localSystemPrompt);
         String localContext = buildLocalModelContext(world, context);
+        ensureLocalServerStarted();
         var response = localModelClient.generateReply(prompt, message, localContext);
         if (response.isPresent()) {
             String reply = response.get();
             memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
+            stopLocalModelServerIfNeeded();
             return voiceIntegration.wrap(reply);
         }
-        return respondLocalModelUnavailable(world, player);
+        response = retryLocalModelAfterStart(prompt, message, localContext);
+        if (response.isPresent()) {
+            String reply = response.get();
+            memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
+            stopLocalModelServerIfNeeded();
+            return voiceIntegration.wrap(reply);
+        }
+        stopLocalModelServerIfNeeded();
+        return respondLocalModelUnavailable(world, player, autoStartLocalServer);
     }
 
-    private VoiceIntegration.VoiceResult respondLocalModelUnavailable(String world, String player) {
-        String reply = "Local model unavailable. Make sure your local AI server is running and reachable.";
+    private VoiceIntegration.VoiceResult respondLocalModelUnavailable(String world, String player, boolean startAttempted) {
+        String reply = buildLocalModelUnavailableMessage(startAttempted);
         memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
         return voiceIntegration.wrap(reply);
     }
 
+    private String buildLocalModelUnavailableMessage(boolean startAttempted) {
+        StringBuilder reply = new StringBuilder("Local model unavailable");
+        if (localModelBaseUrl != null && !localModelBaseUrl.isBlank()) {
+            reply.append(" at ").append(localModelBaseUrl);
+        }
+        reply.append(".");
+        if (startAttempted) {
+            reply.append(" Tried to start the local AI server");
+            if (localServerStartCommand != null && !localServerStartCommand.isBlank()) {
+                reply.append(" using: ").append(localServerStartCommand);
+            } else if (bundledServerResource != null && !bundledServerResource.isBlank()) {
+                reply.append(" using the bundled server");
+            } else {
+                reply.append(", but no start command is configured");
+            }
+            reply.append(".");
+        } else {
+            reply.append(" Make sure your local AI server is running and reachable.");
+        }
+        if (localModelName != null && !localModelName.isBlank()) {
+            reply.append(" Model: ").append(localModelName).append(".");
+        }
+        return reply.toString();
+    }
+
+    private boolean isLocalServerRunning() {
+        return localServerProcess != null && localServerProcess.isAlive();
+    }
+
+    private void ensureLocalServerStarted() {
+        if (autoStartLocalServer && !isLocalServerRunning()) {
+            startLocalModelServer();
+        }
+    }
+
+    private java.util.Optional<String> retryLocalModelAfterStart(String prompt, String message, String localContext) {
+        if (!autoStartLocalServer || isLocalServerRunning()) {
+            return java.util.Optional.empty();
+        }
+        startLocalModelServer();
+        return localModelClient.generateReply(prompt, message, localContext);
+    }
+
+    private void stopLocalModelServerIfNeeded() {
+        if (!autoStartLocalServer) {
+            return;
+        }
+        stopLocalModelServer();
+    }
+
+    private void stopLocalModelServer() {
+        if (localServerProcess == null) {
+            return;
+        }
+        localServerProcess.destroy();
+        localServerProcess = null;
+    }
+
     private void startLocalModelServer() {
-        if (localServerProcess != null && localServerProcess.isAlive()) {
+        if (isLocalServerRunning()) {
             return;
         }
         if (localServerStartCommand == null || localServerStartCommand.isBlank()) {
