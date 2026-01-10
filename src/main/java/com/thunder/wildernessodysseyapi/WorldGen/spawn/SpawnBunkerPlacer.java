@@ -6,8 +6,11 @@ import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureSpawnGuard;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.core.Vec3i;
@@ -16,6 +19,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Places the starter bunker during world creation using vanilla structure templates rather than WorldEdit
@@ -29,6 +33,19 @@ public final class SpawnBunkerPlacer {
     private static final int OCEAN_BUFFER_RADIUS = 128;
     private static final int OCEAN_BUFFER_STEP = 16;
     private static final int WATER_SAMPLE_STEP = 4;
+    private static final Set<ResourceKey<Biome>> WHITELISTED_SPAWN_BIOMES = Set.of(
+            Biomes.PLAINS);
+    private static final Set<ResourceKey<Biome>> BLACKLISTED_SPAWN_BIOMES = Set.of(
+            Biomes.OCEAN,
+            Biomes.DEEP_OCEAN,
+            Biomes.COLD_OCEAN,
+            Biomes.DEEP_COLD_OCEAN,
+            Biomes.LUKEWARM_OCEAN,
+            Biomes.DEEP_LUKEWARM_OCEAN,
+            Biomes.WARM_OCEAN,
+            Biomes.FROZEN_OCEAN,
+            Biomes.DEEP_FROZEN_OCEAN,
+            Biomes.RIVER);
     private static final NBTStructurePlacer BUNKER_PLACER = new NBTStructurePlacer(
             BUNKER_ID,
             List.of(new BunkerPlacementProcessor()));
@@ -128,7 +145,32 @@ public final class SpawnBunkerPlacer {
     }
 
     private static boolean isLandBiome(ServerLevel level, BlockPos pos) {
+        if (!isAllowedBiome(level, pos)) {
+            return false;
+        }
         return !level.getBiome(pos).is(BiomeTags.IS_OCEAN);
+    }
+
+    private static boolean isAllowedBiome(ServerLevel level, BlockPos pos) {
+        var biome = level.getBiome(pos);
+        if (!WHITELISTED_SPAWN_BIOMES.isEmpty()) {
+            boolean whitelisted = false;
+            for (ResourceKey<Biome> key : WHITELISTED_SPAWN_BIOMES) {
+                if (biome.is(key)) {
+                    whitelisted = true;
+                    break;
+                }
+            }
+            if (!whitelisted) {
+                return false;
+            }
+        }
+        for (ResourceKey<Biome> key : BLACKLISTED_SPAWN_BIOMES) {
+            if (biome.is(key)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isViableAnchor(ServerLevel level, BlockPos surface, Vec3i bunkerSize) {
