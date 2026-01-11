@@ -187,6 +187,11 @@ public final class SpawnBunkerPlacer {
     }
 
     private static boolean isDrySurface(ServerLevel level, BlockPos surface) {
+        BlockPos worldSurface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE,
+                new BlockPos(surface.getX(), level.getMinBuildHeight(), surface.getZ()));
+        if (!level.getFluidState(worldSurface).isEmpty()) {
+            return false;
+        }
         return level.getFluidState(surface).isEmpty();
     }
 
@@ -197,7 +202,10 @@ public final class SpawnBunkerPlacer {
             for (int dz = -radius; dz <= radius; dz += step) {
                 BlockPos sample = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                         new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
-                if (level.getBiome(sample).is(BiomeTags.IS_OCEAN)) {
+                BlockPos surfaceSample = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE,
+                        new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
+                if (!level.getFluidState(surfaceSample).isEmpty()
+                        || level.getBiome(sample).is(BiomeTags.IS_OCEAN)) {
                     return true;
                 }
             }
