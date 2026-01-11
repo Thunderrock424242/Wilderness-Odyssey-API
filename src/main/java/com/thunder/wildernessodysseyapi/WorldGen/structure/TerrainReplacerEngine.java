@@ -96,7 +96,11 @@ public final class TerrainReplacerEngine {
     /**
      * Collects replacement blocks for each offset if terrain replacement is enabled.
      */
-    public static TerrainReplacementPlan planReplacement(ServerLevel level, BlockPos origin, List<BlockPos> offsets, boolean enabled) {
+    public static TerrainReplacementPlan planReplacement(ServerLevel level,
+                                                         BlockPos origin,
+                                                         List<BlockPos> offsets,
+                                                         boolean enabled,
+                                                         BoundingBox bounds) {
         if (!enabled || offsets.isEmpty()) {
             return TerrainReplacementPlan.disabled();
         }
@@ -104,11 +108,24 @@ public final class TerrainReplacerEngine {
         List<BlockState> sampled = new ArrayList<>(offsets.size());
         for (BlockPos offset : offsets) {
             BlockPos worldPos = origin.offset(offset);
-            SurfaceMaterial material = sampleSurfaceMaterial(level, worldPos);
+            SurfaceMaterial material = sampleSurfaceMaterialOutsideBounds(level, worldPos, bounds);
             sampled.add(chooseReplacement(material, worldPos.getY()));
         }
 
         return new TerrainReplacementPlan(true, Collections.unmodifiableList(sampled));
+    }
+
+    /**
+     * Samples the surface material outside a structure's bounds, falling back to the target position when
+     * the target is already outside the bounding box or the bounds are unavailable.
+     */
+    public static SurfaceMaterial sampleSurfaceMaterialOutsideBounds(LevelReader level, BlockPos target, BoundingBox bounds) {
+        if (bounds == null || !bounds.isInside(target)) {
+            return sampleSurfaceMaterial(level, target);
+        }
+
+        BlockPos outside = pushOutsideBounds(target, bounds);
+        return sampleSurfaceMaterial(level, outside);
     }
 
     /**
@@ -222,6 +239,29 @@ public final class TerrainReplacerEngine {
                 bounds.maxY(),
                 bounds.maxZ() + radius
         );
+    }
+
+    private static BlockPos pushOutsideBounds(BlockPos target, BoundingBox bounds) {
+        int dxMin = target.getX() - bounds.minX();
+        int dxMax = bounds.maxX() - target.getX();
+        int dzMin = target.getZ() - bounds.minZ();
+        int dzMax = bounds.maxZ() - target.getZ();
+
+        int minDistance = Math.min(Math.min(dxMin, dxMax), Math.min(dzMin, dzMax));
+        int x = target.getX();
+        int z = target.getZ();
+
+        if (minDistance == dxMin) {
+            x = bounds.minX() - 1;
+        } else if (minDistance == dxMax) {
+            x = bounds.maxX() + 1;
+        } else if (minDistance == dzMin) {
+            z = bounds.minZ() - 1;
+        } else {
+            z = bounds.maxZ() + 1;
+        }
+
+        return new BlockPos(x, target.getY(), z);
     }
 
     private static int clamp(int value, int min, int max) {
