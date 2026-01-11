@@ -8,6 +8,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessor;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessorType;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
@@ -46,7 +47,8 @@ public class TerrainSurveyProcessor extends StructureProcessor {
         }
 
         if (state.is(TerrainReplacerBlock.TERRAIN_REPLACER.get())) {
-            var material = TerrainReplacerEngine.sampleSurfaceMaterial(level, placed.pos());
+            BoundingBox bounds = settings.getBoundingBox();
+            var material = TerrainReplacerEngine.sampleSurfaceMaterialOutsideBounds(level, placed.pos(), bounds);
             BlockState sampled = TerrainReplacerEngine.chooseReplacement(material, placed.pos().getY());
             return new StructureTemplate.StructureBlockInfo(placed.pos(), sampled, placed.nbt());
         }

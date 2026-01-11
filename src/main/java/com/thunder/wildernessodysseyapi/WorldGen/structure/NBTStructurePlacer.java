@@ -160,9 +160,10 @@ public class NBTStructurePlacer {
                     id, estimated, StructureUtils.STRUCTURE_BLOCK_LIMIT);
         }
 
+        BoundingBox placementBox = expandPlacementBox(foundation.origin(), data.size(), data.template());
         boolean enableTerrainReplacer = shouldEnableTerrainReplacer(data);
         TerrainReplacementPlan replacementPlan = TerrainReplacerEngine.planReplacement(
-                level, foundation.origin(), data.terrainOffsets(), enableTerrainReplacer);
+                level, foundation.origin(), data.terrainOffsets(), enableTerrainReplacer, placementBox);
         if (!replacementPlan.enabled() && !data.terrainOffsets().isEmpty()) {
             if (!StructureConfig.ENABLE_TERRAIN_REPLACER.get()) {
                 ModConstants.LOGGER.info("Terrain replacer markers are present in {} but replacement is disabled via config.", id);
@@ -172,8 +173,6 @@ public class NBTStructurePlacer {
                 ModConstants.LOGGER.info("Terrain replacer markers are present in {} but replacement is disabled due to template safety checks.", id);
             }
         }
-
-        BoundingBox placementBox = expandPlacementBox(foundation.origin(), data.size(), data.template());
 
         StructurePlaceSettings settings = new StructurePlaceSettings()
                 // We already know the template dimensions, so skip the expensive shape discovery pass.
