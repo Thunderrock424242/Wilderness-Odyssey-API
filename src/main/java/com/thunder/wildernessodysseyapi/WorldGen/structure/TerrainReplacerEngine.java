@@ -149,6 +149,9 @@ public final class TerrainReplacerEngine {
         BoundingBox outerBounds = expandBounds(bounds, radius);
         for (int x = outerBounds.minX(); x <= outerBounds.maxX(); x++) {
             for (int z = outerBounds.minZ(); z <= outerBounds.maxZ(); z++) {
+                if (bounds.isInside(new BlockPos(x, bounds.minY(), z))) {
+                    continue;
+                }
                 if (!mask.allows(x, z)) {
                     continue;
                 }
