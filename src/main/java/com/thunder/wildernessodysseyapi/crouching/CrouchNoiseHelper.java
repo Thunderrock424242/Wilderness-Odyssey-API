@@ -52,9 +52,6 @@ public final class CrouchNoiseHelper {
     }
 
     private static boolean isSilenced(ItemStack stack) {
-        if (!stack.hasTag()) {
-            return false;
-        }
         CompoundTag tag = stack.getTag();
         return tag != null && tag.getBoolean(SILENT_ARMOR_TAG);
     }
