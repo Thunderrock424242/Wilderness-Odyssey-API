@@ -1,11 +1,12 @@
 package com.thunder.wildernessodysseyapi.crouching;
 
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.CustomData;
 
 public final class CrouchNoiseHelper {
     public static final String SILENT_ARMOR_TAG = "wildernessodysseyapi:silent_armor";
@@ -52,7 +53,7 @@ public final class CrouchNoiseHelper {
     }
 
     private static boolean isSilenced(ItemStack stack) {
-        CompoundTag tag = stack.getTag();
-        return tag != null && tag.getBoolean(SILENT_ARMOR_TAG);
+        CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
+        return customData != null && customData.copyTag().getBoolean(SILENT_ARMOR_TAG);
     }
 }
