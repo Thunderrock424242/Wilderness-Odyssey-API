@@ -25,9 +25,11 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.tags.BlockTags;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.BitSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -178,6 +180,10 @@ public class NBTStructurePlacer {
             return null;
         }
 
+        if (isStarterBunker()) {
+            clearTerrainInsideStructure(level, foundation.origin(), data.size(), data.template());
+        }
+
         int autoBlended = 0;
         if (StructureConfig.ENABLE_AUTO_TERRAIN_BLEND.get()) {
             int maxDepth = StructureConfig.AUTO_TERRAIN_BLEND_MAX_DEPTH.get();
@@ -189,12 +195,9 @@ public class NBTStructurePlacer {
             autoBlended = TerrainReplacerEngine.applyAutoBlend(level, placementBox, maxDepth, radius, mask);
         }
 
-        if (data.levelingOffset() != null && foundation.levelingReplacement() != null && !isStarterBunker()) {
+        if (data.levelingOffset() != null && foundation.levelingReplacement() != null) {
             BlockPos markerWorldPos = foundation.origin().offset(data.levelingOffset());
-            BlockState markerReplacement = foundation.levelingReplacement();
-            if (shouldForceDirtLayer(data.levelingOffset())) {
-                markerReplacement = Blocks.DIRT.defaultBlockState();
-            }
+            BlockState markerReplacement = normalizeLevelingReplacement(foundation.levelingReplacement());
             level.setBlock(markerWorldPos, markerReplacement, 2);
         }
 
@@ -520,8 +523,14 @@ public class NBTStructurePlacer {
         return expanded;
     }
 
-    private boolean shouldForceDirtLayer(BlockPos levelingOffset) {
-        return levelingOffset != null && isStarterBunker();
+    private BlockState normalizeLevelingReplacement(BlockState replacement) {
+        if (replacement == null) {
+            return Blocks.GRASS_BLOCK.defaultBlockState();
+        }
+        if (replacement.is(BlockTags.DIRT)) {
+            return Blocks.GRASS_BLOCK.defaultBlockState();
+        }
+        return replacement;
     }
 
     private boolean isStarterBunker() {
@@ -624,5 +633,66 @@ public class NBTStructurePlacer {
             ModConstants.LOGGER.warn("Unable to locate structure palette block list for {}; auto-blend masking will be skipped.", id);
         }
         return List.of();
+    }
+
+    private void clearTerrainInsideStructure(ServerLevel level, BlockPos origin, Vec3i size, StructureTemplate template) {
+        if (!(template instanceof StructureTemplateAccessor accessor)) {
+            return;
+        }
+        int sizeX = size.getX();
+        int sizeY = size.getY();
+        int sizeZ = size.getZ();
+        if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) {
+            return;
+        }
+
+        int volume = sizeX * sizeY * sizeZ;
+        BitSet occupied = new BitSet(volume);
+        for (StructureTemplate.Palette palette : accessor.getPalettes()) {
+            List<StructureBlockInfo> blocks = resolvePaletteBlocks(palette);
+            if (blocks.isEmpty()) {
+                continue;
+            }
+            for (StructureBlockInfo info : blocks) {
+                BlockState state = info.state();
+                if (state.isAir() || state.is(Blocks.STRUCTURE_VOID)) {
+                    continue;
+                }
+                BlockPos pos = info.pos();
+                int x = pos.getX();
+                int y = pos.getY();
+                int z = pos.getZ();
+                if (x < 0 || x >= sizeX || y < 0 || y >= sizeY || z < 0 || z >= sizeZ) {
+                    continue;
+                }
+                int index = x + sizeX * (y + sizeY * z);
+                occupied.set(index);
+            }
+        }
+
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int x = 0; x < sizeX; x++) {
+            for (int y = 0; y < sizeY; y++) {
+                for (int z = 0; z < sizeZ; z++) {
+                    int index = x + sizeX * (y + sizeY * z);
+                    if (occupied.get(index)) {
+                        continue;
+                    }
+                    cursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
+                    BlockState existing = level.getBlockState(cursor);
+                    if (!isTerrainBlock(existing)) {
+                        continue;
+                    }
+                    level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
+                }
+            }
+        }
+    }
+
+    private boolean isTerrainBlock(BlockState state) {
+        return state.is(BlockTags.DIRT)
+                || state.is(BlockTags.SAND)
+                || state.is(BlockTags.BASE_STONE_OVERWORLD)
+                || state.is(Blocks.GRAVEL);
     }
 }
