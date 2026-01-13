@@ -26,6 +26,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.phys.AABB;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -194,7 +195,7 @@ public class NBTStructurePlacer {
         }
 
         int replaced = applyTerrainReplacement(level, foundation.origin(), data.terrainOffsets(),
-                replacementPlan, data.levelingOffset());
+                replacementPlan, data.levelingOffset(), placementBox);
         int autoBlended = 0;
         if (replaced == 0
                 && data.terrainOffsets().isEmpty()
@@ -335,7 +336,8 @@ public class NBTStructurePlacer {
                                         BlockPos origin,
                                         List<BlockPos> offsets,
                                         TerrainReplacementPlan plan,
-                                        BlockPos levelingOffset) {
+                                        BlockPos levelingOffset,
+                                        BoundingBox bounds) {
         if (!plan.enabled()) {
             return 0;
         }
@@ -366,12 +368,29 @@ public class NBTStructurePlacer {
             if (surfaceSample.y() != worldPos.getY()) {
                 continue;
             }
+            if (isInteriorToBounds(bounds, worldPos)) {
+                level.setBlock(worldPos, Blocks.AIR.defaultBlockState(), 2);
+                applied++;
+                continue;
+            }
             BlockState replacement = plan.samples().get(i);
             level.setBlock(worldPos, replacement, 2);
             applied++;
         }
 
         return applied;
+    }
+
+    private boolean isInteriorToBounds(@Nullable BoundingBox bounds, BlockPos worldPos) {
+        if (bounds == null) {
+            return false;
+        }
+        return worldPos.getX() > bounds.minX()
+                && worldPos.getX() < bounds.maxX()
+                && worldPos.getY() > bounds.minY()
+                && worldPos.getY() < bounds.maxY()
+                && worldPos.getZ() > bounds.minZ()
+                && worldPos.getZ() < bounds.maxZ();
     }
 
     /**
@@ -654,6 +673,7 @@ public class NBTStructurePlacer {
         Arrays.fill(lowestY, Integer.MAX_VALUE);
 
         boolean foundBlocks = false;
+        int globalMinY = Integer.MAX_VALUE;
         for (StructureTemplate.Palette palette : accessor.getPalettes()) {
             List<StructureBlockInfo> blocks = resolvePaletteBlocks(palette);
             if (blocks.isEmpty()) {
@@ -669,19 +689,21 @@ public class NBTStructurePlacer {
                     continue;
                 }
                 int index = localX + (localZ * sizeX);
-                lowestY[index] = Math.min(lowestY[index], info.pos().getY());
+                int blockY = info.pos().getY();
+                lowestY[index] = Math.min(lowestY[index], blockY);
+                globalMinY = Math.min(globalMinY, blockY);
                 foundBlocks = true;
             }
         }
 
-        if (!foundBlocks) {
+        if (!foundBlocks || globalMinY == Integer.MAX_VALUE) {
             return TerrainReplacerEngine.AutoBlendMask.allowAll();
         }
 
         boolean[] supported = new boolean[sizeX * sizeZ];
         boolean anySupported = false;
         for (int i = 0; i < lowestY.length; i++) {
-            if (lowestY[i] == 0) {
+            if (lowestY[i] != Integer.MAX_VALUE && lowestY[i] == globalMinY) {
                 supported[i] = true;
                 anySupported = true;
             }

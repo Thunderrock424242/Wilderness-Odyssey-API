@@ -48,11 +48,26 @@ public class TerrainSurveyProcessor extends StructureProcessor {
 
         if (state.is(TerrainReplacerBlock.TERRAIN_REPLACER.get())) {
             BoundingBox bounds = settings.getBoundingBox();
+            if (isInteriorToBounds(bounds, placed.pos())) {
+                return new StructureTemplate.StructureBlockInfo(placed.pos(), Blocks.AIR.defaultBlockState(), placed.nbt());
+            }
             var material = TerrainReplacerEngine.sampleSurfaceMaterialOutsideBounds(level, placed.pos(), bounds);
             BlockState sampled = TerrainReplacerEngine.chooseReplacement(material, placed.pos().getY());
             return new StructureTemplate.StructureBlockInfo(placed.pos(), sampled, placed.nbt());
         }
 
         return placed;
+    }
+
+    private boolean isInteriorToBounds(BoundingBox bounds, BlockPos worldPos) {
+        if (bounds == null) {
+            return false;
+        }
+        return worldPos.getX() > bounds.minX()
+                && worldPos.getX() < bounds.maxX()
+                && worldPos.getY() > bounds.minY()
+                && worldPos.getY() < bounds.maxY()
+                && worldPos.getZ() > bounds.minZ()
+                && worldPos.getZ() < bounds.maxZ();
     }
 }
