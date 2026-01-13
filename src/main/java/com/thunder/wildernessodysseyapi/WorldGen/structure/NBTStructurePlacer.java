@@ -4,7 +4,6 @@ import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StructurePlacementDebugger.PlacementAttempt;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine.SurfaceSample;
-import com.thunder.wildernessodysseyapi.WorldGen.structure.TerrainReplacerEngine.TerrainReplacementPlan;
 import com.thunder.wildernessodysseyapi.mixin.StructureTemplateAccessor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
@@ -26,7 +25,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.phys.AABB;
-import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -40,7 +38,6 @@ import net.neoforged.fml.ModList;
  * Places vanilla structure templates loaded from NBT files and exposes metadata used by the mod.
  */
 public class NBTStructurePlacer {
-    private static final String TERRAIN_REPLACER_NAME = "wildernessodysseyapi:terrain_replacer";
     private static final String CRYO_TUBE_NAME = "wildernessodysseyapi:cryo_tube";
     private static final String CREATE_ELEVATOR_PULLEY_NAME = "create:elevator_pulley";
     private static final String LEVELING_MARKER_NAME =
@@ -162,19 +159,6 @@ public class NBTStructurePlacer {
         }
 
         BoundingBox placementBox = expandPlacementBox(foundation.origin(), data.size(), data.template());
-        boolean enableTerrainReplacer = shouldEnableTerrainReplacer(data);
-        TerrainReplacementPlan replacementPlan = TerrainReplacerEngine.planReplacement(
-                level, foundation.origin(), data.terrainOffsets(), enableTerrainReplacer, placementBox);
-        if (!replacementPlan.enabled() && !data.terrainOffsets().isEmpty()) {
-            if (!StructureConfig.ENABLE_TERRAIN_REPLACER.get()) {
-                ModConstants.LOGGER.info("Terrain replacer markers are present in {} but replacement is disabled via config.", id);
-            } else if (!data.hasMarkerWool()) {
-                ModConstants.LOGGER.info("Terrain replacer markers are present in {} but no wool markers were found; skipping replacement.", id);
-            } else {
-                ModConstants.LOGGER.info("Terrain replacer markers are present in {} but replacement is disabled due to template safety checks.", id);
-            }
-        }
-
         StructurePlaceSettings settings = new StructurePlaceSettings()
                 // We already know the template dimensions, so skip the expensive shape discovery pass.
                 .setKnownShape(true)
@@ -194,12 +178,8 @@ public class NBTStructurePlacer {
             return null;
         }
 
-        int replaced = applyTerrainReplacement(level, foundation.origin(), data.terrainOffsets(),
-                replacementPlan, data.levelingOffset(), placementBox);
         int autoBlended = 0;
-        if (replaced == 0
-                && data.terrainOffsets().isEmpty()
-                && StructureConfig.ENABLE_AUTO_TERRAIN_BLEND.get()) {
+        if (StructureConfig.ENABLE_AUTO_TERRAIN_BLEND.get()) {
             int maxDepth = StructureConfig.AUTO_TERRAIN_BLEND_MAX_DEPTH.get();
             int radius = resolveAutoBlendRadius(data.size());
             TerrainReplacerEngine.AutoBlendMask mask = TerrainReplacerEngine.AutoBlendMask.allowAll();
@@ -229,8 +209,8 @@ public class NBTStructurePlacer {
                 .toList();
 
         StructurePlacementDebugger.markSuccess(attempt,
-                "placed with %s terrain samples, %s auto-blended blocks, and %s cryo tubes"
-                        .formatted(replaced, autoBlended, cryoPositions.size()));
+                "placed with %s auto-blended blocks and %s cryo tubes"
+                        .formatted(autoBlended, cryoPositions.size()));
 
         return new PlacementResult(foundation.origin(), bounds, cryoPositions, List.copyOf(chunkSlices));
     }
@@ -325,73 +305,6 @@ public class NBTStructurePlacer {
         return new PlacementFoundation(placementOrigin, sample.state());
     }
 
-    private boolean shouldEnableTerrainReplacer(TemplateData data) {
-        return StructureConfig.ENABLE_TERRAIN_REPLACER.get()
-                && !isStarterBunker()
-                && !data.disableTerrainReplacement()
-                && data.hasMarkerWool();
-    }
-
-    private int applyTerrainReplacement(ServerLevel level,
-                                        BlockPos origin,
-                                        List<BlockPos> offsets,
-                                        TerrainReplacementPlan plan,
-                                        BlockPos levelingOffset,
-                                        BoundingBox bounds) {
-        if (!plan.enabled()) {
-            return 0;
-        }
-
-        boolean forceDirtLayer = shouldForceDirtLayer(levelingOffset);
-        int dirtLayerY = forceDirtLayer ? levelingOffset.getY() : Integer.MIN_VALUE;
-        int applied = 0;
-        for (int i = 0; i < offsets.size() && i < plan.samples().size(); i++) {
-            BlockPos offset = offsets.get(i);
-            if (forceDirtLayer && offset.getY() != dirtLayerY) {
-                continue;
-            }
-            BlockPos worldPos = origin.offset(offset);
-            BlockState existing = level.getBlockState(worldPos);
-            if (existing.isAir()) {
-                continue;
-            }
-            if (forceDirtLayer) {
-                SurfaceSample sample = TerrainReplacerEngine.sampleSurface(level, worldPos);
-                if (sample.y() != worldPos.getY()) {
-                    continue;
-                }
-                level.setBlock(worldPos, Blocks.DIRT.defaultBlockState(), 2);
-                applied++;
-                continue;
-            }
-            SurfaceSample surfaceSample = TerrainReplacerEngine.sampleSurface(level, worldPos);
-            if (surfaceSample.y() != worldPos.getY()) {
-                continue;
-            }
-            if (isInteriorToBounds(bounds, worldPos)) {
-                level.setBlock(worldPos, Blocks.AIR.defaultBlockState(), 2);
-                applied++;
-                continue;
-            }
-            BlockState replacement = plan.samples().get(i);
-            level.setBlock(worldPos, replacement, 2);
-            applied++;
-        }
-
-        return applied;
-    }
-
-    private boolean isInteriorToBounds(@Nullable BoundingBox bounds, BlockPos worldPos) {
-        if (bounds == null) {
-            return false;
-        }
-        return worldPos.getX() > bounds.minX()
-                && worldPos.getX() < bounds.maxX()
-                && worldPos.getY() > bounds.minY()
-                && worldPos.getY() < bounds.maxY()
-                && worldPos.getZ() > bounds.minZ()
-                && worldPos.getZ() < bounds.maxZ();
-    }
 
     /**
      * Returns the relative cryo tube offsets defined by the structure.
@@ -418,20 +331,17 @@ public class NBTStructurePlacer {
         }
 
         List<BlockPos> cryoOffsets = new ArrayList<>();
-        List<BlockPos> terrainOffsets = new ArrayList<>();
         List<BlockPos> elevatorPulleyOffsets = new ArrayList<>();
         BlockPos levelingOffset = null;
         Vec3i size = template.getSize();
 
-        CollectionResult collectionResult = collectOffsets(template, cryoOffsets, terrainOffsets, elevatorPulleyOffsets, size);
-        boolean disableTerrainReplacement = collectionResult.disableTerrainReplacement();
+        CollectionResult collectionResult = collectOffsets(template, cryoOffsets, elevatorPulleyOffsets, size);
         boolean hasStructureBlocks = collectionResult.hasStructureBlocks();
         LevelingMarkerData levelingData = findLevelingMarker(template);
         levelingOffset = levelingData.offset();
 
-        TemplateData data = new TemplateData(template, List.copyOf(cryoOffsets), List.copyOf(terrainOffsets),
-                List.copyOf(elevatorPulleyOffsets), size, levelingOffset, disableTerrainReplacement,
-                levelingData.present(), hasStructureBlocks);
+        TemplateData data = new TemplateData(template, List.copyOf(cryoOffsets),
+                List.copyOf(elevatorPulleyOffsets), size, levelingOffset, hasStructureBlocks);
 
         // Do not cache empty templates so that later placement attempts can retry once resources finish loading.
         // The GameTest server asks for the bunker extremely early during startup, before data packs have been
@@ -478,40 +388,26 @@ public class NBTStructurePlacer {
 
     private record TemplateData(StructureTemplate template,
                                 List<BlockPos> cryoOffsets,
-                                List<BlockPos> terrainOffsets,
                                 List<BlockPos> elevatorPulleyOffsets,
                                 Vec3i size,
                                 BlockPos levelingOffset,
-                                boolean disableTerrainReplacement,
-                                boolean hasMarkerWool,
                                 boolean hasStructureBlocks) {}
 
-    private record CollectionResult(boolean disableTerrainReplacement, boolean hasStructureBlocks) {}
+    private record CollectionResult(boolean hasStructureBlocks) {}
 
     private record LevelingMarkerData(BlockPos offset, boolean present) {}
 
     private record PlacementFoundation(BlockPos origin, BlockState levelingReplacement) {}
 
-    private CollectionResult collectOffsets(StructureTemplate template, List<BlockPos> cryoOffsets, List<BlockPos> terrainOffsets,
+    private CollectionResult collectOffsets(StructureTemplate template, List<BlockPos> cryoOffsets,
                                             List<BlockPos> elevatorOffsets, Vec3i size) {
         StructurePlaceSettings identitySettings = new StructurePlaceSettings();
-
-        boolean disableTerrainReplacement = false;
 
         Block cryoTube = resolveBlock(CRYO_TUBE_NAME, "cryo tube");
         if (cryoTube != Blocks.AIR) {
             for (StructureBlockInfo info : template.filterBlocks(BlockPos.ZERO, identitySettings, cryoTube)) {
                 cryoOffsets.add(info.pos());
             }
-        }
-
-        Block terrainReplacer = resolveBlock(TERRAIN_REPLACER_NAME, "terrain replacer");
-        if (terrainReplacer != Blocks.AIR) {
-            for (StructureBlockInfo info : template.filterBlocks(BlockPos.ZERO, identitySettings, terrainReplacer)) {
-                terrainOffsets.add(info.pos());
-            }
-
-            disableTerrainReplacement = warnIfTerrainReplacerDominates(size, terrainOffsets.size());
         }
 
         if (ModList.get().isLoaded("create")) {
@@ -525,32 +421,7 @@ public class NBTStructurePlacer {
 
         boolean hasStructureBlocks = size.getX() > 0 && size.getY() > 0 && size.getZ() > 0;
 
-        return new CollectionResult(disableTerrainReplacement, hasStructureBlocks);
-    }
-
-    private boolean warnIfTerrainReplacerDominates(Vec3i size, int terrainCount) {
-        if (terrainCount <= 0) {
-            return false;
-        }
-
-        double volume = (double) size.getX() * size.getY() * size.getZ();
-        if (volume <= 0) {
-            return false;
-        }
-
-        double ratio = terrainCount / volume;
-        double warningThreshold = StructureConfig.TERRAIN_REPLACER_WARNING_THRESHOLD.get();
-        if (ratio >= warningThreshold && warningThreshold > 0) {
-            double percent = Math.round(ratio * 10000.0D) / 100.0D;
-            ModConstants.LOGGER.warn(
-                    "Structure {} uses terrain replacer markers for {}% of its volume ({} of ~{} blocks).",
-                    id, percent, terrainCount, (int) volume);
-            ModConstants.LOGGER.warn(
-                    "Skipping terrain replacement for {} to avoid filling the template with sampled ground blocks.", id);
-            return true;
-        }
-
-        return false;
+        return new CollectionResult(hasStructureBlocks);
     }
 
     private LevelingMarkerData findLevelingMarker(StructureTemplate template) {
