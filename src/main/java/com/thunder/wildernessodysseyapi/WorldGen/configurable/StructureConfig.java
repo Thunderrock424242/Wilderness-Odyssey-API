@@ -17,10 +17,6 @@ public class StructureConfig {
     public static final ModConfigSpec.BooleanValue DEBUG_DISABLE_IMPACT_SITES;
     /** Emit detailed structure placement logs and retain a short history for debugging. */
     public static final ModConfigSpec.BooleanValue DEBUG_LOG_PLACEMENTS;
-    /** Toggle for replacing terrain marker blocks with sampled terrain */
-    public static final ModConfigSpec.BooleanValue ENABLE_TERRAIN_REPLACER;
-    /** Warn when terrain replacer usage exceeds this fraction of the template volume */
-    public static final ModConfigSpec.DoubleValue TERRAIN_REPLACER_WARNING_THRESHOLD;
     /** Fill gaps below structures even when no terrain markers are present. */
     public static final ModConfigSpec.BooleanValue ENABLE_AUTO_TERRAIN_BLEND;
     /** Skip auto-blend in columns where the structure does not touch the template's bottom layer. */
@@ -58,15 +54,6 @@ public class StructureConfig {
         BUILDER.pop();
 
         BUILDER.push("placement");
-        ENABLE_TERRAIN_REPLACER = BUILDER.comment(
-                        "If false, terrain replacer markers are ignored and left as-is when structures are placed."
-                )
-                .define("enableTerrainReplacer", false);
-        TERRAIN_REPLACER_WARNING_THRESHOLD = BUILDER.comment(
-                        "Warn when more than this fraction of a template's volume is tagged as terrain replacer blocks."
-                                + " Helps catch mistakenly-exported templates that would be overwritten by terrain."
-                )
-                .defineInRange("terrainReplacerWarningThreshold", 0.35D, 0.0D, 1.0D);
         ENABLE_AUTO_TERRAIN_BLEND = BUILDER.comment(
                         "If true, structure placement will attempt to blend terrain even when no terrain marker blocks exist."
                 )
