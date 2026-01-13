@@ -201,7 +201,7 @@ public class NBTStructurePlacer {
                 && data.terrainOffsets().isEmpty()
                 && StructureConfig.ENABLE_AUTO_TERRAIN_BLEND.get()) {
             int maxDepth = StructureConfig.AUTO_TERRAIN_BLEND_MAX_DEPTH.get();
-            int radius = StructureConfig.AUTO_TERRAIN_BLEND_RADIUS.get();
+            int radius = resolveAutoBlendRadius(data.size());
             TerrainReplacerEngine.AutoBlendMask mask = TerrainReplacerEngine.AutoBlendMask.allowAll();
             if (StructureConfig.ENABLE_SMART_AUTO_TERRAIN_BLEND.get()) {
                 mask = buildAutoBlendMask(data.template(), foundation.origin(), data.size());
@@ -656,6 +656,17 @@ public class NBTStructurePlacer {
     private boolean isStarterBunker() {
         return ModConstants.MOD_ID.equals(id.getNamespace())
                 && "bunker".equals(id.getPath());
+    }
+
+    private int resolveAutoBlendRadius(Vec3i size) {
+        int configuredRadius = StructureConfig.AUTO_TERRAIN_BLEND_RADIUS.get();
+        if (!isStarterBunker()) {
+            return configuredRadius;
+        }
+        int maxSpan = Math.max(size.getX(), size.getZ());
+        int sizeRadius = maxSpan > 0 ? maxSpan / 24 : 0;
+        int blendedRadius = Math.max(configuredRadius, Math.max(4, sizeRadius));
+        return Math.min(12, blendedRadius);
     }
 
     private TerrainReplacerEngine.AutoBlendMask buildAutoBlendMask(StructureTemplate template, BlockPos origin, Vec3i size) {
