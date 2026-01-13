@@ -185,7 +185,8 @@ dependencies {
     implementation "curse.maven:spark-361579:6225208"
     implementation "curse.maven:sodium-394468:6382651"
     implementation "curse.maven:irisshaders-455508:6661598"
-    implementation "curse.maven:nova-apii-1248874:7419137"
+    implementation "curse.maven:nova-apii-1248874:7449213"
+    implementation "curse.maven:debug-guardian-1093679:7451874"
     implementation 'com.github.luben:zstd-jni:1.5.7-6'
 
     // AI advisory helpers (HTTP client and fault tolerance)
