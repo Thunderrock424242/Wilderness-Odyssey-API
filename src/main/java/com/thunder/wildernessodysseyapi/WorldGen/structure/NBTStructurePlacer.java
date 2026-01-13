@@ -512,15 +512,15 @@ public class NBTStructurePlacer {
             return baseBox;
         }
 
-        BoundingBox expanded = BoundingBox.fromCorners(
-                new BlockPos(baseBox.minX(), baseBox.minY(), baseBox.minZ()),
-                new BlockPos(baseBox.maxX(), baseBox.maxY(), baseBox.maxZ()));
+        List<BlockPos> positions = new ArrayList<>();
+        positions.add(new BlockPos(baseBox.minX(), baseBox.minY(), baseBox.minZ()));
+        positions.add(new BlockPos(baseBox.maxX(), baseBox.maxY(), baseBox.maxZ()));
 
         for (StructureTemplate.StructureEntityInfo info : accessor.getEntityInfoList()) {
-            BlockPos entityPos = origin.offset(info.blockPos);
-            expanded.encapsulate(entityPos);
+            positions.add(origin.offset(info.blockPos));
         }
-        return expanded;
+
+        return BoundingBox.encapsulatingPositions(positions).orElse(baseBox);
     }
 
     private BlockState normalizeLevelingReplacement(BlockState replacement) {
