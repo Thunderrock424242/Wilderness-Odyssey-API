@@ -37,9 +37,7 @@ public final class SpawnBunkerPlacer {
             Biomes.PLAINS,
             Biomes.SUNFLOWER_PLAINS,
             Biomes.MEADOW,
-            Biomes.FOREST,
-            Biomes.BIRCH_FOREST,
-            Biomes.TAIGA);
+            Biomes.FOREST);
     private static final Set<ResourceKey<Biome>> BLACKLISTED_SPAWN_BIOMES = Set.of(
             Biomes.OCEAN,
             Biomes.DEEP_OCEAN,
