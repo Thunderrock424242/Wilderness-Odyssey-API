@@ -33,7 +33,13 @@ public final class SpawnBunkerPlacer {
     private static final int OCEAN_BUFFER_RADIUS = 128;
     private static final int OCEAN_BUFFER_STEP = 16;
     private static final int WATER_SAMPLE_STEP = 4;
-    private static final Set<ResourceKey<Biome>> WHITELISTED_SPAWN_BIOMES = Set.of();
+    private static final Set<ResourceKey<Biome>> WHITELISTED_SPAWN_BIOMES = Set.of(
+            Biomes.PLAINS,
+            Biomes.SUNFLOWER_PLAINS,
+            Biomes.MEADOW,
+            Biomes.FOREST,
+            Biomes.BIRCH_FOREST,
+            Biomes.TAIGA);
     private static final Set<ResourceKey<Biome>> BLACKLISTED_SPAWN_BIOMES = Set.of(
             Biomes.OCEAN,
             Biomes.DEEP_OCEAN,
