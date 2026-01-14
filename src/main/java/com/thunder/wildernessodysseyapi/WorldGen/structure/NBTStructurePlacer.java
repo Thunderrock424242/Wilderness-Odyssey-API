@@ -693,6 +693,8 @@ public class NBTStructurePlacer {
         return state.is(BlockTags.DIRT)
                 || state.is(BlockTags.SAND)
                 || state.is(BlockTags.BASE_STONE_OVERWORLD)
+                || state.is(BlockTags.ORES)
+                || state.is(BlockTags.ORE_BEARING_GROUND)
                 || state.is(Blocks.GRAVEL);
     }
 }
