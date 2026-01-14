@@ -680,23 +680,12 @@ public class NBTStructurePlacer {
                     }
                     cursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
                     BlockState existing = level.getBlockState(cursor);
-                    if (!isTerrainBlock(existing)) {
+                    if (!BunkerTerrainClearer.shouldClear(existing)) {
                         continue;
                     }
                     level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
                 }
             }
         }
-    }
-
-    private boolean isTerrainBlock(BlockState state) {
-        return state.is(BlockTags.DIRT)
-                || state.is(BlockTags.SAND)
-                || state.is(BlockTags.BASE_STONE_OVERWORLD)
-                || state.is(BlockTags.GOLD_ORES)
-                || state.is(BlockTags.COAL_ORES)
-                || state.is(BlockTags.IRON_ORES)
-                || state.is(BlockTags.UNDERWATER_BONEMEALS)
-                || state.is(Blocks.GRAVEL);
     }
 }
