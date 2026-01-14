@@ -683,7 +683,7 @@ public class NBTStructurePlacer {
                     if (!BunkerTerrainClearer.shouldClear(existing)) {
                         continue;
                     }
-                    level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
+                    level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 3);
                 }
             }
         }
