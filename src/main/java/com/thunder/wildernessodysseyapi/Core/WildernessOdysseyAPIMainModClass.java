@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.M
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatOptToggleCommand;
+import com.thunder.wildernessodysseyapi.command.ChangelogCommand;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.processor.ModProcessors;
@@ -158,6 +159,7 @@ public class WildernessOdysseyAPIMainModClass {
         StructureInfoCommand.register(event.getDispatcher());
         FaqCommand.register(event.getDispatcher());
         DonateCommand.register(event.getDispatcher());
+        ChangelogCommand.register(dispatcher);
         WorldGenScanCommand.register(event.getDispatcher());
         StructurePlacementDebugCommand.register(event.getDispatcher());
         GlobalChatCommand.register(dispatcher);
