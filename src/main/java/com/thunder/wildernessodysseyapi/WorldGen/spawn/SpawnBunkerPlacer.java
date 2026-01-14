@@ -179,7 +179,7 @@ public final class SpawnBunkerPlacer {
         if (!isDrySurface(level, surface)) {
             return false;
         }
-        if (isNearOcean(level, surface, OCEAN_BUFFER_RADIUS, OCEAN_BUFFER_STEP)) {
+        if (isNearOcean(level, surface)) {
             return false;
         }
         return isAreaDry(level, surface, bunkerSize);
@@ -194,11 +194,11 @@ public final class SpawnBunkerPlacer {
         return level.getFluidState(surface).isEmpty();
     }
 
-    private static boolean isNearOcean(ServerLevel level, BlockPos surface, int radius, int step) {
+    private static boolean isNearOcean(ServerLevel level, BlockPos surface) {
         int baseX = surface.getX();
         int baseZ = surface.getZ();
-        for (int dx = -radius; dx <= radius; dx += step) {
-            for (int dz = -radius; dz <= radius; dz += step) {
+        for (int dx = -SpawnBunkerPlacer.OCEAN_BUFFER_RADIUS; dx <= SpawnBunkerPlacer.OCEAN_BUFFER_RADIUS; dx += SpawnBunkerPlacer.OCEAN_BUFFER_STEP) {
+            for (int dz = -SpawnBunkerPlacer.OCEAN_BUFFER_RADIUS; dz <= SpawnBunkerPlacer.OCEAN_BUFFER_RADIUS; dz += SpawnBunkerPlacer.OCEAN_BUFFER_STEP) {
                 BlockPos sample = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                         new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
                 BlockPos surfaceSample = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE,

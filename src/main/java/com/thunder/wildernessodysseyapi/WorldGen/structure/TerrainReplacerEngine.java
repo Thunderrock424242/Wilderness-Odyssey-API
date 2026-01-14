@@ -279,6 +279,7 @@ public final class TerrainReplacerEngine {
         return state.is(Blocks.WATER)
                 || state.is(Blocks.LAVA)
                 || state.is(Blocks.BUBBLE_COLUMN)
+                || state.is(BlockTags.GOLD_ORES)
                 || state.getFluidState().is(Fluids.WATER)
                 || state.getFluidState().is(Fluids.LAVA);
     }

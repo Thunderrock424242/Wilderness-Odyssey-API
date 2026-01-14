@@ -21,7 +21,7 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = "3.1.0"
+version = "4.0.0"
 group = "com.thunder.wildernessodysseyapi"
 
 base {
@@ -186,7 +186,7 @@ dependencies {
     implementation "curse.maven:sodium-394468:6382651"
     implementation "curse.maven:irisshaders-455508:6661598"
     implementation "curse.maven:nova-apii-1248874:7449213"
-    implementation "curse.maven:debug-guardian-1093679:7451874"
+    implementation "curse.maven:debug-guardian-1093679:7455435"
     implementation 'com.github.luben:zstd-jni:1.5.7-6'
 
     // AI advisory helpers (HTTP client and fault tolerance)
@@ -246,7 +246,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_id                 : "wildernessodysseyapi",
             mod_name               : "Wilderness Odyssey API",
             mod_license            : "APR",
-            mod_version            : "3.1.0",
+            mod_version            : "4.0.0",
             mod_authors            : "thunderrock424242",
             mod_description        : "a api for my modpack"
     ]
