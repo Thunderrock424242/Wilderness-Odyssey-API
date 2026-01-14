@@ -1,0 +1,16 @@
+# Wilderness Odyssey Changelog
+## 0.0.4
+Added:
+- Welcome to Wilderness Odyssey!
+Changed:
+- Update this file in config/wildernessodysseyapi/changelog.txt to customize releases.
+Fixed:
+- 
+
+## 0.0.3
+Added:
+- Example previous release entry
+Changed:
+- 
+Fixed:
+- 
