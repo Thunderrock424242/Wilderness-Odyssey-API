@@ -15,7 +15,7 @@ public abstract class LivingEntityMixin {
     @Inject(method = "getVisibilityPercent", at = @At("RETURN"), cancellable = true)
     private void wildernessodysseyapi$reduceMobDetectionWhenCrouching(
             Entity viewer,
-            CallbackInfoReturnable<Float> callbackInfo
+            CallbackInfoReturnable<Double> callbackInfo
     ) {
         if (!(viewer instanceof Mob)) {
             return;
@@ -23,12 +23,12 @@ public abstract class LivingEntityMixin {
         if (!((Object) this instanceof Player player) || !player.isCrouching()) {
             return;
         }
-        float multiplier = CrouchNoiseHelper.getCrouchVisibilityMultiplier(player);
-        if (multiplier <= 0.0F) {
-            callbackInfo.setReturnValue(0.0F);
+        double multiplier = CrouchNoiseHelper.getCrouchVisibilityMultiplier(player);
+        if (multiplier <= 0.0D) {
+            callbackInfo.setReturnValue(0.0D);
             return;
         }
-        float visibility = callbackInfo.getReturnValue();
-        callbackInfo.setReturnValue(Math.max(0.0F, visibility * multiplier));
+        double visibility = callbackInfo.getReturnValue();
+        callbackInfo.setReturnValue(Math.max(0.0D, visibility * multiplier));
     }
 }
