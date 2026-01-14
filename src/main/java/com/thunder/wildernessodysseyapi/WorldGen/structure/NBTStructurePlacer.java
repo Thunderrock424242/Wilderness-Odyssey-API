@@ -161,6 +161,9 @@ public class NBTStructurePlacer {
         }
 
         BoundingBox placementBox = expandPlacementBox(foundation.origin(), data.size(), data.template());
+        if (isStarterBunker()) {
+            clearColumnsForStarterBunker(level, foundation.origin(), data.size());
+        }
         StructurePlaceSettings settings = new StructurePlaceSettings()
                 // We already know the template dimensions, so skip the expensive shape discovery pass.
                 .setKnownShape(true)
@@ -695,6 +698,32 @@ public class NBTStructurePlacer {
                     cursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
                     BlockState existing = level.getBlockState(cursor);
                     if (!BunkerTerrainClearer.shouldClear(existing)) {
+                        continue;
+                    }
+                    level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 3);
+                }
+            }
+        }
+    }
+
+    private void clearColumnsForStarterBunker(ServerLevel level, BlockPos origin, Vec3i size) {
+        int sizeX = size.getX();
+        int sizeZ = size.getZ();
+        if (sizeX <= 0 || sizeZ <= 0) {
+            return;
+        }
+
+        int minY = level.getMinBuildHeight();
+        int maxY = level.getMaxBuildHeight() - 1;
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int x = 0; x < sizeX; x++) {
+            for (int z = 0; z < sizeZ; z++) {
+                int worldX = origin.getX() + x;
+                int worldZ = origin.getZ() + z;
+                for (int y = minY; y <= maxY; y++) {
+                    cursor.set(worldX, y, worldZ);
+                    BlockState existing = level.getBlockState(cursor);
+                    if (!BunkerTerrainClearer.shouldClear(existing) || existing.is(Blocks.BEDROCK)) {
                         continue;
                     }
                     level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 3);
