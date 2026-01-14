@@ -21,6 +21,7 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProc
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
@@ -680,7 +681,7 @@ public class NBTStructurePlacer {
                     }
                     cursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
                     BlockState existing = level.getBlockState(cursor);
-                    if (!isTerrainBlock(existing)) {
+                    if (!isTerrainBlock(existing) && !isFluidBlock(existing)) {
                         continue;
                     }
                     level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
@@ -694,5 +695,10 @@ public class NBTStructurePlacer {
                 || state.is(BlockTags.SAND)
                 || state.is(BlockTags.BASE_STONE_OVERWORLD)
                 || state.is(Blocks.GRAVEL);
+    }
+
+    private boolean isFluidBlock(BlockState state) {
+        return state.getFluidState().is(Fluids.WATER)
+                || state.getFluidState().is(Fluids.LAVA);
     }
 }
