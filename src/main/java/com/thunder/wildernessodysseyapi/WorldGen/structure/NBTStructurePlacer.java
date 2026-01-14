@@ -680,7 +680,7 @@ public class NBTStructurePlacer {
                     }
                     cursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
                     BlockState existing = level.getBlockState(cursor);
-                    if (!isTerrainBlock(existing) && !TerrainReplacerEngine.isExcludedReplacement(existing)) {
+                    if (!isTerrainBlock(existing)) {
                         continue;
                     }
                     level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
