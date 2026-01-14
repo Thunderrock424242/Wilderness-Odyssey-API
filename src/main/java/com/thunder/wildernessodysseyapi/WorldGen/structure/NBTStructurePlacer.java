@@ -648,6 +648,11 @@ public class NBTStructurePlacer {
 
         int volume = sizeX * sizeY * sizeZ;
         BitSet occupied = new BitSet(volume);
+        int columns = sizeX * sizeZ;
+        int[] minYByColumn = new int[columns];
+        int[] maxYByColumn = new int[columns];
+        Arrays.fill(minYByColumn, Integer.MAX_VALUE);
+        Arrays.fill(maxYByColumn, Integer.MIN_VALUE);
         for (StructureTemplate.Palette palette : accessor.getPalettes()) {
             List<StructureBlockInfo> blocks = resolvePaletteBlocks(palette);
             if (blocks.isEmpty()) {
@@ -667,13 +672,22 @@ public class NBTStructurePlacer {
                 }
                 int index = x + sizeX * (y + sizeY * z);
                 occupied.set(index);
+                int columnIndex = x + sizeX * z;
+                minYByColumn[columnIndex] = Math.min(minYByColumn[columnIndex], y);
+                maxYByColumn[columnIndex] = Math.max(maxYByColumn[columnIndex], y);
             }
         }
 
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         for (int x = 0; x < sizeX; x++) {
-            for (int y = 0; y < sizeY; y++) {
-                for (int z = 0; z < sizeZ; z++) {
+            for (int z = 0; z < sizeZ; z++) {
+                int columnIndex = x + sizeX * z;
+                int minY = minYByColumn[columnIndex];
+                int maxY = maxYByColumn[columnIndex];
+                if (minY == Integer.MAX_VALUE || maxY == Integer.MIN_VALUE) {
+                    continue;
+                }
+                for (int y = minY; y <= maxY; y++) {
                     int index = x + sizeX * (y + sizeY * z);
                     if (occupied.get(index)) {
                         continue;
