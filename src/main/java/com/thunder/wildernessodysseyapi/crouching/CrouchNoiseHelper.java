@@ -10,20 +10,20 @@ import net.minecraft.world.item.component.CustomData;
 
 public final class CrouchNoiseHelper {
     public static final String SILENT_ARMOR_TAG = "wildernessodysseyapi:silent_armor";
-    private static final float LEATHER_MULTIPLIER = 0.5F;
-    private static final float CHAIN_MULTIPLIER = 0.6F;
-    private static final float IRON_MULTIPLIER = 0.7F;
-    private static final float GOLD_MULTIPLIER = 0.8F;
-    private static final float DIAMOND_MULTIPLIER = 0.9F;
-    private static final float NETHERITE_MULTIPLIER = 1.0F;
+    private static final double LEATHER_MULTIPLIER = 0.5D;
+    private static final double CHAIN_MULTIPLIER = 0.6D;
+    private static final double IRON_MULTIPLIER = 0.7D;
+    private static final double GOLD_MULTIPLIER = 0.8D;
+    private static final double DIAMOND_MULTIPLIER = 0.9D;
+    private static final double NETHERITE_MULTIPLIER = 1.0D;
 
     private CrouchNoiseHelper() {
     }
 
-    public static float getCrouchVisibilityMultiplier(Player player) {
+    public static double getCrouchVisibilityMultiplier(Player player) {
         ItemStack boots = player.getItemBySlot(EquipmentSlot.FEET);
         if (boots.isEmpty()) {
-            return 0.0F;
+            return 0.0D;
         }
         if (isSilenced(boots)) {
             return LEATHER_MULTIPLIER;
