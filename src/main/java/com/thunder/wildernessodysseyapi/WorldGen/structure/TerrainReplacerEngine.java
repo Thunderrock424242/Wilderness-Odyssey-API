@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.WorldGen.structure;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -275,15 +276,18 @@ public final class TerrainReplacerEngine {
         return !state.isAir();
     }
 
-    private static boolean isExcludedReplacement(BlockState state) {
+    public static boolean isExcludedReplacement(BlockState state) {
         return state.is(Blocks.WATER)
                 || state.is(Blocks.LAVA)
                 || state.is(Blocks.BUBBLE_COLUMN)
                 || state.is(BlockTags.GOLD_ORES)
                 || state.is(BlockTags.COAL_ORES)
                 || state.is(BlockTags.IRON_ORES)
+                || state.is(BlockTags.UNDERWATER_BONEMEALS)
                 || state.getFluidState().is(Fluids.WATER)
-                || state.getFluidState().is(Fluids.LAVA);
+                || state.getFluidState().is(Fluids.LAVA)
+                || state.getFluidState().is(FluidTags.WATER)
+                || state.getFluidState().is(FluidTags.LAVA);
     }
 
     /**
