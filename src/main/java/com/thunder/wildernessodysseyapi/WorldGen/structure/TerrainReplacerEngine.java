@@ -280,6 +280,8 @@ public final class TerrainReplacerEngine {
                 || state.is(Blocks.LAVA)
                 || state.is(Blocks.BUBBLE_COLUMN)
                 || state.is(BlockTags.GOLD_ORES)
+                || state.is(BlockTags.COAL_ORES)
+                || state.is(BlockTags.IRON_ORES)
                 || state.getFluidState().is(Fluids.WATER)
                 || state.getFluidState().is(Fluids.LAVA);
     }
