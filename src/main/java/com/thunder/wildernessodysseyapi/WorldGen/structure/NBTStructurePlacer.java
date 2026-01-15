@@ -757,7 +757,7 @@ public class NBTStructurePlacer {
             }
             for (StructureBlockInfo info : blocks) {
                 BlockState state = info.state();
-                if (!state.is(Blocks.GRASS_BLOCK)) {
+                if (!isSurfaceReplacementCandidate(state)) {
                     continue;
                 }
                 BlockPos pos = info.pos();
@@ -775,7 +775,7 @@ public class NBTStructurePlacer {
 
                 BlockPos worldPos = origin.offset(pos);
                 BlockState existing = level.getBlockState(worldPos);
-                if (!existing.is(Blocks.GRASS_BLOCK)) {
+                if (!isSurfaceReplacementCandidate(existing)) {
                     continue;
                 }
 
@@ -788,5 +788,11 @@ public class NBTStructurePlacer {
                 level.setBlock(worldPos, replacement, 2);
             }
         }
+    }
+
+    private boolean isSurfaceReplacementCandidate(BlockState state) {
+        return state.is(BlockTags.DIRT)
+                || state.is(Blocks.GRASS_BLOCK)
+                || state.is(Blocks.BEDROCK);
     }
 }
