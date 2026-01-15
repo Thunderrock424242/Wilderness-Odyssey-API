@@ -185,6 +185,7 @@ public class NBTStructurePlacer {
 
         if (isStarterBunker()) {
             clearTerrainInsideStructure(level, foundation.origin(), data.size(), data.template());
+            replaceStarterBunkerSurfaceBlocks(level, foundation.origin(), data.size(), data.template(), placementBox);
         }
 
         int autoBlended = 0;
@@ -728,6 +729,63 @@ public class NBTStructurePlacer {
                     }
                     level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 3);
                 }
+            }
+        }
+    }
+
+    private void replaceStarterBunkerSurfaceBlocks(ServerLevel level,
+                                                   BlockPos origin,
+                                                   Vec3i size,
+                                                   StructureTemplate template,
+                                                   BoundingBox bounds) {
+        if (!(template instanceof StructureTemplateAccessor accessor)) {
+            return;
+        }
+        int sizeX = size.getX();
+        int sizeY = size.getY();
+        int sizeZ = size.getZ();
+        if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) {
+            return;
+        }
+
+        int volume = sizeX * sizeY * sizeZ;
+        BitSet processed = new BitSet(volume);
+        for (StructureTemplate.Palette palette : accessor.getPalettes()) {
+            List<StructureBlockInfo> blocks = resolvePaletteBlocks(palette);
+            if (blocks.isEmpty()) {
+                continue;
+            }
+            for (StructureBlockInfo info : blocks) {
+                BlockState state = info.state();
+                if (!state.is(Blocks.GRASS_BLOCK)) {
+                    continue;
+                }
+                BlockPos pos = info.pos();
+                int x = pos.getX();
+                int y = pos.getY();
+                int z = pos.getZ();
+                if (x < 0 || x >= sizeX || y < 0 || y >= sizeY || z < 0 || z >= sizeZ) {
+                    continue;
+                }
+                int index = x + sizeX * (y + sizeY * z);
+                if (processed.get(index)) {
+                    continue;
+                }
+                processed.set(index);
+
+                BlockPos worldPos = origin.offset(pos);
+                BlockState existing = level.getBlockState(worldPos);
+                if (!existing.is(Blocks.GRASS_BLOCK)) {
+                    continue;
+                }
+
+                TerrainReplacerEngine.SurfaceMaterial material =
+                        TerrainReplacerEngine.sampleSurfaceMaterialOutsideBounds(level, worldPos, bounds);
+                BlockState replacement = TerrainReplacerEngine.chooseReplacement(material, worldPos.getY());
+                if (replacement == existing) {
+                    continue;
+                }
+                level.setBlock(worldPos, replacement, 2);
             }
         }
     }
