@@ -151,7 +151,8 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         if (structureNameKey != null) {
             StructureBlockCornerCache cache = StructureBlockCornerCache.getIfPresent(serverLevel);
             if (cache != null) {
-                java.util.List<BlockPos> cachedCorners = cache.findCorners(structureNameKey, blockPos, detectionRadius);
+                java.util.List<BlockPos> cachedCorners = cache.findCornersUnsorted(structureNameKey, blockPos,
+                        detectionRadius);
                 for (BlockPos cachedCorner : cachedCorners) {
                     if (cachedCorner.equals(blockPos)) {
                         continue;
@@ -649,7 +650,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         StructureBlockCornerCache cache = StructureBlockCornerCache.getIfPresent(serverLevel);
         boolean addedFromCache = false;
         if (cache != null) {
-            java.util.List<BlockPos> cachedCorners = cache.findCorners(structureNameKey, origin, searchRadius);
+            java.util.List<BlockPos> cachedCorners = cache.findCornersUnsorted(structureNameKey, origin, searchRadius);
             for (BlockPos cachedCorner : cachedCorners) {
                 if (cachedCorner.equals(origin)) {
                     continue;

@@ -81,6 +81,19 @@ public final class StructureBlockCornerCache {
      * Streams known corner positions for the provided structure name, sorted by manhattan distance.
      */
     public synchronized java.util.List<BlockPos> findCorners(String structureName, BlockPos origin, int maxDistance) {
+        java.util.List<BlockPos> result = findCornersUnsorted(structureName, origin, maxDistance);
+        if (result.size() <= 1) {
+            return result;
+        }
+        result.sort(java.util.Comparator.comparingInt(pos -> pos.distManhattan(origin)));
+        return result;
+    }
+
+    /**
+     * Streams known corner positions for the provided structure name without sorting.
+     */
+    public synchronized java.util.List<BlockPos> findCornersUnsorted(String structureName, BlockPos origin,
+            int maxDistance) {
         String normalized = normalize(structureName);
         if (normalized == null) {
             return java.util.Collections.emptyList();
@@ -91,13 +104,16 @@ public final class StructureBlockCornerCache {
         }
         int range = maxDistance < 0 ? Integer.MAX_VALUE : maxDistance;
         java.util.ArrayList<BlockPos> result = new java.util.ArrayList<>(corners.size());
+        if (range == Integer.MAX_VALUE) {
+            result.addAll(corners);
+            return result;
+        }
         for (BlockPos corner : corners) {
             if (!isWithinRange(origin, corner, range)) {
                 continue;
             }
             result.add(corner);
         }
-        result.sort(java.util.Comparator.comparingInt(pos -> pos.distManhattan(origin)));
         return result;
     }
 
