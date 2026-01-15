@@ -15,6 +15,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessor;
@@ -185,7 +186,7 @@ public class NBTStructurePlacer {
 
         if (isStarterBunker()) {
             clearTerrainInsideStructure(level, foundation.origin(), data.size(), data.template());
-            replaceStarterBunkerSurfaceBlocks(level, foundation.origin(), data.size(), data.template(), placementBox);
+            replaceStarterBunkerSurfaceBlocks(level, foundation.origin(), data.size(), placementBox);
         }
 
         int autoBlended = 0;
@@ -548,9 +549,9 @@ public class NBTStructurePlacer {
             return configuredRadius;
         }
         int maxSpan = Math.max(size.getX(), size.getZ());
-        int sizeRadius = maxSpan > 0 ? maxSpan / 24 : 0;
-        int blendedRadius = Math.max(configuredRadius, Math.max(4, sizeRadius));
-        return Math.min(12, blendedRadius);
+        int sizeRadius = maxSpan > 0 ? maxSpan / 16 : 0;
+        int blendedRadius = Math.max(configuredRadius, Math.max(8, sizeRadius));
+        return Math.min(32, blendedRadius);
     }
 
     private TerrainReplacerEngine.AutoBlendMask buildAutoBlendMask(StructureTemplate template, BlockPos origin, Vec3i size) {
@@ -736,9 +737,8 @@ public class NBTStructurePlacer {
     private void replaceStarterBunkerSurfaceBlocks(ServerLevel level,
                                                    BlockPos origin,
                                                    Vec3i size,
-                                                   StructureTemplate template,
                                                    BoundingBox bounds) {
-        if (!(template instanceof StructureTemplateAccessor accessor)) {
+        if (bounds == null) {
             return;
         }
         int sizeX = size.getX();
@@ -748,44 +748,36 @@ public class NBTStructurePlacer {
             return;
         }
 
-        int volume = sizeX * sizeY * sizeZ;
-        BitSet processed = new BitSet(volume);
-        for (StructureTemplate.Palette palette : accessor.getPalettes()) {
-            List<StructureBlockInfo> blocks = resolvePaletteBlocks(palette);
-            if (blocks.isEmpty()) {
-                continue;
-            }
-            for (StructureBlockInfo info : blocks) {
-                BlockState state = info.state();
-                if (!isSurfaceReplacementCandidate(state)) {
-                    continue;
-                }
-                BlockPos pos = info.pos();
-                int x = pos.getX();
-                int y = pos.getY();
-                int z = pos.getZ();
-                if (x < 0 || x >= sizeX || y < 0 || y >= sizeY || z < 0 || z >= sizeZ) {
-                    continue;
-                }
-                int index = x + sizeX * (y + sizeY * z);
-                if (processed.get(index)) {
-                    continue;
-                }
-                processed.set(index);
+        int minX = origin.getX();
+        int minZ = origin.getZ();
+        int maxX = origin.getX() + sizeX - 1;
+        int maxZ = origin.getZ() + sizeZ - 1;
+        int minY = origin.getY();
+        int maxY = origin.getY() + sizeY - 1;
 
-                BlockPos worldPos = origin.offset(pos);
-                BlockState existing = level.getBlockState(worldPos);
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+                if (surfaceY < minY || surfaceY > maxY) {
+                    continue;
+                }
+                cursor.set(x, surfaceY, z);
+                if (!bounds.isInside(cursor)) {
+                    continue;
+                }
+                BlockState existing = level.getBlockState(cursor);
                 if (!isSurfaceReplacementCandidate(existing)) {
                     continue;
                 }
 
                 TerrainReplacerEngine.SurfaceMaterial material =
-                        TerrainReplacerEngine.sampleSurfaceMaterialOutsideBounds(level, worldPos, bounds);
-                BlockState replacement = TerrainReplacerEngine.chooseReplacement(material, worldPos.getY());
+                        TerrainReplacerEngine.sampleSurfaceMaterialOutsideBounds(level, cursor, bounds);
+                BlockState replacement = TerrainReplacerEngine.chooseReplacement(material, surfaceY);
                 if (replacement == existing) {
                     continue;
                 }
-                level.setBlock(worldPos, replacement, 2);
+                level.setBlock(cursor, replacement, 2);
             }
         }
     }
@@ -793,6 +785,8 @@ public class NBTStructurePlacer {
     private boolean isSurfaceReplacementCandidate(BlockState state) {
         return state.is(BlockTags.DIRT)
                 || state.is(Blocks.GRASS_BLOCK)
-                || state.is(Blocks.BEDROCK);
+                || state.is(Blocks.SAND)
+                || state.is(Blocks.RED_SAND)
+                || state.is(Blocks.GRAVEL);
     }
 }
