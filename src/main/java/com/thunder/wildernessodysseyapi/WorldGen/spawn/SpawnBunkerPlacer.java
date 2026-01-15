@@ -33,6 +33,7 @@ public final class SpawnBunkerPlacer {
     private static final int OCEAN_BUFFER_RADIUS = 128;
     private static final int OCEAN_BUFFER_STEP = 16;
     private static final int WATER_SAMPLE_STEP = 4;
+    private static final int BIOME_SAMPLE_STEP = 4;
     private static final Set<ResourceKey<Biome>> WHITELISTED_SPAWN_BIOMES = Set.of(
             Biomes.PLAINS,
             Biomes.SUNFLOWER_PLAINS,
@@ -180,6 +181,9 @@ public final class SpawnBunkerPlacer {
         if (!isLandBiome(level, surface)) {
             return false;
         }
+        if (!isAreaBiomeAllowed(level, surface, bunkerSize)) {
+            return false;
+        }
         if (!isDrySurface(level, surface)) {
             return false;
         }
@@ -239,6 +243,30 @@ public final class SpawnBunkerPlacer {
                     if (!level.getFluidState(cursor).isEmpty()) {
                         return false;
                     }
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean isAreaBiomeAllowed(ServerLevel level, BlockPos surface, Vec3i bunkerSize) {
+        if (bunkerSize.getX() <= 0 || bunkerSize.getZ() <= 0) {
+            return true;
+        }
+        BlockPos levelingOffset = BUNKER_PLACER.peekLevelingOffset(level);
+        BlockPos origin = levelingOffset == null ? surface : surface.subtract(levelingOffset);
+        int minX = origin.getX();
+        int minZ = origin.getZ();
+        int maxX = minX + bunkerSize.getX() - 1;
+        int maxZ = minZ + bunkerSize.getZ() - 1;
+
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int x = minX; x <= maxX; x += BIOME_SAMPLE_STEP) {
+            for (int z = minZ; z <= maxZ; z += BIOME_SAMPLE_STEP) {
+                cursor.set(x, level.getMinBuildHeight(), z);
+                BlockPos sample = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, cursor);
+                if (!isAllowedBiome(level, sample)) {
+                    return false;
                 }
             }
         }
