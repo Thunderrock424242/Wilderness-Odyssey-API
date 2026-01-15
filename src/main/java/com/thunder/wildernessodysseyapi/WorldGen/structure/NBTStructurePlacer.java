@@ -47,6 +47,8 @@ public class NBTStructurePlacer {
     private static final int MIN_LEVELING_MARKER_Y = 62;
     private static final int MAX_LEVELING_MARKER_Y = 65;
     private static final String[] PALETTE_BLOCK_FIELD_NAMES = {"blocks", "blockInfos", "blockInfoList"};
+    private static final java.util.concurrent.ConcurrentMap<Class<?>, java.util.Optional<Field>> PALETTE_BLOCK_FIELDS =
+            new java.util.concurrent.ConcurrentHashMap<>();
     private static boolean loggedPaletteFieldWarning = false;
 
     private final ResourceLocation id;
@@ -616,27 +618,45 @@ public class NBTStructurePlacer {
         if (palette == null) {
             return List.of();
         }
-        for (String fieldName : PALETTE_BLOCK_FIELD_NAMES) {
-            try {
-                Field field = palette.getClass().getDeclaredField(fieldName);
-                field.setAccessible(true);
-                Object value = field.get(palette);
-                if (value instanceof List<?> list) {
-                    return (List<StructureBlockInfo>) list;
-                }
-            } catch (NoSuchFieldException ignored) {
-                // try next candidate
-            } catch (IllegalAccessException e) {
-                ModConstants.LOGGER.warn("Unable to access structure palette blocks for {}.", id, e);
-                return List.of();
+        java.util.Optional<Field> cachedField = PALETTE_BLOCK_FIELDS.computeIfAbsent(palette.getClass(),
+                this::findPaletteBlocksField);
+        if (cachedField.isEmpty()) {
+            return List.of();
+        }
+        try {
+            Object value = cachedField.get().get(palette);
+            if (value instanceof List<?> list) {
+                return (List<StructureBlockInfo>) list;
             }
+        } catch (IllegalAccessException e) {
+            ModConstants.LOGGER.warn("Unable to access structure palette blocks for {}.", id, e);
+            return List.of();
         }
 
         if (!loggedPaletteFieldWarning) {
             loggedPaletteFieldWarning = true;
-            ModConstants.LOGGER.warn("Unable to locate structure palette block list for {}; auto-blend masking will be skipped.", id);
+            ModConstants.LOGGER.warn(
+                    "Unable to locate structure palette block list for {}; auto-blend masking will be skipped.", id);
         }
         return List.of();
+    }
+
+    private java.util.Optional<Field> findPaletteBlocksField(Class<?> paletteClass) {
+        for (String fieldName : PALETTE_BLOCK_FIELD_NAMES) {
+            try {
+                Field field = paletteClass.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                return java.util.Optional.of(field);
+            } catch (NoSuchFieldException ignored) {
+                // try next candidate
+            }
+        }
+        if (!loggedPaletteFieldWarning) {
+            loggedPaletteFieldWarning = true;
+            ModConstants.LOGGER.warn(
+                    "Unable to locate structure palette block list for {}; auto-blend masking will be skipped.", id);
+        }
+        return java.util.Optional.empty();
     }
 
     private void clearTerrainInsideStructure(ServerLevel level, BlockPos origin, Vec3i size, StructureTemplate template) {
