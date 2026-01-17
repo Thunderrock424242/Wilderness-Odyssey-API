@@ -211,8 +211,7 @@ public final class SpawnBunkerPlacer {
                         new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
                 BlockPos surfaceSample = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE,
                         new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
-                if (!level.getFluidState(surfaceSample).isEmpty()
-                        || level.getBiome(sample).is(BiomeTags.IS_OCEAN)) {
+                if (level.getBiome(surfaceSample).is(BiomeTags.IS_OCEAN)) {
                     return true;
                 }
             }
