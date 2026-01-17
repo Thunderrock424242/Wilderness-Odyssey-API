@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.WorldGen.processor.BunkerPlacementProces
 import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.StarterStructureSpawnGuard;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -30,10 +31,13 @@ public final class SpawnBunkerPlacer {
     private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "bunker");
     private static final int LAND_SEARCH_RADIUS = 512;
     private static final int LAND_SEARCH_STEP = 16;
+    private static final int FORCED_PLAINS_SEARCH_RADIUS = 2048;
     private static final int OCEAN_BUFFER_RADIUS = 128;
     private static final int OCEAN_BUFFER_STEP = 16;
     private static final int WATER_SAMPLE_STEP = 4;
     private static final int BIOME_SAMPLE_STEP = 4;
+    private static final boolean FORCE_PLAINS_SPAWN = true;
+    private static final Set<ResourceKey<Biome>> REQUIRED_SPAWN_BIOMES = Set.of(Biomes.PLAINS);
     private static final Set<ResourceKey<Biome>> WHITELISTED_SPAWN_BIOMES = Set.of(
             Biomes.PLAINS,
             Biomes.SUNFLOWER_PLAINS,
@@ -117,6 +121,22 @@ public final class SpawnBunkerPlacer {
             }
         }
 
+        if (FORCE_PLAINS_SPAWN) {
+            BlockPos forced = findRequiredBiomeAnchor(level, baseSpawn, bunkerSize, FORCED_PLAINS_SEARCH_RADIUS);
+            if (forced != null) {
+                ModConstants.LOGGER.warn("Unable to locate a viable plains biome within {} blocks of {}; using distant plains spawn {}.",
+                        LAND_SEARCH_RADIUS, baseSpawn, forced);
+                return forced;
+            }
+        }
+
+        BlockPos fallback = findAllowedAnchor(level, baseSpawn);
+        if (fallback != null) {
+            ModConstants.LOGGER.warn("Unable to locate a fully viable land biome within {} blocks of {}; using fallback spawn {}.",
+                    LAND_SEARCH_RADIUS, baseSpawn, fallback);
+            return fallback;
+        }
+
         ModConstants.LOGGER.warn("Unable to locate a land biome within {} blocks of {}; using base spawn.",
                 LAND_SEARCH_RADIUS, baseSpawn);
         return surface;
@@ -157,6 +177,9 @@ public final class SpawnBunkerPlacer {
 
     private static boolean isAllowedBiome(ServerLevel level, BlockPos pos) {
         var biome = level.getBiome(pos);
+        if (FORCE_PLAINS_SPAWN && !isRequiredBiome(biome)) {
+            return false;
+        }
         if (!WHITELISTED_SPAWN_BIOMES.isEmpty()) {
             boolean whitelisted = false;
             for (ResourceKey<Biome> key : WHITELISTED_SPAWN_BIOMES) {
@@ -175,6 +198,15 @@ public final class SpawnBunkerPlacer {
             }
         }
         return true;
+    }
+
+    private static boolean isRequiredBiome(Holder<Biome> biome) {
+        for (ResourceKey<Biome> key : REQUIRED_SPAWN_BIOMES) {
+            if (biome.is(key)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isViableAnchor(ServerLevel level, BlockPos surface, Vec3i bunkerSize) {
@@ -270,5 +302,58 @@ public final class SpawnBunkerPlacer {
             }
         }
         return true;
+    }
+
+    private static BlockPos findAllowedAnchor(ServerLevel level, BlockPos baseSpawn) {
+        BlockPos surface = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                new BlockPos(baseSpawn.getX(), level.getMinBuildHeight(), baseSpawn.getZ()));
+        if (isLandBiome(level, surface) && isDrySurface(level, surface)) {
+            return surface;
+        }
+
+        int baseX = baseSpawn.getX();
+        int baseZ = baseSpawn.getZ();
+        for (int radius = LAND_SEARCH_STEP; radius <= LAND_SEARCH_RADIUS; radius += LAND_SEARCH_STEP) {
+            for (int dx = -radius; dx <= radius; dx += LAND_SEARCH_STEP) {
+                for (int dz = -radius; dz <= radius; dz += LAND_SEARCH_STEP) {
+                    if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
+                        continue;
+                    }
+
+                    int x = baseX + dx;
+                    int z = baseZ + dz;
+                    BlockPos candidate = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                            new BlockPos(x, level.getMinBuildHeight(), z));
+                    if (isLandBiome(level, candidate) && isDrySurface(level, candidate)) {
+                        return candidate;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static BlockPos findRequiredBiomeAnchor(ServerLevel level, BlockPos baseSpawn, Vec3i bunkerSize, int searchRadius) {
+        int baseX = baseSpawn.getX();
+        int baseZ = baseSpawn.getZ();
+        for (int radius = LAND_SEARCH_STEP; radius <= searchRadius; radius += LAND_SEARCH_STEP) {
+            for (int dx = -radius; dx <= radius; dx += LAND_SEARCH_STEP) {
+                for (int dz = -radius; dz <= radius; dz += LAND_SEARCH_STEP) {
+                    if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
+                        continue;
+                    }
+
+                    int x = baseX + dx;
+                    int z = baseZ + dz;
+                    BlockPos candidate = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                            new BlockPos(x, level.getMinBuildHeight(), z));
+                    if (isViableAnchor(level, candidate, bunkerSize)) {
+                        return candidate;
+                    }
+                }
+            }
+        }
+        return null;
     }
 }
