@@ -12,6 +12,11 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 
+import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+
+/**
+ * Reload listener that populates the FAQ manager when data packs reload.
+ */
 public class FaqReloadListener extends SimpleJsonResourceReloadListener {
     private static final Gson GSON = new Gson();
     private static final Type LIST_TYPE = new TypeToken<List<FaqEntry>>() {}.getType();
@@ -20,17 +25,24 @@ public class FaqReloadListener extends SimpleJsonResourceReloadListener {
         super(GSON, "faq");
     }
 
+    /**
+     * Parses FAQ entries from JSON and stores them in {@link FaqManager}.
+     */
     @Override
     protected void apply(Map<ResourceLocation, JsonElement> map, ResourceManager resourceManager, ProfilerFiller profiler) {
         FaqManager.clear();
         for (Map.Entry<ResourceLocation, com.google.gson.JsonElement> entry : map.entrySet()) {
             try {
                 List<FaqEntry> entries = GSON.fromJson(entry.getValue(), LIST_TYPE);
+                if (entries == null || entries.isEmpty()) {
+                    LOGGER.warn("FAQ file '{}' did not contain any entries", entry.getKey());
+                    continue;
+                }
                 for (FaqEntry entryObj : entries) {
                     FaqManager.add(entryObj);
                 }
             } catch (Exception e) {
-                System.err.println("Failed to parse FAQ: " + entry.getKey() + " → " + e.getMessage());
+                LOGGER.error("Failed to parse FAQ {}", entry.getKey(), e);
             }
         }
     }

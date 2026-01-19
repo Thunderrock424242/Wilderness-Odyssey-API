@@ -1,0 +1,14 @@
+[
+  {
+    "id": "getting_started",
+    "category": "general",
+    "question": "How do I start the modpack?",
+    "answer": "Follow the glowing amethyst shards around the first impact site and check the nearby cryo tubes."
+  },
+  {
+    "id": "meteor_location",
+    "category": "world",
+    "question": "Where does the meteor crash?",
+    "answer": "It happens once per world in the anomaly_zone biome."
+  }
+]

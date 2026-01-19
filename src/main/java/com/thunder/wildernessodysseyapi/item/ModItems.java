@@ -1,7 +1,10 @@
 package com.thunder.wildernessodysseyapi.item;
 
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+
+import net.minecraft.world.item.Item;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
@@ -14,8 +17,8 @@ public class ModItems {
      */
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MOD_ID);
 
-    // No standalone items needed, as the unbreakable block's BlockItem is automatically registered.
 
+    // No standalone items needed, as the unbreakable block's BlockItem is automatically registered.
     /**
      * Register.
      *

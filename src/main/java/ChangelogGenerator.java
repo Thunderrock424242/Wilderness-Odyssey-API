@@ -7,10 +7,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The type Changelog generator.
+ * Converts plain-text changelog files into a minimal HTML representation.
+ * <p>
+ * The generator interprets special prefixes (e.g. {@code !}, {@code !!},
+ * {@code *}) and section markers to style the output accordingly.
  */
 public class ChangelogGenerator {
 
+    /**
+     * Entry point for the command-line utility.
+     *
+     * @param args ignored, the method reads predefined input/output files
+     */
     public static void main(String[] args) {
         // you can hardcode your two files here:
         String[] inputs  = { "changelog.txt",    "APIchangelog.txt"   };
@@ -26,6 +34,12 @@ public class ChangelogGenerator {
         }
     }
 
+    /**
+     * Reads a changelog file, applies formatting rules, and writes an HTML file.
+     *
+     * @param inputFilePath  path to the source changelog text
+     * @param outputFilePath path where the HTML output should be written
+     */
     private static void processFile(String inputFilePath, String outputFilePath) {
         try (BufferedReader reader = new BufferedReader(new FileReader(inputFilePath));
              BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath))) {

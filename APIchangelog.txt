@@ -1,2 +1,19 @@
 API Changes:
 - added a dedicated server link because we have no revune.
+! fixed a bug related to spawn eggs thanks for reporting the issue Duck-Leader
+- finally fixed a server crash
+- added mod contraption compatibility utilities and conditional block replacement
+- expanded structure block limit to 256 blocks
+- added custom weighted jigsaw manager and lightweight math utilities
+!! added a chunk optimizations all old worlds will be incompatible
+* global chat feature is undergoing testing
+* same as the analytics which tells me about you guys and if there are any performance issues i can solve them it only tells me when you guys emcounter high performance and sends it to a server
+!! added starter structure spawn with cryo tubes so now you guys start the pack in a good place
+- added chat roles
+!! adjusts the shader pack to whatever your hardware is
+- added a faq system
+!! added a world version checker
+! added a ai performance updater which you would have to aprove or disaprove suggestions to affect your performance
+- added some anti cheat options
+- added tide system
+* added a bunch of other small things

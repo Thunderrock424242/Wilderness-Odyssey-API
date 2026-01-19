@@ -6,17 +6,14 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.common.NeoForge;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
 @EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
 public class ClientSaveHandler {
 
-    public ClientSaveHandler() {
-        // For some custom client events, you might want to register with MinecraftForge.EVENT_BUS:
-        NeoForge.EVENT_BUS.register(this);
-    }
+    private static final int FLUSH_INTERVAL = 10000;
+    private static int tickCounter = 0;
 
     /**
      * If you want to optimize the final "Saving World" step on a singleplayer game,
@@ -34,6 +31,7 @@ public class ClientSaveHandler {
             // The integrated server is about to close.
             // We can trigger a final chunk flush on the server side to minimize
             // how much is left to save during "Saving World."
+            assert mc.getSingleplayerServer() != null;
             mc.getSingleplayerServer().execute(() -> {
                 // Force chunks to save
                 mc.getSingleplayerServer().overworld().save(null, false, true);
@@ -51,17 +49,16 @@ public class ClientSaveHandler {
      * you could do so every X ticks on the client side, when in singleplayer.
      */
     @SubscribeEvent
-    public static void onClientTick(ClientTickEvent.Post event) {{
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.player == null) return;
-            if (mc.hasSingleplayerServer()) {
-                // Example: flush once every 10,000 ticks on the client side
-                long time = mc.level.getGameTime();
-                if (time % 10000 == 0) {
-                    mc.getSingleplayerServer().execute(() -> {
-                        mc.getSingleplayerServer().overworld().save(null, false, true);
-                    });
-                }
+    public static void onClientTick(ClientTickEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        if (mc.hasSingleplayerServer()) {
+            if (++tickCounter >= FLUSH_INTERVAL) {
+                tickCounter = 0;
+                assert mc.getSingleplayerServer() != null;
+                mc.getSingleplayerServer().execute(() -> {
+                    mc.getSingleplayerServer().overworld().save(null, false, true);
+                });
             }
         }
     }

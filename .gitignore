@@ -28,3 +28,8 @@ repo
 /changelog.txt
 /Modpack_Checklist.txt
 /formatted_APIchangelog.txt
+
+# local environment
+.env
+/logs/debug.log
+/logs/latest.log
