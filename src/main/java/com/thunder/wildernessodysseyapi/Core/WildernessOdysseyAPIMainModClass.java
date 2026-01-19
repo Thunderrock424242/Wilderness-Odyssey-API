@@ -29,6 +29,7 @@ import com.thunder.wildernessodysseyapi.AntiCheat.AntiCheatConfig;
 import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
+import com.thunder.wildernessodysseyapi.rules.GameRulesListManager;
 import com.thunder.wildernessodysseyapi.tide.TideConfig;
 import com.thunder.wildernessodysseyapi.tide.TideManager;
 import net.minecraft.commands.CommandSourceStack;
@@ -144,6 +145,8 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStarting(ServerStartingEvent event){
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
+        GameRulesListManager.ensureRulesFileExists(event.getServer());
+        GameRulesListManager.applyConfiguredRules(event.getServer());
     }
 
     /**
