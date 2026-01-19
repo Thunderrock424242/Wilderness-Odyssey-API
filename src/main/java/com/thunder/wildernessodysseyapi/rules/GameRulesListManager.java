@@ -144,16 +144,7 @@ public final class GameRulesListManager {
         var gameRules = server.getGameRules();
         GameRules.visitGameRuleTypes(new GameRules.GameRuleTypeVisitor() {
             @Override
-            public void visit(GameRules.Key<GameRules.BooleanValue> key, GameRules.Type<GameRules.BooleanValue> type) {
-                addEntry(key);
-            }
-
-            @Override
-            public void visit(GameRules.Key<GameRules.IntegerValue> key, GameRules.Type<GameRules.IntegerValue> type) {
-                addEntry(key);
-            }
-
-            private <T extends GameRules.Value<T>> void addEntry(GameRules.Key<T> key) {
+            public <T extends GameRules.Value<T>> void visit(GameRules.Key<T> key, GameRules.Type<T> type) {
                 String name = key.getId();
                 String value = gameRules.getRule(key).toString();
                 entries.add(new GameRuleEntry(name, value));
