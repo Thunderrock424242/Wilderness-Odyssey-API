@@ -18,6 +18,7 @@ import net.minecraft.server.MinecraftServer;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import net.minecraft.world.level.GameRules;
 
 public final class GameRulesListManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -141,10 +142,22 @@ public final class GameRulesListManager {
     private static List<GameRuleEntry> loadVanillaRuleEntries(MinecraftServer server) {
         List<GameRuleEntry> entries = new ArrayList<>();
         var gameRules = server.getGameRules();
-        net.minecraft.world.level.GameRules.visitGameRuleTypes((key, type) -> {
-            String name = key.getId();
-            String value = gameRules.getRule(key).toString();
-            entries.add(new GameRuleEntry(name, value));
+        GameRules.visitGameRuleTypes(new GameRules.GameRuleTypeVisitor() {
+            @Override
+            public void visit(GameRules.Key<GameRules.BooleanValue> key, GameRules.Type<GameRules.BooleanValue> type) {
+                addEntry(key);
+            }
+
+            @Override
+            public void visit(GameRules.Key<GameRules.IntegerValue> key, GameRules.Type<GameRules.IntegerValue> type) {
+                addEntry(key);
+            }
+
+            private <T extends GameRules.Value<T>> void addEntry(GameRules.Key<T> key) {
+                String name = key.getId();
+                String value = gameRules.getRule(key).toString();
+                entries.add(new GameRuleEntry(name, value));
+            }
         });
         entries.sort((a, b) -> a.name().compareToIgnoreCase(b.name()));
         return List.copyOf(entries);
