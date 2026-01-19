@@ -196,7 +196,7 @@ public class NBTStructurePlacer {
             int maxDepth = StructureConfig.AUTO_TERRAIN_BLEND_MAX_DEPTH.get();
             int radius = resolveAutoBlendRadius(data.size());
             TerrainReplacerEngine.AutoBlendMask mask = TerrainReplacerEngine.AutoBlendMask.allowAll();
-            if (StructureConfig.ENABLE_SMART_AUTO_TERRAIN_BLEND.get()) {
+            if (!isStarterBunker() && StructureConfig.ENABLE_SMART_AUTO_TERRAIN_BLEND.get()) {
                 mask = buildAutoBlendMask(data.template(), foundation.origin(), data.size());
             }
             autoBlended = TerrainReplacerEngine.applyAutoBlend(level, placementBox, maxDepth, radius, mask);
@@ -598,10 +598,11 @@ public class NBTStructurePlacer {
             return TerrainReplacerEngine.AutoBlendMask.allowAll();
         }
 
+        final int supportTolerance = 1;
         boolean[] supported = new boolean[sizeX * sizeZ];
         boolean anySupported = false;
         for (int i = 0; i < lowestY.length; i++) {
-            if (lowestY[i] != Integer.MAX_VALUE && lowestY[i] == globalMinY) {
+            if (lowestY[i] != Integer.MAX_VALUE && lowestY[i] <= globalMinY + supportTolerance) {
                 supported[i] = true;
                 anySupported = true;
             }
