@@ -18,6 +18,7 @@ import net.minecraft.server.MinecraftServer;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import net.minecraft.world.level.GameRules;
 
 public final class GameRulesListManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -141,10 +142,13 @@ public final class GameRulesListManager {
     private static List<GameRuleEntry> loadVanillaRuleEntries(MinecraftServer server) {
         List<GameRuleEntry> entries = new ArrayList<>();
         var gameRules = server.getGameRules();
-        net.minecraft.world.level.GameRules.visitGameRuleTypes((key, type) -> {
-            String name = key.getId();
-            String value = gameRules.getRule(key).toString();
-            entries.add(new GameRuleEntry(name, value));
+        GameRules.visitGameRuleTypes(new GameRules.GameRuleTypeVisitor() {
+            @Override
+            public <T extends GameRules.Value<T>> void visit(GameRules.Key<T> key, GameRules.Type<T> type) {
+                String name = key.getId();
+                String value = gameRules.getRule(key).toString();
+                entries.add(new GameRuleEntry(name, value));
+            }
         });
         entries.sort((a, b) -> a.name().compareToIgnoreCase(b.name()));
         return List.copyOf(entries);
