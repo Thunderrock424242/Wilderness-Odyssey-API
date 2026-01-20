@@ -18,8 +18,8 @@ settings:
   wake_word: "atlas"
   model: "local-story-engine"
 local_model:
-  enabled: true
-  auto_start: true
+  enabled: false
+  auto_start: false
   base_url: "http://localhost:11434"
   model: "llama3.2:3b"
   start_command: ""

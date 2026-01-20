@@ -242,6 +242,14 @@ public class GlobalChatManager {
         settings.save(settingsFile);
     }
 
+    public void setAllowServerAutostart(boolean enabled) {
+        if (settings == null) {
+            return;
+        }
+        settings.setAllowServerAutostart(enabled);
+        settings.save(settingsFile);
+    }
+
     public void sendModerationAction(String action, String target, long durationSeconds, boolean includeIp,
                                      String role, String ip, String reason) {
         if (!connected.get() || settings == null || settings.moderationToken().isEmpty()) {
