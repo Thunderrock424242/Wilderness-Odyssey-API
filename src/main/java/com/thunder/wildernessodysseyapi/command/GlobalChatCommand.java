@@ -168,15 +168,18 @@ public class GlobalChatCommand {
 
     private static int startServer(CommandContext<CommandSourceStack> ctx) {
         int port = IntegerArgumentType.getInteger(ctx, "port");
-        if (GlobalChatManager.getInstance().getSettings() != null
-                && !GlobalChatManager.getInstance().getSettings().allowServerAutostart()) {
+        GlobalChatSettings settings = GlobalChatManager.getInstance().getSettings();
+        if (settings == null || !settings.enabled()) {
+            ctx.getSource().sendFailure(Component.literal("Global chat is disabled. Enable it in config before starting the relay server."));
+            return 0;
+        }
+        if (!settings.allowServerAutostart()) {
             ctx.getSource().sendFailure(Component.literal("Relay autostart is disabled; start the central server on the dedicated host you configured."));
             return 0;
         }
         try {
-            GlobalChatManager manager = GlobalChatManager.getInstance();
-            String moderationToken = manager.getSettings() != null ? manager.getSettings().moderationToken() : "";
-            String clusterToken = manager.getSettings() != null ? manager.getSettings().clusterToken() : "";
+            String moderationToken = settings.moderationToken();
+            String clusterToken = settings.clusterToken();
             SERVER_PROCESS.start(port, moderationToken, clusterToken);
             ctx.getSource().sendSuccess(() -> Component.literal("Started relay server on port " + port), true);
             return 1;
@@ -208,10 +211,7 @@ public class GlobalChatCommand {
 
     private static int setAllowAutostart(CommandContext<CommandSourceStack> ctx) {
         boolean enabled = BoolArgumentType.getBool(ctx, "enabled");
-        GlobalChatManager manager = GlobalChatManager.getInstance();
-        if (manager.getSettings() != null) {
-            manager.getSettings().setAllowServerAutostart(enabled);
-        }
+        GlobalChatManager.getInstance().setAllowServerAutostart(enabled);
         ctx.getSource().sendSuccess(() -> Component.literal("Relay server autostart " + (enabled ? "enabled" : "disabled") + "."), true);
         return 1;
     }

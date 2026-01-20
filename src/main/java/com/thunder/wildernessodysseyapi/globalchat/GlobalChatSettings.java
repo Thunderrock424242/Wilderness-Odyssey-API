@@ -24,7 +24,7 @@ public class GlobalChatSettings {
 
     private String host = DEFAULT_RELAY_HOST;
     private int port = DEFAULT_RELAY_PORT;
-    private boolean enabled = true;
+    private boolean enabled = false;
     private List<String> downtimeHistory = new ArrayList<>();
     private boolean allowServerAutostart = false;
     private String moderationToken = "";
