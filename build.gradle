@@ -179,7 +179,12 @@ dependencies {
     implementation "curse.maven:supplementaries-412082:7114487"
     implementation "curse.maven:multipart-machines-cooking-885587:5686941"
     implementation "curse.maven:locate-fixer-1301683:6762552"
-    implementation 'org.yaml:snakeyaml:2.2'
+    jarJar(implementation("org.yaml:snakeyaml:2.2")) {
+        version {
+            strictly '[2.2,3.0)'
+            prefer '2.2'
+        }
+    }
     implementation "curse.maven:selene-499980:7113115"
     implementation "curse.maven:amendments-896746:7054319"
     implementation "curse.maven:spark-361579:6225208"
@@ -198,6 +203,8 @@ dependencies {
     bundledLibs 'com.squareup.okio:okio:3.9.0'
     bundledLibs 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
     bundledLibs 'com.github.luben:zstd-jni:1.5.7-6'
+
+    additionalRuntimeClasspath 'org.yaml:snakeyaml:2.2'
 
     testImplementation platform("org.junit:junit-bom:${junitVersion}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
