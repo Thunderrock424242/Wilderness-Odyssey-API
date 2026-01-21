@@ -198,7 +198,6 @@ dependencies {
     bundledLibs 'com.squareup.okio:okio:3.9.0'
     bundledLibs 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
     bundledLibs 'com.github.luben:zstd-jni:1.5.7-6'
-    bundledLibs 'org.yaml:snakeyaml:2.2'
 
     testImplementation platform("org.junit:junit-bom:${junitVersion}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
