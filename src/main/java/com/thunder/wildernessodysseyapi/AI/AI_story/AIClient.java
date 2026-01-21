@@ -10,6 +10,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.fml.loading.FMLPaths;
@@ -173,7 +175,9 @@ public class AIClient {
             context = context.isBlank() ? knowledgeContext : context + "\n" + knowledgeContext;
         }
         if (localModelClient == null) {
-            return respondLocalModelUnavailable(world, player, false);
+            String reply = buildOfflineReply(world, player, message, false, false);
+            memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
+            return voiceIntegration.wrap(reply);
         }
         String prompt = formatSystemPrompt(localSystemPrompt);
         String localContext = buildLocalModelContext(world, context);
@@ -193,38 +197,9 @@ public class AIClient {
             return voiceIntegration.wrap(reply);
         }
         stopLocalModelServerIfNeeded();
-        return respondLocalModelUnavailable(world, player, autoStartLocalServer);
-    }
-
-    private VoiceIntegration.VoiceResult respondLocalModelUnavailable(String world, String player, boolean startAttempted) {
-        String reply = buildLocalModelUnavailableMessage(startAttempted);
+        String reply = buildOfflineReply(world, player, message, true, autoStartLocalServer);
         memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
         return voiceIntegration.wrap(reply);
-    }
-
-    private String buildLocalModelUnavailableMessage(boolean startAttempted) {
-        StringBuilder reply = new StringBuilder("Local model unavailable");
-        if (localModelBaseUrl != null && !localModelBaseUrl.isBlank()) {
-            reply.append(" at ").append(localModelBaseUrl);
-        }
-        reply.append(".");
-        if (startAttempted) {
-            reply.append(" Tried to start the local AI server");
-            if (localServerStartCommand != null && !localServerStartCommand.isBlank()) {
-                reply.append(" using: ").append(localServerStartCommand);
-            } else if (bundledServerResource != null && !bundledServerResource.isBlank()) {
-                reply.append(" using the bundled server");
-            } else {
-                reply.append(", but no start command is configured");
-            }
-            reply.append(".");
-        } else {
-            reply.append(" Make sure your local AI server is running and reachable.");
-        }
-        if (localModelName != null && !localModelName.isBlank()) {
-            reply.append(" Model: ").append(localModelName).append(".");
-        }
-        return reply.toString();
     }
 
     private boolean isLocalServerRunning() {
@@ -398,5 +373,88 @@ public class AIClient {
             builder.append("Recent conversation:\n").append(conversationContext.trim()).append("\n");
         }
         return builder.toString().trim();
+    }
+
+    private String buildOfflineReply(String world, String player, String message, boolean modelUnavailable, boolean startAttempted) {
+        int seed = Math.floorMod(Objects.hash(world, player, message, settings.getPersonaName()), 10_000);
+        String lower = message == null ? "" : message.toLowerCase(Locale.ROOT);
+        boolean question = (message != null && message.trim().endsWith("?"))
+                || containsAny(lower, "how", "what", "where", "why", "can i", "should i", "do i");
+        boolean comfort = containsAny(lower, "help", "stuck", "lost", "scared", "afraid", "panic", "worry", "worried");
+
+        List<String> empathyLines = comfort
+                ? List.of("I hear you.", "You're not alone out there.", "I'm with you.")
+                : List.of("Got it.", "Understood.", "Copy that.");
+        List<String> promptLines = question
+                ? List.of(
+                        "Here’s what I can share from the expedition logs:",
+                        "Let me check the field notes—this stands out:",
+                        "From the records we kept, try this lead:")
+                : List.of(
+                        "Thanks for the update—this connects to:",
+                        "Noted. It lines up with this fragment:",
+                        "I logged that. It echoes a prior report:");
+        List<String> followUps = List.of(
+                "Want me to keep watching for signals?",
+                "If you want, tell me what you spot and I’ll compare notes.",
+                "Need a quick scan of nearby ruins or supplies?");
+
+        StringBuilder reply = new StringBuilder();
+        reply.append(pickFrom(empathyLines, seed));
+        reply.append(" ").append(pickFrom(promptLines, seed + 1));
+        String lore = pickLoreLine(seed + 2);
+        if (!lore.isBlank()) {
+            reply.append(" ").append(lore);
+        }
+        reply.append(" ").append(pickFrom(followUps, seed + 3));
+
+        if (modelUnavailable) {
+            reply.append(" If you want richer answers, make sure the local AI server is running");
+            if (localModelBaseUrl != null && !localModelBaseUrl.isBlank()) {
+                reply.append(" at ").append(localModelBaseUrl);
+            }
+            if (startAttempted) {
+                reply.append(" and that auto-start is configured correctly");
+            }
+            reply.append(".");
+        }
+        return reply.toString().trim();
+    }
+
+    private String pickLoreLine(int seed) {
+        List<String> lore = new ArrayList<>(story.size() + backgroundHistory.size());
+        lore.addAll(story);
+        lore.addAll(backgroundHistory);
+        if (!corruptedLore.isEmpty() && Math.floorMod(seed, 6) == 0) {
+            String fragment = pickFrom(corruptedLore, seed);
+            if (corruptedPrefix != null && !corruptedPrefix.isBlank()) {
+                return corruptedPrefix + " " + fragment;
+            }
+            return fragment;
+        }
+        if (!lore.isEmpty()) {
+            return pickFrom(lore, seed);
+        }
+        return "The surface is still unstable; keep your supplies close and move carefully.";
+    }
+
+    private static String pickFrom(List<String> options, int seed) {
+        if (options == null || options.isEmpty()) {
+            return "";
+        }
+        int index = Math.floorMod(seed, options.size());
+        return options.get(index);
+    }
+
+    private static boolean containsAny(String value, String... tokens) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        for (String token : tokens) {
+            if (value.contains(token)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
