@@ -18,7 +18,7 @@ public class TelemetryConsentScreen extends Screen {
     private static final int BUTTON_WIDTH = 180;
     private static final int BUTTON_HEIGHT = 20;
     private static final int TEXT_PADDING = 10;
-    private static final int BUTTON_TOP_MARGIN = 14;
+    private static final int BUTTON_TOP_MARGIN = 18;
     private static final int MAX_TEXT_WIDTH = 340;
 
     private List<FormattedCharSequence> descriptionLines = Collections.emptyList();
@@ -47,7 +47,7 @@ public class TelemetryConsentScreen extends Screen {
         );
         int descriptionHeight = this.descriptionLines.size() * this.font.lineHeight;
         int textBlockHeight = this.font.lineHeight + TEXT_PADDING + descriptionHeight + TEXT_PADDING + this.font.lineHeight;
-        int buttonGap = BUTTON_TOP_MARGIN + TEXT_PADDING;
+        int buttonGap = BUTTON_TOP_MARGIN + TEXT_PADDING + 4;
         int totalHeight = textBlockHeight + buttonGap + (BUTTON_HEIGHT * 2) + 6;
         int startY = Math.max(20, (this.height - totalHeight) / 2);
         this.titleY = startY;
