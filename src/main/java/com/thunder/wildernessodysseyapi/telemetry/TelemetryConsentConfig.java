@@ -19,8 +19,8 @@ public final class TelemetryConsentConfig {
 
         CONSENT_DECISION = builder.comment("Client-side telemetry consent decision (accepted/declined/unknown).")
                 .define("decision", ConsentDecision.UNKNOWN.serialized());
-        CONSENT_VERSION = builder.comment("Mod version when consent was last recorded.")
-                .define("version", ModConstants.VERSION);
+        CONSENT_VERSION = builder.comment("Modpack world version when consent was last recorded.")
+                .define("version", ModConstants.MOD_DEFAULT_WORLD_VERSION);
 
         builder.pop();
 
@@ -36,6 +36,7 @@ public final class TelemetryConsentConfig {
 
     public static void setDecision(ConsentDecision decision) {
         CONSENT_DECISION.set(decision.serialized());
+        CONSENT_VERSION.set(ModConstants.MOD_DEFAULT_WORLD_VERSION);
         CONFIG_SPEC.save();
     }
 
@@ -43,7 +44,7 @@ public final class TelemetryConsentConfig {
         if (!CONFIG_SPEC.isLoaded()) {
             return;
         }
-        String currentVersion = ModConstants.VERSION;
+        String currentVersion = ModConstants.MOD_DEFAULT_WORLD_VERSION;
         if (!CONSENT_VERSION.get().equals(currentVersion)) {
             CONSENT_DECISION.set(ConsentDecision.UNKNOWN.serialized());
             CONSENT_VERSION.set(currentVersion);
