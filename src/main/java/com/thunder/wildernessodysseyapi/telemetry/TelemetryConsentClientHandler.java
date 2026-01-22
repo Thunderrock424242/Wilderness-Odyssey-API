@@ -28,7 +28,7 @@ public final class TelemetryConsentClientHandler {
         }
         Minecraft minecraft = Minecraft.getInstance();
         minecraft.execute(() -> {
-            if (!promptedThisSession && minecraft.screen == null) {
+            if (!promptedThisSession && minecraft.level != null) {
                 promptedThisSession = true;
                 minecraft.setScreen(new TelemetryConsentScreen());
             }
