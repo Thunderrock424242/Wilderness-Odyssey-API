@@ -60,5 +60,11 @@
   "screen.wildernessodysseyapi.world_version.command": "Run /updateworldversion in chat if you are an operator.",
   "screen.wildernessodysseyapi.world_version.worldgen_warning": "World generation and structures may change.",
   "screen.wildernessodysseyapi.world_version.bug_tip": "For bugs, test in a fresh world before reporting.",
+  "screen.wildernessodysseyapi.telemetry.title": "Share Gameplay Statistics?",
+  "screen.wildernessodysseyapi.telemetry.description": "Share your country/state and account age to help improve the mod.",
+  "screen.wildernessodysseyapi.telemetry.accept": "I Accept",
+  "screen.wildernessodysseyapi.telemetry.decline": "I Decline",
+  "command.wildernessodysseyapi.telemetry.status": "Telemetry consent is currently set to: %s",
+  "command.wildernessodysseyapi.telemetry.set": "Telemetry consent updated to: %s",
   "pack.wildernessodysseyapi.plains_spawn.title": "Wilderness Odyssey Plains Spawn"
 }
