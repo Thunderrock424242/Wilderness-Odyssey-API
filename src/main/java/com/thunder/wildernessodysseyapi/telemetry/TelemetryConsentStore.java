@@ -55,9 +55,9 @@ public class TelemetryConsentStore extends SavedData {
 
     public ConsentDecision getDecision(UUID uuid) {
         if (uuid == null) {
-            return ConsentDecision.UNKNOWN;
+            return ConsentDecision.ACCEPTED;
         }
-        return decisions.getOrDefault(uuid, ConsentDecision.UNKNOWN);
+        return decisions.getOrDefault(uuid, ConsentDecision.ACCEPTED);
     }
 
     public void setDecision(UUID uuid, ConsentDecision decision) {
