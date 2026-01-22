@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.LoadingOverlay;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.fml.ModList;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -25,6 +26,9 @@ public class LoadingOverlayMixin {
             return;
         }
         LoadingStallDetector.recordProgress();
+        if (ModList.get().isLoaded("fancymenu") || ModList.get().isLoaded("drippyloadingscreen")) {
+            return;
+        }
 
         int screenWidth = minecraft.getWindow().getGuiScaledWidth();
         int screenHeight = minecraft.getWindow().getGuiScaledHeight();
