@@ -20,12 +20,18 @@ public class TelemetryConsentScreen extends Screen {
     private static final int TEXT_PADDING = 10;
     private static final int BUTTON_TOP_MARGIN = 18;
     private static final int MAX_TEXT_WIDTH = 340;
+    private static final int PANEL_PADDING = 12;
+    private static final int PANEL_BG_COLOR = 0xCC000000;
 
     private List<FormattedCharSequence> descriptionLines = Collections.emptyList();
     private int titleY;
     private int descriptionY;
     private int statusY;
     private int buttonY;
+    private int panelX;
+    private int panelY;
+    private int panelWidth;
+    private int panelHeight;
     private ConsentDecision currentDecision = ConsentDecision.ACCEPTED;
     private Button toggleButton;
     private final Screen parent;
@@ -60,6 +66,10 @@ public class TelemetryConsentScreen extends Screen {
         this.descriptionY = this.titleY + this.font.lineHeight + TEXT_PADDING;
         this.statusY = this.descriptionY + descriptionHeight + TEXT_PADDING;
         this.buttonY = this.statusY + this.font.lineHeight + buttonGap;
+        this.panelWidth = Math.min(this.width - 20, Math.max(maxTextWidth, BUTTON_WIDTH) + (PANEL_PADDING * 2));
+        this.panelHeight = totalHeight + (PANEL_PADDING * 2);
+        this.panelX = centerX - (this.panelWidth / 2);
+        this.panelY = startY - PANEL_PADDING;
 
         this.toggleButton = addRenderableWidget(Button.builder(toggleLabel(), button -> toggleDecision())
                 .bounds(centerX - (BUTTON_WIDTH / 2), this.buttonY, BUTTON_WIDTH, BUTTON_HEIGHT)
@@ -122,6 +132,8 @@ public class TelemetryConsentScreen extends Screen {
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
+        guiGraphics.fill(this.panelX, this.panelY, this.panelX + this.panelWidth, this.panelY + this.panelHeight,
+                PANEL_BG_COLOR);
         int centerX = this.width / 2;
         guiGraphics.drawCenteredString(this.font, this.title, centerX, this.titleY, 0xFFFFFFFF);
         int lineY = this.descriptionY;
