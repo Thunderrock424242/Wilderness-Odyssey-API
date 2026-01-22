@@ -21,7 +21,7 @@ public final class TelemetryConsentClientHandler {
     }
 
     @SubscribeEvent
-    public static void onClientLogin(ClientPlayerNetworkEvent.LoggedInEvent event) {
+    public static void onClientLogin(ClientPlayerNetworkEvent.LoggingIn event) {
         TelemetryConsentConfig.validateVersion();
         if (TelemetryConsentConfig.decision() != ConsentDecision.UNKNOWN) {
             return;

@@ -1,9 +1,12 @@
 package com.thunder.wildernessodysseyapi.telemetry;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.saveddata.SavedData;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.Locale;
@@ -24,10 +27,28 @@ public class TelemetryConsentStore extends SavedData {
     public TelemetryConsentStore() {
     }
 
+    public TelemetryConsentStore(CompoundTag tag, HolderLookup.Provider registries) {
+        String savedVersion = tag.contains(VERSION_KEY, Tag.TAG_STRING) ? tag.getString(VERSION_KEY) : "";
+        if (!ModConstants.VERSION.equals(savedVersion)) {
+            this.version = ModConstants.VERSION;
+            return;
+        }
+        this.version = savedVersion;
+        CompoundTag decisionTag = tag.getCompound(DECISIONS_KEY);
+        for (String key : decisionTag.getAllKeys()) {
+            try {
+                UUID uuid = UUID.fromString(key);
+                ConsentDecision decision = ConsentDecision.fromString(decisionTag.getString(key));
+                this.decisions.put(uuid, decision);
+            } catch (IllegalArgumentException ignored) {
+                // Skip invalid UUID entries.
+            }
+        }
+    }
+
     public static TelemetryConsentStore get(MinecraftServer server) {
         return server.overworld().getDataStorage().computeIfAbsent(
-                TelemetryConsentStore::load,
-                TelemetryConsentStore::new,
+                new SavedData.Factory<>(TelemetryConsentStore::new, TelemetryConsentStore::new),
                 DATA_NAME
         );
     }
@@ -48,36 +69,12 @@ public class TelemetryConsentStore extends SavedData {
     }
 
     @Override
-    public CompoundTag save(CompoundTag tag) {
+    public @NotNull CompoundTag save(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         tag.putString(VERSION_KEY, version);
         CompoundTag decisionTag = new CompoundTag();
         decisions.forEach((uuid, decision) -> decisionTag.putString(uuid.toString(), decision.serialized()));
         tag.put(DECISIONS_KEY, decisionTag);
         return tag;
-    }
-
-    public static TelemetryConsentStore load(CompoundTag tag) {
-        TelemetryConsentStore store = new TelemetryConsentStore();
-        if (tag == null) {
-            return store;
-        }
-        String savedVersion = tag.getString(VERSION_KEY);
-        if (!ModConstants.VERSION.equals(savedVersion)) {
-            store.version = ModConstants.VERSION;
-            return store;
-        }
-        store.version = savedVersion;
-        CompoundTag decisionTag = tag.getCompound(DECISIONS_KEY);
-        for (String key : decisionTag.getAllKeys()) {
-            try {
-                UUID uuid = UUID.fromString(key);
-                ConsentDecision decision = ConsentDecision.fromString(decisionTag.getString(key));
-                store.decisions.put(uuid, decision);
-            } catch (IllegalArgumentException ignored) {
-                // Skip invalid UUID entries.
-            }
-        }
-        return store;
     }
 
     public enum ConsentDecision {
