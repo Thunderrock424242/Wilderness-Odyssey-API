@@ -47,12 +47,13 @@ public class TelemetryConsentScreen extends Screen {
         );
         int descriptionHeight = this.descriptionLines.size() * this.font.lineHeight;
         int textBlockHeight = this.font.lineHeight + TEXT_PADDING + descriptionHeight + TEXT_PADDING + this.font.lineHeight;
-        int totalHeight = textBlockHeight + BUTTON_TOP_MARGIN + (BUTTON_HEIGHT * 2) + 6;
+        int buttonGap = BUTTON_TOP_MARGIN + TEXT_PADDING;
+        int totalHeight = textBlockHeight + buttonGap + (BUTTON_HEIGHT * 2) + 6;
         int startY = Math.max(20, (this.height - totalHeight) / 2);
         this.titleY = startY;
         this.descriptionY = this.titleY + this.font.lineHeight + TEXT_PADDING;
         this.statusY = this.descriptionY + descriptionHeight + TEXT_PADDING;
-        this.buttonY = this.statusY + this.font.lineHeight + BUTTON_TOP_MARGIN;
+        this.buttonY = this.statusY + this.font.lineHeight + buttonGap;
 
         this.toggleButton = addRenderableWidget(Button.builder(toggleLabel(), button -> toggleDecision())
                 .bounds(centerX - (BUTTON_WIDTH / 2), this.buttonY, BUTTON_WIDTH, BUTTON_HEIGHT)
