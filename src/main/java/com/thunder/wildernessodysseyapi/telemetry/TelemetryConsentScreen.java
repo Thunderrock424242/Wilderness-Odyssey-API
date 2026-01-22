@@ -28,9 +28,15 @@ public class TelemetryConsentScreen extends Screen {
     private int buttonY;
     private ConsentDecision currentDecision = ConsentDecision.ACCEPTED;
     private Button toggleButton;
+    private final Screen parent;
 
     public TelemetryConsentScreen() {
+        this(null);
+    }
+
+    public TelemetryConsentScreen(Screen parent) {
         super(Component.translatable("screen.wildernessodysseyapi.telemetry.title"));
+        this.parent = parent;
     }
 
     @Override
@@ -97,7 +103,11 @@ public class TelemetryConsentScreen extends Screen {
     private void applyDecision() {
         TelemetryConsentConfig.setDecision(currentDecision);
         sendConsentCommand(currentDecision);
-        Minecraft.getInstance().setScreen(null);
+        returnToParent();
+    }
+
+    private void returnToParent() {
+        Minecraft.getInstance().setScreen(parent);
     }
 
     private void sendConsentCommand(ConsentDecision decision) {
@@ -126,6 +136,11 @@ public class TelemetryConsentScreen extends Screen {
 
     @Override
     public boolean shouldCloseOnEsc() {
-        return false;
+        return parent != null;
+    }
+
+    @Override
+    public void onClose() {
+        returnToParent();
     }
 }

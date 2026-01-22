@@ -30,7 +30,7 @@ public final class TelemetryConsentClientHandler {
         minecraft.execute(() -> {
             if (!promptedThisSession && minecraft.level != null) {
                 promptedThisSession = true;
-                minecraft.setScreen(new TelemetryConsentScreen());
+                minecraft.setScreen(new TelemetryConsentScreen(minecraft.screen));
             }
         });
     }
@@ -47,7 +47,7 @@ public final class TelemetryConsentClientHandler {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.screen instanceof TitleScreen) {
             promptedThisSession = true;
-            minecraft.setScreen(new TelemetryConsentScreen());
+            minecraft.setScreen(new TelemetryConsentScreen(minecraft.screen));
         }
     }
 }

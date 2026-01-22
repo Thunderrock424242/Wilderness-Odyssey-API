@@ -35,7 +35,7 @@ public abstract class OptionsScreenTelemetryButtonMixin extends Screen {
 
         addRenderableWidget(Button.builder(
                         Component.translatable("screen.wildernessodysseyapi.telemetry.title"),
-                        button -> this.minecraft.setScreen(new TelemetryConsentScreen()))
+                        button -> this.minecraft.setScreen(new TelemetryConsentScreen(this)))
                 .bounds(x, y, width, height)
                 .build());
     }
