@@ -40,7 +40,7 @@ public final class TelemetryQueue {
     }
 
     private static TelemetryQueue createForServer(MinecraftServer server) {
-        Path configDir = server.getFile("config/wildernessodysseyapi").toPath();
+        Path configDir = server.getFile("config/wildernessodysseyapi");
         Path spoolFile = configDir.resolve("telemetry-queue.jsonl");
         return new TelemetryQueue(spoolFile);
     }
@@ -172,7 +172,7 @@ public final class TelemetryQueue {
     }
 
     public record TelemetryQueueStats(int pending, int failed, Instant lastSuccess) {
-        public Optional<Instant> lastSuccess() {
+        public Optional<Instant> lastSuccessOptional() {
             return Optional.ofNullable(lastSuccess);
         }
     }

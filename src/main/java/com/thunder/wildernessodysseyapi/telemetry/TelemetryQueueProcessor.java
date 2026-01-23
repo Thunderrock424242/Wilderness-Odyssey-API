@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.telemetry;
 
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
  * Flushes queued telemetry payloads on a schedule.
@@ -11,8 +11,8 @@ public final class TelemetryQueueProcessor {
     }
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.getServer() == null) {
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (event.getServer() == null) {
             return;
         }
         TelemetryConfig.TelemetryValues config = TelemetryConfig.values();

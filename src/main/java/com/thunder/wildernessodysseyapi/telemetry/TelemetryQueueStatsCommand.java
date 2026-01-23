@@ -18,7 +18,7 @@ public final class TelemetryQueueStatsCommand {
                 .executes(context -> {
                     CommandSourceStack source = context.getSource();
                     TelemetryQueue.TelemetryQueueStats stats = TelemetryQueue.get(source.getServer()).stats();
-                    Optional<Instant> lastSuccess = stats.lastSuccess();
+                    Optional<Instant> lastSuccess = stats.lastSuccessOptional();
                     source.sendSuccess(() -> Component.translatable(
                             "command.wildernessodysseyapi.telemetry.stats",
                             stats.pending(),
