@@ -26,7 +26,7 @@ import java.util.UUID;
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 
 /**
- * Collects player location and account age data and sends it to a Google Sheets webhook.
+ * Collects player country and account age data and sends it to a Google Sheets webhook.
  */
 public final class PlayerTelemetryReporter {
     private static final Gson GSON = new GsonBuilder().create();
@@ -170,22 +170,16 @@ public final class PlayerTelemetryReporter {
         JsonObject payload = new JsonObject();
         payload.addProperty("uuid", player.getUUID().toString());
         payload.addProperty("player_name", player.getGameProfile().getName());
-        payload.addProperty("timestamp", Instant.now().toString());
 
-        if (geoInfo.state != null) {
-            payload.addProperty("state", geoInfo.state);
-        }
         if (geoInfo.country != null) {
             payload.addProperty("country", geoInfo.country);
         }
 
         if (accountAge.estimatedAgeDays != null) {
             payload.addProperty("account_age_days", accountAge.estimatedAgeDays);
-            payload.addProperty("account_age_reference", accountAge.referenceDate.toString());
         } else {
-            payload.addProperty("account_age_reference", "unknown");
+            payload.addProperty("account_age_days", "unknown");
         }
-        payload.addProperty("account_age_source", accountAge.source);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(webhookUrl))
