@@ -25,6 +25,7 @@
     "DebugMixin",
     "LoadingOverlayMixin",
     "MixinWorldCreationUiState",
+    "OptionsScreenTelemetryButtonMixin",
     "ParticleEngineMixin",
     "StructureBlockRendererMixin"
   ]

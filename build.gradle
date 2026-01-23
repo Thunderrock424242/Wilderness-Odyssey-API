@@ -21,7 +21,7 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = "4.0.0"
+version = "4.0.1"
 group = "com.thunder.wildernessodysseyapi"
 
 base {
@@ -179,13 +179,18 @@ dependencies {
     implementation "curse.maven:supplementaries-412082:7114487"
     implementation "curse.maven:multipart-machines-cooking-885587:5686941"
     implementation "curse.maven:locate-fixer-1301683:6762552"
-    implementation 'org.yaml:snakeyaml:2.2'
+    jarJar(implementation("org.yaml:snakeyaml:2.2")) {
+        version {
+            strictly '[2.2,3.0)'
+            prefer '2.2'
+        }
+    }
     implementation "curse.maven:selene-499980:7113115"
     implementation "curse.maven:amendments-896746:7054319"
     implementation "curse.maven:spark-361579:6225208"
     implementation "curse.maven:sodium-394468:6382651"
     implementation "curse.maven:irisshaders-455508:6661598"
-    implementation "curse.maven:nova-apii-1248874:7457043"
+    implementation "curse.maven:nova-apii-1248874:7507458"
     implementation 'com.github.luben:zstd-jni:1.5.7-6'
 
     // AI advisory helpers (HTTP client and fault tolerance)
@@ -198,7 +203,8 @@ dependencies {
     bundledLibs 'com.squareup.okio:okio:3.9.0'
     bundledLibs 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
     bundledLibs 'com.github.luben:zstd-jni:1.5.7-6'
-    bundledLibs 'org.yaml:snakeyaml:2.2'
+
+    additionalRuntimeClasspath 'org.yaml:snakeyaml:2.2'
 
     testImplementation platform("org.junit:junit-bom:${junitVersion}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -245,7 +251,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_id                 : "wildernessodysseyapi",
             mod_name               : "Wilderness Odyssey API",
             mod_license            : "APR",
-            mod_version            : "4.0.0",
+            mod_version            : "4.0.1",
             mod_authors            : "thunderrock424242",
             mod_description        : "a api for my modpack"
     ]
