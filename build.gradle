@@ -21,7 +21,7 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = "4.0.0"
+version = "4.0.1"
 group = "com.thunder.wildernessodysseyapi"
 
 base {
@@ -251,7 +251,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_id                 : "wildernessodysseyapi",
             mod_name               : "Wilderness Odyssey API",
             mod_license            : "APR",
-            mod_version            : "4.0.0",
+            mod_version            : "4.0.1",
             mod_authors            : "thunderrock424242",
             mod_description        : "a api for my modpack"
     ]
