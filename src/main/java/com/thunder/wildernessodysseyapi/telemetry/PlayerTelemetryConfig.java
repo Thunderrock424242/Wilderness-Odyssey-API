@@ -13,6 +13,8 @@ public final class PlayerTelemetryConfig {
     public static final ModConfigSpec.ConfigValue<String> ACCOUNT_AGE_ENDPOINT;
     public static final ModConfigSpec.ConfigValue<String> SHEET_WEBHOOK_URL;
     public static final ModConfigSpec.IntValue REQUEST_TIMEOUT_SECONDS;
+    public static final ModConfigSpec.BooleanValue EXPORT_ON_LOGOUT;
+    public static final ModConfigSpec.BooleanValue INCLUDE_SPARK_REPORT;
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
@@ -40,6 +42,16 @@ public final class PlayerTelemetryConfig {
         REQUEST_TIMEOUT_SECONDS = BUILDER.comment("HTTP request timeout in seconds for telemetry lookups.")
                 .defineInRange("requestTimeoutSeconds", 10, 1, 60);
 
+        EXPORT_ON_LOGOUT = BUILDER.comment(
+                        "Send a telemetry export when a player logs out.",
+                        "If disabled, telemetry only exports on login.")
+                .define("exportOnLogout", true);
+
+        INCLUDE_SPARK_REPORT = BUILDER.comment(
+                        "When Spark is installed, attach a Spark report URL to logout exports.",
+                        "Requires exportOnLogout to be enabled.")
+                .define("includeSparkReport", false);
+
         BUILDER.pop();
 
         CONFIG_SPEC = BUILDER.build();
@@ -54,7 +66,9 @@ public final class PlayerTelemetryConfig {
                 GEO_IP_ENDPOINT.get(),
                 ACCOUNT_AGE_ENDPOINT.get(),
                 SHEET_WEBHOOK_URL.get(),
-                REQUEST_TIMEOUT_SECONDS.get()
+                REQUEST_TIMEOUT_SECONDS.get(),
+                EXPORT_ON_LOGOUT.get(),
+                INCLUDE_SPARK_REPORT.get()
         );
     }
 
@@ -63,7 +77,9 @@ public final class PlayerTelemetryConfig {
             String geoIpEndpoint,
             String accountAgeEndpoint,
             String sheetWebhookUrl,
-            int requestTimeoutSeconds
+            int requestTimeoutSeconds,
+            boolean exportOnLogout,
+            boolean includeSparkReport
     ) {
     }
 }

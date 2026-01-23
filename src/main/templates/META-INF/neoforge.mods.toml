@@ -70,3 +70,9 @@ versionRange="[1.4.0,)"
 ordering="NONE"
 side="BOTH"
 
+[[dependencies.wildernessodysseyapi]]
+modId="spark"
+mandatory=false
+versionRange="[1.0.0,)"
+ordering="NONE"
+side="BOTH"
