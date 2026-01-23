@@ -69,5 +69,11 @@
   "screen.wildernessodysseyapi.telemetry.toggle.off": "Turn Telemetry Off",
   "command.wildernessodysseyapi.telemetry.status": "Telemetry consent is currently set to: %s",
   "command.wildernessodysseyapi.telemetry.set": "Telemetry consent updated to: %s",
+  "command.wildernessodysseyapi.feedback.players_only": "Only players can use this command.",
+  "command.wildernessodysseyapi.feedback.disabled": "Feedback submissions are disabled on this server.",
+  "command.wildernessodysseyapi.feedback.not_configured": "Feedback webhook is not configured. Contact an admin.",
+  "command.wildernessodysseyapi.feedback.empty": "Please enter a feedback message.",
+  "command.wildernessodysseyapi.feedback.too_long": "Feedback message is too long. Max length: %s characters.",
+  "command.wildernessodysseyapi.feedback.sent": "Thanks! Your feedback was sent.",
   "pack.wildernessodysseyapi.plains_spawn.title": "Wilderness Odyssey Plains Spawn"
 }
