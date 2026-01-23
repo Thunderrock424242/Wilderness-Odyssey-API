@@ -23,16 +23,30 @@ public final class TelemetryConsentClientHandler {
     @SubscribeEvent
     public static void onClientLogin(ClientPlayerNetworkEvent.LoggingIn event) {
         TelemetryConsentConfig.validateVersion();
-        if (TelemetryConsentConfig.decision() != ConsentDecision.UNKNOWN) {
+        ConsentDecision decision = TelemetryConsentConfig.decision();
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.execute(() -> {
+            if (decision == ConsentDecision.UNKNOWN) {
+                if (!promptedThisSession && minecraft.level != null) {
+                    promptedThisSession = true;
+                    minecraft.setScreen(new TelemetryConsentScreen(minecraft.screen));
+                }
+            } else {
+                syncDecisionIfPossible(decision);
+            }
+        });
+    }
+
+    static void syncDecisionIfPossible(ConsentDecision decision) {
+        if (decision == ConsentDecision.UNKNOWN) {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
-        minecraft.execute(() -> {
-            if (!promptedThisSession && minecraft.level != null) {
-                promptedThisSession = true;
-                minecraft.setScreen(new TelemetryConsentScreen(minecraft.screen));
-            }
-        });
+        if (minecraft.player == null || minecraft.player.connection == null) {
+            return;
+        }
+        String command = decision == ConsentDecision.ACCEPTED ? "telemetryconsent accept" : "telemetryconsent decline";
+        minecraft.player.connection.sendCommand(command);
     }
 
     @SubscribeEvent

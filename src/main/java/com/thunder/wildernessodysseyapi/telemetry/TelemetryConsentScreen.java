@@ -112,21 +112,12 @@ public class TelemetryConsentScreen extends Screen {
 
     private void applyDecision() {
         TelemetryConsentConfig.setDecision(currentDecision);
-        sendConsentCommand(currentDecision);
+        TelemetryConsentClientHandler.syncDecisionIfPossible(currentDecision);
         returnToParent();
     }
 
     private void returnToParent() {
         Minecraft.getInstance().setScreen(parent);
-    }
-
-    private void sendConsentCommand(ConsentDecision decision) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null || minecraft.player.connection == null) {
-            return;
-        }
-        String command = decision == ConsentDecision.ACCEPTED ? "telemetryconsent accept" : "telemetryconsent decline";
-        minecraft.player.connection.sendCommand(command);
     }
 
     @Override
