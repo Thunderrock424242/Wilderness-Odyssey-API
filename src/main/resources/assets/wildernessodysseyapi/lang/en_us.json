@@ -69,6 +69,7 @@
   "screen.wildernessodysseyapi.telemetry.toggle.off": "Turn Telemetry Off",
   "command.wildernessodysseyapi.telemetry.status": "Telemetry consent is currently set to: %s",
   "command.wildernessodysseyapi.telemetry.set": "Telemetry consent updated to: %s",
+  "command.wildernessodysseyapi.telemetry.stats": "Telemetry queue stats: pending=%s, failed=%s, last_success=%s",
   "command.wildernessodysseyapi.feedback.players_only": "Only players can use this command.",
   "command.wildernessodysseyapi.feedback.disabled": "Feedback submissions are disabled on this server.",
   "command.wildernessodysseyapi.feedback.not_configured": "Feedback webhook is not configured. Contact an admin.",

@@ -40,6 +40,9 @@ import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryConfig;
 import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryReporter;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentCommand;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentConfig;
+import com.thunder.wildernessodysseyapi.telemetry.TelemetryConfig;
+import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueProcessor;
+import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueStatsCommand;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -111,6 +114,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(AIChatListener.class);
         NeoForge.EVENT_BUS.register(PlayerTelemetryReporter.class);
         NeoForge.EVENT_BUS.register(EventTelemetryReporter.class);
+        NeoForge.EVENT_BUS.register(TelemetryQueueProcessor.class);
 
         CryoTubeBlock.register(modEventBus);
         ModItems.register(modEventBus);
@@ -133,6 +137,8 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-telemetry-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, EventTelemetryConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-event-telemetry-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TelemetryConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-telemetry-master-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, FeedbackConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-feedback-server.toml");
         // Previously registered client-only events have been removed
@@ -187,6 +193,7 @@ public class WildernessOdysseyAPIMainModClass {
         GlobalChatOptToggleCommand.register(dispatcher);
         TideInfoCommand.register(dispatcher);
         TelemetryConsentCommand.register(dispatcher);
+        TelemetryQueueStatsCommand.register(dispatcher);
         FeedbackCommand.register(dispatcher);
     }
 
