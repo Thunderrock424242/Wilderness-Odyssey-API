@@ -1,7 +1,5 @@
 package com.thunder.wildernessodysseyapi.telemetry;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentStore.ConsentDecision;
@@ -11,10 +9,6 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -26,11 +20,6 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
  * Sends event-based telemetry payloads (server lifecycle and player login/logout).
  */
 public final class EventTelemetryReporter {
-    private static final Gson GSON = new GsonBuilder().create();
-    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
-
     private EventTelemetryReporter() {
     }
 
@@ -60,13 +49,17 @@ public final class EventTelemetryReporter {
 
     private static void sendEvent(String eventType, ServerPlayer player, net.minecraft.server.MinecraftServer server) {
         EventTelemetryConfig.EventTelemetryValues config = EventTelemetryConfig.values();
-        if (!config.enabled()) {
+        if (!TelemetryConfig.values().enabled() || !config.enabled()) {
             return;
         }
         if (config.webhookUrl() == null || config.webhookUrl().isBlank()) {
             return;
         }
+        if (!TelemetrySampling.shouldSample(eventType, config.sampleEveryNth(), config.sampleRatePercent())) {
+            return;
+        }
         JsonObject payload = new JsonObject();
+        payload.addProperty("schema_version", TelemetryPayloads.SCHEMA_VERSION);
         payload.addProperty("event_type", eventType);
         payload.addProperty("timestamp", Instant.now().toString());
         payload.addProperty("mod_version", VERSION);
@@ -76,27 +69,62 @@ public final class EventTelemetryReporter {
         if (player != null && config.includePlayerIdentifiers()) {
             TelemetryConsentStore consentStore = TelemetryConsentStore.get(server);
             if (consentStore.getDecision(player.getUUID()) == ConsentDecision.ACCEPTED) {
-                payload.addProperty("player_name", player.getGameProfile().getName());
-                payload.addProperty("player_uuid", player.getUUID().toString());
+                String playerName = player.getGameProfile().getName();
+                String playerUuid = player.getUUID().toString();
+                if (config.hashPlayerIdentifiers()) {
+                    playerName = TelemetryHashing.hashIdentifier(playerName, config.identifierHashSalt());
+                    playerUuid = TelemetryHashing.hashIdentifier(playerUuid, config.identifierHashSalt());
+                }
+                payload.addProperty("player_name", playerName);
+                payload.addProperty("player_uuid", playerUuid);
+                payload.addProperty("identifiers_hashed", config.hashPlayerIdentifiers());
             }
         }
 
         AsyncTaskManager.submitIoTask("event-telemetry", () -> {
             try {
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(config.webhookUrl()))
-                        .timeout(Duration.ofSeconds(config.requestTimeoutSeconds()))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(payload)))
-                        .build();
-                HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() / 100 != 2) {
-                    LOGGER.warn("[Telemetry] Event telemetry failed (status {}).", response.statusCode());
+                boolean sent = sendPayload(payload, config);
+                if (!sent) {
+                    enqueueFailedPayload(server, payload, config);
                 }
             } catch (Exception ex) {
                 LOGGER.warn("[Telemetry] Event telemetry failed: {}", ex.getMessage());
             }
             return Optional.empty();
         });
+    }
+
+    private static boolean sendPayload(JsonObject payload, EventTelemetryConfig.EventTelemetryValues config) {
+        try {
+            var response = TelemetryHttp.sendWithRetry(
+                    TelemetryPayloads.buildRequest(config.webhookUrl(), config.requestTimeoutSeconds(), payload),
+                    config.retryMaxAttempts(),
+                    Duration.ofMillis(config.retryBaseDelayMs()),
+                    Duration.ofMillis(config.retryMaxDelayMs())
+            );
+            if (response.statusCode() / 100 != 2) {
+                LOGGER.warn("[Telemetry] Event telemetry failed (status {}).", response.statusCode());
+                return false;
+            }
+            return true;
+        } catch (Exception ex) {
+            LOGGER.warn("[Telemetry] Event telemetry failed: {}", ex.getMessage());
+            return false;
+        }
+    }
+
+    private static void enqueueFailedPayload(net.minecraft.server.MinecraftServer server, JsonObject payload,
+                                             EventTelemetryConfig.EventTelemetryValues config) {
+        TelemetryConfig.TelemetryValues telemetryConfig = TelemetryConfig.values();
+        TelemetryQueue.PendingTelemetryPayload pending = new TelemetryQueue.PendingTelemetryPayload(
+                "event",
+                payload,
+                config.webhookUrl(),
+                config.requestTimeoutSeconds(),
+                config.retryMaxAttempts(),
+                Duration.ofMillis(config.retryBaseDelayMs()),
+                Duration.ofMillis(config.retryMaxDelayMs())
+        );
+        TelemetryQueue.get(server).enqueue(pending, telemetryConfig.queueMaxSize());
     }
 }

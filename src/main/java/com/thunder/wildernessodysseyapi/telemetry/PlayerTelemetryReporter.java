@@ -22,7 +22,6 @@ import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -34,6 +33,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.UUID;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 
@@ -42,9 +43,8 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
  */
 public final class PlayerTelemetryReporter {
     private static final Gson GSON = new GsonBuilder().create();
-    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final Map<UUID, CachedGeoInfo> GEO_CACHE = new ConcurrentHashMap<>();
+    private static final Map<UUID, CachedAccountAge> ACCOUNT_AGE_CACHE = new ConcurrentHashMap<>();
 
     private PlayerTelemetryReporter() {
     }
@@ -59,7 +59,7 @@ public final class PlayerTelemetryReporter {
         }
 
         PlayerTelemetryConfig.TelemetryConfigValues config = PlayerTelemetryConfig.values();
-        if (!config.enabled()) {
+        if (!TelemetryConfig.values().enabled() || !config.enabled()) {
             return;
         }
 
@@ -73,14 +73,21 @@ public final class PlayerTelemetryReporter {
             return;
         }
 
+        if (!TelemetrySampling.shouldSample("player_login", config.sampleEveryNth(), config.sampleRatePercent())) {
+            return;
+        }
+
         String ipAddress = resolveIpAddress(player);
         long playTimeSeconds = getTotalPlayTimeSeconds(player);
         AsyncTaskManager.submitIoTask("player-telemetry-export", () -> {
             try {
-                GeoInfo geoInfo = fetchGeoInfo(ipAddress, config);
-                AccountAgeInfo accountAge = fetchAccountAge(player.getUUID(), config);
-                postToSheet(player, geoInfo, accountAge, playTimeSeconds, null, "login", config.sheetWebhookUrl(),
-                        config.requestTimeoutSeconds());
+                GeoInfo geoInfo = resolveGeoInfo(player.getUUID(), ipAddress, config);
+                AccountAgeInfo accountAge = resolveAccountAge(player.getUUID(), config);
+                JsonObject payload = buildPayload(player, geoInfo, accountAge, playTimeSeconds, null, "login", config);
+                boolean sent = sendPayload(player, payload, config.sheetWebhookUrl(), config);
+                if (!sent) {
+                    enqueueFailedPayload(player.server, "player", payload, config);
+                }
             } catch (Exception ex) {
                 LOGGER.error("[Telemetry] Failed to export telemetry for {}", player.getGameProfile().getName(), ex);
             }
@@ -95,7 +102,7 @@ public final class PlayerTelemetryReporter {
         }
 
         PlayerTelemetryConfig.TelemetryConfigValues config = PlayerTelemetryConfig.values();
-        if (!config.enabled()) {
+        if (!TelemetryConfig.values().enabled() || !config.enabled()) {
             return;
         }
 
@@ -119,8 +126,15 @@ public final class PlayerTelemetryReporter {
                 String sparkReportUrl = config.includeSparkReport()
                         ? fetchSparkReportUrl(player).orElse(null)
                         : null;
-                postToSheet(player, GeoInfo.empty(), AccountAgeInfo.empty(), playTimeSeconds, sparkReportUrl, "logout",
-                        config.sheetWebhookUrl(), config.requestTimeoutSeconds());
+                if (!TelemetrySampling.shouldSample("player_logout", config.sampleEveryNth(), config.sampleRatePercent())) {
+                    return Optional.empty();
+                }
+                JsonObject payload = buildPayload(player, GeoInfo.empty(), AccountAgeInfo.empty(), playTimeSeconds,
+                        sparkReportUrl, "logout", config);
+                boolean sent = sendPayload(player, payload, config.sheetWebhookUrl(), config);
+                if (!sent) {
+                    enqueueFailedPayload(player.server, "player", payload, config);
+                }
             } catch (Exception ex) {
                 LOGGER.error("[Telemetry] Failed to export telemetry for {}", player.getGameProfile().getName(), ex);
             }
@@ -156,7 +170,12 @@ public final class PlayerTelemetryReporter {
                     .timeout(Duration.ofSeconds(config.requestTimeoutSeconds()))
                     .GET()
                     .build();
-            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = TelemetryHttp.sendWithRetry(
+                    request,
+                    config.retryMaxAttempts(),
+                    Duration.ofMillis(config.retryBaseDelayMs()),
+                    Duration.ofMillis(config.retryMaxDelayMs())
+            );
             if (response.statusCode() / 100 != 2) {
                 LOGGER.warn("[Telemetry] Geo IP lookup failed (status {}).", response.statusCode());
                 return GeoInfo.empty();
@@ -188,7 +207,12 @@ public final class PlayerTelemetryReporter {
                     .timeout(Duration.ofSeconds(config.requestTimeoutSeconds()))
                     .GET()
                     .build();
-            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = TelemetryHttp.sendWithRetry(
+                    request,
+                    config.retryMaxAttempts(),
+                    Duration.ofMillis(config.retryBaseDelayMs()),
+                    Duration.ofMillis(config.retryMaxDelayMs())
+            );
             if (response.statusCode() / 100 != 2) {
                 LOGGER.warn("[Telemetry] Account age lookup failed (status {}).", response.statusCode());
                 return AccountAgeInfo.empty();
@@ -223,11 +247,20 @@ public final class PlayerTelemetryReporter {
         }
     }
 
-    private static void postToSheet(ServerPlayer player, GeoInfo geoInfo, AccountAgeInfo accountAge, long playTimeSeconds,
-                                    String sparkReportUrl, String eventType, String webhookUrl, int timeoutSeconds) {
+    private static JsonObject buildPayload(ServerPlayer player, GeoInfo geoInfo, AccountAgeInfo accountAge,
+                                           long playTimeSeconds, String sparkReportUrl, String eventType,
+                                           PlayerTelemetryConfig.TelemetryConfigValues config) {
         JsonObject payload = new JsonObject();
-        payload.addProperty("uuid", player.getUUID().toString());
-        payload.addProperty("player_name", player.getGameProfile().getName());
+        payload.addProperty("schema_version", TelemetryPayloads.SCHEMA_VERSION);
+        String playerUuid = player.getUUID().toString();
+        String playerName = player.getGameProfile().getName();
+        if (config.hashPlayerIdentifiers()) {
+            playerUuid = TelemetryHashing.hashIdentifier(playerUuid, config.identifierHashSalt());
+            playerName = TelemetryHashing.hashIdentifier(playerName, config.identifierHashSalt());
+        }
+        payload.addProperty("uuid", playerUuid);
+        payload.addProperty("player_name", playerName);
+        payload.addProperty("identifiers_hashed", config.hashPlayerIdentifiers());
         payload.addProperty("event_type", eventType);
         Instant eventInstant = Instant.now();
         payload.addProperty("event_timestamp", eventInstant.toString());
@@ -251,22 +284,31 @@ public final class PlayerTelemetryReporter {
         payload.add("spark_report_url", sparkReportUrl == null || sparkReportUrl.isBlank()
                 ? JsonNull.INSTANCE
                 : jsonString(sparkReportUrl));
+        return payload;
+    }
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(webhookUrl))
-                .timeout(Duration.ofSeconds(timeoutSeconds))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(payload)))
-                .build();
+    private static boolean sendPayload(ServerPlayer player, JsonObject payload, String webhookUrl,
+                                       PlayerTelemetryConfig.TelemetryConfigValues config) {
+        if (webhookUrl == null || webhookUrl.isBlank()) {
+            return false;
+        }
         try {
-            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = TelemetryHttp.sendWithRetry(
+                    TelemetryPayloads.buildRequest(webhookUrl, config.requestTimeoutSeconds(), payload),
+                    config.retryMaxAttempts(),
+                    Duration.ofMillis(config.retryBaseDelayMs()),
+                    Duration.ofMillis(config.retryMaxDelayMs())
+            );
             if (response.statusCode() / 100 != 2) {
                 LOGGER.warn("[Telemetry] Sheet export failed (status {}).", response.statusCode());
+                return false;
             } else {
                 LOGGER.info("[Telemetry] Exported telemetry for {}.", player.getGameProfile().getName());
+                return true;
             }
         } catch (Exception ex) {
             LOGGER.warn("[Telemetry] Sheet export failed: {}", ex.getMessage());
+            return false;
         }
     }
 
@@ -444,4 +486,68 @@ public final class PlayerTelemetryReporter {
             this(estimatedAgeDays, referenceDate, "name_change");
         }
     }
+
+    private record CachedGeoInfo(GeoInfo info, Instant timestamp) {
+    }
+
+    private record CachedAccountAge(AccountAgeInfo info, Instant timestamp) {
+    }
+
+    private static GeoInfo resolveGeoInfo(UUID uuid, String ipAddress, PlayerTelemetryConfig.TelemetryConfigValues config) {
+        if (uuid == null) {
+            return fetchGeoInfo(ipAddress, config);
+        }
+        int ttlSeconds = config.geoCacheTtlSeconds();
+        CachedGeoInfo cached = GEO_CACHE.get(uuid);
+        if (cached != null) {
+            if (ttlSeconds > 0 && Duration.between(cached.timestamp(), Instant.now()).toSeconds() <= ttlSeconds) {
+                return cached.info();
+            }
+            if (ttlSeconds <= 0) {
+                GEO_CACHE.remove(uuid);
+            }
+        }
+        GeoInfo info = fetchGeoInfo(ipAddress, config);
+        if (ttlSeconds > 0) {
+            GEO_CACHE.put(uuid, new CachedGeoInfo(info, Instant.now()));
+        }
+        return info;
+    }
+
+    private static AccountAgeInfo resolveAccountAge(UUID uuid, PlayerTelemetryConfig.TelemetryConfigValues config) {
+        if (uuid == null) {
+            return AccountAgeInfo.empty();
+        }
+        int ttlSeconds = config.accountAgeCacheTtlSeconds();
+        CachedAccountAge cached = ACCOUNT_AGE_CACHE.get(uuid);
+        if (cached != null) {
+            if (ttlSeconds > 0 && Duration.between(cached.timestamp(), Instant.now()).toSeconds() <= ttlSeconds) {
+                return cached.info();
+            }
+            if (ttlSeconds <= 0) {
+                ACCOUNT_AGE_CACHE.remove(uuid);
+            }
+        }
+        AccountAgeInfo info = fetchAccountAge(uuid, config);
+        if (ttlSeconds > 0) {
+            ACCOUNT_AGE_CACHE.put(uuid, new CachedAccountAge(info, Instant.now()));
+        }
+        return info;
+    }
+
+    private static void enqueueFailedPayload(net.minecraft.server.MinecraftServer server, String type,
+                                             JsonObject payload, PlayerTelemetryConfig.TelemetryConfigValues config) {
+        TelemetryConfig.TelemetryValues telemetryConfig = TelemetryConfig.values();
+        TelemetryQueue.PendingTelemetryPayload pending = new TelemetryQueue.PendingTelemetryPayload(
+                type,
+                payload,
+                config.sheetWebhookUrl(),
+                config.requestTimeoutSeconds(),
+                config.retryMaxAttempts(),
+                Duration.ofMillis(config.retryBaseDelayMs()),
+                Duration.ofMillis(config.retryMaxDelayMs())
+        );
+        TelemetryQueue.get(server).enqueue(pending, telemetryConfig.queueMaxSize());
+    }
+
 }
