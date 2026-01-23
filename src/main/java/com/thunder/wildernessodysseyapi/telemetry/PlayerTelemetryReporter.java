@@ -8,10 +8,16 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentStore.ConsentDecision;
+import net.minecraft.stats.Stats;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.URI;
@@ -20,7 +26,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.UUID;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
@@ -59,11 +70,53 @@ public final class PlayerTelemetryReporter {
         }
 
         String ipAddress = resolveIpAddress(player);
+        long playTimeSeconds = getTotalPlayTimeSeconds(player);
         AsyncTaskManager.submitIoTask("player-telemetry-export", () -> {
             try {
                 GeoInfo geoInfo = fetchGeoInfo(ipAddress, config);
                 AccountAgeInfo accountAge = fetchAccountAge(player.getUUID(), config);
-                postToSheet(player, geoInfo, accountAge, config.sheetWebhookUrl(), config.requestTimeoutSeconds());
+                postToSheet(player, geoInfo, accountAge, playTimeSeconds, null, "login", config.sheetWebhookUrl(),
+                        config.requestTimeoutSeconds());
+            } catch (Exception ex) {
+                LOGGER.error("[Telemetry] Failed to export telemetry for {}", player.getGameProfile().getName(), ex);
+            }
+            return Optional.empty();
+        });
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        PlayerTelemetryConfig.TelemetryConfigValues config = PlayerTelemetryConfig.values();
+        if (!config.enabled()) {
+            return;
+        }
+
+        if (config.sheetWebhookUrl() == null || config.sheetWebhookUrl().isBlank()) {
+            LOGGER.warn("[Telemetry] Telemetry enabled but sheetWebhookUrl is blank. Skipping export.");
+            return;
+        }
+
+        if (!config.exportOnLogout()) {
+            return;
+        }
+
+        TelemetryConsentStore consentStore = TelemetryConsentStore.get(player.server);
+        if (consentStore.getDecision(player.getUUID()) != ConsentDecision.ACCEPTED) {
+            return;
+        }
+
+        long playTimeSeconds = getTotalPlayTimeSeconds(player);
+        AsyncTaskManager.submitIoTask("player-telemetry-spark-report", () -> {
+            try {
+                String sparkReportUrl = config.includeSparkReport()
+                        ? fetchSparkReportUrl(player).orElse(null)
+                        : null;
+                postToSheet(player, GeoInfo.empty(), AccountAgeInfo.empty(), playTimeSeconds, sparkReportUrl, "logout",
+                        config.sheetWebhookUrl(), config.requestTimeoutSeconds());
             } catch (Exception ex) {
                 LOGGER.error("[Telemetry] Failed to export telemetry for {}", player.getGameProfile().getName(), ex);
             }
@@ -166,10 +219,13 @@ public final class PlayerTelemetryReporter {
         }
     }
 
-    private static void postToSheet(ServerPlayer player, GeoInfo geoInfo, AccountAgeInfo accountAge, String webhookUrl, int timeoutSeconds) {
+    private static void postToSheet(ServerPlayer player, GeoInfo geoInfo, AccountAgeInfo accountAge, long playTimeSeconds,
+                                    String sparkReportUrl, String eventType, String webhookUrl, int timeoutSeconds) {
         JsonObject payload = new JsonObject();
         payload.addProperty("uuid", player.getUUID().toString());
         payload.addProperty("player_name", player.getGameProfile().getName());
+        payload.addProperty("event_type", eventType);
+        payload.addProperty("total_play_time_seconds", playTimeSeconds);
 
         if (geoInfo.country != null) {
             payload.addProperty("country", geoInfo.country);
@@ -179,6 +235,10 @@ public final class PlayerTelemetryReporter {
             payload.addProperty("account_age_days", accountAge.estimatedAgeDays);
         } else {
             payload.addProperty("account_age_days", "unknown");
+        }
+
+        if (sparkReportUrl != null && !sparkReportUrl.isBlank()) {
+            payload.addProperty("spark_report_url", sparkReportUrl);
         }
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -209,6 +269,145 @@ public final class PlayerTelemetryReporter {
             }
         }
         return null;
+    }
+
+    private static long getTotalPlayTimeSeconds(ServerPlayer player) {
+        if (player == null) {
+            return 0L;
+        }
+        int ticks = player.getStats().getValue(Stats.CUSTOM, Stats.PLAY_TIME);
+        return ticks / 20L;
+    }
+
+    private static Optional<String> fetchSparkReportUrl(ServerPlayer player) {
+        if (!ModList.get().isLoaded("spark")) {
+            return Optional.empty();
+        }
+
+        try {
+            Class<?> providerClass = Class.forName("me.lucko.spark.api.SparkProvider");
+            Object sparkApi = providerClass.getMethod("get").invoke(null);
+            if (sparkApi == null) {
+                return Optional.empty();
+            }
+
+            Class<?> sparkApiClass = Class.forName("me.lucko.spark.common.api.SparkApi");
+            if (!sparkApiClass.isInstance(sparkApi)) {
+                return Optional.empty();
+            }
+
+            Field platformField = sparkApiClass.getDeclaredField("platform");
+            platformField.setAccessible(true);
+            Object platform = platformField.get(sparkApi);
+            if (platform == null) {
+                return Optional.empty();
+            }
+
+            Class<?> senderInterface = Class.forName("me.lucko.spark.common.command.sender.CommandSender");
+            SparkCommandCapture capture = new SparkCommandCapture(player);
+            Object senderProxy = Proxy.newProxyInstance(
+                    senderInterface.getClassLoader(),
+                    new Class<?>[]{senderInterface},
+                    capture
+            );
+
+            Method executeCommand = platform.getClass().getMethod("executeCommand", senderInterface, String[].class);
+            Object result = executeCommand.invoke(platform, senderProxy, (Object) new String[]{"report"});
+            if (result instanceof CompletableFuture<?> future) {
+                future.get(10, TimeUnit.SECONDS);
+            }
+            return capture.getReportUrl();
+        } catch (Exception ex) {
+            LOGGER.warn("[Telemetry] Spark report generation failed: {}", ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private static final class SparkCommandCapture implements InvocationHandler {
+        private static final Pattern URL_PATTERN = Pattern.compile("https?://\\S+");
+        private final ServerPlayer player;
+        private Optional<String> reportUrl = Optional.empty();
+
+        private SparkCommandCapture(ServerPlayer player) {
+            this.player = player;
+        }
+
+        Optional<String> getReportUrl() {
+            return reportUrl;
+        }
+
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            String methodName = method.getName();
+            if ("getName".equals(methodName)) {
+                return player.getGameProfile().getName();
+            }
+            if ("getUniqueId".equals(methodName)) {
+                return player.getUUID();
+            }
+            if ("isPlayer".equals(methodName)) {
+                return true;
+            }
+            if ("hasPermission".equals(methodName)) {
+                return true;
+            }
+            if ("sendMessage".equals(methodName) && args != null && args.length > 0) {
+                captureReportUrl(args[0]);
+                return null;
+            }
+            if ("toData".equals(methodName)) {
+                return createSenderData();
+            }
+            if ("hashCode".equals(methodName)) {
+                return Objects.hash(player.getUUID());
+            }
+            if ("equals".equals(methodName)) {
+                return proxy == args[0];
+            }
+            if ("toString".equals(methodName)) {
+                return "SparkCommandCapture{" + player.getGameProfile().getName() + "}";
+            }
+            return null;
+        }
+
+        private void captureReportUrl(Object component) {
+            String message = String.valueOf(component);
+            Matcher matcher = URL_PATTERN.matcher(message);
+            if (matcher.find()) {
+                reportUrl = Optional.of(matcher.group());
+                return;
+            }
+            String json = trySerializeComponent(component);
+            if (json == null) {
+                return;
+            }
+            matcher = URL_PATTERN.matcher(json);
+            if (matcher.find()) {
+                reportUrl = Optional.of(matcher.group());
+            }
+        }
+
+        private String trySerializeComponent(Object component) {
+            try {
+                Class<?> serializerClass = Class.forName("me.lucko.spark.lib.adventure.text.serializer.gson.GsonComponentSerializer");
+                Object serializer = serializerClass.getMethod("gson").invoke(null);
+                Object jsonElement = serializerClass.getMethod("serializeToTree", Class.forName("me.lucko.spark.lib.adventure.text.Component"))
+                        .invoke(serializer, component);
+                return String.valueOf(jsonElement);
+            } catch (Exception ex) {
+                return null;
+            }
+        }
+
+        private Object createSenderData() {
+            try {
+                Class<?> dataClass = Class.forName("me.lucko.spark.common.command.sender.CommandSender$Data");
+                return dataClass.getConstructor(String.class, UUID.class)
+                        .newInstance(player.getGameProfile().getName(), player.getUUID());
+            } catch (Exception ex) {
+                return null;
+            }
+        }
     }
 
     private record GeoInfo(String state, String country) {

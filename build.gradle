@@ -187,7 +187,8 @@ dependencies {
     }
     implementation "curse.maven:selene-499980:7113115"
     implementation "curse.maven:amendments-896746:7054319"
-    implementation "curse.maven:spark-361579:6225208"
+    compileOnly "curse.maven:spark-361579:6225208"
+    localRuntime "curse.maven:spark-361579:6225208"
     implementation "curse.maven:sodium-394468:6382651"
     implementation "curse.maven:irisshaders-455508:6661598"
     implementation "curse.maven:nova-apii-1248874:7507458"
