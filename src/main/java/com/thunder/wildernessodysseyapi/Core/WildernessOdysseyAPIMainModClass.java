@@ -9,6 +9,8 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.M
 import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatOptToggleCommand;
 import com.thunder.wildernessodysseyapi.command.ChangelogCommand;
+import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
+import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.processor.ModProcessors;
@@ -34,6 +36,8 @@ import com.thunder.wildernessodysseyapi.tide.TideConfig;
 import com.thunder.wildernessodysseyapi.tide.TideManager;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryConfig;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryReporter;
+import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryConfig;
+import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryReporter;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentCommand;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentConfig;
 import net.minecraft.commands.CommandSourceStack;
@@ -106,6 +110,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
         NeoForge.EVENT_BUS.register(AIChatListener.class);
         NeoForge.EVENT_BUS.register(PlayerTelemetryReporter.class);
+        NeoForge.EVENT_BUS.register(EventTelemetryReporter.class);
 
         CryoTubeBlock.register(modEventBus);
         ModItems.register(modEventBus);
@@ -126,6 +131,10 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-tides-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PlayerTelemetryConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-telemetry-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, EventTelemetryConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-event-telemetry-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, FeedbackConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-feedback-server.toml");
         // Previously registered client-only events have been removed
         DonationReminderConfig.validateVersion();
 
@@ -178,6 +187,7 @@ public class WildernessOdysseyAPIMainModClass {
         GlobalChatOptToggleCommand.register(dispatcher);
         TideInfoCommand.register(dispatcher);
         TelemetryConsentCommand.register(dispatcher);
+        FeedbackCommand.register(dispatcher);
     }
 
     /**
