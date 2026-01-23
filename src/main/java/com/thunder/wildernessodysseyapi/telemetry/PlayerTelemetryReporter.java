@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
@@ -228,21 +229,28 @@ public final class PlayerTelemetryReporter {
         payload.addProperty("uuid", player.getUUID().toString());
         payload.addProperty("player_name", player.getGameProfile().getName());
         payload.addProperty("event_type", eventType);
+        Instant eventInstant = Instant.now();
+        payload.addProperty("event_timestamp", eventInstant.toString());
+        payload.addProperty("event_epoch_ms", eventInstant.toEpochMilli());
         payload.addProperty("total_play_time_seconds", playTimeSeconds);
-
-        if (geoInfo.country != null) {
-            payload.addProperty("country", geoInfo.country);
-        }
-
-        if (accountAge.estimatedAgeDays != null) {
-            payload.addProperty("account_age_days", accountAge.estimatedAgeDays);
-        } else {
-            payload.addProperty("account_age_days", "unknown");
-        }
-
-        if (sparkReportUrl != null && !sparkReportUrl.isBlank()) {
-            payload.addProperty("spark_report_url", sparkReportUrl);
-        }
+        payload.add("state", geoInfo.state == null || geoInfo.state.isBlank()
+                ? JsonNull.INSTANCE
+                : jsonString(geoInfo.state));
+        payload.add("country", geoInfo.country == null || geoInfo.country.isBlank()
+                ? JsonNull.INSTANCE
+                : jsonString(geoInfo.country));
+        payload.add("account_age_days", accountAge.estimatedAgeDays == null
+                ? JsonNull.INSTANCE
+                : jsonNumber(accountAge.estimatedAgeDays));
+        payload.add("account_age_reference", accountAge.referenceDate == null
+                ? JsonNull.INSTANCE
+                : jsonString(accountAge.referenceDate.toString()));
+        payload.add("account_age_source", accountAge.source == null || accountAge.source.isBlank()
+                ? JsonNull.INSTANCE
+                : jsonString(accountAge.source));
+        payload.add("spark_report_url", sparkReportUrl == null || sparkReportUrl.isBlank()
+                ? JsonNull.INSTANCE
+                : jsonString(sparkReportUrl));
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(webhookUrl))
@@ -272,6 +280,14 @@ public final class PlayerTelemetryReporter {
             }
         }
         return null;
+    }
+
+    private static JsonElement jsonString(String value) {
+        return value == null ? JsonNull.INSTANCE : GSON.toJsonTree(value);
+    }
+
+    private static JsonElement jsonNumber(Number value) {
+        return value == null ? JsonNull.INSTANCE : GSON.toJsonTree(value);
     }
 
     private static long getTotalPlayTimeSeconds(ServerPlayer player) {
