@@ -42,6 +42,9 @@ public final class PlayerTelemetryReporter {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
+        if (player.server.isDedicatedServer()) {
+            return;
+        }
 
         PlayerTelemetryConfig.TelemetryConfigValues config = PlayerTelemetryConfig.values();
         if (!config.enabled()) {
