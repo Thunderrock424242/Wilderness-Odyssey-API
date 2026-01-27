@@ -48,6 +48,10 @@ public class AIClient {
         return settings.getWakeWord();
     }
 
+    public boolean isAtlasEnabled() {
+        return settings.isAtlasEnabled();
+    }
+
     private void loadStory() {
         AIConfig config = AIConfigLoader.load();
         story.addAll(config.getStory());
@@ -72,6 +76,9 @@ public class AIClient {
             return;
         }
         AIConfig.Settings configSettings = config.getSettings();
+        if (configSettings.getAtlasEnabled() != null) {
+            settings.setAtlasEnabled(configSettings.getAtlasEnabled());
+        }
         if (configSettings.getVoiceEnabled() != null) {
             settings.setVoiceEnabled(configSettings.getVoiceEnabled());
         }
@@ -159,6 +166,9 @@ public class AIClient {
     }
 
     public VoiceIntegration.VoiceResult sendMessageWithVoice(String world, String player, String message) {
+        if (!settings.isAtlasEnabled()) {
+            return voiceIntegration.wrap("");
+        }
         String learnedFact = knowledgeStore.extractLearnedFact(message);
         if (learnedFact != null) {
             boolean added = knowledgeStore.addFact(learnedFact);
@@ -175,9 +185,7 @@ public class AIClient {
             context = context.isBlank() ? knowledgeContext : context + "\n" + knowledgeContext;
         }
         if (localModelClient == null) {
-            String reply = buildOfflineReply(world, player, message, false, false);
-            memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
-            return voiceIntegration.wrap(reply);
+            return voiceIntegration.wrap("");
         }
         String prompt = formatSystemPrompt(localSystemPrompt);
         String localContext = buildLocalModelContext(world, context);
@@ -197,9 +205,7 @@ public class AIClient {
             return voiceIntegration.wrap(reply);
         }
         stopLocalModelServerIfNeeded();
-        String reply = buildOfflineReply(world, player, message, true, autoStartLocalServer);
-        memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
-        return voiceIntegration.wrap(reply);
+        return voiceIntegration.wrap("");
     }
 
     private boolean isLocalServerRunning() {

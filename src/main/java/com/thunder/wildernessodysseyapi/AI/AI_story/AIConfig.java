@@ -161,10 +161,19 @@ public class AIConfig {
     }
 
     public static class Settings {
+        private Boolean atlasEnabled;
         private Boolean voiceEnabled;
         private Boolean speechRecognition;
         private String wakeWord;
         private String model;
+
+        public Boolean getAtlasEnabled() {
+            return atlasEnabled;
+        }
+
+        public void setAtlasEnabled(Boolean atlasEnabled) {
+            this.atlasEnabled = atlasEnabled;
+        }
 
         public Boolean getVoiceEnabled() {
             return voiceEnabled;

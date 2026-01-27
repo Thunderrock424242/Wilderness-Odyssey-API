@@ -7,6 +7,7 @@ public class AISettings {
 
     private boolean voiceEnabled = false;
     private boolean speechRecognition = false;
+    private boolean atlasEnabled = true;
     private String modelName = "local-story-engine";
     private String wakeWord = "atlas";
     private String personaName = "Atlas";
@@ -27,6 +28,14 @@ public class AISettings {
 
     public void setSpeechRecognition(boolean speechRecognition) {
         this.speechRecognition = speechRecognition;
+    }
+
+    public boolean isAtlasEnabled() {
+        return atlasEnabled;
+    }
+
+    public void setAtlasEnabled(boolean atlasEnabled) {
+        this.atlasEnabled = atlasEnabled;
     }
 
     public String getModelName() {
