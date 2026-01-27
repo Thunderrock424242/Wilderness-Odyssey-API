@@ -22,6 +22,7 @@ import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
 import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
+import com.thunder.wildernessodysseyapi.config.CloakChipConfig;
 import com.thunder.wildernessodysseyapi.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -133,6 +134,8 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TideConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-tides-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, CloakChipConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-cloak-chip-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PlayerTelemetryConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-telemetry-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, EventTelemetryConfig.CONFIG_SPEC,
