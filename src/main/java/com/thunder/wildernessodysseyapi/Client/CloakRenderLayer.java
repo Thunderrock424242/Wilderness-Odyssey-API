@@ -12,6 +12,7 @@ import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 
 public class CloakRenderLayer extends RenderLayer<Player, PlayerModel<Player>> {
@@ -46,6 +47,10 @@ public class CloakRenderLayer extends RenderLayer<Player, PlayerModel<Player>> {
 
     private static boolean shouldRenderCloak(Player player) {
         if (!player.hasEffect(MobEffects.INVISIBILITY)) {
+            return false;
+        }
+
+        if (!player.getItemBySlot(EquipmentSlot.HEAD).isEmpty()) {
             return false;
         }
 

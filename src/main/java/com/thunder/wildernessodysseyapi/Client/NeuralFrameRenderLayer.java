@@ -11,6 +11,7 @@ import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 
 public class NeuralFrameRenderLayer extends RenderLayer<Player, PlayerModel<Player>> {
@@ -36,6 +37,10 @@ public class NeuralFrameRenderLayer extends RenderLayer<Player, PlayerModel<Play
                        float ageInTicks,
                        float netHeadYaw,
                        float headPitch) {
+        if (!player.getItemBySlot(EquipmentSlot.HEAD).isEmpty()) {
+            return;
+        }
+
         poseStack.pushPose();
         getParentModel().head.translateAndRotate(poseStack);
         VertexConsumer vertexConsumer = buffer.getBuffer(RenderType.entityCutoutNoCull(FRAME_TEXTURE));
