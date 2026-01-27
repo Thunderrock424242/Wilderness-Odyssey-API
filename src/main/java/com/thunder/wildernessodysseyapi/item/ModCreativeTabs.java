@@ -32,6 +32,9 @@ public class ModCreativeTabs {
                     .icon(() -> new ItemStack(Items.AMETHYST_SHARD))
                     .displayItems((parameters, output) -> {
                         output.accept(CryoTubeBlock.CRYO_TUBE.get());
+                        output.accept(ModItems.CLOAK_ITEM.get());
+                        output.accept(ModItems.CLOAK_CHIP.get());
+                        output.accept(ModItems.NEURAL_FRAME.get());
                     })
                     .build()
     );
@@ -43,4 +46,3 @@ public class ModCreativeTabs {
         TABS.register(eventBus);
     }
 }
-
