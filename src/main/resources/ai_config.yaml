@@ -13,6 +13,7 @@ corrupted_data:
   - "Signal jitter... memory block 7b missing."
 corrupted_prefix: "[Signal noise]"
 settings:
+  atlas_enabled: true
   voice_enabled: true
   speech_recognition: false
   wake_word: "atlas"

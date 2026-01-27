@@ -35,6 +35,9 @@ public class AIChatListener {
         if (message.isEmpty()) {
             return;
         }
+        if (!CLIENT.isAtlasEnabled()) {
+            return;
+        }
         if (!isHoldingActivationItem(player)) {
             return;
         }
@@ -55,6 +58,9 @@ public class AIChatListener {
         VoiceIntegration.VoiceResult reply = CLIENT.sendMessageWithVoice(worldKey,
                 player.getName().getString(), message);
 
+        if (reply.text() == null || reply.text().isBlank()) {
+            return;
+        }
         PENDING_REPLIES.add(new PendingReply(player.getUUID(), reply.text()));
     }
 
