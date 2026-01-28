@@ -8,7 +8,7 @@ import net.minecraft.world.damagesource.DamageType;
 public final class ModDamageTypes {
     public static final ResourceKey<DamageType> NEURAL_FRAME_REMOVAL = ResourceKey.create(
             Registries.DAMAGE_TYPE,
-            new ResourceLocation(ModConstants.MOD_ID, "neural_frame_removal")
+            ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "neural_frame_removal")
     );
 
     private ModDamageTypes() {
