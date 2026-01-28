@@ -12,10 +12,10 @@ import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.player.Player;
 
-public class NeuralFrameModel extends EntityModel<Player> {
+public class NeuralFrameModel extends EntityModel<AbstractClientPlayer> {
     public static final ModelLayerLocation LAYER_LOCATION = new ModelLayerLocation(
             ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "neural_frame"),
             "main"
@@ -40,7 +40,7 @@ public class NeuralFrameModel extends EntityModel<Player> {
     }
 
     @Override
-    public void setupAnim(Player entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(AbstractClientPlayer entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
     }
 
     @Override
@@ -48,10 +48,7 @@ public class NeuralFrameModel extends EntityModel<Player> {
                                VertexConsumer vertexConsumer,
                                int packedLight,
                                int packedOverlay,
-                               float red,
-                               float green,
-                               float blue,
-                               float alpha) {
-        frame.render(poseStack, vertexConsumer, packedLight, packedOverlay, red, green, blue, alpha);
+                               int packedColor) {
+        frame.render(poseStack, vertexConsumer, packedLight, packedOverlay, packedColor);
     }
 }

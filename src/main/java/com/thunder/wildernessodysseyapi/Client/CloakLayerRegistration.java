@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.Client;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import net.minecraft.client.resources.PlayerSkin;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -14,11 +15,12 @@ public final class CloakLayerRegistration {
 
     @SubscribeEvent
     public static void onAddLayers(EntityRenderersEvent.AddLayers event) {
-        addLayer(event, "default");
-        addLayer(event, "slim");
+        for (PlayerSkin.Model skin : event.getSkins()) {
+            addLayer(event, skin);
+        }
     }
 
-    private static void addLayer(EntityRenderersEvent.AddLayers event, String skin) {
+    private static void addLayer(EntityRenderersEvent.AddLayers event, PlayerSkin.Model skin) {
         PlayerRenderer renderer = event.getSkin(skin);
         if (renderer != null) {
             renderer.addLayer(new CloakRenderLayer(renderer));
