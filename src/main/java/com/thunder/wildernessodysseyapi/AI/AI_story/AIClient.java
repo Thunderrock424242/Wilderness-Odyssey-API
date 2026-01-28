@@ -22,6 +22,7 @@ import net.neoforged.fml.loading.FMLPaths;
  */
 public class AIClient {
 
+    private static final String DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:11434";
     private final List<String> story = new ArrayList<>();
     private final List<String> corruptedLore = new ArrayList<>();
     private final List<String> backgroundHistory = new ArrayList<>();
@@ -116,7 +117,7 @@ public class AIClient {
             startLocalModelServer();
             stopLocalModelServer();
         }
-        String baseUrl = localModel.getBaseUrl();
+        String baseUrl = DEFAULT_LOCAL_BASE_URL;
         String modelName = localModel.getModel();
         if (baseUrl == null || baseUrl.isBlank() || modelName == null || modelName.isBlank()) {
             return;
@@ -185,11 +186,13 @@ public class AIClient {
             context = context.isBlank() ? knowledgeContext : context + "\n" + knowledgeContext;
         }
         if (localModelClient == null) {
-            return voiceIntegration.wrap("");
+            String reply = buildOfflineReply(world, player, message, true, false);
+            memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
+            return voiceIntegration.wrap(reply);
         }
         String prompt = formatSystemPrompt(localSystemPrompt);
         String localContext = buildLocalModelContext(world, context);
-        ensureLocalServerStarted();
+        boolean startAttempted = ensureLocalServerStarted();
         var response = localModelClient.generateReply(prompt, message, localContext);
         if (response.isPresent()) {
             String reply = response.get();
@@ -197,33 +200,39 @@ public class AIClient {
             stopLocalModelServerIfNeeded();
             return voiceIntegration.wrap(reply);
         }
-        response = retryLocalModelAfterStart(prompt, message, localContext);
-        if (response.isPresent()) {
-            String reply = response.get();
+        RetryResult retry = retryLocalModelAfterStart(prompt, message, localContext);
+        if (retry.response().isPresent()) {
+            String reply = retry.response().get();
             memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
             stopLocalModelServerIfNeeded();
             return voiceIntegration.wrap(reply);
         }
         stopLocalModelServerIfNeeded();
-        return voiceIntegration.wrap("");
+        startAttempted = startAttempted || retry.started();
+        String reply = buildOfflineReply(world, player, message, true, startAttempted);
+        memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
+        return voiceIntegration.wrap(reply);
     }
 
     private boolean isLocalServerRunning() {
         return localServerProcess != null && localServerProcess.isAlive();
     }
 
-    private void ensureLocalServerStarted() {
+    private record RetryResult(java.util.Optional<String> response, boolean started) {}
+
+    private boolean ensureLocalServerStarted() {
         if (autoStartLocalServer && !isLocalServerRunning()) {
-            startLocalModelServer();
+            return startLocalModelServer();
         }
+        return false;
     }
 
-    private java.util.Optional<String> retryLocalModelAfterStart(String prompt, String message, String localContext) {
+    private RetryResult retryLocalModelAfterStart(String prompt, String message, String localContext) {
         if (!autoStartLocalServer || isLocalServerRunning()) {
-            return java.util.Optional.empty();
+            return new RetryResult(java.util.Optional.empty(), false);
         }
-        startLocalModelServer();
-        return localModelClient.generateReply(prompt, message, localContext);
+        boolean started = startLocalModelServer();
+        return new RetryResult(localModelClient.generateReply(prompt, message, localContext), started);
     }
 
     private void stopLocalModelServerIfNeeded() {
@@ -241,35 +250,36 @@ public class AIClient {
         localServerProcess = null;
     }
 
-    private void startLocalModelServer() {
+    private boolean startLocalModelServer() {
         if (isLocalServerRunning()) {
-            return;
+            return false;
         }
         if (localServerStartCommand == null || localServerStartCommand.isBlank()) {
             List<String> bundledCommand = buildBundledServerCommand();
             if (!bundledCommand.isEmpty()) {
-                startLocalModelServer(bundledCommand);
-                return;
+                return startLocalModelServer(bundledCommand);
             }
             ModConstants.LOGGER.warn("Local model auto-start enabled but no start command is configured.");
-            return;
+            return false;
         }
         List<String> command = parseCommand(localServerStartCommand);
         if (command.isEmpty()) {
             ModConstants.LOGGER.warn("Local model auto-start command could not be parsed.");
-            return;
+            return false;
         }
-        startLocalModelServer(command);
+        return startLocalModelServer(command);
     }
 
-    private void startLocalModelServer(List<String> command) {
+    private boolean startLocalModelServer(List<String> command) {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.redirectErrorStream(true);
         try {
             localServerProcess = builder.start();
             ModConstants.LOGGER.info("Started local model server with command: {}", String.join(" ", command));
+            return true;
         } catch (IOException e) {
             ModConstants.LOGGER.warn("Failed to start local model server with command: {}", String.join(" ", command), e);
+            return false;
         }
     }
 
