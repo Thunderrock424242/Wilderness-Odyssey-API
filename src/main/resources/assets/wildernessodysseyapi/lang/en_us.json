@@ -11,6 +11,7 @@
   "item.wildernessodysseyapi.cloak_chip": "Cloak Chip",
   "item.wildernessodysseyapi.neural_frame": "Neural Frame",
   "item.wildernessodysseyapi.sky_torch_staff": "Sky Torch Staff",
+  "death.attack.neural_frame_removal": "why did you remove it you know it will kill you",
 
   "screen.wildernessodyssey.hardware.title": "Hardware Requirements",
   "screen.wildernessodyssey.hardware.section.current": "Detected hardware",

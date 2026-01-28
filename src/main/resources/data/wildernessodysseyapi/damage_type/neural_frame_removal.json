@@ -1,0 +1,6 @@
+{
+  "message_id": "neural_frame_removal",
+  "scaling": "always",
+  "exhaustion": 0.1,
+  "effects": "hurt"
+}
