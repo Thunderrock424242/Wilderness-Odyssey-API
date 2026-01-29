@@ -1,7 +1,7 @@
-package com.thunder.wildernessodysseyapi.telemetry;
+package com.thunder.wildernessodysseyapi.ModPackPatches.telemetry;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
-import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentStore.ConsentDecision;
+import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.TelemetryConsentStore.ConsentDecision;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**

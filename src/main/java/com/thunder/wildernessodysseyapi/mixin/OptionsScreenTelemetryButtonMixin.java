@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentScreen;
+import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.TelemetryConsentScreen;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.ContainerEventHandler;

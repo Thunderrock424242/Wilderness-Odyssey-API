@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.telemetry;
+package com.thunder.wildernessodysseyapi.ModPackPatches.telemetry;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

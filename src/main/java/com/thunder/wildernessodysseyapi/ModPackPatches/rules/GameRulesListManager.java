@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.rules;
+package com.thunder.wildernessodysseyapi.ModPackPatches.rules;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

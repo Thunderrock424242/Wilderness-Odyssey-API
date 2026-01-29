@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.telemetry;
+package com.thunder.wildernessodysseyapi.ModPackPatches.telemetry;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.core.HolderLookup;

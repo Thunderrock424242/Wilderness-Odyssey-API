@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.telemetry;
+package com.thunder.wildernessodysseyapi.ModPackPatches.telemetry;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

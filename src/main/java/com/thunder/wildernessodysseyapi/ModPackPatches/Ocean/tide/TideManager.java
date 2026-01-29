@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.tide;
+package com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.tide;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.core.BlockPos;

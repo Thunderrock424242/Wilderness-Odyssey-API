@@ -1,8 +1,8 @@
-package com.thunder.wildernessodysseyapi.telemetry;
+package com.thunder.wildernessodysseyapi.ModPackPatches.telemetry;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.ArgumentBuilder;
-import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentStore.ConsentDecision;
+import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.TelemetryConsentStore.ConsentDecision;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;

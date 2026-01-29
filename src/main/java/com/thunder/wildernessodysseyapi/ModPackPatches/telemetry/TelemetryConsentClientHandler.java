@@ -1,7 +1,7 @@
-package com.thunder.wildernessodysseyapi.telemetry;
+package com.thunder.wildernessodysseyapi.ModPackPatches.telemetry;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
-import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentStore.ConsentDecision;
+import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.TelemetryConsentStore.ConsentDecision;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.neoforged.api.distmarker.Dist;

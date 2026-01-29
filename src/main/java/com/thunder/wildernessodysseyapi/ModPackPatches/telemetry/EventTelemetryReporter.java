@@ -1,8 +1,8 @@
-package com.thunder.wildernessodysseyapi.telemetry;
+package com.thunder.wildernessodysseyapi.ModPackPatches.telemetry;
 
 import com.google.gson.JsonObject;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
-import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentStore.ConsentDecision;
+import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.TelemetryConsentStore.ConsentDecision;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
