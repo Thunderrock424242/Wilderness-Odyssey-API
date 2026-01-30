@@ -114,6 +114,16 @@ public final class AIConfigLoader {
         config.getLocalModel().setBundledServerArgs(readStringValue(localModel.get("bundled_server_args")));
         config.getLocalModel().setTimeoutSeconds(readInteger(localModel.get("timeout_seconds")));
 
+        Map<String, Object> onboarding = readStringObjectMap(root.get("onboarding"));
+        config.getOnboarding().setEnabled(readBoolean(onboarding.get("enabled")));
+        config.getOnboarding().setCompletionMessage(readStringValue(onboarding.get("completion_message")));
+        config.getOnboarding().setInvalidChoiceMessage(readStringValue(onboarding.get("invalid_choice_message")));
+        List<AIConfig.OnboardingStep> steps = readOnboardingSteps(onboarding.get("steps"));
+        if (steps.isEmpty()) {
+            steps = readOnboardingSteps(root.get("onboarding_steps"));
+        }
+        config.getOnboarding().getSteps().addAll(steps);
+
         return config;
     }
 
@@ -249,6 +259,67 @@ public final class AIConfigLoader {
             results.put(entry.getKey().toString(), entry.getValue());
         }
         return results;
+    }
+
+    private static List<AIConfig.OnboardingStep> readOnboardingSteps(Object value) {
+        if (value == null) {
+            return List.of();
+        }
+        List<AIConfig.OnboardingStep> steps = new ArrayList<>();
+        if (value instanceof Iterable<?> items) {
+            for (Object entry : items) {
+                if (entry instanceof Map<?, ?> map) {
+                    AIConfig.OnboardingStep step = new AIConfig.OnboardingStep();
+                    step.setPrompt(readStringValue(map.get("prompt")));
+                    step.getChoices().addAll(readStringList(map.get("choices")));
+                    step.getResponses().addAll(readStringList(map.get("responses")));
+                    if (!step.getChoices().isEmpty()) {
+                        steps.add(step);
+                    }
+                } else if (entry != null) {
+                    AIConfig.OnboardingStep parsed = parseOnboardingStepString(entry.toString());
+                    if (parsed != null) {
+                        steps.add(parsed);
+                    }
+                }
+            }
+            return steps;
+        }
+        if (value instanceof String text) {
+            AIConfig.OnboardingStep parsed = parseOnboardingStepString(text);
+            return parsed == null ? List.of() : List.of(parsed);
+        }
+        return steps;
+    }
+
+    private static AIConfig.OnboardingStep parseOnboardingStepString(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        String[] parts = text.split("\\|", -1);
+        if (parts.length < 2) {
+            return null;
+        }
+        AIConfig.OnboardingStep step = new AIConfig.OnboardingStep();
+        step.setPrompt(parts[0].trim());
+        for (String choice : parts[1].split(";")) {
+            String trimmed = choice.trim();
+            if (!trimmed.isEmpty()) {
+                step.getChoices().add(trimmed);
+            }
+        }
+        if (parts.length >= 3) {
+            for (String response : parts[2].split(";")) {
+                String trimmed = response.trim();
+                if (!trimmed.isEmpty()) {
+                    step.getResponses().add(trimmed);
+                }
+            }
+        }
+        if (step.getPrompt() == null || step.getPrompt().isBlank() || step.getChoices().isEmpty()) {
+            return null;
+        }
+        return step;
     }
 
     private static String readStringValue(Object value) {

@@ -54,6 +54,12 @@ public class AIChatListener {
 
         ACTIVE_SESSIONS.add(player.getUUID());
 
+        String onboardingReply = CLIENT.handleOnboarding(player.getUUID(), message);
+        if (onboardingReply != null && !onboardingReply.isBlank()) {
+            PENDING_REPLIES.add(new PendingReply(player.getUUID(), onboardingReply));
+            return;
+        }
+
         String worldKey = player.serverLevel().dimension().location().toString();
         VoiceIntegration.VoiceResult reply = CLIENT.sendMessageWithVoice(worldKey,
                 player.getName().getString(), message);
