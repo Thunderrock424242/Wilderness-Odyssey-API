@@ -14,6 +14,7 @@ public final class TideConfig {
     public static final ModConfigSpec.DoubleValue RIVER_AMPLITUDE_BLOCKS;
     public static final ModConfigSpec.DoubleValue PHASE_OFFSET_MINUTES;
     public static final ModConfigSpec.DoubleValue CURRENT_STRENGTH;
+    public static final ModConfigSpec.DoubleValue PLAYER_PROXIMITY_BLOCKS;
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
@@ -38,6 +39,9 @@ public final class TideConfig {
         CURRENT_STRENGTH = BUILDER.comment("Vertical force multiplier applied to entities in water to reflect rising/falling tides.")
                 .defineInRange("currentStrength", 0.004D, 0.0D, 0.05D);
 
+        PLAYER_PROXIMITY_BLOCKS = BUILDER.comment("Maximum distance to the nearest player before tide currents apply. Set to 0 to always apply.")
+                .defineInRange("playerProximityBlocks", 128.0D, 0.0D, 1024.0D);
+
         BUILDER.pop();
 
         CONFIG_SPEC = BUILDER.build();
@@ -53,7 +57,8 @@ public final class TideConfig {
                 OCEAN_AMPLITUDE_BLOCKS.get(),
                 RIVER_AMPLITUDE_BLOCKS.get(),
                 PHASE_OFFSET_MINUTES.get(),
-                CURRENT_STRENGTH.get()
+                CURRENT_STRENGTH.get(),
+                PLAYER_PROXIMITY_BLOCKS.get()
         );
     }
 
@@ -67,7 +72,8 @@ public final class TideConfig {
                 OCEAN_AMPLITUDE_BLOCKS.getDefault(),
                 RIVER_AMPLITUDE_BLOCKS.getDefault(),
                 PHASE_OFFSET_MINUTES.getDefault(),
-                CURRENT_STRENGTH.getDefault()
+                CURRENT_STRENGTH.getDefault(),
+                PLAYER_PROXIMITY_BLOCKS.getDefault()
         );
     }
 
@@ -80,7 +86,8 @@ public final class TideConfig {
             double oceanAmplitudeBlocks,
             double riverAmplitudeBlocks,
             double phaseOffsetMinutes,
-            double currentStrength
+            double currentStrength,
+            double playerProximityBlocks
     ) {
         public long cycleTicks() {
             return (long) Math.max(1L, Math.round(cycleMinutes * 60.0D * 20.0D));
