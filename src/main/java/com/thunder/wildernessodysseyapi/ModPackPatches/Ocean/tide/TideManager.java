@@ -7,6 +7,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
@@ -131,20 +132,27 @@ public final class TideManager {
         if (!serverLevel.hasChunkAt(entity.blockPosition())) {
             return;
         }
+        BlockPos entityPos = entity.blockPosition();
+        if (!serverLevel.getFluidState(entityPos).is(FluidTags.WATER)) {
+            return;
+        }
+        if (!serverLevel.getFluidState(entityPos.above()).isEmpty()) {
+            return;
+        }
         double proximityBlocks = cachedConfig.playerProximityBlocks();
         if (proximityBlocks > 0.0D && serverLevel.getNearestPlayer(entity, proximityBlocks) == null) {
             return;
         }
 
         TideSnapshot snapshot = snapshot(serverLevel);
-        double amplitude = getLocalAmplitude(serverLevel, entity.blockPosition());
+        double amplitude = getLocalAmplitude(serverLevel, entityPos);
         if (amplitude <= 0.0D) {
             return;
         }
         amplitude *= getMoonPhaseAmplitudeFactor(serverLevel);
 
         double verticalForce = snapshot.verticalChangePerTick() * amplitude * cachedConfig.currentStrength();
-        if (Math.abs(verticalForce) < 1.0E-5) {
+        if (Math.abs(verticalForce) < 1.0E-8) {
             return;
         }
 
