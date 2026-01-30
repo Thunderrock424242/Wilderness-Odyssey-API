@@ -12,6 +12,7 @@ public class AIConfig {
     private final Personality personality = new Personality();
     private final Settings settings = new Settings();
     private final LocalModel localModel = new LocalModel();
+    private final Onboarding onboarding = new Onboarding();
 
     public List<String> getStory() {
         return story;
@@ -43,6 +44,10 @@ public class AIConfig {
 
     public LocalModel getLocalModel() {
         return localModel;
+    }
+
+    public Onboarding getOnboarding() {
+        return onboarding;
     }
 
     public static class LocalModel {
@@ -205,6 +210,63 @@ public class AIConfig {
 
         public void setModel(String model) {
             this.model = model;
+        }
+    }
+
+    public static class Onboarding {
+        private Boolean enabled;
+        private String completionMessage;
+        private String invalidChoiceMessage;
+        private final List<OnboardingStep> steps = new ArrayList<>();
+
+        public Boolean getEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(Boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getCompletionMessage() {
+            return completionMessage;
+        }
+
+        public void setCompletionMessage(String completionMessage) {
+            this.completionMessage = completionMessage;
+        }
+
+        public String getInvalidChoiceMessage() {
+            return invalidChoiceMessage;
+        }
+
+        public void setInvalidChoiceMessage(String invalidChoiceMessage) {
+            this.invalidChoiceMessage = invalidChoiceMessage;
+        }
+
+        public List<OnboardingStep> getSteps() {
+            return steps;
+        }
+    }
+
+    public static class OnboardingStep {
+        private String prompt;
+        private final List<String> choices = new ArrayList<>();
+        private final List<String> responses = new ArrayList<>();
+
+        public String getPrompt() {
+            return prompt;
+        }
+
+        public void setPrompt(String prompt) {
+            this.prompt = prompt;
+        }
+
+        public List<String> getChoices() {
+            return choices;
+        }
+
+        public List<String> getResponses() {
+            return responses;
         }
     }
 }

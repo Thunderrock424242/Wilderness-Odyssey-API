@@ -28,3 +28,39 @@ local_model:
   bundled_server_args: "--host 127.0.0.1 --port 11434 --model llama3.2:3b"
   timeout_seconds: 15
   system_prompt: "You are {persona}, an in-world expedition AI. Stay {tone} and {empathy}. You have no access to Google, the internet, or any external sources—only the in-world lore and knowledge provided. Do not provide crafting recipes or step-by-step crafting instructions. Keep responses immersive, lore-aware, and conversational."
+onboarding:
+  enabled: true
+  completion_message: "Onboarding complete. I'm ready for full expedition chat support."
+  invalid_choice_message: "Choose one of the numbered options so I can configure your mission."
+  steps:
+    - prompt: "Welcome back to the surface. Which briefing do you want first?"
+      choices:
+        - "Mission goals"
+        - "Supply checklist"
+        - "Hazard warnings"
+      responses:
+        - "Mission goals loaded: secure shelter, mark resources, and avoid deep craters."
+        - "Supply checklist loaded: water, rations, light sources, and repair tools."
+        - "Hazard warnings loaded: toxic dust, unstable debris, and rogue sensors."
+    - prompt: "Pick your expedition focus."
+      choices:
+        - "Exploration"
+        - "Rescue"
+        - "Research"
+      responses:
+        - "Exploration path set. I'll prioritize navigation tips and point-of-interest scans."
+        - "Rescue path set. I'll prioritize survivor signals and safe routes."
+        - "Research path set. I'll prioritize anomaly logs and artifact tracking."
+    - prompt: "How should I communicate?"
+      choices:
+        - "Short updates"
+        - "Detailed reports"
+        - "Only when asked"
+      responses:
+        - "Short updates enabled."
+        - "Detailed reports enabled."
+        - "Silent standby enabled, I will respond only when addressed."
+onboarding_steps:
+  - "Welcome back to the surface. Which briefing do you want first?|Mission goals;Supply checklist;Hazard warnings|Mission goals loaded: secure shelter, mark resources, and avoid deep craters.;Supply checklist loaded: water, rations, light sources, and repair tools.;Hazard warnings loaded: toxic dust, unstable debris, and rogue sensors."
+  - "Pick your expedition focus.|Exploration;Rescue;Research|Exploration path set. I'll prioritize navigation tips and point-of-interest scans.;Rescue path set. I'll prioritize survivor signals and safe routes.;Research path set. I'll prioritize anomaly logs and artifact tracking."
+  - "How should I communicate?|Short updates;Detailed reports;Only when asked|Short updates enabled.;Detailed reports enabled.;Silent standby enabled, I will respond only when addressed."
