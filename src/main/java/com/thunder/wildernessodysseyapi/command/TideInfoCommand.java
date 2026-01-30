@@ -31,16 +31,21 @@ public final class TideInfoCommand {
         BlockPos pos = BlockPos.containing(source.getPosition());
 
         double amplitude = TideManager.getLocalAmplitude(level, pos);
+        double moonFactor = TideManager.getMoonPhaseAmplitudeFactor(level);
+        amplitude *= moonFactor;
         double tideHeight = snapshot.normalizedHeight() * amplitude;
         double trendPerTick = snapshot.verticalChangePerTick() * amplitude;
+        int moonPhase = level.getMoonPhase();
 
         String message = String.format(
-                "Tide at %d %d %d: %.2f blocks (%s, Δ=%.4f/tick, cycle %.1f min)",
+                "Tide at %d %d %d: %.2f blocks (%s, Δ=%.4f/tick, cycle %.1f min, moon phase %d, factor %.2f)",
                 pos.getX(), pos.getY(), pos.getZ(),
                 tideHeight,
                 snapshot.trendDescription(),
                 trendPerTick,
-                snapshot.cycleTicks() / 20.0D / 60.0D
+                snapshot.cycleTicks() / 20.0D / 60.0D,
+                moonPhase,
+                moonFactor
         );
 
         source.sendSuccess(() -> Component.literal(message), false);

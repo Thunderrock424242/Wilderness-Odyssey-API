@@ -24,7 +24,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import static java.lang.Math.PI;
 
 /**
- * Simulates a simple ocean/river tide that can be queried by other systems and gently influences entities in water.
+ * Simulates a simple ocean/river tide (distinct from any wave simulation) that can be queried by other systems and
+ * gently influences entities in water.
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class TideManager {
@@ -64,6 +65,17 @@ public final class TideManager {
         return 0.0D;
     }
 
+    public static double getMoonPhaseAmplitudeFactor(ServerLevel level) {
+        return switch (level.getMoonPhase()) {
+            case 0 -> 1.2D;
+            case 1, 7 -> 1.1D;
+            case 2, 6 -> 1.0D;
+            case 3, 5 -> 0.9D;
+            case 4 -> 0.8D;
+            default -> 1.0D;
+        };
+    }
+
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         TIDE_STATES.clear();
@@ -86,6 +98,9 @@ public final class TideManager {
 
         MinecraftServer server = event.getServer();
         for (ServerLevel level : server.getAllLevels()) {
+            if (level.players().isEmpty()) {
+                continue;
+            }
             TideState state = TIDE_STATES.computeIfAbsent(level.dimension(), key -> new TideState());
             long dayTime = level.getDayTime();
             double newHeight = computeNormalizedHeight(dayTime, cachedConfig);
@@ -113,12 +128,20 @@ public final class TideManager {
         if (!cachedConfig.enabled() || !entity.isInWaterOrBubble()) {
             return;
         }
+        if (!serverLevel.hasChunkAt(entity.blockPosition())) {
+            return;
+        }
+        double proximityBlocks = cachedConfig.playerProximityBlocks();
+        if (proximityBlocks > 0.0D && serverLevel.getNearestPlayer(entity, proximityBlocks) == null) {
+            return;
+        }
 
         TideSnapshot snapshot = snapshot(serverLevel);
         double amplitude = getLocalAmplitude(serverLevel, entity.blockPosition());
         if (amplitude <= 0.0D) {
             return;
         }
+        amplitude *= getMoonPhaseAmplitudeFactor(serverLevel);
 
         double verticalForce = snapshot.verticalChangePerTick() * amplitude * cachedConfig.currentStrength();
         if (Math.abs(verticalForce) < 1.0E-5) {
