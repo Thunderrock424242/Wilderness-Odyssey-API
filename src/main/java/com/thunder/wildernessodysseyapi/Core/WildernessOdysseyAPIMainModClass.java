@@ -35,6 +35,8 @@ import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.rules.GameRulesListManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.tide.TideConfig;
 import com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.tide.TideManager;
+import com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.wave.WaveConfig;
+import com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.wave.WaveManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.PlayerTelemetryConfig;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.PlayerTelemetryReporter;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.EventTelemetryConfig;
@@ -134,6 +136,8 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TideConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-tides-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, WaveConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-waves-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, CloakChipConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-cloak-chip-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PlayerTelemetryConfig.CONFIG_SPEC,
@@ -248,6 +252,9 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == TideConfig.CONFIG_SPEC) {
             TideManager.reloadConfig();
         }
+        if (event.getConfig().getSpec() == WaveConfig.CONFIG_SPEC) {
+            WaveManager.reloadConfig();
+        }
     }
 
     public void onConfigReloaded(ModConfigEvent.Reloading event) {
@@ -259,6 +266,9 @@ public class WildernessOdysseyAPIMainModClass {
         }
         if (event.getConfig().getSpec() == TideConfig.CONFIG_SPEC) {
             TideManager.reloadConfig();
+        }
+        if (event.getConfig().getSpec() == WaveConfig.CONFIG_SPEC) {
+            WaveManager.reloadConfig();
         }
     }
 }
