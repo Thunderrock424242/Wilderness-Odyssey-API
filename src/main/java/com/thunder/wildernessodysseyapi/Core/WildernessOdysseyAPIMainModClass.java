@@ -32,6 +32,7 @@ import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import com.thunder.wildernessodysseyapi.rules.GameRulesListManager;
 import com.thunder.wildernessodysseyapi.tide.TideConfig;
 import com.thunder.wildernessodysseyapi.tide.TideManager;
+import com.thunder.wildernessodysseyapi.ocean.OceanWaveManager;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryConfig;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryReporter;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentCommand;
@@ -227,6 +228,7 @@ public class WildernessOdysseyAPIMainModClass {
         }
         if (event.getConfig().getSpec() == TideConfig.CONFIG_SPEC) {
             TideManager.reloadConfig();
+            OceanWaveManager.reloadConfig();
         }
     }
 
@@ -239,6 +241,7 @@ public class WildernessOdysseyAPIMainModClass {
         }
         if (event.getConfig().getSpec() == TideConfig.CONFIG_SPEC) {
             TideManager.reloadConfig();
+            OceanWaveManager.reloadConfig();
         }
     }
 }

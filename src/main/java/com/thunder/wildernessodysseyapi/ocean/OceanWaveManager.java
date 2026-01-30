@@ -1,6 +1,7 @@
-package com.thunder.wildernessodysseyapi.tide;
+package com.thunder.wildernessodysseyapi.ocean;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.tide.TideConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceKey;
@@ -24,15 +25,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import static java.lang.Math.PI;
 
 /**
- * Simulates a simple ocean/river tide that can be queried by other systems and gently influences entities in water.
+ * Simulates short ocean surface waves layered on top of the main tide cycle.
+ * The logic is deliberately gameplay-only to remain shader friendly.
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
-public final class TideManager {
-    private static final Map<ResourceKey<Level>, TideState> TIDE_STATES = new ConcurrentHashMap<>();
-
+public final class OceanWaveManager {
+    private static final Map<ResourceKey<Level>, WaveState> WAVE_STATES = new ConcurrentHashMap<>();
     private static TideConfig.TideConfigValues cachedConfig = TideConfig.defaultValues();
 
-    private TideManager() {
+    private OceanWaveManager() {
     }
 
     /**
@@ -43,36 +44,36 @@ public final class TideManager {
     }
 
     /**
-     * Returns the latest tide snapshot for the given level.
+     * Returns the latest wave snapshot for the given level.
      */
-    public static TideSnapshot snapshot(ServerLevel level) {
-        TideState state = TIDE_STATES.computeIfAbsent(level.dimension(), key -> new TideState());
-        return new TideSnapshot(state.normalizedHeight, state.changePerTick, cachedConfig.cycleTicks());
+    public static WaveSnapshot snapshot(ServerLevel level) {
+        WaveState state = WAVE_STATES.computeIfAbsent(level.dimension(), key -> new WaveState());
+        return new WaveSnapshot(state.normalizedHeight, state.changePerTick, cachedConfig.wavePeriodTicks());
     }
 
     /**
-     * Returns the amplitude (in blocks) for the biome at the given position.
+     * Returns the wave amplitude (in blocks) for the biome at the given position.
      */
-    public static double getLocalAmplitude(ServerLevel level, BlockPos pos) {
+    public static double getLocalWaveAmplitude(ServerLevel level, BlockPos pos) {
+        if (!cachedConfig.wavesEnabled()) {
+            return 0.0D;
+        }
         Holder<Biome> biomeHolder = level.getBiome(pos);
         if (biomeHolder.is(BiomeTags.IS_OCEAN)) {
-            return cachedConfig.oceanAmplitudeBlocks();
-        }
-        if (biomeHolder.is(BiomeTags.IS_RIVER)) {
-            return cachedConfig.riverAmplitudeBlocks();
+            return cachedConfig.waveAmplitudeBlocks();
         }
         return 0.0D;
     }
 
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
-        TIDE_STATES.clear();
+        WAVE_STATES.clear();
         cachedConfig = loadConfigWithFallback();
     }
 
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
-        TIDE_STATES.clear();
+        WAVE_STATES.clear();
     }
 
     @SubscribeEvent
@@ -80,25 +81,16 @@ public final class TideManager {
         if (!event.hasTime()) {
             return;
         }
-        if (!cachedConfig.enabled()) {
+        if (!cachedConfig.enabled() || !cachedConfig.wavesEnabled()) {
             return;
         }
 
         MinecraftServer server = event.getServer();
         for (ServerLevel level : server.getAllLevels()) {
-            TideState state = TIDE_STATES.computeIfAbsent(level.dimension(), key -> new TideState());
-            long dayTime = level.getDayTime();
-            double newHeight = computeNormalizedHeight(dayTime, cachedConfig);
-            state.update(dayTime, newHeight);
-        }
-    }
-
-    private static TideConfig.TideConfigValues loadConfigWithFallback() {
-        try {
-            return TideConfig.values();
-        } catch (IllegalStateException e) {
-            ModConstants.LOGGER.warn("Tide config accessed before load; using defaults instead. ({})", e.getMessage());
-            return TideConfig.defaultValues();
+            WaveState state = WAVE_STATES.computeIfAbsent(level.dimension(), key -> new WaveState());
+            long gameTime = level.getGameTime();
+            double newHeight = computeWaveNormalizedHeight(gameTime, cachedConfig);
+            state.update(gameTime, newHeight);
         }
     }
 
@@ -110,17 +102,17 @@ public final class TideManager {
         if (!(entity.level() instanceof ServerLevel serverLevel)) {
             return;
         }
-        if (!cachedConfig.enabled() || !entity.isInWaterOrBubble()) {
+        if (!cachedConfig.enabled() || !cachedConfig.wavesEnabled() || !entity.isInWaterOrBubble()) {
             return;
         }
 
-        TideSnapshot snapshot = snapshot(serverLevel);
-        double amplitude = getLocalAmplitude(serverLevel, entity.blockPosition());
+        WaveSnapshot snapshot = snapshot(serverLevel);
+        double amplitude = getLocalWaveAmplitude(serverLevel, entity.blockPosition());
         if (amplitude <= 0.0D) {
             return;
         }
 
-        double verticalForce = snapshot.verticalChangePerTick() * amplitude * cachedConfig.currentStrength();
+        double verticalForce = snapshot.verticalChangePerTick() * amplitude * cachedConfig.waveStrength();
         if (Math.abs(verticalForce) < 1.0E-5) {
             return;
         }
@@ -128,9 +120,18 @@ public final class TideManager {
         entity.setDeltaMovement(motion.x, motion.y + verticalForce, motion.z);
     }
 
-    private static double computeNormalizedHeight(long dayTime, TideConfig.TideConfigValues config) {
-        long cycleTicks = Math.max(1L, config.cycleTicks());
-        long adjustedTime = (dayTime + config.phaseOffsetTicks()) % cycleTicks;
+    private static TideConfig.TideConfigValues loadConfigWithFallback() {
+        try {
+            return TideConfig.values();
+        } catch (IllegalStateException e) {
+            ModConstants.LOGGER.warn("Wave config accessed before load; using defaults instead. ({})", e.getMessage());
+            return TideConfig.defaultValues();
+        }
+    }
+
+    private static double computeWaveNormalizedHeight(long gameTime, TideConfig.TideConfigValues config) {
+        long cycleTicks = config.wavePeriodTicks();
+        long adjustedTime = gameTime % cycleTicks;
         double phase = (adjustedTime / (double) cycleTicks) * 2.0D * PI;
         return Math.sin(phase);
     }
@@ -138,7 +139,7 @@ public final class TideManager {
     /**
      * Lightweight state container tracked per dimension.
      */
-    private static final class TideState {
+    private static final class WaveState {
         private long lastUpdateTick = -1L;
         private double normalizedHeight = 0.0D;
         private double changePerTick = 0.0D;
@@ -154,18 +155,14 @@ public final class TideManager {
     }
 
     /**
-     * Read-only tide information for consumers.
+     * Read-only wave information for consumers.
      */
-    public record TideSnapshot(double normalizedHeight, double verticalChangePerTick, long cycleTicks) {
-        public boolean isRising() {
-            return verticalChangePerTick > 0.0D;
-        }
-
+    public record WaveSnapshot(double normalizedHeight, double verticalChangePerTick, long cycleTicks) {
         public String trendDescription() {
             if (Math.abs(verticalChangePerTick) < 1.0E-5) {
-                return "slack";
+                return "calm";
             }
-            return isRising() ? "rising" : "falling";
+            return verticalChangePerTick > 0.0D ? "cresting" : "troughing";
         }
     }
 }

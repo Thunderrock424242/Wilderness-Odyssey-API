@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.tide;
 
+import com.thunder.ticktoklib.TickTokHelper;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
@@ -14,6 +15,10 @@ public final class TideConfig {
     public static final ModConfigSpec.DoubleValue RIVER_AMPLITUDE_BLOCKS;
     public static final ModConfigSpec.DoubleValue PHASE_OFFSET_MINUTES;
     public static final ModConfigSpec.DoubleValue CURRENT_STRENGTH;
+    public static final ModConfigSpec.BooleanValue WAVES_ENABLED;
+    public static final ModConfigSpec.DoubleValue WAVE_AMPLITUDE_BLOCKS;
+    public static final ModConfigSpec.DoubleValue WAVE_PERIOD_SECONDS;
+    public static final ModConfigSpec.DoubleValue WAVE_STRENGTH;
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
@@ -38,6 +43,18 @@ public final class TideConfig {
         CURRENT_STRENGTH = BUILDER.comment("Vertical force multiplier applied to entities in water to reflect rising/falling tides.")
                 .defineInRange("currentStrength", 0.004D, 0.0D, 0.05D);
 
+        WAVES_ENABLED = BUILDER.comment("Enable short, choppy ocean surface waves on top of the main tide cycle.")
+                .define("wavesEnabled", true);
+
+        WAVE_AMPLITUDE_BLOCKS = BUILDER.comment("Maximum vertical change (in blocks) applied to ocean surface waves.")
+                .defineInRange("waveAmplitudeBlocks", 0.35D, 0.0D, 4.0D);
+
+        WAVE_PERIOD_SECONDS = BUILDER.comment("Length of a full wave cycle (crest to crest) in real-time seconds.")
+                .defineInRange("wavePeriodSeconds", 6.0D, 1.0D, 60.0D);
+
+        WAVE_STRENGTH = BUILDER.comment("Vertical force multiplier applied to entities in water for wave bobbing.")
+                .defineInRange("waveStrength", 0.15D, 0.0D, 2.0D);
+
         BUILDER.pop();
 
         CONFIG_SPEC = BUILDER.build();
@@ -53,7 +70,11 @@ public final class TideConfig {
                 OCEAN_AMPLITUDE_BLOCKS.get(),
                 RIVER_AMPLITUDE_BLOCKS.get(),
                 PHASE_OFFSET_MINUTES.get(),
-                CURRENT_STRENGTH.get()
+                CURRENT_STRENGTH.get(),
+                WAVES_ENABLED.get(),
+                WAVE_AMPLITUDE_BLOCKS.get(),
+                WAVE_PERIOD_SECONDS.get(),
+                WAVE_STRENGTH.get()
         );
     }
 
@@ -67,7 +88,11 @@ public final class TideConfig {
                 OCEAN_AMPLITUDE_BLOCKS.getDefault(),
                 RIVER_AMPLITUDE_BLOCKS.getDefault(),
                 PHASE_OFFSET_MINUTES.getDefault(),
-                CURRENT_STRENGTH.getDefault()
+                CURRENT_STRENGTH.getDefault(),
+                WAVES_ENABLED.getDefault(),
+                WAVE_AMPLITUDE_BLOCKS.getDefault(),
+                WAVE_PERIOD_SECONDS.getDefault(),
+                WAVE_STRENGTH.getDefault()
         );
     }
 
@@ -80,7 +105,11 @@ public final class TideConfig {
             double oceanAmplitudeBlocks,
             double riverAmplitudeBlocks,
             double phaseOffsetMinutes,
-            double currentStrength
+            double currentStrength,
+            boolean wavesEnabled,
+            double waveAmplitudeBlocks,
+            double wavePeriodSeconds,
+            double waveStrength
     ) {
         public long cycleTicks() {
             return (long) Math.max(1L, Math.round(cycleMinutes * 60.0D * 20.0D));
@@ -88,6 +117,10 @@ public final class TideConfig {
 
         public long phaseOffsetTicks() {
             return (long) Math.max(0L, Math.round(phaseOffsetMinutes * 60.0D * 20.0D));
+        }
+
+        public long wavePeriodTicks() {
+            return (long) Math.max(1L, Math.round(wavePeriodSeconds * TickTokHelper.TICKS_PER_SECOND));
         }
     }
 }
