@@ -35,7 +35,7 @@ public class CryoTubeRenderSetup {
         event.enqueueWork(() ->
                 ItemBlockRenderTypes.setRenderLayer(
                         CryoTubeBlock.CRYO_TUBE.get(),
-                        renderType -> renderType == RenderType.cutout() || renderType == RenderType.translucent()
+                        renderType -> renderType == RenderType.translucent()
                 )
         );
     }
