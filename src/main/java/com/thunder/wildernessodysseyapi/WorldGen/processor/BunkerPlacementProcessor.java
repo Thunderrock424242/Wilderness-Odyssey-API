@@ -8,6 +8,7 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlac
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessor;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureProcessorType;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Prevents air blocks from the bunker template from replacing existing terrain.
@@ -21,12 +22,13 @@ public class BunkerPlacementProcessor extends StructureProcessor {
     }
 
     @Override
-    public StructureTemplate.StructureBlockInfo processBlock(LevelReader level,
-                                                             BlockPos pos,
-                                                             BlockPos pivot,
-                                                             StructureTemplate.StructureBlockInfo raw,
-                                                             StructureTemplate.StructureBlockInfo placed,
-                                                             StructurePlaceSettings settings) {
+    public StructureTemplate.StructureBlockInfo process(LevelReader level,
+                                                        BlockPos pos,
+                                                        BlockPos pivot,
+                                                        StructureTemplate.StructureBlockInfo raw,
+                                                        StructureTemplate.StructureBlockInfo placed,
+                                                        StructurePlaceSettings settings,
+                                                        @Nullable StructureTemplate template) {
         if (placed.state().isAir()) {
             BoundingBox bounds = settings.getBoundingBox();
             if (bounds == null || isBoundary(pos, bounds)) {
