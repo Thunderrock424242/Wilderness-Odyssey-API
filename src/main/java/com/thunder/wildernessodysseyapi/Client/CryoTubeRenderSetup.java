@@ -7,6 +7,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.ChunkRenderTypeSet;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 
@@ -35,7 +36,7 @@ public class CryoTubeRenderSetup {
         event.enqueueWork(() ->
                 ItemBlockRenderTypes.setRenderLayer(
                         CryoTubeBlock.CRYO_TUBE.get(),
-                        renderType -> renderType == RenderType.translucent()
+                        ChunkRenderTypeSet.of(RenderType.translucent())
                 )
         );
     }
