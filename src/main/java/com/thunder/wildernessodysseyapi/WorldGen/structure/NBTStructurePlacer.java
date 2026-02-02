@@ -214,9 +214,11 @@ public class NBTStructurePlacer {
 
         activateCreateElevators(level, foundation.origin(), data.elevatorPulleyOffsets());
 
-        List<BlockPos> cryoPositions = data.cryoOffsets().stream()
-                .map(foundation.origin()::offset)
-                .toList();
+        List<BlockPos> cryoOffsets = data.cryoOffsets();
+        List<BlockPos> cryoPositions = new ArrayList<>(cryoOffsets.size());
+        for (BlockPos offset : cryoOffsets) {
+            cryoPositions.add(foundation.origin().offset(offset));
+        }
 
         StructurePlacementDebugger.markSuccess(attempt,
                 "placed with %s auto-blended blocks and %s cryo tubes"
@@ -447,24 +449,21 @@ public class NBTStructurePlacer {
         double centerX = size.getX() / 2.0D;
         double centerZ = size.getZ() / 2.0D;
 
-        return markers.stream()
-                .min((a, b) -> {
-                    int yCompare = Integer.compare(a.pos().getY(), b.pos().getY());
-                    if (yCompare != 0) {
-                        return yCompare; // prefer markers lower in the template for ground embedding
-                    }
-
-                    double aDx = a.pos().getX() - centerX;
-                    double aDz = a.pos().getZ() - centerZ;
-                    double bDx = b.pos().getX() - centerX;
-                    double bDz = b.pos().getZ() - centerZ;
-                    double aDist = (aDx * aDx) + (aDz * aDz);
-                    double bDist = (bDx * bDx) + (bDz * bDz);
-                    return Double.compare(aDist, bDist);
-                })
-                .map(StructureBlockInfo::pos)
-                .map(pos -> new LevelingMarkerData(pos, true))
-                .orElse(new LevelingMarkerData(null, true));
+        StructureBlockInfo best = null;
+        int bestY = 0;
+        double bestDist = 0.0D;
+        for (StructureBlockInfo marker : markers) {
+            int markerY = marker.pos().getY();
+            double dx = marker.pos().getX() - centerX;
+            double dz = marker.pos().getZ() - centerZ;
+            double dist = (dx * dx) + (dz * dz);
+            if (best == null || markerY < bestY || (markerY == bestY && dist < bestDist)) {
+                best = marker;
+                bestY = markerY;
+                bestDist = dist;
+            }
+        }
+        return new LevelingMarkerData(best == null ? null : best.pos(), true);
     }
 
     private Block resolveBlock(String name, String description) {

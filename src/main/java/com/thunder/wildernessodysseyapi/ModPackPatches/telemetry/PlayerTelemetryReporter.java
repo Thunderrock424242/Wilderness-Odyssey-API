@@ -500,8 +500,11 @@ public final class PlayerTelemetryReporter {
         int ttlSeconds = config.geoCacheTtlSeconds();
         CachedGeoInfo cached = GEO_CACHE.get(uuid);
         if (cached != null) {
-            if (ttlSeconds > 0 && Duration.between(cached.timestamp(), Instant.now()).toSeconds() <= ttlSeconds) {
-                return cached.info();
+            if (ttlSeconds > 0) {
+                Instant now = Instant.now();
+                if (Duration.between(cached.timestamp(), now).toSeconds() <= ttlSeconds) {
+                    return cached.info();
+                }
             }
             if (ttlSeconds <= 0) {
                 GEO_CACHE.remove(uuid);
@@ -521,8 +524,11 @@ public final class PlayerTelemetryReporter {
         int ttlSeconds = config.accountAgeCacheTtlSeconds();
         CachedAccountAge cached = ACCOUNT_AGE_CACHE.get(uuid);
         if (cached != null) {
-            if (ttlSeconds > 0 && Duration.between(cached.timestamp(), Instant.now()).toSeconds() <= ttlSeconds) {
-                return cached.info();
+            if (ttlSeconds > 0) {
+                Instant now = Instant.now();
+                if (Duration.between(cached.timestamp(), now).toSeconds() <= ttlSeconds) {
+                    return cached.info();
+                }
             }
             if (ttlSeconds <= 0) {
                 ACCOUNT_AGE_CACHE.remove(uuid);
