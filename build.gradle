@@ -256,17 +256,6 @@ publishing {
         }
     }
 }
-// Package bundled libraries directly into the mod jar so they are available when Minecraft loads the mod.
-tasks.named('jar', Jar).configure {
-    // Ensure all mod resources (including built-in datapacks) are packaged into the jar.
-    from(sourceSets.main.resources)
-
-    from {
-        configurations.bundledLibs.collect { it.isDirectory() ? it : zipTree(it) }
-    }
-    // Prevent duplicate resources when merging jars.
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
 
 
 tasks.withType(JavaCompile).configureEach {
