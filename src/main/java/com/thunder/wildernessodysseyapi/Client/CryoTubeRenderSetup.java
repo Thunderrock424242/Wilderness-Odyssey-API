@@ -10,6 +10,7 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.ChunkRenderTypeSet;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+import static com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock.CRYO_TUBE;
 
 /**
  * Registers client side rendering for the cryo tube block.
@@ -34,10 +35,7 @@ public class CryoTubeRenderSetup {
         // overlay (texture slot #1 in the model) uses the translucent sheet so
         // it can glow without being affected by lightmaps.
         event.enqueueWork(() ->
-                ItemBlockRenderTypes.setRenderLayer(
-                        CryoTubeBlock.CRYO_TUBE.get(),
-                        ChunkRenderTypeSet.of(RenderType.translucent())
-                )
+                ItemBlockRenderTypes.setRenderLayer(CRYO_TUBE.get(), RenderType.translucent())
         );
     }
 }
