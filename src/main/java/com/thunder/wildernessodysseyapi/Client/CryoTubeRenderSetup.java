@@ -1,13 +1,11 @@
 package com.thunder.wildernessodysseyapi.Client;
 
-import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
-import net.neoforged.neoforge.client.ChunkRenderTypeSet;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
 import static com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock.CRYO_TUBE;
@@ -30,10 +28,6 @@ public class CryoTubeRenderSetup {
      */
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
-        // Allow both cutout and translucent layers. The base tube renders on
-        // cutout to avoid z-fighting when tubes touch, while the emissive
-        // overlay (texture slot #1 in the model) uses the translucent sheet so
-        // it can glow without being affected by lightmaps.
         event.enqueueWork(() ->
                 ItemBlockRenderTypes.setRenderLayer(CRYO_TUBE.get(), RenderType.translucent())
         );
