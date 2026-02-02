@@ -11,6 +11,7 @@ import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -611,7 +612,8 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
     @Unique
     private java.lang.Boolean wildernessodysseyapi$validateCorner(ServerLevel serverLevel, BlockPos position,
             String structureNameKey) {
-        if (!serverLevel.hasChunkAt(position)) {
+        ChunkPos chunkPos = new ChunkPos(position);
+        if (!serverLevel.hasChunk(chunkPos.x, chunkPos.z)) {
             return null;
         }
         BlockState blockState = serverLevel.getBlockState(position);
@@ -914,7 +916,8 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         BlockState cornerState = Blocks.STRUCTURE_BLOCK.defaultBlockState().setValue(StructureBlock.MODE, StructureMode.CORNER);
 
         for (BlockPos target : desiredCorners) {
-            if (!serverLevel.hasChunkAt(target)) {
+            ChunkPos chunkPos = new ChunkPos(target);
+            if (!serverLevel.hasChunk(chunkPos.x, chunkPos.z)) {
                 continue;
             }
             BlockState state = serverLevel.getBlockState(target);
