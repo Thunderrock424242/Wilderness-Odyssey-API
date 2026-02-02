@@ -21,7 +21,7 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = "4.0.1"
+version = "4.1.0"
 group = "com.thunder.wildernessodysseyapi"
 
 base {
@@ -135,15 +135,6 @@ sourceSets {
 // "optional", meaning it will not be pulled by dependents of this mod.
 configurations {
     runtimeClasspath.extendsFrom localRuntime
-
-    integrationTestImplementation.extendsFrom implementation, testImplementation
-    integrationTestRuntimeOnly.extendsFrom runtimeOnly, testRuntimeOnly
-
-    jmhImplementation.extendsFrom implementation
-    jmhRuntimeOnly.extendsFrom runtimeOnly
-
-    schemTestImplementation.extendsFrom implementation, testImplementation
-    schemTestRuntimeOnly.extendsFrom runtimeOnly, testRuntimeOnly
 }
 
 repositories {
@@ -184,17 +175,6 @@ dependencies {
     jarJar(implementation('com.github.luben:zstd-jni:1.5.7-6'))
 
     additionalRuntimeClasspath 'org.yaml:snakeyaml:2.2'
-
-    testImplementation platform("org.junit:junit-bom:${junitVersion}")
-    testImplementation 'org.junit.jupiter:junit-jupiter'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-    integrationTestImplementation platform("org.junit:junit-bom:${junitVersion}")
-    integrationTestImplementation 'org.junit.jupiter:junit-jupiter'
-
-    jmhImplementation "org.openjdk.jmh:jmh-core:${jmhVersion}"
-    jmhAnnotationProcessor "org.openjdk.jmh:jmh-generator-annprocess:${jmhVersion}"
-
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
@@ -209,7 +189,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_id                 : "wildernessodysseyapi",
             mod_name               : "Wilderness Odyssey API",
             mod_license            : "APR",
-            mod_version            : "4.0.1",
+            mod_version            : "4.1.0",
             mod_authors            : "thunderrock424242",
             mod_description        : "a api for my modpack"
     ]
