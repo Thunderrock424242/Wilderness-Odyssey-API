@@ -153,9 +153,9 @@ public class CryoTubeBlock {
 
         // NeoForge 21 updated the Block interaction API. The previous
         // `use` method now resolves through `useItemOn` for item based
-        // interactions or `useWithoutItem` when empty handed. Using the old
+        // interactions or `useWithoutItem` when empty-handed. Using the old
         // signature causes compilation errors. Implement the new
-        // `useWithoutItem` variant to preserve the behaviour of letting the
+        // `useWithoutItem` variant to preserve the behavior of letting the
         // player sleep in the tube.
         public InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand) {
             if (level.getDayTime() >= MAX_SLEEP_TICKS) {

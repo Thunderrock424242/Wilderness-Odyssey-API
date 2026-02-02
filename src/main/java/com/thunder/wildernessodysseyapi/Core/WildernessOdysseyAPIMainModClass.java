@@ -28,8 +28,6 @@ import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import com.thunder.wildernessodysseyapi.AI.AI_story.AIChatListener;
-import com.thunder.wildernessodysseyapi.AntiCheat.AntiCheatConfig;
-import com.thunder.wildernessodysseyapi.AntiCheat.BlacklistChecker;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.rules.GameRulesListManager;
@@ -110,7 +108,6 @@ public class WildernessOdysseyAPIMainModClass {
 
         // Register global events
         NeoForge.EVENT_BUS.register(this);
-        NeoForge.EVENT_BUS.register(BlacklistChecker.class);
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
         NeoForge.EVENT_BUS.register(AIChatListener.class);
         NeoForge.EVENT_BUS.register(PlayerTelemetryReporter.class);
@@ -128,8 +125,6 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-telemetry-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-async.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, AntiCheatConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-anticheat-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TideConfig.CONFIG_SPEC,
