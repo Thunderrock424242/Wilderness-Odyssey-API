@@ -136,14 +136,6 @@ sourceSets {
 configurations {
     runtimeClasspath.extendsFrom localRuntime
 
-    // Ensure bundled libraries are also available on the dev runtime classpath.
-    // Without this, running from compiled classes (not the shaded jar) can miss
-    // dependencies like Moshi and OkHttp, leading to NoClassDefFoundError at startup.
-    runtimeClasspath.extendsFrom bundledLibs
-
-    // Libraries that must be bundled directly into the mod jar so they are available at runtime.
-    bundledLibs
-
     integrationTestImplementation.extendsFrom implementation, testImplementation
     integrationTestRuntimeOnly.extendsFrom runtimeOnly, testRuntimeOnly
 
@@ -153,14 +145,6 @@ configurations {
     schemTestImplementation.extendsFrom implementation, testImplementation
     schemTestRuntimeOnly.extendsFrom runtimeOnly, testRuntimeOnly
 }
-
-// Make sure Gradle run configurations (JavaExec tasks) also see bundled libraries when
-// launching directly from compiled classes, matching the crash log path
-// `/build/classes/java/main/`.
-tasks.withType(JavaExec).configureEach {
-    classpath += configurations.bundledLibs
-}
-
 
 repositories {
     maven {
@@ -193,18 +177,11 @@ dependencies {
     implementation "curse.maven:irisshaders-455508:6661598"
     implementation "curse.maven:nova-apii-1248874:7507458"
     implementation "curse.maven:curios-309927:6529130"
-    implementation 'com.github.luben:zstd-jni:1.5.7-6'
-
-    // AI advisory helpers (HTTP client and fault tolerance)
-    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    implementation 'com.squareup.okio:okio:3.9.0'
-    implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
-
-    // Bundle third-party libraries into the final mod jar to avoid missing-class errors at runtime.
-    bundledLibs 'com.squareup.okhttp3:okhttp:4.12.0'
-    bundledLibs 'com.squareup.okio:okio:3.9.0'
-    bundledLibs 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
-    bundledLibs 'com.github.luben:zstd-jni:1.5.7-6'
+    // Bundle third-party libraries into the final mod jar (Jar-in-Jar) to avoid missing-class errors at runtime.
+    jarJar(implementation('com.squareup.okhttp3:okhttp:4.12.0'))
+    jarJar(implementation('com.squareup.okio:okio:3.9.0'))
+    jarJar(implementation('io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'))
+    jarJar(implementation('com.github.luben:zstd-jni:1.5.7-6'))
 
     additionalRuntimeClasspath 'org.yaml:snakeyaml:2.2'
 
@@ -256,18 +233,6 @@ tasks.register('obfuscateFiles', JavaExec) {
 
     // The more traditional way to set the classpath in build.gradle (Groovy DSL):
     classpath = sourceSets.main.runtimeClasspath
-}
-
-// Package bundled libraries directly into the mod jar so they are available when Minecraft loads the mod.
-tasks.named('jar', Jar).configure {
-    // Ensure all mod resources (including built-in datapacks) are packaged into the jar.
-    from(sourceSets.main.resources)
-
-    from {
-        configurations.bundledLibs.collect { it.isDirectory() ? it : zipTree(it) }
-    }
-    // Prevent duplicate resources when merging jars.
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 publishing {
