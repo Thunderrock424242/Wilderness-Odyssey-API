@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.tide;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -129,7 +130,8 @@ public final class TideManager {
         if (!cachedConfig.enabled() || !entity.isInWaterOrBubble()) {
             return;
         }
-        if (!serverLevel.hasChunkAt(entity.blockPosition())) {
+        ChunkPos entityChunk = new ChunkPos(entity.blockPosition());
+        if (!serverLevel.hasChunk(entityChunk.x, entityChunk.z)) {
             return;
         }
         BlockPos entityPos = entity.blockPosition();
