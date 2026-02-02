@@ -17,11 +17,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 public class MixinWorldCreationUiState {
 
+    private boolean wildernessOdysseyApi$defaultPresetApplied;
+
     /**
      * After preset lists are populated, switch to the large biomes preset.
      */
     @Inject(method = "updatePresetLists", at = @At("TAIL"))
     private void forceLargeBiomesPreset(CallbackInfo ci) {
+        if (wildernessOdysseyApi$defaultPresetApplied) {
+            return;
+        }
         WorldCreationUiState state = (WorldCreationUiState)(Object)this;
         WorldCreationContext context = state.getSettings();
 
@@ -29,6 +34,7 @@ public class MixinWorldCreationUiState {
 
         getter.get(WorldPresets.LARGE_BIOMES).ifPresent(holder -> {
             state.setWorldType(new WorldCreationUiState.WorldTypeEntry(holder));
+            wildernessOdysseyApi$defaultPresetApplied = true;
         });
     }
 }
