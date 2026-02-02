@@ -32,12 +32,9 @@ public final class NbtCompressionUtils {
             if (codec == CompressionCodec.VANILLA_GZIP) {
                 return NbtIo.readCompressed(fileStream, NbtAccounter.unlimitedHeap());
             }
-            try (InputStream decodedStream = wrapDecompressor(codec, fileStream)) {
-                ByteArrayOutputStream copy = new ByteArrayOutputStream();
-                copyStream(decodedStream, copy, new byte[8192]);
-                try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(copy.toByteArray()))) {
-                    return NbtIo.read(in, NbtAccounter.unlimitedHeap());
-                }
+            try (InputStream decodedStream = wrapDecompressor(codec, fileStream);
+                 DataInputStream in = new DataInputStream(decodedStream)) {
+                return NbtIo.read(in, NbtAccounter.unlimitedHeap());
             }
         }
     }
@@ -50,7 +47,10 @@ public final class NbtCompressionUtils {
      * Writes the NBT payload with a custom GZIP compression level.
      */
     public static void writeCompressed(Path target, CompoundTag tag, int compressionLevel, CompressionCodec codec) throws IOException {
-        Files.createDirectories(target.getParent());
+        Path parent = target.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
         if (codec == CompressionCodec.VANILLA_GZIP) {
             try (OutputStream fileStream = Files.newOutputStream(target);
                  GZIPOutputStream gzip = new GZIPOutputStream(fileStream) {
@@ -66,13 +66,10 @@ public final class NbtCompressionUtils {
         }
 
         try (OutputStream fileStream = Files.newOutputStream(target);
-             OutputStream compressor = wrapCompressor(codec, fileStream, compressionLevel)) {
-            ByteArrayOutputStream nbtBuffer = new ByteArrayOutputStream();
-            try (DataOutputStream nbtOut = new DataOutputStream(nbtBuffer)) {
-                NbtIo.write(tag, nbtOut);
-                nbtOut.flush();
-            }
-            compressor.write(nbtBuffer.toByteArray());
+             OutputStream compressor = wrapCompressor(codec, fileStream, compressionLevel);
+             DataOutputStream nbtOut = new DataOutputStream(compressor)) {
+            NbtIo.write(tag, nbtOut);
+            nbtOut.flush();
         }
     }
 
@@ -151,13 +148,6 @@ public final class NbtCompressionUtils {
             if (MISSING_CODEC_WARNED.add(codec)) {
                 ModConstants.LOGGER.warn("Missing {} codec dependency on the runtime classpath; falling back to vanilla GZIP", codec, missingCodec);
             }
-        }
-    }
-
-    private static void copyStream(InputStream in, OutputStream out, byte[] buffer) throws IOException {
-        int read;
-        while ((read = in.read(buffer)) != -1) {
-            out.write(buffer, 0, read);
         }
     }
 
