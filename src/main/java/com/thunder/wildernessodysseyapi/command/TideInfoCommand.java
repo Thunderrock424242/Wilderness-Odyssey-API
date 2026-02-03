@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
+import com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.tide.TideAstronomy;
 import com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.tide.TideManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.tide.TideManager.TideSnapshot;
 import net.minecraft.commands.CommandSourceStack;
@@ -31,7 +32,7 @@ public final class TideInfoCommand {
         BlockPos pos = BlockPos.containing(source.getPosition());
 
         double amplitude = TideManager.getLocalAmplitude(level, pos);
-        double moonFactor = TideManager.getMoonPhaseAmplitudeFactor(level);
+        double moonFactor = TideAstronomy.getMoonPhaseAmplitudeFactor(level);
         double tideHeight = snapshot.normalizedHeight() * amplitude;
         double trendPerTick = snapshot.verticalChangePerTick() * amplitude;
         int moonPhase = level.getMoonPhase();
