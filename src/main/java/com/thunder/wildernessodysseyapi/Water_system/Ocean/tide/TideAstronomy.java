@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.tide;
+package com.thunder.wildernessodysseyapi.Water_system.Ocean.tide;
 
 import net.minecraft.server.level.ServerLevel;
 

@@ -2,8 +2,8 @@ package com.thunder.wildernessodysseyapi.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
-import com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.tide.TideManager;
-import com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.tide.TideManager.TideSnapshot;
+import com.thunder.wildernessodysseyapi.Water_system.Ocean.tide.TideAstronomy;
+import com.thunder.wildernessodysseyapi.Water_system.Ocean.tide.TideManager;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -27,11 +27,11 @@ public final class TideInfoCommand {
     private static int reportTide(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
         ServerLevel level = source.getLevel();
-        TideSnapshot snapshot = TideManager.snapshot(level);
+        TideManager.TideSnapshot snapshot = TideManager.snapshot(level);
         BlockPos pos = BlockPos.containing(source.getPosition());
 
         double amplitude = TideManager.getLocalAmplitude(level, pos);
-        double moonFactor = TideManager.getMoonPhaseAmplitudeFactor(level);
+        double moonFactor = TideAstronomy.getMoonPhaseAmplitudeFactor(level);
         amplitude *= moonFactor;
         double tideHeight = snapshot.normalizedHeight() * amplitude;
         double trendPerTick = snapshot.verticalChangePerTick() * amplitude;
