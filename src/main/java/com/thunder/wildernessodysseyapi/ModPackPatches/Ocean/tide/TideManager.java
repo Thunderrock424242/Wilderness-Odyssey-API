@@ -100,7 +100,8 @@ public final class TideManager {
             }
             TideState state = TIDE_STATES.computeIfAbsent(level.dimension(), key -> new TideState());
             long dayTime = level.getDayTime();
-            double newHeight = computeNormalizedHeight(dayTime, cachedConfig);
+            double moonFactor = getMoonPhaseAmplitudeFactor(level);
+            double newHeight = computeNormalizedHeight(dayTime, cachedConfig) * moonFactor;
             state.update(dayTime, newHeight);
         }
     }

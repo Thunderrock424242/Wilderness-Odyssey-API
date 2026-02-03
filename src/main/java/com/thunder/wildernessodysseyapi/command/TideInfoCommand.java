@@ -32,7 +32,6 @@ public final class TideInfoCommand {
 
         double amplitude = TideManager.getLocalAmplitude(level, pos);
         double moonFactor = TideManager.getMoonPhaseAmplitudeFactor(level);
-        amplitude *= moonFactor;
         double tideHeight = snapshot.normalizedHeight() * amplitude;
         double trendPerTick = snapshot.verticalChangePerTick() * amplitude;
         int moonPhase = level.getMoonPhase();
