@@ -26,6 +26,7 @@ public class CustomCampfireParticle extends SimpleAnimatedParticle {
      */
     protected CustomCampfireParticle(ClientLevel level, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed, SpriteSet sprite) {
         super(level, x, y, z, sprite, 0.1F); // Gravity is set to 0.1F for natural rise
+        this.setSpriteFromAge(sprite);
         this.xd = xSpeed;
         this.yd = ySpeed;
         this.zd = zSpeed;
