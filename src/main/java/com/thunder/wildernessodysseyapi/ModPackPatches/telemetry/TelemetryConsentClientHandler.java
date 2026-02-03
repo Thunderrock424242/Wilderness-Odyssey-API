@@ -3,7 +3,6 @@ package com.thunder.wildernessodysseyapi.ModPackPatches.telemetry;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.TelemetryConsentStore.ConsentDecision;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.TitleScreen;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -26,12 +25,7 @@ public final class TelemetryConsentClientHandler {
         ConsentDecision decision = TelemetryConsentConfig.decision();
         Minecraft minecraft = Minecraft.getInstance();
         minecraft.execute(() -> {
-            if (decision == ConsentDecision.UNKNOWN) {
-                if (!promptedThisSession && minecraft.level != null) {
-                    promptedThisSession = true;
-                    minecraft.setScreen(new TelemetryConsentScreen(minecraft.screen));
-                }
-            } else {
+            if (decision != ConsentDecision.UNKNOWN) {
                 syncDecisionIfPossible(decision);
             }
         });
@@ -51,17 +45,8 @@ public final class TelemetryConsentClientHandler {
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
-        if (promptedThisSession) {
-            return;
-        }
-        TelemetryConsentConfig.validateVersion();
-        if (TelemetryConsentConfig.decision() != ConsentDecision.UNKNOWN) {
-            return;
-        }
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.screen instanceof TitleScreen) {
-            promptedThisSession = true;
-            minecraft.setScreen(new TelemetryConsentScreen(minecraft.screen));
+        if (!promptedThisSession) {
+            TelemetryConsentConfig.validateVersion();
         }
     }
 }
