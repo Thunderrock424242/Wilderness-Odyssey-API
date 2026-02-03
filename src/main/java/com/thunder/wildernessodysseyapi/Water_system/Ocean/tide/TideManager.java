@@ -2,28 +2,18 @@ package com.thunder.wildernessodysseyapi.Water_system.Ocean.tide;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.tags.BiomeTags;
-import net.minecraft.tags.FluidTags;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static java.lang.Math.PI;
 
 /**
  * Simulates a simple ocean/river tide (distinct from any wave simulation) that can be queried by other systems and
@@ -57,25 +47,7 @@ public final class TideManager {
      * Returns the amplitude (in blocks) for the biome at the given position.
      */
     public static double getLocalAmplitude(ServerLevel level, BlockPos pos) {
-        Holder<Biome> biomeHolder = level.getBiome(pos);
-        if (biomeHolder.is(BiomeTags.IS_OCEAN)) {
-            return cachedConfig.oceanAmplitudeBlocks();
-        }
-        if (biomeHolder.is(BiomeTags.IS_RIVER)) {
-            return cachedConfig.riverAmplitudeBlocks();
-        }
-        return 0.0D;
-    }
-
-    public static double getMoonPhaseAmplitudeFactor(ServerLevel level) {
-        return switch (level.getMoonPhase()) {
-            case 0 -> 1.2D;
-            case 1, 7 -> 1.1D;
-            case 2, 6 -> 1.0D;
-            case 3, 5 -> 0.9D;
-            case 4 -> 0.8D;
-            default -> 1.0D;
-        };
+        return TideAmplitudeHelper.getLocalAmplitude(level, pos, cachedConfig);
     }
 
     @SubscribeEvent
@@ -105,8 +77,8 @@ public final class TideManager {
             }
             TideState state = TIDE_STATES.computeIfAbsent(level.dimension(), key -> new TideState());
             long dayTime = level.getDayTime();
-            double newHeight = computeNormalizedHeight(dayTime, cachedConfig);
-            state.update(dayTime, newHeight);
+            TideAstronomy.TideSample sample = TideAstronomy.computeTideSample(dayTime, level, cachedConfig);
+            state.update(dayTime, sample.height(), sample.changePerTick());
         }
     }
 
@@ -119,57 +91,6 @@ public final class TideManager {
         }
     }
 
-    @SubscribeEvent
-    public static void onEntityTick(EntityTickEvent.Post event) {
-        if (!(event.getEntity() instanceof LivingEntity entity)) {
-            return;
-        }
-        if (!(entity.level() instanceof ServerLevel serverLevel)) {
-            return;
-        }
-        TideConfig.TideConfigValues config = cachedConfig;
-        if (!config.enabled() || !entity.isInWaterOrBubble()) {
-            return;
-        }
-        BlockPos entityPos = entity.blockPosition();
-        ChunkPos entityChunk = new ChunkPos(entityPos);
-        if (!serverLevel.hasChunk(entityChunk.x, entityChunk.z)) {
-            return;
-        }
-        if (!serverLevel.getFluidState(entityPos).is(FluidTags.WATER)) {
-            return;
-        }
-        if (!serverLevel.getFluidState(entityPos.above()).isEmpty()) {
-            return;
-        }
-        double proximityBlocks = config.playerProximityBlocks();
-        if (proximityBlocks > 0.0D && serverLevel.getNearestPlayer(entity, proximityBlocks) == null) {
-            return;
-        }
-
-        TideSnapshot snapshot = snapshot(serverLevel);
-        double amplitude = getLocalAmplitude(serverLevel, entityPos);
-        if (amplitude <= 0.0D) {
-            return;
-        }
-        amplitude *= getMoonPhaseAmplitudeFactor(serverLevel);
-
-        double verticalForce = snapshot.verticalChangePerTick() * amplitude * config.currentStrength();
-        if (Math.abs(verticalForce) < 1.0E-8) {
-            return;
-        }
-
-        Vec3 motion = entity.getDeltaMovement();
-        entity.setDeltaMovement(motion.x, motion.y + verticalForce, motion.z);
-    }
-
-    private static double computeNormalizedHeight(long dayTime, TideConfig.TideConfigValues config) {
-        long cycleTicks = Math.max(1L, config.cycleTicks());
-        long adjustedTime = (dayTime + config.phaseOffsetTicks()) % cycleTicks;
-        double phase = (adjustedTime / (double) cycleTicks) * 2.0D * PI;
-        return Math.sin(phase);
-    }
-
     /**
      * Lightweight state container tracked per dimension.
      */
@@ -178,11 +99,8 @@ public final class TideManager {
         private double normalizedHeight = 0.0D;
         private double changePerTick = 0.0D;
 
-        void update(long worldTick, double newHeight) {
-            if (lastUpdateTick >= 0L) {
-                long delta = Math.max(1L, worldTick - lastUpdateTick);
-                changePerTick = (newHeight - normalizedHeight) / delta;
-            }
+        void update(long worldTick, double newHeight, double newChangePerTick) {
+            changePerTick = newChangePerTick;
             normalizedHeight = newHeight;
             lastUpdateTick = worldTick;
         }
