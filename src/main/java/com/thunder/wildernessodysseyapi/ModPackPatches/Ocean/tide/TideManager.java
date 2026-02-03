@@ -127,21 +127,22 @@ public final class TideManager {
         if (!(entity.level() instanceof ServerLevel serverLevel)) {
             return;
         }
-        if (!cachedConfig.enabled() || !entity.isInWaterOrBubble()) {
-            return;
-        }
-        ChunkPos entityChunk = new ChunkPos(entity.blockPosition());
-        if (!serverLevel.hasChunk(entityChunk.x, entityChunk.z)) {
+        TideConfig.TideConfigValues config = cachedConfig;
+        if (!config.enabled() || !entity.isInWaterOrBubble()) {
             return;
         }
         BlockPos entityPos = entity.blockPosition();
+        ChunkPos entityChunk = new ChunkPos(entityPos);
+        if (!serverLevel.hasChunk(entityChunk.x, entityChunk.z)) {
+            return;
+        }
         if (!serverLevel.getFluidState(entityPos).is(FluidTags.WATER)) {
             return;
         }
         if (!serverLevel.getFluidState(entityPos.above()).isEmpty()) {
             return;
         }
-        double proximityBlocks = cachedConfig.playerProximityBlocks();
+        double proximityBlocks = config.playerProximityBlocks();
         if (proximityBlocks > 0.0D && serverLevel.getNearestPlayer(entity, proximityBlocks) == null) {
             return;
         }
@@ -153,7 +154,7 @@ public final class TideManager {
         }
         amplitude *= getMoonPhaseAmplitudeFactor(serverLevel);
 
-        double verticalForce = snapshot.verticalChangePerTick() * amplitude * cachedConfig.currentStrength();
+        double verticalForce = snapshot.verticalChangePerTick() * amplitude * config.currentStrength();
         if (Math.abs(verticalForce) < 1.0E-8) {
             return;
         }
