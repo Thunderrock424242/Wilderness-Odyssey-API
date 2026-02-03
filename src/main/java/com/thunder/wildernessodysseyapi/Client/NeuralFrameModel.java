@@ -33,7 +33,9 @@ public class NeuralFrameModel extends EntityModel<AbstractClientPlayer> {
                 "frame",
                 CubeListBuilder.create()
                         .texOffs(0, 0)
-                        .addBox(3.5F, -5.5F, -4.5F, 2.0F, 4.0F, 1.0F, new CubeDeformation(0.0F)),
+                        .addBox(-3.0F, -5.5F, -4.0F, 6.0F, 4.0F, 0.2F, new CubeDeformation(0.0F))
+                        .texOffs(0, 5)
+                        .addBox(3.0F, -5.5F, -4.0F, 0.4F, 4.0F, 0.2F, new CubeDeformation(0.0F)),
                 PartPose.ZERO
         );
         return LayerDefinition.create(mesh, 16, 16);

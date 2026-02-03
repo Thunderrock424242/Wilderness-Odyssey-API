@@ -23,6 +23,7 @@ import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
 import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.config.CloakChipConfig;
+import com.thunder.wildernessodysseyapi.config.CurioRenderConfig;
 import com.thunder.wildernessodysseyapi.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -121,6 +122,8 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-structures.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-donations-client.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, CurioRenderConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-curio-rendering-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TelemetryConsentConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-telemetry-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC,

@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.Client;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.config.CurioRenderConfig;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
@@ -38,6 +39,9 @@ public class NeuralFrameRenderLayer extends RenderLayer<AbstractClientPlayer, Pl
                        float netHeadYaw,
                        float headPitch) {
         if (!player.getItemBySlot(EquipmentSlot.HEAD).isEmpty()) {
+            return;
+        }
+        if (!CurioRenderConfig.RENDER_NEURAL_FRAME.get()) {
             return;
         }
 
