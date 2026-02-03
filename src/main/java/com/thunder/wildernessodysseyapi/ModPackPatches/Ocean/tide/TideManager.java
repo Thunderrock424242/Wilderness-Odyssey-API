@@ -2,20 +2,15 @@ package com.thunder.wildernessodysseyapi.ModPackPatches.Ocean.tide;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
-import net.minecraft.tags.FluidTags;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -117,50 +112,6 @@ public final class TideManager {
             ModConstants.LOGGER.warn("Tide config accessed before load; using defaults instead. ({})", e.getMessage());
             return TideConfig.defaultValues();
         }
-    }
-
-    @SubscribeEvent
-    public static void onEntityTick(EntityTickEvent.Post event) {
-        if (!(event.getEntity() instanceof LivingEntity entity)) {
-            return;
-        }
-        if (!(entity.level() instanceof ServerLevel serverLevel)) {
-            return;
-        }
-        TideConfig.TideConfigValues config = cachedConfig;
-        if (!config.enabled() || !entity.isInWaterOrBubble()) {
-            return;
-        }
-        BlockPos entityPos = entity.blockPosition();
-        ChunkPos entityChunk = new ChunkPos(entityPos);
-        if (!serverLevel.hasChunk(entityChunk.x, entityChunk.z)) {
-            return;
-        }
-        if (!serverLevel.getFluidState(entityPos).is(FluidTags.WATER)) {
-            return;
-        }
-        if (!serverLevel.getFluidState(entityPos.above()).isEmpty()) {
-            return;
-        }
-        double proximityBlocks = config.playerProximityBlocks();
-        if (proximityBlocks > 0.0D && serverLevel.getNearestPlayer(entity, proximityBlocks) == null) {
-            return;
-        }
-
-        TideSnapshot snapshot = snapshot(serverLevel);
-        double amplitude = getLocalAmplitude(serverLevel, entityPos);
-        if (amplitude <= 0.0D) {
-            return;
-        }
-        amplitude *= getMoonPhaseAmplitudeFactor(serverLevel);
-
-        double verticalForce = snapshot.verticalChangePerTick() * amplitude * config.currentStrength();
-        if (Math.abs(verticalForce) < 1.0E-8) {
-            return;
-        }
-
-        Vec3 motion = entity.getDeltaMovement();
-        entity.setDeltaMovement(motion.x, motion.y + verticalForce, motion.z);
     }
 
     private static double computeNormalizedHeight(long dayTime, TideConfig.TideConfigValues config) {
