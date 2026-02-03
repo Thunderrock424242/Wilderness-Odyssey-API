@@ -1,11 +1,14 @@
 name: Build and Run Server
 
 on:
-  push:
-  pull_request:
+  workflow_run:
+    workflows: ["Build"]
+    types:
+      - completed
 
 jobs:
   run-server:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
