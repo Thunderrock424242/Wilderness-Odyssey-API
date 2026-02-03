@@ -32,7 +32,7 @@ public class ChipSetCurioRenderer implements ICurioRenderer {
             return;
         }
 
-        T entity = slotContext.entity();
+        T entity = (T) slotContext.entity();
         poseStack.pushPose();
         ICurioRenderer.translateIfSneaking(poseStack, entity);
 

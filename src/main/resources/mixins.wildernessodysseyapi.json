@@ -14,7 +14,6 @@
       "ForwardExtentCopyMixin",
       "ServerboundSetStructureBlockPacketMixin",
       "StructureBlockEntityMixin",
-      "GameTestStructureManagerMixin",
       "StructureTemplateAccessor",
       "StructureTemplatePaletteAccessor"
     ],
@@ -23,7 +22,6 @@
   },
   "client": [
     "DebugMixin",
-    "LoadingOverlayMixin",
     "MixinWorldCreationUiState",
     "OptionsScreenTelemetryButtonMixin",
     "StructureBlockRendererMixin"

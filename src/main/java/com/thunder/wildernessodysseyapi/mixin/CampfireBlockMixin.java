@@ -8,6 +8,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.CampfireBlock;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -52,9 +54,9 @@ public class CampfireBlockMixin {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft != null && minecraft.gameRenderer != null) {
             Vec3 cameraPos = minecraft.gameRenderer.getMainCamera().getPosition();
-            Vec3 cameraLook = minecraft.gameRenderer.getMainCamera().getLookVector();
+            Vector3f cameraLook = minecraft.gameRenderer.getMainCamera().getLookVector();
             Vec3 toCampfire = new Vec3(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5).subtract(cameraPos);
-            if (distanceSq > 64 * 64 && cameraLook.dot(toCampfire.normalize()) < 0.2) {
+            if (distanceSq > 64 * 64 && cameraLook.dot((Vector3fc) toCampfire.normalize()) < 0.2) {
                 return;
             }
         }
