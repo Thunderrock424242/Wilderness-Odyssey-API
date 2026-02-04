@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.M
 import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatOptToggleCommand;
 import com.thunder.wildernessodysseyapi.command.ChangelogCommand;
+import com.thunder.wildernessodysseyapi.command.LoreBookCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
@@ -27,6 +28,9 @@ import com.thunder.wildernessodysseyapi.config.CurioRenderConfig;
 import com.thunder.wildernessodysseyapi.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
+import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
+import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootConditions;
+import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootFunctions;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import com.thunder.wildernessodysseyapi.AI.AI_story.AIChatListener;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
@@ -106,6 +110,8 @@ public class WildernessOdysseyAPIMainModClass {
         ModProcessors.PROCESSORS.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         ModAttachments.ATTACHMENTS.register(modEventBus);
+        ModLootFunctions.LOOT_FUNCTIONS.register(modEventBus);
+        ModLootConditions.LOOT_CONDITIONS.register(modEventBus);
 
         // Register global events
         NeoForge.EVENT_BUS.register(this);
@@ -114,6 +120,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(PlayerTelemetryReporter.class);
         NeoForge.EVENT_BUS.register(EventTelemetryReporter.class);
         NeoForge.EVENT_BUS.register(TelemetryQueueProcessor.class);
+        NeoForge.EVENT_BUS.register(LoreBookEvents.class);
 
         CryoTubeBlock.register(modEventBus);
         ModItems.register(modEventBus);
@@ -192,6 +199,7 @@ public class WildernessOdysseyAPIMainModClass {
         StructurePlacementDebugCommand.register(event.getDispatcher());
         GlobalChatCommand.register(dispatcher);
         GlobalChatOptToggleCommand.register(dispatcher);
+        LoreBookCommand.register(dispatcher);
         TideInfoCommand.register(dispatcher);
         TelemetryConsentCommand.register(dispatcher);
         TelemetryQueueStatsCommand.register(dispatcher);
