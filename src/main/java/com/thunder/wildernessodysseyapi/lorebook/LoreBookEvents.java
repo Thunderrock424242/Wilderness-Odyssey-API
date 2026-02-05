@@ -6,11 +6,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.entries.LootItem;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 import net.minecraft.world.level.storage.loot.predicates.LootItemRandomChanceCondition;
 import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.LootTableLoadEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
-import net.neoforged.neoforge.eventbus.api.SubscribeEvent;
 
 public class LoreBookEvents {
     @SubscribeEvent
@@ -27,7 +28,7 @@ public class LoreBookEvents {
                 .setRolls(ConstantValue.exactly(1))
                 .add(LootItem.lootTableItem(Items.WRITTEN_BOOK)
                         .when(LootItemRandomChanceCondition.randomChance(chance))
-                        .when(new LoreBookAvailableCondition())
+                        .when((LootItemCondition.Builder) new LoreBookAvailableCondition())
                         .apply(LoreBookLootFunction.builder()))
                 .build();
         event.getTable().addPool(pool);

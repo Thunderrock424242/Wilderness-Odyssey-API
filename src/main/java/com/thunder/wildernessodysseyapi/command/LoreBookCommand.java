@@ -65,7 +65,7 @@ public class LoreBookCommand {
                                                 context.getSource().sendFailure(Component.literal("Unknown lore book id."));
                                                 return 0;
                                             }
-                                            List<ServerPlayer> players = EntityArgument.getPlayers(context, "targets");
+                                            List<ServerPlayer> players = (List<ServerPlayer>) EntityArgument.getPlayers(context, "targets");
                                             for (ServerPlayer player : players) {
                                                 giveBook(player, entry.get());
                                             }
@@ -76,7 +76,7 @@ public class LoreBookCommand {
                         .requires(source -> source.hasPermission(2))
                         .then(Commands.argument("targets", EntityArgument.players())
                                 .executes(context -> {
-                                    List<ServerPlayer> players = EntityArgument.getPlayers(context, "targets");
+                                    List<ServerPlayer> players = (List<ServerPlayer>) EntityArgument.getPlayers(context, "targets");
                                     int given = 0;
                                     for (ServerPlayer player : players) {
                                         Optional<LoreBookConfig.LoreBookEntry> entry = LoreBookManager.nextEntry(player);
@@ -91,8 +91,7 @@ public class LoreBookCommand {
                                     }
                                     context.getSource().sendSuccess(() -> Component.literal("Next lore books delivered."), true);
                                     return given;
-                                })))
-        );
+                                })));
     }
 
     private static void giveBook(ServerPlayer player, LoreBookConfig.LoreBookEntry entry) {

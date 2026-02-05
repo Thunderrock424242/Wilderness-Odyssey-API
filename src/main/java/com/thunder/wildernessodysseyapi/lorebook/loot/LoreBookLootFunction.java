@@ -11,13 +11,15 @@ import net.minecraft.world.level.storage.loot.functions.LootItemFunctionType;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 
+import java.util.List;
+
 public class LoreBookLootFunction extends LootItemConditionalFunction {
     public static final MapCodec<LoreBookLootFunction> CODEC = RecordCodecBuilder.mapCodec(instance ->
             commonFields(instance).apply(instance, LoreBookLootFunction::new)
     );
 
     protected LoreBookLootFunction(LootItemCondition[] conditions) {
-        super(conditions);
+        super(List.of(conditions));
     }
 
     @Override
