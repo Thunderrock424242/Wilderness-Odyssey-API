@@ -9,6 +9,7 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import java.io.InputStreamReader;
 import java.lang.reflect.Type;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 /**
@@ -17,6 +18,7 @@ import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
 public class FaqManager {
     private static final Map<String, FaqEntry> FAQ_ENTRIES = new HashMap<>();
     private static final Map<String, List<FaqEntry>> FAQ_BY_CATEGORY = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+    private static final Map<String, Set<String>> FAQ_SEARCH_TOKENS = new HashMap<>();
     /**
      * Reads all FAQ JSON files from the given resource manager.
      */
@@ -46,6 +48,7 @@ public class FaqManager {
     public static void clear() {
         FAQ_ENTRIES.clear();
         FAQ_BY_CATEGORY.clear();
+        FAQ_SEARCH_TOKENS.clear();
     }
     /** Adds a single FAQ entry. */
     public static void add(FaqEntry entry) {
@@ -63,6 +66,7 @@ public class FaqManager {
 
         FAQ_ENTRIES.put(id, entry);
         FAQ_BY_CATEGORY.computeIfAbsent(category, c -> new ArrayList<>()).add(entry);
+        FAQ_SEARCH_TOKENS.put(id, buildSearchTokens(entry));
     }
     /** Returns all FAQ ids. */
     public static List<String> getIds() {
@@ -75,24 +79,65 @@ public class FaqManager {
 
     /** Searches FAQs by keyword across all fields with basic fuzzy matching. */
     public static List<FaqEntry> search(String keyword) {
-        String lower = keyword.toLowerCase();
+        String lower = normalize(keyword).toLowerCase(Locale.ROOT);
+        if (lower.isEmpty()) {
+            return Collections.emptyList();
+        }
+
         return FAQ_ENTRIES.values().stream()
-                .filter(entry ->
-                        containsIgnoreCase(entry.id(), lower) ||
-                        containsIgnoreCase(entry.category(), lower) ||
-                        containsIgnoreCase(entry.question(), lower) ||
-                        containsIgnoreCase(entry.answer(), lower) ||
-                        levenshtein(toLower(entry.question()), lower) <= 2)
+                .map(entry -> Map.entry(entry, relevanceScore(entry, lower)))
+                .filter(scored -> scored.getValue() > 0)
+                .sorted(Map.Entry.<FaqEntry, Integer>comparingByValue().reversed()
+                        .thenComparing(scored -> scored.getKey().id(), String.CASE_INSENSITIVE_ORDER))
+                .map(Map.Entry::getKey)
                 .toList();
+    }
+
+    private static int relevanceScore(FaqEntry entry, String query) {
+        String id = normalize(entry.id());
+        String category = normalize(entry.category());
+        String question = toLower(entry.question());
+        String answer = toLower(entry.answer());
+        Set<String> tokens = FAQ_SEARCH_TOKENS.getOrDefault(id, Collections.emptySet());
+
+        int score = 0;
+        if (containsIgnoreCase(id, query)) score += 12;
+        if (containsIgnoreCase(category, query)) score += 7;
+        if (containsIgnoreCase(question, query)) score += 10;
+        if (containsIgnoreCase(answer, query)) score += 6;
+
+        if (tokens.contains(query)) {
+            score += 11;
+        } else {
+            boolean fuzzyTokenMatch = tokens.stream().anyMatch(token -> levenshtein(token, query) <= 2);
+            if (fuzzyTokenMatch) {
+                score += 5;
+            }
+        }
+
+        int questionDistance = levenshtein(question, query);
+        if (questionDistance <= 2) {
+            score += 4;
+        }
+        return score;
+    }
+
+    private static Set<String> buildSearchTokens(FaqEntry entry) {
+        return Arrays.stream((normalize(entry.id()) + ' ' + normalize(entry.category()) + ' ' +
+                normalize(entry.question()) + ' ' + normalize(entry.answer()))
+                .toLowerCase(Locale.ROOT)
+                .split("[^a-z0-9_]+"))
+                .filter(token -> !token.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
     private static boolean containsIgnoreCase(String text, String query) {
         if (text == null) {
             return false;
         }
-        return text.toLowerCase().contains(query);
+        return text.toLowerCase(Locale.ROOT).contains(query);
     }
     private static String toLower(String value) {
-        return value == null ? "" : value.toLowerCase();
+        return value == null ? "" : value.toLowerCase(Locale.ROOT);
     }
 
     private static String normalize(String value) {

@@ -6,6 +6,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
+
 import java.util.Comparator;
 import java.util.List;
 
@@ -42,7 +43,6 @@ public class FaqCommand {
                                 .executes(ctx -> {
                                     String query = StringArgumentType.getString(ctx, "query");
                                     List<FaqEntry> results = FaqManager.search(query);
-                                    results.sort(Comparator.comparing(FaqEntry::id));
                                     if (results.isEmpty()) {
                                         ctx.getSource().sendFailure(Component.translatable("command.wildernessodysseyapi.faq.no_results"));
                                     } else {
@@ -56,21 +56,53 @@ public class FaqCommand {
                                     }
                                     return 1;
                                 })))
-                .then(Commands.literal("list")
+                .then(Commands.literal("categories")
                         .executes(ctx -> {
                             for (String cat : FaqManager.getCategories()) {
                                 ctx.getSource().sendSuccess(() -> Component.translatable(
                                         "command.wildernessodysseyapi.faq.list_category",
                                         cat), false);
-                                for (FaqEntry entry : FaqManager.getByCategory(cat)) {
-                                    ctx.getSource().sendSuccess(() -> Component.translatable(
-                                            "command.wildernessodysseyapi.faq.list_entry",
-                                            entry.id(),
-                                            entry.question()), false);
-                                }
                             }
                             return 1;
                         }))
+                .then(Commands.literal("list")
+                        .executes(ctx -> listCategory(ctx.getSource(), null))
+                        .then(Commands.argument("category", StringArgumentType.word())
+                                .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(FaqManager.getCategories(), builder))
+                                .executes(ctx -> listCategory(
+                                        ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "category")))))
         );
+    }
+
+    private static int listCategory(CommandSourceStack source, String category) {
+        if (category != null) {
+            List<FaqEntry> entries = FaqManager.getByCategory(category);
+            if (entries.isEmpty()) {
+                source.sendFailure(Component.translatable("command.wildernessodysseyapi.faq.no_results"));
+                return 1;
+            }
+            source.sendSuccess(() -> Component.translatable("command.wildernessodysseyapi.faq.list_category", category), false);
+            entries.stream()
+                    .sorted(Comparator.comparing(FaqEntry::id))
+                    .forEach(entry -> source.sendSuccess(() -> Component.translatable(
+                            "command.wildernessodysseyapi.faq.list_entry",
+                            entry.id(),
+                            entry.question()), false));
+            return 1;
+        }
+
+        for (String cat : FaqManager.getCategories()) {
+            source.sendSuccess(() -> Component.translatable(
+                    "command.wildernessodysseyapi.faq.list_category",
+                    cat), false);
+            for (FaqEntry entry : FaqManager.getByCategory(cat)) {
+                source.sendSuccess(() -> Component.translatable(
+                        "command.wildernessodysseyapi.faq.list_entry",
+                        entry.id(),
+                        entry.question()), false);
+            }
+        }
+        return 1;
     }
 }
