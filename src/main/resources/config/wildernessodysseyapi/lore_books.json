@@ -1,0 +1,14 @@
+{
+  "chance": 0.03,
+  "books": [
+    {
+      "id": "lore_001",
+      "title": "Lore Book I",
+      "author": "Archivist",
+      "pages": [
+        "The first entry in the wilderness archive.",
+        "More pages can be added here to expand the story."
+      ]
+    }
+  ]
+}
