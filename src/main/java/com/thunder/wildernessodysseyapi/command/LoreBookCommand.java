@@ -11,7 +11,7 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 
 public class LoreBookCommand {
@@ -65,18 +65,18 @@ public class LoreBookCommand {
                                                 context.getSource().sendFailure(Component.literal("Unknown lore book id."));
                                                 return 0;
                                             }
-                                            List<ServerPlayer> players = (List<ServerPlayer>) EntityArgument.getPlayers(context, "targets");
+                                            Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "targets");
                                             for (ServerPlayer player : players) {
                                                 giveBook(player, entry.get());
                                             }
                                             context.getSource().sendSuccess(() -> Component.literal("Lore book given."), true);
                                             return players.size();
-                                        })))))
+                                        }))))
                 .then(Commands.literal("give_next")
                         .requires(source -> source.hasPermission(2))
                         .then(Commands.argument("targets", EntityArgument.players())
                                 .executes(context -> {
-                                    List<ServerPlayer> players = (List<ServerPlayer>) EntityArgument.getPlayers(context, "targets");
+                                    Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "targets");
                                     int given = 0;
                                     for (ServerPlayer player : players) {
                                         Optional<LoreBookConfig.LoreBookEntry> entry = LoreBookManager.nextEntry(player);

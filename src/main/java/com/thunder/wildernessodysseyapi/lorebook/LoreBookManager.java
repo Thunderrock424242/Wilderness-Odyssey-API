@@ -1,14 +1,19 @@
 package com.thunder.wildernessodysseyapi.lorebook;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.Filterable;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.component.WrittenBookContent;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -79,21 +84,20 @@ public final class LoreBookManager {
 
     public static ItemStack createBookStack(LoreBookConfig.LoreBookEntry entry) {
         ItemStack stack = new ItemStack(Items.WRITTEN_BOOK);
-        CompoundTag tag = stack.getOrCreateTag();
         String title = entry.title() == null ? "Lore" : entry.title();
         String author = entry.author() == null ? "Unknown" : entry.author();
-        tag.putString("title", title);
-        tag.putString("author", author);
-        ListTag pages = new ListTag();
+        List<Filterable<Component>> pages = new ArrayList<>();
         if (entry.pages() != null) {
             for (String page : entry.pages()) {
-                String safePage = page == null ? "" : page;
-                pages.add(StringTag.valueOf(Component.Serializer.toJson(Component.literal(safePage))));
+                pages.add(Filterable.passThrough(Component.literal(page == null ? "" : page)));
             }
         }
-        tag.put("pages", pages);
+
+        stack.set(DataComponents.WRITTEN_BOOK_CONTENT,
+                new WrittenBookContent(Filterable.passThrough(title), author, 0, pages, true));
+
         String id = entry.id() == null ? "" : entry.id();
-        tag.putString(LORE_ID_TAG, id);
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, tag -> tag.putString(LORE_ID_TAG, id));
         return stack;
     }
 
@@ -101,8 +105,12 @@ public final class LoreBookManager {
         if (!stack.is(Items.WRITTEN_BOOK)) {
             return Optional.empty();
         }
-        CompoundTag tag = stack.getTag();
-        if (tag == null || !tag.contains(LORE_ID_TAG)) {
+        CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
+        if (customData == null) {
+            return Optional.empty();
+        }
+        CompoundTag tag = customData.copyTag();
+        if (!tag.contains(LORE_ID_TAG)) {
             return Optional.empty();
         }
         return Optional.ofNullable(tag.getString(LORE_ID_TAG));

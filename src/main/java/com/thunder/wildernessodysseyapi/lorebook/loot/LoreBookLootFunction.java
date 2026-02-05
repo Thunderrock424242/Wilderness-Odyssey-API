@@ -15,7 +15,7 @@ import java.util.List;
 
 public class LoreBookLootFunction extends LootItemConditionalFunction {
     public static final MapCodec<LoreBookLootFunction> CODEC = RecordCodecBuilder.mapCodec(instance ->
-            commonFields(instance).apply(instance, LoreBookLootFunction::new)
+            commonFields(instance).apply(instance, conditions -> new LoreBookLootFunction(conditions.toArray(LootItemCondition[]::new)))
     );
 
     protected LoreBookLootFunction(LootItemCondition[] conditions) {
@@ -38,6 +38,6 @@ public class LoreBookLootFunction extends LootItemConditionalFunction {
     }
 
     public static Builder<?> builder() {
-        return simpleBuilder(LoreBookLootFunction::new);
+        return simpleBuilder(conditions -> new LoreBookLootFunction(conditions.toArray(LootItemCondition[]::new)));
     }
 }
