@@ -8,7 +8,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 public final class ModLootFunctions {
     public static final DeferredRegister<LootItemFunctionType> LOOT_FUNCTIONS =
-            DeferredRegister.create((net.minecraft.resources.ResourceKey<? extends net.minecraft.core.Registry<LootItemFunctionType>>) Registries.LOOT_FUNCTION_TYPE, ModConstants.MOD_ID);
+            DeferredRegister.create(Registries.LOOT_FUNCTION_TYPE, ModConstants.MOD_ID);
 
     public static final DeferredHolder<LootItemFunctionType, LootItemFunctionType> LORE_BOOK =
             LOOT_FUNCTIONS.register("lore_book", () -> new LootItemFunctionType(LoreBookLootFunction.CODEC));
