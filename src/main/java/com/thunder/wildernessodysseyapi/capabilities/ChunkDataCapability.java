@@ -12,9 +12,11 @@ public class ChunkDataCapability implements INBTSerializable<CompoundTag> {
 
     private static final String VISITS_TAG = "Visits";
     private static final String FLAGS_TAG = "Flags";
+    private static final String UPGRADE_VERSION_TAG = "UpgradeVersion";
 
     private int visitCount;
     private short stateFlags;
+    private int upgradeVersion;
     private boolean dirty;
     private Runnable dirtyListener = () -> {};
 
@@ -54,6 +56,17 @@ public class ChunkDataCapability implements INBTSerializable<CompoundTag> {
         }
     }
 
+    public int getUpgradeVersion() {
+        return upgradeVersion;
+    }
+
+    public void setUpgradeVersion(int upgradeVersion) {
+        if (this.upgradeVersion != upgradeVersion) {
+            this.upgradeVersion = upgradeVersion;
+            markDirty();
+        }
+    }
+
     public boolean isDirty() {
         return dirty;
     }
@@ -67,6 +80,7 @@ public class ChunkDataCapability implements INBTSerializable<CompoundTag> {
         CompoundTag tag = new CompoundTag();
         tag.putInt(VISITS_TAG, visitCount);
         tag.putShort(FLAGS_TAG, stateFlags);
+        tag.putInt(UPGRADE_VERSION_TAG, upgradeVersion);
         return tag;
     }
 
@@ -74,6 +88,7 @@ public class ChunkDataCapability implements INBTSerializable<CompoundTag> {
     public void deserializeNBT(HolderLookup.Provider provider, CompoundTag nbt) {
         visitCount = nbt.getInt(VISITS_TAG);
         stateFlags = nbt.getShort(FLAGS_TAG);
+        upgradeVersion = nbt.getInt(UPGRADE_VERSION_TAG);
         dirty = false;
     }
 }
