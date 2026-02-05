@@ -11,6 +11,7 @@ import com.thunder.wildernessodysseyapi.command.GlobalChatOptToggleCommand;
 import com.thunder.wildernessodysseyapi.command.ChangelogCommand;
 import com.thunder.wildernessodysseyapi.command.LoreBookCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
+import com.thunder.wildernessodysseyapi.command.WorldUpgradeCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
@@ -205,6 +206,7 @@ public class WildernessOdysseyAPIMainModClass {
         TelemetryConsentCommand.register(dispatcher);
         TelemetryQueueStatsCommand.register(dispatcher);
         FeedbackCommand.register(dispatcher);
+        WorldUpgradeCommand.register(dispatcher);
         AIBackendCommand.register(dispatcher);
     }
 
