@@ -91,7 +91,7 @@ public class LoreBookCommand {
                                     }
                                     context.getSource().sendSuccess(() -> Component.literal("Next lore books delivered."), true);
                                     return given;
-                                })));
+                                }))));
     }
 
     private static void giveBook(ServerPlayer player, LoreBookConfig.LoreBookEntry entry) {
