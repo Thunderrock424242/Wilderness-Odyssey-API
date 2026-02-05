@@ -12,6 +12,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.time.Instant;
 import java.net.InetSocketAddress;
@@ -24,6 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -41,12 +43,14 @@ public class GlobalChatRelayServer {
     // Serialize nulls to mirror the previous Moshi-based payloads and keep the wire format stable.
     private static final Gson GSON = new GsonBuilder().serializeNulls().create();
     private static final int MAX_MESSAGES_PER_MINUTE = 20;
+    private static final int MAX_MESSAGES_PER_IP_PER_MINUTE = 90;
 
     private final ServerSocket serverSocket;
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Map<Socket, ClientState> clients = new ConcurrentHashMap<>();
     private final Map<String, BanEntry> bansByName = new ConcurrentHashMap<>();
     private final Map<String, BanEntry> bansByIp = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, QuotaWindow> ipQuotas = new ConcurrentHashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final String moderationToken;
     private final String clusterToken;
@@ -57,12 +61,9 @@ public class GlobalChatRelayServer {
         if (moderationToken == null || moderationToken.isBlank() || "changeme".equals(moderationToken)) {
             throw new IllegalArgumentException("A non-default moderation token is required");
         }
-        if (clusterToken == null || clusterToken.isBlank()) {
-            throw new IllegalArgumentException("A cluster token is required to start the relay");
-        }
         this.serverSocket = new ServerSocket(port);
         this.moderationToken = moderationToken;
-        this.clusterToken = clusterToken;
+        this.clusterToken = clusterToken == null ? "" : clusterToken;
         loadWhitelist();
         createDirectoriesSecure(analyticsDir);
     }
@@ -89,14 +90,27 @@ public class GlobalChatRelayServer {
     private void handleClient(Socket socket) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
              PrintWriter writer = new PrintWriter(socket.getOutputStream(), true)) {
+            socket.setSoTimeout(30_000);
             String line;
             while ((line = reader.readLine()) != null) {
-                GlobalChatPacket packet = GSON.fromJson(line, GlobalChatPacket.class);
+                GlobalChatPacket packet;
+                try {
+                    packet = GSON.fromJson(line, GlobalChatPacket.class);
+                } catch (Exception malformedPacketError) {
+                    ClientState state = clients.get(socket);
+                    if (state != null) {
+                        sendSystemMessage(state, "Malformed packet; closing connection.");
+                    }
+                    closeQuietly(socket);
+                    return;
+                }
                 if (packet == null) {
                     continue;
                 }
                 dispatch(packet, socket, writer);
             }
+        } catch (SocketTimeoutException idleTimeout) {
+            // Idle client timed out waiting for a packet; close connection quietly.
         } catch (IOException e) {
             System.err.println("[GlobalChatRelayServer] Client connection failed: " + e.getMessage());
         } finally {
@@ -147,6 +161,16 @@ public class GlobalChatRelayServer {
             }
             return;
         }
+        if ("external".equals(type)) {
+            if (externalWhitelist.contains(state.remoteAddress)) {
+                state.authenticated = true;
+                state.role = "external";
+                return;
+            }
+            sendSystemMessage(state, "External client is not on the trusted IP whitelist.");
+            closeQuietly(socket);
+            return;
+        }
         sendSystemMessage(state, "Unknown client type; connection rejected.");
         closeQuietly(socket);
     }
@@ -184,7 +208,19 @@ public class GlobalChatRelayServer {
             sendSystemMessage(state, "Rate limit exceeded; please slow down.");
             return;
         }
+        if (!tryConsumeIpQuota(state.remoteAddress)) {
+            sendSystemMessage(state, "IP rate limit exceeded; temporarily throttled.");
+            return;
+        }
         broadcast(packet, state);
+    }
+
+    private boolean tryConsumeIpQuota(String remoteAddress) {
+        if (remoteAddress == null || remoteAddress.isBlank() || "unknown".equals(remoteAddress)) {
+            return true;
+        }
+        QuotaWindow quota = ipQuotas.computeIfAbsent(remoteAddress, ignored -> new QuotaWindow());
+        return quota.tryConsume(MAX_MESSAGES_PER_IP_PER_MINUTE);
     }
 
     private void broadcast(GlobalChatPacket packet, ClientState origin) {
@@ -328,6 +364,7 @@ public class GlobalChatRelayServer {
     private void cleanupExpiredBans() {
         bansByName.entrySet().removeIf(entry -> !entry.getValue().isActive());
         bansByIp.entrySet().removeIf(entry -> !entry.getValue().isActive());
+        ipQuotas.entrySet().removeIf(entry -> entry.getValue().isIdle());
     }
 
     private String formatDuration(long durationSeconds) {
@@ -473,6 +510,28 @@ public class GlobalChatRelayServer {
             if (providedId != null && !providedId.isBlank()) {
                 this.serverId = providedId;
             }
+        }
+    }
+
+    private static class QuotaWindow {
+        private Instant windowStart = Instant.now();
+        private int consumed = 0;
+
+        synchronized boolean tryConsume(int limitPerMinute) {
+            Instant now = Instant.now();
+            if (Duration.between(windowStart, now).getSeconds() >= 60) {
+                consumed = 0;
+                windowStart = now;
+            }
+            if (consumed >= limitPerMinute) {
+                return false;
+            }
+            consumed++;
+            return true;
+        }
+
+        synchronized boolean isIdle() {
+            return Duration.between(windowStart, Instant.now()).toMinutes() >= 5;
         }
     }
 

@@ -3,7 +3,7 @@
 The global chat system lets multiple Wilderness Odyssey servers share messages through a lightweight relay process. This guide covers how to anchor the relay to a specific dedicated server, connect other servers, and use moderation/opt-in controls.
 
 ## Components
-- **Relay server**: External JVM process that accepts TCP connections, relays chat, enforces rate limits/bans, and handles admin actions.
+- **Relay server**: External JVM process that accepts TCP connections, relays chat, enforces per-server and per-IP rate limits, applies bans/timeouts, and handles admin actions.
 - **Embedded client**: Runs inside each Minecraft server JVM after you bind it to a relay host and port. It keeps a downtime history, tracks ping, and fans out messages only to opted-in players.
 - **Commands**: Registered under `/globalchat` for binding, status checks, opt-in, messaging, relay lifecycle, and moderation.
 
@@ -66,7 +66,8 @@ Moderation commands require a valid token (set via `/globalchat moderationtoken 
 - During the handshake, the relay rejects clients whose `HELLO` packets lack the matching `clusterToken`, ensuring only authorized servers and whitelisted external IPs can participate.
 
 ### Connection trust and whitelisting
-- The relay only accepts Minecraft clients by default. Each client performs a handshake declaring itself as a Minecraft node and is rejected if it skips this step.
+- The relay only accepts Minecraft clients by default. Each client performs a HELLO handshake declaring itself as a Minecraft node and is rejected if it skips this step.
+- Relay ingestion is hardened against malformed packets and idle connections (30s handshake/read timeout), reducing stale-socket and parser abuse risk.
 - If you need to let a non-Minecraft tool (for example, an external bot) talk in global chat, start the relay with a comma-separated whitelist of trusted IPs:
   ```bash
   java -Dwilderness.globalchat.token=<moderationToken> \
