@@ -28,6 +28,10 @@ public class AIChatListener {
     private static final Set<UUID> ACTIVE_SESSIONS = ConcurrentHashMap.newKeySet();
     private static final Queue<PendingReply> PENDING_REPLIES = new ConcurrentLinkedQueue<>();
 
+    public static AIClient getClient() {
+        return CLIENT;
+    }
+
     @SubscribeEvent
     public static void onChat(ServerChatEvent event) {
         ServerPlayer player = event.getPlayer();

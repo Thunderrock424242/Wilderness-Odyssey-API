@@ -28,6 +28,7 @@ import com.thunder.wildernessodysseyapi.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
+import com.thunder.wildernessodysseyapi.AI.AI_story.AIBackendCommand;
 import com.thunder.wildernessodysseyapi.AI.AI_story.AIChatListener;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
@@ -196,6 +197,7 @@ public class WildernessOdysseyAPIMainModClass {
         TelemetryConsentCommand.register(dispatcher);
         TelemetryQueueStatsCommand.register(dispatcher);
         FeedbackCommand.register(dispatcher);
+        AIBackendCommand.register(dispatcher);
     }
 
     /**
