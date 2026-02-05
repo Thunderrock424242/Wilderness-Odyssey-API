@@ -17,12 +17,12 @@ public class ModConstants {
      * this shows the world version MINOR means its small change MAJOR is a game breaking change
      * The default world version for the mod; update this when releasing new versions
      */
-    public static final String MOD_DEFAULT_WORLD_VERSION = "1.0.0"; // Update your Mod Version Here Major , Minor , Patch
+    public static final String MOD_DEFAULT_WORLD_VERSION = "1.0.0"; // Update your Mod World Version Here Major , Minor , Patch
 
     /**
      * The constant VERSION.
      */
-    public static final String VERSION = "0.0.4"; // Change this to your mod pack version
+    public static final String VERSION = "0.0.4"; // Change this to your ModPack version
     /**
      * The constant LOGGER.
      */
