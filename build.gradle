@@ -151,8 +151,6 @@ dependencies {
     implementation "curse.maven:regions-unexplored-659110:6273893"
     implementation "curse.maven:terrablender-neoforge-940057:6054947"
     implementation "curse.maven:geckolib-388172:7023453"
-    implementation "curse.maven:supplementaries-412082:7114487"
-    implementation "curse.maven:multipart-machines-cooking-885587:5686941"
     implementation "curse.maven:locate-fixer-1301683:6762552"
     jarJar(implementation("org.yaml:snakeyaml:2.2")) {
         version {
@@ -161,7 +159,6 @@ dependencies {
         }
     }
     implementation "curse.maven:selene-499980:7113115"
-    implementation "curse.maven:amendments-896746:7054319"
     compileOnly "curse.maven:spark-361579:6225208"
     localRuntime "curse.maven:spark-361579:6225208"
     implementation "curse.maven:sodium-394468:6382651"
