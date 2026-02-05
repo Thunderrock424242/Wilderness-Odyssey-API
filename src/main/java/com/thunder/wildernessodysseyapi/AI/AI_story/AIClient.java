@@ -263,11 +263,29 @@ public class AIClient {
         return combineResponses(response, nextPrompt);
     }
 
+    public BackendStatus getBackendStatus() {
+        boolean reachable = localModelClient != null && localModelClient.isReachable();
+        return new BackendStatus(
+                localModelClient != null,
+                autoStartLocalServer,
+                isLocalServerRunning(),
+                localModelClient != null,
+                localModelBaseUrl == null ? DEFAULT_LOCAL_BASE_URL : localModelBaseUrl,
+                localModelName == null ? "" : localModelName,
+                reachable);
+    }
+
+    public boolean triggerBackendStart() {
+        return startLocalModelServer();
+    }
+
     private boolean isLocalServerRunning() {
         return localServerProcess != null && localServerProcess.isAlive();
     }
 
     private record RetryResult(java.util.Optional<String> response, boolean started) {}
+
+    public record BackendStatus(boolean enabled, boolean autoStart, boolean serverRunning, boolean clientInitialized, String endpoint, String model, boolean reachable) {}
 
     private boolean ensureLocalServerStarted() {
         if (autoStartLocalServer && !isLocalServerRunning()) {
