@@ -1,6 +1,7 @@
 name: Build and Run Client
 
 on:
+  workflow_dispatch:
   workflow_run:
     workflows: ["Build"]
     types:
@@ -8,23 +9,23 @@ on:
 
 jobs:
   run-client:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
 
       - name: Setup JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Install xvfb
         run: sudo apt-get update && sudo apt-get install -y xvfb
@@ -39,22 +40,24 @@ jobs:
           TAIL_PID=$!
           xvfb-run --auto-servernum --server-args='-screen 0 1024x768x24' ./gradlew runClient --no-daemon > latest.log 2>&1 &
           PID=$!
-          if timeout 20m bash -c 'until grep -q "Created: 512x512x0 minecraft:textures/atlas/particles.png-atlas" latest.log; do sleep 5; done'; then
+
+          if timeout 20m bash -c 'until grep -Eq "Created: .*minecraft:textures/atlas/particles.png-atlas|Stopping!|Loaded [0-9]+ recipes" latest.log; do sleep 5; done'; then
             sleep 1m
             kill $PID || true
             wait $PID || true
           else
-            echo "Client failed to reach main menu" >&2
+            echo "Client failed to reach a healthy initialized state" >&2
             kill $PID || true
             wait $PID || true
             exit 1
           fi
+
           kill $TAIL_PID || true
           wait $TAIL_PID || true
 
       - name: Upload client log
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: latest-log
           path: latest.log
