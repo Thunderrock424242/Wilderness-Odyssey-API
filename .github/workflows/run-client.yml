@@ -1,15 +1,11 @@
 name: Build and Run Client
 
 on:
-  workflow_dispatch:
-  workflow_run:
-    workflows: ["build"]
-    types:
-      - completed
+  push:
+  pull_request:
 
 jobs:
   run-client:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -40,18 +36,16 @@ jobs:
           TAIL_PID=$!
           xvfb-run --auto-servernum --server-args='-screen 0 1024x768x24' ./gradlew runClient --no-daemon > latest.log 2>&1 &
           PID=$!
-
-          if timeout 20m bash -c 'until grep -Eq "Created: .*minecraft:textures/atlas/particles.png-atlas|Stopping!|Loaded [0-9]+ recipes" latest.log; do sleep 5; done'; then
+          if timeout 20m bash -c 'until grep -q "Created: 512x512x0 minecraft:textures/atlas/particles.png-atlas" latest.log; do sleep 5; done'; then
             sleep 1m
             kill $PID || true
             wait $PID || true
           else
-            echo "Client failed to reach a healthy initialized state" >&2
+            echo "Client failed to reach main menu" >&2
             kill $PID || true
             wait $PID || true
             exit 1
           fi
-
           kill $TAIL_PID || true
           wait $TAIL_PID || true
 
