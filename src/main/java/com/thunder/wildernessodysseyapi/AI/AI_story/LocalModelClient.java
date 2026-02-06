@@ -3,9 +3,6 @@ package com.thunder.wildernessodysseyapi.AI.AI_story;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
-import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -26,7 +23,7 @@ public class LocalModelClient {
     private final URI endpoint;
     private final String model;
     private final Duration timeout;
-    private final CircuitBreaker circuitBreaker;
+    private final SimpleCircuitBreaker circuitBreaker;
 
     public LocalModelClient(String baseUrl, String model, Duration timeout) {
         this.httpClient = HttpClient.newHttpClient();
@@ -34,12 +31,12 @@ public class LocalModelClient {
         this.endpoint = URI.create(baseUrl + "/api/generate");
         this.model = model;
         this.timeout = timeout;
-        this.circuitBreaker = CircuitBreaker.of("atlas-local-model", CircuitBreakerConfig.custom()
-                .failureRateThreshold(50.0f)
-                .minimumNumberOfCalls(4)
-                .slidingWindowSize(10)
-                .waitDurationInOpenState(Duration.ofSeconds(15))
-                .build());
+        this.circuitBreaker = new SimpleCircuitBreaker(
+                4,
+                10,
+                0.5,
+                Duration.ofSeconds(15)
+        );
     }
 
     public Optional<String> generateReply(String systemPrompt, String playerMessage, String context) {
@@ -64,7 +61,7 @@ public class LocalModelClient {
                 return Optional.empty();
             }
             return Optional.of(parsed.response.trim());
-        } catch (CallNotPermittedException e) {
+        } catch (CircuitBreakerOpenException e) {
             ModConstants.LOGGER.warn("Local model circuit breaker is open; skipping request for {}.", endpoint);
             return Optional.empty();
         }
@@ -78,7 +75,7 @@ public class LocalModelClient {
         try {
             Optional<Object> response = executeJsonRequest(request, Object.class);
             return response.isPresent();
-        } catch (CallNotPermittedException e) {
+        } catch (CircuitBreakerOpenException e) {
             ModConstants.LOGGER.debug("Local model probe skipped because circuit breaker is open.");
             return false;
         }
@@ -87,7 +84,7 @@ public class LocalModelClient {
     private <T> Optional<T> executeJsonRequest(HttpRequest request, Class<T> responseType) {
         long startNanos = System.nanoTime();
         if (!circuitBreaker.tryAcquirePermission()) {
-            throw CallNotPermittedException.createCallNotPermittedException(circuitBreaker);
+            throw new CircuitBreakerOpenException();
         }
         try {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -136,5 +133,95 @@ public class LocalModelClient {
 
     private static class OllamaResponse {
         private String response;
+    }
+
+    private static final class CircuitBreakerOpenException extends RuntimeException {
+        private CircuitBreakerOpenException() {
+            super("Local model circuit breaker is open.");
+        }
+    }
+
+    private static final class SimpleCircuitBreaker {
+        private final int minimumNumberOfCalls;
+        private final int slidingWindowSize;
+        private final double failureRateThreshold;
+        private final Duration openDuration;
+        private final boolean[] recentOutcomes;
+        private int outcomeIndex;
+        private int outcomeCount;
+        private int failureCount;
+        private long openUntilNanos;
+
+        private SimpleCircuitBreaker(int minimumNumberOfCalls,
+                                     int slidingWindowSize,
+                                     double failureRateThreshold,
+                                     Duration openDuration) {
+            this.minimumNumberOfCalls = minimumNumberOfCalls;
+            this.slidingWindowSize = slidingWindowSize;
+            this.failureRateThreshold = failureRateThreshold;
+            this.openDuration = openDuration;
+            this.recentOutcomes = new boolean[slidingWindowSize];
+        }
+
+        synchronized boolean tryAcquirePermission() {
+            if (isOpen()) {
+                return false;
+            }
+            return true;
+        }
+
+        synchronized void onSuccess(long elapsedNanos) {
+            recordOutcome(false);
+        }
+
+        synchronized void onError(long elapsedNanos, java.util.concurrent.TimeUnit timeUnit, Exception exception) {
+            recordOutcome(true);
+        }
+
+        private boolean isOpen() {
+            if (openUntilNanos == 0) {
+                return false;
+            }
+            if (System.nanoTime() >= openUntilNanos) {
+                reset();
+                return false;
+            }
+            return true;
+        }
+
+        private void recordOutcome(boolean failed) {
+            if (openUntilNanos != 0) {
+                return;
+            }
+            if (outcomeCount < slidingWindowSize) {
+                outcomeCount++;
+            } else {
+                boolean oldFailure = recentOutcomes[outcomeIndex];
+                if (oldFailure) {
+                    failureCount--;
+                }
+            }
+            recentOutcomes[outcomeIndex] = failed;
+            if (failed) {
+                failureCount++;
+            }
+            outcomeIndex = (outcomeIndex + 1) % slidingWindowSize;
+            if (outcomeCount >= minimumNumberOfCalls) {
+                double failureRate = (double) failureCount / (double) outcomeCount;
+                if (failureRate >= failureRateThreshold) {
+                    openUntilNanos = System.nanoTime() + openDuration.toNanos();
+                }
+            }
+        }
+
+        private void reset() {
+            openUntilNanos = 0;
+            outcomeIndex = 0;
+            outcomeCount = 0;
+            failureCount = 0;
+            for (int i = 0; i < recentOutcomes.length; i++) {
+                recentOutcomes[i] = false;
+            }
+        }
     }
 }
