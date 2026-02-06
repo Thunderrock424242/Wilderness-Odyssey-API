@@ -168,7 +168,8 @@ dependencies {
     // Bundle third-party libraries into the final mod jar (Jar-in-Jar) to avoid missing-class errors at runtime.
     jarJar(implementation('com.squareup.okhttp3:okhttp:4.12.0'))
     jarJar(implementation('com.squareup.okio:okio:3.9.0'))
-    jarJar(implementation('io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'))
+    implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
+    jarJar 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
     jarJar(implementation('com.github.luben:zstd-jni:1.5.7-6'))
 
     additionalRuntimeClasspath 'org.yaml:snakeyaml:2.2'
