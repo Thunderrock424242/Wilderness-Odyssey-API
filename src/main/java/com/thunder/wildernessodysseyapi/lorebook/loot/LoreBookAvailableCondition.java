@@ -11,6 +11,10 @@ import net.minecraft.world.level.storage.loot.predicates.LootItemConditionType;
 public class LoreBookAvailableCondition implements LootItemCondition {
     public static final MapCodec<LoreBookAvailableCondition> CODEC = MapCodec.unit(LoreBookAvailableCondition::new);
 
+    public static LootItemCondition.Builder builder() {
+        return LoreBookAvailableCondition::new;
+    }
+
     @Override
     public LootItemConditionType getType() {
         return ModLootConditions.LORE_BOOK_AVAILABLE.get();
