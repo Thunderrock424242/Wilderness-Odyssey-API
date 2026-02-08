@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 public class LocalModelClient {
 
@@ -170,7 +171,7 @@ public class LocalModelClient {
             return true;
         }
 
-        synchronized void onSuccess(long elapsedNanos) {
+        synchronized void onSuccess(long elapsedNanos, TimeUnit nanoseconds) {
             recordOutcome(false);
         }
 
