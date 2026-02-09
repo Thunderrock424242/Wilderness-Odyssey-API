@@ -7,7 +7,6 @@
     "mixins": [
       "CreatePathsMixin",
       "BlockEntityMixin",
-      "CampfireBlockMixin",
       "DayNightCycleMixin",
       "EntityAccessor",
       "LivingEntityMixin",
