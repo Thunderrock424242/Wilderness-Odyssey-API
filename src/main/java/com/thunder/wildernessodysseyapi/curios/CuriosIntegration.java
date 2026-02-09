@@ -37,14 +37,40 @@ public final class CuriosIntegration {
 
         ICurioStacksHandler stacksHandler = stacksHandlerOptional.get();
         int slots = stacksHandler.getSlots();
+        int emptySlot = -1;
         for (int i = 0; i < slots; i++) {
             ItemStack existing = stacksHandler.getStacks().getStackInSlot(i);
             if (existing.isEmpty()) {
-                stacksHandler.getStacks().setStackInSlot(i, new ItemStack(item));
-                return true;
+                emptySlot = i;
+                break;
             }
         }
 
-        return false;
+        if (emptySlot == -1) {
+            return false;
+        }
+
+        ItemStack sourceStack = ItemStack.EMPTY;
+        int sourceIndex = -1;
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (stack.is(item)) {
+                sourceStack = stack;
+                sourceIndex = i;
+                break;
+            }
+        }
+
+        if (sourceStack.isEmpty() || sourceIndex == -1) {
+            return false;
+        }
+
+        ItemStack equippedStack = sourceStack.split(1);
+        if (sourceStack.isEmpty()) {
+            player.getInventory().setItem(sourceIndex, ItemStack.EMPTY);
+        }
+
+        stacksHandler.getStacks().setStackInSlot(emptySlot, equippedStack);
+        return true;
     }
 }
