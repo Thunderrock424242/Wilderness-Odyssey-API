@@ -14,6 +14,7 @@ import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
+import com.thunder.wildernessodysseyapi.item.cloak.CloakItem;
 
 public class NeuralFrameRenderLayer extends RenderLayer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> {
     private static final ResourceLocation FRAME_TEXTURE = ResourceLocation.fromNamespaceAndPath(
@@ -39,6 +40,9 @@ public class NeuralFrameRenderLayer extends RenderLayer<AbstractClientPlayer, Pl
                        float netHeadYaw,
                        float headPitch) {
         if (!player.getItemBySlot(EquipmentSlot.HEAD).isEmpty()) {
+            return;
+        }
+        if (CloakItem.hasCloakChip(player)) {
             return;
         }
         if (!CurioRenderConfig.RENDER_NEURAL_FRAME.get()) {
