@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.ModPackPatches.client;
 
 import com.thunder.wildernessodysseyapi.config.DebugOverlayConfig;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.DebugScreenOverlay;
 import net.minecraft.util.Mth;
 
 public final class DebugOverlayAnimator {
@@ -18,7 +19,12 @@ public final class DebugOverlayAnimator {
             return;
         }
 
-        boolean renderDebug = minecraft.options.renderDebug;
+        DebugScreenOverlay debugOverlay = minecraft.getDebugOverlay();
+        if (debugOverlay == null) {
+            return;
+        }
+
+        boolean renderDebug = debugOverlay.showDebugScreen();
         if (!DebugOverlayConfig.ENABLE_ANIMATION.get()) {
             progress = renderDebug ? 1f : 0f;
             targetVisible = renderDebug;
@@ -39,11 +45,11 @@ public final class DebugOverlayAnimator {
                 : Math.max(0f, progress - step);
 
         if (!targetVisible && progress > 0f && !renderDebug) {
-            setRenderDebug(minecraft, true);
+            setRenderDebug(debugOverlay, true);
         } else if (!targetVisible && progress <= 0f && renderDebug) {
-            setRenderDebug(minecraft, false);
+            setRenderDebug(debugOverlay, false);
         } else if (targetVisible && !renderDebug) {
-            setRenderDebug(minecraft, true);
+            setRenderDebug(debugOverlay, true);
         }
     }
 
@@ -54,10 +60,10 @@ public final class DebugOverlayAnimator {
         return Mth.clamp(progress, 0f, 1f);
     }
 
-    private static void setRenderDebug(Minecraft minecraft, boolean value) {
-        if (minecraft.options.renderDebug != value) {
+    private static void setRenderDebug(DebugScreenOverlay debugOverlay, boolean value) {
+        if (debugOverlay.showDebugScreen() != value) {
             suppressUpdate = true;
-            minecraft.options.renderDebug = value;
+            debugOverlay.toggleOverlay();
             lastRenderDebug = value;
         }
     }
