@@ -15,7 +15,7 @@ import top.theillusivec4.curios.api.SlotContext;
 import top.theillusivec4.curios.api.type.capability.ICurioItem;
 
 public class ChipSetItem extends Item implements ICurioItem {
-    public static final String CHIP_SET_SLOT = "chip_set";
+    public static final String CHIP_SET_SLOT = "chip";
     private static final int NAUSEA_DURATION_TICKS = 20 * 20;
     private static final float CHIP_DAMAGE = 2.0F;
 

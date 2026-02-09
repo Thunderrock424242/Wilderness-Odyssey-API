@@ -1,14 +1,15 @@
 package com.thunder.wildernessodysseyapi.curios;
 
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.player.Player;
 import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.type.capability.ICuriosItemHandler;
 import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
 
 import java.util.Optional;
+import java.util.function.Predicate;
 
 public final class CuriosIntegration {
     private CuriosIntegration() {
@@ -110,6 +111,41 @@ public final class CuriosIntegration {
             }
 
             stacksHandler.getStacks().setStackInSlot(i, equippedStack);
+            return true;
+        }
+
+        return false;
+    }
+
+    public static boolean unequipMatching(Player player, String slot, Predicate<ItemStack> matcher) {
+        Optional<ICuriosItemHandler> handlerOptional = CuriosApi.getCuriosInventory(player);
+        if (handlerOptional.isEmpty()) {
+            return false;
+        }
+
+        Optional<ICurioStacksHandler> stacksHandlerOptional = handlerOptional.get().getStacksHandler(slot);
+        if (stacksHandlerOptional.isEmpty()) {
+            return false;
+        }
+
+        ICurioStacksHandler stacksHandler = stacksHandlerOptional.get();
+        int slots = stacksHandler.getSlots();
+        for (int i = 0; i < slots; i++) {
+            ItemStack existing = stacksHandler.getStacks().getStackInSlot(i);
+            if (existing.isEmpty() || !matcher.test(existing)) {
+                continue;
+            }
+
+            ItemStack removed = existing.copy();
+            removed.setCount(1);
+            existing.shrink(1);
+            if (existing.isEmpty()) {
+                stacksHandler.getStacks().setStackInSlot(i, ItemStack.EMPTY);
+            }
+
+            if (!player.addItem(removed)) {
+                player.drop(removed, false);
+            }
             return true;
         }
 
