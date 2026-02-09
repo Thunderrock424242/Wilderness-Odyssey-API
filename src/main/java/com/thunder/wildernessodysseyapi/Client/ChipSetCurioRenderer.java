@@ -42,7 +42,7 @@ public class ChipSetCurioRenderer implements ICurioRenderer {
             humanoidModel.head.translateAndRotate(poseStack);
         }
 
-        poseStack.translate(0.35F, -0.2F, 0.0F);
+        poseStack.translate(0.35F, -0.2F, 0.25F);
         poseStack.scale(0.35F, 0.35F, 0.35F);
 
         Minecraft.getInstance().getItemRenderer().renderStatic(

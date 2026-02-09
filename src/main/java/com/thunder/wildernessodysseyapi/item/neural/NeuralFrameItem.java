@@ -14,7 +14,7 @@ public class NeuralFrameItem extends Item implements ICurioItem {
 
     @Override
     public boolean canUnequip(SlotContext slotContext, ItemStack stack) {
-        return true;
+        return false;
     }
 
     @Override
