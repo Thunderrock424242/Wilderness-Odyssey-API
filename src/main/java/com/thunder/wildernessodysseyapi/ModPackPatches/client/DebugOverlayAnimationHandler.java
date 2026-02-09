@@ -13,10 +13,7 @@ public final class DebugOverlayAnimationHandler {
     }
 
     @SubscribeEvent
-    public static void onClientTick(ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
+    public static void onClientTick(ClientTickEvent.Post event) {
         DebugOverlayAnimator.tick(Minecraft.getInstance());
     }
 }
