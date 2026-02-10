@@ -39,9 +39,13 @@ The global chat system lets multiple Wilderness Odyssey servers share messages t
   ```
   /globalchat optin true
   ```
-- Send a message once opted in:
+- Send a message once opted in (default `global` channel):
   ```
   /globalchat send <message>
+  ```
+- Send to a specific channel (`global`, `help`, `staff`):
+  ```
+  /globalchat sendchannel <channel> <message>
   ```
 - Use `/globalchat status` to see your opt-in flag along with relay connectivity.
 
@@ -76,6 +80,28 @@ Moderation commands require a valid token (set via `/globalchat moderationtoken 
        com.thunder.wildernessodysseyapi.globalchat.server.GlobalChatRelayServer <port>
   ```
   Non-Minecraft clients must connect from a whitelisted IP and identify as `external` during the handshake or they will be dropped.
+
+
+## Discord bridge for help/staff channels
+You can map `help` and/or `staff` channel traffic to Discord and ingest Discord replies back into Minecraft.
+
+### Outbound (Minecraft -> Discord)
+Set webhook URLs per channel on the relay host:
+```bash
+-Dwilderness.globalchat.discord.channels.help.webhook=<discord-webhook-url>
+-Dwilderness.globalchat.discord.channels.staff.webhook=<discord-webhook-url>
+```
+Messages sent in those channels are posted to the matching webhook using the Minecraft sender name.
+
+### Inbound (Discord -> Minecraft)
+To ingest replies from Discord into Minecraft, also configure:
+```bash
+-Dwilderness.globalchat.discord.botToken=<discord-bot-token>
+-Dwilderness.globalchat.discord.channels.help.channelId=<discord-channel-id>
+-Dwilderness.globalchat.discord.channels.staff.channelId=<discord-channel-id>
+-Dwilderness.globalchat.discord.pollSeconds=4
+```
+The relay polls channel messages and re-broadcasts them into global chat with source `discord`. In Minecraft they render with a blue `[discord]` prefix followed by the Discord username and message text.
 
 ## Persisted settings
 `config/wildernessodysseyapi/global-chat.json` stores:

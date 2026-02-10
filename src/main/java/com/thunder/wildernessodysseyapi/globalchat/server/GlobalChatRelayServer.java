@@ -56,6 +56,7 @@ public class GlobalChatRelayServer {
     private final String clusterToken;
     private final Set<String> externalWhitelist = new HashSet<>();
     private final Path analyticsDir = Path.of("analytics");
+    private final DiscordBridgeService discordBridge;
 
     public GlobalChatRelayServer(int port, String moderationToken, String clusterToken) throws IOException {
         if (moderationToken == null || moderationToken.isBlank() || "changeme".equals(moderationToken)) {
@@ -66,11 +67,13 @@ public class GlobalChatRelayServer {
         this.clusterToken = clusterToken == null ? "" : clusterToken;
         loadWhitelist();
         createDirectoriesSecure(analyticsDir);
+        this.discordBridge = DiscordBridgeService.fromSystemProperties(this::broadcastFromDiscordBridge);
     }
 
     public void start() {
         System.out.println("[GlobalChatRelayServer] Listening on " + serverSocket.getLocalPort());
         executor.submit(this::acceptLoop);
+        discordBridge.start();
     }
 
     private void acceptLoop() {
@@ -225,6 +228,26 @@ public class GlobalChatRelayServer {
 
     private void broadcast(GlobalChatPacket packet, ClientState origin) {
         packet.serverId = origin.serverId;
+        packet.timestamp = System.currentTimeMillis();
+        packet.source = packet.source == null || packet.source.isBlank() ? "minecraft" : packet.source;
+        String json = GSON.toJson(packet);
+        String channel = packet.channel == null || packet.channel.isBlank() ? "global" : packet.channel;
+        if ("minecraft".equalsIgnoreCase(packet.source) && ("help".equalsIgnoreCase(channel) || "staff".equalsIgnoreCase(channel))) {
+            discordBridge.relayMinecraftToDiscord(packet);
+        }
+        for (Map.Entry<Socket, ClientState> entry : clients.entrySet()) {
+            try {
+                PrintWriter writer = entry.getValue().writer;
+                writer.println(json);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+
+    private void broadcastFromDiscordBridge(GlobalChatPacket packet) {
+        packet.source = "discord";
+        packet.serverId = "discord";
         packet.timestamp = System.currentTimeMillis();
         String json = GSON.toJson(packet);
         for (Map.Entry<Socket, ClientState> entry : clients.entrySet()) {
@@ -408,6 +431,7 @@ public class GlobalChatRelayServer {
             serverSocket.close();
         } catch (IOException ignored) {
         }
+        discordBridge.stop();
         executor.shutdownNow();
     }
 

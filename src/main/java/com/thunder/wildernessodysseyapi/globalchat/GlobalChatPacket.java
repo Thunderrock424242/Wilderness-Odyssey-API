@@ -18,6 +18,9 @@ public class GlobalChatPacket {
     public Type type;
     public String sender;
     public String message;
+    public String channel;
+    public String source;
+    public String messageId;
     public String serverId;
     public long timestamp;
     public String clientType;

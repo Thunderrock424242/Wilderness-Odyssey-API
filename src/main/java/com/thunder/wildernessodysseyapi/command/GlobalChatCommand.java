@@ -41,6 +41,10 @@ public class GlobalChatCommand {
                 .then(Commands.literal("send")
                         .then(Commands.argument("message", StringArgumentType.greedyString())
                                 .executes(GlobalChatCommand::send)))
+                .then(Commands.literal("sendchannel")
+                        .then(Commands.argument("channel", StringArgumentType.word())
+                                .then(Commands.argument("message", StringArgumentType.greedyString())
+                                        .executes(GlobalChatCommand::sendChannel))))
                 .then(Commands.literal("startserver")
                         .requires(source -> source.hasPermission(2))
                         .then(Commands.argument("port", IntegerArgumentType.integer(1, 65535))
@@ -140,8 +144,30 @@ public class GlobalChatCommand {
             return 0;
         }
         String message = StringArgumentType.getString(ctx, "message");
-        GlobalChatManager.getInstance().sendChat(player.getGameProfile().getName(), message);
+        GlobalChatManager.getInstance().sendChat(player.getGameProfile().getName(), "global", message);
         ctx.getSource().sendSuccess(() -> Component.literal("Sent to global chat."), false);
+        return 1;
+    }
+
+
+    private static int sendChannel(CommandContext<CommandSourceStack> ctx) {
+        ServerPlayer player = ctx.getSource().getPlayer();
+        if (player == null) {
+            ctx.getSource().sendFailure(Component.literal("Global chat messages must be sent by a player."));
+            return 0;
+        }
+        if (!GlobalChatOptIn.isOptedIn(player)) {
+            ctx.getSource().sendFailure(Component.literal("You must opt into global chat before sending messages."));
+            return 0;
+        }
+        String channel = StringArgumentType.getString(ctx, "channel").toLowerCase();
+        if (!("global".equals(channel) || "help".equals(channel) || "staff".equals(channel))) {
+            ctx.getSource().sendFailure(Component.literal("Unknown channel. Allowed: global, help, staff."));
+            return 0;
+        }
+        String message = StringArgumentType.getString(ctx, "message");
+        GlobalChatManager.getInstance().sendChat(player.getGameProfile().getName(), channel, message);
+        ctx.getSource().sendSuccess(() -> Component.literal("Sent to #" + channel + "."), false);
         return 1;
     }
 

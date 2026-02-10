@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.globalchat;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Launches the external relay server using the same classpath as the running JVM.
@@ -14,14 +16,30 @@ public class GlobalChatServerProcess {
             return;
         }
         String classpath = System.getProperty("java.class.path");
-        ProcessBuilder builder = new ProcessBuilder("java",
-                "-Dwilderness.globalchat.token=" + moderationToken,
-                "-Dwilderness.globalchat.clustertoken=" + clusterToken,
-                "-cp", classpath,
-                "com.thunder.wildernessodysseyapi.globalchat.server.GlobalChatRelayServer",
-                String.valueOf(port));
+        List<String> command = new ArrayList<>();
+        command.add("java");
+        command.add("-Dwilderness.globalchat.token=" + moderationToken);
+        command.add("-Dwilderness.globalchat.clustertoken=" + clusterToken);
+        passThroughProperty(command, "wilderness.globalchat.discord.botToken");
+        passThroughProperty(command, "wilderness.globalchat.discord.pollSeconds");
+        passThroughProperty(command, "wilderness.globalchat.discord.channels.help.webhook");
+        passThroughProperty(command, "wilderness.globalchat.discord.channels.staff.webhook");
+        passThroughProperty(command, "wilderness.globalchat.discord.channels.help.channelId");
+        passThroughProperty(command, "wilderness.globalchat.discord.channels.staff.channelId");
+        command.add("-cp");
+        command.add(classpath);
+        command.add("com.thunder.wildernessodysseyapi.globalchat.server.GlobalChatRelayServer");
+        command.add(String.valueOf(port));
+        ProcessBuilder builder = new ProcessBuilder(command);
         builder.redirectErrorStream(true);
         process = builder.start();
+    }
+
+    private void passThroughProperty(List<String> command, String key) {
+        String value = System.getProperty(key, "");
+        if (value != null && !value.isBlank()) {
+            command.add("-D" + key + "=" + value);
+        }
     }
 
     public void stop() {
