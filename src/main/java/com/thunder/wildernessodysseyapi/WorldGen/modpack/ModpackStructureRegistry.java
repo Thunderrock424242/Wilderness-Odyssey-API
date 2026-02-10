@@ -2,6 +2,8 @@ package com.thunder.wildernessodysseyapi.WorldGen.modpack;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
@@ -24,7 +26,7 @@ import java.util.Optional;
 
 /**
  * Loads user-provided NBT templates from config/wildernessodysseyapi/modpack_structures
- * and exposes runtime placers for commands/integration hooks.
+ * and exposes runtime placers plus worldgen scaffold generation for pack authors.
  */
 public final class ModpackStructureRegistry {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -73,7 +75,7 @@ public final class ModpackStructureRegistry {
             }
 
             NBTStructurePlacer placer = new NBTStructurePlacer(id, nbtPath);
-            ENTRIES.put(id, new Entry(id, nbtPath, configPath, definition.alignToSurface, placer));
+            ENTRIES.put(id, new Entry(id, nbtPath, configPath, definition.alignToSurface, definition, placer));
         }
 
         ModConstants.LOGGER.info("Loaded {} modpack structure templates from {}", ENTRIES.size(), ROOT);
@@ -91,11 +93,141 @@ public final class ModpackStructureRegistry {
         return ROOT;
     }
 
+    public static synchronized int generateAllWorldgenScaffolds() {
+        int written = 0;
+        for (Entry entry : ENTRIES.values()) {
+            try {
+                generateWorldgenScaffold(entry);
+                written++;
+            } catch (IOException e) {
+                ModConstants.LOGGER.warn("Failed generating worldgen scaffold for {}", entry.id(), e);
+            }
+        }
+        return written;
+    }
+
+    public static synchronized boolean generateWorldgenScaffold(ResourceLocation id) {
+        Entry entry = ENTRIES.get(id);
+        if (entry == null) {
+            return false;
+        }
+        try {
+            generateWorldgenScaffold(entry);
+            return true;
+        } catch (IOException e) {
+            ModConstants.LOGGER.warn("Failed generating worldgen scaffold for {}", id, e);
+            return false;
+        }
+    }
+
+    private static void generateWorldgenScaffold(Entry entry) throws IOException {
+        Definition def = entry.definition();
+        ResourceLocation id = entry.id();
+
+        Path datapackRoot = ROOT.resolve("generated_datapack");
+        Path dataRoot = datapackRoot.resolve("data").resolve(id.getNamespace());
+
+        Path structures = dataRoot.resolve("structures").resolve(id.getPath() + ".nbt");
+        Files.createDirectories(structures.getParent());
+        Files.copy(entry.nbtPath(), structures, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+        Path structureJson = dataRoot.resolve("worldgen/structure").resolve(id.getPath() + ".json");
+        writeJson(structureJson, buildStructureJson(id, def));
+
+        Path structureSetJson = dataRoot.resolve("worldgen/structure_set").resolve(id.getPath() + ".json");
+        writeJson(structureSetJson, buildStructureSetJson(id, def));
+
+        ResourceLocation biomeTag = ResourceLocation.tryParse(def.biomeTag);
+        if (biomeTag == null) {
+            biomeTag = ResourceLocation.fromNamespaceAndPath("minecraft", "is_overworld");
+        }
+        Path biomeTagJson = datapackRoot.resolve("data")
+                .resolve(biomeTag.getNamespace())
+                .resolve("tags/worldgen/biome")
+                .resolve(biomeTag.getPath() + ".json");
+
+        JsonObject biomeTagObj = new JsonObject();
+        biomeTagObj.addProperty("replace", false);
+        JsonArray values = new JsonArray();
+        values.add("minecraft:plains");
+        biomeTagObj.add("values", values);
+        writeJsonIfMissing(biomeTagJson, biomeTagObj);
+
+        Path hasStructureTagJson = dataRoot.resolve("tags/worldgen/biome/has_structure").resolve(id.getPath() + ".json");
+        JsonObject hasStructureObj = new JsonObject();
+        hasStructureObj.addProperty("replace", false);
+        JsonArray hasValues = new JsonArray();
+        hasValues.add("#" + biomeTag.getNamespace() + ":" + biomeTag.getPath());
+        hasStructureObj.add("values", hasValues);
+        writeJson(hasStructureTagJson, hasStructureObj);
+
+        writePackMcmetaIfMissing(datapackRoot);
+    }
+
+    private static JsonObject buildStructureJson(ResourceLocation id, Definition def) {
+        JsonObject root = new JsonObject();
+        root.addProperty("type", "minecraft:jigsaw");
+        root.addProperty("biomes", "#" + def.biomeTag);
+        root.addProperty("step", def.generationStep);
+        root.addProperty("terrain_adaptation", def.terrainAdaptation);
+        root.addProperty("start_height", 0);
+
+        JsonObject startPool = new JsonObject();
+        startPool.addProperty("element_type", "minecraft:single_pool_element");
+        startPool.addProperty("location", id.toString());
+        startPool.addProperty("projection", "rigid");
+
+        JsonObject pool = new JsonObject();
+        pool.addProperty("name", id + "_pool");
+        JsonArray elements = new JsonArray();
+        JsonObject weighted = new JsonObject();
+        weighted.add("element", startPool);
+        weighted.addProperty("weight", 1);
+        elements.add(weighted);
+        pool.add("elements", elements);
+        pool.addProperty("fallback", "minecraft:empty");
+
+        root.add("start_pool_inline", pool);
+        root.addProperty("size", 1);
+        root.addProperty("max_distance_from_center", 80);
+        root.addProperty("use_expansion_hack", false);
+        return root;
+    }
+
+    private static JsonObject buildStructureSetJson(ResourceLocation id, Definition def) {
+        JsonObject root = new JsonObject();
+        JsonArray structures = new JsonArray();
+        JsonObject structure = new JsonObject();
+        structure.addProperty("structure", id.toString());
+        structure.addProperty("weight", 1);
+        structures.add(structure);
+        root.add("structures", structures);
+
+        JsonObject placement = new JsonObject();
+        placement.addProperty("type", "minecraft:random_spread");
+        placement.addProperty("spacing", def.spacing);
+        placement.addProperty("separation", def.separation);
+        placement.addProperty("salt", def.salt);
+        root.add("placement", placement);
+        return root;
+    }
+
+    private static void writePackMcmetaIfMissing(Path datapackRoot) throws IOException {
+        Path packMeta = datapackRoot.resolve("pack.mcmeta");
+        if (Files.exists(packMeta)) {
+            return;
+        }
+        JsonObject root = new JsonObject();
+        JsonObject pack = new JsonObject();
+        pack.addProperty("pack_format", 61);
+        pack.addProperty("description", "Generated modpack structures for Wilderness Odyssey API");
+        root.add("pack", pack);
+        writeJson(packMeta, root);
+    }
+
     private static Definition loadDefinition(Path configPath, String baseName) {
         if (!Files.exists(configPath)) {
-            Definition def = new Definition();
-            def.structureId = "wildernessodysseyapi:modpack/" + sanitizePath(baseName);
-            def.displayName = baseName;
+            Definition def = createDefaultDefinition(baseName);
             writeDefinition(configPath, def);
             return def;
         }
@@ -105,17 +237,20 @@ public final class ModpackStructureRegistry {
             if (parsed == null) {
                 throw new JsonSyntaxException("Empty json");
             }
-            if (parsed.structureId == null || parsed.structureId.isBlank()) {
-                parsed.structureId = "wildernessodysseyapi:modpack/" + sanitizePath(baseName);
-            }
+            Definition defaults = createDefaultDefinition(baseName);
+            parsed.normalize(defaults);
             return parsed;
         } catch (Exception e) {
             ModConstants.LOGGER.warn("Failed to parse modpack structure config {}. Using defaults.", configPath, e);
-            Definition fallback = new Definition();
-            fallback.structureId = "wildernessodysseyapi:modpack/" + sanitizePath(baseName);
-            fallback.displayName = baseName;
-            return fallback;
+            return createDefaultDefinition(baseName);
         }
+    }
+
+    private static Definition createDefaultDefinition(String baseName) {
+        Definition def = new Definition();
+        def.structureId = "wildernessodysseyapi:modpack/" + sanitizePath(baseName);
+        def.displayName = baseName;
+        return def;
     }
 
     private static void writeDefinition(Path configPath, Definition definition) {
@@ -124,6 +259,20 @@ public final class ModpackStructureRegistry {
         } catch (IOException e) {
             ModConstants.LOGGER.warn("Failed writing default structure config {}", configPath, e);
         }
+    }
+
+    private static void writeJson(Path path, JsonObject obj) throws IOException {
+        Files.createDirectories(path.getParent());
+        try (Writer writer = Files.newBufferedWriter(path)) {
+            GSON.toJson(obj, writer);
+        }
+    }
+
+    private static void writeJsonIfMissing(Path path, JsonObject obj) throws IOException {
+        if (Files.exists(path)) {
+            return;
+        }
+        writeJson(path, obj);
     }
 
     private static void writeTemplateConfigIfMissing() throws IOException {
@@ -136,10 +285,16 @@ public final class ModpackStructureRegistry {
         sample.displayName = "Example Structure";
         sample.alignToSurface = true;
         sample.enabled = true;
+        sample.biomeTag = "minecraft:is_overworld";
+        sample.generationStep = "surface_structures";
+        sample.terrainAdaptation = "beard_thin";
+        sample.spacing = 36;
+        sample.separation = 12;
+        sample.salt = 150001;
         sample.notes = List.of(
                 "Drop a .nbt file next to this json and rename this file to <same_name>.json",
                 "structureId controls the in-game id used by /modpackstructures place <id>",
-                "alignToSurface=true uses NBTStructurePlacer.placeAnchored (recommended for terrain)"
+                "Use /modpackstructures scaffold to generate datapack structure + structure_set templates"
         );
         try (Writer writer = Files.newBufferedWriter(template)) {
             GSON.toJson(sample, writer);
@@ -175,14 +330,31 @@ public final class ModpackStructureRegistry {
                         Path nbtPath,
                         Path configPath,
                         boolean alignToSurface,
+                        Definition definition,
                         NBTStructurePlacer placer) {
     }
 
-    private static final class Definition {
+    public static final class Definition {
         boolean enabled = true;
         String structureId;
         String displayName = "";
         boolean alignToSurface = true;
+        String biomeTag = "minecraft:is_overworld";
+        String generationStep = "surface_structures";
+        String terrainAdaptation = "beard_thin";
+        int spacing = 36;
+        int separation = 12;
+        int salt = 150001;
         List<String> notes = List.of();
+
+        void normalize(Definition defaults) {
+            if (structureId == null || structureId.isBlank()) structureId = defaults.structureId;
+            if (displayName == null) displayName = defaults.displayName;
+            if (biomeTag == null || biomeTag.isBlank()) biomeTag = defaults.biomeTag;
+            if (generationStep == null || generationStep.isBlank()) generationStep = defaults.generationStep;
+            if (terrainAdaptation == null || terrainAdaptation.isBlank()) terrainAdaptation = defaults.terrainAdaptation;
+            spacing = Math.max(2, spacing);
+            separation = Math.max(1, Math.min(separation, spacing - 1));
+        }
     }
 }

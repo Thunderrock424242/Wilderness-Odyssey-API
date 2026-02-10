@@ -1,6 +1,6 @@
 # Modpack Structure Folder (NBT auto-registration)
 
-You can now drop structure templates in:
+You can drop structure templates in:
 
 `config/wildernessodysseyapi/modpack_structures`
 
@@ -20,21 +20,44 @@ For each `my_base.nbt`, create (or edit) `my_base.json` in the same folder:
   "enabled": true,
   "structureId": "wildernessodysseyapi:modpack/my_base",
   "displayName": "My Base",
-  "alignToSurface": true
+  "alignToSurface": true,
+  "biomeTag": "minecraft:is_overworld",
+  "generationStep": "surface_structures",
+  "terrainAdaptation": "beard_thin",
+  "spacing": 36,
+  "separation": 12,
+  "salt": 150001
 }
 ```
 
 ### Fields
 
 - `enabled`: whether this structure should be loaded.
-- `structureId`: command id used by placement commands.
+- `structureId`: command id used by placement commands and scaffold output.
 - `displayName`: optional note for pack authors.
-- `alignToSurface`: default placement mode recommendation (anchored terrain fit).
+- `alignToSurface`: default placement mode for `/modpackstructures place` when no override is passed.
+- `biomeTag`, `generationStep`, `terrainAdaptation`, `spacing`, `separation`, `salt`: used by scaffold generation for worldgen json templates.
 
 ## Commands
 
 - `/modpackstructures reload`
 - `/modpackstructures list`
 - `/modpackstructures place <id> [x y z] [alignToSurface]`
+- `/modpackstructures scaffold [id]`
 
-`alignToSurface=true` uses the same anchored placement style as the starter structure logic.
+`alignToSurface=true` uses anchored placement.
+
+## Worldgen scaffold generation
+
+Use `/modpackstructures scaffold` to generate a datapack template at:
+
+`config/wildernessodysseyapi/modpack_structures/generated_datapack`
+
+For each structure id, it writes:
+
+- `data/<namespace>/structures/<path>.nbt` (copy of your source template)
+- `data/<namespace>/worldgen/structure/<path>.json`
+- `data/<namespace>/worldgen/structure_set/<path>.json`
+- `data/<namespace>/tags/worldgen/biome/has_structure/<path>.json`
+
+This gives you a ready-to-edit base to move into your real datapack/modpack pack for actual worldgen registration.

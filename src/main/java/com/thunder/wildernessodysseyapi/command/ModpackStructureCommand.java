@@ -28,15 +28,19 @@ public final class ModpackStructureCommand {
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("reload").executes(ctx -> reload(ctx.getSource())))
                 .then(Commands.literal("list").executes(ctx -> list(ctx.getSource())))
+                .then(Commands.literal("scaffold")
+                        .executes(ctx -> scaffoldAll(ctx.getSource()))
+                        .then(Commands.argument("id", ResourceLocationArgument.id())
+                                .executes(ctx -> scaffoldOne(ctx.getSource(), ResourceLocationArgument.getId(ctx, "id")))))
                 .then(Commands.literal("place")
                         .then(Commands.argument("id", ResourceLocationArgument.id())
                                 .executes(ctx -> place(ctx.getSource(), ResourceLocationArgument.getId(ctx, "id"),
-                                        BlockPos.containing(ctx.getSource().getPosition()), true))
+                                        BlockPos.containing(ctx.getSource().getPosition()), null))
                                 .then(Commands.argument("pos", BlockPosArgument.blockPos())
                                         .executes(ctx -> place(ctx.getSource(),
                                                 ResourceLocationArgument.getId(ctx, "id"),
                                                 BlockPosArgument.getLoadedBlockPos(ctx, "pos"),
-                                                true))
+                                                null))
                                         .then(Commands.argument("alignToSurface", BoolArgumentType.bool())
                                                 .executes(ctx -> place(ctx.getSource(),
                                                         ResourceLocationArgument.getId(ctx, "id"),
@@ -70,7 +74,24 @@ public final class ModpackStructureCommand {
         return entries.size();
     }
 
-    private static int place(CommandSourceStack source, ResourceLocation id, BlockPos pos, boolean alignToSurface) {
+    private static int scaffoldAll(CommandSourceStack source) {
+        int generated = ModpackStructureRegistry.generateAllWorldgenScaffolds();
+        source.sendSuccess(() -> Component.literal("Generated worldgen datapack scaffold for " + generated
+                + " structures at " + ModpackStructureRegistry.rootDirectory().resolve("generated_datapack")), true);
+        return generated;
+    }
+
+    private static int scaffoldOne(CommandSourceStack source, ResourceLocation id) {
+        boolean ok = ModpackStructureRegistry.generateWorldgenScaffold(id);
+        if (!ok) {
+            source.sendFailure(Component.literal("Unknown structure id or scaffold generation failed: " + id));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("Generated worldgen scaffold for " + id), true);
+        return 1;
+    }
+
+    private static int place(CommandSourceStack source, ResourceLocation id, BlockPos pos, Boolean alignToSurfaceOverride) {
         ServerLevel level = source.getLevel();
         ModpackStructureRegistry.Entry entry = ModpackStructureRegistry.get(id).orElse(null);
         if (entry == null) {
@@ -78,6 +99,7 @@ public final class ModpackStructureCommand {
             return 0;
         }
 
+        boolean alignToSurface = alignToSurfaceOverride != null ? alignToSurfaceOverride : entry.alignToSurface();
         NBTStructurePlacer.PlacementResult result = alignToSurface
                 ? entry.placer().placeAnchored(level, pos)
                 : entry.placer().place(level, pos);
@@ -88,7 +110,8 @@ public final class ModpackStructureCommand {
         }
 
         source.sendSuccess(() -> Component.literal("Placed " + id + " at "
-                + result.origin().getX() + "," + result.origin().getY() + "," + result.origin().getZ()), true);
+                + result.origin().getX() + "," + result.origin().getY() + "," + result.origin().getZ()
+                + " (alignToSurface=" + alignToSurface + ")"), true);
         return 1;
     }
 }
