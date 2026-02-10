@@ -30,6 +30,8 @@ import net.minecraft.tags.BlockTags;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.BitSet;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,6 +56,7 @@ public class NBTStructurePlacer {
 
     private final ResourceLocation id;
     private final List<StructureProcessor> extraProcessors;
+    private final Path externalTemplatePath;
     private TemplateData cachedData;
 
     public NBTStructurePlacer(String namespace, String path) {
@@ -61,12 +64,21 @@ public class NBTStructurePlacer {
     }
 
     public NBTStructurePlacer(ResourceLocation id) {
-        this(id, List.of());
+        this(id, List.of(), null);
+    }
+
+    public NBTStructurePlacer(ResourceLocation id, Path externalTemplatePath) {
+        this(id, List.of(), externalTemplatePath);
     }
 
     public NBTStructurePlacer(ResourceLocation id, List<StructureProcessor> extraProcessors) {
+        this(id, extraProcessors, null);
+    }
+
+    public NBTStructurePlacer(ResourceLocation id, List<StructureProcessor> extraProcessors, Path externalTemplatePath) {
         this.id = id;
         this.extraProcessors = List.copyOf(extraProcessors);
+        this.externalTemplatePath = externalTemplatePath;
     }
 
     /**
@@ -369,6 +381,20 @@ public class NBTStructurePlacer {
     }
 
     private StructureTemplate loadDirect(ServerLevel level, StructureTemplateManager manager) {
+        if (externalTemplatePath != null) {
+            if (!Files.exists(externalTemplatePath)) {
+                ModConstants.LOGGER.warn("External structure template {} not found for {}.", externalTemplatePath, id);
+                return null;
+            }
+            try (var stream = Files.newInputStream(externalTemplatePath)) {
+                CompoundTag tag = NbtIo.readCompressed(stream, NbtAccounter.unlimitedHeap());
+                return manager.readStructure(tag);
+            } catch (Exception e) {
+                ModConstants.LOGGER.warn("Failed to read external structure template {} for {}.", externalTemplatePath, id, e);
+                return null;
+            }
+        }
+
         ResourceLocation resourcePath = ResourceLocation.fromNamespaceAndPath(
                 id.getNamespace(),
                 "structures/" + id.getPath() + ".nbt");
