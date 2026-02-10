@@ -18,24 +18,18 @@ public final class CloakTickHandler {
             return;
         }
 
-        boolean holdingCloak = CloakItem.isHoldingCloak(player);
-        boolean hasCompass = CloakItem.hasCompassLink(player);
         boolean hasChip = CloakItem.hasCloakChip(player);
 
-        if (CloakState.isCloaked(player)) {
-            if (!holdingCloak || !hasCompass || !hasChip) {
+        if (!hasChip) {
+            if (CloakState.isCloaked(player)) {
                 CloakState.setCloaked(player, false);
                 CloakState.clearCloak(player);
-                return;
             }
-
-            CloakState.refreshIfNeeded(player);
             return;
         }
 
-        if (holdingCloak && hasCompass && hasChip) {
-            CloakState.setCloaked(player, true);
-            CloakState.applyCloak(player);
+        if (CloakState.isCloaked(player)) {
+            CloakState.refreshIfNeeded(player);
         }
     }
 }
