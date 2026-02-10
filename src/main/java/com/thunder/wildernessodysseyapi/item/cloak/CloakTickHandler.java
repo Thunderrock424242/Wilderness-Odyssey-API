@@ -33,9 +33,7 @@ public final class CloakTickHandler {
             return;
         }
 
-        if (holdingCloak && hasCompass && hasChip) {
-            CloakState.setCloaked(player, true);
-            CloakState.applyCloak(player);
-        }
+        // Cloak activation is explicitly user-triggered from CloakItem#use.
+        // The tick handler should only sustain or clear an existing cloak.
     }
 }
