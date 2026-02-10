@@ -16,6 +16,7 @@ import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.processor.ModProcessors;
+import com.thunder.wildernessodysseyapi.WorldGen.modpack.ModpackStructureRegistry;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
@@ -23,6 +24,7 @@ import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
+import com.thunder.wildernessodysseyapi.command.ModpackStructureCommand;
 import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.config.CloakChipConfig;
 import com.thunder.wildernessodysseyapi.config.CurioRenderConfig;
@@ -184,6 +186,7 @@ public class WildernessOdysseyAPIMainModClass {
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
         GameRulesListManager.ensureRulesFileExists(event.getServer());
         GameRulesListManager.applyConfiguredRules(event.getServer());
+        ModpackStructureRegistry.loadAll();
     }
 
     /**
@@ -206,6 +209,7 @@ public class WildernessOdysseyAPIMainModClass {
         GlobalChatOptToggleCommand.register(dispatcher);
         LoreBookCommand.register(dispatcher);
         TideInfoCommand.register(dispatcher);
+        ModpackStructureCommand.register(dispatcher);
         TelemetryConsentCommand.register(dispatcher);
         TelemetryQueueStatsCommand.register(dispatcher);
         FeedbackCommand.register(dispatcher);
