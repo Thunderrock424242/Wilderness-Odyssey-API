@@ -155,6 +155,9 @@ dependencies {
     implementation "curse.maven:supplementaries-412082:7114487"
     implementation "curse.maven:multipart-machines-cooking-885587:5686941"
     implementation "curse.maven:amendments-896746:7054319"
+    implementation "curse.maven:easy-npc-config-ui-1214728:7592643"
+    implementation "curse.maven:easy-npc-core-1308987:7592636"
+    implementation "curse.maven:easy-npc-559312:7592647"
     jarJar(implementation("org.yaml:snakeyaml:2.2")) {
         version {
             strictly '[2.2,3.0)'
