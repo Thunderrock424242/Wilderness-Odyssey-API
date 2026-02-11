@@ -84,6 +84,10 @@ Impact zones are fully data pack driven. The bundled `impact_zone` structure, st
 
 Multiple impact zones can now exist—add more structure set entries via datapack to control how many spawn and where.
 
+Modpack Structure Staging (drop-in NBT)
+-----------------------------------------
+For a step-by-step flow that starts from `config/wildernessodysseyapi/modpack_structures/*.nbt` and scaffolds a full datapack layout, see `docs/modpack-structure-registry.md`.
+
 Using Data Pack Structures
 --------------------------
 The mod now loads vanilla structure templates from data packs using the
