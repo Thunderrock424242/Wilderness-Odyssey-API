@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.globalchat;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -172,12 +173,23 @@ public class GlobalChatManager {
             return;
         }
         if (packet.type == GlobalChatPacket.Type.CHAT || packet.type == GlobalChatPacket.Type.SYSTEM) {
-            Component chat = Component.literal("[Global] " + packet.sender + ": " + packet.message);
+            String channel = packet.channel == null || packet.channel.isBlank() ? "global" : packet.channel;
+            String source = packet.source == null || packet.source.isBlank() ? "minecraft" : packet.source;
+            if ("discord".equalsIgnoreCase(source)) {
+                Component chat = Component.literal("[").withStyle(ChatFormatting.GRAY)
+                        .append(Component.literal("discord").withStyle(ChatFormatting.BLUE))
+                        .append(Component.literal("] ").withStyle(ChatFormatting.GRAY))
+                        .append(Component.literal(packet.sender).withStyle(ChatFormatting.AQUA))
+                        .append(Component.literal(": " + packet.message).withStyle(ChatFormatting.WHITE));
+                broadcastToOptedIn(chat);
+                return;
+            }
+            Component chat = Component.literal("[" + channel + "] " + packet.sender + ": " + packet.message);
             broadcastToOptedIn(chat);
         }
     }
 
-    public void sendChat(String sender, String message) {
+    public void sendChat(String sender, String channel, String message) {
         if (!connected.get()) {
             return;
         }
@@ -185,6 +197,8 @@ public class GlobalChatManager {
         packet.type = GlobalChatPacket.Type.CHAT;
         packet.sender = sender;
         packet.message = message;
+        packet.channel = (channel == null || channel.isBlank()) ? "global" : channel.trim().toLowerCase();
+        packet.source = "minecraft";
         packet.timestamp = System.currentTimeMillis();
         writer.println(GSON.toJson(packet));
     }
