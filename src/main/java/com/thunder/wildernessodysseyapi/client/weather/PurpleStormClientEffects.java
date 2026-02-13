@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.client.weather;
+package com.thunder.wildernessodysseyapi.Client.weather;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import net.minecraft.client.Minecraft;
