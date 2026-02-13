@@ -31,6 +31,7 @@ import com.thunder.wildernessodysseyapi.config.CurioRenderConfig;
 import com.thunder.wildernessodysseyapi.config.DebugOverlayConfig;
 import com.thunder.wildernessodysseyapi.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
+import com.thunder.wildernessodysseyapi.entity.ModEntities;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootConditions;
@@ -115,6 +116,7 @@ public class WildernessOdysseyAPIMainModClass {
         ModProcessors.PROCESSORS.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         ModAttachments.ATTACHMENTS.register(modEventBus);
+        ModEntities.ENTITY_TYPES.register(modEventBus);
         ModLootFunctions.LOOT_FUNCTIONS.register(modEventBus);
         ModLootConditions.LOOT_CONDITIONS.register(modEventBus);
 
