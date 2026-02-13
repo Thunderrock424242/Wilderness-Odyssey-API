@@ -33,6 +33,7 @@ import com.thunder.wildernessodysseyapi.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.entity.ModEntities;
 import com.thunder.wildernessodysseyapi.item.ModItems;
+import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootConditions;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootFunctions;
@@ -131,6 +132,7 @@ public class WildernessOdysseyAPIMainModClass {
 
         CryoTubeBlock.register(modEventBus);
         ModItems.register(modEventBus);
+        ModSoundEvents.register(modEventBus);
 
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-structures.toml");
