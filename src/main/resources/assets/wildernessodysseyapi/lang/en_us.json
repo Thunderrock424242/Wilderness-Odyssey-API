@@ -82,8 +82,8 @@
   "command.wildernessodysseyapi.feedback.too_long": "Feedback message is too long. Max length: %s characters.",
   "command.wildernessodysseyapi.feedback.sent": "Thanks! Your feedback was sent.",
   "pack.wildernessodysseyapi.plains_spawn.title": "Wilderness Odyssey Plains Spawn",
-  "item.wildernessodysseyapi.music_disc_dustwinds": "Music Disc",
-  "item.wildernessodysseyapi.music_disc_starfall": "Music Disc",
+  "item.wildernessodysseyapi.music_disc_dustwinds": "Music Disc: Don't Be So Serious",
+  "item.wildernessodysseyapi.music_disc_starfall": "Music Disc: Outside the Box",
   "jukebox_song.wildernessodysseyapi.dont_be_so_serious": "Don't Be So Serious",
   "jukebox_song.wildernessodysseyapi.outside_the_box": "Outside the Box"
 }
