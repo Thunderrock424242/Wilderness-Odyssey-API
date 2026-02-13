@@ -1,0 +1,8 @@
+{
+  "sound_event": "wildernessodysseyapi:outside_the_box",
+  "description": {
+    "translate": "jukebox_song.wildernessodysseyapi.outside_the_box"
+  },
+  "length_in_seconds": 322.0,
+  "comparator_output": 12
+}

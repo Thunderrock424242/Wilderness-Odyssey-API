@@ -1,8 +1,0 @@
-{
-  "sound_event": "wildernessodysseyapi:music_disc.dustwinds",
-  "description": {
-    "translate": "jukebox_song.wildernessodysseyapi.dustwinds"
-  },
-  "length_in_seconds": 210.0,
-  "comparator_output": 8
-}
