@@ -1,17 +1,17 @@
 {
-  "outside the box": {
+  "outside_the_box": {
     "sounds": [
       {
-        "name": "minecraft:music_disc.cat",
-        "type": "event"
+        "name": "wildernessodysseyapi:music/Patrick Patrikios - Outside the Box",
+        "stream": true
       }
     ]
   },
-  "don't be so serious music disk": {
+  "dont_be_so_serious": {
     "sounds": [
       {
-        "name": "minecraft:music_disc.otherside",
-        "type": "event"
+        "name": "wildernessodysseyapi:music/Low Roar - Dont Be So Serious",
+        "stream": true
       }
     ]
   }

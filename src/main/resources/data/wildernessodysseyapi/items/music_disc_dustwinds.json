@@ -3,7 +3,7 @@
     "minecraft:max_stack_size": 1,
     "minecraft:rarity": "rare",
     "minecraft:jukebox_playable": {
-      "song": "wildernessodysseyapi:dustwinds",
+      "song": "wildernessodysseyapi:dont_be_so_serious",
       "show_in_tooltip": true
     }
   }
