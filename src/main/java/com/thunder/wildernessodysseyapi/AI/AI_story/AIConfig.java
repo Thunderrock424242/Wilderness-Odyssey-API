@@ -60,6 +60,11 @@ public class AIConfig {
         private String bundledServerResource;
         private String bundledServerArgs;
         private Integer timeoutSeconds;
+        private Integer retryAttempts;
+        private Integer retryBackoffMillis;
+        private String modelDownloadUrl;
+        private String modelDownloadSha256;
+        private String modelFileName;
 
         public Boolean getEnabled() {
             return enabled;
@@ -131,6 +136,46 @@ public class AIConfig {
 
         public void setTimeoutSeconds(Integer timeoutSeconds) {
             this.timeoutSeconds = timeoutSeconds;
+        }
+
+        public Integer getRetryAttempts() {
+            return retryAttempts;
+        }
+
+        public void setRetryAttempts(Integer retryAttempts) {
+            this.retryAttempts = retryAttempts;
+        }
+
+        public Integer getRetryBackoffMillis() {
+            return retryBackoffMillis;
+        }
+
+        public void setRetryBackoffMillis(Integer retryBackoffMillis) {
+            this.retryBackoffMillis = retryBackoffMillis;
+        }
+
+        public String getModelDownloadUrl() {
+            return modelDownloadUrl;
+        }
+
+        public void setModelDownloadUrl(String modelDownloadUrl) {
+            this.modelDownloadUrl = modelDownloadUrl;
+        }
+
+        public String getModelDownloadSha256() {
+            return modelDownloadSha256;
+        }
+
+        public void setModelDownloadSha256(String modelDownloadSha256) {
+            this.modelDownloadSha256 = modelDownloadSha256;
+        }
+
+        public String getModelFileName() {
+            return modelFileName;
+        }
+
+        public void setModelFileName(String modelFileName) {
+            this.modelFileName = modelFileName;
         }
     }
 

@@ -50,11 +50,24 @@ The build already includes lightweight HTTP/JSON and fault-tolerance libraries f
 
 These are pulled from Maven Central and can be used by any local or sidecar AI helper you run alongside the mod. The game still runs normally if you choose not to enable an AI helper.
 
-Self-hosted AI chatbot (free/offline)
+Self-hosted AI chatbot (custom local LLM required)
 -------------------------------------
-Atlas already ships with a local, offline chatbot pipeline—no external services or API keys are needed. The AI client loads its lore, survival tips, personality tone, empathy level, and wake word from `src/main/resources/ai_config.yaml` at server startup and generates deterministic replies in code without calling any cloud model. If you want to retheme it, edit the `story`, `background_history`, `personality`, `survival_tips`, or `wake_word` entries in that config file and restart the integrated server. The core class that powers this behavior is `src/main/java/com/thunder/wildernessodysseyapi/AI/AI_story/AIClient.java`, which notes that all data is loaded from resources and "no external service or hosting is required." Running the mod on a local or integrated server therefore gives you a self-hosted chatbot for free; you can also layer your own sidecar process that speaks HTTP using the bundled OkHttp/Moshi libs if you prefer another local model. The bundled config ships with `local_model.enabled` set to `false` for publishing safety—when it is `false`, the local model client is not initialized. When you enable it, the mod always targets the local machine at `http://127.0.0.1:11434` and ignores any configured `base_url` so it stays self-hosted by default. If a local model is unavailable, Atlas responds with deterministic offline replies so chat stays responsive.
+Atlas now requires a local custom LLM backend for runtime responses. There is no deterministic offline fallback path in chat mode.
 
-New in this branch: Atlas now uses a Resilience4j circuit breaker around local model HTTP calls, includes an explicit reachability probe (`/api/tags`), and exposes admin commands for sidecar operations: `/atlasbackend status`, `/atlasbackend probe`, and `/atlasbackend start`.
+Local LLM support is sidecar-based:
+- This repo does **not** bundle custom-trained LLM model weight files.
+- You must run/provide a compatible local model server (for example an Ollama-style `/api/generate` endpoint).
+- `local_model.base_url` is honored (defaults to `http://127.0.0.1:11434` if omitted).
+- `local_model.auto_start` can launch a configured sidecar command/resource, but only if you provide that executable.
+- For a better packaging workflow, you can set `model_download_url`, `model_download_sha256`, and `model_file_name` so the model artifact is bootstrapped into `config/wildernessodysseyapi/local-model/models/` at runtime.
+- You can use `{model_path}`, `{model_name}`, and `{base_url}` placeholders in `start_command` / `bundled_server_args`.
+
+If the local model is unavailable, Atlas returns a backend-unavailable message and instructs operators to restore the local model service.
+
+Admin commands for sidecar operations:
+- `/atlasbackend status`
+- `/atlasbackend probe`
+- `/atlasbackend start`
 Secrets:
 -------
 For local development, copy `.env.example` to `.env` and fill in required tokens.

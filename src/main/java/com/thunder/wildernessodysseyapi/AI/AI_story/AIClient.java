@@ -11,7 +11,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.UUID;
 
 import net.minecraft.server.MinecraftServer;
@@ -27,7 +26,6 @@ public class AIClient {
     private final List<String> story = new ArrayList<>();
     private final List<String> corruptedLore = new ArrayList<>();
     private final List<String> backgroundHistory = new ArrayList<>();
-    private String corruptedPrefix = "";
     private final AISettings settings = new AISettings();
     private final VoiceIntegration voiceIntegration = new VoiceIntegration(settings);
     private final MemoryStore memoryStore = new MemoryStore();
@@ -42,6 +40,12 @@ public class AIClient {
     private Process localServerProcess;
     private String localModelBaseUrl;
     private String localModelName;
+    private String localModelDownloadUrl;
+    private String localModelDownloadSha256;
+    private String localModelFileName;
+    private Path localModelFilePath;
+    private int localModelRetryAttempts = 1;
+    private int localModelRetryBackoffMillis = 250;
     private boolean onboardingEnabled;
     private String onboardingCompletionMessage = "You're all set. You can ask me anything now.";
     private String onboardingInvalidChoiceMessage = "Pick one of the numbered options so I can guide you.";
@@ -64,9 +68,6 @@ public class AIClient {
         story.addAll(config.getStory());
         corruptedLore.addAll(config.getCorruptedData());
         backgroundHistory.addAll(config.getBackgroundHistory());
-        if (config.getCorruptedPrefix() != null) {
-            corruptedPrefix = config.getCorruptedPrefix();
-        }
         applySettings(config);
         configureLocalModel(config.getLocalModel());
         configureOnboarding(config.getOnboarding());
@@ -120,20 +121,30 @@ public class AIClient {
         localServerStartCommand = localModel.getStartCommand();
         bundledServerResource = localModel.getBundledServerResource();
         bundledServerArgs = localModel.getBundledServerArgs();
-        if (autoStartLocalServer) {
-            startLocalModelServer();
-            stopLocalModelServer();
+        localModelDownloadUrl = localModel.getModelDownloadUrl();
+        localModelDownloadSha256 = localModel.getModelDownloadSha256();
+        localModelFileName = localModel.getModelFileName();
+        localModelFilePath = bootstrapLocalModelFile();
+        String baseUrl = localModel.getBaseUrl();
+        if (baseUrl == null || baseUrl.isBlank()) {
+            baseUrl = DEFAULT_LOCAL_BASE_URL;
         }
-        String baseUrl = DEFAULT_LOCAL_BASE_URL;
         String modelName = localModel.getModel();
-        if (baseUrl == null || baseUrl.isBlank() || modelName == null || modelName.isBlank()) {
+        if (baseUrl.isBlank() || modelName == null || modelName.isBlank()) {
             return;
         }
         localModelBaseUrl = baseUrl.trim();
         localModelName = modelName.trim();
         int timeoutSeconds = localModel.getTimeoutSeconds() == null ? 15 : localModel.getTimeoutSeconds();
+        Integer retryAttempts = localModel.getRetryAttempts();
+        localModelRetryAttempts = retryAttempts == null ? 2 : Math.max(1, retryAttempts);
+        Integer retryBackoffMillis = localModel.getRetryBackoffMillis();
+        localModelRetryBackoffMillis = retryBackoffMillis == null ? 300 : Math.max(0, retryBackoffMillis);
         localSystemPrompt = localModel.getSystemPrompt();
         localModelClient = new LocalModelClient(localModelBaseUrl, localModelName, java.time.Duration.ofSeconds(timeoutSeconds));
+        if (autoStartLocalServer) {
+            ensureLocalServerStarted();
+        }
     }
 
     private void configureOnboarding(AIConfig.Onboarding onboarding) {
@@ -165,9 +176,7 @@ public class AIClient {
     }
 
     /**
-     * Adds the message to memory and returns an offline generated reply that
-     * blends world lore, recent player context, and a small set of
-     * deterministic templates.
+     * Adds the message to memory and returns a reply from the configured local model backend.
      *
      * @param player  player name
      * @param message player message
@@ -178,9 +187,7 @@ public class AIClient {
     }
 
     /**
-     * Adds the message to per-world memory and returns an offline generated reply that
-     * blends world lore, recent player context, and a small set of
-     * deterministic templates.
+     * Adds the message to per-world memory and returns a reply from the configured local model backend.
      *
      * @param world   world or save identifier
      * @param player  player name
@@ -211,30 +218,27 @@ public class AIClient {
             context = context.isBlank() ? knowledgeContext : context + "\n" + knowledgeContext;
         }
         if (localModelClient == null) {
-            String reply = buildOfflineReply(world, player, message, true, false);
+            String reply = buildModelUnavailableReply(false, false);
             memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
             return voiceIntegration.wrap(reply);
         }
         String prompt = formatSystemPrompt(localSystemPrompt);
         String localContext = buildLocalModelContext(world, context);
         boolean startAttempted = ensureLocalServerStarted();
-        var response = localModelClient.generateReply(prompt, message, localContext);
+        var response = requestLocalReplyWithRetry(prompt, message, localContext);
         if (response.isPresent()) {
             String reply = response.get();
             memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
-            stopLocalModelServerIfNeeded();
             return voiceIntegration.wrap(reply);
         }
         RetryResult retry = retryLocalModelAfterStart(prompt, message, localContext);
         if (retry.response().isPresent()) {
             String reply = retry.response().get();
             memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
-            stopLocalModelServerIfNeeded();
             return voiceIntegration.wrap(reply);
         }
-        stopLocalModelServerIfNeeded();
         startAttempted = startAttempted || retry.started();
-        String reply = buildOfflineReply(world, player, message, true, startAttempted);
+        String reply = buildModelUnavailableReply(true, startAttempted);
         memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
         return voiceIntegration.wrap(reply);
     }
@@ -299,22 +303,27 @@ public class AIClient {
             return new RetryResult(java.util.Optional.empty(), false);
         }
         boolean started = startLocalModelServer();
-        return new RetryResult(localModelClient.generateReply(prompt, message, localContext), started);
+        return new RetryResult(requestLocalReplyWithRetry(prompt, message, localContext), started);
     }
 
-    private void stopLocalModelServerIfNeeded() {
-        if (!autoStartLocalServer) {
-            return;
+    private java.util.Optional<String> requestLocalReplyWithRetry(String prompt, String message, String localContext) {
+        java.util.Optional<String> response = java.util.Optional.empty();
+        int attempts = Math.max(1, localModelRetryAttempts);
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            response = localModelClient.generateReply(prompt, message, localContext);
+            if (response.isPresent()) {
+                return response;
+            }
+            if (attempt < attempts && localModelRetryBackoffMillis > 0) {
+                try {
+                    Thread.sleep(localModelRetryBackoffMillis);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
         }
-        stopLocalModelServer();
-    }
-
-    private void stopLocalModelServer() {
-        if (localServerProcess == null) {
-            return;
-        }
-        localServerProcess.destroy();
-        localServerProcess = null;
+        return response;
     }
 
     private boolean startLocalModelServer() {
@@ -329,7 +338,7 @@ public class AIClient {
             ModConstants.LOGGER.warn("Local model auto-start enabled but no start command is configured.");
             return false;
         }
-        List<String> command = parseCommand(localServerStartCommand);
+        List<String> command = parseCommand(resolveCommandTemplates(localServerStartCommand));
         if (command.isEmpty()) {
             ModConstants.LOGGER.warn("Local model auto-start command could not be parsed.");
             return false;
@@ -369,6 +378,37 @@ public class AIClient {
         return parts;
     }
 
+    private Path bootstrapLocalModelFile() {
+        if (localModelDownloadUrl == null || localModelDownloadUrl.isBlank()) {
+            return null;
+        }
+        String fileName = localModelFileName;
+        if (fileName == null || fileName.isBlank()) {
+            String raw = localModelDownloadUrl.trim();
+            int slash = raw.lastIndexOf('/');
+            fileName = slash >= 0 ? raw.substring(slash + 1) : "atlas-custom-model.gguf";
+        }
+        Path modelsDir = FMLPaths.CONFIGDIR.get().resolve("wildernessodysseyapi").resolve("local-model").resolve("models");
+        return LocalModelBootstrapper.ensureModelFile(localModelDownloadUrl, localModelDownloadSha256, fileName, modelsDir);
+    }
+
+    private String resolveCommandTemplates(String command) {
+        if (command == null || command.isBlank()) {
+            return command;
+        }
+        String resolved = command;
+        if (localModelFilePath != null) {
+            resolved = resolved.replace("{model_path}", localModelFilePath.toAbsolutePath().toString());
+        }
+        if (localModelName != null) {
+            resolved = resolved.replace("{model_name}", localModelName);
+        }
+        if (localModelBaseUrl != null) {
+            resolved = resolved.replace("{base_url}", localModelBaseUrl);
+        }
+        return resolved;
+    }
+
     private List<String> buildBundledServerCommand() {
         if (bundledServerResource == null || bundledServerResource.isBlank()) {
             return List.of();
@@ -379,7 +419,7 @@ public class AIClient {
         }
         String fullCommand = extractedBinary.toAbsolutePath().toString();
         if (bundledServerArgs != null && !bundledServerArgs.isBlank()) {
-            fullCommand = fullCommand + " " + bundledServerArgs.trim();
+            fullCommand = fullCommand + " " + resolveCommandTemplates(bundledServerArgs.trim());
         }
         return parseCommand(fullCommand);
     }
@@ -458,51 +498,27 @@ public class AIClient {
         return builder.toString().trim();
     }
 
-    private String buildOfflineReply(String world, String player, String message, boolean modelUnavailable, boolean startAttempted) {
-        int seed = Math.floorMod(Objects.hash(world, player, message, settings.getPersonaName()), 10_000);
-        String lower = message == null ? "" : message.toLowerCase(Locale.ROOT);
-        boolean question = (message != null && message.trim().endsWith("?"))
-                || containsAny(lower, "how", "what", "where", "why", "can i", "should i", "do i");
-        boolean comfort = containsAny(lower, "help", "stuck", "lost", "scared", "afraid", "panic", "worry", "worried");
-
-        List<String> empathyLines = comfort
-                ? List.of("I hear you.", "You're not alone out there.", "I'm with you.")
-                : List.of("Got it.", "Understood.", "Copy that.");
-        List<String> promptLines = question
-                ? List.of(
-                        "Here’s what I can share from the expedition logs:",
-                        "Let me check the field notes—this stands out:",
-                        "From the records we kept, try this lead:")
-                : List.of(
-                        "Thanks for the update—this connects to:",
-                        "Noted. It lines up with this fragment:",
-                        "I logged that. It echoes a prior report:");
-        List<String> followUps = List.of(
-                "Want me to keep watching for signals?",
-                "If you want, tell me what you spot and I’ll compare notes.",
-                "Need a quick scan of nearby ruins or supplies?");
-
+    private String buildModelUnavailableReply(boolean modelUnavailable, boolean startAttempted) {
         StringBuilder reply = new StringBuilder();
-        reply.append(pickFrom(empathyLines, seed));
-        reply.append(" ").append(pickFrom(promptLines, seed + 1));
-        String lore = pickLoreLine(seed + 2);
-        if (!lore.isBlank()) {
-            reply.append(" ").append(lore);
-        }
-        reply.append(" ").append(pickFrom(followUps, seed + 3));
-
+        reply.append("Local Atlas LLM is required and no offline fallback is enabled.");
         if (modelUnavailable) {
-            reply.append(" If you want richer answers, make sure the local AI server is running");
+            reply.append(" I could not get a response from the configured local model backend");
             if (localModelBaseUrl != null && !localModelBaseUrl.isBlank()) {
                 reply.append(" at ").append(localModelBaseUrl);
             }
-            if (startAttempted) {
-                reply.append(" and that auto-start is configured correctly");
-            }
             reply.append(".");
+            if (startAttempted) {
+                reply.append(" Auto-start was attempted, so verify start command/resource and model runtime logs.");
+            }
+        } else {
+            reply.append(" Configure local_model.enabled=true with your custom model endpoint in ai_config.yaml.");
         }
-        return reply.toString().trim();
+        if (localModelDownloadUrl != null && !localModelDownloadUrl.isBlank() && localModelFilePath == null) {
+            reply.append(" Model bootstrap is configured but the artifact could not be prepared from model_download_url.");
+        }
+        return reply.toString();
     }
+
 
     private int resolveChoiceIndex(AIConfig.OnboardingStep step, String message) {
         if (step == null || step.getChoices().isEmpty()) {
@@ -618,40 +634,6 @@ public class AIClient {
         return step;
     }
 
-    private String pickLoreLine(int seed) {
-        List<String> lore = new ArrayList<>(story.size() + backgroundHistory.size());
-        lore.addAll(story);
-        lore.addAll(backgroundHistory);
-        if (!corruptedLore.isEmpty() && Math.floorMod(seed, 6) == 0) {
-            String fragment = pickFrom(corruptedLore, seed);
-            if (corruptedPrefix != null && !corruptedPrefix.isBlank()) {
-                return corruptedPrefix + " " + fragment;
-            }
-            return fragment;
-        }
-        if (!lore.isEmpty()) {
-            return pickFrom(lore, seed);
-        }
-        return "The surface is still unstable; keep your supplies close and move carefully.";
-    }
 
-    private static String pickFrom(List<String> options, int seed) {
-        if (options == null || options.isEmpty()) {
-            return "";
-        }
-        int index = Math.floorMod(seed, options.size());
-        return options.get(index);
-    }
 
-    private static boolean containsAny(String value, String... tokens) {
-        if (value == null || value.isBlank()) {
-            return false;
-        }
-        for (String token : tokens) {
-            if (value.contains(token)) {
-                return true;
-            }
-        }
-        return false;
-    }
 }
