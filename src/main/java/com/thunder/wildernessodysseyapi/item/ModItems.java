@@ -33,6 +33,16 @@ public class ModItems {
             () -> new NeuralFrameItem(new Item.Properties().stacksTo(1))
     );
 
+    public static final DeferredItem<Item> MUSIC_DISC_DUSTWINDS = ITEMS.register(
+            "music_disc_dustwinds",
+            () -> new Item(new Item.Properties().stacksTo(1))
+    );
+
+    public static final DeferredItem<Item> MUSIC_DISC_STARFALL = ITEMS.register(
+            "music_disc_starfall",
+            () -> new Item(new Item.Properties().stacksTo(1))
+    );
+
     /**
      * Register.
      *

@@ -35,6 +35,8 @@ public class ModCreativeTabs {
                         output.accept(ModItems.CLOAK_ITEM.get());
                         output.accept(ModItems.CLOAK_CHIP.get());
                         output.accept(ModItems.NEURAL_FRAME.get());
+                        output.accept(ModItems.MUSIC_DISC_DUSTWINDS.get());
+                        output.accept(ModItems.MUSIC_DISC_STARFALL.get());
                     })
                     .build()
     );

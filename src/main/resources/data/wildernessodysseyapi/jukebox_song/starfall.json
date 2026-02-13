@@ -1,0 +1,8 @@
+{
+  "sound_event": "wildernessodysseyapi:music_disc.starfall",
+  "description": {
+    "translate": "jukebox_song.wildernessodysseyapi.starfall"
+  },
+  "length_in_seconds": 322.0,
+  "comparator_output": 12
+}

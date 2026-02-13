@@ -1,0 +1,18 @@
+{
+  "outside the box": {
+    "sounds": [
+      {
+        "name": "minecraft:music_disc.cat",
+        "type": "event"
+      }
+    ]
+  },
+  "don't be so serious music disk": {
+    "sounds": [
+      {
+        "name": "minecraft:music_disc.otherside",
+        "type": "event"
+      }
+    ]
+  }
+}
