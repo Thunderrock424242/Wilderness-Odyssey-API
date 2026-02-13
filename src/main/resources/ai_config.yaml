@@ -18,15 +18,25 @@ settings:
   speech_recognition: false
   wake_word: "atlas"
   model: "local-story-engine"
+# Required local LLM sidecar settings.
+# NOTE: chat now requires a running local model backend; there is no offline fallback reply mode.
+# This mod does not include custom-trained model files, so point to a local model server you provide.
 local_model:
-  enabled: false
-  auto_start: false
-  base_url: "http://localhost:11434"
-  model: "llama3.2:3b"
+  enabled: true
+  auto_start: true
+  base_url: "http://127.0.0.1:11434"
+  model: "atlas-custom:8b"
   start_command: ""
   bundled_server_resource: "local_model/local-model-server"
-  bundled_server_args: "--host 127.0.0.1 --port 11434 --model llama3.2:3b"
-  timeout_seconds: 15
+  bundled_server_args: "--host 127.0.0.1 --port 11434 --model {model_name} --model-file {model_path}"
+  timeout_seconds: 12
+  # Optional bootstrap for downloading a custom model artifact into config/wildernessodysseyapi/local-model/models.
+  # Use {model_path} / {model_name} / {base_url} placeholders in start_command or bundled_server_args.
+  model_download_url: ""
+  model_download_sha256: ""
+  model_file_name: "atlas-custom-8b.gguf"
+  retry_attempts: 3
+  retry_backoff_millis: 200
   system_prompt: "You are {persona}, an in-world expedition AI. Stay {tone} and {empathy}. You have no access to Google, the internet, or any external sources—only the in-world lore and knowledge provided. Do not provide crafting recipes or step-by-step crafting instructions. Keep responses immersive, lore-aware, and conversational."
 onboarding:
   enabled: true
