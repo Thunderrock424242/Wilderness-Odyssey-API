@@ -26,7 +26,7 @@ public final class ModEntities {
                             .clientTrackingRange(8)
                             .build("purple_storm_monster"));
 
-    @EventBusSubscriber(modid = ModConstants.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
+    @EventBusSubscriber(modid = ModConstants.MOD_ID)
     public static final class ModEntityEvents {
         private ModEntityEvents() {
         }
