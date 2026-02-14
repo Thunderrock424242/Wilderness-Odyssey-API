@@ -2,7 +2,7 @@
   "outside_the_box": {
     "sounds": [
       {
-        "name": "wildernessodysseyapi:music/outside_the_box_music_disk",
+        "name": "wildernessodysseyapi:music/outside_the_box",
         "stream": true
       }
     ]
@@ -10,7 +10,7 @@
   "dont_be_so_serious": {
     "sounds": [
       {
-        "name": "wildernessodysseyapi:music/dont_be_serious_music_disk",
+        "name": "wildernessodysseyapi:music/dont_be_so_serious",
         "stream": true
       }
     ]
