@@ -1,5 +1,6 @@
 {
   "outside_the_box": {
+    "category": "records",
     "sounds": [
       {
         "name": "wildernessodysseyapi:music/outside_the_box",
@@ -8,6 +9,7 @@
     ]
   },
   "dont_be_so_serious": {
+    "category": "records",
     "sounds": [
       {
         "name": "wildernessodysseyapi:music/dont_be_so_serious",
