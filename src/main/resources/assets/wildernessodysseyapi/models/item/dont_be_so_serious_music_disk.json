@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "wildernessodysseyapi:item/dont_be_so_serious_music_disk"
+  }
+}

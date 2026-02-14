@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "wildernessodysseyapi:item/outside_the_box_music_disk"
+  }
+}
