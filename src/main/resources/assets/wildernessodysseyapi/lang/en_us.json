@@ -85,5 +85,9 @@
   "item.wildernessodysseyapi.music_disc_dustwinds": "Music Disc: Don't Be So Serious",
   "item.wildernessodysseyapi.music_disc_starfall": "Music Disc: Outside the Box",
   "jukebox_song.wildernessodysseyapi.dont_be_so_serious": "Don't Be So Serious",
-  "jukebox_song.wildernessodysseyapi.outside_the_box": "Outside the Box"
+  "jukebox_song.wildernessodysseyapi.outside_the_box": "Outside the Box",
+  "biome.wildernessodysseyapi.anomaly_plains": "Anomaly Plains",
+  "biome.wildernessodysseyapi.anomaly_desert": "Anomaly Desert",
+  "biome.wildernessodysseyapi.anomaly_tundra": "Anomaly Tundra",
+  "biome.wildernessodysseyapi.anomaly_rainforest": "Anomaly Rainforest"
 }

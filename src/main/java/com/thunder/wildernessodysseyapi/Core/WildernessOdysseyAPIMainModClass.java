@@ -16,6 +16,7 @@ import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.processor.ModProcessors;
+import com.thunder.wildernessodysseyapi.WorldGen.biome.ModBiomes;
 import com.thunder.wildernessodysseyapi.WorldGen.modpack.ModpackStructureRegistry;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
@@ -115,6 +116,7 @@ public class WildernessOdysseyAPIMainModClass {
         modEventBus.addListener(this::onConfigLoaded);
         modEventBus.addListener(this::onConfigReloaded);
         ModProcessors.PROCESSORS.register(modEventBus);
+        ModBiomes.BIOMES.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         ModAttachments.ATTACHMENTS.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);
