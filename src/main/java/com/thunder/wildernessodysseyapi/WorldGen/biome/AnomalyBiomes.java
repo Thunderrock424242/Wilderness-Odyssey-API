@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.WorldGen.biome;
 
 import net.minecraft.data.worldgen.BiomeDefaultFeatures;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.sounds.Music;
 import net.minecraft.sounds.Musics;
 import net.minecraft.world.level.biome.AmbientMoodSettings;
@@ -8,6 +10,8 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeGenerationSettings;
 import net.minecraft.world.level.biome.BiomeSpecialEffects;
 import net.minecraft.world.level.biome.MobSpawnSettings;
+import net.minecraft.world.level.levelgen.carver.ConfiguredWorldCarver;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 
 public final class AnomalyBiomes {
     private static final int ANOMALY_SKY_COLOR = 0x7A59C7;
@@ -22,7 +26,7 @@ public final class AnomalyBiomes {
         MobSpawnSettings.Builder spawns = new MobSpawnSettings.Builder();
         AnomalyBiomeMobSettings.addPlainsSpawns(spawns);
 
-        BiomeGenerationSettings.Builder generation = new BiomeGenerationSettings.Builder();
+        BiomeGenerationSettings.Builder generation = generationBuilder();
         BiomeDefaultFeatures.addDefaultCarversAndLakes(generation);
         BiomeDefaultFeatures.addDefaultCrystalFormations(generation);
         BiomeDefaultFeatures.addDefaultMonsterRoom(generation);
@@ -34,7 +38,7 @@ public final class AnomalyBiomes {
         BiomeDefaultFeatures.addPlainGrass(generation);
         BiomeDefaultFeatures.addPlainVegetation(generation);
         BiomeDefaultFeatures.addDefaultMushrooms(generation);
-        BiomeDefaultFeatures.addDefaultExtraVegetation(generation, true);
+        BiomeDefaultFeatures.addDefaultExtraVegetation(generation);
 
         return baseBiome(true, 0.8F, 0.4F, spawns, generation);
     }
@@ -43,7 +47,7 @@ public final class AnomalyBiomes {
         MobSpawnSettings.Builder spawns = new MobSpawnSettings.Builder();
         AnomalyBiomeMobSettings.addDesertSpawns(spawns);
 
-        BiomeGenerationSettings.Builder generation = new BiomeGenerationSettings.Builder();
+        BiomeGenerationSettings.Builder generation = generationBuilder();
         BiomeDefaultFeatures.addFossilDecoration(generation);
         BiomeDefaultFeatures.addDefaultCarversAndLakes(generation);
         BiomeDefaultFeatures.addDefaultCrystalFormations(generation);
@@ -64,7 +68,7 @@ public final class AnomalyBiomes {
         MobSpawnSettings.Builder spawns = new MobSpawnSettings.Builder();
         AnomalyBiomeMobSettings.addTundraSpawns(spawns);
 
-        BiomeGenerationSettings.Builder generation = new BiomeGenerationSettings.Builder();
+        BiomeGenerationSettings.Builder generation = generationBuilder();
         BiomeDefaultFeatures.addDefaultCarversAndLakes(generation);
         BiomeDefaultFeatures.addDefaultCrystalFormations(generation);
         BiomeDefaultFeatures.addDefaultMonsterRoom(generation);
@@ -77,7 +81,7 @@ public final class AnomalyBiomes {
         BiomeDefaultFeatures.addDefaultFlowers(generation);
         BiomeDefaultFeatures.addTaigaGrass(generation);
         BiomeDefaultFeatures.addDefaultMushrooms(generation);
-        BiomeDefaultFeatures.addDefaultExtraVegetation(generation, false);
+        BiomeDefaultFeatures.addDefaultExtraVegetation(generation);
 
         return baseBiome(true, -0.45F, 0.8F, spawns, generation);
     }
@@ -86,7 +90,7 @@ public final class AnomalyBiomes {
         MobSpawnSettings.Builder spawns = new MobSpawnSettings.Builder();
         AnomalyBiomeMobSettings.addRainforestSpawns(spawns);
 
-        BiomeGenerationSettings.Builder generation = new BiomeGenerationSettings.Builder();
+        BiomeGenerationSettings.Builder generation = generationBuilder();
         BiomeDefaultFeatures.addDefaultCarversAndLakes(generation);
         BiomeDefaultFeatures.addDefaultCrystalFormations(generation);
         BiomeDefaultFeatures.addDefaultMonsterRoom(generation);
@@ -132,5 +136,11 @@ public final class AnomalyBiomes {
 
     private static Music defaultMusic() {
         return Musics.GAME;
+    }
+
+    private static BiomeGenerationSettings.Builder generationBuilder() {
+        HolderGetter<PlacedFeature> placedFeatures = BuiltInRegistries.PLACED_FEATURE.asLookup();
+        HolderGetter<ConfiguredWorldCarver<?>> worldCarvers = BuiltInRegistries.CONFIGURED_CARVER.asLookup();
+        return new BiomeGenerationSettings.Builder(placedFeatures, worldCarvers);
     }
 }
