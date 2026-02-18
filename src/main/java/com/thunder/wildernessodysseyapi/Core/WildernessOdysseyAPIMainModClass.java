@@ -25,6 +25,7 @@ import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
+import com.thunder.wildernessodysseyapi.client.WildernessClientSetup;
 import com.thunder.wildernessodysseyapi.command.ModpackStructureCommand;
 import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.config.CloakChipConfig;
@@ -61,6 +62,8 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.DistExecutor;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -123,6 +126,8 @@ public class WildernessOdysseyAPIMainModClass {
         ModLootFunctions.LOOT_FUNCTIONS.register(modEventBus);
         ModLootConditions.LOOT_CONDITIONS.register(modEventBus);
 
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> WildernessClientSetup.init(modEventBus));
+
         // Register global events
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
@@ -162,7 +167,6 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-telemetry-master-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, FeedbackConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-feedback-server.toml");
-        // Previously registered client-only events have been removed
         DonationReminderConfig.validateVersion();
 
     }

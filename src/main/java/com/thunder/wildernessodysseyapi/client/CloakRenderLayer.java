@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.Client;
+package com.thunder.wildernessodysseyapi.client;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.thunder.wildernessodysseyapi.item.cloak.CloakItem;

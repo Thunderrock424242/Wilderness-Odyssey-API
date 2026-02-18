@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.Client;
+package com.thunder.wildernessodysseyapi.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.thunder.wildernessodysseyapi.config.CurioRenderConfig;

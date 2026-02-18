@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.Client;
+package com.thunder.wildernessodysseyapi.client;
 
 import com.thunder.wildernessodysseyapi.Core.ModConstants;
 import com.mojang.blaze3d.vertex.PoseStack;
