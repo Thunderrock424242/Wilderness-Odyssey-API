@@ -1,9 +1,11 @@
 package com.thunder.wildernessodysseyapi.WorldGen.biome;
 
-import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BiomeDefaultFeatures;
 import net.minecraft.core.HolderGetter;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.sounds.Music;
 import net.minecraft.sounds.Musics;
 import net.minecraft.world.level.biome.AmbientMoodSettings;
@@ -140,8 +142,17 @@ public final class AnomalyBiomes {
     }
 
     private static BiomeGenerationSettings.Builder generationBuilder() {
-        HolderGetter<PlacedFeature> placedFeatures = Registries.PLACED_FEATURE.asLookup();
-        HolderGetter<ConfiguredWorldCarver<?>> worldCarvers = Registries.CONFIGURED_CARVER.asLookup();
+        HolderGetter<PlacedFeature> placedFeatures = lookup(Registries.PLACED_FEATURE);
+        HolderGetter<ConfiguredWorldCarver<?>> worldCarvers = lookup(Registries.CONFIGURED_CARVER);
         return new BiomeGenerationSettings.Builder(placedFeatures, worldCarvers);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> HolderGetter<T> lookup(ResourceKey<? extends Registry<T>> registryKey) {
+        Registry<?> registry = BuiltInRegistries.REGISTRY.getValue(registryKey.location());
+        if (registry == null) {
+            throw new IllegalStateException("Missing built-in registry for " + registryKey.location());
+        }
+        return ((Registry<T>) registry).asLookup();
     }
 }
