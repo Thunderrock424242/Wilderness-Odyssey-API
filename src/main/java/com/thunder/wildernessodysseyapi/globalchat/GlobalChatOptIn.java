@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.globalchat;
 
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.nbt.CompoundTag;
 

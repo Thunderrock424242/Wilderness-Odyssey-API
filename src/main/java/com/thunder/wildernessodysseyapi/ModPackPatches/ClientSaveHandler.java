@@ -7,7 +7,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
 
 @EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
 public class ClientSaveHandler {

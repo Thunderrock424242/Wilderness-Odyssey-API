@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.telemetry;
 
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;

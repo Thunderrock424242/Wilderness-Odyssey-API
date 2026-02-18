@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.worldupgrade;
 
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;

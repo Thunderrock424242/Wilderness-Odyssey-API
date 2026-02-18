@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.changelog;
 
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;

@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.donations.command;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -15,7 +15,7 @@ import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 /**
  * Client command allowing players to disable donation reminders.
  */
-@EventBusSubscriber(value = Dist.CLIENT, modid = com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID)
+@EventBusSubscriber(value = Dist.CLIENT, modid = com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID)
 public class DonationOptOutCommand {
 
     /** Registers the {@code /donation_optout} client command. */

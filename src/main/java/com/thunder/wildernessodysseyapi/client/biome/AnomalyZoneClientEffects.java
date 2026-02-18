@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.client.biome;
 
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
-import com.thunder.wildernessodysseyapi.WorldGen.biome.ModBiomes;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.worldgen.biome.ModBiomes;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;

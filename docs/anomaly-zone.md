@@ -11,7 +11,7 @@ This mod now registers four anomaly-zone biome variants:
 
 All spawn lists are hard-coded in:
 
-- `com.thunder.wildernessodysseyapi.WorldGen.biome.AnomalyBiomeMobSettings`
+- `com.thunder.wildernessodysseyapi.worldgen.biome.AnomalyBiomeMobSettings`
 
 You can edit each biome method to control exactly which vanilla mobs and custom mobs can spawn:
 

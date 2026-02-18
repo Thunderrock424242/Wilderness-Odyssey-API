@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.capabilities;
 
-import com.thunder.wildernessodysseyapi.Core.ModAttachments;
+import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -8,7 +8,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.ChunkDataEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
 
 /**
  * Hooks chunk events to manage the chunk capability lifecycle.

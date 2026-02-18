@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.client;
 
 import com.thunder.ticktoklib.TickTokHelper;
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.LoadingOverlay;
 import net.neoforged.api.distmarker.Dist;

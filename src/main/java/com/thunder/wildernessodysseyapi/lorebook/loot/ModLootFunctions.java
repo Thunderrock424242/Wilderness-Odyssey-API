@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.lorebook.loot;
 
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.storage.loot.functions.LootItemFunctionType;
 import net.neoforged.neoforge.registries.DeferredHolder;

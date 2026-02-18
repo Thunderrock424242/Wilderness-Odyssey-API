@@ -9,7 +9,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
 
 /**
  * The type Mod items.

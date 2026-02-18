@@ -7,7 +7,7 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.List;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 
 /**
  * Utility window for viewing logged mod list changes.

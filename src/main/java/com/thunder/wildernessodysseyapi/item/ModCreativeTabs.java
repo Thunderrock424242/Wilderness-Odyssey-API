@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.item;
 
-import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
+import com.thunder.wildernessodysseyapi.worldgen.blocks.CryoTubeBlock;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
@@ -10,7 +10,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_ID;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
 
 /**
  * Registers creative mode tabs for the mod.

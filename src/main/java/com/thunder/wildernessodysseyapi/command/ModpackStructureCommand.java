@@ -2,8 +2,8 @@ package com.thunder.wildernessodysseyapi.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
-import com.thunder.wildernessodysseyapi.WorldGen.modpack.ModpackStructureRegistry;
-import com.thunder.wildernessodysseyapi.WorldGen.structure.NBTStructurePlacer;
+import com.thunder.wildernessodysseyapi.worldgen.modpack.ModpackStructureRegistry;
+import com.thunder.wildernessodysseyapi.worldgen.structure.NBTStructurePlacer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;

@@ -1,6 +1,6 @@
-package com.thunder.wildernessodysseyapi.Client.weather;
+package com.thunder.wildernessodysseyapi.client.weather;
 
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.DustParticleOptions;

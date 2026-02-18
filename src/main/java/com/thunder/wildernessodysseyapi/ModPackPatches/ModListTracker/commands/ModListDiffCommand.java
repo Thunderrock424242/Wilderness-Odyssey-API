@@ -11,7 +11,7 @@ import net.minecraft.network.chat.Component;
 import java.awt.GraphicsEnvironment;
 import java.util.List;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 
 /**
  * Command to display mod list differences since last launch.

@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.worldupgrade;
 
-import com.thunder.wildernessodysseyapi.Core.ModAttachments;
+import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -15,8 +15,8 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
 
 /**
  * Central queue + executor for chunk migration tasks.

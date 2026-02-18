@@ -13,8 +13,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
 
 /**
  * Sends event-based telemetry payloads (server lifecycle and player login/logout).

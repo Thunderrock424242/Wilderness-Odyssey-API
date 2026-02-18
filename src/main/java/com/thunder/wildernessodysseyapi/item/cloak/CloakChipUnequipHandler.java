@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.item.cloak;
 
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.curios.CuriosIntegration;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.item.chip.ChipSetItem;

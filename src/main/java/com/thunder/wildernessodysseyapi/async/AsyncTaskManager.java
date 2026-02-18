@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.async;
 
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.server.MinecraftServer;
 
 import java.util.Objects;

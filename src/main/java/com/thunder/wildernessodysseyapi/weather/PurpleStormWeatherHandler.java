@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.weather;
 
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.entity.ModEntities;
 import com.thunder.wildernessodysseyapi.entity.PurpleStormMonsterEntity;
 import net.minecraft.core.BlockPos;

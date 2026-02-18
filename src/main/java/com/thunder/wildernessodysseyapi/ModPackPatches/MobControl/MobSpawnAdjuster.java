@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.MobControl;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 
 import java.util.Collections;
 import java.util.Set;

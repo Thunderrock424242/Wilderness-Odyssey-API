@@ -36,7 +36,7 @@ import java.util.UUID;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 
 /**
  * Collects player country and account age data and sends it to a Google Sheets webhook.

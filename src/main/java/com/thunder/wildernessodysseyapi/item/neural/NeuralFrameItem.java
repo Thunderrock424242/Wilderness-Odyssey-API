@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.item.neural;
 
-import com.thunder.wildernessodysseyapi.Core.ModDamageTypes;
+import com.thunder.wildernessodysseyapi.core.ModDamageTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;

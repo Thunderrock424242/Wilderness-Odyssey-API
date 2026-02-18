@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.donations.config;
 
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**

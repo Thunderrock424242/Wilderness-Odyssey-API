@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.LOGGER;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.moddiscovery.ModInfo;
@@ -43,8 +43,8 @@ public class ModTracker {
 
         versionChange = "";
         if (history != null && history.lastVersion != null &&
-                !Objects.equals(history.lastVersion, com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION)) {
-            versionChange = "Pack updated from " + history.lastVersion + " to " + com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
+                !Objects.equals(history.lastVersion, com.thunder.wildernessodysseyapi.core.ModConstants.VERSION)) {
+            versionChange = "Pack updated from " + history.lastVersion + " to " + com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
             LOGGER.info(versionChange);
         }
 
@@ -75,10 +75,10 @@ public class ModTracker {
         if (history == null) {
             history = new ModTrackingHistory();
         }
-        history.versionTimestamps.put(com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION, System.currentTimeMillis());
+        history.versionTimestamps.put(com.thunder.wildernessodysseyapi.core.ModConstants.VERSION, System.currentTimeMillis());
         pruneHistory(history);
-        history.lastVersion = com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION;
-        history.versions.put(com.thunder.wildernessodysseyapi.Core.ModConstants.VERSION, currentMods);
+        history.lastVersion = com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
+        history.versions.put(com.thunder.wildernessodysseyapi.core.ModConstants.VERSION, currentMods);
         saveHistory(history);
         LOGGER.info("Mod list change check completed.");
     }

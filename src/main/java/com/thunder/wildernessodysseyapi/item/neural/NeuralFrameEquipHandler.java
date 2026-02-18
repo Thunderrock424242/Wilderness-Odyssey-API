@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.item.neural;
 
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.curios.CuriosIntegration;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import net.minecraft.server.level.ServerPlayer;

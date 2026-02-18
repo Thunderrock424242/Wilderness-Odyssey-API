@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.server;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.nbt.CompoundTag;

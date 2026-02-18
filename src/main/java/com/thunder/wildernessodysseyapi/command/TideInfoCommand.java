@@ -2,8 +2,8 @@ package com.thunder.wildernessodysseyapi.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
-import com.thunder.wildernessodysseyapi.Water_system.Ocean.tide.TideAstronomy;
-import com.thunder.wildernessodysseyapi.Water_system.Ocean.tide.TideManager;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideAstronomy;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideManager;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;

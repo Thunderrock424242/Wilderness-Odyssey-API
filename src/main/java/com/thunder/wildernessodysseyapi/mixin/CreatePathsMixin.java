@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.simibubi.create.foundation.utility.CreatePaths;
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;

@@ -22,7 +22,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.thunder.wildernessodysseyapi.Core.ModConstants.MOD_DEFAULT_WORLD_VERSION;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_DEFAULT_WORLD_VERSION;
 
 @EventBusSubscriber
 public class WorldVersionChecker {

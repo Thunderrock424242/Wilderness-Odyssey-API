@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import com.thunder.wildernessodysseyapi.Core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.changelog.ChangelogManager;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;

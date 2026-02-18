@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.worldupgrade;
 
-import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
+import com.thunder.wildernessodysseyapi.worldgen.blocks.CryoTubeBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
