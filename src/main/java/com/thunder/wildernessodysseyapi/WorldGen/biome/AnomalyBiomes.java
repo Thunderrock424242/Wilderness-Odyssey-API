@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.WorldGen.biome;
 
+import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BiomeDefaultFeatures;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -139,8 +140,8 @@ public final class AnomalyBiomes {
     }
 
     private static BiomeGenerationSettings.Builder generationBuilder() {
-        HolderGetter<PlacedFeature> placedFeatures = BuiltInRegistries.PLACED_FEATURE.asLookup();
-        HolderGetter<ConfiguredWorldCarver<?>> worldCarvers = BuiltInRegistries.CONFIGURED_CARVER.asLookup();
+        HolderGetter<PlacedFeature> placedFeatures = Registries.PLACED_FEATURE.asLookup();
+        HolderGetter<ConfiguredWorldCarver<?>> worldCarvers = Registries.CONFIGURED_CARVER.asLookup();
         return new BiomeGenerationSettings.Builder(placedFeatures, worldCarvers);
     }
 }
