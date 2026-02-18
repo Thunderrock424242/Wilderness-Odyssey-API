@@ -149,7 +149,7 @@ public final class AnomalyBiomes {
 
     @SuppressWarnings("unchecked")
     private static <T> HolderGetter<T> lookup(ResourceKey<? extends Registry<T>> registryKey) {
-        Registry<?> registry = BuiltInRegistries.REGISTRY.getValue(registryKey.location());
+        Registry<?> registry = BuiltInRegistries.REGISTRY.get(registryKey.location());
         if (registry == null) {
             throw new IllegalStateException("Missing built-in registry for " + registryKey.location());
         }
