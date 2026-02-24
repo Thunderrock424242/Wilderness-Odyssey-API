@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.ModPackPatches.worldupgrade;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
+import com.thunder.wildernessodysseyapi.util.ChunkErrorReporter;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -103,7 +104,12 @@ public final class WorldUpgradeManager {
                 migrated = migrateChunk(level, chunk, state.getTargetVersion());
             } catch (Exception exception) {
                 failed = true;
-                LOGGER.error("World upgrade failed at {} {}", task.dimension().location(), task.pos(), exception);
+                ServerLevel failedLevel = server.getLevel(task.dimension());
+                if (failedLevel != null) {
+                    ChunkErrorReporter.reportChunkError("upgrade", failedLevel, task.pos(), exception);
+                } else {
+                    LOGGER.error("World upgrade failed at {} {}", task.dimension().location(), task.pos(), exception);
+                }
             }
             state.onChunkProcessed(migrated, failed);
             processed++;
