@@ -1,14 +1,11 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.mojang.datafixers.util.Either;
 import com.thunder.wildernessodysseyapi.util.ChunkErrorReporter;
-import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.GenerationChunkHolder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.StaticCache2D;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStep;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -32,14 +29,14 @@ public abstract class ChunkMapGenerationErrorMixin {
                                                                     ChunkStep step,
                                                                     StaticCache2D<GenerationChunkHolder> cache,
                                                                     boolean loading,
-                                                                    CallbackInfoReturnable<CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>>> cir) {
-        CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> original = cir.getReturnValue();
+                                                                    CallbackInfoReturnable<CompletableFuture<?>> cir) {
+        CompletableFuture<?> original = cir.getReturnValue();
         if (original == null) {
             return;
         }
 
         ChunkPos chunkPos = holder.getPos();
-        CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> wrapped = original.whenComplete((result, throwable) -> {
+        CompletableFuture<?> wrapped = original.whenComplete((result, throwable) -> {
             if (throwable == null) {
                 return;
             }
