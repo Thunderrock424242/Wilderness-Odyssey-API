@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.worldgen.structure;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.util.ChunkErrorReporter;
 import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.worldgen.structure.StructurePlacementDebugger.PlacementAttempt;
 import com.thunder.wildernessodysseyapi.worldgen.structure.TerrainReplacerEngine.SurfaceSample;
@@ -15,6 +16,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
@@ -168,75 +170,75 @@ public class NBTStructurePlacer {
                                                 TemplateData data,
                                                 PlacementFoundation foundation,
                                                 PlacementAttempt attempt) {
-        LargeStructurePlacementOptimizer.preparePlacement(level, foundation.origin(), data.size());
-        if (LargeStructurePlacementOptimizer.exceedsStructureBlockLimit(data.size())) {
-            int estimated = LargeStructurePlacementOptimizer.estimateAffectedBlocks(data.size());
-            ModConstants.LOGGER.warn("Placing structure {} will touch approximately {} blocks, exceeding the recommended limit of {}.",
-                    id, estimated, StructureUtils.STRUCTURE_BLOCK_LIMIT);
-        }
+        try {
+            LargeStructurePlacementOptimizer.preparePlacement(level, foundation.origin(), data.size());
+            if (LargeStructurePlacementOptimizer.exceedsStructureBlockLimit(data.size())) {
+                int estimated = LargeStructurePlacementOptimizer.estimateAffectedBlocks(data.size());
+                ModConstants.LOGGER.warn("Placing structure {} will touch approximately {} blocks, exceeding the recommended limit of {}.",
+                        id, estimated, StructureUtils.STRUCTURE_BLOCK_LIMIT);
+            }
 
-        BoundingBox placementBox = expandPlacementBox(foundation.origin(), data.size(), data.template());
-        if (isStarterBunker()) {
-            clearColumnsForStarterBunker(level, foundation.origin(), data.size());
-        }
-        StructurePlaceSettings settings = new StructurePlaceSettings()
-                // We already know the template dimensions, so skip the expensive shape discovery pass.
-                .setKnownShape(true)
-                // Supplying the bounds up-front prevents the vanilla placer from bailing out when it cannot
-                // infer them (which resulted in the template refusing to place while terrain markers still
-                // ran).
-                .setBoundingBox(placementBox)
-                // Preserve entities baked into the template (e.g., Create super glue and contraptions) so
-                // complex machines such as elevators remain assembled after placement.
-                .setIgnoreEntities(false);
-        for (StructureProcessor processor : extraProcessors) {
-            settings.addProcessor(processor);
-        }
-        boolean placed = data.template().placeInWorld(level, foundation.origin(), foundation.origin(), settings, level.random, 2);
-        if (!placed) {
-            StructurePlacementDebugger.markFailure(attempt, "template refused placement");
+            BoundingBox placementBox = expandPlacementBox(foundation.origin(), data.size(), data.template());
+            if (isStarterBunker()) {
+                clearColumnsForStarterBunker(level, foundation.origin(), data.size());
+            }
+            StructurePlaceSettings settings = new StructurePlaceSettings()
+                    .setKnownShape(true)
+                    .setBoundingBox(placementBox)
+                    .setIgnoreEntities(false);
+            for (StructureProcessor processor : extraProcessors) {
+                settings.addProcessor(processor);
+            }
+            boolean placed = data.template().placeInWorld(level, foundation.origin(), foundation.origin(), settings, level.random, 2);
+            if (!placed) {
+                StructurePlacementDebugger.markFailure(attempt, "template refused placement");
+                return null;
+            }
+
+            if (isStarterBunker()) {
+                clearTerrainInsideStructure(level, foundation.origin(), data.size(), data.template());
+                replaceStarterBunkerSurfaceBlocks(level, foundation.origin(), data.size(), placementBox);
+            }
+
+            int autoBlended = 0;
+            if (StructureConfig.ENABLE_AUTO_TERRAIN_BLEND.get()) {
+                int maxDepth = StructureConfig.AUTO_TERRAIN_BLEND_MAX_DEPTH.get();
+                int radius = resolveAutoBlendRadius(data.size());
+                TerrainReplacerEngine.AutoBlendMask mask = TerrainReplacerEngine.AutoBlendMask.allowAll();
+                if (!isStarterBunker() && StructureConfig.ENABLE_SMART_AUTO_TERRAIN_BLEND.get()) {
+                    mask = buildAutoBlendMask(data.template(), foundation.origin(), data.size());
+                }
+                autoBlended = TerrainReplacerEngine.applyAutoBlend(level, placementBox, maxDepth, radius, mask);
+            }
+
+            if (data.levelingOffset() != null && foundation.levelingReplacement() != null) {
+                BlockPos markerWorldPos = foundation.origin().offset(data.levelingOffset());
+                BlockState markerReplacement = normalizeLevelingReplacement(foundation.levelingReplacement());
+                level.setBlock(markerWorldPos, markerReplacement, 2);
+            }
+
+            Vec3i size = data.size();
+            AABB bounds = LargeStructurePlacementOptimizer.createBounds(foundation.origin(), size);
+            List<AABB> chunkSlices = LargeStructurePlacementOptimizer.computeChunkSlices(foundation.origin(), size);
+
+            activateCreateElevators(level, foundation.origin(), data.elevatorPulleyOffsets());
+
+            List<BlockPos> cryoOffsets = data.cryoOffsets();
+            List<BlockPos> cryoPositions = new ArrayList<>(cryoOffsets.size());
+            for (BlockPos offset : cryoOffsets) {
+                cryoPositions.add(foundation.origin().offset(offset));
+            }
+
+            StructurePlacementDebugger.markSuccess(attempt,
+                    "placed with %s auto-blended blocks and %s cryo tubes"
+                            .formatted(autoBlended, cryoPositions.size()));
+
+            return new PlacementResult(foundation.origin(), bounds, cryoPositions, List.copyOf(chunkSlices));
+        } catch (Exception exception) {
+            StructurePlacementDebugger.markFailure(attempt, "exception: " + exception.getClass().getSimpleName());
+            ChunkErrorReporter.reportChunkError("generation", level, new ChunkPos(foundation.origin()), exception);
             return null;
         }
-
-        if (isStarterBunker()) {
-            clearTerrainInsideStructure(level, foundation.origin(), data.size(), data.template());
-            replaceStarterBunkerSurfaceBlocks(level, foundation.origin(), data.size(), placementBox);
-        }
-
-        int autoBlended = 0;
-        if (StructureConfig.ENABLE_AUTO_TERRAIN_BLEND.get()) {
-            int maxDepth = StructureConfig.AUTO_TERRAIN_BLEND_MAX_DEPTH.get();
-            int radius = resolveAutoBlendRadius(data.size());
-            TerrainReplacerEngine.AutoBlendMask mask = TerrainReplacerEngine.AutoBlendMask.allowAll();
-            if (!isStarterBunker() && StructureConfig.ENABLE_SMART_AUTO_TERRAIN_BLEND.get()) {
-                mask = buildAutoBlendMask(data.template(), foundation.origin(), data.size());
-            }
-            autoBlended = TerrainReplacerEngine.applyAutoBlend(level, placementBox, maxDepth, radius, mask);
-        }
-
-        if (data.levelingOffset() != null && foundation.levelingReplacement() != null) {
-            BlockPos markerWorldPos = foundation.origin().offset(data.levelingOffset());
-            BlockState markerReplacement = normalizeLevelingReplacement(foundation.levelingReplacement());
-            level.setBlock(markerWorldPos, markerReplacement, 2);
-        }
-
-        Vec3i size = data.size();
-        AABB bounds = LargeStructurePlacementOptimizer.createBounds(foundation.origin(), size);
-        List<AABB> chunkSlices = LargeStructurePlacementOptimizer.computeChunkSlices(foundation.origin(), size);
-
-        activateCreateElevators(level, foundation.origin(), data.elevatorPulleyOffsets());
-
-        List<BlockPos> cryoOffsets = data.cryoOffsets();
-        List<BlockPos> cryoPositions = new ArrayList<>(cryoOffsets.size());
-        for (BlockPos offset : cryoOffsets) {
-            cryoPositions.add(foundation.origin().offset(offset));
-        }
-
-        StructurePlacementDebugger.markSuccess(attempt,
-                "placed with %s auto-blended blocks and %s cryo tubes"
-                        .formatted(autoBlended, cryoPositions.size()));
-
-        return new PlacementResult(foundation.origin(), bounds, cryoPositions, List.copyOf(chunkSlices));
     }
 
     /** Returns the template id used by this placer. */
