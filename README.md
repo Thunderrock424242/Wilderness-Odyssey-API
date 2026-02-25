@@ -52,7 +52,7 @@ These are pulled from Maven Central and can be used by any local or sidecar AI h
 
 Self-hosted AI chatbot (custom local LLM required)
 -------------------------------------
-AI purpose checklist: see `docs/ai-purpose-scope.md` for feature scope, boundaries, and MVP definition.
+AI purpose checklist: see `docs/ai-purpose-scope.md` for A.E.T.H.E.R core + subsystem scope, boundaries, and MVP definition.
 Atlas now requires a local custom LLM backend for runtime responses. There is no deterministic offline fallback path in chat mode.
 
 Local LLM support is sidecar-based:
