@@ -91,7 +91,7 @@ public class WorldVersionClientChecker {
                     .resolve("world_version.json");
         }
         if (mc.level != null) {
-            String worldName = mc.level.getLevelData().getLevelName();
+            String worldName = mc.level.dimension().location().getPath();
             return mc.gameDirectory.toPath()
                     .resolve("saves")
                     .resolve(worldName)
