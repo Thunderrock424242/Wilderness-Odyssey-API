@@ -30,7 +30,7 @@ public class ChipSetItem extends Item implements ICurioItem {
 
     @Override
     public void onUnequip(SlotContext slotContext, ItemStack newStack, ItemStack stack) {
-        // Unequipping should not re-apply side effects such as chip feedback damage.
+        applyChipSetEffects(slotContext, stack);
     }
 
     @Override
