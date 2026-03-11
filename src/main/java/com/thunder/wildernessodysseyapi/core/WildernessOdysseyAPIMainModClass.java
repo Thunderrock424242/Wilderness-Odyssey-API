@@ -31,6 +31,7 @@ import com.thunder.wildernessodysseyapi.config.CloakChipConfig;
 import com.thunder.wildernessodysseyapi.config.CurioRenderConfig;
 import com.thunder.wildernessodysseyapi.config.DebugOverlayConfig;
 import com.thunder.wildernessodysseyapi.config.StructureBlockConfig;
+import com.thunder.wildernessodysseyapi.config.TrueDarknessConfig;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.entity.ModEntities;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -146,6 +147,8 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-telemetry-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DebugOverlayConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-debug-overlay-client.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TrueDarknessConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-true-darkness-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-async.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,

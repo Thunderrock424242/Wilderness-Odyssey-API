@@ -27,6 +27,8 @@
     "MixinWorldCreationUiState",
     "OptionsScreenTelemetryButtonMixin",
     "StructureBlockRendererMixin",
-    "ClientLevelWeatherColorMixin"
+    "ClientLevelWeatherColorMixin",
+    "ClientLevelTrueDarknessMixin",
+    "LightTextureTrueDarknessMixin"
   ]
 }
