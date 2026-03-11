@@ -30,7 +30,7 @@ public class ChipSetItem extends Item implements ICurioItem {
 
     @Override
     public void onUnequip(SlotContext slotContext, ItemStack newStack, ItemStack stack) {
-        applyChipSetEffects(slotContext, stack);
+        // Unequipping should not re-apply side effects such as chip feedback damage.
     }
 
     @Override
@@ -54,6 +54,10 @@ public class ChipSetItem extends Item implements ICurioItem {
 
         LivingEntity wearer = slotContext.entity();
         if (wearer.level().isClientSide) {
+            return;
+        }
+
+        if (wearer.isInvulnerable()) {
             return;
         }
 

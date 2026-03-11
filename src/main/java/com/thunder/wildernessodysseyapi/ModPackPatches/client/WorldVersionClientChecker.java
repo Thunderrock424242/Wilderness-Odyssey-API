@@ -78,7 +78,6 @@ public class WorldVersionClientChecker {
         } catch (Exception e) {
             LoggerUtil.log(LoggerUtil.ConflictSeverity.ERROR,
                     "[WorldVersionClientChecker] Exception during check: " + e.getMessage());
-            e.printStackTrace();
         }
         hasCheckedCurrentWorld = true;
         lastCheckedWorldPath = currentWorldPath;
@@ -92,7 +91,7 @@ public class WorldVersionClientChecker {
                     .resolve("world_version.json");
         }
         if (mc.level != null) {
-            String worldName = mc.getSingleplayerServer().getWorldData().getLevelName();
+            String worldName = mc.level.getLevelData().getLevelName();
             return mc.gameDirectory.toPath()
                     .resolve("saves")
                     .resolve(worldName)
@@ -105,8 +104,9 @@ public class WorldVersionClientChecker {
         boolean isLocal = mc.isLocalServer();
         ServerData serverData = mc.getCurrentServer();
         // Disconnect from the current level
-        assert mc.level != null;
-        mc.level.disconnect();
+        if (mc.level != null) {
+            mc.level.disconnect();
+        }
         if (isLocal) {
             mc.disconnect(new GenericMessageScreen(Component.translatable("menu.savingLevel")));
         } else {

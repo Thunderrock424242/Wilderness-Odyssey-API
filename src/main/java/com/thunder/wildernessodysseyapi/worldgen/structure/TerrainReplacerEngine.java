@@ -176,7 +176,7 @@ public final class TerrainReplacerEngine {
                 for (int y = surfaceY + 1; y <= fillTop; y++) {
                     cursor.set(x, y, z);
                     BlockState existing = level.getBlockState(cursor);
-                    if (!existing.isAir()) {
+                    if (!isAutoBlendReplaceable(existing)) {
                         continue;
                     }
                     BlockState replacement = material.fillerState();
@@ -211,6 +211,11 @@ public final class TerrainReplacerEngine {
             }
         }
         return false;
+    }
+
+
+    private static boolean isAutoBlendReplaceable(BlockState state) {
+        return state.isAir() || !state.getFluidState().isEmpty() || state.canBeReplaced();
     }
 
     private static int findLowestStructureBlock(ServerLevel level, BoundingBox bounds, int x, int z) {

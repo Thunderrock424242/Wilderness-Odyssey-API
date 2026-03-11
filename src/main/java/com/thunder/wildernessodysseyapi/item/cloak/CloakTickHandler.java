@@ -19,8 +19,9 @@ public final class CloakTickHandler {
         }
 
         boolean hasChip = CloakItem.hasCloakChip(player);
+        boolean hasCompass = CloakItem.hasCompassLink(player);
 
-        if (!hasChip) {
+        if (!hasChip || !hasCompass) {
             if (CloakState.isCloaked(player)) {
                 CloakState.setCloaked(player, false);
                 CloakState.clearCloak(player);
