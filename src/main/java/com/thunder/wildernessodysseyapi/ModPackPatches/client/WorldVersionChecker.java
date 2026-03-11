@@ -52,7 +52,6 @@ public class WorldVersionChecker {
             }
         } catch (Exception e) {
             LoggerUtil.log(LoggerUtil.ConflictSeverity.ERROR, "Exception in WorldVersionChecker.onServerStarted: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
@@ -95,7 +94,6 @@ public class WorldVersionChecker {
             }
         } catch (Exception e) {
             LoggerUtil.log(LoggerUtil.ConflictSeverity.ERROR, "Exception in WorldVersionChecker.onPlayerJoin: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
