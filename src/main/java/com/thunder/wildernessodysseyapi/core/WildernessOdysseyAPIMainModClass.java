@@ -225,7 +225,6 @@ public class WildernessOdysseyAPIMainModClass {
         FeedbackCommand.register(dispatcher);
         WorldUpgradeCommand.register(dispatcher);
         AIBackendCommand.register(dispatcher);
-        LocateLastDeathAliasCommand.register(dispatcher);
     }
 
     /**
