@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.M
 import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatOptToggleCommand;
 import com.thunder.wildernessodysseyapi.command.ChangelogCommand;
+import com.thunder.wildernessodysseyapi.command.MeteorCommand;
 import com.thunder.wildernessodysseyapi.WorldGen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.WorldGen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.WorldGen.processor.ModProcessors;
@@ -177,6 +178,7 @@ public class WildernessOdysseyAPIMainModClass {
         StructurePlacementDebugCommand.register(event.getDispatcher());
         GlobalChatCommand.register(dispatcher);
         GlobalChatOptToggleCommand.register(dispatcher);
+        MeteorCommand.register(dispatcher);
         TideInfoCommand.register(dispatcher);
         TelemetryConsentCommand.register(dispatcher);
     }
