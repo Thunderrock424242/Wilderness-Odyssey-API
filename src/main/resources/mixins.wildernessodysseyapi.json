@@ -6,7 +6,6 @@
   "refmap": "mixins.wildernessodysseyapi.refmap.json",
   "mixins": [
     "ChunkMapGenerationErrorMixin",
-    "StructureBlockCornerCacheBridge",
     "CreatePathsMixin",
     "BlockEntityMixin",
     "DayNightCycleMixin",
