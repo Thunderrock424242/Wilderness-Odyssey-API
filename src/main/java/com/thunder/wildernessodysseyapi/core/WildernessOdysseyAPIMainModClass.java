@@ -10,7 +10,6 @@ import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatOptToggleCommand;
 import com.thunder.wildernessodysseyapi.command.ChangelogCommand;
 import com.thunder.wildernessodysseyapi.command.LoreBookCommand;
-import com.thunder.wildernessodysseyapi.command.LocateLastDeathAliasCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
 import com.thunder.wildernessodysseyapi.command.WorldUpgradeCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
