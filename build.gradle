@@ -3,12 +3,7 @@ plugins {
     id 'application'
     id 'java-library'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.140'
-}
-
-ext {
-    junitVersion = '5.10.2'
-    jmhVersion = '1.37'
+    id 'net.neoforged.moddev' version '2.0.141'
 }
 
 
@@ -33,7 +28,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 neoForge {
     // Specify the version of NeoForge to use.
-    version = "21.1.219"
+    version = "21.1.220"
 
     parchment {
         mappingsVersion = project.parchment_mappings_version
@@ -121,12 +116,6 @@ neoForge {
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 sourceSets {
-    jmh {
-        java.srcDir 'src/jmh/java'
-        resources.srcDir 'src/jmh/resources'
-        compileClasspath += sourceSets.main.output + configurations.runtimeClasspath
-        runtimeClasspath += output + compileClasspath
-    }
 }
 
 // Sets up a dependency configuration called 'localRuntime'.
@@ -221,7 +210,7 @@ publishing {
             from components.java
             groupId = 'com.thunder'
             artifactId = 'wildernessodysseyapi'
-            version = '3.1.0'
+            version = '4.1.0'
         }
     }
 
@@ -244,15 +233,6 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
-}
-
-tasks.register('jmh', JavaExec) {
-    group = 'benchmark'
-    description = 'Runs JMH benchmarks for NBT serialization/deserialization.'
-    classpath = sourceSets.jmh.runtimeClasspath
-    mainClass.set('org.openjdk.jmh.Main')
-    jvmArgs += ['-Djmh.ignoreLock=true']
-    dependsOn tasks.named('compileJmhJava')
 }
 
 tasks.register('profileChunkWorkload', JavaExec) {
