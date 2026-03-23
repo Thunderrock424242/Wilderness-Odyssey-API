@@ -52,6 +52,8 @@ public class NBTStructurePlacer {
     private static final int MIN_LEVELING_MARKER_Y = 62;
     private static final int MAX_LEVELING_MARKER_Y = 65;
     private static final String[] PALETTE_BLOCK_FIELD_NAMES = {"blocks", "blockInfos", "blockInfoList"};
+    private static final int STARTER_BUNKER_PERIMETER_BLEND_RADIUS = 3;
+    private static final int STARTER_BUNKER_PERIMETER_BLEND_DEPTH = 2;
     private static final java.util.concurrent.ConcurrentMap<Class<?>, java.util.Optional<Field>> PALETTE_BLOCK_FIELDS =
             new java.util.concurrent.ConcurrentHashMap<>();
     private static boolean loggedPaletteFieldWarning = false;
@@ -198,6 +200,7 @@ public class NBTStructurePlacer {
             if (isStarterBunker()) {
                 clearTerrainInsideStructure(level, foundation.origin(), data.size(), data.template());
                 replaceStarterBunkerSurfaceBlocks(level, foundation.origin(), data.size(), placementBox);
+                blendStarterBunkerPerimeter(level, foundation.origin(), data.size(), placementBox);
             }
 
             int autoBlended = 0;
@@ -828,6 +831,81 @@ public class NBTStructurePlacer {
                 level.setBlock(cursor, replacement, 2);
             }
         }
+    }
+
+    private void blendStarterBunkerPerimeter(ServerLevel level,
+                                             BlockPos origin,
+                                             Vec3i size,
+                                             BoundingBox bounds) {
+        if (bounds == null) {
+            return;
+        }
+        int sizeX = size.getX();
+        int sizeZ = size.getZ();
+        if (sizeX <= 0 || sizeZ <= 0) {
+            return;
+        }
+
+        int minX = origin.getX() - STARTER_BUNKER_PERIMETER_BLEND_RADIUS;
+        int minZ = origin.getZ() - STARTER_BUNKER_PERIMETER_BLEND_RADIUS;
+        int maxX = origin.getX() + sizeX - 1 + STARTER_BUNKER_PERIMETER_BLEND_RADIUS;
+        int maxZ = origin.getZ() + sizeZ - 1 + STARTER_BUNKER_PERIMETER_BLEND_RADIUS;
+
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                int edgeDistance = distanceToBounds2D(x, z, bounds);
+                if (edgeDistance <= 0 || edgeDistance > STARTER_BUNKER_PERIMETER_BLEND_RADIUS) {
+                    continue;
+                }
+
+                int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+                cursor.set(x, surfaceY, z);
+                BlockState existing = level.getBlockState(cursor);
+                if (!isSurfaceReplacementCandidate(existing)) {
+                    continue;
+                }
+
+                TerrainReplacerEngine.SurfaceMaterial material =
+                        TerrainReplacerEngine.sampleSurfaceMaterialOutsideBounds(level, cursor, bounds);
+
+                int depth = Math.max(1, STARTER_BUNKER_PERIMETER_BLEND_DEPTH - (edgeDistance - 1));
+                int minY = surfaceY - (depth - 1);
+                for (int y = surfaceY; y >= minY; y--) {
+                    cursor.setY(y);
+                    BlockState stateAtY = level.getBlockState(cursor);
+                    if (!isSurfaceReplacementCandidate(stateAtY)) {
+                        break;
+                    }
+                    BlockState replacement = TerrainReplacerEngine.chooseReplacement(material, y);
+                    if (replacement != stateAtY) {
+                        level.setBlock(cursor, replacement, 2);
+                    }
+                }
+            }
+        }
+    }
+
+    private int distanceToBounds2D(int x, int z, BoundingBox bounds) {
+        int dx;
+        if (x < bounds.minX()) {
+            dx = bounds.minX() - x;
+        } else if (x > bounds.maxX()) {
+            dx = x - bounds.maxX();
+        } else {
+            dx = 0;
+        }
+
+        int dz;
+        if (z < bounds.minZ()) {
+            dz = bounds.minZ() - z;
+        } else if (z > bounds.maxZ()) {
+            dz = z - bounds.maxZ();
+        } else {
+            dz = 0;
+        }
+
+        return Math.max(dx, dz);
     }
 
     private boolean isSurfaceReplacementCandidate(BlockState state) {
