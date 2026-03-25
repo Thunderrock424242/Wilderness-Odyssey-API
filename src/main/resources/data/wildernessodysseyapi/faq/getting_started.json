@@ -1,0 +1,16 @@
+[
+  {
+    "id": "getting_started",
+    "category": "getting_started",
+    "question": "How do I start the modpack?",
+    "answer": "Check nearby cryo tubes, gather early resources, then follow story prompts from your first impact clues.",
+    "aliases": ["new world", "begin", "starting tips"]
+  },
+  {
+    "id": "starter_priority",
+    "category": "getting_started",
+    "question": "What should I prioritize in the first day?",
+    "answer": "Secure shelter before nightfall, craft basic tools, and mark your crash-site route for easier return trips.",
+    "aliases": ["first day", "early game", "priority"]
+  }
+]
