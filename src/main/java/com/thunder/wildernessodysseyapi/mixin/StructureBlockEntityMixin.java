@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.bridge.StructureBlockCornerCacheBridge;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.util.StructureBlockCornerCache;
 import com.thunder.wildernessodysseyapi.util.NbtCompressionUtils;
 import com.thunder.wildernessodysseyapi.util.StructureBlockHostileSpawnContext;
@@ -27,6 +28,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.entity.EntityType;
@@ -810,7 +812,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
     @Unique
     private static void wildernessodysseyapi$stripHostileEntities(java.nio.file.Path structurePath) {
         try {
-            CompoundTag root = NbtIo.readCompressed(structurePath);
+            CompoundTag root = NbtIo.readCompressed(structurePath, NbtAccounter.unlimitedHeap());
             if (root == null || !root.contains("entities", Tag.TAG_LIST)) {
                 return;
             }
@@ -838,7 +840,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
             root.put("entities", filteredEntities);
             NbtIo.writeCompressed(root, structurePath);
         } catch (Exception exception) {
-            com.thunder.wildernessodysseyapi.ModConstants.LOGGER.warn("Failed stripping hostile entities from saved structure {}", structurePath, exception);
+            ModConstants.LOGGER.warn("Failed stripping hostile entities from saved structure {}", structurePath, exception);
         }
     }
 
