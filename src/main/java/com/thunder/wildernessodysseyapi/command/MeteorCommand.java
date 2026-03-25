@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -47,6 +48,19 @@ public final class MeteorCommand {
                                                 ctx.getSource(),
                                                 IntegerArgumentType.getInteger(ctx, "size"),
                                                 IntegerArgumentType.getInteger(ctx, "range")
+                                        )))))
+                .then(Commands.literal("preview")
+                        .then(Commands.argument("size", IntegerArgumentType.integer(MIN_SIZE, MAX_SIZE))
+                                .executes(ctx -> previewMeteor(
+                                        ctx.getSource(),
+                                        IntegerArgumentType.getInteger(ctx, "size"),
+                                        48
+                                ))
+                                .then(Commands.argument("range", IntegerArgumentType.integer(MIN_DISTANCE, MAX_DISTANCE))
+                                        .executes(ctx -> previewMeteor(
+                                                ctx.getSource(),
+                                                IntegerArgumentType.getInteger(ctx, "size"),
+                                                IntegerArgumentType.getInteger(ctx, "range")
                                         ))))));
     }
 
@@ -56,8 +70,62 @@ public final class MeteorCommand {
             return 0;
         }
 
-        Vec3 origin = source.getPosition();
         RandomSource random = level.random;
+        BlockPos impactPos = selectImpactPos(level, source.getPosition(), range, random);
+
+        createImpact(level, impactPos, size, random);
+
+        BlockPos finalImpactPos = impactPos;
+        source.sendSuccess(() -> Component.literal(String.format(
+                "Meteor impact created at %d, %d, %d (size %d)",
+                finalImpactPos.getX(),
+                finalImpactPos.getY(),
+                finalImpactPos.getZ(),
+                size
+        )), true);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int previewMeteor(CommandSourceStack source, int size, int range) {
+        if (!(source.getLevel() instanceof ServerLevel level)) {
+            source.sendFailure(Component.literal("Meteor command can only run on a server level."));
+            return 0;
+        }
+
+        RandomSource random = level.random;
+        BlockPos impactPos = selectImpactPos(level, source.getPosition(), range, random);
+        Vec3 start = impactPos.getCenter().add(0, Math.max(25, size * 5), 0);
+        Vec3 end = impactPos.getCenter().add(0, 0.2, 0);
+        Vec3 direction = end.subtract(start).normalize();
+        double totalDistance = start.distanceTo(end);
+        int steps = Math.max(24, size * 10);
+        for (int i = 0; i <= steps; i++) {
+            double distance = totalDistance * (i / (double) steps);
+            Vec3 point = start.add(direction.scale(distance));
+            level.sendParticles(ParticleTypes.FLAME, point.x, point.y, point.z, 2, 0.1, 0.1, 0.1, 0.01);
+            level.sendParticles(ParticleTypes.SMOKE, point.x, point.y, point.z, 1, 0.05, 0.05, 0.05, 0.01);
+        }
+
+        level.sendParticles(ParticleTypes.EXPLOSION, impactPos.getX() + 0.5, impactPos.getY() + 1.0, impactPos.getZ() + 0.5,
+                15, 0.4, 0.2, 0.4, 0.01);
+        BlockPos fireMarker = impactPos.above();
+        if (BaseFireBlock.canBePlacedAt(level, fireMarker, Direction.UP)) {
+            level.setBlock(fireMarker, BaseFireBlock.getState(level, fireMarker), 3);
+        }
+
+        source.sendSuccess(() -> Component.literal(String.format(
+                "Meteor preview marked at %d, %d, %d (size %d). Use /meteor summon %d %d to spawn one.",
+                impactPos.getX(),
+                impactPos.getY(),
+                impactPos.getZ(),
+                size,
+                size,
+                range
+        )), true);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static BlockPos selectImpactPos(ServerLevel level, Vec3 origin, int range, RandomSource random) {
         double angle = random.nextDouble() * Mth.TWO_PI;
         double distance = MIN_DISTANCE + random.nextDouble() * Math.max(1, range - MIN_DISTANCE);
 
@@ -175,7 +243,7 @@ public final class MeteorCommand {
         for (int i = 0; i < radius * 8; i++) {
             BlockPos around = impactPos.offset(random.nextInt(radius * 2 + 1) - radius, 0, random.nextInt(radius * 2 + 1) - radius);
             BlockPos firePos = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, around).above();
-            if (BaseFireBlock.canBePlacedAt(level, firePos, net.minecraft.core.Direction.UP)) {
+            if (BaseFireBlock.canBePlacedAt(level, firePos, Direction.UP)) {
                 level.setBlock(firePos, BaseFireBlock.getState(level, firePos), 3);
             }
         }
