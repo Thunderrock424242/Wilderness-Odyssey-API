@@ -134,6 +134,7 @@ public final class AIConfigLoader {
         config.getFallback().setMenuPrompt(readStringValue(fallback.get("menu_prompt")));
         config.getFallback().setUnavailableHint(readStringValue(fallback.get("unavailable_hint")));
         config.getFallback().getPersonas().addAll(readFallbackPersonas(fallback.get("personas")));
+        hydrateFallbackPromptFiles(config.getFallback().getPersonas());
 
         return config;
     }
@@ -285,13 +286,73 @@ public final class AIConfigLoader {
             AIConfig.FallbackPersona persona = new AIConfig.FallbackPersona();
             persona.setName(readStringValue(map.get("name")));
             persona.setIntroduction(readStringValue(map.get("introduction")));
+            persona.setPromptFile(readStringValue(map.get("prompt_file")));
             persona.getAliases().addAll(readStringList(map.get("aliases")));
             persona.getPrompts().addAll(readFallbackPrompts(map.get("prompts")));
-            if (persona.getName() != null && !persona.getName().isBlank() && !persona.getPrompts().isEmpty()) {
-                personas.add(persona);
+            if (persona.getName() != null && !persona.getName().isBlank()) {
+                boolean hasInlinePrompts = !persona.getPrompts().isEmpty();
+                boolean hasPromptFile = persona.getPromptFile() != null && !persona.getPromptFile().isBlank();
+                if (hasInlinePrompts || hasPromptFile) {
+                    personas.add(persona);
+                }
             }
         }
         return personas;
+    }
+
+    private static void hydrateFallbackPromptFiles(List<AIConfig.FallbackPersona> personas) {
+        if (personas == null || personas.isEmpty()) {
+            return;
+        }
+        for (AIConfig.FallbackPersona persona : personas) {
+            if (persona == null || persona.getPromptFile() == null || persona.getPromptFile().isBlank()) {
+                continue;
+            }
+            List<AIConfig.FallbackPrompt> filePrompts = loadPromptFilePrompts(persona.getPromptFile());
+            if (!filePrompts.isEmpty()) {
+                persona.getPrompts().addAll(filePrompts);
+            }
+        }
+    }
+
+    private static List<AIConfig.FallbackPrompt> loadPromptFilePrompts(String promptFile) {
+        if (promptFile == null || promptFile.isBlank()) {
+            return List.of();
+        }
+        String normalized = promptFile.startsWith("/") ? promptFile.substring(1) : promptFile;
+        String content = readPromptFileContent(normalized);
+        if (content == null || content.isBlank()) {
+            ModConstants.LOGGER.warn("Fallback prompt file {} is empty or unavailable.", normalized);
+            return List.of();
+        }
+        Map<?, ?> root = parseWithSnakeYaml(content);
+        if (root == null) {
+            root = parseSimpleYaml(content);
+        }
+        if (root == null) {
+            return List.of();
+        }
+        return readFallbackPrompts(root.get("prompts"));
+    }
+
+    private static String readPromptFileContent(String normalizedPath) {
+        Path externalPath = FMLPaths.CONFIGDIR.get().resolve(normalizedPath);
+        if (Files.exists(externalPath)) {
+            try {
+                return Files.readString(externalPath, StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                ModConstants.LOGGER.warn("Failed reading fallback prompt file from config dir: {}", externalPath, e);
+            }
+        }
+        try (InputStream in = AIConfigLoader.class.getClassLoader().getResourceAsStream(normalizedPath)) {
+            if (in == null) {
+                return null;
+            }
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            ModConstants.LOGGER.warn("Failed reading bundled fallback prompt file {}.", normalizedPath, e);
+            return null;
+        }
     }
 
     private static List<AIConfig.FallbackPrompt> readFallbackPrompts(Object value) {

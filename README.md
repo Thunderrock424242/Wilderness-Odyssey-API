@@ -64,6 +64,7 @@ Local LLM support is sidecar-based:
 - You can use `{model_path}`, `{model_name}`, and `{base_url}` placeholders in `start_command` / `bundled_server_args`.
 
 If the local model is unavailable, players can still address Aether to open a subsystem menu and route deterministic replies from Aegis, Eclipse, Terra, Helios, Enforcer, or Requiem via `ai_config.yaml`.
+Each subsystem can keep its own prompt library in a separate file under `src/main/resources/ai_fallback/`, referenced by `fallback.personas[].prompt_file`.
 
 Admin commands for sidecar operations:
 - `/atlasbackend status`

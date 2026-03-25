@@ -1,0 +1,4 @@
+prompts:
+  - label: "Power and stability"
+    triggers: ["energy", "machines", "atmosphere", "stability", "power"]
+    response: "Helios response: balance machine load in phases, preserve backup power, and monitor atmospheric variance before scaling operations."

@@ -1,0 +1,4 @@
+prompts:
+  - label: "Threat prioritization"
+    triggers: ["combat", "security", "threat", "readiness"]
+    response: "Enforcer response: establish perimeter coverage, prioritize fast-moving threats first, and maintain staggered defensive positions."

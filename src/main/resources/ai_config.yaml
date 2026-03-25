@@ -46,52 +46,31 @@ fallback:
     - name: "Aether"
       aliases: ["aether core", "central ai"]
       introduction: "A.E.T.H.E.R online. Choose a subsystem prompt and I will route it for a focused response."
-      prompts:
-        - label: "Subsystem menu"
-          triggers: ["subsystem", "prompt", "menu", "options"]
-          response: "Choose a subsystem: 1) Aegis 2) Eclipse 3) Terra 4) Helios 5) Enforcer 6) Requiem."
+      prompt_file: "ai_fallback/aether.yaml"
     - name: "Aegis"
       aliases: ["health ai", "protection ai"]
       introduction: "Health / Protection"
-      prompts:
-        - label: "Player safety guidance"
-          triggers: ["safety", "health", "protection", "hazard prevention"]
-          response: "Aegis response: maintain med reserves, rotate hazard checks, and keep defensive readiness active before entering unstable zones."
+      prompt_file: "ai_fallback/aegis.yaml"
     - name: "Eclipse"
       aliases: ["rift ai", "anomaly ai"]
       introduction: "Rift / Anomaly"
-      prompts:
-        - label: "Anomaly response"
-          triggers: ["rift", "anomaly", "risk", "safe response"]
-          response: "Eclipse response: classify rift intensity first, keep distance from unstable nodes, and only approach with marked fallback routes."
+      prompt_file: "ai_fallback/eclipse.yaml"
     - name: "Terra"
       aliases: ["terrain ai", "exploration ai"]
       introduction: "Terrain / World Restoration / Exploration"
-      prompts:
-        - label: "Exploration routing"
-          triggers: ["terrain", "world restoration", "exploration", "route"]
-          response: "Terra response: route along stable ridgelines, tag restoration candidates, and avoid crater-edge traversal during low visibility."
+      prompt_file: "ai_fallback/terra.yaml"
     - name: "Helios"
       aliases: ["energy ai", "machine ai", "atmosphere ai"]
       introduction: "Energy / Machines / Atmospheric Stability"
-      prompts:
-        - label: "Power and stability"
-          triggers: ["energy", "machines", "atmosphere", "stability", "power"]
-          response: "Helios response: balance machine load in phases, preserve backup power, and monitor atmospheric variance before scaling operations."
+      prompt_file: "ai_fallback/helios.yaml"
     - name: "Enforcer"
       aliases: ["combat ai", "security ai"]
       introduction: "Combat / Security"
-      prompts:
-        - label: "Threat prioritization"
-          triggers: ["combat", "security", "threat", "readiness"]
-          response: "Enforcer response: establish perimeter coverage, prioritize fast-moving threats first, and maintain staggered defensive positions."
+      prompt_file: "ai_fallback/enforcer.yaml"
     - name: "Requiem"
       aliases: ["archive ai", "memory ai", "history ai"]
       introduction: "Archive / Memory / History"
-      prompts:
-        - label: "Lore continuity"
-          triggers: ["archive", "memory", "history", "lore"]
-          response: "Requiem response: cross-check recovered records against field evidence and preserve chronology for expedition continuity."
+      prompt_file: "ai_fallback/requiem.yaml"
 onboarding:
   enabled: true
   completion_message: "Onboarding complete. I'm ready for full expedition chat support."

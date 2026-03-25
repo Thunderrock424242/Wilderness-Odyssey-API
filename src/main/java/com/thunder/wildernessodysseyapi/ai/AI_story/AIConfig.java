@@ -357,6 +357,7 @@ public class AIConfig {
     public static class FallbackPersona {
         private String name;
         private String introduction;
+        private String promptFile;
         private final List<String> aliases = new ArrayList<>();
         private final List<FallbackPrompt> prompts = new ArrayList<>();
 
@@ -374,6 +375,14 @@ public class AIConfig {
 
         public void setIntroduction(String introduction) {
             this.introduction = introduction;
+        }
+
+        public String getPromptFile() {
+            return promptFile;
+        }
+
+        public void setPromptFile(String promptFile) {
+            this.promptFile = promptFile;
         }
 
         public List<String> getAliases() {

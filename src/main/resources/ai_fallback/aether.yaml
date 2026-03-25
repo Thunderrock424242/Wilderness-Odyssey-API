@@ -1,0 +1,4 @@
+prompts:
+  - label: "Subsystem menu"
+    triggers: ["subsystem", "prompt", "menu", "options"]
+    response: "Choose a subsystem: 1) Aegis 2) Eclipse 3) Terra 4) Helios 5) Enforcer 6) Requiem."
