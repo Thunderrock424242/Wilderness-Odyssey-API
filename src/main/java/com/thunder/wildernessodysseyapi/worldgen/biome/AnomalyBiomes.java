@@ -40,31 +40,15 @@ public final class AnomalyBiomes {
         BiomeDefaultFeatures.addDefaultSoftDisks(generation);
         BiomeDefaultFeatures.addPlainGrass(generation);
         BiomeDefaultFeatures.addPlainVegetation(generation);
+        BiomeDefaultFeatures.addForestFlowers(generation);
+        BiomeDefaultFeatures.addDefaultFlowers(generation);
+        BiomeDefaultFeatures.addForestGrass(generation);
+        BiomeDefaultFeatures.addSparseJungleTrees(generation);
+        BiomeDefaultFeatures.addJungleGrass(generation);
         BiomeDefaultFeatures.addDefaultMushrooms(generation);
         BiomeDefaultFeatures.addDefaultExtraVegetation(generation);
 
-        return baseBiome(true, 0.8F, 0.4F, spawns, generation);
-    }
-
-    public static Biome anomalyDesert() {
-        MobSpawnSettings.Builder spawns = new MobSpawnSettings.Builder();
-        AnomalyBiomeMobSettings.addDesertSpawns(spawns);
-
-        BiomeGenerationSettings.Builder generation = generationBuilder();
-        BiomeDefaultFeatures.addFossilDecoration(generation);
-        BiomeDefaultFeatures.addDefaultCarversAndLakes(generation);
-        BiomeDefaultFeatures.addDefaultCrystalFormations(generation);
-        BiomeDefaultFeatures.addDefaultMonsterRoom(generation);
-        BiomeDefaultFeatures.addDefaultUndergroundVariety(generation);
-        BiomeDefaultFeatures.addDefaultSprings(generation);
-        BiomeDefaultFeatures.addSurfaceFreezing(generation);
-        BiomeDefaultFeatures.addDefaultOres(generation);
-        BiomeDefaultFeatures.addDefaultSoftDisks(generation);
-        BiomeDefaultFeatures.addDesertVegetation(generation);
-        BiomeDefaultFeatures.addDesertExtraVegetation(generation);
-        BiomeDefaultFeatures.addDesertExtraDecoration(generation);
-
-        return baseBiome(false, 2.0F, 0.0F, spawns, generation);
+        return baseBiome(true, 0.9F, 0.65F, spawns, generation);
     }
 
     public static Biome anomalyTundra() {
