@@ -9,6 +9,7 @@ import net.minecraft.network.chat.Component;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Provides the {@code /faq} command with multiple sub-commands.
@@ -72,6 +73,9 @@ public class FaqCommand {
                                 .executes(ctx -> listCategory(
                                         ctx.getSource(),
                                         StringArgumentType.getString(ctx, "category")))))
+                .then(Commands.literal("reload")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(ctx -> reloadFaq(ctx.getSource())))
         );
     }
 
@@ -103,6 +107,19 @@ public class FaqCommand {
                         entry.question()), false);
             }
         }
+        return 1;
+    }
+
+    private static int reloadFaq(CommandSourceStack source) {
+        source.sendSuccess(() -> Component.literal("Reloading datapacks (including FAQ entries)..."), true);
+        CompletableFuture<?> reloadFuture = source.getServer().reloadResources(source.getServer().getPackRepository().getSelectedIds());
+        reloadFuture.whenComplete((ignored, throwable) -> source.getServer().execute(() -> {
+            if (throwable == null) {
+                source.sendSuccess(() -> Component.literal("FAQ reload complete."), true);
+            } else {
+                source.sendFailure(Component.literal("FAQ reload failed. Check server logs."));
+            }
+        }));
         return 1;
     }
 }
