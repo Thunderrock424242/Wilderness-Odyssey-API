@@ -11,6 +11,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
@@ -70,7 +71,7 @@ public final class MeteorCommand {
         // If an overhang exists, ray trace down so impact feels grounded to visible terrain.
         Vec3 start = new Vec3(targetX + 0.5, impactPos.getY() + 40, targetZ + 0.5);
         Vec3 end = new Vec3(targetX + 0.5, impactPos.getY() - 20, targetZ + 0.5);
-        BlockHitResult hitResult = level.clip(new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null));
+        BlockHitResult hitResult = level.clip(new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, (Entity) null));
         if (hitResult.getType() == HitResult.Type.BLOCK) {
             impactPos = hitResult.getBlockPos().above();
         }

@@ -265,8 +265,9 @@ public class AIClient {
             return voiceIntegration.wrap(speaker, reply);
         }
         startAttempted = startAttempted || retry.started();
+        boolean finalStartAttempted = startAttempted;
         String reply = deterministicFallback.map(AIFallbackResponder.FallbackReply::text)
-                .orElseGet(() -> buildModelUnavailableReply(true, startAttempted, message));
+                .orElseGet(() -> buildModelUnavailableReply(true, finalStartAttempted, message));
         memoryStore.addAiMessage(world, player, speaker, reply);
         return voiceIntegration.wrap(speaker, reply);
     }
