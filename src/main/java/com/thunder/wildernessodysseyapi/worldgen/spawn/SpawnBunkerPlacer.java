@@ -4,17 +4,20 @@ import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.worldgen.processor.BunkerPlacementProcessor;
 import com.thunder.wildernessodysseyapi.worldgen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.worldgen.structure.StarterStructureSpawnGuard;
+import com.thunder.wildernessodysseyapi.worldgen.structure.TerrainReplacerEngine;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.core.Vec3i;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -29,33 +32,21 @@ import java.util.Set;
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class SpawnBunkerPlacer {
     private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "bunker");
-    private static final int LAND_SEARCH_RADIUS = 512;
-    private static final int LAND_SEARCH_STEP = 16;
-    private static final int FORCED_PLAINS_SEARCH_RADIUS = 2048;
-    private static final int OCEAN_BUFFER_RADIUS = 128;
-    private static final int OCEAN_BUFFER_STEP = 16;
-    private static final int WATER_SAMPLE_STEP = 4;
-    private static final int BIOME_SAMPLE_STEP = 4;
-    private static final int SURFACE_SAMPLE_STEP = 4;
-    private static final int MAX_SURFACE_Y_VARIANCE = 6;
-    private static final boolean FORCE_PLAINS_SPAWN = true;
-    private static final Set<ResourceKey<Biome>> REQUIRED_SPAWN_BIOMES = Set.of(Biomes.PLAINS);
-    private static final Set<ResourceKey<Biome>> WHITELISTED_SPAWN_BIOMES = Set.of(
-            Biomes.PLAINS,
-            Biomes.SUNFLOWER_PLAINS,
-            Biomes.MEADOW,
-            Biomes.FOREST);
-    private static final Set<ResourceKey<Biome>> BLACKLISTED_SPAWN_BIOMES = Set.of(
-            Biomes.OCEAN,
-            Biomes.DEEP_OCEAN,
-            Biomes.COLD_OCEAN,
-            Biomes.DEEP_COLD_OCEAN,
-            Biomes.LUKEWARM_OCEAN,
-            Biomes.DEEP_LUKEWARM_OCEAN,
-            Biomes.WARM_OCEAN,
-            Biomes.FROZEN_OCEAN,
-            Biomes.DEEP_FROZEN_OCEAN,
-            Biomes.RIVER);
+    private static final int OCEAN_SEARCH_RADIUS = 4096;
+    private static final int OCEAN_SEARCH_STEP = 32;
+    private static final int OCEAN_REGION_RADIUS = 112;
+    private static final int OCEAN_REGION_STEP = 16;
+    private static final int FOOTPRINT_SAMPLE_STEP = 4;
+    private static final int MIN_OCEAN_WATER_DEPTH = 8;
+    private static final int MAX_SEAFLOOR_VARIANCE = 18;
+    private static final int ISLAND_PLATFORM_PADDING = 10;
+    private static final int ISLAND_SHORE_RADIUS_PADDING = 24;
+    private static final int ISLAND_SLOPE_DEPTH = 7;
+    private static final Set<ResourceKey<Biome>> BLACKLISTED_OCEAN_BIOMES = Set.of(
+            Biomes.RIVER,
+            Biomes.FROZEN_RIVER,
+            Biomes.SWAMP,
+            Biomes.MANGROVE_SWAMP);
     private static final NBTStructurePlacer BUNKER_PLACER = new NBTStructurePlacer(
             BUNKER_ID,
             List.of(new BunkerPlacementProcessor()));
@@ -87,61 +78,48 @@ public final class SpawnBunkerPlacer {
      * Places the spawn bunker so that its leveling marker (or template origin) is anchored at the supplied position.
      */
     public static NBTStructurePlacer.PlacementResult placeBunker(ServerLevel level, BlockPos anchor) {
+        Vec3i bunkerSize = BUNKER_PLACER.peekSize(level);
+        prepareStarterIsland(level, anchor, bunkerSize);
         return BUNKER_PLACER.placeAnchored(level, anchor);
     }
 
     private static BlockPos resolveAnchor(ServerLevel level) {
         BlockPos baseSpawn = level.getSharedSpawnPos();
         Vec3i bunkerSize = BUNKER_PLACER.peekSize(level);
-        return findLandAnchor(level, baseSpawn, bunkerSize);
+        return findOceanAnchor(level, baseSpawn, bunkerSize);
     }
 
-    private static BlockPos findLandAnchor(ServerLevel level, BlockPos baseSpawn, Vec3i bunkerSize) {
-        BlockPos surface = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                new BlockPos(baseSpawn.getX(), level.getMinBuildHeight(), baseSpawn.getZ()));
-        if (isViableAnchor(level, surface, bunkerSize)) {
-            return surface;
+    private static BlockPos findOceanAnchor(ServerLevel level, BlockPos baseSpawn, Vec3i bunkerSize) {
+        BlockPos anchor = toOceanAnchor(level, baseSpawn);
+        if (isViableOceanAnchor(level, anchor, bunkerSize)) {
+            return anchor;
         }
 
         int baseX = baseSpawn.getX();
         int baseZ = baseSpawn.getZ();
-        for (int radius = LAND_SEARCH_STEP; radius <= LAND_SEARCH_RADIUS; radius += LAND_SEARCH_STEP) {
-            for (int dx = -radius; dx <= radius; dx += LAND_SEARCH_STEP) {
-                for (int dz = -radius; dz <= radius; dz += LAND_SEARCH_STEP) {
+        for (int radius = OCEAN_SEARCH_STEP; radius <= OCEAN_SEARCH_RADIUS; radius += OCEAN_SEARCH_STEP) {
+            for (int dx = -radius; dx <= radius; dx += OCEAN_SEARCH_STEP) {
+                for (int dz = -radius; dz <= radius; dz += OCEAN_SEARCH_STEP) {
                     if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
                         continue;
                     }
 
-                    int x = baseX + dx;
-                    int z = baseZ + dz;
-                    BlockPos candidate = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                            new BlockPos(x, level.getMinBuildHeight(), z));
-                    if (isViableAnchor(level, candidate, bunkerSize)) {
+                    BlockPos candidate = toOceanAnchor(level, new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
+                    if (isViableOceanAnchor(level, candidate, bunkerSize)) {
                         return candidate;
                     }
                 }
             }
         }
 
-        if (FORCE_PLAINS_SPAWN) {
-            BlockPos forced = findRequiredBiomeAnchor(level, baseSpawn, bunkerSize, FORCED_PLAINS_SEARCH_RADIUS);
-            if (forced != null) {
-                ModConstants.LOGGER.warn("Unable to locate a viable plains biome within {} blocks of {}; using distant plains spawn {}.",
-                        LAND_SEARCH_RADIUS, baseSpawn, forced);
-                return forced;
-            }
-        }
+        ModConstants.LOGGER.warn("Unable to locate a fully open ocean spawn region within {} blocks of {}; using best-effort ocean fallback.",
+                OCEAN_SEARCH_RADIUS, baseSpawn);
+        return anchor;
+    }
 
-        BlockPos fallback = findAllowedAnchor(level, baseSpawn);
-        if (fallback != null) {
-            ModConstants.LOGGER.warn("Unable to locate a fully viable land biome within {} blocks of {}; using fallback spawn {}.",
-                    LAND_SEARCH_RADIUS, baseSpawn, fallback);
-            return fallback;
-        }
-
-        ModConstants.LOGGER.warn("Unable to locate a land biome within {} blocks of {}; using base spawn.",
-                LAND_SEARCH_RADIUS, baseSpawn);
-        return surface;
+    private static BlockPos toOceanAnchor(ServerLevel level, BlockPos pos) {
+        int anchorY = Math.min(level.getMaxBuildHeight() - 1, level.getSeaLevel() + 2);
+        return new BlockPos(pos.getX(), anchorY, pos.getZ());
     }
 
     private static void applySpawnData(ServerLevel level, NBTStructurePlacer.PlacementResult result) {
@@ -170,31 +148,25 @@ public final class SpawnBunkerPlacer {
         return BlockPos.containing(result.bounds().getCenter());
     }
 
-    private static boolean isLandBiome(ServerLevel level, BlockPos pos) {
-        if (!isAllowedBiome(level, pos)) {
+    private static boolean isViableOceanAnchor(ServerLevel level, BlockPos anchor, Vec3i bunkerSize) {
+        if (!isOceanBiome(level, anchor)) {
             return false;
         }
-        return !level.getBiome(pos).is(BiomeTags.IS_OCEAN);
+        if (!hasOceanFootprint(level, anchor, bunkerSize)) {
+            return false;
+        }
+        if (!isSurroundedByOcean(level, anchor)) {
+            return false;
+        }
+        return hasStableSeafloor(level, anchor, bunkerSize);
     }
 
-    private static boolean isAllowedBiome(ServerLevel level, BlockPos pos) {
-        var biome = level.getBiome(pos);
-        if (FORCE_PLAINS_SPAWN && !isRequiredBiome(biome)) {
+    private static boolean isOceanBiome(ServerLevel level, BlockPos pos) {
+        Holder<Biome> biome = level.getBiome(pos);
+        if (!biome.is(BiomeTags.IS_OCEAN)) {
             return false;
         }
-        if (!WHITELISTED_SPAWN_BIOMES.isEmpty()) {
-            boolean whitelisted = false;
-            for (ResourceKey<Biome> key : WHITELISTED_SPAWN_BIOMES) {
-                if (biome.is(key)) {
-                    whitelisted = true;
-                    break;
-                }
-            }
-            if (!whitelisted) {
-                return false;
-            }
-        }
-        for (ResourceKey<Biome> key : BLACKLISTED_SPAWN_BIOMES) {
+        for (ResourceKey<Biome> key : BLACKLISTED_OCEAN_BIOMES) {
             if (biome.is(key)) {
                 return false;
             }
@@ -202,135 +174,159 @@ public final class SpawnBunkerPlacer {
         return true;
     }
 
-    private static boolean isRequiredBiome(Holder<Biome> biome) {
-        for (ResourceKey<Biome> key : REQUIRED_SPAWN_BIOMES) {
-            if (biome.is(key)) {
-                return true;
-            }
-        }
-        return false;
-    }
+    private static boolean hasOceanFootprint(ServerLevel level, BlockPos anchor, Vec3i bunkerSize) {
+        BlockPos origin = getPlacementOrigin(level, anchor);
+        int minX = origin.getX();
+        int minZ = origin.getZ();
+        int maxX = minX + Math.max(1, bunkerSize.getX()) - 1;
+        int maxZ = minZ + Math.max(1, bunkerSize.getZ()) - 1;
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
-    private static boolean isViableAnchor(ServerLevel level, BlockPos surface, Vec3i bunkerSize) {
-        if (!isLandBiome(level, surface)) {
-            return false;
-        }
-        if (!isAreaBiomeAllowed(level, surface, bunkerSize)) {
-            return false;
-        }
-        if (!isDrySurface(level, surface)) {
-            return false;
-        }
-        if (isNearOcean(level, surface)) {
-            return false;
-        }
-        if (!isAreaTerrainStable(level, surface, bunkerSize)) {
-            return false;
-        }
-        return isAreaDry(level, surface, bunkerSize);
-    }
+        for (int x = minX; x <= maxX; x = nextSampleCoordinate(x, maxX, FOOTPRINT_SAMPLE_STEP)) {
+            for (int z = minZ; z <= maxZ; z = nextSampleCoordinate(z, maxZ, FOOTPRINT_SAMPLE_STEP)) {
+                cursor.set(x, anchor.getY(), z);
+                if (!isOceanBiome(level, cursor)) {
+                    return false;
+                }
 
-    private static boolean isDrySurface(ServerLevel level, BlockPos surface) {
-        BlockPos worldSurface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE,
-                new BlockPos(surface.getX(), level.getMinBuildHeight(), surface.getZ()));
-        if (!level.getFluidState(worldSurface).isEmpty()) {
-            return false;
-        }
-        return level.getFluidState(surface).isEmpty();
-    }
+                BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, cursor);
+                if (level.getFluidState(surface).isEmpty()) {
+                    return false;
+                }
 
-    private static boolean isNearOcean(ServerLevel level, BlockPos surface) {
-        int baseX = surface.getX();
-        int baseZ = surface.getZ();
-        for (int dx = -OCEAN_BUFFER_RADIUS; dx <= OCEAN_BUFFER_RADIUS; dx += OCEAN_BUFFER_STEP) {
-            for (int dz = -OCEAN_BUFFER_RADIUS; dz <= OCEAN_BUFFER_RADIUS; dz += OCEAN_BUFFER_STEP) {
-                BlockPos surfaceSample = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE,
-                        new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
-                if (level.getBiome(surfaceSample).is(BiomeTags.IS_OCEAN)) {
-                    return true;
+                int seafloorY = TerrainReplacerEngine.sampleSurface(level, cursor).y();
+                int waterDepth = surface.getY() - seafloorY;
+                if (waterDepth < MIN_OCEAN_WATER_DEPTH) {
+                    return false;
                 }
             }
         }
-        return false;
+        return true;
     }
 
-    private static boolean isAreaDry(ServerLevel level, BlockPos surface, Vec3i bunkerSize) {
-        if (bunkerSize.getX() <= 0 || bunkerSize.getZ() <= 0) {
-            return true;
+    private static boolean isSurroundedByOcean(ServerLevel level, BlockPos anchor) {
+        int baseX = anchor.getX();
+        int baseZ = anchor.getZ();
+        for (int dx = -OCEAN_REGION_RADIUS; dx <= OCEAN_REGION_RADIUS; dx += OCEAN_REGION_STEP) {
+            for (int dz = -OCEAN_REGION_RADIUS; dz <= OCEAN_REGION_RADIUS; dz += OCEAN_REGION_STEP) {
+                BlockPos samplePos = new BlockPos(baseX + dx, anchor.getY(), baseZ + dz);
+                if (!isOceanBiome(level, samplePos)) {
+                    return false;
+                }
+
+                BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, samplePos);
+                if (level.getFluidState(surface).isEmpty()) {
+                    return false;
+                }
+            }
         }
-        BlockPos origin = getPlacementOrigin(level, surface);
-        int minX = origin.getX();
-        int minZ = origin.getZ();
-        int maxX = minX + bunkerSize.getX() - 1;
-        int maxZ = minZ + bunkerSize.getZ() - 1;
-        int minY = origin.getY();
-        int maxY = origin.getY() + bunkerSize.getY() - 1;
-        int clampedMinY = Math.max(minY, level.getMinBuildHeight());
-        int clampedMaxY = Math.min(maxY, level.getMaxBuildHeight() - 1);
+        return true;
+    }
+
+    private static boolean hasStableSeafloor(ServerLevel level, BlockPos anchor, Vec3i bunkerSize) {
+        BlockPos origin = getPlacementOrigin(level, anchor);
+        int minX = origin.getX() - ISLAND_PLATFORM_PADDING;
+        int minZ = origin.getZ() - ISLAND_PLATFORM_PADDING;
+        int maxX = origin.getX() + Math.max(1, bunkerSize.getX()) - 1 + ISLAND_PLATFORM_PADDING;
+        int maxZ = origin.getZ() + Math.max(1, bunkerSize.getZ()) - 1 + ISLAND_PLATFORM_PADDING;
+
+        int minFloorY = Integer.MAX_VALUE;
+        int maxFloorY = Integer.MIN_VALUE;
+        for (int x = minX; x <= maxX; x = nextSampleCoordinate(x, maxX, FOOTPRINT_SAMPLE_STEP)) {
+            for (int z = minZ; z <= maxZ; z = nextSampleCoordinate(z, maxZ, FOOTPRINT_SAMPLE_STEP)) {
+                int floorY = TerrainReplacerEngine.sampleSurface(level, new BlockPos(x, anchor.getY(), z)).y();
+                minFloorY = Math.min(minFloorY, floorY);
+                maxFloorY = Math.max(maxFloorY, floorY);
+                if (maxFloorY - minFloorY > MAX_SEAFLOOR_VARIANCE) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static void prepareStarterIsland(ServerLevel level, BlockPos anchor, Vec3i bunkerSize) {
+        BlockPos origin = getPlacementOrigin(level, anchor);
+        int sizeX = Math.max(1, bunkerSize.getX());
+        int sizeZ = Math.max(1, bunkerSize.getZ());
+        int centerX = origin.getX() + (sizeX / 2);
+        int centerZ = origin.getZ() + (sizeZ / 2);
+        int flatRadius = Math.max(sizeX, sizeZ) / 2 + ISLAND_PLATFORM_PADDING;
+        int shoreRadius = flatRadius + ISLAND_SHORE_RADIUS_PADDING;
+        int islandTopY = anchor.getY() - 1;
+        int seaLevel = level.getSeaLevel();
 
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        for (int x = minX; x <= maxX; x = nextSampleCoordinate(x, maxX, WATER_SAMPLE_STEP)) {
-            for (int z = minZ; z <= maxZ; z = nextSampleCoordinate(z, maxZ, WATER_SAMPLE_STEP)) {
-                for (int y = clampedMinY; y <= clampedMaxY; y++) {
+        for (int x = centerX - shoreRadius; x <= centerX + shoreRadius; x++) {
+            for (int z = centerZ - shoreRadius; z <= centerZ + shoreRadius; z++) {
+                double dx = x - centerX;
+                double dz = z - centerZ;
+                double distance = Math.sqrt(dx * dx + dz * dz);
+                if (distance > shoreRadius) {
+                    continue;
+                }
+
+                int seafloorY = TerrainReplacerEngine.sampleSurface(level, new BlockPos(x, anchor.getY(), z)).y();
+                int targetTopY = resolveIslandTopY(distance, flatRadius, shoreRadius, islandTopY, seaLevel);
+                if (targetTopY <= seafloorY) {
+                    targetTopY = Math.min(islandTopY, seafloorY + 1);
+                }
+                if (targetTopY <= seafloorY) {
+                    continue;
+                }
+
+                for (int y = seafloorY; y <= targetTopY; y++) {
                     cursor.set(x, y, z);
-                    if (!level.getFluidState(cursor).isEmpty()) {
-                        return false;
+                    level.setBlock(cursor, selectIslandBlock(distance, flatRadius, shoreRadius, targetTopY, y, seaLevel), 2);
+                }
+
+                if (targetTopY >= seaLevel) {
+                    for (int y = targetTopY + 1; y <= seaLevel; y++) {
+                        cursor.set(x, y, z);
+                        if (!level.getBlockState(cursor).isAir() || !level.getFluidState(cursor).isEmpty()) {
+                            level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
+                        }
                     }
                 }
             }
         }
-        return true;
     }
 
-    private static boolean isAreaBiomeAllowed(ServerLevel level, BlockPos surface, Vec3i bunkerSize) {
-        if (bunkerSize.getX() <= 0 || bunkerSize.getZ() <= 0) {
-            return true;
+    private static int resolveIslandTopY(double distance,
+                                         int flatRadius,
+                                         int shoreRadius,
+                                         int islandTopY,
+                                         int seaLevel) {
+        if (distance <= flatRadius) {
+            return islandTopY;
         }
-        BlockPos origin = getPlacementOrigin(level, surface);
-        int minX = origin.getX();
-        int minZ = origin.getZ();
-        int maxX = minX + bunkerSize.getX() - 1;
-        int maxZ = minZ + bunkerSize.getZ() - 1;
 
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        for (int x = minX; x <= maxX; x = nextSampleCoordinate(x, maxX, BIOME_SAMPLE_STEP)) {
-            for (int z = minZ; z <= maxZ; z = nextSampleCoordinate(z, maxZ, BIOME_SAMPLE_STEP)) {
-                cursor.set(x, level.getMinBuildHeight(), z);
-                BlockPos sample = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, cursor);
-                if (!isAllowedBiome(level, sample)) {
-                    return false;
-                }
-            }
-        }
-        return true;
+        double slopeProgress = (distance - flatRadius) / Math.max(1.0D, shoreRadius - flatRadius);
+        int drop = (int) Math.round(slopeProgress * ISLAND_SLOPE_DEPTH);
+        return Math.max(seaLevel - 2, islandTopY - drop);
     }
 
-    private static boolean isAreaTerrainStable(ServerLevel level, BlockPos surface, Vec3i bunkerSize) {
-        if (bunkerSize.getX() <= 0 || bunkerSize.getZ() <= 0) {
-            return true;
-        }
-        BlockPos origin = getPlacementOrigin(level, surface);
-        int minX = origin.getX();
-        int minZ = origin.getZ();
-        int maxX = minX + bunkerSize.getX() - 1;
-        int maxZ = minZ + bunkerSize.getZ() - 1;
-
-        int minSurfaceY = Integer.MAX_VALUE;
-        int maxSurfaceY = Integer.MIN_VALUE;
-
-        for (int x = minX; x <= maxX; x = nextSampleCoordinate(x, maxX, SURFACE_SAMPLE_STEP)) {
-            for (int z = minZ; z <= maxZ; z = nextSampleCoordinate(z, maxZ, SURFACE_SAMPLE_STEP)) {
-                int y = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                        new BlockPos(x, level.getMinBuildHeight(), z)).getY();
-                minSurfaceY = Math.min(minSurfaceY, y);
-                maxSurfaceY = Math.max(maxSurfaceY, y);
-                if (maxSurfaceY - minSurfaceY > MAX_SURFACE_Y_VARIANCE) {
-                    return false;
-                }
+    private static BlockState selectIslandBlock(double distance,
+                                                int flatRadius,
+                                                int shoreRadius,
+                                                int targetTopY,
+                                                int y,
+                                                int seaLevel) {
+        if (y == targetTopY) {
+            if (targetTopY <= seaLevel || distance >= shoreRadius - 4) {
+                return Blocks.SAND.defaultBlockState();
             }
+            return Blocks.GRASS_BLOCK.defaultBlockState();
         }
 
-        return true;
+        if (y >= targetTopY - 3) {
+            if (distance >= flatRadius || targetTopY <= seaLevel) {
+                return Blocks.SANDSTONE.defaultBlockState();
+            }
+            return Blocks.DIRT.defaultBlockState();
+        }
+
+        return Blocks.STONE.defaultBlockState();
     }
 
     private static BlockPos getPlacementOrigin(ServerLevel level, BlockPos surface) {
@@ -345,58 +341,5 @@ public final class SpawnBunkerPlacer {
 
         int next = current + step;
         return Math.min(next, max);
-    }
-
-    private static BlockPos findAllowedAnchor(ServerLevel level, BlockPos baseSpawn) {
-        BlockPos surface = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                new BlockPos(baseSpawn.getX(), level.getMinBuildHeight(), baseSpawn.getZ()));
-        if (isLandBiome(level, surface) && isDrySurface(level, surface)) {
-            return surface;
-        }
-
-        int baseX = baseSpawn.getX();
-        int baseZ = baseSpawn.getZ();
-        for (int radius = LAND_SEARCH_STEP; radius <= LAND_SEARCH_RADIUS; radius += LAND_SEARCH_STEP) {
-            for (int dx = -radius; dx <= radius; dx += LAND_SEARCH_STEP) {
-                for (int dz = -radius; dz <= radius; dz += LAND_SEARCH_STEP) {
-                    if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
-                        continue;
-                    }
-
-                    int x = baseX + dx;
-                    int z = baseZ + dz;
-                    BlockPos candidate = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                            new BlockPos(x, level.getMinBuildHeight(), z));
-                    if (isLandBiome(level, candidate) && isDrySurface(level, candidate)) {
-                        return candidate;
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private static BlockPos findRequiredBiomeAnchor(ServerLevel level, BlockPos baseSpawn, Vec3i bunkerSize, int searchRadius) {
-        int baseX = baseSpawn.getX();
-        int baseZ = baseSpawn.getZ();
-        for (int radius = LAND_SEARCH_STEP; radius <= searchRadius; radius += LAND_SEARCH_STEP) {
-            for (int dx = -radius; dx <= radius; dx += LAND_SEARCH_STEP) {
-                for (int dz = -radius; dz <= radius; dz += LAND_SEARCH_STEP) {
-                    if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
-                        continue;
-                    }
-
-                    int x = baseX + dx;
-                    int z = baseZ + dz;
-                    BlockPos candidate = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                            new BlockPos(x, level.getMinBuildHeight(), z));
-                    if (isViableAnchor(level, candidate, bunkerSize)) {
-                        return candidate;
-                    }
-                }
-            }
-        }
-        return null;
     }
 }
