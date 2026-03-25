@@ -16,15 +16,12 @@ public final class ModBiomes {
 
     public static final ResourceKey<Biome> ANOMALY_PLAINS_KEY = ResourceKey.create(Registries.BIOME,
             ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "anomaly_plains"));
-    public static final ResourceKey<Biome> ANOMALY_DESERT_KEY = ResourceKey.create(Registries.BIOME,
-            ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "anomaly_desert"));
     public static final ResourceKey<Biome> ANOMALY_TUNDRA_KEY = ResourceKey.create(Registries.BIOME,
             ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "anomaly_tundra"));
     public static final ResourceKey<Biome> ANOMALY_RAINFOREST_KEY = ResourceKey.create(Registries.BIOME,
             ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "anomaly_rainforest"));
 
     public static final DeferredHolder<Biome, Biome> ANOMALY_PLAINS = BIOMES.register("anomaly_plains", AnomalyBiomes::anomalyPlains);
-    public static final DeferredHolder<Biome, Biome> ANOMALY_DESERT = BIOMES.register("anomaly_desert", AnomalyBiomes::anomalyDesert);
     public static final DeferredHolder<Biome, Biome> ANOMALY_TUNDRA = BIOMES.register("anomaly_tundra", AnomalyBiomes::anomalyTundra);
     public static final DeferredHolder<Biome, Biome> ANOMALY_RAINFOREST = BIOMES.register("anomaly_rainforest", AnomalyBiomes::anomalyRainforest);
 }

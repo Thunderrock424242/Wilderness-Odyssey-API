@@ -1,11 +1,14 @@
 # Anomaly Zone biomes
 
-This mod now registers four anomaly-zone biome variants:
+This mod now registers three anomaly-zone biome variants:
 
 - `wildernessodysseyapi:anomaly_plains`
-- `wildernessodysseyapi:anomaly_desert`
 - `wildernessodysseyapi:anomaly_tundra`
 - `wildernessodysseyapi:anomaly_rainforest`
+
+## Biome vibe note
+
+- `anomaly_plains` is tuned as a jungle + forest + plains hybrid (rolling plains, forest flowers/grass, and sparse jungle trees).
 
 ## Mob control (hard-coded)
 
@@ -16,7 +19,6 @@ All spawn lists are hard-coded in:
 You can edit each biome method to control exactly which vanilla mobs and custom mobs can spawn:
 
 - `addPlainsSpawns`
-- `addDesertSpawns`
 - `addTundraSpawns`
 - `addRainforestSpawns`
 
@@ -37,6 +39,11 @@ Current behavior while player is inside an anomaly biome:
 - Occasional electric spark "cracks"
 
 Effects disable automatically when the player leaves anomaly biomes.
+
+## Compatibility notes
+
+- TerraBlender: the mod now registers an overworld region that maps vanilla climate slots to anomaly biomes, so anomaly biomes can participate in normal and Large Biomes world presets.
+- Biolith/Lithostitched: anomaly biomes are exposed in both `minecraft:is_overworld` and common `c:is_overworld` biome tags for easier cross-mod biome matching.
 
 ## Note on world generation
 
