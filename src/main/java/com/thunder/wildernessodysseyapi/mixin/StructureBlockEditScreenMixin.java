@@ -1,10 +1,8 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.util.StructureBlockHostileSpawnContext;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Renderable;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.inventory.StructureBlockEditScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.entity.StructureBlockEntity;
@@ -22,7 +20,7 @@ public abstract class StructureBlockEditScreenMixin {
 
     @Shadow private StructureBlockEntity structure;
     @Invoker("addRenderableWidget")
-    protected abstract <T extends GuiEventListener & Renderable & NarratableEntry> T wildernessodysseyapi$invokeAddRenderableWidget(T widget);
+    protected abstract <T extends AbstractWidget> T wildernessodysseyapi$invokeAddRenderableWidget(T widget);
 
     @Unique
     private boolean wildernessodysseyapi$disableHostileSpawns;
