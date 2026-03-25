@@ -29,7 +29,6 @@
     "StructureBlockRendererMixin",
     "ClientLevelWeatherColorMixin",
     "ClientLevelTrueDarknessMixin",
-    "LightTextureTrueDarknessMixin",
-    "StructureBlockEditScreenMixin"
+    "LightTextureTrueDarknessMixin"
   ]
 }
