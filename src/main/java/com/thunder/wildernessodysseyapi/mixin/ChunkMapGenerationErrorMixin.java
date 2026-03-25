@@ -28,7 +28,6 @@ public abstract class ChunkMapGenerationErrorMixin {
     private void wildernessodysseyapi$reportChunkGenerationFailures(GenerationChunkHolder holder,
                                                                     ChunkStep step,
                                                                     StaticCache2D<GenerationChunkHolder> cache,
-                                                                    boolean loading,
                                                                     CallbackInfoReturnable<CompletableFuture<?>> cir) {
         CompletableFuture<?> original = cir.getReturnValue();
         if (original == null) {
