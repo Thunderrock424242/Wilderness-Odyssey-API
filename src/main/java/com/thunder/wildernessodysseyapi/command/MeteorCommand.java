@@ -135,18 +135,7 @@ public final class MeteorCommand {
 
         // Refine the impact to the first visible surface in this column.
         impactPos = findSurfaceFromAbove(level, impactPos, targetX, targetZ);
-
-        createImpact(level, impactPos, size, random);
-
-        BlockPos finalImpactPos = impactPos;
-        source.sendSuccess(() -> Component.literal(String.format(
-                "Meteor impact created at %d, %d, %d (size %d)",
-                finalImpactPos.getX(),
-                finalImpactPos.getY(),
-                finalImpactPos.getZ(),
-                size
-        )), true);
-        return Command.SINGLE_SUCCESS;
+        return impactPos;
     }
 
     private static BlockPos findSurfaceFromAbove(ServerLevel level, BlockPos fallback, int targetX, int targetZ) {
