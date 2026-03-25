@@ -51,7 +51,6 @@
   "command.wildernessodysseyapi.faq.not_found": "FAQ not found for id: %s",
   "command.wildernessodysseyapi.faq.no_results": "No FAQs found.",
   "command.wildernessodysseyapi.faq.search_result": "- [%s] %s: %s",
-  "command.wildernessodysseyapi.faq.list_category": "Category: %s",
   "command.wildernessodysseyapi.faq.list_entry": "- %s: %s",
   "screen.wildernessodysseyapi.world_version.title": "World Version Warning",
   "screen.wildernessodysseyapi.world_version.proceed": "Proceed (Return to Play)",
@@ -88,5 +87,11 @@
   "jukebox_song.wildernessodysseyapi.outside_the_box": "Outside the Box",
   "biome.wildernessodysseyapi.anomaly_plains": "Anomaly Plains",
   "biome.wildernessodysseyapi.anomaly_tundra": "Anomaly Tundra",
-  "biome.wildernessodysseyapi.anomaly_rainforest": "Anomaly Rainforest"
+  "biome.wildernessodysseyapi.anomaly_rainforest": "Anomaly Rainforest",
+  "command.wildernessodysseyapi.faq.list_topic": "Topic: %s",
+  "command.wildernessodysseyapi.faq.page_header": "Page %s/%s (%s results)",
+  "command.wildernessodysseyapi.faq.cooldown": "Please wait %s ms before running another FAQ query.",
+  "command.wildernessodysseyapi.faq.debug.summary": "FAQ debug — entries=%s, topics=%s, generated=%s",
+  "command.wildernessodysseyapi.faq.debug.no_result": "No-result query '%s' seen %s times",
+  "command.wildernessodysseyapi.faq.usage": "Use /faq <topic> (and optional page) to view entries. Topics:"
 }
