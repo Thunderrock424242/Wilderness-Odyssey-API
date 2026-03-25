@@ -13,6 +13,7 @@ public class AIConfig {
     private final Settings settings = new Settings();
     private final LocalModel localModel = new LocalModel();
     private final Onboarding onboarding = new Onboarding();
+    private final Fallback fallback = new Fallback();
 
     public List<String> getStory() {
         return story;
@@ -48,6 +49,10 @@ public class AIConfig {
 
     public Onboarding getOnboarding() {
         return onboarding;
+    }
+
+    public Fallback getFallback() {
+        return fallback;
     }
 
     public static class LocalModel {
@@ -178,7 +183,6 @@ public class AIConfig {
             this.modelFileName = modelFileName;
         }
     }
-
 
     public static class Personality {
         private String name;
@@ -312,6 +316,98 @@ public class AIConfig {
 
         public List<String> getResponses() {
             return responses;
+        }
+    }
+
+    public static class Fallback {
+        private Boolean enabled;
+        private String menuPrompt;
+        private String unavailableHint;
+        private final List<FallbackPersona> personas = new ArrayList<>();
+
+        public Boolean getEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(Boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getMenuPrompt() {
+            return menuPrompt;
+        }
+
+        public void setMenuPrompt(String menuPrompt) {
+            this.menuPrompt = menuPrompt;
+        }
+
+        public String getUnavailableHint() {
+            return unavailableHint;
+        }
+
+        public void setUnavailableHint(String unavailableHint) {
+            this.unavailableHint = unavailableHint;
+        }
+
+        public List<FallbackPersona> getPersonas() {
+            return personas;
+        }
+    }
+
+    public static class FallbackPersona {
+        private String name;
+        private String introduction;
+        private final List<String> aliases = new ArrayList<>();
+        private final List<FallbackPrompt> prompts = new ArrayList<>();
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getIntroduction() {
+            return introduction;
+        }
+
+        public void setIntroduction(String introduction) {
+            this.introduction = introduction;
+        }
+
+        public List<String> getAliases() {
+            return aliases;
+        }
+
+        public List<FallbackPrompt> getPrompts() {
+            return prompts;
+        }
+    }
+
+    public static class FallbackPrompt {
+        private String label;
+        private String response;
+        private final List<String> triggers = new ArrayList<>();
+
+        public String getLabel() {
+            return label;
+        }
+
+        public void setLabel(String label) {
+            this.label = label;
+        }
+
+        public String getResponse() {
+            return response;
+        }
+
+        public void setResponse(String response) {
+            this.response = response;
+        }
+
+        public List<String> getTriggers() {
+            return triggers;
         }
     }
 }

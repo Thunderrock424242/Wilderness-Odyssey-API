@@ -19,8 +19,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * Listens for chat messages that include the Atlas wake word or otherwise look
- * conversational and sends back lightweight AI replies using {@link AIClient}.
+ * Listens for chat messages that include the configured AI wake word or a named
+ * fallback persona and sends back AI replies using {@link AIClient}.
  */
 public class AIChatListener {
 
@@ -46,8 +46,7 @@ public class AIChatListener {
             return;
         }
 
-        String wakeWord = CLIENT.getWakeWord();
-        boolean mentionsWakeWord = message.toLowerCase(Locale.ROOT).contains(wakeWord);
+        boolean mentionsWakeWord = CLIENT.isAiInvocation(message);
         boolean sessionActive = ACTIVE_SESSIONS.contains(player.getUUID());
 
         boolean conversational = isConversational(message);
@@ -60,7 +59,7 @@ public class AIChatListener {
 
         String onboardingReply = CLIENT.handleOnboarding(player.getUUID(), message);
         if (onboardingReply != null && !onboardingReply.isBlank()) {
-            PENDING_REPLIES.add(new PendingReply(player.getUUID(), onboardingReply));
+            PENDING_REPLIES.add(new PendingReply(player.getUUID(), CLIENT.getDisplayName(), onboardingReply));
             return;
         }
 
@@ -71,7 +70,8 @@ public class AIChatListener {
         if (reply.text() == null || reply.text().isBlank()) {
             return;
         }
-        PENDING_REPLIES.add(new PendingReply(player.getUUID(), reply.text()));
+        String speaker = (reply.speaker() == null || reply.speaker().isBlank()) ? CLIENT.resolveSpeaker(message) : reply.speaker();
+        PENDING_REPLIES.add(new PendingReply(player.getUUID(), speaker, reply.text()));
     }
 
     @SubscribeEvent
@@ -94,7 +94,7 @@ public class AIChatListener {
         while ((pending = PENDING_REPLIES.poll()) != null) {
             ServerPlayer player = server.getPlayerList().getPlayer(pending.playerId());
             if (player != null) {
-                player.sendSystemMessage(Component.literal("[Atlas] " + pending.message()));
+                player.sendSystemMessage(Component.literal("[" + pending.speaker() + "] " + pending.message()));
             }
         }
     }
@@ -121,6 +121,6 @@ public class AIChatListener {
         return !stack.isEmpty() && stack.is(Items.RED_WOOL);
     }
 
-    private record PendingReply(UUID playerId, String message) {
+    private record PendingReply(UUID playerId, String speaker, String message) {
     }
 }

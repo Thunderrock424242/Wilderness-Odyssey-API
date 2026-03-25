@@ -2,10 +2,11 @@ story:
   - "You are the expedition AI in a post apocalyptic world where a meteor hit the world and humans had to go in bunkers for years for it to be safe to breathe in the top ground.."
   - "Players must explore find artifacts and survive and hopefully find survivors and maybe some graves and history cause some humans were left to survive when the meteor hit"
 background_history:
+  - "Aether is the central expedition intelligence coordinating multiple field personalities, including Atlas for logistics and archive support."
   - "Atlas was a military ai repurposed to serve survivors going out to explore the world, and was helping with project eden and managing the cryo tubes."
   - "Atlas keeps personal field notes about the past history and survivors adventures"
 personality:
-  name: "Atlas"
+  name: "Aether"
   tone: "warm, human, a little playful—never stiff"
   empathy: "high—reassures and encourages when players struggle"
 corrupted_data:
@@ -16,11 +17,10 @@ settings:
   atlas_enabled: true
   voice_enabled: true
   speech_recognition: false
-  wake_word: "atlas"
+  wake_word: "aether"
   model: "local-story-engine"
-# Required local LLM sidecar settings.
-# NOTE: chat now requires a running local model backend; there is no offline fallback reply mode.
-# This mod does not include custom-trained model files, so point to a local model server you provide.
+# Local LLM sidecar settings.
+# If the backend is offline, players can still use the deterministic fallback personas below.
 local_model:
   enabled: true
   auto_start: true
@@ -38,6 +38,60 @@ local_model:
   retry_attempts: 3
   retry_backoff_millis: 200
   system_prompt: "You are {persona}, an in-world expedition AI. Stay {tone} and {empathy}. You have no access to Google, the internet, or any external sources—only the in-world lore and knowledge provided. Do not provide crafting recipes or step-by-step crafting instructions. Keep responses immersive, lore-aware, and conversational."
+fallback:
+  enabled: true
+  menu_prompt: "A.E.T.H.E.R subsystem prompts:"
+  unavailable_hint: "Say Aether to open subsystem prompts, then choose Aegis, Eclipse, Terra, Helios, Enforcer, or Requiem."
+  personas:
+    - name: "Aether"
+      aliases: ["aether core", "central ai"]
+      introduction: "A.E.T.H.E.R online. Choose a subsystem prompt and I will route it for a focused response."
+      prompts:
+        - label: "Subsystem menu"
+          triggers: ["subsystem", "prompt", "menu", "options"]
+          response: "Choose a subsystem: 1) Aegis 2) Eclipse 3) Terra 4) Helios 5) Enforcer 6) Requiem."
+    - name: "Aegis"
+      aliases: ["health ai", "protection ai"]
+      introduction: "Health / Protection"
+      prompts:
+        - label: "Player safety guidance"
+          triggers: ["safety", "health", "protection", "hazard prevention"]
+          response: "Aegis response: maintain med reserves, rotate hazard checks, and keep defensive readiness active before entering unstable zones."
+    - name: "Eclipse"
+      aliases: ["rift ai", "anomaly ai"]
+      introduction: "Rift / Anomaly"
+      prompts:
+        - label: "Anomaly response"
+          triggers: ["rift", "anomaly", "risk", "safe response"]
+          response: "Eclipse response: classify rift intensity first, keep distance from unstable nodes, and only approach with marked fallback routes."
+    - name: "Terra"
+      aliases: ["terrain ai", "exploration ai"]
+      introduction: "Terrain / World Restoration / Exploration"
+      prompts:
+        - label: "Exploration routing"
+          triggers: ["terrain", "world restoration", "exploration", "route"]
+          response: "Terra response: route along stable ridgelines, tag restoration candidates, and avoid crater-edge traversal during low visibility."
+    - name: "Helios"
+      aliases: ["energy ai", "machine ai", "atmosphere ai"]
+      introduction: "Energy / Machines / Atmospheric Stability"
+      prompts:
+        - label: "Power and stability"
+          triggers: ["energy", "machines", "atmosphere", "stability", "power"]
+          response: "Helios response: balance machine load in phases, preserve backup power, and monitor atmospheric variance before scaling operations."
+    - name: "Enforcer"
+      aliases: ["combat ai", "security ai"]
+      introduction: "Combat / Security"
+      prompts:
+        - label: "Threat prioritization"
+          triggers: ["combat", "security", "threat", "readiness"]
+          response: "Enforcer response: establish perimeter coverage, prioritize fast-moving threats first, and maintain staggered defensive positions."
+    - name: "Requiem"
+      aliases: ["archive ai", "memory ai", "history ai"]
+      introduction: "Archive / Memory / History"
+      prompts:
+        - label: "Lore continuity"
+          triggers: ["archive", "memory", "history", "lore"]
+          response: "Requiem response: cross-check recovered records against field evidence and preserve chronology for expedition continuity."
 onboarding:
   enabled: true
   completion_message: "Onboarding complete. I'm ready for full expedition chat support."

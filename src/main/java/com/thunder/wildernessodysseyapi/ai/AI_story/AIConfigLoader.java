@@ -129,6 +129,12 @@ public final class AIConfigLoader {
         }
         config.getOnboarding().getSteps().addAll(steps);
 
+        Map<String, Object> fallback = readStringObjectMap(root.get("fallback"));
+        config.getFallback().setEnabled(readBoolean(fallback.get("enabled")));
+        config.getFallback().setMenuPrompt(readStringValue(fallback.get("menu_prompt")));
+        config.getFallback().setUnavailableHint(readStringValue(fallback.get("unavailable_hint")));
+        config.getFallback().getPersonas().addAll(readFallbackPersonas(fallback.get("personas")));
+
         return config;
     }
 
@@ -264,6 +270,48 @@ public final class AIConfigLoader {
             results.put(entry.getKey().toString(), entry.getValue());
         }
         return results;
+    }
+
+
+    private static List<AIConfig.FallbackPersona> readFallbackPersonas(Object value) {
+        if (!(value instanceof Iterable<?> items)) {
+            return List.of();
+        }
+        List<AIConfig.FallbackPersona> personas = new ArrayList<>();
+        for (Object entry : items) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                continue;
+            }
+            AIConfig.FallbackPersona persona = new AIConfig.FallbackPersona();
+            persona.setName(readStringValue(map.get("name")));
+            persona.setIntroduction(readStringValue(map.get("introduction")));
+            persona.getAliases().addAll(readStringList(map.get("aliases")));
+            persona.getPrompts().addAll(readFallbackPrompts(map.get("prompts")));
+            if (persona.getName() != null && !persona.getName().isBlank() && !persona.getPrompts().isEmpty()) {
+                personas.add(persona);
+            }
+        }
+        return personas;
+    }
+
+    private static List<AIConfig.FallbackPrompt> readFallbackPrompts(Object value) {
+        if (!(value instanceof Iterable<?> items)) {
+            return List.of();
+        }
+        List<AIConfig.FallbackPrompt> prompts = new ArrayList<>();
+        for (Object entry : items) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                continue;
+            }
+            AIConfig.FallbackPrompt prompt = new AIConfig.FallbackPrompt();
+            prompt.setLabel(readStringValue(map.get("label")));
+            prompt.setResponse(readStringValue(map.get("response")));
+            prompt.getTriggers().addAll(readStringList(map.get("triggers")));
+            if (prompt.getLabel() != null && !prompt.getLabel().isBlank()) {
+                prompts.add(prompt);
+            }
+        }
+        return prompts;
     }
 
     private static List<AIConfig.OnboardingStep> readOnboardingSteps(Object value) {

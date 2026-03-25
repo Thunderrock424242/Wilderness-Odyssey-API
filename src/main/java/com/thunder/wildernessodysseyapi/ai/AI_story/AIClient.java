@@ -31,6 +31,7 @@ public class AIClient {
     private final MemoryStore memoryStore = new MemoryStore();
     private final AIKnowledgeStore knowledgeStore = new AIKnowledgeStore();
     private final AIOnboardingStore onboardingStore = new AIOnboardingStore();
+    private final AIFallbackResponder fallbackResponder = new AIFallbackResponder();
     private LocalModelClient localModelClient;
     private String localSystemPrompt;
     private boolean autoStartLocalServer;
@@ -59,8 +60,24 @@ public class AIClient {
         return settings.getWakeWord();
     }
 
+    public String getDisplayName() {
+        return settings.getPersonaName();
+    }
+
     public boolean isAtlasEnabled() {
         return settings.isAtlasEnabled();
+    }
+
+    public boolean isAiInvocation(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String lower = message.toLowerCase(Locale.ROOT);
+        return lower.contains(settings.getWakeWord()) || fallbackResponder.findMentionedPersonaName(message).isPresent();
+    }
+
+    public String resolveSpeaker(String message) {
+        return fallbackResponder.findMentionedPersonaName(message).orElse(settings.getPersonaName());
     }
 
     private void loadStory() {
@@ -71,6 +88,7 @@ public class AIClient {
         applySettings(config);
         configureLocalModel(config.getLocalModel());
         configureOnboarding(config.getOnboarding());
+        fallbackResponder.configure(config.getFallback(), settings.getPersonaName(), settings.getWakeWord());
     }
 
     public synchronized void scanGameData(MinecraftServer server) {
@@ -200,16 +218,17 @@ public class AIClient {
 
     public VoiceIntegration.VoiceResult sendMessageWithVoice(String world, String player, String message) {
         if (!settings.isAtlasEnabled()) {
-            return voiceIntegration.wrap("");
+            return voiceIntegration.wrap(settings.getPersonaName(), "");
         }
+        String speaker = resolveSpeaker(message);
         String learnedFact = knowledgeStore.extractLearnedFact(message);
         if (learnedFact != null) {
             boolean added = knowledgeStore.addFact(learnedFact);
             String reply = added
                     ? "Got it. I'll remember: " + learnedFact
                     : "I already have that logged: " + learnedFact;
-            memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
-            return voiceIntegration.wrap(reply);
+            memoryStore.addAiMessage(world, player, speaker, reply);
+            return voiceIntegration.wrap(speaker, reply);
         }
         memoryStore.addPlayerMessage(world, player, message);
         String context = memoryStore.getRecentContext(world, player);
@@ -217,10 +236,18 @@ public class AIClient {
         if (!knowledgeContext.isBlank()) {
             context = context.isBlank() ? knowledgeContext : context + "\n" + knowledgeContext;
         }
+        var deterministicFallback = fallbackResponder.buildReply(message);
         if (localModelClient == null) {
-            String reply = buildModelUnavailableReply(false, false);
-            memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
-            return voiceIntegration.wrap(reply);
+            String reply = deterministicFallback.map(AIFallbackResponder.FallbackReply::text)
+                    .orElseGet(() -> buildModelUnavailableReply(false, false, message));
+            memoryStore.addAiMessage(world, player, speaker, reply);
+            return voiceIntegration.wrap(speaker, reply);
+        }
+        if (deterministicFallback.isPresent()
+                && (!deterministicFallback.get().menu() || shouldPreferFallback(message))) {
+            String reply = deterministicFallback.get().text();
+            memoryStore.addAiMessage(world, player, deterministicFallback.get().speaker(), reply);
+            return voiceIntegration.wrap(deterministicFallback.get().speaker(), reply);
         }
         String prompt = formatSystemPrompt(localSystemPrompt);
         String localContext = buildLocalModelContext(world, context);
@@ -228,19 +255,20 @@ public class AIClient {
         var response = requestLocalReplyWithRetry(prompt, message, localContext);
         if (response.isPresent()) {
             String reply = response.get();
-            memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
-            return voiceIntegration.wrap(reply);
+            memoryStore.addAiMessage(world, player, speaker, reply);
+            return voiceIntegration.wrap(speaker, reply);
         }
         RetryResult retry = retryLocalModelAfterStart(prompt, message, localContext);
         if (retry.response().isPresent()) {
             String reply = retry.response().get();
-            memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
-            return voiceIntegration.wrap(reply);
+            memoryStore.addAiMessage(world, player, speaker, reply);
+            return voiceIntegration.wrap(speaker, reply);
         }
         startAttempted = startAttempted || retry.started();
-        String reply = buildModelUnavailableReply(true, startAttempted);
-        memoryStore.addAiMessage(world, player, settings.getPersonaName(), reply);
-        return voiceIntegration.wrap(reply);
+        String reply = deterministicFallback.map(AIFallbackResponder.FallbackReply::text)
+                .orElseGet(() -> buildModelUnavailableReply(true, startAttempted, message));
+        memoryStore.addAiMessage(world, player, speaker, reply);
+        return voiceIntegration.wrap(speaker, reply);
     }
 
     public String handleOnboarding(UUID playerId, String message) {
@@ -498,9 +526,22 @@ public class AIClient {
         return builder.toString().trim();
     }
 
-    private String buildModelUnavailableReply(boolean modelUnavailable, boolean startAttempted) {
+    private boolean shouldPreferFallback(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String lower = message.toLowerCase(Locale.ROOT);
+        return lower.contains("prompt")
+                || lower.contains("option")
+                || lower.contains("menu")
+                || lower.contains("fallback")
+                || lower.contains("preset")
+                || lower.contains("list");
+    }
+
+    private String buildModelUnavailableReply(boolean modelUnavailable, boolean startAttempted, String message) {
         StringBuilder reply = new StringBuilder();
-        reply.append("Local Atlas LLM is required and no offline fallback is enabled.");
+        reply.append("Local ").append(settings.getPersonaName()).append(" LLM is unavailable right now.");
         if (modelUnavailable) {
             reply.append(" I could not get a response from the configured local model backend");
             if (localModelBaseUrl != null && !localModelBaseUrl.isBlank()) {
@@ -515,6 +556,9 @@ public class AIClient {
         }
         if (localModelDownloadUrl != null && !localModelDownloadUrl.isBlank() && localModelFilePath == null) {
             reply.append(" Model bootstrap is configured but the artifact could not be prepared from model_download_url.");
+        }
+        if (!fallbackResponder.buildReply(message).isPresent()) {
+            return fallbackResponder.appendUnavailableHint(reply.toString());
         }
         return reply.toString();
     }

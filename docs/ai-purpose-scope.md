@@ -44,7 +44,7 @@ Use this as the handoff checklist for anyone building or integrating AI features
   - Backend endpoint config (local sidecar or hosted service).
 - **Reliability behavior**
   - Timeouts, retries, and backoff for AI calls.
-  - Graceful backend-unavailable fallback messaging.
+  - Graceful backend-unavailable fallback messaging, including deterministic prompt-menu personas for lightweight mode.
 - **Performance safeguards**
   - Async execution only; never block server tick/world thread.
   - Queue limits/rate limiting to avoid lag spikes.
@@ -71,7 +71,7 @@ Use this as the handoff checklist for anyone building or integrating AI features
 - A.E.T.H.E.R responds in-world with consistent tone and roleplay behavior.
 - Subsystem routing is available (explicit or automatic) for the six domains.
 - Onboarding steps complete successfully with selectable options.
-- Backend failures return a friendly fallback message in-game.
+- Backend failures return a friendly fallback message in-game, with optional named persona prompt menus.
 - AI requests are async and do not degrade TPS under normal load.
 - Admin can verify backend status from commands/logs.
 
