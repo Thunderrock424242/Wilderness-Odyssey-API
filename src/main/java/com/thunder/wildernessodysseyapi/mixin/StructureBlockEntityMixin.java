@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.bridge.StructureBlockCornerCacheBridge;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.util.StructureBlockCornerCache;
 import com.thunder.wildernessodysseyapi.util.NbtCompressionUtils;
 import com.thunder.wildernessodysseyapi.util.StructureBlockHostileSpawnContext;
@@ -838,7 +839,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
             root.put("entities", filteredEntities);
             NbtIo.writeCompressed(root, structurePath);
         } catch (Exception exception) {
-            com.thunder.wildernessodysseyapi.ModConstants.LOGGER.warn("Failed stripping hostile entities from saved structure {}", structurePath, exception);
+            ModConstants.LOGGER.warn("Failed stripping hostile entities from saved structure {}", structurePath, exception);
         }
     }
 
