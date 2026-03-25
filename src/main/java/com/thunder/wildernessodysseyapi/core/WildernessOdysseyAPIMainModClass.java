@@ -26,6 +26,7 @@ import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
 import com.thunder.wildernessodysseyapi.command.ModpackStructureCommand;
+import com.thunder.wildernessodysseyapi.command.MeteorCommand;
 import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.config.CloakChipConfig;
 import com.thunder.wildernessodysseyapi.config.CurioRenderConfig;
@@ -223,6 +224,7 @@ public class WildernessOdysseyAPIMainModClass {
         TelemetryQueueStatsCommand.register(dispatcher);
         FeedbackCommand.register(dispatcher);
         WorldUpgradeCommand.register(dispatcher);
+        MeteorCommand.register(dispatcher);
         AIBackendCommand.register(dispatcher);
     }
 
