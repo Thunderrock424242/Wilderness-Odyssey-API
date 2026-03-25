@@ -1,0 +1,4 @@
+prompts:
+  - label: "Lore continuity"
+    triggers: ["archive", "memory", "history", "lore"]
+    response: "Requiem response: cross-check recovered records against field evidence and preserve chronology for expedition continuity."

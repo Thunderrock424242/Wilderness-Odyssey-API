@@ -1,0 +1,4 @@
+prompts:
+  - label: "Exploration routing"
+    triggers: ["terrain", "world restoration", "exploration", "route"]
+    response: "Terra response: route along stable ridgelines, tag restoration candidates, and avoid crater-edge traversal during low visibility."

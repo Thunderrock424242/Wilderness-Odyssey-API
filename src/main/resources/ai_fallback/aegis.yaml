@@ -1,0 +1,4 @@
+prompts:
+  - label: "Player safety guidance"
+    triggers: ["safety", "health", "protection", "hazard prevention"]
+    response: "Aegis response: maintain med reserves, rotate hazard checks, and keep defensive readiness active before entering unstable zones."

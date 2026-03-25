@@ -1,0 +1,4 @@
+prompts:
+  - label: "Anomaly response"
+    triggers: ["rift", "anomaly", "risk", "safe response"]
+    response: "Eclipse response: classify rift intensity first, keep distance from unstable nodes, and only approach with marked fallback routes."

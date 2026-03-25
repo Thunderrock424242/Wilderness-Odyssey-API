@@ -5,7 +5,7 @@ package com.thunder.wildernessodysseyapi.ai.AI_story;
  */
 public class VoiceIntegration {
 
-    public record VoiceResult(String text, String voiceLine, boolean voiceQueued, boolean speechInputAllowed) {
+    public record VoiceResult(String speaker, String text, String voiceLine, boolean voiceQueued, boolean speechInputAllowed) {
     }
 
     private final AISettings settings;
@@ -14,7 +14,7 @@ public class VoiceIntegration {
         this.settings = settings;
     }
 
-    public VoiceResult wrap(String text) {
-        return new VoiceResult(text, null, false, settings.isSpeechRecognition());
+    public VoiceResult wrap(String speaker, String text) {
+        return new VoiceResult(speaker, text, null, false, settings.isSpeechRecognition());
     }
 }

@@ -53,7 +53,7 @@ These are pulled from Maven Central and can be used by any local or sidecar AI h
 Self-hosted AI chatbot (custom local LLM required)
 -------------------------------------
 AI purpose checklist: see `docs/ai-purpose-scope.md` for A.E.T.H.E.R core + subsystem scope, boundaries, and MVP definition.
-Atlas now requires a local custom LLM backend for runtime responses. There is no deterministic offline fallback path in chat mode.
+A.E.T.H.E.R. can use a local custom LLM backend for full runtime responses, and it now also supports deterministic fallback personas when players prefer a lighter-weight menu flow.
 
 Local LLM support is sidecar-based:
 - This repo does **not** bundle custom-trained LLM model weight files.
@@ -63,7 +63,8 @@ Local LLM support is sidecar-based:
 - For a better packaging workflow, you can set `model_download_url`, `model_download_sha256`, and `model_file_name` so the model artifact is bootstrapped into `config/wildernessodysseyapi/local-model/models/` at runtime.
 - You can use `{model_path}`, `{model_name}`, and `{base_url}` placeholders in `start_command` / `bundled_server_args`.
 
-If the local model is unavailable, Atlas returns a backend-unavailable message and instructs operators to restore the local model service.
+If the local model is unavailable, players can still address Aether to open a subsystem menu and route deterministic replies from Aegis, Eclipse, Terra, Helios, Enforcer, or Requiem via `ai_config.yaml`.
+Each subsystem can keep its own prompt library in a separate file under `src/main/resources/ai_fallback/`, referenced by `fallback.personas[].prompt_file`.
 
 Admin commands for sidecar operations:
 - `/atlasbackend status`
