@@ -14,14 +14,11 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
-import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseFireBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -136,14 +133,33 @@ public final class MeteorCommand {
         int targetZ = Mth.floor(origin.z + Math.sin(angle) * distance);
         BlockPos impactPos = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, new BlockPos(targetX, 0, targetZ));
 
-        // If an overhang exists, ray trace down so impact feels grounded to visible terrain.
-        Vec3 start = new Vec3(targetX + 0.5, impactPos.getY() + 40, targetZ + 0.5);
-        Vec3 end = new Vec3(targetX + 0.5, impactPos.getY() - 20, targetZ + 0.5);
-        BlockHitResult hitResult = level.clip(new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, (Entity) null));
-        if (hitResult.getType() == HitResult.Type.BLOCK) {
-            impactPos = hitResult.getBlockPos().above();
+        // Refine the impact to the first visible surface in this column.
+        impactPos = findSurfaceFromAbove(level, impactPos, targetX, targetZ);
+
+        createImpact(level, impactPos, size, random);
+
+        BlockPos finalImpactPos = impactPos;
+        source.sendSuccess(() -> Component.literal(String.format(
+                "Meteor impact created at %d, %d, %d (size %d)",
+                finalImpactPos.getX(),
+                finalImpactPos.getY(),
+                finalImpactPos.getZ(),
+                size
+        )), true);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static BlockPos findSurfaceFromAbove(ServerLevel level, BlockPos fallback, int targetX, int targetZ) {
+        int maxY = Math.min(level.getMaxBuildHeight() - 1, fallback.getY() + 40);
+        int minY = Math.max(level.getMinBuildHeight(), fallback.getY() - 20);
+
+        for (int y = maxY; y >= minY; y--) {
+            BlockPos cursor = new BlockPos(targetX, y, targetZ);
+            if (!level.getBlockState(cursor).isAir()) {
+                return cursor.above();
+            }
         }
-        return impactPos;
+        return fallback;
     }
 
     private static void createImpact(ServerLevel level, BlockPos impactPos, int size, RandomSource random) {
