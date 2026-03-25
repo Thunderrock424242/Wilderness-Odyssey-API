@@ -1,0 +1,16 @@
+[
+  {
+    "id": "meteor_location",
+    "category": "meteor",
+    "question": "Where does the meteor crash?",
+    "answer": "It happens once per world in the anomaly_zone biome.",
+    "aliases": ["impact", "crash site", "meteor spawn"]
+  },
+  {
+    "id": "meteor_intro",
+    "category": "meteor",
+    "question": "How do I find the first meteor site?",
+    "answer": "Follow the glowing amethyst shards around spawn and track the densest shard trail.",
+    "aliases": ["start", "begin", "first site"]
+  }
+]
