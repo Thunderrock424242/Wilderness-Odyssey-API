@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
+import com.thunder.wildernessodysseyapi.bridge.StructureBlockHostileSpawnToggleBridge;
+import com.thunder.wildernessodysseyapi.util.StructureBlockHostileSpawnContext;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
@@ -10,6 +12,7 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -18,7 +21,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Extends the structure block packet so it can transmit the expanded capture limits.
  */
 @Mixin(ServerboundSetStructureBlockPacket.class)
-public abstract class ServerboundSetStructureBlockPacketMixin {
+public abstract class ServerboundSetStructureBlockPacketMixin implements StructureBlockHostileSpawnToggleBridge {
+
+    @Unique
+    private boolean wildernessodysseyapi$disableHostileSpawns;
 
     @Shadow @Final @Mutable private BlockPos offset;
     @Shadow @Final @Mutable private Vec3i size;
@@ -34,6 +40,9 @@ public abstract class ServerboundSetStructureBlockPacketMixin {
         buffer.writeVarInt(Mth.clamp(this.size.getX(), 0, maxSize));
         buffer.writeVarInt(Mth.clamp(this.size.getY(), 0, maxSize));
         buffer.writeVarInt(Mth.clamp(this.size.getZ(), 0, maxSize));
+        this.wildernessodysseyapi$disableHostileSpawns = this.wildernessodysseyapi$disableHostileSpawns
+                || StructureBlockHostileSpawnContext.isDisableHostileSpawns();
+        buffer.writeBoolean(this.wildernessodysseyapi$disableHostileSpawns);
     }
 
     @Inject(method = "<init>(Lnet/minecraft/network/FriendlyByteBuf;)V", at = @At("TAIL"))
@@ -55,8 +64,23 @@ public abstract class ServerboundSetStructureBlockPacketMixin {
 
             this.offset = new BlockPos(offsetX, offsetY, offsetZ);
             this.size = new Vec3i(sizeX, sizeY, sizeZ);
+            if (buffer.isReadable()) {
+                this.wildernessodysseyapi$disableHostileSpawns = buffer.readBoolean();
+            }
         } catch (IndexOutOfBoundsException ignored) {
             // Fall back to the vanilla bounds if the extra payload was not present.
         }
     }
+
+
+    @Override
+    public boolean wildernessodysseyapi$isHostileSpawnsDisabled() {
+        return this.wildernessodysseyapi$disableHostileSpawns;
+    }
+
+    @Override
+    public void wildernessodysseyapi$setHostileSpawnsDisabled(boolean disabled) {
+        this.wildernessodysseyapi$disableHostileSpawns = disabled;
+    }
+
 }
