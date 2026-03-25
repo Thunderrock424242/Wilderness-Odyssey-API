@@ -17,6 +17,7 @@ import com.thunder.wildernessodysseyapi.worldgen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.worldgen.processor.ModProcessors;
 import com.thunder.wildernessodysseyapi.worldgen.biome.ModBiomes;
+import com.thunder.wildernessodysseyapi.worldgen.biome.BiomeCompatibilityBootstrap;
 import com.thunder.wildernessodysseyapi.worldgen.modpack.ModpackStructureRegistry;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
@@ -27,6 +28,7 @@ import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
 import com.thunder.wildernessodysseyapi.command.ModpackStructureCommand;
 import com.thunder.wildernessodysseyapi.command.MeteorCommand;
+import com.thunder.wildernessodysseyapi.command.UnstuckCommand;
 import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
 import com.thunder.wildernessodysseyapi.config.CloakChipConfig;
 import com.thunder.wildernessodysseyapi.config.CurioRenderConfig;
@@ -174,6 +176,7 @@ public class WildernessOdysseyAPIMainModClass {
 
     private void commonSetup(final FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
+            BiomeCompatibilityBootstrap.initialize();
             System.out.println("Wilderness Odyssey setup complete!");
         });
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
@@ -225,6 +228,7 @@ public class WildernessOdysseyAPIMainModClass {
         FeedbackCommand.register(dispatcher);
         WorldUpgradeCommand.register(dispatcher);
         MeteorCommand.register(dispatcher);
+        UnstuckCommand.register(dispatcher);
         AIBackendCommand.register(dispatcher);
     }
 

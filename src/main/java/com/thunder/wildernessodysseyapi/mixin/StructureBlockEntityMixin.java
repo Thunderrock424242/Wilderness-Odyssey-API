@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.thunder.wildernessodysseyapi.bridge.StructureBlockCornerCacheBridge;
 import com.thunder.wildernessodysseyapi.util.StructureBlockCornerCache;
 import com.thunder.wildernessodysseyapi.util.NbtCompressionUtils;
+import com.thunder.wildernessodysseyapi.util.StructureBlockHostileSpawnContext;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -24,6 +25,12 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.util.Mth;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.storage.LevelResource;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -775,8 +782,9 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         if (structureName == null || structureName.isBlank()) {
             return;
         }
+        boolean disableHostileSpawns = StructureBlockHostileSpawnContext.isDisableHostileSpawns();
         int compressionLevel = StructureBlockSettings.getStructureCompressionLevel();
-        if (compressionLevel <= 0) {
+        if (!disableHostileSpawns && compressionLevel <= 0) {
             return;
         }
 
@@ -791,7 +799,47 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
             return;
         }
 
-        NbtCompressionUtils.rewriteCompressedAsync(structurePath, compressionLevel, com.thunder.wildernessodysseyapi.io.CompressionCodec.VANILLA_GZIP);
+        if (disableHostileSpawns) {
+            wildernessodysseyapi$stripHostileEntities(structurePath);
+        }
+        if (compressionLevel > 0) {
+            NbtCompressionUtils.rewriteCompressedAsync(structurePath, compressionLevel, com.thunder.wildernessodysseyapi.io.CompressionCodec.VANILLA_GZIP);
+        }
+    }
+
+    @Unique
+    private static void wildernessodysseyapi$stripHostileEntities(java.nio.file.Path structurePath) {
+        try {
+            CompoundTag root = NbtIo.readCompressed(structurePath);
+            if (root == null || !root.contains("entities", Tag.TAG_LIST)) {
+                return;
+            }
+            ListTag sourceEntities = root.getList("entities", Tag.TAG_COMPOUND);
+            if (sourceEntities.isEmpty()) {
+                return;
+            }
+
+            ListTag filteredEntities = new ListTag();
+            for (int i = 0; i < sourceEntities.size(); i++) {
+                CompoundTag entityEntry = sourceEntities.getCompound(i);
+                CompoundTag entityNbt = entityEntry.getCompound("nbt");
+                String id = entityNbt.getString("id");
+                if (id.isBlank()) {
+                    filteredEntities.add(entityEntry.copy());
+                    continue;
+                }
+                EntityType<?> entityType = BuiltInRegistries.ENTITY_TYPE.getOptional(ResourceLocation.tryParse(id)).orElse(null);
+                if (entityType != null && entityType.getCategory() == MobCategory.MONSTER) {
+                    continue;
+                }
+                filteredEntities.add(entityEntry.copy());
+            }
+
+            root.put("entities", filteredEntities);
+            NbtIo.writeCompressed(root, structurePath);
+        } catch (Exception exception) {
+            com.thunder.wildernessodysseyapi.ModConstants.LOGGER.warn("Failed stripping hostile entities from saved structure {}", structurePath, exception);
+        }
     }
 
     @Unique

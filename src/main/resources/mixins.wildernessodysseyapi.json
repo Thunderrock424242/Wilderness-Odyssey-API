@@ -15,7 +15,8 @@
     "ServerboundSetStructureBlockPacketMixin",
     "StructureBlockEntityMixin",
     "StructureTemplateAccessor",
-    "StructureTemplatePaletteAccessor"
+    "StructureTemplatePaletteAccessor",
+    "ServerGamePacketListenerImplMixin"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -28,6 +29,7 @@
     "StructureBlockRendererMixin",
     "ClientLevelWeatherColorMixin",
     "ClientLevelTrueDarknessMixin",
-    "LightTextureTrueDarknessMixin"
+    "LightTextureTrueDarknessMixin",
+    "StructureBlockEditScreenMixin"
   ]
 }
