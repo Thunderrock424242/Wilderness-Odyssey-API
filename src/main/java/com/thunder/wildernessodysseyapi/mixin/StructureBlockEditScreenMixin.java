@@ -11,6 +11,7 @@ import net.minecraft.world.level.block.entity.StructureBlockEntity;
 import net.minecraft.world.level.block.state.properties.StructureMode;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -20,7 +21,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class StructureBlockEditScreenMixin {
 
     @Shadow private StructureBlockEntity structure;
-    @Shadow protected abstract <T extends GuiEventListener & Renderable & NarratableEntry> T addRenderableWidget(T widget);
+    @Invoker("addRenderableWidget")
+    protected abstract <T extends GuiEventListener & Renderable & NarratableEntry> T wildernessodysseyapi$invokeAddRenderableWidget(T widget);
 
     @Unique
     private boolean wildernessodysseyapi$disableHostileSpawns;
@@ -32,7 +34,7 @@ public abstract class StructureBlockEditScreenMixin {
         StructureBlockEditScreen screen = (StructureBlockEditScreen) (Object) this;
         int x = screen.width / 2 - 152;
         int y = screen.height / 4 + 144;
-        this.wildernessodysseyapi$disableHostileSpawnsButton = this.addRenderableWidget(Button
+        this.wildernessodysseyapi$disableHostileSpawnsButton = this.wildernessodysseyapi$invokeAddRenderableWidget(Button
                 .builder(wildernessodysseyapi$toggleLabel(), button -> wildernessodysseyapi$toggleDisableHostileSpawns())
                 .bounds(x, y, 304, 20)
                 .build());
