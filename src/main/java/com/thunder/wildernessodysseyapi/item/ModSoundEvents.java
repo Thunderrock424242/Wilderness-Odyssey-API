@@ -26,6 +26,21 @@ public final class ModSoundEvents {
             () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MOD_ID, "outside_the_box"))
     );
 
+    public static final DeferredHolder<SoundEvent, SoundEvent> ANOMALY_PRIORITY_TRACK = SOUND_EVENTS.register(
+            "anomaly_priority_track",
+            () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MOD_ID, "anomaly_priority_track"))
+    );
+
+    public static final DeferredHolder<SoundEvent, SoundEvent> ANOMALY_BIOME_MUSIC = SOUND_EVENTS.register(
+            "anomaly_biome_music",
+            () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MOD_ID, "anomaly_biome_music"))
+    );
+
+    public static final DeferredHolder<SoundEvent, SoundEvent> IMPACT_SITE_MUSIC = SOUND_EVENTS.register(
+            "impact_site_music",
+            () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MOD_ID, "impact_site_music"))
+    );
+
     private ModSoundEvents() {
     }
 

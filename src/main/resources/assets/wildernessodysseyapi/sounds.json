@@ -16,5 +16,48 @@
         "stream": true
       }
     ]
+  },
+  "anomaly_priority_track": {
+    "category": "music",
+    "sounds": [
+      {
+        "name": "wildernessodysseyapi:music/anomaly_priority_track",
+        "stream": true
+      }
+    ]
+  },
+  "anomaly_biome_music": {
+    "category": "music",
+    "sounds": [
+      {
+        "type": "event",
+        "name": "wildernessodysseyapi:anomaly_priority_track",
+        "weight": 7
+      },
+      {
+        "type": "event",
+        "name": "minecraft:music.overworld.badlands",
+        "weight": 2
+      },
+      {
+        "type": "event",
+        "name": "minecraft:music.overworld.grove",
+        "weight": 2
+      },
+      {
+        "type": "event",
+        "name": "minecraft:music.overworld.dripstone_caves",
+        "weight": 1
+      }
+    ]
+  },
+  "impact_site_music": {
+    "category": "music",
+    "sounds": [
+      {
+        "name": "wildernessodysseyapi:music/impact_site_music",
+        "stream": true
+      }
+    ]
   }
 }
