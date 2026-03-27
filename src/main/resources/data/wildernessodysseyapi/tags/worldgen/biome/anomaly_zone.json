@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
+    "wildernessodysseyapi:anomaly_zone",
     "wildernessodysseyapi:anomaly_plains",
     "wildernessodysseyapi:anomaly_tundra",
     "wildernessodysseyapi:anomaly_rainforest"

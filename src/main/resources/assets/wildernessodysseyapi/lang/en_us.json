@@ -88,6 +88,7 @@
   "biome.wildernessodysseyapi.anomaly_plains": "Anomaly Plains",
   "biome.wildernessodysseyapi.anomaly_tundra": "Anomaly Tundra",
   "biome.wildernessodysseyapi.anomaly_rainforest": "Anomaly Rainforest",
+  "biome.wildernessodysseyapi.anomaly_zone": "Anomaly Zone",
   "command.wildernessodysseyapi.faq.list_topic": "Topic: %s",
   "command.wildernessodysseyapi.faq.page_header": "Page %s/%s (%s results)",
   "command.wildernessodysseyapi.faq.cooldown": "Please wait %s ms before running another FAQ query.",

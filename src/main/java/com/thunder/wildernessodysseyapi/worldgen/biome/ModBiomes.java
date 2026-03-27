@@ -20,6 +20,13 @@ public final class ModBiomes {
             ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "anomaly_tundra"));
     public static final ResourceKey<Biome> ANOMALY_RAINFOREST_KEY = ResourceKey.create(Registries.BIOME,
             ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "anomaly_rainforest"));
+    /**
+     * Backward-compatible alias used by commands/datapacks that still reference
+     * {@code wildernessodysseyapi:anomaly_zone}.
+     */
+    @Deprecated
+    public static final ResourceKey<Biome> ANOMALY_ZONE_KEY = ResourceKey.create(Registries.BIOME,
+            ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "anomaly_zone"));
     @Deprecated
     public static final ResourceKey<Biome> ANOMALY_DESERT_KEY = ResourceKey.create(Registries.BIOME,
             ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "anomaly_desert"));
@@ -27,4 +34,6 @@ public final class ModBiomes {
     public static final DeferredHolder<Biome, Biome> ANOMALY_PLAINS = BIOMES.register("anomaly_plains", AnomalyBiomes::anomalyPlains);
     public static final DeferredHolder<Biome, Biome> ANOMALY_TUNDRA = BIOMES.register("anomaly_tundra", AnomalyBiomes::anomalyTundra);
     public static final DeferredHolder<Biome, Biome> ANOMALY_RAINFOREST = BIOMES.register("anomaly_rainforest", AnomalyBiomes::anomalyRainforest);
+    @Deprecated
+    public static final DeferredHolder<Biome, Biome> ANOMALY_ZONE = BIOMES.register("anomaly_zone", AnomalyBiomes::anomalyPlains);
 }
