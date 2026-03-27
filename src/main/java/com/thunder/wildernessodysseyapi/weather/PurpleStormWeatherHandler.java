@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.weather;
 
+import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.entity.ModEntities;
 import com.thunder.wildernessodysseyapi.entity.PurpleStormMonsterEntity;
@@ -19,9 +20,9 @@ public final class PurpleStormWeatherHandler {
     private PurpleStormWeatherHandler() {
     }
 
-    public static final long HOUR_TICKS = 72_000L;
-    public static final long EVENT_DURATION_TICKS = 36_000L;
-    private static final int SPAWN_ATTEMPT_INTERVAL_TICKS = 200;
+    public static final long HOUR_TICKS = TickTokAPI.toTicksFromHours(1L);
+    public static final long EVENT_DURATION_TICKS = TickTokAPI.toTicksFromMinutes(30L);
+    private static final int SPAWN_ATTEMPT_INTERVAL_TICKS = TickTokAPI.toTicksFromSeconds(10);
 
     @SubscribeEvent
     public static void onLevelTick(LevelTickEvent.Post event) {

@@ -1,11 +1,12 @@
 package com.thunder.wildernessodysseyapi.config;
 
+import com.thunder.ticktoklib.api.TickTokAPI;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 public final class CloakChipConfig {
     public static final ModConfigSpec CONFIG_SPEC;
     public static final ModConfigSpec.BooleanValue ENABLE_NAUSEA;
-    public static final int NAUSEA_DURATION_TICKS = 200;
+    public static final int NAUSEA_DURATION_TICKS = TickTokAPI.toTicksFromSeconds(10);
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();

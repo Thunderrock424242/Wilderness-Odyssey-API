@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.client.biome;
 
+import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.worldgen.biome.ModBiomes;
 import net.minecraft.client.Minecraft;
@@ -18,7 +19,7 @@ public final class ImpactSiteMusicController {
     private static final int EFFECT_RADIUS = 100;
     private static final int SCAN_STEP = 4;
     private static final int SCAN_VERTICAL = 12;
-    private static final int SCAN_INTERVAL_TICKS = 20;
+    private static final int SCAN_INTERVAL_TICKS = TickTokAPI.toTicks(1);
 
     private static ImpactSiteMusicSoundInstance activeMusic;
     private static BlockPos cachedImpactCenter;

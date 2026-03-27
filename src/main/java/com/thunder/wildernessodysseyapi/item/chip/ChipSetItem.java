@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.item.chip;
 
+import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.item.ModItemTags;
 import com.thunder.wildernessodysseyapi.curios.CuriosIntegration;
 import net.minecraft.world.InteractionHand;
@@ -16,7 +17,7 @@ import top.theillusivec4.curios.api.type.capability.ICurioItem;
 
 public class ChipSetItem extends Item implements ICurioItem {
     public static final String CHIP_SET_SLOT = "chip";
-    private static final int NAUSEA_DURATION_TICKS = 20 * 20;
+    private static final int NAUSEA_DURATION_TICKS = TickTokAPI.toTicksFromSeconds(20);
     private static final float CHIP_DAMAGE = 2.0F;
 
     public ChipSetItem(Properties properties) {
