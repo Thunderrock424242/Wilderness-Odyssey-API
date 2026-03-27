@@ -122,7 +122,7 @@ public final class AnomalyBiomes {
     }
 
     private static Music defaultMusic() {
-        return new Music(ModSoundEvents.ANOMALY_BIOME_MUSIC.getHolder().orElseThrow(), 6000, 12000, false);
+        return new Music(ModSoundEvents.ANOMALY_BIOME_MUSIC, 6000, 12000, false);
     }
 
     private static BiomeGenerationSettings.Builder generationBuilder() {
