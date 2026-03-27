@@ -15,6 +15,9 @@ public final class PlayerTelemetryConfig {
     public static final ModConfigSpec.IntValue REQUEST_TIMEOUT_SECONDS;
     public static final ModConfigSpec.BooleanValue EXPORT_ON_LOGOUT;
     public static final ModConfigSpec.BooleanValue INCLUDE_SPARK_REPORT;
+    public static final ModConfigSpec.ConfigValue<String> SPARK_WEBHOOK_URL;
+    public static final ModConfigSpec.BooleanValue BLOCK_LOGOUT_UNTIL_SPARK_SENT;
+    public static final ModConfigSpec.IntValue LOGOUT_BLOCK_TIMEOUT_SECONDS;
     public static final ModConfigSpec.DoubleValue SAMPLE_RATE_PERCENT;
     public static final ModConfigSpec.IntValue SAMPLE_EVERY_NTH;
     public static final ModConfigSpec.BooleanValue HASH_PLAYER_IDENTIFIERS;
@@ -60,6 +63,20 @@ public final class PlayerTelemetryConfig {
                         "When Spark is installed, attach a Spark report URL to logout exports.",
                         "Requires exportOnLogout to be enabled.")
                 .define("includeSparkReport", false);
+
+        SPARK_WEBHOOK_URL = BUILDER.comment(
+                        "Optional dedicated webhook for Spark report payloads on logout.",
+                        "When set, Spark report metadata is sent separately from the main telemetry webhook.")
+                .define("sparkWebhookUrl", "");
+
+        BLOCK_LOGOUT_UNTIL_SPARK_SENT = BUILDER.comment(
+                        "When true, run logout telemetry synchronously so Spark webhook delivery can complete before logout finishes.",
+                        "Use with caution: this can delay logout while network calls complete.")
+                .define("blockLogoutUntilSparkSent", false);
+
+        LOGOUT_BLOCK_TIMEOUT_SECONDS = BUILDER.comment(
+                        "Maximum time to wait during blocking logout telemetry execution.")
+                .defineInRange("logoutBlockTimeoutSeconds", 15, 1, 120);
 
         SAMPLE_RATE_PERCENT = BUILDER.comment(
                         "Sampling rate percentage for player telemetry (0-100).",
@@ -116,6 +133,9 @@ public final class PlayerTelemetryConfig {
                 REQUEST_TIMEOUT_SECONDS.get(),
                 EXPORT_ON_LOGOUT.get(),
                 INCLUDE_SPARK_REPORT.get(),
+                SPARK_WEBHOOK_URL.get(),
+                BLOCK_LOGOUT_UNTIL_SPARK_SENT.get(),
+                LOGOUT_BLOCK_TIMEOUT_SECONDS.get(),
                 SAMPLE_RATE_PERCENT.get(),
                 SAMPLE_EVERY_NTH.get(),
                 HASH_PLAYER_IDENTIFIERS.get(),
@@ -136,6 +156,9 @@ public final class PlayerTelemetryConfig {
             int requestTimeoutSeconds,
             boolean exportOnLogout,
             boolean includeSparkReport,
+            String sparkWebhookUrl,
+            boolean blockLogoutUntilSparkSent,
+            int logoutBlockTimeoutSeconds,
             double sampleRatePercent,
             int sampleEveryNth,
             boolean hashPlayerIdentifiers,
