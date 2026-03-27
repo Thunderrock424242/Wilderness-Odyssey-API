@@ -120,7 +120,6 @@ public class WildernessOdysseyAPIMainModClass {
         modEventBus.addListener(this::onConfigLoaded);
         modEventBus.addListener(this::onConfigReloaded);
         ModProcessors.PROCESSORS.register(modEventBus);
-        ModBiomes.BIOMES.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         ModAttachments.ATTACHMENTS.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);
