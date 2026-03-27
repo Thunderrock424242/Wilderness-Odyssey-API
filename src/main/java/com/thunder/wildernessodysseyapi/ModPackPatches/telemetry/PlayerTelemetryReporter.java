@@ -7,6 +7,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.TelemetryConsentStore.ConsentDecision;
 import net.minecraft.stats.Stats;
@@ -337,7 +338,7 @@ public final class PlayerTelemetryReporter {
             return 0L;
         }
         int ticks = player.getStats().getValue(Stats.CUSTOM, Stats.PLAY_TIME);
-        return ticks / 20L;
+        return Math.round(TickTokAPI.toSeconds(ticks));
     }
 
     private static Optional<String> fetchSparkReportUrl(ServerPlayer player) {

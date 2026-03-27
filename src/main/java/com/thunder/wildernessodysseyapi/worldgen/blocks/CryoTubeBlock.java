@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.worldgen.blocks;
 
+import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.api.CryoSleepEvent;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import net.minecraft.core.BlockPos;
@@ -103,7 +104,7 @@ public class CryoTubeBlock {
         /**
          * After this many ticks (10 Minecraft days) tubes no longer function.
          */
-        private static final long MAX_SLEEP_TICKS = 24000L * 10L;
+        private static final long MAX_SLEEP_TICKS = TickTokAPI.toTicksFromMinutes(200L);
 
 
         public BlockImpl(Properties properties) {

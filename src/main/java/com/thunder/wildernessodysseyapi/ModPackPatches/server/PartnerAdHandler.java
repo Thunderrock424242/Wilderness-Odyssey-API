@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.server;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -29,7 +30,6 @@ import java.util.UUID;
  * Sends occasional partner advertisements to players.
  */
 public class PartnerAdHandler {
-    private static final long TICKS_PER_HOUR = 20L * 60L * 60L;
     private static long tickCounter = 0;
 
     private static final Set<UUID> OPTED_OUT = new HashSet<>();
@@ -41,7 +41,7 @@ public class PartnerAdHandler {
     private static final String DISCOUNT = "15%";
     private static final String HOSTING_LINK = "https://billing.kinetichosting.net/aff.php?aff=606";
 
-    private static final long DELAY_TICKS = 20L * 90L; // 1.5 minutes
+    private static final long DELAY_TICKS = TickTokAPI.durationLong(0, 1, 30, 0); // 1.5 minutes
     private static final Map<UUID, Long> PENDING_ADS = new HashMap<>();
 
     /**

@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
+import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideAstronomy;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideManager;
 import net.minecraft.commands.CommandSourceStack;
@@ -43,7 +44,7 @@ public final class TideInfoCommand {
                 tideHeight,
                 snapshot.trendDescription(),
                 trendPerTick,
-                snapshot.cycleTicks() / 20.0D / 60.0D,
+                TickTokAPI.ticksToDuration(snapshot.cycleTicks()).toSeconds() / 60.0D,
                 moonPhase,
                 moonFactor
         );

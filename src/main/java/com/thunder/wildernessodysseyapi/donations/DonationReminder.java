@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.donations;
 
+import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.ClickEvent;
@@ -20,7 +21,7 @@ import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
 public class DonationReminder {
     private static boolean pendingReminder = false;
     private static int tickCountdown = 0;
-    private static final int DELAY_TICKS = 20 * 180; // 3 minutes
+    private static final int DELAY_TICKS = TickTokAPI.toTicksFromMinutes(3); // 3 minutes
 
     /**
      * Starts the donation reminder countdown when the player joins.

@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.item.cloak;
 
+import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.curios.CuriosIntegration;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import net.minecraft.network.chat.Component;
@@ -12,6 +13,8 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 
 public class CloakItem extends Item {
+    private static final int CLOAK_TOGGLE_COOLDOWN_TICKS = TickTokAPI.toTicks(1);
+
     public CloakItem(Properties properties) {
         super(properties);
     }
@@ -44,7 +47,7 @@ public class CloakItem extends Item {
             player.displayClientMessage(Component.translatable("message.wildernessodysseyapi.cloak_disabled"), true);
         }
 
-        player.getCooldowns().addCooldown(this, 20);
+        player.getCooldowns().addCooldown(this, CLOAK_TOGGLE_COOLDOWN_TICKS);
         return InteractionResultHolder.success(stack);
     }
 

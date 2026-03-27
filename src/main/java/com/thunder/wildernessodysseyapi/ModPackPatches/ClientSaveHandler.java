@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches;
 
+import com.thunder.ticktoklib.api.TickTokAPI;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -12,7 +13,7 @@ import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
 @EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
 public class ClientSaveHandler {
 
-    private static final int FLUSH_INTERVAL = 10000;
+    private static final int FLUSH_INTERVAL = TickTokAPI.duration(0, 8, 20, 0);
     private static int tickCounter = 0;
 
     /**

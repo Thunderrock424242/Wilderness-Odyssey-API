@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.ModPackPatches.client;
 
-import com.thunder.ticktoklib.TickTokHelper;
+import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.LoadingOverlay;
@@ -31,8 +31,8 @@ import java.util.OptionalInt;
 public final class LoadingStallDetector {
     private static final int DEFAULT_THRESHOLD_MINUTES = 5;
     private static final int STALL_THRESHOLD_MINUTES = resolveThresholdMinutes();
-    private static final Duration STALL_THRESHOLD = toDuration(TickTokHelper.toTicksMinutes(STALL_THRESHOLD_MINUTES));
-    private static final Duration REMINDER_INTERVAL = toDuration(TickTokHelper.toTicksMinutes(1));
+    private static final Duration STALL_THRESHOLD = toDuration(TickTokAPI.toTicksFromMinutes(STALL_THRESHOLD_MINUTES));
+    private static final Duration REMINDER_INTERVAL = toDuration(TickTokAPI.toTicksFromMinutes(1));
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private static long overlayStartedAt = 0L;
@@ -214,7 +214,7 @@ public final class LoadingStallDetector {
         long safeMillis = Math.max(millis, 0);
         int ticks = safeMillisToTicks(safeMillis);
 
-        String base = ticks >= TickTokHelper.TICKS_PER_HOUR
+        String base = ticks >= TickTokAPI.toTicksFromHours(1)
                 ? formatTicksToHMS(ticks)
                 : formatTicksToMinSec(ticks);
 
@@ -223,7 +223,7 @@ public final class LoadingStallDetector {
     }
 
     private static int safeMillisToTicks(long millis) {
-        double ticks = Math.round(Math.max(0L, millis) * TickTokHelper.TICKS_PER_SECOND / 1000.0d);
+        long ticks = TickTokAPI.toTicksFromMilliseconds(Math.max(0L, millis));
         return (int) Math.min(ticks, Integer.MAX_VALUE);
     }
 
@@ -240,7 +240,7 @@ public final class LoadingStallDetector {
         try {
             if (override.endsWith("t")) { // ticks suffix
                 int ticks = Integer.parseInt(override.substring(0, override.length() - 1));
-                int minutes = (int) Math.ceil(TickTokHelper.toMinutes(ticks));
+                int minutes = (int) Math.ceil(TickTokAPI.toMinutes(ticks));
                 return minutes > 0 ? OptionalInt.of(minutes) : OptionalInt.empty();
             }
 
@@ -263,12 +263,12 @@ public final class LoadingStallDetector {
     }
 
     private static Duration toDuration(int ticks) {
-        long millis = Math.round(TickTokHelper.toSeconds(ticks) * 1000.0d);
+        long millis = TickTokAPI.toMillisecondsLong(ticks);
         return Duration.ofMillis(millis);
     }
 
     private static String formatTicksToHMS(int ticks) {
-        long seconds = Math.max(0L, Math.round(TickTokHelper.toSeconds(ticks)));
+        long seconds = Math.max(0L, Math.round(TickTokAPI.toSeconds(ticks)));
         long hours = seconds / 3600;
         long minutes = (seconds % 3600) / 60;
         long remainderSeconds = seconds % 60;
@@ -276,7 +276,7 @@ public final class LoadingStallDetector {
     }
 
     private static String formatTicksToMinSec(int ticks) {
-        long seconds = Math.max(0L, Math.round(TickTokHelper.toSeconds(ticks)));
+        long seconds = Math.max(0L, Math.round(TickTokAPI.toSeconds(ticks)));
         long minutes = seconds / 60;
         long remainderSeconds = seconds % 60;
         return String.format("%02d:%02d", minutes, remainderSeconds);

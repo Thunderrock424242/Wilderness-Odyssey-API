@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.lorebook;
 
+import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -24,7 +25,7 @@ public final class LoreBookManager {
     private static final String ROOT_TAG = ModConstants.MOD_ID + "_lore_books";
     private static final String COLLECTED_TAG = "collected";
     private static final String LAST_SCAN_TAG = "last_scan";
-    private static final long SCAN_INTERVAL_TICKS = 40L;
+    private static final long SCAN_INTERVAL_TICKS = TickTokAPI.toTicksFromSeconds(2L);
 
     private static volatile LoreBookConfig cachedConfig;
 

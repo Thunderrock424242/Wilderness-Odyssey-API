@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.ocean.tide;
 
+import com.thunder.ticktoklib.api.TickTokAPI;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.List;
@@ -163,11 +164,11 @@ public final class TideConfig {
             double playerProximityBlocks
     ) {
         public long cycleTicks() {
-            return (long) Math.max(1L, Math.round(cycleMinutes * 60.0D * 20.0D));
+            return Math.max(1L, TickTokAPI.toTicksFromMinutes(cycleMinutes));
         }
 
         public long phaseOffsetTicks() {
-            return (long) Math.max(0L, Math.round(phaseOffsetMinutes * 60.0D * 20.0D));
+            return Math.max(0L, TickTokAPI.toTicksFromMinutes(phaseOffsetMinutes));
         }
     }
 }

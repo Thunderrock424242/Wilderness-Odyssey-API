@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.worldgen.spawn;
 
+import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.worldgen.blocks.CryoTubeBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -29,6 +30,10 @@ public class PlayerSpawnHandler {
 
     private static final String CRYO_ASSIGNED_TAG = "wo_cryo_assigned";
     private static final String CRYO_POS_TAG = "wo_cryo_pos";
+    private static final int INTRO_SLOWDOWN_TICKS = TickTokAPI.toTicksFromSeconds(3);
+    private static final int TITLE_FADE_IN_TICKS = TickTokAPI.toTicks(1);
+    private static final int TITLE_STAY_TICKS = TickTokAPI.toTicksFromSeconds(3);
+    private static final int TITLE_FADE_OUT_TICKS = TickTokAPI.toTicks(1);
 
     private static List<BlockPos> spawnBlocks = Collections.emptyList();
 
@@ -69,7 +74,7 @@ public class PlayerSpawnHandler {
         playIntroCinematic(player);
         tag.putBoolean(CRYO_ASSIGNED_TAG, true);
         tag.putLong(CRYO_POS_TAG, spawnPos.asLong());
-        player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 60, 255, false, false));
+        player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, INTRO_SLOWDOWN_TICKS, 255, false, false));
     }
 
     private static BlockPos selectSpawn(ServerPlayer player, CompoundTag tag) {
@@ -103,7 +108,7 @@ public class PlayerSpawnHandler {
      */
     private static void playIntroCinematic(ServerPlayer player) {
         ServerGamePacketListenerImpl connection = player.connection;
-        connection.send(new ClientboundSetTitlesAnimationPacket(20, 60, 20));
+        connection.send(new ClientboundSetTitlesAnimationPacket(TITLE_FADE_IN_TICKS, TITLE_STAY_TICKS, TITLE_FADE_OUT_TICKS));
         connection.send(new ClientboundSetTitleTextPacket(Component.translatable("message.wildernessodysseyapi.wake_up")));
     }
 }
