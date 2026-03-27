@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.faq.FaqCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.faq.FaqReloadListener;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListVersionCommand;
+import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ConfigAuditCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatCommand;
 import com.thunder.wildernessodysseyapi.command.GlobalChatOptToggleCommand;
 import com.thunder.wildernessodysseyapi.command.ChangelogCommand;
@@ -212,6 +213,7 @@ public class WildernessOdysseyAPIMainModClass {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
         ModListDiffCommand.register(dispatcher);
         ModListVersionCommand.register(dispatcher);
+        ConfigAuditCommand.register(dispatcher);
         StructureInfoCommand.register(event.getDispatcher());
         FaqCommand.register(event.getDispatcher());
         DonateCommand.register(event.getDispatcher());
