@@ -28,7 +28,7 @@ public final class ConfigAuditCommand {
         MinecraftServer server = source.getServer();
         Path configDir = server.getFile("config");
         Path reportPath = configDir.resolve("wildernessodysseyapi/config-audit-report.json");
-        Path unresolvedLogPath = server.getFile("logs").toPath().resolve("config-audit-unresolved.log");
+        Path unresolvedLogPath = server.getFile("logs").resolve("config-audit-unresolved.log");
 
         ConfigLinkAudit.AuditResult result = ConfigLinkAudit.run(configDir, reportPath, unresolvedLogPath);
 
