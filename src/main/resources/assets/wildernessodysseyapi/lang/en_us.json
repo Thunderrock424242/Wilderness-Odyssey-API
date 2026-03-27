@@ -1,7 +1,6 @@
 {
   "itemGroup.wildernessodysseyapi": "Wilderness Odyssey API",
   "message.wildernessodysseyapi.wake_up": "Waking from cryostasis...",
-  "message.wildernessodysseyapi.cryo_tube_locked": "The cryo tube can no longer be used.",
   "message.wildernessodysseyapi.cloak_enabled": "Cloak engaged.",
   "message.wildernessodysseyapi.cloak_disabled": "Cloak disengaged.",
   "message.wildernessodysseyapi.cloak_requires_compass": "A compass must be linked to activate the cloak.",

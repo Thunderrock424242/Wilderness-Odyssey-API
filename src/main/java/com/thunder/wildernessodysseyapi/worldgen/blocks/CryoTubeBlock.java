@@ -1,7 +1,5 @@
 package com.thunder.wildernessodysseyapi.worldgen.blocks;
 
-import com.thunder.ticktoklib.api.TickTokAPI;
-import com.thunder.wildernessodysseyapi.api.CryoSleepEvent;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -9,7 +7,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
@@ -32,7 +29,6 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -95,17 +91,12 @@ public class CryoTubeBlock {
     }
 
     /**
-     * Simple implementation that allows players to sleep inside the tube.
+     * Simple implementation that allows players to set a spawn point in the tube.
      */
     public static class BlockImpl extends Block implements EntityBlock {
         public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
         // Narrow voxel shape matching the tube's slender footprint.
         private static final VoxelShape SHAPE = Block.box(0.0D, 0.0D, 0.0D, 16.0D, 48.0D, 16.0D);
-        /**
-         * After this many ticks (10 Minecraft days) tubes no longer function.
-         */
-        private static final long MAX_SLEEP_TICKS = TickTokAPI.toTicksFromMinutes(200L);
-
 
         public BlockImpl(Properties properties) {
             super(properties);
@@ -156,28 +147,11 @@ public class CryoTubeBlock {
         // `use` method now resolves through `useItemOn` for item based
         // interactions or `useWithoutItem` when empty-handed. Using the old
         // signature causes compilation errors. Implement the new
-        // `useWithoutItem` variant to preserve the behavior of letting the
-        // player sleep in the tube.
+        // `useWithoutItem` variant so the tube only works as a spawn point.
         public InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand) {
-            if (level.getDayTime() >= MAX_SLEEP_TICKS) {
-                if (!level.isClientSide) {
-                    player.displayClientMessage(Component.translatable("message.wildernessodysseyapi.cryo_tube_locked"), true);
-                }
-                return InteractionResult.FAIL;
-            }
-
-            if (!level.isClientSide) {
-                player.startSleepInBed(pos);
-                player.setPose(Pose.STANDING);
-                Direction facing = state.getValue(FACING);
-                float rotation = facing.toYRot();
-                player.setYRot(rotation);
-                player.setYBodyRot(rotation);
-                player.setYHeadRot(rotation);
-                player.setXRot(0.0F);
-                if (player instanceof ServerPlayer serverPlayer) {
-                    NeoForge.EVENT_BUS.post(new CryoSleepEvent(serverPlayer));
-                }
+            if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.setRespawnPosition(level.dimension(), pos, serverPlayer.getYRot(), true, false);
+                serverPlayer.displayClientMessage(Component.translatable("block.minecraft.set_spawn"), true);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
