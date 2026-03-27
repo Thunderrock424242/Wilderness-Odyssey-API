@@ -4,7 +4,12 @@ import com.thunder.wildernessodysseyapi.item.cloak.CloakChipItem;
 import com.thunder.wildernessodysseyapi.item.cloak.CloakItem;
 import com.thunder.wildernessodysseyapi.item.neural.NeuralFrameItem;
 
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.JukeboxSong;
+import net.minecraft.world.item.Rarity;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -35,13 +40,22 @@ public class ModItems {
 
     public static final DeferredItem<Item> MUSIC_DISC_DUSTWINDS = ITEMS.register(
             "music_disc_dustwinds",
-            () -> new Item(new Item.Properties().stacksTo(1))
+            () -> new Item(createMusicDiscProperties("dont_be_so_serious"))
     );
 
     public static final DeferredItem<Item> MUSIC_DISC_STARFALL = ITEMS.register(
             "music_disc_starfall",
-            () -> new Item(new Item.Properties().stacksTo(1))
+            () -> new Item(createMusicDiscProperties("outside_the_box"))
     );
+
+    private static Item.Properties createMusicDiscProperties(String songPath) {
+        ResourceLocation songId = ResourceLocation.fromNamespaceAndPath(MOD_ID, songPath);
+        ResourceKey<JukeboxSong> songKey = ResourceKey.create(Registries.JUKEBOX_SONG, songId);
+        return new Item.Properties()
+                .stacksTo(1)
+                .rarity(Rarity.RARE)
+                .jukeboxPlayable(songKey);
+    }
 
     /**
      * Register.
