@@ -34,6 +34,9 @@ public final class SpawnBunkerPlacer {
     private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "bunker");
     private static final int OCEAN_SEARCH_RADIUS = 4096;
     private static final int OCEAN_SEARCH_STEP = 32;
+    private static final int MAX_ANCHOR_CANDIDATES = 2048;
+    private static final int FAST_OCEAN_SAMPLE_OFFSET = 48;
+    private static final int OCEAN_FALLBACK_SEARCH_STEP = 64;
     private static final int OCEAN_REGION_RADIUS = 112;
     private static final int OCEAN_REGION_STEP = 16;
     private static final int FOOTPRINT_SAMPLE_STEP = 4;
@@ -97,6 +100,7 @@ public final class SpawnBunkerPlacer {
 
         int baseX = baseSpawn.getX();
         int baseZ = baseSpawn.getZ();
+        int evaluated = 1;
         for (int radius = OCEAN_SEARCH_STEP; radius <= OCEAN_SEARCH_RADIUS; radius += OCEAN_SEARCH_STEP) {
             for (int dx = -radius; dx <= radius; dx += OCEAN_SEARCH_STEP) {
                 for (int dz = -radius; dz <= radius; dz += OCEAN_SEARCH_STEP) {
@@ -108,13 +112,22 @@ public final class SpawnBunkerPlacer {
                     if (isViableOceanAnchor(level, candidate, bunkerSize)) {
                         return candidate;
                     }
+                    evaluated++;
+                    if (evaluated >= MAX_ANCHOR_CANDIDATES) {
+                        BlockPos forcedOceanAnchor = findAnyOceanAnchor(level, baseSpawn);
+                        ModConstants.LOGGER.warn(
+                                "Hit spawn bunker ocean-search budget ({} candidates) near {}; using fallback {}.",
+                                MAX_ANCHOR_CANDIDATES, baseSpawn, forcedOceanAnchor);
+                        return forcedOceanAnchor;
+                    }
                 }
             }
         }
 
+        BlockPos forcedOceanAnchor = findAnyOceanAnchor(level, baseSpawn);
         ModConstants.LOGGER.warn("Unable to locate a fully open ocean spawn region within {} blocks of {}; using best-effort ocean fallback.",
                 OCEAN_SEARCH_RADIUS, baseSpawn);
-        return anchor;
+        return forcedOceanAnchor;
     }
 
     private static BlockPos toOceanAnchor(ServerLevel level, BlockPos pos) {
@@ -149,6 +162,9 @@ public final class SpawnBunkerPlacer {
     }
 
     private static boolean isViableOceanAnchor(ServerLevel level, BlockPos anchor, Vec3i bunkerSize) {
+        if (!fastIsProbablyOceanAnchor(level, anchor)) {
+            return false;
+        }
         if (!isOceanBiome(level, anchor)) {
             return false;
         }
@@ -159,6 +175,49 @@ public final class SpawnBunkerPlacer {
             return false;
         }
         return hasStableSeafloor(level, anchor, bunkerSize);
+    }
+
+    private static boolean fastIsProbablyOceanAnchor(ServerLevel level, BlockPos anchor) {
+        if (!isOceanWaterSample(level, anchor)) {
+            return false;
+        }
+        return isOceanWaterSample(level, anchor.offset(FAST_OCEAN_SAMPLE_OFFSET, 0, 0))
+                && isOceanWaterSample(level, anchor.offset(-FAST_OCEAN_SAMPLE_OFFSET, 0, 0))
+                && isOceanWaterSample(level, anchor.offset(0, 0, FAST_OCEAN_SAMPLE_OFFSET))
+                && isOceanWaterSample(level, anchor.offset(0, 0, -FAST_OCEAN_SAMPLE_OFFSET));
+    }
+
+    private static boolean isOceanWaterSample(ServerLevel level, BlockPos pos) {
+        if (!isOceanBiome(level, pos)) {
+            return false;
+        }
+        BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, pos);
+        return !level.getFluidState(surface).isEmpty();
+    }
+
+    private static BlockPos findAnyOceanAnchor(ServerLevel level, BlockPos baseSpawn) {
+        BlockPos baseAnchor = toOceanAnchor(level, baseSpawn);
+        if (isOceanWaterSample(level, baseAnchor)) {
+            return baseAnchor;
+        }
+
+        int baseX = baseSpawn.getX();
+        int baseZ = baseSpawn.getZ();
+        for (int radius = OCEAN_FALLBACK_SEARCH_STEP; radius <= OCEAN_SEARCH_RADIUS; radius += OCEAN_FALLBACK_SEARCH_STEP) {
+            for (int dx = -radius; dx <= radius; dx += OCEAN_FALLBACK_SEARCH_STEP) {
+                for (int dz = -radius; dz <= radius; dz += OCEAN_FALLBACK_SEARCH_STEP) {
+                    if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
+                        continue;
+                    }
+
+                    BlockPos candidate = toOceanAnchor(level, new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
+                    if (isOceanWaterSample(level, candidate)) {
+                        return candidate;
+                    }
+                }
+            }
+        }
+        return baseAnchor;
     }
 
     private static boolean isOceanBiome(ServerLevel level, BlockPos pos) {
