@@ -22,6 +22,11 @@ final class ImpactSiteMusicSoundInstance extends AbstractTickableSoundInstance {
     }
 
     @Override
+    public boolean canStartSilent() {
+        return true;
+    }
+
+    @Override
     public void tick() {
         if (this.targetVolume <= 0.001F && this.volume <= 0.001F) {
             this.stop();
