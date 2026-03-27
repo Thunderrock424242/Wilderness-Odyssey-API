@@ -7,7 +7,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.sounds.Music;
-import net.minecraft.sounds.Musics;
+import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
 import net.minecraft.world.level.biome.AmbientMoodSettings;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeGenerationSettings;
@@ -122,7 +122,7 @@ public final class AnomalyBiomes {
     }
 
     private static Music defaultMusic() {
-        return Musics.GAME;
+        return new Music(ModSoundEvents.ANOMALY_BIOME_MUSIC, 6000, 12000, false);
     }
 
     private static BiomeGenerationSettings.Builder generationBuilder() {
