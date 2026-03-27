@@ -121,25 +121,48 @@ public final class PlayerTelemetryReporter {
         }
 
         long playTimeSeconds = getTotalPlayTimeSeconds(player);
+        Runnable logoutExportTask = () -> runLogoutExport(player, config, playTimeSeconds);
+        if (config.blockLogoutUntilSparkSent()) {
+            logoutExportTask.run();
+            return;
+        }
+
         AsyncTaskManager.submitIoTask("player-telemetry-spark-report", () -> {
-            try {
-                String sparkReportUrl = config.includeSparkReport()
-                        ? fetchSparkReportUrl(player).orElse(null)
-                        : null;
-                if (!TelemetrySampling.shouldSample("player_logout", config.sampleEveryNth(), config.sampleRatePercent())) {
-                    return Optional.empty();
-                }
-                JsonObject payload = buildPayload(player, GeoInfo.empty(), AccountAgeInfo.empty(), playTimeSeconds,
-                        sparkReportUrl, "logout", config);
-                boolean sent = sendPayload(player, payload, config.sheetWebhookUrl(), config);
-                if (!sent) {
-                    enqueueFailedPayload(player.server, "player", payload, config);
-                }
-            } catch (Exception ex) {
-                LOGGER.error("[Telemetry] Failed to export telemetry for {}", player.getGameProfile().getName(), ex);
-            }
+            logoutExportTask.run();
             return Optional.empty();
         });
+    }
+
+    private static void runLogoutExport(ServerPlayer player, PlayerTelemetryConfig.TelemetryConfigValues config,
+                                        long playTimeSeconds) {
+        try {
+            String sparkReportUrl = config.includeSparkReport()
+                    ? fetchSparkReportUrl(player, config.logoutBlockTimeoutSeconds()).orElse(null)
+                    : null;
+            if (!TelemetrySampling.shouldSample("player_logout", config.sampleEveryNth(), config.sampleRatePercent())) {
+                return;
+            }
+
+            String sparkWebhookUrl = config.sparkWebhookUrl();
+            boolean hasDedicatedSparkWebhook = sparkWebhookUrl != null && !sparkWebhookUrl.isBlank();
+            if (hasDedicatedSparkWebhook && sparkReportUrl != null && !sparkReportUrl.isBlank()) {
+                JsonObject sparkPayload = buildSparkPayload(player, sparkReportUrl, playTimeSeconds);
+                boolean sparkSent = sendPayload(player, sparkPayload, sparkWebhookUrl, config);
+                if (!sparkSent) {
+                    enqueueFailedPayload(player.server, "spark", sparkPayload, config);
+                }
+            }
+
+            String sparkUrlForMainPayload = hasDedicatedSparkWebhook ? null : sparkReportUrl;
+            JsonObject payload = buildPayload(player, GeoInfo.empty(), AccountAgeInfo.empty(), playTimeSeconds,
+                    sparkUrlForMainPayload, "logout", config);
+            boolean sent = sendPayload(player, payload, config.sheetWebhookUrl(), config);
+            if (!sent) {
+                enqueueFailedPayload(player.server, "player", payload, config);
+            }
+        } catch (Exception ex) {
+            LOGGER.error("[Telemetry] Failed to export telemetry for {}", player.getGameProfile().getName(), ex);
+        }
     }
 
     private static String resolveIpAddress(ServerPlayer player) {
@@ -340,7 +363,7 @@ public final class PlayerTelemetryReporter {
         return ticks / 20L;
     }
 
-    private static Optional<String> fetchSparkReportUrl(ServerPlayer player) {
+    private static Optional<String> fetchSparkReportUrl(ServerPlayer player, int timeoutSeconds) {
         if (!ModList.get().isLoaded("spark")) {
             return Optional.empty();
         }
@@ -375,13 +398,28 @@ public final class PlayerTelemetryReporter {
             Method executeCommand = platform.getClass().getMethod("executeCommand", senderInterface, String[].class);
             Object result = executeCommand.invoke(platform, senderProxy, (Object) new String[]{"report"});
             if (result instanceof CompletableFuture<?> future) {
-                future.get(10, TimeUnit.SECONDS);
+                future.get(Math.max(1, timeoutSeconds), TimeUnit.SECONDS);
             }
             return capture.getReportUrl();
         } catch (Exception ex) {
             LOGGER.warn("[Telemetry] Spark report generation failed: {}", ex.getMessage());
             return Optional.empty();
         }
+    }
+
+    private static JsonObject buildSparkPayload(ServerPlayer player, String sparkReportUrl, long playTimeSeconds) {
+        Instant now = Instant.now();
+        JsonObject payload = new JsonObject();
+        payload.addProperty("event_type", "spark_report");
+        payload.addProperty("player_name", player.getGameProfile().getName());
+        payload.addProperty("player_uuid", player.getUUID().toString());
+        payload.addProperty("spark_report_url", sparkReportUrl);
+        payload.addProperty("timestamp", now.toString());
+        payload.addProperty("report_date_utc", now.toString().substring(0, 10));
+        payload.addProperty("report_time_utc", now.toString().substring(11, 19));
+        payload.addProperty("play_time_seconds", playTimeSeconds);
+        payload.addProperty("play_time_minutes", Math.round((playTimeSeconds / 60.0) * 100.0) / 100.0);
+        return payload;
     }
 
     private static final class SparkCommandCapture implements InvocationHandler {
