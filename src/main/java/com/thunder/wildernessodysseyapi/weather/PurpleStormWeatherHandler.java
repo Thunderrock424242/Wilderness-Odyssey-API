@@ -4,12 +4,15 @@ import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.entity.ModEntities;
 import com.thunder.wildernessodysseyapi.entity.PurpleStormMonsterEntity;
+import com.thunder.wildernessodysseyapi.worldgen.biome.ModBiomes;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -50,7 +53,7 @@ public final class PurpleStormWeatherHandler {
 
         if (gameTime >= data.nextRollGameTime()) {
             data.setNextRollGameTime(gameTime + HOUR_TICKS);
-            if (serverLevel.random.nextFloat() <= 0.5F) {
+            if (hasPlayersInAnomalyBiomes(serverLevel) && serverLevel.random.nextFloat() <= 0.5F) {
                 startStorm(serverLevel, data, gameTime);
             }
         }
@@ -90,6 +93,10 @@ public final class PurpleStormWeatherHandler {
     private static void trySpawnPurpleStormMonster(ServerLevel level) {
         RandomSource random = level.getRandom();
         for (ServerPlayer player : level.players()) {
+            if (!isInAnomalyBiome(level, player.blockPosition())) {
+                continue;
+            }
+
             if (random.nextFloat() > 0.35F) {
                 continue;
             }
@@ -98,6 +105,9 @@ public final class PurpleStormWeatherHandler {
             int z = player.blockPosition().getZ() + random.nextInt(49) - 24;
             int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
             BlockPos spawnPos = new BlockPos(x, y, z);
+            if (!isInAnomalyBiome(level, spawnPos)) {
+                continue;
+            }
 
             if (!level.getBlockState(spawnPos).isAir() || !level.getBlockState(spawnPos.above()).isAir()) {
                 continue;
@@ -113,5 +123,23 @@ public final class PurpleStormWeatherHandler {
                 level.addFreshEntity(monster);
             }
         }
+    }
+
+    private static boolean hasPlayersInAnomalyBiomes(ServerLevel level) {
+        for (ServerPlayer player : level.players()) {
+            if (isInAnomalyBiome(level, player.blockPosition())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isInAnomalyBiome(ServerLevel level, BlockPos pos) {
+        Holder<Biome> biome = level.getBiome(pos);
+        return biome.is(ModBiomes.ANOMALY_PLAINS_KEY)
+                || biome.is(ModBiomes.ANOMALY_TUNDRA_KEY)
+                || biome.is(ModBiomes.ANOMALY_RAINFOREST_KEY)
+                || biome.is(ModBiomes.ANOMALY_ZONE_KEY)
+                || biome.is(ModBiomes.ANOMALY_DESERT_KEY);
     }
 }
