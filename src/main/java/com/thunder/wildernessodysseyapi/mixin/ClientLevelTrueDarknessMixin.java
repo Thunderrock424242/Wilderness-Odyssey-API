@@ -9,6 +9,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ClientLevel.class)
+/**
+ * Client-level mixin that increases sky darkening at night for the True Darkness feature.
+ */
 public class ClientLevelTrueDarknessMixin {
 
     @Inject(method = "getSkyDarken", at = @At("RETURN"), cancellable = true)

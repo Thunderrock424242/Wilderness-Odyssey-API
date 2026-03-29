@@ -14,6 +14,10 @@ import net.minecraft.server.level.ServerPlayer;
 import java.util.Collection;
 import java.util.Optional;
 
+/**
+ * Administrative and player-facing command handlers for querying and granting
+ * lore books.
+ */
 public class LoreBookCommand {
     private static final SuggestionProvider<CommandSourceStack> LORE_ID_SUGGESTIONS = (context, builder) -> {
         for (LoreBookConfig.LoreBookEntry entry : LoreBookManager.config().books()) {
@@ -24,6 +28,9 @@ public class LoreBookCommand {
         return builder.buildFuture();
     };
 
+    /**
+     * Registers the {@code /lorebook} command tree.
+     */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("lorebook")
                 .then(Commands.literal("retrieve")
@@ -94,6 +101,9 @@ public class LoreBookCommand {
                                 }))));
     }
 
+    /**
+     * Gives a generated lore book to a player and marks it as collected.
+     */
     private static void giveBook(ServerPlayer player, LoreBookConfig.LoreBookEntry entry) {
         player.getInventory().placeItemBackInInventory(LoreBookManager.createBookStack(entry));
         LoreBookManager.markCollected(player, entry.id());

@@ -17,6 +17,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * HTTP client wrapper for local LLM backends used by the story AI system.
+ */
 public class LocalModelClient {
 
     private final HttpClient httpClient;

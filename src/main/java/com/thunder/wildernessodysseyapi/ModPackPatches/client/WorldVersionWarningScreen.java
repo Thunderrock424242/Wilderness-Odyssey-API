@@ -6,6 +6,9 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+/**
+ * Client GUI screen that warns players about world-version compatibility mismatches.
+ */
 public class WorldVersionWarningScreen extends Screen {
     private final Runnable onProceed;
     private final Runnable onCancel;

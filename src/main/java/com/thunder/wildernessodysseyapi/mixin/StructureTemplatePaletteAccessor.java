@@ -7,6 +7,9 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 import java.util.List;
 
 @Mixin(StructureTemplate.Palette.class)
+/**
+ * Mixin accessor for reading and mutating StructureTemplate palette block lists.
+ */
 public interface StructureTemplatePaletteAccessor {
     @Invoker("<init>")
     static StructureTemplate.Palette wildernessOdysseyApi$createPalette(List<StructureTemplate.StructureBlockInfo> blocks) {

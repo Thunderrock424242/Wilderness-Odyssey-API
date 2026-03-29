@@ -10,14 +10,25 @@ import net.neoforged.neoforge.common.NeoForge;
 import java.io.IOException;
 import java.nio.file.Path;
 
+/**
+ * Loads per-table config overrides from disk and swaps chest loot tables at
+ * load time.
+ */
 public class LootTableOverrideHandler {
 
     private static final Path CONFIG_DIR = Path.of("config", "loot_tables");
 
+    /**
+     * Registers the loot-table replacement listener.
+     */
     public static void init(FMLCommonSetupEvent event) {
         NeoForge.EVENT_BUS.addListener(EventPriority.HIGH, LootTableOverrideHandler::onLootLoad);
     }
 
+    /**
+     * Replaces targeted chest loot tables with YAML/JSON override content when
+     * present.
+     */
     public static void onLootLoad(LootTableLoadEvent event) {
         ResourceLocation id = event.getName();
         if (!id.getPath().startsWith("chests/")) return;
