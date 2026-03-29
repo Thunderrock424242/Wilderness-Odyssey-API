@@ -1,11 +1,14 @@
 package com.thunder.wildernessodysseyapi.client.weather;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.worldgen.biome.ModBiomes;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -52,6 +55,22 @@ public final class PurpleStormClientEffects {
     }
 
     private static boolean isPurpleStormVisualActive(Level level) {
-        return level.isRaining() && level.isThundering();
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return false;
+        }
+
+        return level.isRaining()
+                && level.isThundering()
+                && isInAnomalyBiome(level, minecraft.player.blockPosition());
+    }
+
+    private static boolean isInAnomalyBiome(Level level, BlockPos pos) {
+        Holder<Biome> biome = level.getBiome(pos);
+        return biome.is(ModBiomes.ANOMALY_PLAINS_KEY)
+                || biome.is(ModBiomes.ANOMALY_TUNDRA_KEY)
+                || biome.is(ModBiomes.ANOMALY_RAINFOREST_KEY)
+                || biome.is(ModBiomes.ANOMALY_ZONE_KEY)
+                || biome.is(ModBiomes.ANOMALY_DESERT_KEY);
     }
 }
