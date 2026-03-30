@@ -13,6 +13,7 @@ public final class VolumetricFluidConfig {
     public static final ModConfigSpec.IntValue PLAYER_SAMPLE_RADIUS;
     public static final ModConfigSpec.IntValue PLAYER_SAMPLE_STEP;
     public static final ModConfigSpec.IntValue ACTIVE_RADIUS;
+    public static final ModConfigSpec.ConfigValue<String> PRESET;
     public static final ModConfigSpec.BooleanValue REPLACE_VANILLA_ENGINE;
     public static final ModConfigSpec.DoubleValue DOWNWARD_TRANSFER;
     public static final ModConfigSpec.DoubleValue LATERAL_TRANSFER;
@@ -44,6 +45,9 @@ public final class VolumetricFluidConfig {
 
         ACTIVE_RADIUS = BUILDER.comment("Cells farther than this many blocks from all players are skipped for expensive updates.")
                 .defineInRange("activeRadius", 80, 8, 256);
+
+        PRESET = BUILDER.comment("Preset profile: safe, realism, or custom. Presets override many tunables below.")
+                .defineInList("preset", "safe", java.util.List.of("safe", "realism", "custom"));
 
         REPLACE_VANILLA_ENGINE = BUILDER.comment("If true, cancels vanilla water fluid ticks and routes behavior through the volumetric solver.")
                 .define("replaceVanillaWaterEngine", false);
@@ -86,12 +90,13 @@ public final class VolumetricFluidConfig {
     }
 
     public static Values values() {
-        return new Values(
+        Values raw = new Values(
                 ENABLED.get(),
                 TICK_INTERVAL.get(),
                 PLAYER_SAMPLE_RADIUS.get(),
                 PLAYER_SAMPLE_STEP.get(),
                 ACTIVE_RADIUS.get(),
+                PRESET.get(),
                 REPLACE_VANILLA_ENGINE.get(),
                 DOWNWARD_TRANSFER.get(),
                 LATERAL_TRANSFER.get(),
@@ -104,15 +109,17 @@ public final class VolumetricFluidConfig {
                 MIN_CELL_VOLUME.get(),
                 MAX_CELLS_PER_STEP.get()
         );
+        return applyPreset(raw);
     }
 
     public static Values defaultValues() {
-        return new Values(
+        Values raw = new Values(
                 ENABLED.getDefault(),
                 TICK_INTERVAL.getDefault(),
                 PLAYER_SAMPLE_RADIUS.getDefault(),
                 PLAYER_SAMPLE_STEP.getDefault(),
                 ACTIVE_RADIUS.getDefault(),
+                PRESET.getDefault(),
                 REPLACE_VANILLA_ENGINE.getDefault(),
                 DOWNWARD_TRANSFER.getDefault(),
                 LATERAL_TRANSFER.getDefault(),
@@ -125,6 +132,53 @@ public final class VolumetricFluidConfig {
                 MIN_CELL_VOLUME.getDefault(),
                 MAX_CELLS_PER_STEP.getDefault()
         );
+        return applyPreset(raw);
+    }
+
+
+    private static Values applyPreset(Values raw) {
+        String preset = raw.preset() == null ? "safe" : raw.preset().toLowerCase(java.util.Locale.ROOT);
+        return switch (preset) {
+            case "realism" -> new Values(
+                    raw.enabled(),
+                    1,
+                    24,
+                    1,
+                    128,
+                    "realism",
+                    true,
+                    0.45D,
+                    0.18D,
+                    0.14D,
+                    0.28D,
+                    5,
+                    0.90D,
+                    0.55D,
+                    0.05D,
+                    0.005D,
+                    50000
+            );
+            case "custom" -> raw;
+            default -> new Values(
+                    raw.enabled(),
+                    3,
+                    12,
+                    3,
+                    64,
+                    "safe",
+                    false,
+                    0.25D,
+                    0.06D,
+                    0.04D,
+                    0.12D,
+                    2,
+                    0.88D,
+                    0.72D,
+                    0.08D,
+                    0.015D,
+                    12000
+            );
+        };
     }
 
     public record Values(
@@ -133,6 +187,7 @@ public final class VolumetricFluidConfig {
             int playerSampleRadius,
             int playerSampleStep,
             int activeRadius,
+            String preset,
             boolean replaceVanillaWaterEngine,
             double downwardTransfer,
             double lateralTransfer,

@@ -45,6 +45,10 @@ public final class VolumetricFluidManager {
         return cachedConfig.enabled() && cachedConfig.replaceVanillaWaterEngine();
     }
 
+    public static String activePreset() {
+        return cachedConfig.preset();
+    }
+
     public static void ingestVanillaWaterTick(ServerLevel level, BlockPos pos, double normalizedVolume) {
         if (!cachedConfig.enabled()) {
             return;
