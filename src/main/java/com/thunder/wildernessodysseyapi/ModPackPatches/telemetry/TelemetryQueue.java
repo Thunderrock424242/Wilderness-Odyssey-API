@@ -21,6 +21,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 
+/**
+ * Persistent per-server queue for telemetry payloads that retries delivery and
+ * stores pending events on disk.
+ */
 public final class TelemetryQueue {
     private static final Gson GSON = new GsonBuilder().create();
     private static final Map<MinecraftServer, TelemetryQueue> QUEUES = new ConcurrentHashMap<>();
@@ -35,6 +39,9 @@ public final class TelemetryQueue {
         loadFromDisk();
     }
 
+    /**
+     * Returns the shared telemetry queue for a running server instance.
+     */
     public static TelemetryQueue get(MinecraftServer server) {
         return QUEUES.computeIfAbsent(server, TelemetryQueue::createForServer);
     }
@@ -45,6 +52,10 @@ public final class TelemetryQueue {
         return new TelemetryQueue(spoolFile);
     }
 
+    /**
+     * Adds a payload to the queue, dropping the oldest entry when the queue is
+     * already full.
+     */
     public synchronized void enqueue(PendingTelemetryPayload payload, int maxQueueSize) {
         if (queue.size() >= maxQueueSize) {
             queue.pollFirst();
@@ -54,6 +65,11 @@ public final class TelemetryQueue {
         persistAll();
     }
 
+    /**
+     * Attempts to send queued payloads up to {@code maxBatchSize}.
+     *
+     * @return Number of payloads attempted in this flush cycle.
+     */
     public synchronized int flush(int maxBatchSize) {
         int attempted = 0;
         boolean changed = false;
@@ -77,6 +93,9 @@ public final class TelemetryQueue {
         return attempted;
     }
 
+    /**
+     * @return Snapshot of queue depth, failures, and last successful send time.
+     */
     public synchronized TelemetryQueueStats stats() {
         return new TelemetryQueueStats(queue.size(), failedCount.get(), lastSuccess);
     }
@@ -118,6 +137,9 @@ public final class TelemetryQueue {
         }
     }
 
+    /**
+     * One queued telemetry event plus retry metadata.
+     */
     public static final class PendingTelemetryPayload {
         private String type;
         private JsonObject payload;
@@ -134,6 +156,9 @@ public final class TelemetryQueue {
         private PendingTelemetryPayload() {
         }
 
+        /**
+         * Creates a queued payload entry with retry and timeout settings.
+         */
         public PendingTelemetryPayload(String type, JsonObject payload, String webhookUrl, int timeoutSeconds,
                                        int maxRetries, Duration baseDelay, Duration maxDelay) {
             this.type = type;
@@ -147,6 +172,9 @@ public final class TelemetryQueue {
             this.createdAt = Instant.now();
         }
 
+        /**
+         * Sends this payload through the telemetry HTTP client with retries.
+         */
         public boolean send() {
             if (payload == null || webhookUrl == null || webhookUrl.isBlank()) {
                 return false;
@@ -165,12 +193,18 @@ public final class TelemetryQueue {
             }
         }
 
+        /**
+         * Increments attempt metadata after a failed send attempt.
+         */
         public void incrementAttempts() {
             attempts++;
             lastAttempt = Instant.now();
         }
     }
 
+    /**
+     * Immutable queue statistics view.
+     */
     public record TelemetryQueueStats(int pending, int failed, Instant lastSuccess) {
         public Optional<Instant> lastSuccessOptional() {
             return Optional.ofNullable(lastSuccess);

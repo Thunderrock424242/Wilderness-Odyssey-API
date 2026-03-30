@@ -13,12 +13,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Announces the current mod changelog once per newly created world.
+ */
 @EventBusSubscriber
 public class ChangelogAnnouncements {
 
     private static final AtomicBoolean announced = new AtomicBoolean(false);
     private static volatile boolean newWorld = false;
 
+    /**
+     * Detects whether the server world appears new and resets announcement state.
+     */
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         MinecraftServer server = event.getServer();
@@ -27,6 +33,10 @@ public class ChangelogAnnouncements {
         announced.set(false);
     }
 
+    /**
+     * Sends the current version changelog to the first logging-in player for a
+     * new world, then records that it was shown.
+     */
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {

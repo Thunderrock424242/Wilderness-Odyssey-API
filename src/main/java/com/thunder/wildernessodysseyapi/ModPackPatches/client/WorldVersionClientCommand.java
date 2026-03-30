@@ -21,6 +21,9 @@ import java.nio.file.Paths;
 
 
 @EventBusSubscriber(value = Dist.CLIENT)
+/**
+ * Client-side command utilities for reporting local world/modpack version details.
+ */
 public class WorldVersionClientCommand {
 
 

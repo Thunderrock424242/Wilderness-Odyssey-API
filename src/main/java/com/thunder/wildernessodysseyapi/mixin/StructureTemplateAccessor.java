@@ -8,6 +8,9 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 import java.util.List;
 
 @Mixin(StructureTemplate.class)
+/**
+ * Mixin accessor exposing internals of StructureTemplate for structure processing code.
+ */
 public interface StructureTemplateAccessor {
     @Accessor("palettes")
     List<StructureTemplate.Palette> getPalettes();

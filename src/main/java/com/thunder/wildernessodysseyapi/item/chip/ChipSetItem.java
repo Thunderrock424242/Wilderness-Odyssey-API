@@ -15,6 +15,10 @@ import net.minecraft.world.level.Level;
 import top.theillusivec4.curios.api.SlotContext;
 import top.theillusivec4.curios.api.type.capability.ICurioItem;
 
+/**
+ * Curio chip item that auto-equips from hand and applies an on-equip neural
+ * backlash effect.
+ */
 public class ChipSetItem extends Item implements ICurioItem {
     public static final String CHIP_SET_SLOT = "chip";
     private static final int NAUSEA_DURATION_TICKS = TickTokAPI.toTicksFromSeconds(20);
@@ -34,6 +38,9 @@ public class ChipSetItem extends Item implements ICurioItem {
         applyChipSetEffects(slotContext, stack);
     }
 
+    /**
+     * Tries to equip this chip into the Curios chip slot when used from hand.
+     */
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         if (level.isClientSide) {
@@ -48,6 +55,9 @@ public class ChipSetItem extends Item implements ICurioItem {
         return InteractionResultHolder.pass(player.getItemInHand(hand));
     }
 
+    /**
+     * Applies the damage/confusion penalty tied to chip equip state changes.
+     */
     private void applyChipSetEffects(SlotContext slotContext, ItemStack stack) {
         if (!stack.is(ModItemTags.CHIP_SET)) {
             return;

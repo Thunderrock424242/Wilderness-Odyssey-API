@@ -15,6 +15,9 @@ import net.minecraft.client.model.geom.builders.PartDefinition;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.resources.ResourceLocation;
 
+/**
+ * Model definition for rendering the neural frame cosmetic/equipment layer.
+ */
 public class NeuralFrameModel extends EntityModel<AbstractClientPlayer> {
     public static final ModelLayerLocation LAYER_LOCATION = new ModelLayerLocation(
             ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "neural_frame"),

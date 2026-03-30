@@ -12,6 +12,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 
+/**
+ * Handheld toggle item that enables/disables player cloak state when required
+ * dependencies are present.
+ */
 public class CloakItem extends Item {
     private static final int CLOAK_TOGGLE_COOLDOWN_TICKS = TickTokAPI.toTicks(1);
 
@@ -19,6 +23,10 @@ public class CloakItem extends Item {
         super(properties);
     }
 
+    /**
+     * Toggles cloaking on the server after validating compass and cloak-chip
+     * requirements.
+     */
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
@@ -55,10 +63,16 @@ public class CloakItem extends Item {
         return player.getOffhandItem().is(Items.COMPASS) || player.getMainHandItem().is(Items.COMPASS);
     }
 
+    /**
+     * @return {@code true} when the player has a cloak chip equipped in Curios.
+     */
     public static boolean hasCloakChip(Player player) {
         return CuriosIntegration.isEquipped(player, ModItems.CLOAK_CHIP.get());
     }
 
+    /**
+     * @return {@code true} when the player is currently holding the cloak item.
+     */
     public static boolean isHoldingCloak(Player player) {
         return player.getMainHandItem().is(ModItems.CLOAK_ITEM.get())
                 || player.getOffhandItem().is(ModItems.CLOAK_ITEM.get());

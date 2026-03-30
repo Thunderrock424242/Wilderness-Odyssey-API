@@ -13,6 +13,10 @@ import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 
 import java.util.List;
 
+/**
+ * Loot function that converts a placeholder written book stack into the next
+ * undiscovered lore book for the current looting player.
+ */
 public class LoreBookLootFunction extends LootItemConditionalFunction {
     public static final MapCodec<LoreBookLootFunction> CODEC = RecordCodecBuilder.mapCodec(instance ->
             commonFields(instance).apply(instance, conditions -> new LoreBookLootFunction(conditions.toArray(LootItemCondition[]::new)))
@@ -27,6 +31,10 @@ public class LoreBookLootFunction extends LootItemConditionalFunction {
         return ModLootFunctions.LORE_BOOK.get();
     }
 
+    /**
+     * Replaces the source stack with a generated lore book, or removes the item
+     * when no eligible player/book is available in this context.
+     */
     @Override
     protected ItemStack run(ItemStack stack, LootContext lootContext) {
         if (!(lootContext.getParamOrNull(LootContextParams.THIS_ENTITY) instanceof ServerPlayer player)) {
@@ -37,6 +45,9 @@ public class LoreBookLootFunction extends LootItemConditionalFunction {
                 .orElse(ItemStack.EMPTY);
     }
 
+    /**
+     * @return Builder used by loot table code/JSON to register this function.
+     */
     public static Builder<?> builder() {
         return simpleBuilder(conditions -> new LoreBookLootFunction(conditions.toArray(LootItemCondition[]::new)));
     }

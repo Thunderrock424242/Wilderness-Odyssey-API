@@ -12,6 +12,9 @@ import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 
+/**
+ * Hostile entity implementation used during purple-storm weather events.
+ */
 public class PurpleStormMonsterEntity extends Zombie {
 
     public PurpleStormMonsterEntity(EntityType<? extends Zombie> entityType, Level level) {

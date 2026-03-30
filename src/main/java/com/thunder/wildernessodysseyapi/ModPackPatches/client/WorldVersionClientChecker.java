@@ -21,6 +21,9 @@ import java.nio.file.Paths;
 import static com.thunder.wildernessodysseyapi.ModPackPatches.client.WorldVersionChecker.*;
 
 @EventBusSubscriber(Dist.CLIENT)
+/**
+ * Client helper that validates server/world version metadata and triggers warnings.
+ */
 public class WorldVersionClientChecker {
 
     public static boolean PATCH_UPDATE_NOTIFICATION = false;
