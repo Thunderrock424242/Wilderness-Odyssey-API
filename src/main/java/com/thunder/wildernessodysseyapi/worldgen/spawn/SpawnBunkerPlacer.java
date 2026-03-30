@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.worldgen.spawn;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.worldgen.processor.BunkerPlacementProcessor;
 import com.thunder.wildernessodysseyapi.worldgen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.worldgen.structure.StarterStructureSpawnGuard;
@@ -63,6 +64,10 @@ public final class SpawnBunkerPlacer {
             return;
         }
         if (!level.dimension().equals(Level.OVERWORLD)) {
+            return;
+        }
+        if (StructureConfig.DEBUG_DISABLE_STARTER_BUNKER.get()) {
+            ModConstants.LOGGER.info("Skipping starter bunker placement because placement.debugDisableStarterBunker is enabled.");
             return;
         }
 

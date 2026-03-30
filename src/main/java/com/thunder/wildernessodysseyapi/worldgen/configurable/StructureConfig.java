@@ -29,6 +29,8 @@ public class StructureConfig {
     public static final ModConfigSpec.IntValue MAX_LEVELING_DEPTH;
     /** Prevent hostile mob spawns inside the starter bunker immediately after placement */
     public static final ModConfigSpec.BooleanValue PREVENT_STARTER_STRUCTURE_HOSTILES;
+    /** Debug toggle to skip starter bunker placement and keep vanilla spawn selection. */
+    public static final ModConfigSpec.BooleanValue DEBUG_DISABLE_STARTER_BUNKER;
     /** Horizontal radius where hostile mobs may not spawn around the placed starter bunker */
     public static final ModConfigSpec.IntValue STARTER_STRUCTURE_SPAWN_DENY_RADIUS;
     /** Vertical half-height where hostile mobs may not spawn around the placed starter bunker */
@@ -81,6 +83,10 @@ public class StructureConfig {
                         "When true, hostile mob spawns inside the starter bunker will be blocked after placement."
                 )
                 .define("starterStructurePreventHostiles", true);
+        DEBUG_DISABLE_STARTER_BUNKER = BUILDER.comment(
+                        "If true, the starter bunker will not be placed and vanilla spawn selection will run instead."
+                )
+                .define("debugDisableStarterBunker", false);
         STARTER_STRUCTURE_SPAWN_DENY_RADIUS = BUILDER.comment(
                         "Horizontal radius (in blocks) around the starter bunker where hostile mob spawns are denied."
                 )
