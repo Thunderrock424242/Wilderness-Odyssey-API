@@ -56,6 +56,9 @@ public final class VolumetricFluidManager {
         FluidGrid grid = GRIDS.computeIfAbsent(level.dimension(), ignored -> new FluidGrid());
         FluidCell cell = grid.cells.computeIfAbsent(pos.asLong(), ignored -> new FluidCell());
         cell.volume = Math.max(cell.volume, Math.max(cachedConfig.minCellVolume(), normalizedVolume));
+        if (level.getBlockState(pos).is(Blocks.WATER)) {
+            grid.protectedWaterBlocks.add(pos.asLong());
+        }
     }
 
     @SubscribeEvent
@@ -71,7 +74,7 @@ public final class VolumetricFluidManager {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (!event.hasTime() || !cachedConfig.enabled()) {
+        if (!cachedConfig.enabled()) {
             return;
         }
 
@@ -122,6 +125,7 @@ public final class VolumetricFluidManager {
         }
         grid.cells.clear();
         grid.controlledBlocks.clear();
+        grid.protectedWaterBlocks.clear();
     }
 
     public static int seedFromExistingWater(ServerLevel level, BlockPos center, int radius) {
@@ -140,6 +144,7 @@ public final class VolumetricFluidManager {
                     }
                     FluidCell cell = grid.cells.computeIfAbsent(cursor.asLong(), ignored -> new FluidCell());
                     cell.volume = Math.max(cell.volume, level.getFluidState(cursor).getAmount() / 8.0D);
+                    grid.protectedWaterBlocks.add(cursor.asLong());
                     injected++;
                 }
             }
@@ -166,6 +171,7 @@ public final class VolumetricFluidManager {
                         }
                         FluidCell cell = grid.cells.computeIfAbsent(cursor.asLong(), ignored -> new FluidCell());
                         cell.volume = Math.max(cell.volume, Math.max(0.125D, level.getFluidState(cursor).getAmount() / 8.0D));
+                        grid.protectedWaterBlocks.add(cursor.asLong());
                     }
                 }
             }
@@ -303,6 +309,10 @@ public final class VolumetricFluidManager {
 
     private static void applyToWorld(ServerLevel level, FluidGrid grid, VolumetricFluidConfig.Values config) {
         Set<Long> controlledNow = new HashSet<>();
+        grid.protectedWaterBlocks.removeIf(packedPos -> {
+            BlockPos pos = BlockPos.of(packedPos);
+            return level.isLoaded(pos) && !level.getBlockState(pos).is(Blocks.WATER);
+        });
 
         for (Map.Entry<Long, FluidCell> entry : grid.cells.entrySet()) {
             long packedPos = entry.getKey();
@@ -318,14 +328,18 @@ public final class VolumetricFluidManager {
                 boolean wasControlled = grid.controlledBlocks.contains(packedPos);
                 if (state.isAir()) {
                     level.setBlockAndUpdate(pos, Blocks.WATER.defaultBlockState());
+                    grid.protectedWaterBlocks.remove(packedPos);
                     controlledNow.add(packedPos);
-                } else if (wasControlled && state.is(Blocks.WATER)) {
+                } else if (wasControlled && state.is(Blocks.WATER) && !grid.protectedWaterBlocks.contains(packedPos)) {
                     controlledNow.add(packedPos);
                 }
             }
         }
 
         for (Long packedPos : new ArrayList<>(grid.controlledBlocks)) {
+            if (grid.protectedWaterBlocks.contains(packedPos)) {
+                continue;
+            }
             FluidCell cell = grid.cells.get(packedPos);
             double volume = cell == null ? 0.0D : cell.volume;
             if (volume > config.removeThreshold()) {
@@ -396,6 +410,7 @@ public final class VolumetricFluidManager {
     private static final class FluidGrid {
         private final Map<Long, FluidCell> cells = new HashMap<>();
         private final Set<Long> controlledBlocks = new HashSet<>();
+        private final Set<Long> protectedWaterBlocks = new HashSet<>();
     }
 
     private static final class FluidCell {
