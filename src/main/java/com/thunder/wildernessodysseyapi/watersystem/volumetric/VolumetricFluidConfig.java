@@ -13,6 +13,7 @@ public final class VolumetricFluidConfig {
     public static final ModConfigSpec.IntValue PLAYER_SAMPLE_RADIUS;
     public static final ModConfigSpec.IntValue PLAYER_SAMPLE_STEP;
     public static final ModConfigSpec.IntValue ACTIVE_RADIUS;
+    public static final ModConfigSpec.BooleanValue REPLACE_VANILLA_ENGINE;
     public static final ModConfigSpec.DoubleValue DOWNWARD_TRANSFER;
     public static final ModConfigSpec.DoubleValue LATERAL_TRANSFER;
     public static final ModConfigSpec.DoubleValue ADVECTION_TRANSFER;
@@ -43,6 +44,9 @@ public final class VolumetricFluidConfig {
 
         ACTIVE_RADIUS = BUILDER.comment("Cells farther than this many blocks from all players are skipped for expensive updates.")
                 .defineInRange("activeRadius", 80, 8, 256);
+
+        REPLACE_VANILLA_ENGINE = BUILDER.comment("If true, cancels vanilla water fluid ticks and routes behavior through the volumetric solver.")
+                .define("replaceVanillaWaterEngine", false);
 
         DOWNWARD_TRANSFER = BUILDER.comment("Max water volume moved downward per step from one cell.")
                 .defineInRange("downwardTransfer", 0.35D, 0.01D, 1.0D);
@@ -88,6 +92,7 @@ public final class VolumetricFluidConfig {
                 PLAYER_SAMPLE_RADIUS.get(),
                 PLAYER_SAMPLE_STEP.get(),
                 ACTIVE_RADIUS.get(),
+                REPLACE_VANILLA_ENGINE.get(),
                 DOWNWARD_TRANSFER.get(),
                 LATERAL_TRANSFER.get(),
                 ADVECTION_TRANSFER.get(),
@@ -108,6 +113,7 @@ public final class VolumetricFluidConfig {
                 PLAYER_SAMPLE_RADIUS.getDefault(),
                 PLAYER_SAMPLE_STEP.getDefault(),
                 ACTIVE_RADIUS.getDefault(),
+                REPLACE_VANILLA_ENGINE.getDefault(),
                 DOWNWARD_TRANSFER.getDefault(),
                 LATERAL_TRANSFER.getDefault(),
                 ADVECTION_TRANSFER.getDefault(),
@@ -127,6 +133,7 @@ public final class VolumetricFluidConfig {
             int playerSampleRadius,
             int playerSampleStep,
             int activeRadius,
+            boolean replaceVanillaWaterEngine,
             double downwardTransfer,
             double lateralTransfer,
             double advectionTransfer,

@@ -34,8 +34,9 @@ public final class VolumetricFluidCommand {
         ServerLevel level = context.getSource().getLevel();
         VolumetricFluidManager.SimulationSnapshot snapshot = VolumetricFluidManager.getSnapshot(level);
         context.getSource().sendSuccess(() -> Component.literal(String.format(
-                "VolFluid: cells=%d, controlled=%d, totalVolume=%.2f, avgSpeed=%.4f",
-                snapshot.activeCells(), snapshot.controlledBlocks(), snapshot.totalVolume(), snapshot.averageSpeed()
+                "VolFluid: cells=%d, controlled=%d, totalVolume=%.2f, avgSpeed=%.4f, replaceVanilla=%s",
+                snapshot.activeCells(), snapshot.controlledBlocks(), snapshot.totalVolume(), snapshot.averageSpeed(),
+                VolumetricFluidManager.shouldReplaceVanillaWaterEngine()
         )), false);
         return snapshot.activeCells();
     }

@@ -41,6 +41,19 @@ public final class VolumetricFluidManager {
         cachedConfig = loadConfigWithFallback();
     }
 
+    public static boolean shouldReplaceVanillaWaterEngine() {
+        return cachedConfig.enabled() && cachedConfig.replaceVanillaWaterEngine();
+    }
+
+    public static void ingestVanillaWaterTick(ServerLevel level, BlockPos pos, double normalizedVolume) {
+        if (!cachedConfig.enabled()) {
+            return;
+        }
+        FluidGrid grid = GRIDS.computeIfAbsent(level.dimension(), ignored -> new FluidGrid());
+        FluidCell cell = grid.cells.computeIfAbsent(pos.asLong(), ignored -> new FluidCell());
+        cell.volume = Math.max(cell.volume, Math.max(cachedConfig.minCellVolume(), normalizedVolume));
+    }
+
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         GRIDS.clear();
