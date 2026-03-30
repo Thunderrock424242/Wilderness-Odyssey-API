@@ -4,12 +4,10 @@
   "downfall": 0.8,
   "temperature_modifier": "frozen",
   "effects": {
-    "fog_color": 8010183,
-    "water_color": 7163848,
-    "water_fog_color": 5059720,
-    "sky_color": 8010183,
-    "grass_color": 7223207,
-    "foliage_color": 8142775,
+    "fog_color": 12638463,
+    "water_color": 4159204,
+    "water_fog_color": 329011,
+    "sky_color": 7907327,
     "mood_sound": {
       "sound": "minecraft:ambient.cave",
       "tick_delay": 6000,

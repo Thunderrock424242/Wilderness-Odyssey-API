@@ -67,10 +67,7 @@ public final class PurpleStormClientEffects {
 
     private static boolean isInAnomalyBiome(Level level, BlockPos pos) {
         Holder<Biome> biome = level.getBiome(pos);
-        return biome.is(ModBiomes.ANOMALY_PLAINS_KEY)
-                || biome.is(ModBiomes.ANOMALY_TUNDRA_KEY)
-                || biome.is(ModBiomes.ANOMALY_RAINFOREST_KEY)
-                || biome.is(ModBiomes.ANOMALY_ZONE_KEY)
-                || biome.is(ModBiomes.ANOMALY_DESERT_KEY);
+        return biome.is(ModBiomes.ANOMALY_RAINFOREST_KEY)
+                || biome.is(ModBiomes.ANOMALY_ZONE_KEY);
     }
 }

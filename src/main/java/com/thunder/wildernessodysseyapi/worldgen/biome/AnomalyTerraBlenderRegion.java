@@ -24,10 +24,10 @@ public final class AnomalyTerraBlenderRegion extends Region {
     @Override
     public void addBiomes(Registry<Biome> registry, Consumer<Pair<Climate.ParameterPoint, ResourceKey<Biome>>> mapper) {
         addModifiedVanillaOverworldBiomes(mapper, builder -> {
-            builder.replaceBiome(Biomes.PLAINS, ModBiomes.ANOMALY_PLAINS_KEY);
-            builder.replaceBiome(Biomes.FOREST, ModBiomes.ANOMALY_PLAINS_KEY);
+            builder.replaceBiome(Biomes.PLAINS, ModBiomes.ANOMALY_RAINFOREST_KEY);
+            builder.replaceBiome(Biomes.FOREST, ModBiomes.ANOMALY_RAINFOREST_KEY);
             builder.replaceBiome(Biomes.JUNGLE, ModBiomes.ANOMALY_RAINFOREST_KEY);
-            builder.replaceBiome(Biomes.SNOWY_PLAINS, ModBiomes.ANOMALY_TUNDRA_KEY);
+            builder.replaceBiome(Biomes.SNOWY_PLAINS, ModBiomes.ANOMALY_RAINFOREST_KEY);
         });
     }
 }

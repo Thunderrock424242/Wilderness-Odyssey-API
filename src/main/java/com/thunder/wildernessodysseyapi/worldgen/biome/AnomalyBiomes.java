@@ -6,9 +6,6 @@ import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.sounds.Music;
-import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
-import net.minecraft.world.level.biome.AmbientMoodSettings;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeGenerationSettings;
 import net.minecraft.world.level.biome.BiomeSpecialEffects;
@@ -17,15 +14,15 @@ import net.minecraft.world.level.levelgen.carver.ConfiguredWorldCarver;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 
 public final class AnomalyBiomes {
-    private static final int ANOMALY_SKY_COLOR = 0x7A59C7;
-    private static final int ANOMALY_FOG_COLOR = 0x7A59C7;
-    private static final int ANOMALY_WATER_COLOR = 0x6D4FC8;
-    private static final int ANOMALY_WATER_FOG_COLOR = 0x4D2C88;
+    private static final int VANILLA_SKY_COLOR = 0x77ADFF;
+    private static final int VANILLA_FOG_COLOR = 0xC0D8FF;
+    private static final int VANILLA_WATER_COLOR = 0x3F76E4;
+    private static final int VANILLA_WATER_FOG_COLOR = 0x050533;
 
     private AnomalyBiomes() {
     }
 
-    public static Biome anomalyPlains() {
+    public static Biome anomalyForest() {
         MobSpawnSettings.Builder spawns = new MobSpawnSettings.Builder();
         AnomalyBiomeMobSettings.addPlainsSpawns(spawns);
 
@@ -38,17 +35,14 @@ public final class AnomalyBiomes {
         BiomeDefaultFeatures.addSurfaceFreezing(generation);
         BiomeDefaultFeatures.addDefaultOres(generation);
         BiomeDefaultFeatures.addDefaultSoftDisks(generation);
-        BiomeDefaultFeatures.addPlainGrass(generation);
-        BiomeDefaultFeatures.addPlainVegetation(generation);
         BiomeDefaultFeatures.addForestFlowers(generation);
         BiomeDefaultFeatures.addDefaultFlowers(generation);
         BiomeDefaultFeatures.addForestGrass(generation);
-        BiomeDefaultFeatures.addSparseJungleTrees(generation);
-        BiomeDefaultFeatures.addJungleGrass(generation);
+        BiomeDefaultFeatures.addOtherBirchTrees(generation);
         BiomeDefaultFeatures.addDefaultMushrooms(generation);
         BiomeDefaultFeatures.addDefaultExtraVegetation(generation);
 
-        return baseBiome(true, 0.9F, 0.65F, spawns, generation);
+        return baseBiome(true, 0.7F, 0.8F, spawns, generation);
     }
 
     public static Biome anomalyTundra() {
@@ -104,14 +98,10 @@ public final class AnomalyBiomes {
                 .temperature(temperature)
                 .downfall(downfall)
                 .specialEffects(new BiomeSpecialEffects.Builder()
-                        .waterColor(ANOMALY_WATER_COLOR)
-                        .waterFogColor(ANOMALY_WATER_FOG_COLOR)
-                        .fogColor(ANOMALY_FOG_COLOR)
-                        .skyColor(ANOMALY_SKY_COLOR)
-                        .grassColorOverride(0x6E4FA7)
-                        .foliageColorOverride(0x7C57B7)
-                        .ambientMoodSound(AmbientMoodSettings.LEGACY_CAVE_SETTINGS)
-                        .backgroundMusic(defaultMusic())
+                        .waterColor(VANILLA_WATER_COLOR)
+                        .waterFogColor(VANILLA_WATER_FOG_COLOR)
+                        .fogColor(VANILLA_FOG_COLOR)
+                        .skyColor(VANILLA_SKY_COLOR)
                         .build())
                 .mobSpawnSettings(spawns.build())
                 .generationSettings(generation.build())
@@ -119,10 +109,6 @@ public final class AnomalyBiomes {
                         ? Biome.TemperatureModifier.FROZEN
                         : Biome.TemperatureModifier.NONE)
                 .build();
-    }
-
-    private static Music defaultMusic() {
-        return new Music(ModSoundEvents.ANOMALY_BIOME_MUSIC, 6000, 12000, false);
     }
 
     private static BiomeGenerationSettings.Builder generationBuilder() {

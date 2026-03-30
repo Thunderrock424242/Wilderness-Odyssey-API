@@ -4,24 +4,11 @@
   "downfall": 0.9,
   "temperature_modifier": "none",
   "effects": {
-    "fog_color": 8010183,
-    "water_color": 7163848,
-    "water_fog_color": 5059720,
-    "sky_color": 8010183,
-    "grass_color": 7223207,
-    "foliage_color": 8142775,
-    "mood_sound": {
-      "sound": "minecraft:ambient.cave",
-      "tick_delay": 6000,
-      "block_search_extent": 8,
-      "offset": 2.0
-    },
-    "music": {
-      "sound": "wildernessodysseyapi:anomaly_biome_music",
-      "min_delay": 6000,
-      "max_delay": 12000,
-      "replace_current_music": false
-    }
+    "fog_color": 12638463,
+    "water_color": 4159204,
+    "water_fog_color": 329011,
+    "sky_color": 7842047,
+    "grass_color_modifier": "jungle"
   },
   "spawners": {
     "monster": [],
