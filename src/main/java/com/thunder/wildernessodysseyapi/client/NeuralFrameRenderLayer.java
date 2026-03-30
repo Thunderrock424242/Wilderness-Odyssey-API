@@ -19,6 +19,9 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 
+/**
+ * Player render layer responsible for drawing the neural frame model and texture.
+ */
 public class NeuralFrameRenderLayer extends RenderLayer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> {
     private static final ResourceLocation FRAME_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             ModConstants.MOD_ID,

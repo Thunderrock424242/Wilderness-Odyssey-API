@@ -12,6 +12,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(LightTexture.class)
+/**
+ * Client lightmap mixin that deepens nighttime lighting when True Darkness is enabled.
+ */
 public class LightTextureTrueDarknessMixin {
 
     @Inject(method = "getBrightness", at = @At("RETURN"), cancellable = true)

@@ -8,6 +8,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ClientLevel.class)
+/**
+ * Client-level mixin that tints world colors during custom weather effects.
+ */
 public class ClientLevelWeatherColorMixin {
 
     @Inject(method = "getSkyColor", at = @At("RETURN"), cancellable = true)

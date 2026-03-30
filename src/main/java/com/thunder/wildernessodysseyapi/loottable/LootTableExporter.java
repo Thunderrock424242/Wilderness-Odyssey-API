@@ -15,10 +15,18 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Exports vanilla/modded chest loot tables into config files so pack makers can
+ * inspect and override loot behavior outside of code.
+ */
 public class LootTableExporter {
 
     private static final Path CONFIG_DIR = Path.of("config", "loot_tables");
 
+    /**
+     * Registers a reload listener that exports loot tables asynchronously during
+     * resource reload.
+     */
     public static void onReload(AddReloadListenerEvent event) {
         event.addListener((barrier, manager, profiler, prepareProfiler, applyProfiler, executor) -> {
             return CompletableFuture.runAsync(() -> exportLootTables(manager));

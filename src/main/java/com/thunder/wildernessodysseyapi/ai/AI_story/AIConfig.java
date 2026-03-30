@@ -3,6 +3,9 @@ package com.thunder.wildernessodysseyapi.ai.AI_story;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Data model representing the parsed AI YAML/JSON configuration structure.
+ */
 public class AIConfig {
 
     private final List<String> story = new ArrayList<>();

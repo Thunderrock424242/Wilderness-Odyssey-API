@@ -16,6 +16,9 @@ import net.minecraft.util.FastColor;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlot;
 
+/**
+ * Player render layer that draws the cloak texture while cloaking conditions are met.
+ */
 public class CloakRenderLayer extends RenderLayer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> {
     private static final ResourceLocation CLOAK_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             ModConstants.MOD_ID,

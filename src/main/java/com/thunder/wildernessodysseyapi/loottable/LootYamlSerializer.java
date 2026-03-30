@@ -14,6 +14,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
+/**
+ * Utility for round-tripping Minecraft loot tables between codec-backed JSON
+ * and human-editable YAML files.
+ */
 public class LootYamlSerializer {
 
     private static final DumperOptions OPTIONS = new DumperOptions();
@@ -27,6 +31,12 @@ public class LootYamlSerializer {
         YAML = new Yaml(OPTIONS);
     }
 
+    /**
+     * Writes a loot table to YAML with pretty formatting.
+     *
+     * @param path Destination path for YAML output.
+     * @param table Loot table to serialize.
+     */
     public static void writeLootTable(Path path, LootTable table) throws IOException {
         JsonElement json = LootTable.DIRECT_CODEC.encodeStart(JsonOps.INSTANCE, table).getOrThrow(error -> new IllegalStateException(error));
         var gson = new GsonBuilder().setPrettyPrinting().create();
@@ -34,6 +44,14 @@ public class LootYamlSerializer {
         Files.writeString(path, YAML.dump(map));
     }
 
+    /**
+     * Reads a YAML loot table and falls back to a JSON snapshot when YAML parsing
+     * or codec validation fails.
+     *
+     * @param yamlPath Primary YAML path.
+     * @param jsonFallbackPath Backup JSON path.
+     * @return Parsed loot table.
+     */
     public static LootTable readLootTableWithFallback(Path yamlPath, Path jsonFallbackPath) throws IOException {
         var gson = new GsonBuilder().create();
 

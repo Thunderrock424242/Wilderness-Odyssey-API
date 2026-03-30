@@ -6,11 +6,18 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import top.theillusivec4.curios.api.SlotContext;
 
+/**
+ * Specialized chip variant used by the cloak system that notifies the player
+ * when equipped.
+ */
 public class CloakChipItem extends ChipSetItem {
     public CloakChipItem(Properties properties) {
         super(properties);
     }
 
+    /**
+     * Applies base chip behavior and sends an equip status message server-side.
+     */
     @Override
     public void onEquip(SlotContext slotContext, ItemStack prevStack, ItemStack stack) {
         super.onEquip(slotContext, prevStack, stack);

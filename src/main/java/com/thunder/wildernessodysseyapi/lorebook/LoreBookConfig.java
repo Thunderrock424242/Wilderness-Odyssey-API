@@ -15,6 +15,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Loads and exposes the configurable loot-book entries used by the lore book
+ * system.
+ */
 public class LoreBookConfig {
     public static final String CONFIG_NAME = "lore_books.json";
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -22,14 +26,26 @@ public class LoreBookConfig {
     private float chance = 0.03f;
     private List<LoreBookEntry> books = new ArrayList<>();
 
+    /**
+     * @return Per-chest chance of injecting a generated lore book entry.
+     */
     public float chance() {
         return chance;
     }
 
+    /**
+     * @return Configured lore book definitions that can be generated for players.
+     */
     public List<LoreBookEntry> books() {
         return books;
     }
 
+    /**
+     * Loads the lore book configuration from the mod config directory, seeding
+     * a default file from resources when missing.
+     *
+     * @return Loaded config instance or defaults when reading/parsing fails.
+     */
     public static LoreBookConfig load() {
         Path configPath = FMLPaths.CONFIGDIR.get().resolve(ModConstants.MOD_ID).resolve(CONFIG_NAME);
         ensureDefaultConfig(configPath);
@@ -71,6 +87,14 @@ public class LoreBookConfig {
         }
     }
 
+    /**
+     * One configured book entry from {@code lore_books.json}.
+     *
+     * @param id Internal unique key for this lore entry.
+     * @param title Display title written into the generated book.
+     * @param author Display author for the generated book.
+     * @param pages Ordered pages written into the generated book.
+     */
     public record LoreBookEntry(String id, String title, String author, List<String> pages) {
     }
 }

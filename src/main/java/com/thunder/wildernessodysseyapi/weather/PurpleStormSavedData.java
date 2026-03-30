@@ -5,6 +5,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.saveddata.SavedData;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * Persistent world data container for tracking purple-storm state across saves.
+ */
 public class PurpleStormSavedData extends SavedData {
     public static final String DATA_NAME = "wildernessodysseyapi_purple_storm";
 

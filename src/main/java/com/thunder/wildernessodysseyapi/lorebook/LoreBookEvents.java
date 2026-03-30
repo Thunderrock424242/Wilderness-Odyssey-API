@@ -12,7 +12,14 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.LootTableLoadEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
+/**
+ * Forge event hooks that inject lore books into chest loot and keep a player's
+ * discovered-book state in sync as they play.
+ */
 public class LoreBookEvents {
+    /**
+     * Adds an optional generated written-book entry to chest loot tables.
+     */
     @SubscribeEvent
     public static void onLootTableLoad(LootTableLoadEvent event) {
         ResourceLocation id = event.getName();
@@ -33,6 +40,10 @@ public class LoreBookEvents {
         event.getTable().addPool(pool);
     }
 
+    /**
+     * Runs per-player scanning logic on the server to detect newly acquired lore
+     * books.
+     */
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (event.getEntity().level().isClientSide()) {

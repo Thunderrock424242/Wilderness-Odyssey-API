@@ -20,6 +20,10 @@ import java.util.List;
 import java.util.Objects;
 import net.minecraft.world.level.GameRules;
 
+/**
+ * Loads, caches, and applies configurable game-rule presets for dedicated and
+ * single-player server contexts.
+ */
 public final class GameRulesListManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path RULES_PATH = Paths.get("config", ModConstants.MOD_ID, "game-rules.json");
@@ -29,6 +33,9 @@ public final class GameRulesListManager {
     private GameRulesListManager() {
     }
 
+    /**
+     * Creates the game-rules config file with defaults when it does not exist.
+     */
     public static void ensureRulesFileExists(MinecraftServer server) {
         Objects.requireNonNull(server, "server");
         if (Files.exists(RULES_PATH)) {
@@ -44,6 +51,9 @@ public final class GameRulesListManager {
         }
     }
 
+    /**
+     * Returns the cached rules config, loading from disk on first access.
+     */
     public static GameRulesConfig getRules() {
         GameRulesConfig current = cachedConfig;
         if (current != null) {
@@ -57,6 +67,9 @@ public final class GameRulesListManager {
         }
     }
 
+    /**
+     * Forces a reload of game-rule settings from disk.
+     */
     public static void reload() {
         cachedConfig = loadRules();
     }
@@ -106,6 +119,9 @@ public final class GameRulesListManager {
         }
     }
 
+    /**
+     * Applies configured game rules using the server command dispatcher.
+     */
     public static void applyConfiguredRules(MinecraftServer server) {
         Objects.requireNonNull(server, "server");
         GameRulesConfig rules = getRules();
@@ -125,6 +141,9 @@ public final class GameRulesListManager {
         return new GameRulesConfig(vanillaRules, vanillaRules);
     }
 
+    /**
+     * Immutable rule configuration split by server type.
+     */
     public record GameRulesConfig(List<GameRuleEntry> serverRules, List<GameRuleEntry> singlePlayerRules) {
         public GameRulesConfig {
             serverRules = serverRules == null ? Collections.emptyList() : List.copyOf(serverRules);
@@ -132,6 +151,9 @@ public final class GameRulesListManager {
         }
     }
 
+    /**
+     * One game-rule name/value assignment.
+     */
     public record GameRuleEntry(String name, String value) {
         public GameRuleEntry {
             name = name == null ? "" : name.trim();
