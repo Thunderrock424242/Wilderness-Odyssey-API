@@ -16,7 +16,8 @@
     "StructureBlockEntityMixin",
     "StructureTemplateAccessor",
     "StructureTemplatePaletteAccessor",
-    "ServerGamePacketListenerImplMixin"
+    "ServerGamePacketListenerImplMixin",
+    "LiquidBlockVolumetricMixin"
   ],
   "injectors": {
     "defaultRequire": 1
