@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.ocean.tide;
 import com.thunder.ticktoklib.api.TickTokAPI;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -75,10 +76,10 @@ public final class TideConfig {
                 .defineInRange("riverInlandMinFactor", 0.2D, 0.0D, 1.0D);
 
         DIMENSION_AMPLITUDE_MULTIPLIERS = BUILDER.comment("Per-dimension amplitude multipliers: \"namespace:dimension=multiplier\".")
-                .define("dimensionAmplitudeMultipliers", List.of());
+                .defineListAllowEmpty("dimensionAmplitudeMultipliers", ArrayList::new, TideConfig::isValidMultiplierEntry);
 
         BIOME_AMPLITUDE_MULTIPLIERS = BUILDER.comment("Per-biome amplitude multipliers: \"namespace:biome=multiplier\".")
-                .define("biomeAmplitudeMultipliers", List.of());
+                .defineListAllowEmpty("biomeAmplitudeMultipliers", ArrayList::new, TideConfig::isValidMultiplierEntry);
 
         CURRENT_STRENGTH = BUILDER.comment("Vertical force multiplier applied to entities in water to reflect rising/falling tides.")
                 .defineInRange("currentStrength", 0.004D, 0.0D, 0.05D);
@@ -92,6 +93,10 @@ public final class TideConfig {
     }
 
     private TideConfig() {
+    }
+
+    private static boolean isValidMultiplierEntry(Object value) {
+        return value instanceof String;
     }
 
     public static TideConfigValues values() {
