@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(net.minecraft.world.level.block.LiquidBlock.class)
 public class LiquidBlockVolumetricMixin {
 
-    @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "tick", at = @At("HEAD"), cancellable = true, require = 0)
     private void wildernessodysseyapi$replaceVanillaWaterTick(BlockState state,
                                                               ServerLevel level,
                                                               BlockPos pos,
