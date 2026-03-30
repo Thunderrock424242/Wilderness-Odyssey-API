@@ -27,6 +27,7 @@ import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
+import com.thunder.wildernessodysseyapi.command.VolumetricFluidCommand;
 import com.thunder.wildernessodysseyapi.command.ModpackStructureCommand;
 import com.thunder.wildernessodysseyapi.command.MeteorCommand;
 import com.thunder.wildernessodysseyapi.command.UnstuckCommand;
@@ -51,6 +52,8 @@ import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.rules.GameRulesListManager;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideConfig;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideManager;
+import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricFluidConfig;
+import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricFluidManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.PlayerTelemetryConfig;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.PlayerTelemetryReporter;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.EventTelemetryConfig;
@@ -158,6 +161,8 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TideConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-tides-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, VolumetricFluidConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-volumetric-fluid-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, CloakChipConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-cloak-chip-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PlayerTelemetryConfig.CONFIG_SPEC,
@@ -223,6 +228,7 @@ public class WildernessOdysseyAPIMainModClass {
         GlobalChatOptToggleCommand.register(dispatcher);
         LoreBookCommand.register(dispatcher);
         TideInfoCommand.register(dispatcher);
+        VolumetricFluidCommand.register(dispatcher);
         ModpackStructureCommand.register(dispatcher);
         TelemetryConsentCommand.register(dispatcher);
         TelemetryQueueStatsCommand.register(dispatcher);
@@ -281,6 +287,9 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == TideConfig.CONFIG_SPEC) {
             TideManager.reloadConfig();
         }
+        if (event.getConfig().getSpec() == VolumetricFluidConfig.CONFIG_SPEC) {
+            VolumetricFluidManager.reloadConfig();
+        }
     }
 
     public void onConfigReloaded(ModConfigEvent.Reloading event) {
@@ -292,6 +301,9 @@ public class WildernessOdysseyAPIMainModClass {
         }
         if (event.getConfig().getSpec() == TideConfig.CONFIG_SPEC) {
             TideManager.reloadConfig();
+        }
+        if (event.getConfig().getSpec() == VolumetricFluidConfig.CONFIG_SPEC) {
+            VolumetricFluidManager.reloadConfig();
         }
     }
 }
