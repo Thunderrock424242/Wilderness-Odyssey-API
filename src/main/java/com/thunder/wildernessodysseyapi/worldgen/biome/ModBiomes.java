@@ -10,6 +10,7 @@ public final class ModBiomes {
     private ModBiomes() {
     }
 
+    @Deprecated
     public static final ResourceKey<Biome> ANOMALY_PLAINS_KEY = ResourceKey.create(Registries.BIOME,
             ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "anomaly_plains"));
     public static final ResourceKey<Biome> ANOMALY_TUNDRA_KEY = ResourceKey.create(Registries.BIOME,
