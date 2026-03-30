@@ -17,7 +17,6 @@ import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.worldgen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.worldgen.processor.ModProcessors;
-import com.thunder.wildernessodysseyapi.worldgen.biome.ModBiomes;
 import com.thunder.wildernessodysseyapi.worldgen.biome.BiomeCompatibilityBootstrap;
 import com.thunder.wildernessodysseyapi.worldgen.modpack.ModpackStructureRegistry;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
