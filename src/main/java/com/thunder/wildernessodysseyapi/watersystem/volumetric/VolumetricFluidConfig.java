@@ -6,6 +6,8 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  * Server-side tuning values for the sparse volumetric water simulation.
  */
 public final class VolumetricFluidConfig {
+    private static final java.util.Set<String> VALID_PRESETS = java.util.Set.of("safe", "realism", "custom");
+
     public static final ModConfigSpec CONFIG_SPEC;
 
     public static final ModConfigSpec.BooleanValue ENABLED;
@@ -47,7 +49,8 @@ public final class VolumetricFluidConfig {
                 .defineInRange("activeRadius", 80, 8, 256);
 
         PRESET = BUILDER.comment("Preset profile: safe, realism, or custom. Presets override many tunables below.")
-                .defineInList("preset", "safe", java.util.List.of("safe", "realism", "custom"));
+                .define("preset", "safe", value -> value instanceof String preset
+                        && VALID_PRESETS.contains(preset.toLowerCase(java.util.Locale.ROOT)));
 
         REPLACE_VANILLA_ENGINE = BUILDER.comment("If true, cancels vanilla water fluid ticks and routes behavior through the volumetric solver.")
                 .define("replaceVanillaWaterEngine", false);
