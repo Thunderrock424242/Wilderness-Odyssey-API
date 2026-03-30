@@ -298,10 +298,13 @@ public final class VolumetricFluidManager {
 
             if (cell.volume >= config.placeThreshold()) {
                 BlockState state = level.getBlockState(pos);
+                boolean wasControlled = grid.controlledBlocks.contains(packedPos);
                 if (state.isAir()) {
                     level.setBlockAndUpdate(pos, Blocks.WATER.defaultBlockState());
+                    controlledNow.add(packedPos);
+                } else if (wasControlled && state.is(Blocks.WATER)) {
+                    controlledNow.add(packedPos);
                 }
-                controlledNow.add(packedPos);
             }
         }
 
