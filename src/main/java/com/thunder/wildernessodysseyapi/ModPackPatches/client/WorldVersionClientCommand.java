@@ -21,9 +21,7 @@ import java.nio.file.Paths;
 
 
 @EventBusSubscriber(value = Dist.CLIENT)
-/**
- * Client-side command utilities for reporting local world/modpack version details.
- */
+// Client-side command utilities for reporting local world/modpack version details.
 public class WorldVersionClientCommand {
 
 
@@ -83,4 +81,6 @@ public class WorldVersionClientCommand {
             minecraft.setScreen(new JoinMultiplayerScreen(titleScreen));
         }
     }
-}*/
+}
+
+*/
