@@ -51,8 +51,10 @@ import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.rules.GameRulesListManager;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideConfig;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideManager;
+import com.thunder.wildernessodysseyapi.watersystem.volumetric.client.VolumetricFluidRenderConfig;
 import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricFluidConfig;
 import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricFluidManager;
+import com.thunder.wildernessodysseyapi.watersystem.volumetric.network.VolumetricSurfaceSyncPayload;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.PlayerTelemetryConfig;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.PlayerTelemetryReporter;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.EventTelemetryConfig;
@@ -79,6 +81,8 @@ import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -120,6 +124,7 @@ public class WildernessOdysseyAPIMainModClass {
 
         // Register mod setup and creative tabs
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(this::registerPayloads);
         modEventBus.addListener(this::onConfigLoaded);
         modEventBus.addListener(this::onConfigReloaded);
         ModProcessors.PROCESSORS.register(modEventBus);
@@ -154,6 +159,8 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-debug-overlay-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TrueDarknessConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-true-darkness-client.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, VolumetricFluidRenderConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-volumetric-renderer-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-async.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,
@@ -185,6 +192,15 @@ public class WildernessOdysseyAPIMainModClass {
         });
         LOGGER.warn("Mod Pack Version: {}", VERSION); // Logs as a warning
         LOGGER.warn("This message is for development purposes only."); // Logs as info
+    }
+
+    private void registerPayloads(final RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar("1");
+        registrar.playToClient(
+                VolumetricSurfaceSyncPayload.TYPE,
+                VolumetricSurfaceSyncPayload.STREAM_CODEC,
+                VolumetricSurfaceSyncPayload::handle
+        );
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {

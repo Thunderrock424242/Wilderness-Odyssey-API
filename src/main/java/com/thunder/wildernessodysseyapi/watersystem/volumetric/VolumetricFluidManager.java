@@ -1,15 +1,21 @@
 package com.thunder.wildernessodysseyapi.watersystem.volumetric;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideAstronomy;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -31,7 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class VolumetricFluidManager {
     private static final Direction[] LATERALS = {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
-    private static final Map<ResourceKey<Level>, FluidGrid> GRIDS = new ConcurrentHashMap<>();
+    private static final Map<ResourceKey<Level>, Map<SimulatedFluid, FluidGrid>> GRIDS = new ConcurrentHashMap<>();
     private static VolumetricFluidConfig.Values cachedConfig = VolumetricFluidConfig.defaultValues();
 
     private VolumetricFluidManager() {
@@ -45,6 +51,14 @@ public final class VolumetricFluidManager {
         return cachedConfig.enabled() && cachedConfig.replaceVanillaWaterEngine();
     }
 
+    public static boolean shouldReplaceVanillaLavaEngine() {
+        return cachedConfig.enabled() && cachedConfig.enableLava() && cachedConfig.replaceVanillaLavaEngine();
+    }
+
+    public static boolean isLavaSimulationEnabled() {
+        return cachedConfig.enabled() && cachedConfig.enableLava();
+    }
+
     public static String activePreset() {
         return cachedConfig.preset();
     }
@@ -53,7 +67,16 @@ public final class VolumetricFluidManager {
         if (!cachedConfig.enabled()) {
             return;
         }
-        FluidGrid grid = GRIDS.computeIfAbsent(level.dimension(), ignored -> new FluidGrid());
+        FluidGrid grid = getGrid(level, SimulatedFluid.WATER);
+        FluidCell cell = grid.cells.computeIfAbsent(pos.asLong(), ignored -> new FluidCell());
+        cell.volume = Math.max(cell.volume, Math.max(cachedConfig.minCellVolume(), normalizedVolume));
+    }
+
+    public static void ingestVanillaLavaTick(ServerLevel level, BlockPos pos, double normalizedVolume) {
+        if (!cachedConfig.enabled() || !cachedConfig.enableLava()) {
+            return;
+        }
+        FluidGrid grid = getGrid(level, SimulatedFluid.LAVA);
         FluidCell cell = grid.cells.computeIfAbsent(pos.asLong(), ignored -> new FluidCell());
         cell.volume = Math.max(cell.volume, Math.max(cachedConfig.minCellVolume(), normalizedVolume));
     }
@@ -90,15 +113,15 @@ public final class VolumetricFluidManager {
             if (level.players().isEmpty()) {
                 continue;
             }
-            FluidGrid grid = GRIDS.computeIfAbsent(level.dimension(), ignored -> new FluidGrid());
-            ingestWaterNearPlayers(level, grid, cachedConfig);
-            stepSimulation(level, grid, cachedConfig);
-            applyToWorld(level, grid, cachedConfig);
+            stepFluid(level, SimulatedFluid.WATER, cachedConfig);
+            if (cachedConfig.enableLava()) {
+                stepFluid(level, SimulatedFluid.LAVA, cachedConfig);
+            }
         }
     }
 
-    public static SimulationSnapshot getSnapshot(ServerLevel level) {
-        FluidGrid grid = GRIDS.computeIfAbsent(level.dimension(), ignored -> new FluidGrid());
+    public static SimulationSnapshot getSnapshot(ServerLevel level, SimulatedFluid fluidType) {
+        FluidGrid grid = getGrid(level, fluidType);
         double totalVolume = 0.0D;
         double totalSpeed = 0.0D;
         for (FluidCell cell : grid.cells.values()) {
@@ -109,14 +132,80 @@ public final class VolumetricFluidManager {
         return new SimulationSnapshot(grid.cells.size(), grid.controlledBlocks.size(), totalVolume, avgSpeed);
     }
 
-    public static void clear(ServerLevel level) {
-        FluidGrid grid = GRIDS.get(level.dimension());
+    /**
+     * Builds a compact list of fluid-surface samples that a client mesh renderer can consume.
+     * One sample is emitted per X/Z column using the highest active cell.
+     */
+    public static List<SurfaceSample> sampleSurface(ServerLevel level,
+                                                    SimulatedFluid fluidType,
+                                                    BlockPos center,
+                                                    int radius,
+                                                    int maxSamples) {
+        FluidGrid grid = getGrid(level, fluidType);
+        if (grid.cells.isEmpty() || maxSamples <= 0 || radius <= 0) {
+            return List.of();
+        }
+
+        int minX = center.getX() - radius;
+        int maxX = center.getX() + radius;
+        int minZ = center.getZ() - radius;
+        int maxZ = center.getZ() + radius;
+        Map<Long, SurfaceSample> byColumn = new HashMap<>();
+        TideManager.TideSnapshot tideSnapshot = TideManager.snapshot(level);
+        double moonPhaseFactor = fluidType == SimulatedFluid.WATER ? TideAstronomy.getMoonPhaseAmplitudeFactor(level) : 1.0D;
+
+        for (Map.Entry<Long, FluidCell> entry : grid.cells.entrySet()) {
+            BlockPos pos = BlockPos.of(entry.getKey());
+            if (pos.getX() < minX || pos.getX() > maxX || pos.getZ() < minZ || pos.getZ() > maxZ) {
+                continue;
+            }
+            FluidCell cell = entry.getValue();
+            if (cell.volume <= cachedConfig.minCellVolume()) {
+                continue;
+            }
+
+            long columnKey = BlockPos.asLong(pos.getX(), 0, pos.getZ());
+            double surfaceY = pos.getY() + Math.max(0.0D, Math.min(1.0D, cell.volume));
+            double shorelineFactor = fluidType == SimulatedFluid.WATER ? computeShorelineFactor(level, pos) : 0.0D;
+            double tideOffset = 0.0D;
+            if (fluidType == SimulatedFluid.WATER) {
+                tideOffset = tideSnapshot.normalizedHeight() * TideManager.getLocalAmplitude(level, pos);
+            }
+            SurfaceSample current = byColumn.get(columnKey);
+            if (current == null || surfaceY > current.surfaceY()) {
+                byColumn.put(columnKey, new SurfaceSample(
+                        pos.getX(),
+                        pos.getZ(),
+                        surfaceY,
+                        cell.volume,
+                        shorelineFactor,
+                        tideOffset,
+                        moonPhaseFactor,
+                        fluidType
+                ));
+            }
+        }
+
+        if (byColumn.isEmpty()) {
+            return List.of();
+        }
+
+        List<SurfaceSample> samples = new ArrayList<>(byColumn.values());
+        samples.sort((a, b) -> Double.compare(b.volume(), a.volume()));
+        if (samples.size() > maxSamples) {
+            return List.copyOf(samples.subList(0, maxSamples));
+        }
+        return List.copyOf(samples);
+    }
+
+    public static void clear(ServerLevel level, SimulatedFluid fluidType) {
+        FluidGrid grid = getGridOrNull(level, fluidType);
         if (grid == null) {
             return;
         }
         for (Long packedPos : new ArrayList<>(grid.controlledBlocks)) {
             BlockPos pos = BlockPos.of(packedPos);
-            if (level.getBlockState(pos).is(Blocks.WATER)) {
+            if (level.getBlockState(pos).is(fluidType.block())) {
                 level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
             }
         }
@@ -124,8 +213,8 @@ public final class VolumetricFluidManager {
         grid.controlledBlocks.clear();
     }
 
-    public static int seedFromExistingWater(ServerLevel level, BlockPos center, int radius) {
-        FluidGrid grid = GRIDS.computeIfAbsent(level.dimension(), ignored -> new FluidGrid());
+    public static int seedFromExistingFluid(ServerLevel level, BlockPos center, int radius, SimulatedFluid fluidType) {
+        FluidGrid grid = getGrid(level, fluidType);
         int injected = 0;
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         int minY = Math.max(level.getMinBuildHeight(), center.getY() - radius);
@@ -135,7 +224,7 @@ public final class VolumetricFluidManager {
             for (int y = minY; y <= maxY; y++) {
                 for (int z = center.getZ() - radius; z <= center.getZ() + radius; z++) {
                     cursor.set(x, y, z);
-                    if (!level.isLoaded(cursor) || level.getFluidState(cursor).getType() != Fluids.WATER) {
+                    if (!level.isLoaded(cursor) || level.getFluidState(cursor).getType() != fluidType.fluid()) {
                         continue;
                     }
                     FluidCell cell = grid.cells.computeIfAbsent(cursor.asLong(), ignored -> new FluidCell());
@@ -148,7 +237,30 @@ public final class VolumetricFluidManager {
         return injected;
     }
 
-    private static void ingestWaterNearPlayers(ServerLevel level, FluidGrid grid, VolumetricFluidConfig.Values config) {
+    public static SurfaceSample sampleAtPosition(ServerLevel level, BlockPos pos, SimulatedFluid fluidType) {
+        FluidGrid grid = getGrid(level, fluidType);
+        FluidCell cell = grid.cells.get(pos.asLong());
+        double volume = cell == null ? 0.0D : cell.volume;
+        double shorelineFactor = fluidType == SimulatedFluid.WATER ? computeShorelineFactor(level, pos) : 0.0D;
+        double tideOffset = 0.0D;
+        double moonPhaseFactor = 1.0D;
+        if (fluidType == SimulatedFluid.WATER) {
+            TideManager.TideSnapshot tideSnapshot = TideManager.snapshot(level);
+            tideOffset = tideSnapshot.normalizedHeight() * TideManager.getLocalAmplitude(level, pos);
+            moonPhaseFactor = TideAstronomy.getMoonPhaseAmplitudeFactor(level);
+        }
+        double surfaceY = pos.getY() + Math.max(0.0D, Math.min(1.0D, volume));
+        return new SurfaceSample(pos.getX(), pos.getZ(), surfaceY, volume, shorelineFactor, tideOffset, moonPhaseFactor, fluidType);
+    }
+
+    private static void stepFluid(ServerLevel level, SimulatedFluid fluidType, VolumetricFluidConfig.Values config) {
+        FluidGrid grid = getGrid(level, fluidType);
+        ingestFluidNearPlayers(level, grid, config, fluidType);
+        stepSimulation(level, grid, config, fluidType);
+        applyToWorld(level, grid, config, fluidType);
+    }
+
+    private static void ingestFluidNearPlayers(ServerLevel level, FluidGrid grid, VolumetricFluidConfig.Values config, SimulatedFluid fluidType) {
         int radius = config.playerSampleRadius();
         int step = Math.max(1, config.playerSampleStep());
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
@@ -161,7 +273,7 @@ public final class VolumetricFluidManager {
                 for (int y = minY; y <= maxY; y += step) {
                     for (int z = origin.getZ() - radius; z <= origin.getZ() + radius; z += step) {
                         cursor.set(x, y, z);
-                        if (!level.isLoaded(cursor) || level.getFluidState(cursor).getType() != Fluids.WATER) {
+                        if (!level.isLoaded(cursor) || level.getFluidState(cursor).getType() != fluidType.fluid()) {
                             continue;
                         }
                         FluidCell cell = grid.cells.computeIfAbsent(cursor.asLong(), ignored -> new FluidCell());
@@ -172,7 +284,7 @@ public final class VolumetricFluidManager {
         }
     }
 
-    private static void stepSimulation(ServerLevel level, FluidGrid grid, VolumetricFluidConfig.Values config) {
+    private static void stepSimulation(ServerLevel level, FluidGrid grid, VolumetricFluidConfig.Values config, SimulatedFluid fluidType) {
         if (grid.cells.isEmpty()) {
             return;
         }
@@ -203,7 +315,7 @@ public final class VolumetricFluidManager {
 
                 // gravity/downward bias
                 BlockPos below = pos.below();
-                if (below.getY() >= level.getMinBuildHeight() && isFluidPassable(level, below)) {
+                if (below.getY() >= level.getMinBuildHeight() && isFluidPassable(level, below, fluidType)) {
                     double down = Math.min(remaining, config.downwardTransfer() * (1.0D + pressure));
                     if (down > 0.0D) {
                         accumulate(volumeDelta, below.asLong(), down);
@@ -219,7 +331,7 @@ public final class VolumetricFluidManager {
                         break;
                     }
                     BlockPos sidePos = pos.relative(direction);
-                    if (!isFluidPassable(level, sidePos)) {
+                    if (!isFluidPassable(level, sidePos, fluidType)) {
                         continue;
                     }
 
@@ -258,12 +370,12 @@ public final class VolumetricFluidManager {
             }
         }
 
-        advectByVelocity(level, grid, config);
+        advectByVelocity(level, grid, config, fluidType);
         applyVelocityDamping(grid, config.inertiaDamping());
         pruneCells(grid, config.minCellVolume());
     }
 
-    private static void advectByVelocity(ServerLevel level, FluidGrid grid, VolumetricFluidConfig.Values config) {
+    private static void advectByVelocity(ServerLevel level, FluidGrid grid, VolumetricFluidConfig.Values config, SimulatedFluid fluidType) {
         Map<Long, Double> advectedVolume = new HashMap<>();
 
         for (Map.Entry<Long, FluidCell> entry : new ArrayList<>(grid.cells.entrySet())) {
@@ -285,7 +397,7 @@ public final class VolumetricFluidManager {
             if (target.getY() < level.getMinBuildHeight() || target.getY() >= level.getMaxBuildHeight()) {
                 continue;
             }
-            if (!isFluidPassable(level, target)) {
+            if (!isFluidPassable(level, target, fluidType)) {
                 continue;
             }
 
@@ -301,7 +413,7 @@ public final class VolumetricFluidManager {
         applyVolumeDelta(grid, advectedVolume, config.minCellVolume());
     }
 
-    private static void applyToWorld(ServerLevel level, FluidGrid grid, VolumetricFluidConfig.Values config) {
+    private static void applyToWorld(ServerLevel level, FluidGrid grid, VolumetricFluidConfig.Values config, SimulatedFluid fluidType) {
         Set<Long> controlledNow = new HashSet<>();
 
         for (Map.Entry<Long, FluidCell> entry : grid.cells.entrySet()) {
@@ -316,10 +428,14 @@ public final class VolumetricFluidManager {
             if (cell.volume >= config.placeThreshold()) {
                 BlockState state = level.getBlockState(pos);
                 boolean wasControlled = grid.controlledBlocks.contains(packedPos);
+                BlockState simulatedState = fluidStateForVolume(fluidType, cell.volume);
                 if (state.isAir()) {
-                    level.setBlockAndUpdate(pos, Blocks.WATER.defaultBlockState());
+                    level.setBlockAndUpdate(pos, simulatedState);
                     controlledNow.add(packedPos);
-                } else if (wasControlled && state.is(Blocks.WATER)) {
+                } else if (wasControlled && state.is(fluidType.block())) {
+                    if (!state.equals(simulatedState)) {
+                        level.setBlockAndUpdate(pos, simulatedState);
+                    }
                     controlledNow.add(packedPos);
                 }
             }
@@ -332,13 +448,24 @@ public final class VolumetricFluidManager {
                 continue;
             }
             BlockPos pos = BlockPos.of(packedPos);
-            if (level.isLoaded(pos) && level.getBlockState(pos).is(Blocks.WATER)) {
+            if (level.isLoaded(pos) && level.getBlockState(pos).is(fluidType.block())) {
                 level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
             }
         }
 
         grid.controlledBlocks.clear();
         grid.controlledBlocks.addAll(controlledNow);
+    }
+
+    private static BlockState fluidStateForVolume(SimulatedFluid fluidType, double volume) {
+        BlockState base = fluidType.block().defaultBlockState();
+        IntegerProperty flowingProperty = BlockStateProperties.LEVEL_FLOWING;
+        if (!base.hasProperty(flowingProperty)) {
+            return base;
+        }
+        // Minecraft liquid levels: 0 = full/source, 1..7 = descending heights.
+        int level = Math.max(0, Math.min(7, 7 - (int) Math.round(Math.max(0.0D, Math.min(1.0D, volume)) * 7.0D)));
+        return base.setValue(flowingProperty, level);
     }
 
     private static boolean isNearAnyPlayer(ServerLevel level, BlockPos pos, int radiusSq) {
@@ -350,12 +477,12 @@ public final class VolumetricFluidManager {
         return false;
     }
 
-    private static boolean isFluidPassable(ServerLevel level, BlockPos pos) {
+    private static boolean isFluidPassable(ServerLevel level, BlockPos pos, SimulatedFluid fluidType) {
         if (!level.isLoaded(pos)) {
             return false;
         }
         BlockState state = level.getBlockState(pos);
-        return state.isAir() || state.is(Blocks.WATER) || state.canBeReplaced();
+        return state.isAir() || state.is(fluidType.block()) || state.canBeReplaced();
     }
 
     private static void accumulate(Map<Long, Double> delta, long packedPos, double value) {
@@ -393,6 +520,19 @@ public final class VolumetricFluidManager {
         }
     }
 
+    private static FluidGrid getGrid(ServerLevel level, SimulatedFluid fluidType) {
+        Map<SimulatedFluid, FluidGrid> byFluid = GRIDS.computeIfAbsent(level.dimension(), ignored -> new ConcurrentHashMap<>());
+        return byFluid.computeIfAbsent(fluidType, ignored -> new FluidGrid());
+    }
+
+    private static FluidGrid getGridOrNull(ServerLevel level, SimulatedFluid fluidType) {
+        Map<SimulatedFluid, FluidGrid> byFluid = GRIDS.get(level.dimension());
+        if (byFluid == null) {
+            return null;
+        }
+        return byFluid.get(fluidType);
+    }
+
     private static final class FluidGrid {
         private final Map<Long, FluidCell> cells = new HashMap<>();
         private final Set<Long> controlledBlocks = new HashSet<>();
@@ -406,5 +546,59 @@ public final class VolumetricFluidManager {
     }
 
     public record SimulationSnapshot(int activeCells, int controlledBlocks, double totalVolume, double averageSpeed) {
+    }
+
+    public record SurfaceSample(int blockX,
+                                int blockZ,
+                                double surfaceY,
+                                double volume,
+                                double shorelineFactor,
+                                double tideOffset,
+                                double moonPhaseFactor,
+                                SimulatedFluid fluidType) {
+    }
+
+    private static double computeShorelineFactor(ServerLevel level, BlockPos pos) {
+        double biomeBoost = level.getBiome(pos).is(BiomeTags.IS_BEACH) ? 0.6D : 0.0D;
+        int sandHits = 0;
+        int edgeHits = 0;
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (Direction direction : LATERALS) {
+            cursor.setWithOffset(pos, direction);
+            if (!level.isLoaded(cursor)) {
+                continue;
+            }
+            BlockState state = level.getBlockState(cursor);
+            if (state.is(Blocks.SAND) || state.is(Blocks.RED_SAND) || state.is(Blocks.SANDSTONE)) {
+                sandHits++;
+            }
+            if (!state.isAir() && !state.liquid()) {
+                edgeHits++;
+            }
+        }
+        double sandFactor = sandHits / 4.0D;
+        double edgeFactor = edgeHits / 4.0D;
+        return Math.max(0.0D, Math.min(1.0D, biomeBoost + sandFactor * 0.6D + edgeFactor * 0.25D));
+    }
+
+    public enum SimulatedFluid {
+        WATER(Fluids.WATER, Blocks.WATER),
+        LAVA(Fluids.LAVA, Blocks.LAVA);
+
+        private final Fluid fluid;
+        private final net.minecraft.world.level.block.Block block;
+
+        SimulatedFluid(Fluid fluid, net.minecraft.world.level.block.Block block) {
+            this.fluid = fluid;
+            this.block = block;
+        }
+
+        public Fluid fluid() {
+            return fluid;
+        }
+
+        public net.minecraft.world.level.block.Block block() {
+            return block;
+        }
     }
 }
