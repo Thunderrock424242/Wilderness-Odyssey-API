@@ -23,7 +23,9 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -98,8 +100,9 @@ public final class SpawnBunkerPlacer {
     }
 
     private static BlockPos findOceanAnchor(ServerLevel level, BlockPos baseSpawn, Vec3i bunkerSize) {
+        OceanSearchContext context = new OceanSearchContext(level);
         BlockPos anchor = toOceanAnchor(level, baseSpawn);
-        if (isViableOceanAnchor(level, anchor, bunkerSize)) {
+        if (isViableOceanAnchor(context, anchor, bunkerSize)) {
             return anchor;
         }
 
@@ -114,12 +117,12 @@ public final class SpawnBunkerPlacer {
                     }
 
                     BlockPos candidate = toOceanAnchor(level, new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
-                    if (isViableOceanAnchor(level, candidate, bunkerSize)) {
+                    if (isViableOceanAnchor(context, candidate, bunkerSize)) {
                         return candidate;
                     }
                     evaluated++;
                     if (evaluated >= MAX_ANCHOR_CANDIDATES) {
-                        BlockPos forcedOceanAnchor = findAnyOceanAnchor(level, baseSpawn);
+                        BlockPos forcedOceanAnchor = findAnyOceanAnchor(level, baseSpawn, context);
                         ModConstants.LOGGER.warn(
                                 "Hit spawn bunker ocean-search budget ({} candidates) near {}; using fallback {}.",
                                 MAX_ANCHOR_CANDIDATES, baseSpawn, forcedOceanAnchor);
@@ -129,7 +132,7 @@ public final class SpawnBunkerPlacer {
             }
         }
 
-        BlockPos forcedOceanAnchor = findAnyOceanAnchor(level, baseSpawn);
+        BlockPos forcedOceanAnchor = findAnyOceanAnchor(level, baseSpawn, context);
         ModConstants.LOGGER.warn("Unable to locate a fully open ocean spawn region within {} blocks of {}; using best-effort ocean fallback.",
                 OCEAN_SEARCH_RADIUS, baseSpawn);
         return forcedOceanAnchor;
@@ -166,43 +169,39 @@ public final class SpawnBunkerPlacer {
         return BlockPos.containing(result.bounds().getCenter());
     }
 
-    private static boolean isViableOceanAnchor(ServerLevel level, BlockPos anchor, Vec3i bunkerSize) {
-        if (!fastIsProbablyOceanAnchor(level, anchor)) {
+    private static boolean isViableOceanAnchor(OceanSearchContext context, BlockPos anchor, Vec3i bunkerSize) {
+        if (!fastIsProbablyOceanAnchor(context, anchor)) {
             return false;
         }
-        if (!isOceanBiome(level, anchor)) {
+        if (!context.isOceanBiome(anchor)) {
             return false;
         }
-        if (!hasOceanFootprint(level, anchor, bunkerSize)) {
+        if (!hasOceanFootprint(context, anchor, bunkerSize)) {
             return false;
         }
-        if (!isSurroundedByOcean(level, anchor)) {
+        if (!isSurroundedByOcean(context, anchor)) {
             return false;
         }
-        return hasStableSeafloor(level, anchor, bunkerSize);
+        return hasStableSeafloor(context, anchor, bunkerSize);
     }
 
-    private static boolean fastIsProbablyOceanAnchor(ServerLevel level, BlockPos anchor) {
-        if (!isOceanWaterSample(level, anchor)) {
+    private static boolean fastIsProbablyOceanAnchor(OceanSearchContext context, BlockPos anchor) {
+        if (!isOceanWaterSample(context, anchor)) {
             return false;
         }
-        return isOceanWaterSample(level, anchor.offset(FAST_OCEAN_SAMPLE_OFFSET, 0, 0))
-                && isOceanWaterSample(level, anchor.offset(-FAST_OCEAN_SAMPLE_OFFSET, 0, 0))
-                && isOceanWaterSample(level, anchor.offset(0, 0, FAST_OCEAN_SAMPLE_OFFSET))
-                && isOceanWaterSample(level, anchor.offset(0, 0, -FAST_OCEAN_SAMPLE_OFFSET));
+        return isOceanWaterSample(context, anchor.offset(FAST_OCEAN_SAMPLE_OFFSET, 0, 0))
+                && isOceanWaterSample(context, anchor.offset(-FAST_OCEAN_SAMPLE_OFFSET, 0, 0))
+                && isOceanWaterSample(context, anchor.offset(0, 0, FAST_OCEAN_SAMPLE_OFFSET))
+                && isOceanWaterSample(context, anchor.offset(0, 0, -FAST_OCEAN_SAMPLE_OFFSET));
     }
 
-    private static boolean isOceanWaterSample(ServerLevel level, BlockPos pos) {
-        if (!isOceanBiome(level, pos)) {
-            return false;
-        }
-        BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, pos);
-        return !level.getFluidState(surface).isEmpty();
+    private static boolean isOceanWaterSample(OceanSearchContext context, BlockPos pos) {
+        return context.hasSurfaceWater(pos);
     }
 
-    private static BlockPos findAnyOceanAnchor(ServerLevel level, BlockPos baseSpawn) {
+    private static BlockPos findAnyOceanAnchor(ServerLevel level, BlockPos baseSpawn, OceanSearchContext context) {
         BlockPos baseAnchor = toOceanAnchor(level, baseSpawn);
-        if (isOceanWaterSample(level, baseAnchor)) {
+        if (isOceanWaterSample(context, baseAnchor)) {
             return baseAnchor;
         }
 
@@ -216,7 +215,7 @@ public final class SpawnBunkerPlacer {
                     }
 
                     BlockPos candidate = toOceanAnchor(level, new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
-                    if (isOceanWaterSample(level, candidate)) {
+                    if (isOceanWaterSample(context, candidate)) {
                         return candidate;
                     }
                 }
@@ -225,20 +224,8 @@ public final class SpawnBunkerPlacer {
         return baseAnchor;
     }
 
-    private static boolean isOceanBiome(ServerLevel level, BlockPos pos) {
-        Holder<Biome> biome = level.getBiome(pos);
-        if (!biome.is(BiomeTags.IS_OCEAN)) {
-            return false;
-        }
-        for (ResourceKey<Biome> key : BLACKLISTED_OCEAN_BIOMES) {
-            if (biome.is(key)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean hasOceanFootprint(ServerLevel level, BlockPos anchor, Vec3i bunkerSize) {
+    private static boolean hasOceanFootprint(OceanSearchContext context, BlockPos anchor, Vec3i bunkerSize) {
+        ServerLevel level = context.level();
         BlockPos origin = getPlacementOrigin(level, anchor);
         int minX = origin.getX();
         int minZ = origin.getZ();
@@ -249,16 +236,16 @@ public final class SpawnBunkerPlacer {
         for (int x = minX; x <= maxX; x = nextSampleCoordinate(x, maxX, FOOTPRINT_SAMPLE_STEP)) {
             for (int z = minZ; z <= maxZ; z = nextSampleCoordinate(z, maxZ, FOOTPRINT_SAMPLE_STEP)) {
                 cursor.set(x, anchor.getY(), z);
-                if (!isOceanBiome(level, cursor)) {
+                if (!context.isOceanBiome(cursor)) {
                     return false;
                 }
 
+                if (!context.hasSurfaceWater(cursor)) {
+                    return false;
+                }
+
+                int seafloorY = context.sampleSeafloorY(cursor);
                 BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, cursor);
-                if (level.getFluidState(surface).isEmpty()) {
-                    return false;
-                }
-
-                int seafloorY = TerrainReplacerEngine.sampleSurface(level, cursor).y();
                 int waterDepth = surface.getY() - seafloorY;
                 if (waterDepth < MIN_OCEAN_WATER_DEPTH) {
                     return false;
@@ -268,18 +255,18 @@ public final class SpawnBunkerPlacer {
         return true;
     }
 
-    private static boolean isSurroundedByOcean(ServerLevel level, BlockPos anchor) {
+    private static boolean isSurroundedByOcean(OceanSearchContext context, BlockPos anchor) {
+        ServerLevel level = context.level();
         int baseX = anchor.getX();
         int baseZ = anchor.getZ();
         for (int dx = -OCEAN_REGION_RADIUS; dx <= OCEAN_REGION_RADIUS; dx += OCEAN_REGION_STEP) {
             for (int dz = -OCEAN_REGION_RADIUS; dz <= OCEAN_REGION_RADIUS; dz += OCEAN_REGION_STEP) {
                 BlockPos samplePos = new BlockPos(baseX + dx, anchor.getY(), baseZ + dz);
-                if (!isOceanBiome(level, samplePos)) {
+                if (!context.isOceanBiome(samplePos)) {
                     return false;
                 }
 
-                BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, samplePos);
-                if (level.getFluidState(surface).isEmpty()) {
+                if (!context.hasSurfaceWater(samplePos)) {
                     return false;
                 }
             }
@@ -287,7 +274,8 @@ public final class SpawnBunkerPlacer {
         return true;
     }
 
-    private static boolean hasStableSeafloor(ServerLevel level, BlockPos anchor, Vec3i bunkerSize) {
+    private static boolean hasStableSeafloor(OceanSearchContext context, BlockPos anchor, Vec3i bunkerSize) {
+        ServerLevel level = context.level();
         BlockPos origin = getPlacementOrigin(level, anchor);
         int minX = origin.getX() - ISLAND_PLATFORM_PADDING;
         int minZ = origin.getZ() - ISLAND_PLATFORM_PADDING;
@@ -298,7 +286,7 @@ public final class SpawnBunkerPlacer {
         int maxFloorY = Integer.MIN_VALUE;
         for (int x = minX; x <= maxX; x = nextSampleCoordinate(x, maxX, FOOTPRINT_SAMPLE_STEP)) {
             for (int z = minZ; z <= maxZ; z = nextSampleCoordinate(z, maxZ, FOOTPRINT_SAMPLE_STEP)) {
-                int floorY = TerrainReplacerEngine.sampleSurface(level, new BlockPos(x, anchor.getY(), z)).y();
+                int floorY = context.sampleSeafloorY(new BlockPos(x, anchor.getY(), z));
                 minFloorY = Math.min(minFloorY, floorY);
                 maxFloorY = Math.max(maxFloorY, floorY);
                 if (maxFloorY - minFloorY > MAX_SEAFLOOR_VARIANCE) {
@@ -405,5 +393,58 @@ public final class SpawnBunkerPlacer {
 
         int next = current + step;
         return Math.min(next, max);
+    }
+
+    private static final class OceanSearchContext {
+        private final ServerLevel level;
+        private final Map<Long, Boolean> oceanBiomeCache = new HashMap<>();
+        private final Map<Long, Boolean> surfaceWaterCache = new HashMap<>();
+        private final Map<Long, Integer> seafloorCache = new HashMap<>();
+
+        private OceanSearchContext(ServerLevel level) {
+            this.level = level;
+        }
+
+        private ServerLevel level() {
+            return level;
+        }
+
+        private boolean isOceanBiome(BlockPos pos) {
+            long key = xzKey(pos.getX(), pos.getZ());
+            return oceanBiomeCache.computeIfAbsent(key, ignored -> computeOceanBiome(pos));
+        }
+
+        private boolean hasSurfaceWater(BlockPos pos) {
+            long key = xzKey(pos.getX(), pos.getZ());
+            return surfaceWaterCache.computeIfAbsent(key, ignored -> {
+                if (!isOceanBiome(pos)) {
+                    return false;
+                }
+                BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, pos);
+                return !level.getFluidState(surface).isEmpty();
+            });
+        }
+
+        private int sampleSeafloorY(BlockPos pos) {
+            long key = xzKey(pos.getX(), pos.getZ());
+            return seafloorCache.computeIfAbsent(key, ignored -> TerrainReplacerEngine.sampleSurface(level, pos).y());
+        }
+
+        private boolean computeOceanBiome(BlockPos pos) {
+            Holder<Biome> biome = level.getBiome(pos);
+            if (!biome.is(BiomeTags.IS_OCEAN)) {
+                return false;
+            }
+            for (ResourceKey<Biome> key : BLACKLISTED_OCEAN_BIOMES) {
+                if (biome.is(key)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static long xzKey(int x, int z) {
+            return ((long) x << 32) ^ (z & 0xFFFF_FFFFL);
+        }
     }
 }
