@@ -17,6 +17,8 @@ public final class VolumetricFluidConfig {
     public static final ModConfigSpec.IntValue ACTIVE_RADIUS;
     public static final ModConfigSpec.ConfigValue<String> PRESET;
     public static final ModConfigSpec.BooleanValue REPLACE_VANILLA_ENGINE;
+    public static final ModConfigSpec.BooleanValue ENABLE_LAVA;
+    public static final ModConfigSpec.BooleanValue REPLACE_VANILLA_LAVA_ENGINE;
     public static final ModConfigSpec.DoubleValue DOWNWARD_TRANSFER;
     public static final ModConfigSpec.DoubleValue LATERAL_TRANSFER;
     public static final ModConfigSpec.DoubleValue ADVECTION_TRANSFER;
@@ -54,6 +56,12 @@ public final class VolumetricFluidConfig {
 
         REPLACE_VANILLA_ENGINE = BUILDER.comment("If true, cancels vanilla water fluid ticks and routes behavior through the volumetric solver.")
                 .define("replaceVanillaWaterEngine", false);
+
+        ENABLE_LAVA = BUILDER.comment("If true, runs the hybrid volumetric solver for lava in addition to water.")
+                .define("enableLava", false);
+
+        REPLACE_VANILLA_LAVA_ENGINE = BUILDER.comment("If true, cancels vanilla lava fluid ticks and routes behavior through the volumetric solver.")
+                .define("replaceVanillaLavaEngine", false);
 
         DOWNWARD_TRANSFER = BUILDER.comment("Max water volume moved downward per step from one cell.")
                 .defineInRange("downwardTransfer", 0.35D, 0.01D, 1.0D);
@@ -101,6 +109,8 @@ public final class VolumetricFluidConfig {
                 ACTIVE_RADIUS.get(),
                 PRESET.get(),
                 REPLACE_VANILLA_ENGINE.get(),
+                ENABLE_LAVA.get(),
+                REPLACE_VANILLA_LAVA_ENGINE.get(),
                 DOWNWARD_TRANSFER.get(),
                 LATERAL_TRANSFER.get(),
                 ADVECTION_TRANSFER.get(),
@@ -124,6 +134,8 @@ public final class VolumetricFluidConfig {
                 ACTIVE_RADIUS.getDefault(),
                 PRESET.getDefault(),
                 REPLACE_VANILLA_ENGINE.getDefault(),
+                ENABLE_LAVA.getDefault(),
+                REPLACE_VANILLA_LAVA_ENGINE.getDefault(),
                 DOWNWARD_TRANSFER.getDefault(),
                 LATERAL_TRANSFER.getDefault(),
                 ADVECTION_TRANSFER.getDefault(),
@@ -150,6 +162,8 @@ public final class VolumetricFluidConfig {
                     128,
                     "realism",
                     true,
+                    true,
+                    true,
                     0.45D,
                     0.18D,
                     0.14D,
@@ -169,6 +183,8 @@ public final class VolumetricFluidConfig {
                     3,
                     64,
                     "safe",
+                    false,
+                    false,
                     false,
                     0.25D,
                     0.06D,
@@ -192,6 +208,8 @@ public final class VolumetricFluidConfig {
             int activeRadius,
             String preset,
             boolean replaceVanillaWaterEngine,
+            boolean enableLava,
+            boolean replaceVanillaLavaEngine,
             double downwardTransfer,
             double lateralTransfer,
             double advectionTransfer,

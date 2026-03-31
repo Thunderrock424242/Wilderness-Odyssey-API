@@ -23,14 +23,17 @@ public class LiquidBlockVolumetricMixin {
                                                               BlockPos pos,
                                                               RandomSource random,
                                                               CallbackInfo ci) {
-        if (!VolumetricFluidManager.shouldReplaceVanillaWaterEngine()) {
+        if (state.getFluidState().getType() == Fluids.WATER) {
+            if (!VolumetricFluidManager.shouldReplaceVanillaWaterEngine()) {
+                return;
+            }
+            VolumetricFluidManager.ingestVanillaWaterTick(level, pos, state.getFluidState().getAmount() / 8.0D);
+            ci.cancel();
             return;
         }
-        if (state.getFluidState().getType() != Fluids.WATER) {
-            return;
+        if (state.getFluidState().getType() == Fluids.LAVA && VolumetricFluidManager.shouldReplaceVanillaLavaEngine()) {
+            VolumetricFluidManager.ingestVanillaLavaTick(level, pos, state.getFluidState().getAmount() / 8.0D);
+            ci.cancel();
         }
-
-        VolumetricFluidManager.ingestVanillaWaterTick(level, pos, state.getFluidState().getAmount() / 8.0D);
-        ci.cancel();
     }
 }
