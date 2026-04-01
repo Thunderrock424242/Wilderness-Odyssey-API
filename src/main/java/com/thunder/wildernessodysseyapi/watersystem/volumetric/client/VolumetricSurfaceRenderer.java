@@ -23,8 +23,6 @@ import java.util.List;
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.GAME)
 public final class VolumetricSurfaceRenderer {
-    private static final double MAX_EDGE_DELTA = 1.5D;
-
     private VolumetricSurfaceRenderer() {
     }
 
@@ -55,6 +53,11 @@ public final class VolumetricSurfaceRenderer {
         double maxRenderDistanceSq = maxRenderDistance * (double) maxRenderDistance;
         double waveStrength = VolumetricFluidRenderConfig.WAVE_STRENGTH.get();
         double foamStrength = VolumetricFluidRenderConfig.FOAM_STRENGTH.get();
+        double maxSurfaceSlopeDelta = VolumetricFluidRenderConfig.MAX_SURFACE_SLOPE_DELTA.get();
+
+        if (minecraft.player.isUnderWater()) {
+            return;
+        }
 
         if (VolumetricSurfaceClientCache.isStale((long) time, VolumetricFluidRenderConfig.MAX_STALE_AGE_TICKS.get())) {
             return;
@@ -62,7 +65,7 @@ public final class VolumetricSurfaceRenderer {
 
         renderFluid(
                 VolumetricSurfaceMesher.buildTriangles(
-                        VolumetricSurfaceClientCache.snapshot(minecraft.level.dimension().location(), SimulatedFluid.WATER), MAX_EDGE_DELTA),
+                        VolumetricSurfaceClientCache.snapshot(minecraft.level.dimension().location(), SimulatedFluid.WATER), maxSurfaceSlopeDelta),
                 waterConsumer,
                 pose,
                 camera,
@@ -79,7 +82,7 @@ public final class VolumetricSurfaceRenderer {
 
         renderFluid(
                 VolumetricSurfaceMesher.buildTriangles(
-                        VolumetricSurfaceClientCache.snapshot(minecraft.level.dimension().location(), SimulatedFluid.LAVA), MAX_EDGE_DELTA),
+                        VolumetricSurfaceClientCache.snapshot(minecraft.level.dimension().location(), SimulatedFluid.LAVA), maxSurfaceSlopeDelta),
                 lavaConsumer,
                 pose,
                 camera,

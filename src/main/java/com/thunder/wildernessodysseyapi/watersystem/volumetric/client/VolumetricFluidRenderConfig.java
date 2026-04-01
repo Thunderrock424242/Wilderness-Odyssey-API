@@ -12,6 +12,7 @@ public final class VolumetricFluidRenderConfig {
     public static final ModConfigSpec.IntValue MAX_TRIANGLES_PER_FLUID;
     public static final ModConfigSpec.IntValue MAX_RENDER_DISTANCE;
     public static final ModConfigSpec.IntValue MAX_STALE_AGE_TICKS;
+    public static final ModConfigSpec.DoubleValue MAX_SURFACE_SLOPE_DELTA;
     public static final ModConfigSpec.DoubleValue WAVE_STRENGTH;
     public static final ModConfigSpec.DoubleValue FOAM_STRENGTH;
     public static final ModConfigSpec.IntValue WATER_ALPHA;
@@ -23,8 +24,8 @@ public final class VolumetricFluidRenderConfig {
         BUILDER.push("volumetricFluidRenderer");
 
         ENABLE_PREVIEW_RENDERER = BUILDER
-                .comment("Enable first-pass volumetric mesh preview rendering for synced water/lava surfaces.")
-                .define("enablePreviewRenderer", true);
+                .comment("Enable first-pass volumetric mesh preview rendering for synced water/lava surfaces. Disabled by default because this renderer is still experimental.")
+                .define("enablePreviewRenderer", false);
 
         MAX_TRIANGLES_PER_FLUID = BUILDER
                 .comment("Hard cap for rendered triangles per fluid type.")
@@ -37,6 +38,10 @@ public final class VolumetricFluidRenderConfig {
         MAX_STALE_AGE_TICKS = BUILDER
                 .comment("Skip rendering if no fresh sync packet was received in this many ticks.")
                 .defineInRange("maxStaleAgeTicks", 160, 20, 2000);
+
+        MAX_SURFACE_SLOPE_DELTA = BUILDER
+                .comment("Maximum allowed Y delta across a generated quad. Lower values reduce vertical wall artifacts from sparse samples.")
+                .defineInRange("maxSurfaceSlopeDelta", 0.55D, 0.05D, 2.0D);
 
         WAVE_STRENGTH = BUILDER
                 .comment("Simple sinusoidal wave amplitude applied to preview vertices.")
