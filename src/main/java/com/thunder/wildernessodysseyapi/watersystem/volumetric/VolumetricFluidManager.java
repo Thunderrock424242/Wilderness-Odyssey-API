@@ -159,6 +159,12 @@ public final class VolumetricFluidManager {
             if (pos.getX() < minX || pos.getX() > maxX || pos.getZ() < minZ || pos.getZ() > maxZ) {
                 continue;
             }
+            BlockPos abovePos = pos.above();
+            if (abovePos.getY() < level.getMaxBuildHeight()
+                    && level.getFluidState(abovePos).getType() == fluidType.fluid()) {
+                // Skip submerged cells; only emit columns where this cell is the exposed fluid surface.
+                continue;
+            }
             FluidCell cell = entry.getValue();
             if (cell.volume <= cachedConfig.minCellVolume()) {
                 continue;
@@ -427,12 +433,8 @@ public final class VolumetricFluidManager {
 
             if (cell.volume >= config.placeThreshold()) {
                 BlockState state = level.getBlockState(pos);
-                boolean wasControlled = grid.controlledBlocks.contains(packedPos);
                 BlockState simulatedState = fluidStateForVolume(fluidType, cell.volume);
-                if (state.isAir()) {
-                    level.setBlockAndUpdate(pos, simulatedState);
-                    controlledNow.add(packedPos);
-                } else if (wasControlled && state.is(fluidType.block())) {
+                if (state.isAir() || state.is(fluidType.block())) {
                     if (!state.equals(simulatedState)) {
                         level.setBlockAndUpdate(pos, simulatedState);
                     }
