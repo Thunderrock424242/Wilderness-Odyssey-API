@@ -16,8 +16,8 @@ import java.io.IOException;
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
 public final class VolumetricSurfaceShaders {
-    public static final ResourceLocation WATER_SHADER = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "core/volumetric_surface_water");
-    public static final ResourceLocation LAVA_SHADER = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "core/volumetric_surface_lava");
+    public static final ResourceLocation WATER_SHADER = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "volumetric_surface_water");
+    public static final ResourceLocation LAVA_SHADER = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "volumetric_surface_lava");
 
     private static ShaderInstance waterShader;
     private static ShaderInstance lavaShader;
