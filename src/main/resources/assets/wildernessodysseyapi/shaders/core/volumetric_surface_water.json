@@ -4,8 +4,8 @@
     "srcrgb": "srcalpha",
     "dstrgb": "1-srcalpha"
   },
-  "vertex": "wildernessodysseyapi:core/volumetric_surface_water",
-  "fragment": "wildernessodysseyapi:core/volumetric_surface_water",
+  "vertex": "wildernessodysseyapi:volumetric_surface_water",
+  "fragment": "wildernessodysseyapi:volumetric_surface_water",
   "attributes": [
     "Position",
     "Color",
