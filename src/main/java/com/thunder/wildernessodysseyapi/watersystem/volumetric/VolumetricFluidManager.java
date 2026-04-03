@@ -421,6 +421,11 @@ public final class VolumetricFluidManager {
 
     private static void applyToWorld(ServerLevel level, FluidGrid grid, VolumetricFluidConfig.Values config, SimulatedFluid fluidType) {
         Set<Long> controlledNow = new HashSet<>();
+        boolean replacingVanillaEngine = switch (fluidType) {
+            case WATER -> config.replaceVanillaWaterEngine();
+            case LAVA -> config.replaceVanillaLavaEngine();
+        };
+        double placeThreshold = replacingVanillaEngine ? config.minCellVolume() : config.placeThreshold();
 
         for (Map.Entry<Long, FluidCell> entry : grid.cells.entrySet()) {
             long packedPos = entry.getKey();
@@ -431,7 +436,7 @@ public final class VolumetricFluidManager {
                 continue;
             }
 
-            if (cell.volume >= config.placeThreshold()) {
+            if (cell.volume >= placeThreshold) {
                 BlockState state = level.getBlockState(pos);
                 BlockState simulatedState = fluidStateForVolume(fluidType, cell.volume);
                 if (state.isAir() || state.is(fluidType.block())) {
@@ -452,6 +457,18 @@ public final class VolumetricFluidManager {
             BlockPos pos = BlockPos.of(packedPos);
             if (level.isLoaded(pos) && level.getBlockState(pos).is(fluidType.block())) {
                 level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
+            }
+        }
+
+        if (replacingVanillaEngine) {
+            for (Map.Entry<Long, FluidCell> entry : grid.cells.entrySet()) {
+                if (entry.getValue().volume > config.removeThreshold()) {
+                    continue;
+                }
+                BlockPos pos = BlockPos.of(entry.getKey());
+                if (level.isLoaded(pos) && level.getBlockState(pos).is(fluidType.block())) {
+                    level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
+                }
             }
         }
 

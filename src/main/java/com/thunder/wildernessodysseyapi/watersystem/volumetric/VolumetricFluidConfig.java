@@ -55,7 +55,7 @@ public final class VolumetricFluidConfig {
                         && VALID_PRESETS.contains(preset.toLowerCase(java.util.Locale.ROOT)));
 
         REPLACE_VANILLA_ENGINE = BUILDER.comment("If true, cancels vanilla water fluid ticks and routes behavior through the volumetric solver.")
-                .define("replaceVanillaWaterEngine", false);
+                .define("replaceVanillaWaterEngine", true);
 
         ENABLE_LAVA = BUILDER.comment("If true, runs the hybrid volumetric solver for lava in addition to water.")
                 .define("enableLava", false);
@@ -183,7 +183,7 @@ public final class VolumetricFluidConfig {
                     3,
                     64,
                     "safe",
-                    false,
+                    true,
                     false,
                     false,
                     0.25D,
