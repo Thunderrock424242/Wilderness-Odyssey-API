@@ -31,8 +31,8 @@ import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
 public final class WindowIconHandler {
 
     private static final ResourceLocation[] ICON_LOCATIONS = new ResourceLocation[] {
-            ResourceLocation.fromNamespaceAndPath(MOD_ID, "icons/WildernessOdyssey_16x16.png"),
-            ResourceLocation.fromNamespaceAndPath(MOD_ID, "icons/WildernessOdyssey_32x32.png")
+            ResourceLocation.fromNamespaceAndPath(MOD_ID, "icons/wildernessodyssey_16x16.png"),
+            ResourceLocation.fromNamespaceAndPath(MOD_ID, "icons/wildernessodyssey_32x32.png")
     };
 
     private WindowIconHandler() {
