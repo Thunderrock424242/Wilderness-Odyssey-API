@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
@@ -12,7 +13,6 @@ import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricSurface
 import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricSurfaceMesher.Triangle;
 import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricSurfaceMesher.Vertex;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.BufferUploader;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
