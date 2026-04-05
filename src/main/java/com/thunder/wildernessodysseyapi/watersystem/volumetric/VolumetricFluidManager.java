@@ -269,6 +269,13 @@ public final class VolumetricFluidManager {
     private static void ingestFluidNearPlayers(ServerLevel level, FluidGrid grid, VolumetricFluidConfig.Values config, SimulatedFluid fluidType) {
         int radius = config.playerSampleRadius();
         int step = Math.max(1, config.playerSampleStep());
+        if (fluidType == SimulatedFluid.WATER && config.replaceVanillaWaterEngine()) {
+            // Full-density sampling avoids checkerboard artifacts when vanilla ticks are cancelled.
+            step = 1;
+            radius = Math.max(radius, 24);
+        } else if (fluidType == SimulatedFluid.LAVA && config.replaceVanillaLavaEngine()) {
+            step = 1;
+        }
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
         for (ServerPlayer player : level.players()) {
@@ -455,25 +462,35 @@ public final class VolumetricFluidManager {
                 continue;
             }
             BlockPos pos = BlockPos.of(packedPos);
-            if (level.isLoaded(pos) && level.getBlockState(pos).is(fluidType.block())) {
-                level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
+            if (!shouldRemoveControlledFluidBlock(level, pos, fluidType, replacingVanillaEngine)) {
+                continue;
             }
+            level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
         }
 
-        if (replacingVanillaEngine) {
-            for (Map.Entry<Long, FluidCell> entry : grid.cells.entrySet()) {
-                if (entry.getValue().volume > config.removeThreshold()) {
-                    continue;
-                }
-                BlockPos pos = BlockPos.of(entry.getKey());
-                if (level.isLoaded(pos) && level.getBlockState(pos).is(fluidType.block())) {
-                    level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
-                }
-            }
-        }
 
         grid.controlledBlocks.clear();
         grid.controlledBlocks.addAll(controlledNow);
+    }
+
+
+    private static boolean shouldRemoveControlledFluidBlock(ServerLevel level,
+                                                            BlockPos pos,
+                                                            SimulatedFluid fluidType,
+                                                            boolean replacingVanillaEngine) {
+        if (!level.isLoaded(pos)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(pos);
+        if (!state.is(fluidType.block())) {
+            return false;
+        }
+        if (!replacingVanillaEngine) {
+            return true;
+        }
+        // In replacement mode, keep source blocks so oceans/lakes remain stable while allowing low-volume
+        // flowing water to dissipate naturally.
+        return !state.getFluidState().isSource();
     }
 
     private static BlockState fluidStateForVolume(SimulatedFluid fluidType, double volume) {
