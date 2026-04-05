@@ -1,14 +1,19 @@
 package com.thunder.wildernessodysseyapi.watersystem.volumetric.client;
 
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricFluidManager.SimulatedFluid;
 import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricSurfaceMesher;
 import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricSurfaceMesher.Triangle;
 import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricSurfaceMesher.Vertex;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -44,9 +49,6 @@ public final class VolumetricSurfaceRenderer {
 
         PoseStack poseStack = event.getPoseStack();
         Vec3 camera = event.getCamera().getPosition();
-        MultiBufferSource.BufferSource bufferSource = minecraft.renderBuffers().bufferSource();
-        VertexConsumer waterConsumer = bufferSource.getBuffer(VolumetricSurfaceRenderTypes.waterSurface());
-        VertexConsumer lavaConsumer = bufferSource.getBuffer(VolumetricSurfaceRenderTypes.lavaSurface());
         Matrix4f pose = poseStack.last().pose();
 
         double time = minecraft.level.getGameTime();
@@ -60,10 +62,10 @@ public final class VolumetricSurfaceRenderer {
             return;
         }
 
-        renderFluid(
+        renderFluidPass(
                 VolumetricSurfaceMesher.buildTriangles(
                         VolumetricSurfaceClientCache.snapshot(minecraft.level.dimension().location(), SimulatedFluid.WATER), MAX_EDGE_DELTA),
-                waterConsumer,
+                VolumetricSurfaceRenderTypes.waterSurface(),
                 pose,
                 camera,
                 time,
@@ -77,10 +79,10 @@ public final class VolumetricSurfaceRenderer {
                 VolumetricFluidRenderConfig.WATER_ALPHA.get()
         );
 
-        renderFluid(
+        renderFluidPass(
                 VolumetricSurfaceMesher.buildTriangles(
                         VolumetricSurfaceClientCache.snapshot(minecraft.level.dimension().location(), SimulatedFluid.LAVA), MAX_EDGE_DELTA),
-                lavaConsumer,
+                VolumetricSurfaceRenderTypes.lavaSurface(),
                 pose,
                 camera,
                 time,
@@ -93,25 +95,41 @@ public final class VolumetricSurfaceRenderer {
                 40,
                 VolumetricFluidRenderConfig.LAVA_ALPHA.get()
         );
-
-        bufferSource.endBatch(VolumetricSurfaceRenderTypes.waterSurface());
-        bufferSource.endBatch(VolumetricSurfaceRenderTypes.lavaSurface());
     }
 
-    private static void renderFluid(List<Triangle> triangles,
-                                    VertexConsumer consumer,
-                                    Matrix4f pose,
-                                    Vec3 camera,
-                                    double time,
-                                    int maxTrianglesPerFluid,
-                                    double maxRenderDistanceSq,
-                                    double waveStrength,
-                                    double foamStrength,
-                                    int red,
-                                    int green,
-                                    int blue,
-                                    int alpha) {
+    private static void renderFluidPass(List<Triangle> triangles,
+                                        RenderType renderType,
+                                        Matrix4f pose,
+                                        Vec3 camera,
+                                        double time,
+                                        int maxTrianglesPerFluid,
+                                        double maxRenderDistanceSq,
+                                        double waveStrength,
+                                        double foamStrength,
+                                        int red,
+                                        int green,
+                                        int blue,
+                                        int alpha) {
+        BufferBuilder bufferBuilder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP);
+        int vertexCount = renderFluid(triangles, bufferBuilder, pose, camera, time, maxTrianglesPerFluid, maxRenderDistanceSq, waveStrength, foamStrength, red, green, blue, alpha);
+        drawIfPopulated(renderType, bufferBuilder, vertexCount);
+    }
+
+    private static int renderFluid(List<Triangle> triangles,
+                                   VertexConsumer consumer,
+                                   Matrix4f pose,
+                                   Vec3 camera,
+                                   double time,
+                                   int maxTrianglesPerFluid,
+                                   double maxRenderDistanceSq,
+                                   double waveStrength,
+                                   double foamStrength,
+                                   int red,
+                                   int green,
+                                   int blue,
+                                   int alpha) {
         int rendered = 0;
+        int vertices = 0;
         for (Triangle triangle : triangles) {
             if (rendered++ >= maxTrianglesPerFluid) {
                 break;
@@ -123,7 +141,18 @@ public final class VolumetricSurfaceRenderer {
             addVertex(consumer, pose, triangle.a(), camera, time, waveStrength, foam, red, green, blue, alpha);
             addVertex(consumer, pose, triangle.b(), camera, time, waveStrength, foam, red, green, blue, alpha);
             addVertex(consumer, pose, triangle.c(), camera, time, waveStrength, foam, red, green, blue, alpha);
+            vertices += 3;
         }
+        return vertices;
+    }
+
+    private static void drawIfPopulated(RenderType renderType, BufferBuilder bufferBuilder, int vertexCount) {
+        if (vertexCount <= 0) {
+            return;
+        }
+        renderType.setupRenderState();
+        BufferUploader.drawWithShader(bufferBuilder.buildOrThrow());
+        renderType.clearRenderState();
     }
 
     private static boolean isTriangleNearCamera(Triangle triangle, Vec3 camera, double maxRenderDistanceSq) {
