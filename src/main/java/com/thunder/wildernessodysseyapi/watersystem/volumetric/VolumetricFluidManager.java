@@ -355,8 +355,10 @@ public final class VolumetricFluidManager {
                         continue;
                     }
 
+                    double momentumBias = 1.0D + directionalMomentum(cell, direction) * config.momentumBlend();
+                    momentumBias = Math.max(0.15D, momentumBias);
                     double flow = Math.min(remaining,
-                            Math.min(config.lateralTransfer(), gradient * config.pressureStrength()));
+                            Math.min(config.lateralTransfer() * momentumBias, gradient * config.pressureStrength() * momentumBias));
                     if (flow <= 0.0D) {
                         continue;
                     }
@@ -384,6 +386,9 @@ public final class VolumetricFluidManager {
         }
 
         advectByVelocity(level, grid, config, fluidType);
+        applyViscosityDiffusion(grid, config);
+        applyVorticityConfinement(grid, config);
+        applyTurbulence(level, grid, config);
         applyVelocityDamping(grid, config.inertiaDamping());
         pruneCells(grid, config.minCellVolume());
     }
@@ -543,8 +548,116 @@ public final class VolumetricFluidManager {
         }
     }
 
+    private static void applyViscosityDiffusion(FluidGrid grid, VolumetricFluidConfig.Values config) {
+        if (config.viscosity() <= 0.0D || grid.cells.isEmpty()) {
+            return;
+        }
+        Map<Long, double[]> smoothed = new HashMap<>();
+        for (Map.Entry<Long, FluidCell> entry : grid.cells.entrySet()) {
+            BlockPos pos = BlockPos.of(entry.getKey());
+            FluidCell cell = entry.getValue();
+            double avgVx = cell.vx;
+            double avgVy = cell.vy;
+            double avgVz = cell.vz;
+            int samples = 1;
+            for (Direction direction : Direction.values()) {
+                FluidCell neighbor = grid.cells.get(pos.relative(direction).asLong());
+                if (neighbor == null) {
+                    continue;
+                }
+                avgVx += neighbor.vx;
+                avgVy += neighbor.vy;
+                avgVz += neighbor.vz;
+                samples++;
+            }
+            double blend = Math.min(1.0D, config.viscosity());
+            double targetVx = avgVx / samples;
+            double targetVy = avgVy / samples;
+            double targetVz = avgVz / samples;
+            smoothed.put(entry.getKey(), new double[]{
+                    lerp(cell.vx, targetVx, blend),
+                    lerp(cell.vy, targetVy, blend),
+                    lerp(cell.vz, targetVz, blend)
+            });
+        }
+        for (Map.Entry<Long, double[]> entry : smoothed.entrySet()) {
+            FluidCell cell = grid.cells.get(entry.getKey());
+            if (cell == null) {
+                continue;
+            }
+            double[] velocity = entry.getValue();
+            cell.vx = velocity[0];
+            cell.vy = velocity[1];
+            cell.vz = velocity[2];
+        }
+    }
+
+    private static void applyVorticityConfinement(FluidGrid grid, VolumetricFluidConfig.Values config) {
+        if (config.vorticity() <= 0.0D || grid.cells.isEmpty()) {
+            return;
+        }
+        double strength = config.vorticity() * 0.10D;
+        for (Map.Entry<Long, FluidCell> entry : grid.cells.entrySet()) {
+            BlockPos pos = BlockPos.of(entry.getKey());
+            FluidCell center = entry.getValue();
+            FluidCell east = grid.cells.get(pos.east().asLong());
+            FluidCell west = grid.cells.get(pos.west().asLong());
+            FluidCell north = grid.cells.get(pos.north().asLong());
+            FluidCell south = grid.cells.get(pos.south().asLong());
+
+            double dVzdx = ((east == null ? center.vz : east.vz) - (west == null ? center.vz : west.vz)) * 0.5D;
+            double dVxdz = ((south == null ? center.vx : south.vx) - (north == null ? center.vx : north.vx)) * 0.5D;
+            double curlY = dVzdx - dVxdz;
+
+            center.vx += -curlY * strength;
+            center.vz += curlY * strength;
+        }
+    }
+
+    private static void applyTurbulence(ServerLevel level, FluidGrid grid, VolumetricFluidConfig.Values config) {
+        if (config.turbulence() <= 0.0D || grid.cells.isEmpty()) {
+            return;
+        }
+        double amplitude = config.turbulence() * 0.05D;
+        for (Map.Entry<Long, FluidCell> entry : grid.cells.entrySet()) {
+            BlockPos pos = BlockPos.of(entry.getKey());
+            FluidCell cell = entry.getValue();
+            double flowSpeed = Math.sqrt(cell.vx * cell.vx + cell.vz * cell.vz);
+            if (flowSpeed < 0.01D) {
+                continue;
+            }
+            double shorelineFactor = computeShorelineFactor(level, pos);
+            double noise = pseudoNoise(pos.getX(), pos.getY(), pos.getZ(), level.getGameTime());
+            double injection = amplitude * (0.5D + shorelineFactor) * noise;
+            cell.vx += injection;
+            cell.vz -= injection * 0.7D;
+        }
+    }
+
     private static void pruneCells(FluidGrid grid, double minCellVolume) {
         grid.cells.entrySet().removeIf(entry -> entry.getValue().volume <= minCellVolume);
+    }
+
+    private static double directionalMomentum(FluidCell cell, Direction direction) {
+        return switch (direction) {
+            case EAST -> cell.vx;
+            case WEST -> -cell.vx;
+            case SOUTH -> cell.vz;
+            case NORTH -> -cell.vz;
+            default -> 0.0D;
+        };
+    }
+
+    private static double lerp(double from, double to, double alpha) {
+        return from + (to - from) * alpha;
+    }
+
+    private static double pseudoNoise(int x, int y, int z, long t) {
+        long seed = x * 73428767L ^ y * 912931L ^ z * 438289L ^ t * 28711L;
+        seed ^= (seed << 13);
+        seed ^= (seed >>> 7);
+        seed ^= (seed << 17);
+        return ((seed & 1023L) / 511.5D) - 1.0D;
     }
 
     private static VolumetricFluidConfig.Values loadConfigWithFallback() {

@@ -6,7 +6,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  * Server-side tuning values for the sparse volumetric water simulation.
  */
 public final class VolumetricFluidConfig {
-    private static final java.util.Set<String> VALID_PRESETS = java.util.Set.of("safe", "realism", "custom");
+    private static final java.util.Set<String> VALID_PRESETS = java.util.Set.of("safe", "realism", "physics_pro", "custom");
 
     public static final ModConfigSpec CONFIG_SPEC;
 
@@ -25,6 +25,10 @@ public final class VolumetricFluidConfig {
     public static final ModConfigSpec.DoubleValue PRESSURE_STRENGTH;
     public static final ModConfigSpec.IntValue PRESSURE_ITERATIONS;
     public static final ModConfigSpec.DoubleValue INERTIA_DAMPING;
+    public static final ModConfigSpec.DoubleValue MOMENTUM_BLEND;
+    public static final ModConfigSpec.DoubleValue VISCOSITY;
+    public static final ModConfigSpec.DoubleValue TURBULENCE;
+    public static final ModConfigSpec.DoubleValue VORTICITY;
     public static final ModConfigSpec.DoubleValue PLACE_THRESHOLD;
     public static final ModConfigSpec.DoubleValue REMOVE_THRESHOLD;
     public static final ModConfigSpec.DoubleValue MIN_CELL_VOLUME;
@@ -50,7 +54,7 @@ public final class VolumetricFluidConfig {
         ACTIVE_RADIUS = BUILDER.comment("Cells farther than this many blocks from all players are skipped for expensive updates.")
                 .defineInRange("activeRadius", 80, 8, 256);
 
-        PRESET = BUILDER.comment("Preset profile: safe, realism, or custom. Presets override many tunables below.")
+        PRESET = BUILDER.comment("Preset profile: safe, realism, physics_pro, or custom. Presets override many tunables below.")
                 .define("preset", "safe", value -> value instanceof String preset
                         && VALID_PRESETS.contains(preset.toLowerCase(java.util.Locale.ROOT)));
 
@@ -80,6 +84,18 @@ public final class VolumetricFluidConfig {
 
         INERTIA_DAMPING = BUILDER.comment("Velocity damping factor applied every step.")
                 .defineInRange("inertiaDamping", 0.82D, 0.1D, 0.99D);
+
+        MOMENTUM_BLEND = BUILDER.comment("How strongly velocity direction biases lateral transfer. 0 disables directional preference.")
+                .defineInRange("momentumBlend", 0.45D, 0.0D, 2.0D);
+
+        VISCOSITY = BUILDER.comment("Velocity smoothing strength between neighboring cells. Higher values look thicker/slower.")
+                .defineInRange("viscosity", 0.18D, 0.0D, 1.0D);
+
+        TURBULENCE = BUILDER.comment("Small pseudo-random velocity injection used to break up overly uniform flow.")
+                .defineInRange("turbulence", 0.05D, 0.0D, 0.5D);
+
+        VORTICITY = BUILDER.comment("Swirl preservation factor; raises curling motion at flow boundaries.")
+                .defineInRange("vorticity", 0.12D, 0.0D, 1.0D);
 
         PLACE_THRESHOLD = BUILDER.comment("Cell volume threshold to place/update a world water block.")
                 .defineInRange("placeThreshold", 0.65D, 0.05D, 1.0D);
@@ -117,6 +133,10 @@ public final class VolumetricFluidConfig {
                 PRESSURE_STRENGTH.get(),
                 PRESSURE_ITERATIONS.get(),
                 INERTIA_DAMPING.get(),
+                MOMENTUM_BLEND.get(),
+                VISCOSITY.get(),
+                TURBULENCE.get(),
+                VORTICITY.get(),
                 PLACE_THRESHOLD.get(),
                 REMOVE_THRESHOLD.get(),
                 MIN_CELL_VOLUME.get(),
@@ -142,6 +162,10 @@ public final class VolumetricFluidConfig {
                 PRESSURE_STRENGTH.getDefault(),
                 PRESSURE_ITERATIONS.getDefault(),
                 INERTIA_DAMPING.getDefault(),
+                MOMENTUM_BLEND.getDefault(),
+                VISCOSITY.getDefault(),
+                TURBULENCE.getDefault(),
+                VORTICITY.getDefault(),
                 PLACE_THRESHOLD.getDefault(),
                 REMOVE_THRESHOLD.getDefault(),
                 MIN_CELL_VOLUME.getDefault(),
@@ -170,10 +194,39 @@ public final class VolumetricFluidConfig {
                     0.28D,
                     5,
                     0.90D,
+                    0.65D,
+                    0.22D,
+                    0.06D,
+                    0.20D,
                     0.55D,
                     0.05D,
                     0.005D,
                     50000
+            );
+            case "physics_pro" -> new Values(
+                    raw.enabled(),
+                    1,
+                    28,
+                    1,
+                    144,
+                    "physics_pro",
+                    true,
+                    true,
+                    true,
+                    0.52D,
+                    0.21D,
+                    0.18D,
+                    0.34D,
+                    7,
+                    0.92D,
+                    0.85D,
+                    0.28D,
+                    0.09D,
+                    0.30D,
+                    0.45D,
+                    0.03D,
+                    0.003D,
+                    75000
             );
             case "custom" -> raw;
             default -> new Values(
@@ -192,6 +245,10 @@ public final class VolumetricFluidConfig {
                     0.12D,
                     2,
                     0.88D,
+                    0.30D,
+                    0.08D,
+                    0.02D,
+                    0.05D,
                     0.72D,
                     0.08D,
                     0.015D,
@@ -216,6 +273,10 @@ public final class VolumetricFluidConfig {
             double pressureStrength,
             int pressureIterations,
             double inertiaDamping,
+            double momentumBlend,
+            double viscosity,
+            double turbulence,
+            double vorticity,
             double placeThreshold,
             double removeThreshold,
             double minCellVolume,
