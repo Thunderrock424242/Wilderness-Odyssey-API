@@ -6,7 +6,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  * Server-side tuning values for the sparse volumetric water simulation.
  */
 public final class VolumetricFluidConfig {
-    private static final java.util.Set<String> VALID_PRESETS = java.util.Set.of("safe", "realism", "physics_pro", "custom");
+    private static final java.util.Set<String> VALID_PRESETS = java.util.Set.of("safe", "realism", "custom");
 
     public static final ModConfigSpec CONFIG_SPEC;
 
@@ -54,7 +54,7 @@ public final class VolumetricFluidConfig {
         ACTIVE_RADIUS = BUILDER.comment("Cells farther than this many blocks from all players are skipped for expensive updates.")
                 .defineInRange("activeRadius", 80, 8, 256);
 
-        PRESET = BUILDER.comment("Preset profile: safe, realism, physics_pro, or custom. Presets override many tunables below.")
+        PRESET = BUILDER.comment("Preset profile: safe, realism, or custom. Presets override many tunables below.")
                 .define("preset", "safe", value -> value instanceof String preset
                         && VALID_PRESETS.contains(preset.toLowerCase(java.util.Locale.ROOT)));
 
@@ -181,35 +181,10 @@ public final class VolumetricFluidConfig {
             case "realism" -> new Values(
                     raw.enabled(),
                     1,
-                    24,
-                    1,
-                    128,
-                    "realism",
-                    true,
-                    true,
-                    true,
-                    0.45D,
-                    0.18D,
-                    0.14D,
-                    0.28D,
-                    5,
-                    0.90D,
-                    0.65D,
-                    0.22D,
-                    0.06D,
-                    0.20D,
-                    0.55D,
-                    0.05D,
-                    0.005D,
-                    50000
-            );
-            case "physics_pro" -> new Values(
-                    raw.enabled(),
-                    1,
                     28,
                     1,
                     144,
-                    "physics_pro",
+                    "realism",
                     true,
                     true,
                     true,
