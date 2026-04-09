@@ -13,7 +13,6 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -22,12 +21,12 @@ import java.util.Set;
 
 /**
  * WildernessFluidRegistry
- *
+ * <p>
  * Handles server-side finite fluid simulation.
  * Water levels are tracked via vanilla fluid states (0–8).
  * Each tick, unbalanced water blocks attempt to equalize with
  * lower neighbours, simulating realistic gravity-driven flow.
- *
+ * <p>
  * Infinite water source behaviour is suppressed by preventing
  * two source blocks from merging into a third (handled in the Mixin).
  */
