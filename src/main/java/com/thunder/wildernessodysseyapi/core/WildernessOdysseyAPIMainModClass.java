@@ -59,6 +59,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.TelemetryConsen
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.TelemetryConfig;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.TelemetryQueueProcessor;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.TelemetryQueueStatsCommand;
+import com.thunder.wildernessodysseyapi.watersystem.water.WaterPhysicsMod;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -141,6 +142,7 @@ public class WildernessOdysseyAPIMainModClass {
         CryoTubeBlock.register(modEventBus);
         ModItems.register(modEventBus);
         ModSoundEvents.register(modEventBus);
+        WaterPhysicsMod.register(modEventBus);
 
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-structures.toml");
@@ -301,4 +303,3 @@ public class WildernessOdysseyAPIMainModClass {
             TideManager.reloadConfig();
         }
     }
-
