@@ -14,6 +14,7 @@ import com.thunder.wildernessodysseyapi.command.LoreBookCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
 import com.thunder.wildernessodysseyapi.command.WorldUpgradeCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.worldgen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.worldgen.processor.ModProcessors;
@@ -48,8 +49,6 @@ import com.thunder.wildernessodysseyapi.ai.AI_story.AIChatListener;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.rules.GameRulesListManager;
-import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideConfig;
-import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.PlayerTelemetryConfig;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.PlayerTelemetryReporter;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.EventTelemetryConfig;
@@ -75,6 +74,7 @@ import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.fml.event.config.ModConfigEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
@@ -252,6 +252,14 @@ public class WildernessOdysseyAPIMainModClass {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         player.sendSystemMessage(Component.literal("[GlobalChat] Global chat is opt-in. Use /globalchatoptin to join or /globalchatoptout to leave."));
+    }
+
+    @SubscribeEvent
+    public static void onLevelUnload(LevelEvent.Unload event) {
+        // Clear caches on world exit to avoid stale data
+        WaterBodyClassifier.clearCache();
+        com.thunder.wilderness.water.entity.BoatTiltStore.clear();
+        com.thunder.wilderness.water.sph.SPHSimulationManager.get().shutdown();
     }
 
     @SubscribeEvent

@@ -1,0 +1,13 @@
+
+/**
+ * WildernessWaterMod
+ *
+ * Unified entry point for the full Wilderness water system:
+ *
+ *   System 1 — SPH bucket pour (BucketPlaceMixin, SPHSimulator, FluidRenderer)
+ *   System 2 — Finite fluid simulation (WildernessFluidRegistry, WaterSourceMixin)
+ *   System 3 — Ripple / splash particles (RippleRenderer, WaterEntryEventHandler)
+ *   System 4 — Gerstner waves per water body (GerstnerWaveRenderMixin, WaveEntityPhysics)
+ *   System 5 — Moon-phase tide system (TideSystem, TideWorldUpdater, TideHudOverlay)
+ *   System 6 — Boat rocking (BoatRenderMixin, BoatTiltStore)
+ */
