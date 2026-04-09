@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.particle;
 
-import com.thunder.wilderness.water.WaterPhysicsMod;
+import com.thunder.wildernessodysseyapi.watersystem.water.WaterPhysicsMod;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.neoforged.bus.api.IEventBus;

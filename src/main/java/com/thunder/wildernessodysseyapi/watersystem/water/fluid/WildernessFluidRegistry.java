@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.fluid;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.WaterPhysicsMod;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -26,7 +27,7 @@ import java.util.List;
  * Infinite water source behaviour is suppressed by preventing
  * two source blocks from merging into a third (handled in the Mixin).
  */
-@EventBusSubscriber(modid = "wilderness", bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber(modid = WaterPhysicsMod.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
 public class WildernessFluidRegistry {
 
     // How many fluid blocks are processed per tick (tune for performance)

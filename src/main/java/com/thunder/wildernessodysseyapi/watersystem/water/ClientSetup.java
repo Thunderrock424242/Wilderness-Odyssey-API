@@ -1,8 +1,8 @@
 package com.thunder.wildernessodysseyapi.watersystem.water;
 
-import com.thunder.wilderness.water.particle.RippleParticleProvider;
-import com.thunder.wilderness.water.particle.WildernessParticleRegistry;
-import com.thunder.wilderness.water.render.WaterShaderManager;
+import com.thunder.wildernessodysseyapi.watersystem.water.particle.RippleParticleProvider;
+import com.thunder.wildernessodysseyapi.watersystem.water.particle.WildernessParticleRegistry;
+import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterShaderManager;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;

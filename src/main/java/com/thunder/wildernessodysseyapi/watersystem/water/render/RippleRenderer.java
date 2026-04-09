@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.WaterPhysicsMod;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
@@ -21,7 +22,7 @@ import java.util.*;
  * They are drawn during RenderLevelStageEvent AFTER_TRANSLUCENT_BLOCKS so they
  * composite correctly with the translucent water geometry.
  */
-@EventBusSubscriber(modid = "wilderness", bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
+@EventBusSubscriber(modid = WaterPhysicsMod.MOD_ID, bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
 public class RippleRenderer {
 
     private static final float MAX_RADIUS = 1.8f;
