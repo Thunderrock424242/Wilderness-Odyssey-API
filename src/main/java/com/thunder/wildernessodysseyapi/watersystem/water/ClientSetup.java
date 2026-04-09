@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water;
 
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.particle.RippleParticleProvider;
 import com.thunder.wildernessodysseyapi.watersystem.water.particle.WildernessParticleRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterShaderManager;
@@ -9,7 +10,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
 import net.neoforged.neoforge.client.event.RegisterShadersEvent;
 
-@EventBusSubscriber(modid = WaterPhysicsMod.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+@EventBusSubscriber(modid = ModConstants.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class ClientSetup {
 
     @SubscribeEvent

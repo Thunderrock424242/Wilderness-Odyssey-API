@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.particle;
 
-import com.thunder.wildernessodysseyapi.watersystem.water.WaterPhysicsMod;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.neoforged.bus.api.IEventBus;
@@ -17,7 +17,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 public class WildernessParticleRegistry {
 
     public static final DeferredRegister<net.minecraft.core.particles.ParticleType<?>> PARTICLES =
-        DeferredRegister.create(BuiltInRegistries.PARTICLE_TYPE, WaterPhysicsMod.MOD_ID);
+        DeferredRegister.create(BuiltInRegistries.PARTICLE_TYPE, ModConstants.MOD_ID);
 
     public static final DeferredHolder<net.minecraft.core.particles.ParticleType<?>, SimpleParticleType> RIPPLE =
         PARTICLES.register("ripple", () -> new SimpleParticleType(false));
