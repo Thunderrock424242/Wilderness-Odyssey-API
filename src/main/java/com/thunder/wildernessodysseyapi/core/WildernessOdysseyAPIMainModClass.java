@@ -123,7 +123,6 @@ public class WildernessOdysseyAPIMainModClass {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerPayloads);
         modEventBus.addListener(this::onConfigLoaded);
-        modEventBus.addListener(this::onConfigReloaded);
         ModProcessors.PROCESSORS.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         ModAttachments.ATTACHMENTS.register(modEventBus);
@@ -292,7 +291,6 @@ public class WildernessOdysseyAPIMainModClass {
             TideManager.reloadConfig();
         }
         }
-    }
 
     public void onConfigReloaded(ModConfigEvent.Reloading event) {
         if (event.getConfig().getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
@@ -305,3 +303,4 @@ public class WildernessOdysseyAPIMainModClass {
             TideManager.reloadConfig();
         }
     }
+}
