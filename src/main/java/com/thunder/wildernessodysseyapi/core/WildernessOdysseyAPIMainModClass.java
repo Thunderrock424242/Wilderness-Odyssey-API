@@ -26,7 +26,6 @@ import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
-import com.thunder.wildernessodysseyapi.command.VolumetricFluidCommand;
 import com.thunder.wildernessodysseyapi.command.ModpackStructureCommand;
 import com.thunder.wildernessodysseyapi.command.MeteorCommand;
 import com.thunder.wildernessodysseyapi.command.UnstuckCommand;
@@ -51,10 +50,6 @@ import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.rules.GameRulesListManager;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideConfig;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideManager;
-import com.thunder.wildernessodysseyapi.watersystem.volumetric.client.VolumetricFluidRenderConfig;
-import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricFluidConfig;
-import com.thunder.wildernessodysseyapi.watersystem.volumetric.VolumetricFluidManager;
-import com.thunder.wildernessodysseyapi.watersystem.volumetric.network.VolumetricSurfaceSyncPayload;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.PlayerTelemetryConfig;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.PlayerTelemetryReporter;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.EventTelemetryConfig;
@@ -159,16 +154,12 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-debug-overlay-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TrueDarknessConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-true-darkness-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, VolumetricFluidRenderConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-volumetric-renderer-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-async.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TideConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-tides-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, VolumetricFluidConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-volumetric-fluid-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, CloakChipConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-cloak-chip-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PlayerTelemetryConfig.CONFIG_SPEC,
@@ -196,11 +187,6 @@ public class WildernessOdysseyAPIMainModClass {
 
     private void registerPayloads(final RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
-        registrar.playToClient(
-                VolumetricSurfaceSyncPayload.TYPE,
-                VolumetricSurfaceSyncPayload.STREAM_CODEC,
-                VolumetricSurfaceSyncPayload::handle
-        );
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
@@ -243,7 +229,6 @@ public class WildernessOdysseyAPIMainModClass {
         GlobalChatOptToggleCommand.register(dispatcher);
         LoreBookCommand.register(dispatcher);
         TideInfoCommand.register(dispatcher);
-        VolumetricFluidCommand.register(dispatcher);
         ModpackStructureCommand.register(dispatcher);
         TelemetryConsentCommand.register(dispatcher);
         TelemetryQueueStatsCommand.register(dispatcher);
@@ -302,8 +287,6 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == TideConfig.CONFIG_SPEC) {
             TideManager.reloadConfig();
         }
-        if (event.getConfig().getSpec() == VolumetricFluidConfig.CONFIG_SPEC) {
-            VolumetricFluidManager.reloadConfig();
         }
     }
 
@@ -317,8 +300,5 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == TideConfig.CONFIG_SPEC) {
             TideManager.reloadConfig();
         }
-        if (event.getConfig().getSpec() == VolumetricFluidConfig.CONFIG_SPEC) {
-            VolumetricFluidManager.reloadConfig();
-        }
     }
-}
+
