@@ -5,31 +5,33 @@
   "compatibilityLevel": "JAVA_21",
   "refmap": "mixins.wildernessodysseyapi.refmap.json",
   "mixins": [
+    "BlockEntityMixin",
     "ChunkMapGenerationErrorMixin",
     "CreatePathsMixin",
-    "BlockEntityMixin",
     "DayNightCycleMixin",
     "EntityAccessor",
-    "LivingEntityMixin",
     "ForwardExtentCopyMixin",
+    "LiquidBlockVolumetricMixin",
+    "LivingEntityMixin",
     "ServerboundSetStructureBlockPacketMixin",
+    "ServerGamePacketListenerImplMixin",
     "StructureBlockEntityMixin",
     "StructureTemplateAccessor",
     "StructureTemplatePaletteAccessor",
-    "ServerGamePacketListenerImplMixin",
-    "LiquidBlockVolumetricMixin"
+    "WaterSourceMixin"
   ],
   "injectors": {
     "defaultRequire": 1
   },
   "client": [
+    "ClientLevelTrueDarknessMixin",
+    "ClientLevelWeatherColorMixin",
     "DebugMixin",
     "DebugScreenOverlayMixin",
+    "LightTextureTrueDarknessMixin",
     "MixinWorldCreationUiState",
     "OptionsScreenTelemetryButtonMixin",
     "StructureBlockRendererMixin",
-    "ClientLevelWeatherColorMixin",
-    "ClientLevelTrueDarknessMixin",
-    "LightTextureTrueDarknessMixin"
+    "WaveRenderMixin"
   ]
 }
