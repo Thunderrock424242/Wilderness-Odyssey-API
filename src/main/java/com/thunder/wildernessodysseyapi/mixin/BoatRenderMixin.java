@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.thunder.wilderness.water.entity.BoatTiltStore;
+import com.thunder.wildernessodysseyapi.watersystem.water.entity.BoatTiltStore;
 import net.minecraft.client.renderer.entity.BoatRenderer;
 import net.minecraft.world.entity.vehicle.Boat;
 import org.spongepowered.asm.mixin.Mixin;
