@@ -4,17 +4,21 @@ import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * WildernessFluidRegistry
@@ -59,24 +63,46 @@ public class WildernessFluidRegistry {
      * Collect a sample of loaded water blocks near active chunks.
      */
     private static List<BlockPos> gatherSurfaceWaterBlocks(ServerLevel level, int limit) {
-        List<BlockPos> result = new ArrayList<>();
-        level.getChunkSource().chunkMap.getChunks().forEach(chunk -> {
-            if (result.size() >= limit) return;
-            BlockPos center = chunk.getPos().getMiddleBlockPosition(64);
-            for (int dx = -8; dx <= 8 && result.size() < limit; dx += 2) {
-                for (int dz = -8; dz <= 8 && result.size() < limit; dz += 2) {
-                    for (int dy = -4; dy <= 4; dy++) {
-                        BlockPos check = center.offset(dx, dy, dz);
-                        FluidState fs = level.getFluidState(check);
-                        if (fs.is(Fluids.WATER) || fs.is(Fluids.FLOWING_WATER)) {
-                            result.add(check);
-                            break;
+        Set<BlockPos> uniquePositions = new LinkedHashSet<>();
+        List<ServerPlayer> players = level.players();
+        int playerCount = Math.max(1, players.size());
+        int perPlayerLimit = Math.max(8, limit / playerCount);
+
+        // Sample around active players first (works across NeoForge updates without chunk-map internals).
+        for (ServerPlayer player : players) {
+            if (uniquePositions.size() >= limit) {
+                break;
+            }
+            collectNearbyWater(level, player.blockPosition(), perPlayerLimit, limit, uniquePositions);
+        }
+
+        // If no players are present, still process a small sample around world spawn.
+        if (uniquePositions.isEmpty()) {
+            collectNearbyWater(level, level.getSharedSpawnPos(), limit, limit, uniquePositions);
+        }
+
+        return new ArrayList<>(uniquePositions);
+    }
+
+    private static void collectNearbyWater(ServerLevel level, BlockPos center, int scanLimit, int totalLimit, Set<BlockPos> result) {
+        int added = 0;
+        for (int dx = -8; dx <= 8 && result.size() < totalLimit && added < scanLimit; dx += 2) {
+            for (int dz = -8; dz <= 8 && result.size() < totalLimit && added < scanLimit; dz += 2) {
+                for (int dy = -4; dy <= 4; dy++) {
+                    BlockPos check = center.offset(dx, dy, dz);
+                    if (!level.hasChunkAt(check)) {
+                        continue;
+                    }
+                    FluidState fs = level.getFluidState(check);
+                    if (fs.is(Fluids.WATER) || fs.is(Fluids.FLOWING_WATER)) {
+                        if (result.add(check)) {
+                            added++;
                         }
+                        break;
                     }
                 }
             }
-        });
-        return result;
+        }
     }
 
     /**
