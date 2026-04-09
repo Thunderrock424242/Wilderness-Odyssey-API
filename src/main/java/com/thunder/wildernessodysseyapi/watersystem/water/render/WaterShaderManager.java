@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
-import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
@@ -17,9 +16,9 @@ import java.io.IOException;
  * wave displacement (the two effects layer nicely).
  *
  * Shader files live at:
- *   assets/wildernessodysseyapi/shaders/core/volumetric_surface_water.vsh
- *   assets/wildernessodysseyapi/shaders/core/volumetric_surface_water.fsh
- *   assets/wildernessodysseyapi/shaders/core/volumetric_surface_water.json
+ *   assets/wilderness/shaders/core/water_surface.vsh
+ *   assets/wilderness/shaders/core/water_surface.fsh
+ *   assets/wilderness/shaders/core/water_surface.json
  */
 public class WaterShaderManager {
 
@@ -30,13 +29,13 @@ public class WaterShaderManager {
             event.registerShader(
                 new ShaderInstance(
                     event.getResourceProvider(),
-                    ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "volumetric_surface_water"),
+                    ResourceLocation.fromNamespaceAndPath("wilderness", "water_surface"),
                     DefaultVertexFormat.BLOCK
                 ),
                 shader -> waterSurfaceShader = shader
             );
         } catch (IOException e) {
-            throw new RuntimeException("Failed to register volumetric_surface_water shader", e);
+            throw new RuntimeException("Failed to register water_surface shader", e);
         }
     }
 }
