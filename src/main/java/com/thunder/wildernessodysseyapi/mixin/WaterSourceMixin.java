@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * WaterSourceMixin
- *
+ * <p>
  * Suppresses the vanilla "infinite water source" mechanic.
  * Vanilla creates a new source block whenever a flowing block
  * is surrounded by 2+ source blocks. This mixin cancels that,

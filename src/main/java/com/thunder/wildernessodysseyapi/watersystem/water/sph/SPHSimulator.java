@@ -20,7 +20,7 @@ import java.util.*;
 public class SPHSimulator {
 
     /** The internal array of particles. Fast and non-allocating. Modified ONLY by the physics thread. */
-    private final List<SPHParticle> particles = new ArrayList<>();
+    public final List<SPHParticle> particles = new ArrayList<>();
 
     /** A thread-safe snapshot of the particles for the renderer to read. Updated at the end of the tick. */
     private volatile List<SPHParticle> renderParticles = new ArrayList<>();

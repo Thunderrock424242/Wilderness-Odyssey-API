@@ -66,12 +66,17 @@ public final class LoreBookManager {
         for (int i = 0; i < list.size(); i++) {
             if (id.equals(list.getString(i))) {
                 player.getPersistentData().put(ROOT_TAG, root);
-                return;
+                return; // Book is already collected, do nothing.
             }
         }
+
+        // Save the new book to the player's NBT
         list.add(StringTag.valueOf(id));
         root.put(COLLECTED_TAG, list);
         player.getPersistentData().put(ROOT_TAG, root);
+
+        // THE FIX: Send the packet to the client so the GUI updates instantly!
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, new SyncLoreBookPayload(id));
     }
 
     public static Set<String> getCollected(ServerPlayer player) {
@@ -138,14 +143,4 @@ public final class LoreBookManager {
             loreIdFrom(stack).ifPresent(id -> markCollected(player, id));
         }
     }
-
-    public void unlockBookForPlayer(ServerPlayer player, String bookId) {
-        // 1. Save the unlock to the server's data file (Your existing logic)
-        this.playerData.get(player.getUUID()).add(bookId);
-        this.setDirty();
-
-        // 2. THE FIX: Send the packet to the client so the GUI updates instantly!
-        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, new SyncLoreBookPayload(bookId));
-    }
-
 }

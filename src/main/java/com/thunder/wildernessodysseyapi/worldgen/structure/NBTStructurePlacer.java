@@ -6,7 +6,6 @@ import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.worldgen.structure.StructurePlacementDebugger.PlacementAttempt;
 import com.thunder.wildernessodysseyapi.worldgen.structure.TerrainReplacerEngine.SurfaceSample;
 import com.thunder.wildernessodysseyapi.mixin.StructureTemplateAccessor;
-import com.thunder.wildernessodysseyapi.mixin.StructureTemplatePaletteAccessor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -31,6 +30,7 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.tags.BlockTags;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +39,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import net.neoforged.fml.ModList;
 
 /**
@@ -53,6 +55,11 @@ public class NBTStructurePlacer {
     private static final int MAX_LEVELING_MARKER_Y = 65;
     private static final int STARTER_BUNKER_PERIMETER_BLEND_RADIUS = 3;
     private static final int STARTER_BUNKER_PERIMETER_BLEND_DEPTH = 2;
+
+    // Restored reflection cache for the Palette final class workaround
+    private static final String[] PALETTE_BLOCK_FIELD_NAMES = {"blocks", "blockInfos", "blockInfoList", "c"};
+    private static final ConcurrentMap<Class<?>, Optional<Field>> PALETTE_BLOCK_FIELDS = new ConcurrentHashMap<>();
+    private static boolean loggedPaletteFieldWarning = false;
 
     private final ResourceLocation id;
     private final List<StructureProcessor> extraProcessors;
@@ -81,29 +88,14 @@ public class NBTStructurePlacer {
         this.externalTemplatePath = externalTemplatePath;
     }
 
-    /**
-     * Places the configured structure template at the given origin.
-     *
-     * @param level  the level to place into
-     * @param origin the placement origin
-     * @return placement result containing bounds and cryo tube positions, or {@code null} on failure
-     */
     public PlacementResult place(ServerLevel level, BlockPos origin) {
         return place(level, origin, null);
     }
 
-    /**
-     * Places the structure so that the leveling marker (or template origin if no marker exists)
-     * lines up with the provided {@code anchor} position.
-     */
     public PlacementResult placeAnchored(ServerLevel level, BlockPos anchor) {
         return placeAnchored(level, anchor, null);
     }
 
-    /**
-     * Places the structure and reports progress to the provided debug attempt when available,
-     * aligning the template's anchor with the supplied world position.
-     */
     public PlacementResult placeAnchored(ServerLevel level, BlockPos anchor, PlacementAttempt debugAttempt) {
         TemplateData data = load(level);
         if (data == null) {
@@ -135,9 +127,6 @@ public class NBTStructurePlacer {
         return placeWithFoundation(level, data, foundation, attempt);
     }
 
-    /**
-     * Places the structure and reports progress to the provided debug attempt when available.
-     */
     public PlacementResult place(ServerLevel level, BlockPos origin, PlacementAttempt debugAttempt) {
         TemplateData data = load(level);
         if (data == null) {
@@ -240,18 +229,15 @@ public class NBTStructurePlacer {
         }
     }
 
-    /** Returns the template id used by this placer. */
     public ResourceLocation id() {
         return id;
     }
 
-    /** Returns the template size if known, or {@link Vec3i#ZERO} when loading failed. */
     public Vec3i peekSize(ServerLevel level) {
         TemplateData data = load(level);
         return data == null ? Vec3i.ZERO : data.size();
     }
 
-    /** Returns the leveling marker offset when present, or {@code null} if the template lacks one. */
     public BlockPos peekLevelingOffset(ServerLevel level) {
         TemplateData data = load(level);
         return data == null ? null : data.levelingOffset();
@@ -330,10 +316,6 @@ public class NBTStructurePlacer {
         return new PlacementFoundation(placementOrigin, sample.state());
     }
 
-
-    /**
-     * Returns the relative cryo tube offsets defined by the structure.
-     */
     public List<BlockPos> getCryoOffsets(ServerLevel level) {
         TemplateData data = load(level);
         return data == null ? List.of() : data.cryoOffsets();
@@ -343,7 +325,6 @@ public class NBTStructurePlacer {
         if (cachedData != null) {
             return cachedData;
         }
-
 
         StructureTemplateManager manager = level.getStructureManager();
         StructureTemplate template = manager.get(id).orElse(null);
@@ -625,11 +606,34 @@ public class NBTStructurePlacer {
         return new TerrainReplacerEngine.AutoBlendMask(origin.getX(), origin.getZ(), sizeX, sizeZ, supported);
     }
 
+    // THE FIX: Restored the cached reflection logic to bypass the final class compilation error
+    @SuppressWarnings("unchecked")
     private List<StructureBlockInfo> resolvePaletteBlocks(StructureTemplate.Palette palette) {
-        if (palette instanceof StructureTemplatePaletteAccessor accessor) {
-            return accessor.getBlocks();
+        try {
+            Optional<Field> fieldOpt = PALETTE_BLOCK_FIELDS.computeIfAbsent(palette.getClass(), clazz -> {
+                for (String fieldName : PALETTE_BLOCK_FIELD_NAMES) {
+                    try {
+                        Field field = clazz.getDeclaredField(fieldName);
+                        field.setAccessible(true);
+                        return Optional.of(field);
+                    } catch (NoSuchFieldException ignored) {
+                    }
+                }
+                return Optional.empty();
+            });
+
+            if (fieldOpt.isPresent()) {
+                return (List<StructureBlockInfo>) fieldOpt.get().get(palette);
+            } else if (!loggedPaletteFieldWarning) {
+                ModConstants.LOGGER.warn("Failed to find block list field in StructureTemplate.Palette! Auto-blending will be skipped.");
+                loggedPaletteFieldWarning = true;
+            }
+        } catch (Exception e) {
+            if (!loggedPaletteFieldWarning) {
+                ModConstants.LOGGER.warn("Error accessing StructureTemplate.Palette blocks: {}", e.getMessage());
+                loggedPaletteFieldWarning = true;
+            }
         }
-        ModConstants.LOGGER.warn("Palette is not an instance of StructureTemplatePaletteAccessor! Missing mixin?");
         return List.of();
     }
 

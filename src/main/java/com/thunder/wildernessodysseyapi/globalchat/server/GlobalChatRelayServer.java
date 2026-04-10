@@ -58,38 +58,42 @@ public class GlobalChatRelayServer {
     private final Path analyticsDir = Path.of("analytics");
     private final DiscordBridgeService discordBridge;
 
-    public GlobalChatRelayServer(int port, String moderationToken, String clusterToken) throws IOException {
+    public GlobalChatRelayServer(int startingPort, String moderationToken, String clusterToken) throws IOException {
         if (moderationToken == null || moderationToken.isBlank() || "changeme".equals(moderationToken)) {
             throw new IllegalArgumentException("A non-default moderation token is required");
         }
-        this.serverSocket = new ServerSocket(port);
+
         this.moderationToken = moderationToken;
         this.clusterToken = clusterToken == null ? "" : clusterToken;
         loadWhitelist();
         createDirectoriesSecure(analyticsDir);
         this.discordBridge = DiscordBridgeService.fromSystemProperties(this::broadcastFromDiscordBridge);
-    }
 
-    public void startServer(int startingPort) {
+        // Port Hunting Logic moved to the constructor
         int currentPort = startingPort;
-        int maxPort = startingPort + 10; // Try up to 10 fallback ports
-        ServerSocket serverSocket = null;
+        int maxPort = startingPort + 10;
+        ServerSocket tempSocket = null;
 
         while (currentPort <= maxPort) {
             try {
-                serverSocket = new ServerSocket(currentPort);
-                com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER.info("[Global Chat] Relay Server successfully bound to port: " + currentPort);
-                break; // Success! Break the loop.
+                tempSocket = new ServerSocket(currentPort);
+                System.out.println("[Global Chat] Relay Server successfully bound to port: " + currentPort);
+                break;
             } catch (IOException e) {
-                com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER.warn("[Global Chat] Port " + currentPort + " is in use. Trying next port...");
+                System.out.println("[Global Chat] Port " + currentPort + " is in use. Trying next port...");
                 currentPort++;
             }
         }
 
-        if (serverSocket == null) {
-            com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER.error("[Global Chat] CRITICAL: Could not find an open port. Global Chat is disabled.");
-            return; // Disable the feature safely
+        if (tempSocket == null) {
+            throw new IOException("[Global Chat] CRITICAL: Could not find an open port. Global Chat is disabled.");
         }
+        this.serverSocket = tempSocket;
+    }
+
+    public void startServer() {
+        System.out.println("[Global Chat] Accepting connections...");
+        acceptLoop(); // Ensure the loop actually runs!
     }
 
     private void acceptLoop() {
