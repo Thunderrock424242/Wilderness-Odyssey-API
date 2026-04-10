@@ -8,14 +8,14 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * First migration step: replace known legacy block ids with current blocks.
  */
 public final class LegacyBlockReplacementMigration implements WorldMigration {
-    private static final Map<ResourceLocation, Block> REPLACEMENTS = buildReplacements();
+
+    // Resolve the blocks ONCE into memory to prevent doing 98,000 string lookups per chunk
+    private static final Block LEGACY_CRYO_1 = BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath("wildernessodyssey", "cryo_tube"));
+    private static final Block LEGACY_CRYO_2 = BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath("wildernessodysseyapi", "old_cryo_tube"));
 
     @Override
     public String id() {
@@ -34,34 +34,41 @@ public final class LegacyBlockReplacementMigration implements WorldMigration {
 
     @Override
     public boolean apply(MigrationContext context) {
+        // If the blocks didn't resolve (e.g. they aren't in the registry), skip migration
+        if (LEGACY_CRYO_1 == null && LEGACY_CRYO_2 == null) return true;
+
         ChunkPos chunkPos = context.chunk().getPos();
         int minY = context.level().getMinBuildHeight();
         int maxY = context.level().getMaxBuildHeight();
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
-        for (int x = chunkPos.getMinBlockX(); x <= chunkPos.getMaxBlockX(); x++) {
+        Block newCryo = CryoTubeBlock.CRYO_TUBE.get();
+        BlockState newCryoState = newCryo.defaultBlockState();
+
+        // Optimized Loop: Y -> Z -> X is the fastest iteration order for Minecraft chunks
+        for (int y = minY; y < maxY; y++) {
+
+            // OPTIMIZATION: Skip completely empty 16x16x16 chunk sections (Sky/Caves)
+            int sectionIndex = context.chunk().getSectionIndex(y);
+            if (context.chunk().getSection(sectionIndex).hasOnlyAir()) {
+                y += 15; // Fast-forward to the end of this empty section
+                continue;
+            }
+
             for (int z = chunkPos.getMinBlockZ(); z <= chunkPos.getMaxBlockZ(); z++) {
-                for (int y = minY; y < maxY; y++) {
+                for (int x = chunkPos.getMinBlockX(); x <= chunkPos.getMaxBlockX(); x++) {
                     cursor.set(x, y, z);
                     BlockState state = context.level().getBlockState(cursor);
-                    ResourceLocation key = BuiltInRegistries.BLOCK.getKey(state.getBlock());
-                    Block replacement = REPLACEMENTS.get(key);
-                    if (replacement == null || replacement == state.getBlock()) {
-                        continue;
+                    Block block = state.getBlock();
+
+                    // Lightning fast memory reference check instead of Map/Registry string lookup
+                    if (block == LEGACY_CRYO_1 || block == LEGACY_CRYO_2) {
+                        context.level().setBlock(cursor, newCryoState, 2);
                     }
-                    context.level().setBlock(cursor, replacement.defaultBlockState(), 2);
                 }
             }
         }
 
         return true;
-    }
-
-    private static Map<ResourceLocation, Block> buildReplacements() {
-        Map<ResourceLocation, Block> replacements = new HashMap<>();
-        // Keep legacy aliases for old internal ids here.
-        replacements.put(ResourceLocation.fromNamespaceAndPath("wildernessodyssey", "cryo_tube"), CryoTubeBlock.CRYO_TUBE.get());
-        replacements.put(ResourceLocation.fromNamespaceAndPath("wildernessodysseyapi", "old_cryo_tube"), CryoTubeBlock.CRYO_TUBE.get());
-        return replacements;
     }
 }

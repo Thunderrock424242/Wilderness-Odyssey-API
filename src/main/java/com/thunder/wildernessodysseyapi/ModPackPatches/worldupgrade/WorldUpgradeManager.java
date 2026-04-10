@@ -100,7 +100,13 @@ public final class WorldUpgradeManager {
                 if (level == null) {
                     continue;
                 }
-                LevelChunk chunk = level.getChunk(task.pos().x, task.pos().z);
+
+                // THE FIX: Use getChunkNow to avoid forcing synchronous I/O loading
+                LevelChunk chunk = level.getChunkSource().getChunkNow(task.pos().x, task.pos().z);
+                if (chunk == null) {
+                    continue; // The chunk unloaded before we could process it. Skip it safely!
+                }
+
                 migrated = migrateChunk(level, chunk, state.getTargetVersion());
             } catch (Exception exception) {
                 failed = true;
