@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.material.WaterFluid;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,8 +25,7 @@ public class WaterSourceMixin {
         at = @At("HEAD"),
         cancellable = true
     )
-    private void preventInfiniteSource(LevelReader level, BlockPos pos,
-                                        CallbackInfoReturnable<Boolean> cir) {
+    private void preventInfiniteSource(Level level, CallbackInfoReturnable<Boolean> cir) {
         // Always return false — water will never self-replicate
         cir.setReturnValue(false);
     }
