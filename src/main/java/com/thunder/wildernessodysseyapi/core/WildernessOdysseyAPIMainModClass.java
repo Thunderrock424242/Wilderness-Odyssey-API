@@ -236,7 +236,7 @@ public class WildernessOdysseyAPIMainModClass {
     }
 
     @SubscribeEvent
-    public static void onLevelUnload(LevelEvent.Unload event) {
+    public void onLevelUnload(LevelEvent.Unload event) {
         WaterBodyClassifier.clearCache();
         BoatTiltStore.clear();
         SPHSimulationManager.get().shutdown();
