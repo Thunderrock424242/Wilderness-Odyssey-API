@@ -56,7 +56,7 @@ public final class AsyncTaskManager {
         }
 
         cpuExecutor = buildExecutor("WO-Async-CPU", config.maxThreads(), config.queueSize());
-        ioExecutor = buildExecutor("WO-Async-IO", Math.max(1, Math.min(2, config.maxThreads())), config.queueSize());
+        ioExecutor = buildExecutor("WO-Async-IO", Math.max(4, config.maxThreads() * 2), config.queueSize());
         INITIALIZED.set(true);
         ModConstants.LOGGER.info("[Async] Initialized with {} worker threads and queue size {}.", config.maxThreads(), config.queueSize());
     }

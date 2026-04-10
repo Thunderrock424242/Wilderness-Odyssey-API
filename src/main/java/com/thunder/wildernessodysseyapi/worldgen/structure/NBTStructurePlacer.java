@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
 import com.thunder.wildernessodysseyapi.worldgen.structure.StructurePlacementDebugger.PlacementAttempt;
 import com.thunder.wildernessodysseyapi.worldgen.structure.TerrainReplacerEngine.SurfaceSample;
 import com.thunder.wildernessodysseyapi.mixin.StructureTemplateAccessor;
+import com.thunder.wildernessodysseyapi.mixin.StructureTemplatePaletteAccessor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -30,7 +31,6 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.tags.BlockTags;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,12 +51,8 @@ public class NBTStructurePlacer {
             BuiltInRegistries.BLOCK.getKey(Blocks.BLUE_WOOL).toString();
     private static final int MIN_LEVELING_MARKER_Y = 62;
     private static final int MAX_LEVELING_MARKER_Y = 65;
-    private static final String[] PALETTE_BLOCK_FIELD_NAMES = {"blocks", "blockInfos", "blockInfoList"};
     private static final int STARTER_BUNKER_PERIMETER_BLEND_RADIUS = 3;
     private static final int STARTER_BUNKER_PERIMETER_BLEND_DEPTH = 2;
-    private static final java.util.concurrent.ConcurrentMap<Class<?>, java.util.Optional<Field>> PALETTE_BLOCK_FIELDS =
-            new java.util.concurrent.ConcurrentHashMap<>();
-    private static boolean loggedPaletteFieldWarning = false;
 
     private final ResourceLocation id;
     private final List<StructureProcessor> extraProcessors;
@@ -372,9 +368,6 @@ public class NBTStructurePlacer {
         TemplateData data = new TemplateData(template, List.copyOf(cryoOffsets),
                 List.copyOf(elevatorPulleyOffsets), size, levelingOffset, hasStructureBlocks);
 
-        // Do not cache empty templates so that later placement attempts can retry once resources finish loading.
-        // The GameTest server asks for the bunker extremely early during startup, before data packs have been
-        // stitched. Caching the placeholder zero-sized template here would permanently mark the bunker as empty.
         if (hasStructureBlocks) {
             cachedData = data;
         } else {
@@ -423,10 +416,6 @@ public class NBTStructurePlacer {
         return size.getX() <= 0 || size.getY() <= 0 || size.getZ() <= 0;
     }
 
-    /**
-     * Result of placing a structure, exposing the overall bounds, any detected cryo tubes and
-     * chunk-aligned slices that callers can use for follow-up processing.
-     */
     public record PlacementResult(BlockPos origin, AABB bounds, List<BlockPos> cryoPositions, List<AABB> chunkSlices) {}
 
     private record TemplateData(StructureTemplate template,
@@ -468,8 +457,6 @@ public class NBTStructurePlacer {
     }
 
     private LevelingMarkerData findLevelingMarker(StructureTemplate template) {
-        // Multiple wool markers can exist in a template; prefer the deepest one to better match terrain when
-        // burying the structure, and fall back to the closest-to-center marker to avoid edge anchors.
         StructurePlaceSettings identitySettings = new StructurePlaceSettings();
         List<StructureBlockInfo> markers = template.filterBlocks(BlockPos.ZERO, identitySettings, Blocks.BLUE_WOOL);
         if (markers.isEmpty()) {
@@ -517,9 +504,6 @@ public class NBTStructurePlacer {
             return;
         }
 
-        // No mixin is required here: Create already exposes the assembly trigger on the block entity
-        // itself. Calling the same method that a player interaction would invoke keeps us aligned
-        // with Create's update flow without linking against its classes at compile time.
         for (BlockPos offset : pulleyOffsets) {
             BlockPos worldPos = origin.offset(offset);
             BlockEntity blockEntity = level.getBlockEntity(worldPos);
@@ -539,10 +523,6 @@ public class NBTStructurePlacer {
         }
     }
 
-    /**
-     * Ensures the placement bounding box encloses entities baked into the template, preventing contraptions that
-     * extend below the footprint (e.g., rope pulleys) from being discarded during placement.
-     */
     private BoundingBox expandPlacementBox(BlockPos origin, Vec3i size, StructureTemplate template) {
         BoundingBox baseBox = LargeStructurePlacementOptimizer.createPlacementBox(origin, size);
         if (!(template instanceof StructureTemplateAccessor accessor)) {
@@ -645,50 +625,12 @@ public class NBTStructurePlacer {
         return new TerrainReplacerEngine.AutoBlendMask(origin.getX(), origin.getZ(), sizeX, sizeZ, supported);
     }
 
-    @SuppressWarnings("unchecked")
     private List<StructureBlockInfo> resolvePaletteBlocks(StructureTemplate.Palette palette) {
-        if (palette == null) {
-            return List.of();
+        if (palette instanceof StructureTemplatePaletteAccessor accessor) {
+            return accessor.getBlocks();
         }
-        java.util.Optional<Field> cachedField = PALETTE_BLOCK_FIELDS.computeIfAbsent(palette.getClass(),
-                this::findPaletteBlocksField);
-        if (cachedField.isEmpty()) {
-            return List.of();
-        }
-        try {
-            Object value = cachedField.get().get(palette);
-            if (value instanceof List<?> list) {
-                return (List<StructureBlockInfo>) list;
-            }
-        } catch (IllegalAccessException e) {
-            ModConstants.LOGGER.warn("Unable to access structure palette blocks for {}.", id, e);
-            return List.of();
-        }
-
-        if (!loggedPaletteFieldWarning) {
-            loggedPaletteFieldWarning = true;
-            ModConstants.LOGGER.warn(
-                    "Unable to locate structure palette block list for {}; auto-blend masking will be skipped.", id);
-        }
+        ModConstants.LOGGER.warn("Palette is not an instance of StructureTemplatePaletteAccessor! Missing mixin?");
         return List.of();
-    }
-
-    private java.util.Optional<Field> findPaletteBlocksField(Class<?> paletteClass) {
-        for (String fieldName : PALETTE_BLOCK_FIELD_NAMES) {
-            try {
-                Field field = paletteClass.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                return java.util.Optional.of(field);
-            } catch (NoSuchFieldException ignored) {
-                // try next candidate
-            }
-        }
-        if (!loggedPaletteFieldWarning) {
-            loggedPaletteFieldWarning = true;
-            ModConstants.LOGGER.warn(
-                    "Unable to locate structure palette block list for {}; auto-blend masking will be skipped.", id);
-        }
-        return java.util.Optional.empty();
     }
 
     private void clearTerrainInsideStructure(ServerLevel level, BlockPos origin, Vec3i size, StructureTemplate template) {
@@ -753,7 +695,7 @@ public class NBTStructurePlacer {
                     if (!BunkerTerrainClearer.shouldClear(existing)) {
                         continue;
                     }
-                    level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 3);
+                    level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
                 }
             }
         }
@@ -779,7 +721,7 @@ public class NBTStructurePlacer {
                     if (!BunkerTerrainClearer.shouldClear(existing) || existing.is(Blocks.BEDROCK)) {
                         continue;
                     }
-                    level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 3);
+                    level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
                 }
             }
         }
