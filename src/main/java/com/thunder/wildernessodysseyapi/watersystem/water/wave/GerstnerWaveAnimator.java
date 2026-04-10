@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.wave;
 
-import com.thunder.wilderness.water.tide.TideSystem;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import net.minecraft.client.Minecraft;
 
 /**

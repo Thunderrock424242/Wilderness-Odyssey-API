@@ -1,7 +1,8 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.mesh;
 
-import com.thunder.wilderness.water.sph.SPHParticle;
-import com.thunder.wilderness.water.sph.SPHSimulator;
+
+import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHParticle;
+import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulator;
 
 import java.util.List;
 

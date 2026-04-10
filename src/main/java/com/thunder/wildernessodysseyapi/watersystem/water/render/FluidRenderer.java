@@ -2,9 +2,10 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
-import com.thunder.wilderness.water.mesh.FluidMesh;
-import com.thunder.wilderness.water.sph.SPHSimulationManager;
-import com.thunder.wilderness.water.sph.SPHSimulator;
+import com.thunder.wildernessodysseyapi.watersystem.water.mesh.FluidMesh;
+import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHConstants;
+import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
+import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulator;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -138,7 +139,7 @@ public class FluidRenderer {
 
         for (var p : droplets) {
             float x = p.position.x, y = p.position.y, z = p.position.z;
-            float life = p.dropletLife / (float) com.thunder.wilderness.water.sph.SPHConstants.DROPLET_LIFETIME;
+            float life = p.dropletLife / (float) SPHConstants.DROPLET_LIFETIME;
             float alpha = DA * life;
 
             // Billboarded quad (axis-aligned for simplicity)

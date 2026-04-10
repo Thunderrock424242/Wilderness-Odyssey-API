@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.mesh;
 
-import com.thunder.wilderness.water.sph.SPHConstants;
+import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHConstants;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;

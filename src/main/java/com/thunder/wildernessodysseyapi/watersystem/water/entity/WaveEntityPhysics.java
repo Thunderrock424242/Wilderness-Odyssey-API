@@ -1,9 +1,9 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.entity;
 
-import com.thunder.wilderness.water.tide.TideSystem;
-import com.thunder.wilderness.water.wave.GerstnerWaveAnimator;
-import com.thunder.wilderness.water.wave.GerstnerWaveProfile;
-import com.thunder.wilderness.water.wave.WaterBodyClassifier;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.vehicle.Boat;
@@ -14,14 +14,14 @@ import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
 /**
  * WaveEntityPhysics
- *
+ * <p>
  * Applies wave-driven forces to entities in water:
- *
+ * <p>
  *   Boats     — rock (pitch/roll) and bob vertically with the wave profile.
  *               Horizontal push from wave direction.
- *
+ * <p>
  *   Items     — float and drift with the surface current.
- *
+ * <p>
  *   Living    — slight push when wading in ocean/river water.
  *               Stronger at high tide (tidal current effect).
  */

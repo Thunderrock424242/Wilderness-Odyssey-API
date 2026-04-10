@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.ocean.tide;
 
-import com.thunder.wilderness.water.wave.WaterBodyClassifier;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;

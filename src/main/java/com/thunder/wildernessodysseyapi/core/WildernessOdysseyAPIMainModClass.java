@@ -14,6 +14,8 @@ import com.thunder.wildernessodysseyapi.command.LoreBookCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
 import com.thunder.wildernessodysseyapi.command.WorldUpgradeCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.entity.BoatTiltStore;
+import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.worldgen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
@@ -26,7 +28,6 @@ import com.thunder.wildernessodysseyapi.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
-import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
 import com.thunder.wildernessodysseyapi.command.ModpackStructureCommand;
 import com.thunder.wildernessodysseyapi.command.MeteorCommand;
 import com.thunder.wildernessodysseyapi.command.UnstuckCommand;
@@ -161,8 +162,6 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-async.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TideConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-tides-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, CloakChipConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-cloak-chip-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PlayerTelemetryConfig.CONFIG_SPEC,
@@ -231,7 +230,6 @@ public class WildernessOdysseyAPIMainModClass {
         GlobalChatCommand.register(dispatcher);
         GlobalChatOptToggleCommand.register(dispatcher);
         LoreBookCommand.register(dispatcher);
-        TideInfoCommand.register(dispatcher);
         ModpackStructureCommand.register(dispatcher);
         TelemetryConsentCommand.register(dispatcher);
         TelemetryQueueStatsCommand.register(dispatcher);
@@ -258,8 +256,8 @@ public class WildernessOdysseyAPIMainModClass {
     public static void onLevelUnload(LevelEvent.Unload event) {
         // Clear caches on world exit to avoid stale data
         WaterBodyClassifier.clearCache();
-        com.thunder.wilderness.water.entity.BoatTiltStore.clear();
-        com.thunder.wilderness.water.sph.SPHSimulationManager.get().shutdown();
+        BoatTiltStore.clear();
+        SPHSimulationManager.get().shutdown();
     }
 
     @SubscribeEvent
@@ -295,10 +293,7 @@ public class WildernessOdysseyAPIMainModClass {
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
         }
-        if (event.getConfig().getSpec() == TideConfig.CONFIG_SPEC) {
-            TideManager.reloadConfig();
-        }
-        }
+    }
 
     public void onConfigReloaded(ModConfigEvent.Reloading event) {
         if (event.getConfig().getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
@@ -306,9 +301,6 @@ public class WildernessOdysseyAPIMainModClass {
         }
         if (event.getConfig().getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
-        }
-        if (event.getConfig().getSpec() == TideConfig.CONFIG_SPEC) {
-            TideManager.reloadConfig();
         }
     }
 }

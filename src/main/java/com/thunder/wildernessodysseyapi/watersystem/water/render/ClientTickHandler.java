@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
-import com.thunder.wilderness.water.sph.SPHSimulationManager;
+import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;

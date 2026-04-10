@@ -1,7 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wilderness.water.wave.GerstnerWaveAnimator;
-import com.thunder.wilderness.water.wave.WaterBodyClassifier;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import net.minecraft.client.renderer.block.LiquidBlockRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;
@@ -16,14 +15,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * GerstnerWaveRenderMixin
- *
+ * <p>
  * Replaces the simple sine WaveRenderMixin from the first system.
  * Injects into LiquidBlockRenderer#tesselate to:
  *   1. Classify the water body at this block position
  *   2. Update the Gerstner animator (once per frame guard)
  *   3. The actual vertex displacement is applied via GerstnerVertexConsumer
  *      which wraps the passed VertexConsumer.
- *
+ * <p>
  * NOTE: The @ModifyArg redirect to wrap the VertexConsumer requires
  * the GerstnerVertexConsumer. We inject at HEAD to update timing,
  * and a separate @ModifyArg targets the consumer parameter.
