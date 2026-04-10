@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.lorebook;
 
 import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.network.SyncLoreBookPayload;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -137,4 +138,14 @@ public final class LoreBookManager {
             loreIdFrom(stack).ifPresent(id -> markCollected(player, id));
         }
     }
+
+    public void unlockBookForPlayer(ServerPlayer player, String bookId) {
+        // 1. Save the unlock to the server's data file (Your existing logic)
+        this.playerData.get(player.getUUID()).add(bookId);
+        this.setDirty();
+
+        // 2. THE FIX: Send the packet to the client so the GUI updates instantly!
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, new SyncLoreBookPayload(bookId));
+    }
+
 }

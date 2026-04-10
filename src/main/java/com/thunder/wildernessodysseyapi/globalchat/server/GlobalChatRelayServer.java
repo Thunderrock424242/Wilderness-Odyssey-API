@@ -70,10 +70,26 @@ public class GlobalChatRelayServer {
         this.discordBridge = DiscordBridgeService.fromSystemProperties(this::broadcastFromDiscordBridge);
     }
 
-    public void start() {
-        System.out.println("[GlobalChatRelayServer] Listening on " + serverSocket.getLocalPort());
-        executor.submit(this::acceptLoop);
-        discordBridge.start();
+    public void startServer(int startingPort) {
+        int currentPort = startingPort;
+        int maxPort = startingPort + 10; // Try up to 10 fallback ports
+        ServerSocket serverSocket = null;
+
+        while (currentPort <= maxPort) {
+            try {
+                serverSocket = new ServerSocket(currentPort);
+                com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER.info("[Global Chat] Relay Server successfully bound to port: " + currentPort);
+                break; // Success! Break the loop.
+            } catch (IOException e) {
+                com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER.warn("[Global Chat] Port " + currentPort + " is in use. Trying next port...");
+                currentPort++;
+            }
+        }
+
+        if (serverSocket == null) {
+            com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER.error("[Global Chat] CRITICAL: Could not find an open port. Global Chat is disabled.");
+            return; // Disable the feature safely
+        }
     }
 
     private void acceptLoop() {
@@ -565,7 +581,7 @@ public class GlobalChatRelayServer {
         String clusterToken = System.getProperty("wilderness.globalchat.clustertoken", "");
         GlobalChatRelayServer server = new GlobalChatRelayServer(port, token, clusterToken);
         Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
-        server.start();
+        server.startServer();
     }
 
     private void createDirectoriesSecure(Path dir) throws IOException {
