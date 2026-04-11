@@ -4,10 +4,10 @@ import net.minecraft.world.level.Level;
 
 /**
  * TideSystem
- *
+ * <p>
  * Calculates the current tide height offset based on the Minecraft
  * moon phase (0–7) and time-of-day, producing a smooth tidal cycle.
- *
+ * <p>
  * Minecraft moon phases:
  *   0 = Full moon     → highest tide (spring tide)
  *   1 = Waning gibbous
@@ -17,7 +17,7 @@ import net.minecraft.world.level.Level;
  *   5 = Waxing crescent
  *   6 = First quarter → lowest tide (neap tide)
  *   7 = Waxing gibbous
- *
+ * <p>
  * Tidal model:
  *   - Spring tides at full + new moon (phases 0, 4) → ±MAX_SPRING blocks
  *   - Neap tides at quarter moons (phases 2, 6) → ±MAX_NEAP blocks
@@ -117,7 +117,7 @@ public class TideSystem {
     /**
      * Map moon phase (0–7) to a tidal amplitude.
      * Uses a cosine interpolation between spring and neap.
-     *
+     * <p>
      * Phase 0 (full) and phase 4 (new) → spring tide (max amplitude)
      * Phase 2 and phase 6 (quarters)    → neap tide (min amplitude)
      */
