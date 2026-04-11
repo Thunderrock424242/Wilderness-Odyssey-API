@@ -21,7 +21,7 @@ import java.util.*;
  * They are drawn during RenderLevelStageEvent AFTER_TRANSLUCENT_BLOCKS so they
  * composite correctly with the translucent water geometry.
  */
-@EventBusSubscriber(modid = "wilderness", bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
+@EventBusSubscriber(modid = "wildernessodysseyapi", bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
 public class RippleRenderer {
 
     private static final float MAX_RADIUS = 1.8f;

@@ -29,7 +29,7 @@ public class WaterShaderManager {
             event.registerShader(
                 new ShaderInstance(
                     event.getResourceProvider(),
-                    ResourceLocation.fromNamespaceAndPath("wilderness", "water_surface"),
+                    ResourceLocation.fromNamespaceAndPath("wildernessodysseyapi", "water_surface"),
                     DefaultVertexFormat.BLOCK
                 ),
                 shader -> waterSurfaceShader = shader

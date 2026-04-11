@@ -11,7 +11,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * The server simulation is what ultimately places real water blocks
  * when the fluid settles.
  */
-@EventBusSubscriber(modid = "wilderness", bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber(modid = "wildernessodysseyapi", bus = EventBusSubscriber.Bus.GAME)
 public class ServerTickHandler {
 
     private static final float SERVER_TICK_DELTA = 0.05f;

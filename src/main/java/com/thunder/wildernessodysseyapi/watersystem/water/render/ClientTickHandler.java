@@ -15,7 +15,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  *
  * 1 Minecraft client tick = 1/20 second = 0.05s
  */
-@EventBusSubscriber(modid = "wilderness", bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
+@EventBusSubscriber(modid = "wildernessodysseyapi", bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
 public class ClientTickHandler {
 
     private static final float CLIENT_TICK_DELTA = 0.05f; // 20 TPS

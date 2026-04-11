@@ -25,7 +25,7 @@ import net.neoforged.neoforge.event.tick.EntityTickEvent;
  *   Living    — slight push when wading in ocean/river water.
  *               Stronger at high tide (tidal current effect).
  */
-@EventBusSubscriber(modid = "wilderness", bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber(modid = "wildernessodysseyapi", bus = EventBusSubscriber.Bus.GAME)
 public class WaveEntityPhysics {
 
     @SubscribeEvent

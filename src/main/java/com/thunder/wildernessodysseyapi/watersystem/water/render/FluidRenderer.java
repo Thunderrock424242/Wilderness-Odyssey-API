@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Renders during AFTER_TRANSLUCENT_BLOCKS so it composites
  * correctly with vanilla translucent geometry.
  */
-@EventBusSubscriber(modid = "wilderness", bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
+@EventBusSubscriber(modid = "wildernessodysseyapi", bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
 public class FluidRenderer {
 
     // One FluidMesh per active simulator

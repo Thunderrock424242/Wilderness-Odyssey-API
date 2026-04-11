@@ -22,7 +22,7 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
  *
  * Can be toggled with a config option (defaults on).
  */
-@EventBusSubscriber(modid = "wilderness", bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
+@EventBusSubscriber(modid = "wildernessodysseyapi", bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
 public class TideHudOverlay {
 
     private static final boolean SHOW_HUD = true; // TODO: wire to config

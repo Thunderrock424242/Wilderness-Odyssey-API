@@ -26,7 +26,7 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
  * individual water source blocks at the shoreline, which is both cheaper
  * and more natural looking.
  */
-@EventBusSubscriber(modid = "wilderness", bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber(modid = "wildernessodysseyapi", bus = EventBusSubscriber.Bus.GAME)
 public class TideWorldUpdater {
 
     private static final int SEA_LEVEL        = 62;
