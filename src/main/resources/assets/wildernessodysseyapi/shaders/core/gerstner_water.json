@@ -4,8 +4,8 @@
     "srcrgb": "srcalpha",
     "dstrgb": "1-srcalpha"
   },
-  "vertex": "wilderness:gerstner_water",
-  "fragment": "wilderness:gerstner_water",
+  "vertex": "wildernessodysseyapi:gerstner_water",
+  "fragment": "wildernessodysseyapi:gerstner_water",
   "attributes": ["Position","Color","UV0","UV2","Normal"],
   "samplers": [
     { "name": "Sampler0" },
