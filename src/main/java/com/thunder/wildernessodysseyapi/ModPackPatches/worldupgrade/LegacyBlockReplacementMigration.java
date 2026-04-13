@@ -5,6 +5,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -14,8 +15,15 @@ import net.minecraft.world.level.block.state.BlockState;
 public final class LegacyBlockReplacementMigration implements WorldMigration {
 
     // Resolve the blocks ONCE into memory to prevent doing 98,000 string lookups per chunk
-    private static final Block LEGACY_CRYO_1 = BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath("wildernessodyssey", "cryo_tube"));
-    private static final Block LEGACY_CRYO_2 = BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath("wildernessodysseyapi", "old_cryo_tube"));
+    private static final Block LEGACY_CRYO_1 = resolveLegacyBlock("wildernessodyssey", "cryo_tube");
+    private static final Block LEGACY_CRYO_2 = resolveLegacyBlock("wildernessodysseyapi", "old_cryo_tube");
+
+    private static Block resolveLegacyBlock(String namespace, String path) {
+        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(namespace, path);
+        return BuiltInRegistries.BLOCK.getOptional(id)
+                .filter(block -> block != Blocks.AIR)
+                .orElse(null);
+    }
 
     @Override
     public String id() {
