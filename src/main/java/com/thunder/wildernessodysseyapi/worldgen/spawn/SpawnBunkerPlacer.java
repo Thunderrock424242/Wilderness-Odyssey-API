@@ -35,9 +35,9 @@ import java.util.Set;
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class SpawnBunkerPlacer {
     private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "bunker");
-    private static final int OCEAN_SEARCH_RADIUS = 4096;
+    private static final int OCEAN_SEARCH_RADIUS = 384;
     private static final int OCEAN_SEARCH_STEP = 32;
-    private static final int MAX_ANCHOR_CANDIDATES = 2048;
+    private static final int MAX_ANCHOR_CANDIDATES = 256;
     private static final int FAST_OCEAN_SAMPLE_OFFSET = 48;
     private static final int OCEAN_FALLBACK_SEARCH_STEP = 64;
     private static final int OCEAN_REGION_RADIUS = 112;
@@ -124,7 +124,7 @@ public final class SpawnBunkerPlacer {
                     if (evaluated >= MAX_ANCHOR_CANDIDATES) {
                         BlockPos forcedOceanAnchor = findAnyOceanAnchor(level, baseSpawn, context);
                         ModConstants.LOGGER.warn(
-                                "Hit spawn bunker ocean-search budget ({} candidates) near {}; using fallback {}.",
+                                "Hit spawn bunker ocean-search budget ({} candidates) near {}; limiting generation-time work and using fallback {}.",
                                 MAX_ANCHOR_CANDIDATES, baseSpawn, forcedOceanAnchor);
                         return forcedOceanAnchor;
                     }
@@ -133,7 +133,7 @@ public final class SpawnBunkerPlacer {
         }
 
         BlockPos forcedOceanAnchor = findAnyOceanAnchor(level, baseSpawn, context);
-        ModConstants.LOGGER.warn("Unable to locate a fully open ocean spawn region within {} blocks of {}; using best-effort ocean fallback.",
+        ModConstants.LOGGER.warn("Unable to locate a fully open ocean spawn region within {} blocks of {}; limiting generation-time work and using best-effort ocean fallback.",
                 OCEAN_SEARCH_RADIUS, baseSpawn);
         return forcedOceanAnchor;
     }
