@@ -20,6 +20,7 @@ import com.thunder.wildernessodysseyapi.command.WorldGenScanCommand;
 import com.thunder.wildernessodysseyapi.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.command.TideInfoCommand;
 import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
+import com.thunder.wildernessodysseyapi.config.OwnershipConfig;
 import com.thunder.wildernessodysseyapi.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
@@ -127,6 +128,8 @@ public class WildernessOdysseyAPIMainModClass {
                 CONFIG_FOLDER + "wildernessodysseyapi-tides-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PlayerTelemetryConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-telemetry-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, OwnershipConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-ownership.toml");
         // Previously registered client-only events have been removed
         DonationReminderConfig.validateVersion();
 
@@ -157,6 +160,13 @@ public class WildernessOdysseyAPIMainModClass {
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
         GameRulesListManager.ensureRulesFileExists(event.getServer());
         GameRulesListManager.applyConfiguredRules(event.getServer());
+
+        if (OwnershipConfig.CONFIG.showNoticeOnStartup()) {
+            LOGGER.info("[Ownership] Project: {}", OwnershipConfig.CONFIG.projectName());
+            LOGGER.info("[Ownership] Owner: {}", OwnershipConfig.CONFIG.ownerName());
+            LOGGER.info("[Ownership] Notice: {}", OwnershipConfig.CONFIG.ownershipNotice());
+            LOGGER.info("[Ownership] Contact: {}", OwnershipConfig.CONFIG.supportContact());
+        }
     }
 
     /**
