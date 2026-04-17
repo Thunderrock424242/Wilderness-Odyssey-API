@@ -147,6 +147,7 @@ public class WildernessOdysseyAPIMainModClass {
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, EventTelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-event-telemetry-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-telemetry-master-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, FeedbackConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-feedback-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, OwnershipConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-ownership.toml");
     }
 
     // =========================================
@@ -183,6 +184,13 @@ public class WildernessOdysseyAPIMainModClass {
         GameRulesListManager.ensureRulesFileExists(event.getServer());
         GameRulesListManager.applyConfiguredRules(event.getServer());
         ModpackStructureRegistry.loadAll();
+
+        if (OwnershipConfig.CONFIG.showNoticeOnStartup()) {
+            LOGGER.info("[Ownership] Project: {}", OwnershipConfig.CONFIG.projectName());
+            LOGGER.info("[Ownership] Owner: {}", OwnershipConfig.CONFIG.ownerName());
+            LOGGER.info("[Ownership] Notice: {}", OwnershipConfig.CONFIG.ownershipNotice());
+            LOGGER.info("[Ownership] Contact: {}", OwnershipConfig.CONFIG.supportContact());
+        }
     }
 
     @SubscribeEvent

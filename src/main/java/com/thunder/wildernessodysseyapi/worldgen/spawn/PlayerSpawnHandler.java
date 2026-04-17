@@ -97,7 +97,7 @@ public class PlayerSpawnHandler {
     private static void teleportPlayer(ServerPlayer player, BlockPos spawnPos) {
         player.teleportTo(player.serverLevel(),
                 spawnPos.getX() + 0.5,
-                spawnPos.getY(),
+                spawnPos.getY() + 0.5,
                 spawnPos.getZ() + 0.5,
                 player.getYRot(),
                 player.getXRot());
