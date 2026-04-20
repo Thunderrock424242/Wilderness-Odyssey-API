@@ -13,6 +13,7 @@
     "EntityAccessor",
     "ForwardExtentCopyMixin",
     "LivingEntityMixin",
+    "MixinMinecraftServerSpawn",
     "ServerboundSetStructureBlockPacketMixin",
     "ServerGamePacketListenerImplMixin",
     "StructureBlockEntityMixin",

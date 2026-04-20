@@ -35,15 +35,15 @@ import java.util.Set;
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class SpawnBunkerPlacer {
     private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "bunker");
-    private static final int OCEAN_SEARCH_RADIUS = 256;
+    private static final int OCEAN_SEARCH_RADIUS = 512;
     private static final int OCEAN_SEARCH_STEP = 32;
     private static final int MAX_ANCHOR_CANDIDATES = 128;
     private static final int FAST_OCEAN_SAMPLE_OFFSET = 48;
-    private static final int OCEAN_FALLBACK_SEARCH_STEP = 64;
+    private static final int OCEAN_FALLBACK_SEARCH_STEP = 32;
     private static final int OCEAN_REGION_RADIUS = 160;
     private static final int OCEAN_REGION_STEP = 16;
     private static final int FOOTPRINT_SAMPLE_STEP = 4;
-    private static final int MIN_OCEAN_WATER_DEPTH = 8;
+    private static final int MIN_OCEAN_WATER_DEPTH = 20;
     private static final int MAX_SEAFLOOR_VARIANCE = 18;
     private static final int ISLAND_PLATFORM_PADDING = 30;
     private static final int ISLAND_SHORE_RADIUS_PADDING = 48;
@@ -90,7 +90,7 @@ public final class SpawnBunkerPlacer {
         return BUNKER_PLACER.placeAnchored(level, anchor);
     }
 
-    private static BlockPos resolveAnchor(ServerLevel level) {
+    static BlockPos resolveAnchor(ServerLevel level) {
         BlockPos baseSpawn = level.getSharedSpawnPos();
         Vec3i bunkerSize = BUNKER_PLACER.peekSize(level);
         return findOceanAnchor(level, baseSpawn, bunkerSize);
@@ -140,7 +140,7 @@ public final class SpawnBunkerPlacer {
         return new BlockPos(pos.getX(), anchorY, pos.getZ());
     }
 
-    private static void applySpawnData(ServerLevel level, NBTStructurePlacer.PlacementResult result) {
+    static void applySpawnData(ServerLevel level, NBTStructurePlacer.PlacementResult result) {
         List<BlockPos> cryoPositions = result.cryoPositions();
         if (!cryoPositions.isEmpty()) {
             CryoSpawnData data = CryoSpawnData.get(level);
@@ -198,7 +198,7 @@ public final class SpawnBunkerPlacer {
 
     private static BlockPos findAnyOceanAnchor(ServerLevel level, BlockPos baseSpawn, OceanSearchContext context) {
         BlockPos baseAnchor = toOceanAnchor(level, baseSpawn);
-        if (isOceanWaterSample(context, baseAnchor)) {
+        if (context.isOceanBiome(baseAnchor) && isOceanWaterSample(context, baseAnchor)) {
             return baseAnchor;
         }
 
@@ -207,12 +207,11 @@ public final class SpawnBunkerPlacer {
         for (int radius = OCEAN_FALLBACK_SEARCH_STEP; radius <= OCEAN_SEARCH_RADIUS; radius += OCEAN_FALLBACK_SEARCH_STEP) {
             for (int dx = -radius; dx <= radius; dx += OCEAN_FALLBACK_SEARCH_STEP) {
                 for (int dz = -radius; dz <= radius; dz += OCEAN_FALLBACK_SEARCH_STEP) {
-                    if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
-                        continue;
-                    }
+                    if (Math.abs(dx) != radius && Math.abs(dz) != radius) continue;
 
                     BlockPos candidate = toOceanAnchor(level, new BlockPos(baseX + dx, level.getMinBuildHeight(), baseZ + dz));
-                    if (isOceanWaterSample(context, candidate)) {
+                    // FIXED: require actual ocean biome, not just surface water
+                    if (context.isOceanBiome(candidate) && isOceanWaterSample(context, candidate)) {
                         return candidate;
                     }
                 }
@@ -224,10 +223,11 @@ public final class SpawnBunkerPlacer {
     private static boolean hasOceanFootprint(OceanSearchContext context, BlockPos anchor, Vec3i bunkerSize) {
         ServerLevel level = context.level();
         BlockPos origin = getPlacementOrigin(level, anchor);
-        int minX = origin.getX();
-        int minZ = origin.getZ();
-        int maxX = minX + Math.max(1, bunkerSize.getX()) - 1;
-        int maxZ = minZ + Math.max(1, bunkerSize.getZ()) - 1;
+        // FIXED: include platform padding in the check so the whole island area is validated
+        int minX = origin.getX() - ISLAND_PLATFORM_PADDING;
+        int minZ = origin.getZ() - ISLAND_PLATFORM_PADDING;
+        int maxX = origin.getX() + Math.max(1, bunkerSize.getX()) - 1 + ISLAND_PLATFORM_PADDING;
+        int maxZ = origin.getZ() + Math.max(1, bunkerSize.getZ()) - 1 + ISLAND_PLATFORM_PADDING;
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
         for (int x = minX; x <= maxX; x = nextSampleCoordinate(x, maxX, FOOTPRINT_SAMPLE_STEP)) {
@@ -236,11 +236,9 @@ public final class SpawnBunkerPlacer {
                 if (!context.isOceanBiome(cursor)) {
                     return false;
                 }
-
                 if (!context.hasSurfaceWater(cursor)) {
                     return false;
                 }
-
                 int seafloorY = context.sampleSeafloorY(cursor);
                 BlockPos surface = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE, cursor);
                 int waterDepth = surface.getY() - seafloorY;
