@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifi
 import net.minecraft.client.renderer.block.LiquidBlockRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
@@ -69,7 +70,7 @@ public class GerstnerWaveRenderMixin {
             return originalConsumer;
         }
 
-        WaterBodyClassifier.WaterType waterType = WaterBodyClassifier.classify(level, pos);
+        WaterBodyClassifier.WaterType waterType = WaterBodyClassifier.classify((LevelReader) level, pos);
         return new GerstnerVertexConsumer(originalConsumer, pos.getX(), pos.getZ(), waterType);
     }
 }
