@@ -32,6 +32,7 @@ public class TideWorldUpdater {
     private static final int SEA_LEVEL        = 62;
     private static final int TIDE_CHECK_RANGE = 24;  // blocks around players
     private static final int TICK_INTERVAL    = 100; // ticks between updates
+    private static final int MAX_TIDE_STEPS   = 2;   // keep in sync with TideSystem amplitude
 
     private static float lastTideOffset = 0f;
     private static int   tickCounter    = 0;
@@ -67,24 +68,44 @@ public class TideWorldUpdater {
                     if (WaterBodyClassifier.classify(level, surface)
                             != WaterBodyClassifier.WaterType.OCEAN) continue;
 
-                    int targetY = SEA_LEVEL + Math.round(tideOffset);
-
-                    BlockPos above = surface.above();
-                    BlockState aboveState = level.getBlockState(above);
-
-                    if (tideOffset > 0.5f && aboveState.isAir()) {
-                        // High tide: fill one block above shoreline
-                        level.setBlock(above, Blocks.WATER.defaultBlockState(), 2);
-                    } else if (tideOffset < -0.5f) {
-                        // Low tide: drain topmost water block if it exists
-                        if (level.getFluidState(surface).is(Fluids.WATER)
-                                && surface.getY() > SEA_LEVEL - 1) {
-                            level.setBlock(surface, Blocks.AIR.defaultBlockState(), 2);
-                        }
-                    }
+                    int targetY = clampTargetY(SEA_LEVEL + Math.round(tideOffset));
+                    applyColumnTide(level, surface, targetY);
                 }
             }
         });
+    }
+
+    private static int clampTargetY(int y) {
+        return Math.max(SEA_LEVEL - MAX_TIDE_STEPS, Math.min(SEA_LEVEL + MAX_TIDE_STEPS, y));
+    }
+
+    /**
+     * Raise or lower one sampled shoreline column to match the target tide height.
+     * This keeps transitions smoother than one-off threshold fills/drains and
+     * actually uses the computed targetY for both rising and falling tides.
+     */
+    private static void applyColumnTide(ServerLevel level, BlockPos surface, int targetY) {
+        int topY = surface.getY();
+
+        if (topY < targetY) {
+            for (int y = topY + 1; y <= targetY; y++) {
+                BlockPos pos = new BlockPos(surface.getX(), y, surface.getZ());
+                BlockState state = level.getBlockState(pos);
+                if (state.isAir()) {
+                    level.setBlock(pos, Blocks.WATER.defaultBlockState(), 2);
+                }
+            }
+            return;
+        }
+
+        if (topY > targetY) {
+            for (int y = topY; y > targetY; y--) {
+                BlockPos pos = new BlockPos(surface.getX(), y, surface.getZ());
+                if (level.getFluidState(pos).is(Fluids.WATER)) {
+                    level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+                }
+            }
+        }
     }
 
     /**
