@@ -157,7 +157,7 @@ public class FluidRenderer {
         if (WaterShaderManager.waterSurfaceShader != null) {
             RenderSystem.setShader(() -> WaterShaderManager.waterSurfaceShader);
         } else {
-            RenderSystem.setShader(net.minecraft.client.renderer.GameRenderer::getPositionColorShader);
+            RenderSystem.setShader(GameRenderer::getPositionColorShader);
         }
         BufferUploader.drawWithShader(buf.buildOrThrow());
 
