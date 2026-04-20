@@ -30,7 +30,7 @@ public class WaterShaderManager {
                 new ShaderInstance(
                     event.getResourceProvider(),
                     ResourceLocation.fromNamespaceAndPath("wildernessodysseyapi", "water_surface"),
-                    DefaultVertexFormat.BLOCK
+                        DefaultVertexFormat.POSITION_COLOR_NORMAL
                 ),
                 shader -> waterSurfaceShader = shader
             );

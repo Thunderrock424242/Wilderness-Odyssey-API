@@ -6,7 +6,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.mesh.FluidMesh;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulator;
-import net.neoforged.api.distmarker.Dist;
+import net.minecraft.client.renderer.GameRenderer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Renders during AFTER_TRANSLUCENT_BLOCKS so it composites
  * correctly with vanilla translucent geometry.
  */
-@EventBusSubscriber(modid = "wildernessodysseyapi", bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
+@EventBusSubscriber(modid = "wildernessodysseyapi")
 public class FluidRenderer {
 
     // One FluidMesh per active simulator
@@ -109,6 +109,11 @@ public class FluidRenderer {
             }
         }
 
+        if (WaterShaderManager.waterSurfaceShader != null) {
+            RenderSystem.setShader(() -> WaterShaderManager.waterSurfaceShader);
+        } else {
+            RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        }
         BufferUploader.drawWithShader(buf.buildOrThrow());
 
         RenderSystem.depthMask(true);
@@ -149,6 +154,11 @@ public class FluidRenderer {
             buf.addVertex(mat, x-s, y+s, z).setColor(DR, DG, DB, alpha).setNormal(0,0,1);
         }
 
+        if (WaterShaderManager.waterSurfaceShader != null) {
+            RenderSystem.setShader(() -> WaterShaderManager.waterSurfaceShader);
+        } else {
+            RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        }
         BufferUploader.drawWithShader(buf.buildOrThrow());
 
         RenderSystem.depthMask(true);

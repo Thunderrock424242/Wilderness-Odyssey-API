@@ -12,21 +12,21 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 /**
  * TideWorldUpdater
- *
+ * <p>
  * Applies tide-level changes to ocean water blocks in loaded chunks.
  * Runs on the server every 100 ticks (5 seconds) to limit performance impact.
- *
+ * <p>
  * Logic:
  *   - Get current tide offset from TideSystem
  *   - For ocean blocks at sea level (Y=62): if tide > 0.5 fill one block higher
  *   - For ocean blocks above sea level:     if tide < -0.5 remove them
  *   - Smooth transition prevents jarring pop-in
- *
+ * <p>
  * This does NOT move the actual Minecraft sea level — it adds/removes
  * individual water source blocks at the shoreline, which is both cheaper
  * and more natural looking.
  */
-@EventBusSubscriber(modid = "wildernessodysseyapi", bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber(modid = "wildernessodysseyapi")
 public class TideWorldUpdater {
 
     private static final int SEA_LEVEL        = 62;
@@ -34,22 +34,25 @@ public class TideWorldUpdater {
     private static final int TICK_INTERVAL    = 100; // ticks between updates
     private static final int MAX_TIDE_STEPS   = 2;   // keep in sync with TideSystem amplitude
 
-    private static float lastTideOffset = 0f;
-    private static int   tickCounter    = 0;
+    private static final java.util.Map<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>, Integer> tickCounters = new java.util.HashMap<>();
+    private static final java.util.Map<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>, Float> lastTideOffsets = new java.util.HashMap<>();
 
     @SubscribeEvent
     public static void onLevelTick(LevelTickEvent.Post event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
 
-        tickCounter++;
-        if (tickCounter < TICK_INTERVAL) return;
-        tickCounter = 0;
+        var key = level.dimension();
+
+        int counter = tickCounters.getOrDefault(key, 0) + 1;
+        tickCounters.put(key, counter);
+        if (counter < TICK_INTERVAL) return;
+        tickCounters.put(key, 0);
 
         float tideOffset = TideSystem.getTideOffset(level);
-        float delta      = tideOffset - lastTideOffset;
-        lastTideOffset   = tideOffset;
+        float lastOffset = lastTideOffsets.getOrDefault(key, 0f);
+        float delta      = tideOffset - lastOffset;
+        lastTideOffsets.put(key, tideOffset);
 
-        // Only do expensive work if tide changed meaningfully
         if (Math.abs(delta) < 0.05f) return;
 
         applyTideToOceanShores(level, tideOffset);

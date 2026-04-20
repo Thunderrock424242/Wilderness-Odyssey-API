@@ -35,19 +35,19 @@ import java.util.Set;
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class SpawnBunkerPlacer {
     private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "bunker");
-    private static final int OCEAN_SEARCH_RADIUS = 384;
+    private static final int OCEAN_SEARCH_RADIUS = 256;
     private static final int OCEAN_SEARCH_STEP = 32;
-    private static final int MAX_ANCHOR_CANDIDATES = 256;
+    private static final int MAX_ANCHOR_CANDIDATES = 128;
     private static final int FAST_OCEAN_SAMPLE_OFFSET = 48;
     private static final int OCEAN_FALLBACK_SEARCH_STEP = 64;
-    private static final int OCEAN_REGION_RADIUS = 112;
+    private static final int OCEAN_REGION_RADIUS = 160;
     private static final int OCEAN_REGION_STEP = 16;
     private static final int FOOTPRINT_SAMPLE_STEP = 4;
     private static final int MIN_OCEAN_WATER_DEPTH = 8;
     private static final int MAX_SEAFLOOR_VARIANCE = 18;
-    private static final int ISLAND_PLATFORM_PADDING = 10;
-    private static final int ISLAND_SHORE_RADIUS_PADDING = 24;
-    private static final int ISLAND_SLOPE_DEPTH = 7;
+    private static final int ISLAND_PLATFORM_PADDING = 30;
+    private static final int ISLAND_SHORE_RADIUS_PADDING = 48;
+    private static final int ISLAND_SLOPE_DEPTH = 4;
     private static final Set<ResourceKey<Biome>> BLACKLISTED_OCEAN_BIOMES = Set.of(
             Biomes.RIVER,
             Biomes.FROZEN_RIVER,
@@ -62,26 +62,23 @@ public final class SpawnBunkerPlacer {
 
     @SubscribeEvent
     public static void onCreateSpawn(LevelEvent.CreateSpawnPosition event) {
-        if (!(event.getLevel() instanceof ServerLevel level)) {
-            return;
-        }
-        if (!level.dimension().equals(Level.OVERWORLD)) {
-            return;
-        }
-        if (StructureConfig.DEBUG_DISABLE_STARTER_BUNKER.get()) {
-            ModConstants.LOGGER.info("Skipping starter bunker placement because placement.debugDisableStarterBunker is enabled.");
-            return;
-        }
+        if (!(event.getLevel() instanceof ServerLevel level)) return;
+        if (!level.dimension().equals(Level.OVERWORLD)) return;
+        if (StructureConfig.DEBUG_DISABLE_STARTER_BUNKER.get()) return;
 
         BlockPos anchor = resolveAnchor(level);
         NBTStructurePlacer.PlacementResult result = placeBunker(level, anchor);
         if (result == null) {
-            ModConstants.LOGGER.warn("Spawn bunker placement failed at {}; falling back to vanilla spawn selection.", anchor);
+            ModConstants.LOGGER.warn("Spawn bunker placement failed at {}; falling back.", anchor);
             return;
         }
-
         applySpawnData(level, result);
         event.setCanceled(true);
+    }
+
+    private static boolean isOceanAt(ServerLevel level, BlockPos pos) {
+        return level.getBiome(pos).is(BiomeTags.IS_OCEAN)
+                || level.getBiome(pos).is(BiomeTags.IS_DEEP_OCEAN);
     }
 
     /**
@@ -329,7 +326,7 @@ public final class SpawnBunkerPlacer {
 
                 for (int y = seafloorY; y <= targetTopY; y++) {
                     cursor.set(x, y, z);
-                    level.setBlock(cursor, selectIslandBlock(distance, flatRadius, shoreRadius, targetTopY, y, seaLevel), 2);
+                    level.setBlock(cursor, selectIslandBlock(level, x, z, distance, flatRadius, shoreRadius, targetTopY, y, seaLevel), 2);
                 }
 
                 if (targetTopY >= seaLevel) {
@@ -358,26 +355,25 @@ public final class SpawnBunkerPlacer {
         return Math.max(seaLevel - 2, islandTopY - drop);
     }
 
-    private static BlockState selectIslandBlock(double distance,
-                                                int flatRadius,
-                                                int shoreRadius,
-                                                int targetTopY,
-                                                int y,
-                                                int seaLevel) {
+    private static BlockState selectIslandBlock(ServerLevel level, int x, int z,
+                                                double distance, int flatRadius,
+                                                int shoreRadius, int targetTopY,
+                                                int y, int seaLevel) {
         if (y == targetTopY) {
-            if (targetTopY <= seaLevel || distance >= shoreRadius - 4) {
-                return Blocks.SAND.defaultBlockState();
-            }
-            return Blocks.GRASS_BLOCK.defaultBlockState();
+            // Sample what block naturally exists at this surface position
+            BlockPos surface = new BlockPos(x, targetTopY, z);
+            BlockState natural = level.getBlockState(surface.below());
+            // If it's a recognizable surface block use it, otherwise fall back to sand
+            if (!natural.isAir() && !natural.liquid()) return natural;
+            return (targetTopY <= seaLevel || distance >= shoreRadius - 4)
+                    ? Blocks.SAND.defaultBlockState()
+                    : Blocks.GRASS_BLOCK.defaultBlockState();
         }
-
         if (y >= targetTopY - 3) {
-            if (distance >= flatRadius || targetTopY <= seaLevel) {
-                return Blocks.SANDSTONE.defaultBlockState();
-            }
-            return Blocks.DIRT.defaultBlockState();
+            return (distance >= flatRadius || targetTopY <= seaLevel)
+                    ? Blocks.SANDSTONE.defaultBlockState()
+                    : Blocks.DIRT.defaultBlockState();
         }
-
         return Blocks.STONE.defaultBlockState();
     }
 

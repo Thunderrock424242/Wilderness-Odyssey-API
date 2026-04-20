@@ -10,6 +10,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.C
 import com.thunder.wildernessodysseyapi.command.*;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideWorldUpdater;
 import com.thunder.wildernessodysseyapi.watersystem.water.entity.BoatTiltStore;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
@@ -39,6 +40,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.*;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.particle.WildernessParticleRegistry;
 
+import com.thunder.wildernessodysseyapi.worldgen.spawn.OceanSpawnLocator;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -129,6 +131,8 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(EventTelemetryReporter.class);
         NeoForge.EVENT_BUS.register(TelemetryQueueProcessor.class);
         NeoForge.EVENT_BUS.register(LoreBookEvents.class);
+        NeoForge.EVENT_BUS.register(TideWorldUpdater.class);
+        NeoForge.EVENT_BUS.register(OceanSpawnLocator.class);
     }
 
     private void registerConfigs(ModContainer container) {

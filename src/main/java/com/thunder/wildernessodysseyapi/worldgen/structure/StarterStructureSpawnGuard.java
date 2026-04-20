@@ -81,6 +81,11 @@ public final class StarterStructureSpawnGuard {
         return false;
     }
 
+    public static boolean hasPlacedBunker(ServerLevel level) {
+        List<SpawnDenyZone> zones = ZONES.get(level.dimension());
+        return zones != null && !zones.isEmpty();
+    }
+
     private record SpawnDenyZone(AABB bounds) {
         boolean contains(BlockPos pos) {
             return bounds.contains(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D);
