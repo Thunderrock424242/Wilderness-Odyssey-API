@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerVertexConsumer;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.client.renderer.block.LiquidBlockRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;
@@ -11,6 +13,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
@@ -48,5 +51,25 @@ public class GerstnerWaveRenderMixin {
             GerstnerWaveAnimator.update();
             lastUpdateNanos = now;
         }
+    }
+
+    @ModifyVariable(
+        method = "tesselate",
+        at = @At("HEAD"),
+        argsOnly = true,
+        index = 3
+    )
+    private VertexConsumer wrapWaterVertexConsumer(VertexConsumer originalConsumer,
+                                                   BlockAndTintGetter level,
+                                                   BlockPos pos,
+                                                   VertexConsumer consumer,
+                                                   BlockState blockState,
+                                                   FluidState fluidState) {
+        if (!fluidState.is(Fluids.WATER) && !fluidState.is(Fluids.FLOWING_WATER)) {
+            return originalConsumer;
+        }
+
+        WaterBodyClassifier.WaterType waterType = WaterBodyClassifier.classify(level, pos);
+        return new GerstnerVertexConsumer(originalConsumer, pos.getX(), pos.getZ(), waterType);
     }
 }
