@@ -35,19 +35,19 @@ import java.util.Set;
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class SpawnBunkerPlacer {
     private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "bunker");
-    private static final int OCEAN_SEARCH_RADIUS = 128;
+    private static final int OCEAN_SEARCH_RADIUS = 256;
     private static final int OCEAN_SEARCH_STEP = 32;
-    private static final int MAX_ANCHOR_CANDIDATES = 64;
+    private static final int MAX_ANCHOR_CANDIDATES = 128;
     private static final int FAST_OCEAN_SAMPLE_OFFSET = 48;
     private static final int OCEAN_FALLBACK_SEARCH_STEP = 64;
-    private static final int OCEAN_REGION_RADIUS = 64;
-    private static final int OCEAN_REGION_STEP = 32;
+    private static final int OCEAN_REGION_RADIUS = 160;
+    private static final int OCEAN_REGION_STEP = 16;
     private static final int FOOTPRINT_SAMPLE_STEP = 4;
     private static final int MIN_OCEAN_WATER_DEPTH = 8;
     private static final int MAX_SEAFLOOR_VARIANCE = 18;
-    private static final int ISLAND_PLATFORM_PADDING = 10;
-    private static final int ISLAND_SHORE_RADIUS_PADDING = 24;
-    private static final int ISLAND_SLOPE_DEPTH = 7;
+    private static final int ISLAND_PLATFORM_PADDING = 30;
+    private static final int ISLAND_SHORE_RADIUS_PADDING = 48;
+    private static final int ISLAND_SLOPE_DEPTH = 4;
     private static final Set<ResourceKey<Biome>> BLACKLISTED_OCEAN_BIOMES = Set.of(
             Biomes.RIVER,
             Biomes.FROZEN_RIVER,
