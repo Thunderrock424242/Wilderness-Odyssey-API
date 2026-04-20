@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
@@ -15,7 +16,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  *
  * 1 Minecraft client tick = 1/20 second = 0.05s
  */
-@EventBusSubscriber(modid = "wildernessodysseyapi")
+@EventBusSubscriber(modid = "wildernessodysseyapi", value = Dist.CLIENT)
 public class ClientTickHandler {
 
     private static final float CLIENT_TICK_DELTA = 0.05f; // 20 TPS
