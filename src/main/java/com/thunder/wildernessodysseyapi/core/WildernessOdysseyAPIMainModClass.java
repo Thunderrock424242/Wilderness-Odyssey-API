@@ -10,6 +10,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.C
 import com.thunder.wildernessodysseyapi.command.*;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideWorldUpdater;
 import com.thunder.wildernessodysseyapi.watersystem.water.entity.BoatTiltStore;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
@@ -129,6 +130,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(EventTelemetryReporter.class);
         NeoForge.EVENT_BUS.register(TelemetryQueueProcessor.class);
         NeoForge.EVENT_BUS.register(LoreBookEvents.class);
+        NeoForge.EVENT_BUS.register(TideWorldUpdater.class);
     }
 
     private void registerConfigs(ModContainer container) {
