@@ -66,9 +66,6 @@ public final class SpawnBunkerPlacer {
         if (!level.dimension().equals(Level.OVERWORLD)) return;
         if (StructureConfig.DEBUG_DISABLE_STARTER_BUNKER.get()) return;
 
-        // Force spawn into ocean FIRST so resolveAnchor barely has to search
-        nudgeSpawnToOcean(level);
-
         BlockPos anchor = resolveAnchor(level);
         NBTStructurePlacer.PlacementResult result = placeBunker(level, anchor);
         if (result == null) {
@@ -77,28 +74,6 @@ public final class SpawnBunkerPlacer {
         }
         applySpawnData(level, result);
         event.setCanceled(true);
-    }
-
-    private static void nudgeSpawnToOcean(ServerLevel level) {
-        BlockPos current = level.getSharedSpawnPos();
-        // Check if we're already in ocean — if so, done
-        if (isOceanAt(level, current)) return;
-
-        // Spiral outward until we hit ocean
-        for (int radius = 64; radius <= 3000; radius += 64) {
-            for (int angle = 0; angle < 360; angle += 20) {
-                double rad = Math.toRadians(angle);
-                int x = current.getX() + (int)(Math.cos(rad) * radius);
-                int z = current.getZ() + (int)(Math.sin(rad) * radius);
-                BlockPos candidate = new BlockPos(x, level.getSeaLevel(), z);
-                if (isOceanAt(level, candidate)) {
-                    level.setDefaultSpawnPos(candidate, 0f);
-                    ModConstants.LOGGER.info("Nudged spawn to ocean at {}", candidate);
-                    return;
-                }
-            }
-        }
-        ModConstants.LOGGER.warn("Could not find ocean for spawn nudge — bunker search will run normally.");
     }
 
     private static boolean isOceanAt(ServerLevel level, BlockPos pos) {

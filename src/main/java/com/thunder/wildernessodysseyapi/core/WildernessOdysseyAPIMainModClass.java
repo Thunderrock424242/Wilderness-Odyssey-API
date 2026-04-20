@@ -40,6 +40,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.*;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.particle.WildernessParticleRegistry;
 
+import com.thunder.wildernessodysseyapi.worldgen.spawn.OceanSpawnLocator;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -131,6 +132,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(TelemetryQueueProcessor.class);
         NeoForge.EVENT_BUS.register(LoreBookEvents.class);
         NeoForge.EVENT_BUS.register(TideWorldUpdater.class);
+        NeoForge.EVENT_BUS.register(OceanSpawnLocator.class);
     }
 
     private void registerConfigs(ModContainer container) {
