@@ -36,6 +36,7 @@ import com.thunder.wildernessodysseyapi.ai.AI_story.AIChatListener;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.rules.GameRulesListManager;
+import com.thunder.wildernessodysseyapi.ModPackPatches.server.ServerPropertiesTemplateManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.*;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.particle.WildernessParticleRegistry;
@@ -185,6 +186,7 @@ public class WildernessOdysseyAPIMainModClass {
     public void onServerStarting(ServerStartingEvent event) {
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
+        ServerPropertiesTemplateManager.ensureManagedServerProperties(event.getServer());
         GameRulesListManager.ensureRulesFileExists(event.getServer());
         GameRulesListManager.applyConfiguredRules(event.getServer());
         ModpackStructureRegistry.loadAll();
