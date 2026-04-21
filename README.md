@@ -122,6 +122,19 @@ Loot tables defined inside the structure templates work the same way as vanilla
 NBT structures. The scanner now reads loot table references directly from the
 template data so datapacks can supply their own chest contents.
 
+Managed server.properties template
+--------------------------
+The mod now maintains `config/wildernessodysseyapi/server.properties` as a pack-shippable template and also mirrors a world-local copy at `<world>/server.properties.wildernessodyssey`.
+
+- On first dedicated-server boot, the global managed file is created from bundled defaults.
+- A world-local template is created from the global template (or current live file if needed).
+- On startup, the world-local template is preferred and synced into the live root `server.properties`, with a timestamped backup of the previous live file.
+- If the bundled template in the mod jar changes after an update, managed global/world templates are automatically replaced so new defaults switch over.
+- This means the managed settings can travel with the world folder when moving that world to another server.
+- Synced values still apply on the next restart because Minecraft reads `server.properties` before mod startup.
+
+Ship your own defaults with `config/wildernessodysseyapi/server.properties`, or distribute a preconfigured world containing `<world>/server.properties.wildernessodyssey`.
+
 World Generation Diagnostics
 --------------------------
 Use `/worldgenscan <radius>` to count nearby structures, features, and biomes and identify which mods add them.
