@@ -10,7 +10,6 @@
     "ChunkMapGenerationErrorMixin",
     "CreatePathsMixin",
     "DayNightCycleMixin",
-    "DedicatedServerPropertiesMixin",
     "EntityAccessor",
     "ForwardExtentCopyMixin",
     "LivingEntityMixin",
