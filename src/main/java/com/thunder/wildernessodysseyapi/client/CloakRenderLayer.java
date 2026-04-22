@@ -60,7 +60,6 @@ public class CloakRenderLayer extends RenderLayer<AbstractClientPlayer, PlayerMo
         }
 
         return CloakItem.isHoldingCloak(player)
-                && CloakItem.hasCompassLink(player)
-                && CloakItem.hasCloakChip(player);
+                && player.isShiftKeyDown();
     }
 }

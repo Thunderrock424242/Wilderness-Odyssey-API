@@ -18,19 +18,53 @@ public final class CloakTickHandler {
             return;
         }
 
-        boolean hasChip = CloakItem.hasCloakChip(player);
-        boolean hasCompass = CloakItem.hasCompassLink(player);
-
-        if (!hasChip || !hasCompass) {
+        if (!CloakItem.isHoldingCloak(player)) {
             if (CloakState.isCloaked(player)) {
                 CloakState.setCloaked(player, false);
                 CloakState.clearCloak(player);
             }
+            CloakState.setHoldingBreath(player, false);
             return;
         }
 
-        if (CloakState.isCloaked(player)) {
+        boolean holdingBreath = player.isShiftKeyDown();
+        boolean wasHoldingBreath = CloakState.isHoldingBreath(player);
+        int maxBreath = CloakState.getCurrentMaxBreath(player);
+
+        if (holdingBreath && !wasHoldingBreath) {
+            CloakState.incrementBreathPenalty(player);
+            maxBreath = CloakState.getCurrentMaxBreath(player);
+            if (player.getAirSupply() > maxBreath) {
+                player.setAirSupply(maxBreath);
+            }
+        }
+
+        CloakState.setHoldingBreath(player, holdingBreath);
+
+        if (!holdingBreath) {
+            if (CloakState.isCloaked(player)) {
+                CloakState.setCloaked(player, false);
+                CloakState.clearCloak(player);
+            }
+            if (player.getAirSupply() < maxBreath) {
+                player.setAirSupply(Math.min(maxBreath, player.getAirSupply() + 2));
+            }
+            return;
+        }
+
+        if (player.getAirSupply() <= 0) {
+            CloakState.setCloaked(player, false);
+            CloakState.clearCloak(player);
+            return;
+        }
+
+        if (!CloakState.isCloaked(player)) {
+            CloakState.setCloaked(player, true);
+            CloakState.applyCloak(player);
+        } else {
             CloakState.refreshIfNeeded(player);
         }
+
+        player.setAirSupply(Math.max(0, player.getAirSupply() - 2));
     }
 }

@@ -13,11 +13,7 @@ import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
-import com.thunder.wildernessodysseyapi.item.cloak.CloakItem;
-import com.thunder.wildernessodysseyapi.item.ModItems;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
 
 /**
  * Player render layer responsible for drawing the neural frame model and texture.
@@ -58,23 +54,5 @@ public class NeuralFrameRenderLayer extends RenderLayer<AbstractClientPlayer, Pl
         model.renderToBuffer(poseStack, vertexConsumer, packedLight, OverlayTexture.NO_OVERLAY, 0xFFFFFFFF);
         poseStack.popPose();
 
-        if (CloakItem.hasCloakChip(player) && CurioRenderConfig.RENDER_CHIP_SET.get()) {
-            ItemStack chipStack = new ItemStack(ModItems.CLOAK_CHIP.get());
-            poseStack.pushPose();
-            getParentModel().head.translateAndRotate(poseStack);
-            poseStack.translate(0.35F, -0.2F, 0.25F);
-            poseStack.scale(0.35F, 0.35F, 0.35F);
-            Minecraft.getInstance().getItemRenderer().renderStatic(
-                    chipStack,
-                    ItemDisplayContext.HEAD,
-                    packedLight,
-                    OverlayTexture.NO_OVERLAY,
-                    poseStack,
-                    buffer,
-                    player.level(),
-                    player.getId()
-            );
-            poseStack.popPose();
-        }
     }
 }
