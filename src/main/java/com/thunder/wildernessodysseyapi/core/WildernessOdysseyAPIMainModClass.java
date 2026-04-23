@@ -147,7 +147,6 @@ public class WildernessOdysseyAPIMainModClass {
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TrueDarknessConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-true-darkness-client.toml");
 
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, CloakChipConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-cloak-chip-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PlayerTelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-telemetry-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, EventTelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-event-telemetry-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-telemetry-master-server.toml");

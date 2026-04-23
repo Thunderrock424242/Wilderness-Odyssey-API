@@ -37,9 +37,9 @@ public final class ServerPropertiesTemplateManager {
             return;
         }
 
-        Path liveFile = server.getFile("server.properties").toPath();
-        Path globalManagedFile = server.getFile("config/" + ModConstants.MOD_ID + "/server.properties").toPath();
-        Path hashStateFile = server.getFile("config/" + ModConstants.MOD_ID + "/" + BUNDLED_HASH_STATE).toPath();
+        Path liveFile = server.getFile("server.properties");
+        Path globalManagedFile = server.getFile("config/" + ModConstants.MOD_ID + "/server.properties");
+        Path hashStateFile = server.getFile("config/" + ModConstants.MOD_ID + "/" + BUNDLED_HASH_STATE);
         Path worldManagedFile = server.getWorldPath(LevelResource.ROOT).resolve(WORLD_TEMPLATE_FILE);
 
         try {
