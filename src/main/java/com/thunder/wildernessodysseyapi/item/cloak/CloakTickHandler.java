@@ -46,7 +46,7 @@ public final class CloakTickHandler {
                 CloakState.setCloaked(player, false);
                 CloakState.clearCloak(player);
             }
-            if (player.getAirSupply() < maxBreath) {
+            if (!player.isUnderWater() && player.getAirSupply() < maxBreath) {
                 player.setAirSupply(Math.min(maxBreath, player.getAirSupply() + 2));
             }
             return;
@@ -65,6 +65,7 @@ public final class CloakTickHandler {
             CloakState.refreshIfNeeded(player);
         }
 
-        player.setAirSupply(Math.max(0, player.getAirSupply() - 2));
+        int cloakAirDrainPerTick = player.isUnderWater() ? 2 : 6;
+        player.setAirSupply(Math.max(0, player.getAirSupply() - cloakAirDrainPerTick));
     }
 }
