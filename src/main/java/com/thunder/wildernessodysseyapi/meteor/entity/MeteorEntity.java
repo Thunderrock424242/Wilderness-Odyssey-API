@@ -165,8 +165,9 @@ public class MeteorEntity extends Entity {
                 20, 1.0, 0.5, 1.0, 0.1);
 
         // Impact sound — use explosion + blaze sound layered
+        // In 1.21.1 SoundEvents fields are Holder<SoundEvent>, unwrap with .value()
         level.playSound(null, impactPos,
-                SoundEvents.GENERIC_EXPLODE,
+                SoundEvents.GENERIC_EXPLODE.value(),
                 SoundSource.BLOCKS, 5.0f, 0.6f + level.random.nextFloat() * 0.3f);
         level.playSound(null, impactPos,
                 SoundEvents.BLAZE_HURT,
