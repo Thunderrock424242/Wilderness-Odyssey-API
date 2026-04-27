@@ -43,12 +43,15 @@ import com.thunder.wildernessodysseyapi.watersystem.water.particle.WildernessPar
 
 import com.thunder.wildernessodysseyapi.worldgen.spawn.OceanSpawnLocator;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.level.levelgen.feature.Feature;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -68,6 +71,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadHandler;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -81,6 +86,20 @@ public class WildernessOdysseyAPIMainModClass {
     private static final String CONFIG_FOLDER = ModConstants.MOD_ID + "/";
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
     private final GlobalChatManager globalChatManager = GlobalChatManager.getInstance();
+
+    // ---- DeferredRegisters ----
+    public static final DeferredRegister<MobEffect> MOB_EFFECTS =
+            DeferredRegister.create(Registries.MOB_EFFECT, MOD_ID);
+
+    public static final DeferredRegister<Feature<?>> FEATURES =
+            DeferredRegister.create(Registries.FEATURE, MOD_ID);
+
+    // ---- Registered objects ----
+    public static final DeferredHolder<MobEffect, RadiationEffect> RADIATION_EFFECT =
+            MOB_EFFECTS.register("radiation", RadiationEffect::new);
+
+    public static final DeferredHolder<Feature<?>, MeteorFeature> METEOR_IMPACT_FEATURE =
+            FEATURES.register("meteor_impact", MeteorFeature::new);
 
     private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader, IPayloadHandler<T> handler) {}
 
@@ -102,8 +121,16 @@ public class WildernessOdysseyAPIMainModClass {
         // 4. Configs
         registerConfigs(container);
 
+        // Register deferred registers to the mod event bus
+        MOB_EFFECTS.register(modEventBus);
+        FEATURES.register(modEventBus);
+
+        // Register server tick event for radiation zone checks
+        RadiationTickHandler.register();
+
         DonationReminderConfig.validateVersion();
     }
+
 
     // =========================================
     // REGISTRATION HELPERS

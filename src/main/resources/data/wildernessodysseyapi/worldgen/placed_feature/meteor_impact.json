@@ -1,0 +1,19 @@
+{
+  "feature": "meteormod:meteor_impact",
+  "placement": [
+    {
+      "type": "minecraft:rarity_filter",
+      "chance": 800
+    },
+    {
+      "type": "minecraft:in_square"
+    },
+    {
+      "type": "minecraft:heightmap",
+      "heightmap": "WORLD_SURFACE_WG"
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}
