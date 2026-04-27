@@ -1,6 +1,6 @@
 {
   "type": "neoforge:add_features",
   "biomes": "#minecraft:is_overworld",
-  "features": "meteormod:meteor_impact",
+  "features": "wildernessodysseyapi:meteor_impact",
   "step": "surface_structures"
 }
