@@ -9,7 +9,6 @@ import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.AttributeMap;
 
 public class RadiationEffect extends MobEffect {
 
@@ -79,8 +78,8 @@ public class RadiationEffect extends MobEffect {
     }
 
     @Override
-    public void onEffectAdded(LivingEntity entity, AttributeMap attributes) {
-        super.onEffectAdded(entity, attributes);
+    public void onEffectAdded(LivingEntity entity, int amplifier) {
+        super.onEffectAdded(entity, amplifier);
         if (entity.level() instanceof ServerLevel serverLevel) {
             serverLevel.playSound(
                 null,

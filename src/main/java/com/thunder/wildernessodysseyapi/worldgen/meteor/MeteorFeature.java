@@ -364,6 +364,11 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
     // =========================================================
     //  Helpers
     // =========================================================
+    private BlockPos snapToSurface(WorldGenLevel world, BlockPos pos) {
+        int y = getSurfaceY(world, pos.getX(), pos.getZ());
+        return new BlockPos(pos.getX(), y, pos.getZ());
+    }
+
     private int getSurfaceY(WorldGenLevel world, int x, int z) {
         int y = world.getMaxBuildHeight() - 1;
         while (y > world.getMinBuildHeight() && world.getBlockState(new BlockPos(x, y, z)).isAir()) {

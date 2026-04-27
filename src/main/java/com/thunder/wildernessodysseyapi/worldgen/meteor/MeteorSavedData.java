@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.worldgen.meteor;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -31,8 +32,7 @@ public class MeteorSavedData extends SavedData {
         return level.getDataStorage().computeIfAbsent(
             new Factory<>(
                 MeteorSavedData::new,
-                MeteorSavedData::load,
-                null
+                MeteorSavedData::load
             ),
             DATA_NAME
         );
@@ -40,7 +40,7 @@ public class MeteorSavedData extends SavedData {
 
     // ---- NBT ----
 
-    private static MeteorSavedData load(CompoundTag nbt) {
+    private static MeteorSavedData load(CompoundTag nbt, HolderLookup.Provider registries) {
         MeteorSavedData data = new MeteorSavedData();
         ListTag list = nbt.getList("meteors", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
@@ -56,7 +56,7 @@ public class MeteorSavedData extends SavedData {
     }
 
     @Override
-    public CompoundTag save(CompoundTag nbt) {
+    public CompoundTag save(CompoundTag nbt, HolderLookup.Provider registries) {
         ListTag list = new ListTag();
         for (MeteorRecord m : meteors) {
             CompoundTag entry = new CompoundTag();
