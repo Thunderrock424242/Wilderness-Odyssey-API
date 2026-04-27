@@ -27,9 +27,11 @@ import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.entity.ModEntities;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
+import com.thunder.wildernessodysseyapi.item.cloak.CloakState;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootConditions;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootFunctions;
+import com.thunder.wildernessodysseyapi.network.CloakInputPayload;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import com.thunder.wildernessodysseyapi.ai.AI_story.AIBackendCommand;
 import com.thunder.wildernessodysseyapi.ai.AI_story.AIChatListener;
@@ -141,7 +143,6 @@ public class WildernessOdysseyAPIMainModClass {
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-async.toml");
 
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-donations-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, CurioRenderConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-curio-rendering-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TelemetryConsentConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-telemetry-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DebugOverlayConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-debug-overlay-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TrueDarknessConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-true-darkness-client.toml");
@@ -169,6 +170,12 @@ public class WildernessOdysseyAPIMainModClass {
 
     private void registerPayloads(final RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
+        registrar.playToServer(CloakInputPayload.TYPE, CloakInputPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer serverPlayer) {
+                        CloakState.setHoldingBreath(serverPlayer, payload.altDown());
+                    }
+                }));
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {

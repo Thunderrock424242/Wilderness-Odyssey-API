@@ -1,8 +1,8 @@
 package com.thunder.wildernessodysseyapi.item;
 
 import com.thunder.wildernessodysseyapi.item.cloak.CloakItem;
+import com.thunder.wildernessodysseyapi.item.cloak.BreathingMaskItem;
 import com.thunder.wildernessodysseyapi.item.cloak.InhalerItem;
-import com.thunder.wildernessodysseyapi.item.neural.NeuralFrameItem;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -29,13 +29,13 @@ public class ModItems {
             "cloak_item",
             () -> new CloakItem(new Item.Properties().stacksTo(1))
     );
-    public static final DeferredItem<Item> NEURAL_FRAME = ITEMS.register(
-            "neural_frame",
-            () -> new NeuralFrameItem(new Item.Properties().stacksTo(1))
-    );
     public static final DeferredItem<Item> INHALER = ITEMS.register(
             "inhaler",
             () -> new InhalerItem(new Item.Properties().stacksTo(1).durability(50))
+    );
+    public static final DeferredItem<Item> BREATHING_MASK = ITEMS.register(
+            "breathing_mask",
+            () -> new BreathingMaskItem(new Item.Properties().stacksTo(1))
     );
 
     public static final DeferredItem<Item> MUSIC_DISC_DUSTWINDS = ITEMS.register(

@@ -11,8 +11,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
- * Handheld cloak focus item. The actual cloaking behavior is now controlled by
- * holding the breath key while this item is held.
+ * Legacy cloak focus item. Cloaking behavior is controlled by the cloak Alt key.
  */
 public class CloakItem extends Item {
     private static final int CLOAK_TOGGLE_COOLDOWN_TICKS = TickTokAPI.toTicks(1);

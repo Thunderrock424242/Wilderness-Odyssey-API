@@ -8,6 +8,7 @@ import net.minecraft.world.entity.player.Player;
 public final class CloakState {
     private static final String CLOAK_TAG = "wildernessodysseyapi_cloak_active";
     private static final String CLOAK_HOLDING_BREATH_TAG = "wildernessodysseyapi_cloak_holding_breath";
+    private static final String CLOAK_PREV_HOLDING_BREATH_TAG = "wildernessodysseyapi_cloak_prev_holding_breath";
     private static final String CLOAK_BREATH_PENALTY_TAG = "wildernessodysseyapi_cloak_breath_penalty";
     private static final int REFRESH_DURATION_TICKS = 220;
     private static final int BASE_BREATH_TICKS = 300;
@@ -32,6 +33,14 @@ public final class CloakState {
 
     public static void setHoldingBreath(Player player, boolean holdingBreath) {
         player.getPersistentData().putBoolean(CLOAK_HOLDING_BREATH_TAG, holdingBreath);
+    }
+
+    public static boolean wasHoldingBreath(Player player) {
+        return player.getPersistentData().getBoolean(CLOAK_PREV_HOLDING_BREATH_TAG);
+    }
+
+    public static void setWasHoldingBreath(Player player, boolean holdingBreath) {
+        player.getPersistentData().putBoolean(CLOAK_PREV_HOLDING_BREATH_TAG, holdingBreath);
     }
 
     public static int getBreathPenalty(Player player) {
