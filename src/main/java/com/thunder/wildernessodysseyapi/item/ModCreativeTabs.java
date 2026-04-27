@@ -34,7 +34,7 @@ public class ModCreativeTabs {
                         output.accept(CryoTubeBlock.CRYO_TUBE.get());
                         output.accept(ModItems.CLOAK_ITEM.get());
                         output.accept(ModItems.INHALER.get());
-                        output.accept(ModItems.NEURAL_FRAME.get());
+                        output.accept(ModItems.BREATHING_MASK.get());
                         output.accept(ModItems.MUSIC_DISC_DUSTWINDS.get());
                         output.accept(ModItems.MUSIC_DISC_STARFALL.get());
                     })

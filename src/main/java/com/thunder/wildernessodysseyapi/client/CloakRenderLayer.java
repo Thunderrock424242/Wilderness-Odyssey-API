@@ -1,7 +1,6 @@
 package com.thunder.wildernessodysseyapi.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.item.cloak.CloakItem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.PlayerModel;
@@ -14,7 +13,6 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FastColor;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.EquipmentSlot;
 
 /**
  * Player render layer that draws the cloak texture while cloaking conditions are met.
@@ -51,15 +49,6 @@ public class CloakRenderLayer extends RenderLayer<AbstractClientPlayer, PlayerMo
     }
 
     private static boolean shouldRenderCloak(AbstractClientPlayer player) {
-        if (!player.hasEffect(MobEffects.INVISIBILITY)) {
-            return false;
-        }
-
-        if (!player.getItemBySlot(EquipmentSlot.HEAD).isEmpty()) {
-            return false;
-        }
-
-        return CloakItem.isHoldingCloak(player)
-                && player.isShiftKeyDown();
+        return player.hasEffect(MobEffects.INVISIBILITY);
     }
 }

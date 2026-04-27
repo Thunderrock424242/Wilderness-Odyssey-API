@@ -1,9 +1,12 @@
 package com.thunder.wildernessodysseyapi.item.cloak;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.item.ModItems;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
@@ -18,17 +21,9 @@ public final class CloakTickHandler {
             return;
         }
 
-        if (!CloakItem.isHoldingCloak(player)) {
-            if (CloakState.isCloaked(player)) {
-                CloakState.setCloaked(player, false);
-                CloakState.clearCloak(player);
-            }
-            CloakState.setHoldingBreath(player, false);
-            return;
-        }
-
-        boolean holdingBreath = player.isShiftKeyDown();
-        boolean wasHoldingBreath = CloakState.isHoldingBreath(player);
+        boolean holdingBreath = CloakState.isHoldingBreath(player);
+        boolean wearingBreathingMask = player.getItemBySlot(EquipmentSlot.HEAD).is(ModItems.BREATHING_MASK.get());
+        boolean wasHoldingBreath = CloakState.wasHoldingBreath(player);
         int maxBreath = CloakState.getCurrentMaxBreath(player);
 
         if (holdingBreath && !wasHoldingBreath) {
@@ -39,7 +34,7 @@ public final class CloakTickHandler {
             }
         }
 
-        CloakState.setHoldingBreath(player, holdingBreath);
+        CloakState.setWasHoldingBreath(player, holdingBreath);
 
         if (!holdingBreath) {
             if (CloakState.isCloaked(player)) {
@@ -52,7 +47,7 @@ public final class CloakTickHandler {
             return;
         }
 
-        if (player.getAirSupply() <= 0) {
+        if (!wearingBreathingMask && player.getAirSupply() <= 0) {
             CloakState.setCloaked(player, false);
             CloakState.clearCloak(player);
             return;
@@ -65,7 +60,20 @@ public final class CloakTickHandler {
             CloakState.refreshIfNeeded(player);
         }
 
-        int cloakAirDrainPerTick = player.isUnderWater() ? 2 : 6;
-        player.setAirSupply(Math.max(0, player.getAirSupply() - cloakAirDrainPerTick));
+        if (!wearingBreathingMask) {
+            int cloakAirDrainPerTick = player.isUnderWater() ? 2 : 6;
+            player.setAirSupply(Math.max(0, player.getAirSupply() - cloakAirDrainPerTick));
+        }
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        Player player = event.getEntity();
+        CloakState.setHoldingBreath(player, false);
+        CloakState.setWasHoldingBreath(player, false);
+        if (CloakState.isCloaked(player)) {
+            CloakState.setCloaked(player, false);
+            CloakState.clearCloak(player);
+        }
     }
 }
