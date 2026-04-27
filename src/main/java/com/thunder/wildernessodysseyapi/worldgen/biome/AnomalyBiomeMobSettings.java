@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.worldgen.biome;
 
-import com.thunder.wildernessodysseyapi.entity.ModEntities;
+import com.thunder.wildernessodysseyapi.core.ModEntities;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.MobSpawnSettings;

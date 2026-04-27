@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.weather;
 
 import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.entity.ModEntities;
+import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.entity.PurpleStormMonsterEntity;
 import com.thunder.wildernessodysseyapi.worldgen.biome.ModBiomes;
 import net.minecraft.core.BlockPos;

@@ -27,7 +27,6 @@ import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.config.*;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
-import com.thunder.wildernessodysseyapi.entity.ModEntities;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
 import com.thunder.wildernessodysseyapi.item.cloak.CloakState;
@@ -144,8 +143,7 @@ public class WildernessOdysseyAPIMainModClass {
         ModProcessors.PROCESSORS.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         ModAttachments.ATTACHMENTS.register(modEventBus);
-        ModEntities.ENTITY_TYPES.register(modEventBus);
-        com.thunder.wildernessodysseyapi.core.ModEntities.register(modEventBus);
+        ModEntities.register(modEventBus);
         ModLootFunctions.LOOT_FUNCTIONS.register(modEventBus);
         ModLootConditions.LOOT_CONDITIONS.register(modEventBus);
 
