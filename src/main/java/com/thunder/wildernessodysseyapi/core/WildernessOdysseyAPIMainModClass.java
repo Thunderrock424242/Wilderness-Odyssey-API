@@ -8,6 +8,8 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.M
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ConfigAuditCommand;
 import com.thunder.wildernessodysseyapi.command.*;
+import com.thunder.wildernessodysseyapi.effect.RadiationEffect;
+import com.thunder.wildernessodysseyapi.effect.RadiationTickHandler;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideWorldUpdater;
@@ -16,6 +18,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManag
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.worldgen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
+import com.thunder.wildernessodysseyapi.worldgen.meteor.MeteorFeature;
 import com.thunder.wildernessodysseyapi.worldgen.processor.ModProcessors;
 import com.thunder.wildernessodysseyapi.worldgen.biome.BiomeCompatibilityBootstrap;
 import com.thunder.wildernessodysseyapi.worldgen.modpack.ModpackStructureRegistry;
@@ -77,13 +80,12 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
-import static com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.*;
 
-@Mod(ModConstants.MOD_ID)
+@Mod(MOD_ID)
 public class WildernessOdysseyAPIMainModClass {
 
-    private static final String CONFIG_FOLDER = ModConstants.MOD_ID + "/";
+    private static final String CONFIG_FOLDER = MOD_ID + "/";
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
     private final GlobalChatManager globalChatManager = GlobalChatManager.getInstance();
 
