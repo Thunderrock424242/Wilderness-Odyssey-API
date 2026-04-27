@@ -145,6 +145,7 @@ public class WildernessOdysseyAPIMainModClass {
         ModCreativeTabs.register(modEventBus);
         ModAttachments.ATTACHMENTS.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);
+        com.thunder.wildernessodysseyapi.core.ModEntities.register(modEventBus);
         ModLootFunctions.LOOT_FUNCTIONS.register(modEventBus);
         ModLootConditions.LOOT_CONDITIONS.register(modEventBus);
 
