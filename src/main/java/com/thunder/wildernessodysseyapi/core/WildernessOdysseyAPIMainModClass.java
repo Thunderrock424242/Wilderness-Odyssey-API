@@ -34,6 +34,7 @@ import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootConditions;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootFunctions;
 import com.thunder.wildernessodysseyapi.network.CloakInputPayload;
+import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import com.thunder.wildernessodysseyapi.ai.AI_story.AIBackendCommand;
 import com.thunder.wildernessodysseyapi.ai.AI_story.AIChatListener;
@@ -51,6 +52,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.effect.MobEffect;
@@ -180,6 +182,7 @@ public class WildernessOdysseyAPIMainModClass {
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, EventTelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-event-telemetry-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-telemetry-master-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, FeedbackConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-feedback-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, RiftfallConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-riftfall-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, OwnershipConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-ownership.toml");
     }
 
@@ -238,6 +241,9 @@ public class WildernessOdysseyAPIMainModClass {
         // Phase 1 Fix: Flushes the async queue on the main thread safely
         if (event.hasTime() && event.getServer() != null) {
             AsyncTaskManager.drainMainThreadQueue(event.getServer());
+            for (ServerLevel level : event.getServer().getAllLevels()) {
+                RiftfallSystem.tick(level);
+            }
         }
     }
 
