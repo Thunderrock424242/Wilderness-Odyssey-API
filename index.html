@@ -4,6 +4,29 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Wilderness Odyssey — The World Reborn</title>
+<!-- ═══ OPEN GRAPH — controls Discord / Twitter / iMessage embeds ═══
+     Update these if you change the site URL or want a new preview image.
+     For the image, upload a screenshot to your repo and point og:image at it.
+     Recommended image size: 1200 x 630px
+════════════════════════════════════════════════════════════════════ -->
+
+<!-- General -->
+<meta name="description" content="Awaken 50 years after a devastating meteor strike. Explore a breathtaking post-apocalyptic world reshaped by nature and anomaly energy. A Minecraft modpack by Thunderrock424242.">
+<meta name="theme-color" content="#e8a020">
+
+<!-- Open Graph (Discord, Facebook, iMessage, Slack, etc.) -->
+<meta property="og:type"        content="website">
+<meta property="og:url"         content="https://thunderrock424242.github.io/Wilderness-Odyssey-API">
+<meta property="og:title"       content="Wilderness Odyssey — The World Reborn">
+<meta property="og:description" content="Awaken 50 years after a devastating meteor strike. Explore a breathtaking post-apocalyptic world reshaped by nature and anomaly energy. A Minecraft modpack by Thunderrock424242.">
+<meta property="og:image"       content="https://thunderrock424242.github.io/Wilderness-Odyssey-API/preview.png">
+
+<!-- Twitter / X card -->
+<meta name="twitter:card"        content="summary_large_image">
+<meta name="twitter:title"       content="Wilderness Odyssey — The World Reborn">
+<meta name="twitter:description" content="Awaken 50 years after a devastating meteor strike. Explore a breathtaking post-apocalyptic world reshaped by nature and anomaly energy.">
+<meta name="twitter:image"       content="https://thunderrock424242.github.io/Wilderness-Odyssey-API/preview.png">
+
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -505,6 +528,9 @@
   </div>
 </footer>
 
-<script src="script.js"></script>
+<!-- config.js must load first — terminal.js and main.js depend on WO_CONFIG -->
+<script src="js/config.js"></script>
+<script src="js/terminal.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>
