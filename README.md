@@ -106,3 +106,15 @@ World Generation Diagnostics
 Use `/worldgenscan <radius>` to count nearby structures, features, and biomes and identify which mods add them.
 
 For a roadmap on chunk lifecycle, async I/O, and networking improvements, see `docs/chunk-system-improvements.md`.
+
+Website (GitHub Pages)
+----------------------
+A starter website for the modpack hub is available in `website/`.
+
+Quick publish steps:
+1. Push this branch to GitHub.
+2. In repository settings, open **Pages**.
+3. Set source to your branch and `/website` folder (or copy files to root on a `gh-pages` branch).
+4. Replace placeholder links and sample content in `website/index.html`, `website/description.html`, `website/gallery.html`, `website/updates.html`, and `website/version-checker.html`.
+
+Tip: update the CurseForge and Discord badge links in `website/index.html` to your real project pages.
