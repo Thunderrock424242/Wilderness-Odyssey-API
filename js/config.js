@@ -31,8 +31,8 @@ const WO_CONFIG = {
   /* ── WEBSITE INFO ─────────────────────────────────────
      Update these every time you change the site          */
   website: {
-    version: "3.0.0",
-    updated: "2025-11-14",
+    version: "0.5.0",
+    updated: "5-9-2026",
     author:  "Thunderrock424242",
   },
 
@@ -61,37 +61,6 @@ const WO_CONFIG = {
         "Optimised SPH fluid simulation — ~18% performance improvement",
       ]
     },
-    {
-      version: "0.4.1-alpha",
-      date:    "2025-10-28",
-      entries: [
-        "Hotfix: Crater Stalker spawn rate reduced (was overwhelming early-game players)",
-        "Fixed bunker door rendering on Intel integrated graphics",
-        "Minor terrain generation corrections in river delta biomes",
-      ]
-    },
-    {
-      version: "0.4.0-alpha",
-      date:    "2025-10-15",
-      entries: [
-        "Major update: Water physics v2 — Gerstner wave system replaced with full SPH simulation",
-        "Ocean tides now respond to in-game moon cycle",
-        "Added boat physics with buoyancy model",
-        "First dimension prototype: The Verdant Beyond (experimental)",
-        "5 new passive creatures added to lush biomes",
-      ]
-    },
-    {
-      version: "0.3.0-alpha",
-      date:    "2025-09-02",
-      entries: [
-        "Initial public alpha release on CurseForge",
-        "Core biome system: 8 biomes implemented",
-        "Basic creature roster: 12 species",
-        "Bunker spawn system and intro sequence",
-        "World generation overhaul — meteor impact crater as world centrepoint",
-      ]
-    },
   ],
 
   /* ── WEBSITE CHANGELOG ────────────────────────────────
@@ -100,8 +69,8 @@ const WO_CONFIG = {
   ─────────────────────────────────────────────────────── */
   websiteLog: [
     {
-      version: "3.0.0",
-      date:    "2025-11-14",
+      version: "0.5.0",
+      date:    "5-9-2026",
       entries: [
         "Full cinematic redesign — movie trailer aesthetic",
         "Interactive Bunker OS terminal with command system",
@@ -112,23 +81,7 @@ const WO_CONFIG = {
         "Split into index.html + style.css + js/config.js + js/terminal.js + js/main.js",
       ]
     },
-    {
-      version: "2.0.0",
-      date:    "2025-10-01",
-      entries: [
-        "Colour theme overhaul — amber/gold palette from logo",
-        "Blue wisp + orange ember particle system",
-        "Roadmap section with animated status indicators",
-      ]
-    },
-    {
-      version: "1.0.0",
-      date:    "2025-09-02",
-      entries: [
-        "Initial website launch",
-        "Basic hero, features, Discord, and CurseForge links",
-      ]
-    },
+    
   ],
 
 };
