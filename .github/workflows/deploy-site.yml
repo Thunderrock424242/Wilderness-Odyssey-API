@@ -1,7 +1,7 @@
-name: Deploy Website
+name: Deploy Wilderness Odyssey Website
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # manual trigger only
 
 permissions:
   contents: read
@@ -18,18 +18,19 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
+      - name: Checkout Website branch
+        uses: actions/checkout@v4     # fixed — v6 doesn't exist
+        with:
+          ref: Website                # explicitly targets your Website branch
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
       - name: Upload website artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
-          path: website
+          path: website               # correct — your files are in /website folder
 
       - name: Deploy to GitHub Pages
         id: deployment
