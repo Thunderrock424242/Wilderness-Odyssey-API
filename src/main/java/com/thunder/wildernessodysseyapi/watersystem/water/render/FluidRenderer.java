@@ -126,7 +126,7 @@ public class FluidRenderer {
     // -------------------------------------------------------------------------
 
     private static void drawDroplets(SPHSimulator sim, PoseStack poseStack) {
-        var droplets = sim.particles.stream()
+        var droplets = sim.getRenderParticles().stream()
                 .filter(p -> p.isDroplet)
                 .toList();
 

@@ -202,7 +202,7 @@ public final class RiftfallSystem {
         if ((level.getGameTime() % RiftfallConfig.CONFIG.riftbornSpawnIntervalTicks()) != 0) return;
 
         EntityType<PurpleStormMonsterEntity> type = ModEntities.PURPLE_STORM_MONSTER.get();
-        int globalCount = level.getEntities(type, new AABB(-30_000_000, level.getMinBuildHeight(), -30_000_000, 30_000_000, level.getMaxBuildHeight(), 30_000_000)).size();
+        int globalCount = level.getEntities(type, new AABB(-30_000_000, level.getMinBuildHeight(), -30_000_000, 30_000_000, level.getMaxBuildHeight(), 30_000_000), PurpleStormMonsterEntity::isAlive).size();
         if (globalCount >= RiftfallConfig.CONFIG.maxRiftbornGlobal()) return;
 
         int budget = stage == RiftfallStage.METEOR_SURGE
@@ -213,7 +213,7 @@ public final class RiftfallSystem {
         for (ServerPlayer player : level.players()) {
             if (budget <= 0) break;
             if (!playerCanSeeSky(level, player)) continue;
-            int nearby = level.getEntities(type, new AABB(player.blockPosition()).inflate(32)).size();
+            int nearby = level.getEntities(type, new AABB(player.blockPosition()).inflate(32), PurpleStormMonsterEntity::isAlive).size();
             if (nearby >= RiftfallConfig.CONFIG.maxRiftbornPerPlayer()) continue;
 
             BlockPos spawn = findGroundNear(level, player.blockPosition(), 18, 36);

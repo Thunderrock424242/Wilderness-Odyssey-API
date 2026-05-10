@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
-import com.thunder.wildernessodysseyapi.watersystem.water.particle.WildernessParticleRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.api.distmarker.Dist;
@@ -76,11 +75,5 @@ public class WaterEntryEventHandler {
             );
         }
 
-        // Also spawn the custom ripple particle
-        mc.level.addParticle(
-            WildernessParticleRegistry.RIPPLE.get(),
-            x, y, z,
-            0, 0, 0
-        );
     }
 }

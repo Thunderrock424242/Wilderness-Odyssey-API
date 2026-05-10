@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
-import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -19,11 +18,8 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 @EventBusSubscriber(modid = "wildernessodysseyapi", value = Dist.CLIENT)
 public class ClientTickHandler {
 
-    private static final float CLIENT_TICK_DELTA = 0.05f; // 20 TPS
-
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         GerstnerWaveAnimator.update();
-        SPHSimulationManager.get().tickAll(CLIENT_TICK_DELTA);
     }
 }

@@ -81,6 +81,13 @@ public class SPHSimulationManager {
             cb.run();
         }
 
+        if (!AsyncTaskManager.snapshot().enabled()) {
+            for (SPHSimulator sim : active) {
+                sim.tick(deltaTime);
+            }
+            return;
+        }
+
         // Dispatch all physics math to the background CPU pool.
         List<CompletableFuture<Boolean>> futures = new ArrayList<>();
         for (SPHSimulator sim : active) {

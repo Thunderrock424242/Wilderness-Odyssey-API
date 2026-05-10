@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -36,17 +36,17 @@ public abstract class BucketPlaceMixin {
     @Shadow @Final public Fluid content;
 
     // 2. Shadow the sound method so the game still plays the splash sound
-    @Shadow protected abstract void playEmptySound(@Nullable Player player, LevelAccessor level, BlockPos pos);
+    @Shadow protected abstract void playEmptySound(@Nullable LivingEntity entity, LevelAccessor level, BlockPos pos);
 
     /**
      * Inject into emptyContents. This is the method Vanilla uses right before a fluid block appears.
      */
     @Inject(
-            method = "emptyContents(Lnet/minecraft/world/entity/player/Player;Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/phys/BlockHitResult;Lnet/minecraft/world/item/ItemStack;)Z",
+            method = "emptyContents(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/phys/BlockHitResult;Lnet/minecraft/world/item/ItemStack;)Z",
             at = @At("HEAD"),
             cancellable = true
     )
-    private void onBucketEmpty(@Nullable Player player, Level level, BlockPos pos, @Nullable BlockHitResult result, @Nullable ItemStack container, CallbackInfoReturnable<Boolean> cir) {
+    private void onBucketEmpty(@Nullable LivingEntity entity, Level level, BlockPos pos, @Nullable BlockHitResult result, @Nullable ItemStack container, CallbackInfoReturnable<Boolean> cir) {
 
         // Only intercept if the bucket actually contains WATER
         if (this.content == Fluids.WATER) {
@@ -69,7 +69,7 @@ public abstract class BucketPlaceMixin {
             }
 
             // Play the vanilla pouring sound so it feels normal to the player
-            this.playEmptySound(player, level, pos);
+            this.playEmptySound(entity, level, pos);
 
             // CRITICAL: Cancel the original method!
             // This stops Vanilla from instantly placing a square water block over our simulation,

@@ -44,7 +44,6 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.rules.GameRulesListManage
 import com.thunder.wildernessodysseyapi.ModPackPatches.server.ServerPropertiesTemplateManager;
 import com.thunder.wildernessodysseyapi.ModPackPatches.telemetry.*;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
-import com.thunder.wildernessodysseyapi.watersystem.water.particle.WildernessParticleRegistry;
 
 import com.thunder.wildernessodysseyapi.worldgen.spawn.OceanSpawnLocator;
 import net.minecraft.commands.CommandSourceStack;
@@ -153,7 +152,6 @@ public class WildernessOdysseyAPIMainModClass {
         ModItems.register(modEventBus);
         ModSoundEvents.register(modEventBus);
         WildernessFluidRegistry.register(modEventBus);
-        WildernessParticleRegistry.register(modEventBus);
     }
 
     private void registerEventHandlers() {
