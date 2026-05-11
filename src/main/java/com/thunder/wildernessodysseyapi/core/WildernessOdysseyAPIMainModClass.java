@@ -35,6 +35,9 @@ import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootConditions;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootFunctions;
 import com.thunder.wildernessodysseyapi.network.CloakInputPayload;
 import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
+import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
+import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockEntities;
+import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import com.thunder.wildernessodysseyapi.ai.AI_story.AIBackendCommand;
 import com.thunder.wildernessodysseyapi.ai.AI_story.AIChatListener;
@@ -147,6 +150,8 @@ public class WildernessOdysseyAPIMainModClass {
         ModEntities.register(modEventBus);
         ModLootFunctions.LOOT_FUNCTIONS.register(modEventBus);
         ModLootConditions.LOOT_CONDITIONS.register(modEventBus);
+        TemporalRiftBlocks.register(modEventBus);
+        TemporalRiftBlockEntities.register(modEventBus);
 
         CryoTubeBlock.register(modEventBus);
         ModItems.register(modEventBus);
@@ -181,6 +186,7 @@ public class WildernessOdysseyAPIMainModClass {
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-telemetry-master-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, FeedbackConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-feedback-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, RiftfallConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-riftfall-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TemporalRiftConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-temporal-rift-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, OwnershipConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-ownership.toml");
     }
 
@@ -210,6 +216,7 @@ public class WildernessOdysseyAPIMainModClass {
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(CryoTubeBlock.CRYO_TUBE.get());
+            event.accept(TemporalRiftBlocks.TIME_CAPSULE.get());
         }
     }
 

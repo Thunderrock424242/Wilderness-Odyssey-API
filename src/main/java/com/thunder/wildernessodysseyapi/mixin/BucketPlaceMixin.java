@@ -50,27 +50,23 @@ public abstract class BucketPlaceMixin {
         // Only intercept if the bucket actually contains WATER
         if (content == Fluids.WATER) {
 
-            // Only run the heavy SPH simulation on the logical server to prevent desyncs
-            if (!level.isClientSide) {
+            SPHSimulationManager.get().createSimulation(
+                    pos.getX() + 0.5f,
+                    pos.getY() + 0.5f,
+                    pos.getZ() + 0.5f,
+                    level,
+                    settlePos -> {
+                        if (level.isClientSide) return;
 
-                // Trigger your threaded SPH Manager!
-                // Add 0.5f so the particles spawn exactly in the center of the block space
-                SPHSimulationManager.get().createSimulation(
-                        pos.getX() + 0.5f,
-                        pos.getY() + 0.5f,
-                        pos.getZ() + 0.5f,
-                        level,
-                        settlePos -> {
-                            BlockState state = level.getBlockState(settlePos);
-                            if (state.getBlock() instanceof LiquidBlockContainer liquidContainer
-                                    && liquidContainer.canPlaceLiquid(player, level, settlePos, state, Fluids.WATER)) {
-                                liquidContainer.placeLiquid(level, settlePos, state, Fluids.WATER.getSource(false));
-                            } else if (state.isAir() || state.canBeReplaced(Fluids.WATER) || state.is(Blocks.WATER)) {
-                                level.setBlock(settlePos, Blocks.WATER.defaultBlockState(), 3);
-                            }
+                        BlockState state = level.getBlockState(settlePos);
+                        if (state.getBlock() instanceof LiquidBlockContainer liquidContainer
+                                && liquidContainer.canPlaceLiquid(player, level, settlePos, state, Fluids.WATER)) {
+                            liquidContainer.placeLiquid(level, settlePos, state, Fluids.WATER.getSource(false));
+                        } else if (state.isAir() || state.canBeReplaced(Fluids.WATER) || state.is(Blocks.WATER)) {
+                            level.setBlock(settlePos, Blocks.WATER.defaultBlockState(), 3);
                         }
-                );
-            }
+                    }
+            );
 
             // Play the vanilla pouring sound so it feels normal to the player
             SoundEvent soundEvent = content.getFluidType().getSound(player, level, pos, SoundActions.BUCKET_EMPTY);

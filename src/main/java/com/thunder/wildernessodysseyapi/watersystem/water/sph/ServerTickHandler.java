@@ -18,6 +18,10 @@ public class ServerTickHandler {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        SPHSimulationManager.get().tickAll(SERVER_TICK_DELTA);
+        if (event.getServer() == null) return;
+
+        for (var level : event.getServer().getAllLevels()) {
+            SPHSimulationManager.get().tickLevel(level, SERVER_TICK_DELTA);
+        }
     }
 }

@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.item;
 
 import com.thunder.wildernessodysseyapi.worldgen.blocks.CryoTubeBlock;
+import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
@@ -32,6 +33,7 @@ public class ModCreativeTabs {
                     .icon(() -> new ItemStack(Items.AMETHYST_SHARD))
                     .displayItems((parameters, output) -> {
                         output.accept(CryoTubeBlock.CRYO_TUBE.get());
+                        output.accept(TemporalRiftBlocks.TIME_CAPSULE.get());
                         output.accept(ModItems.CLOAK_ITEM.get());
                         output.accept(ModItems.INHALER.get());
                         output.accept(ModItems.BREATHING_MASK.get());

@@ -51,15 +51,18 @@ public class FluidRenderer {
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
 
-        List<SPHSimulator> active = new ArrayList<>(SPHSimulationManager.get().getActive());
-        if (active.isEmpty()) {
-            meshMap.clear();
-            return;
-        }
-
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
         if (level == null) return;
+
+        List<SPHSimulator> active = new ArrayList<>(SPHSimulationManager.get().getActive(level));
+        if (active.isEmpty()) {
+            active = new ArrayList<>(SPHSimulationManager.get().getActive());
+            if (active.isEmpty()) {
+                meshMap.clear();
+                return;
+            }
+        }
 
         meshMap.keySet().retainAll(active);
 

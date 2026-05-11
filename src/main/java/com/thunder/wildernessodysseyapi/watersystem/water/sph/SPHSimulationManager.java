@@ -240,6 +240,21 @@ public class SPHSimulationManager {
         }
     }
 
+    public void tickLevel(BlockGetter level, float deltaTime) {
+        runPendingSettleCallbacks();
+
+        for (SPHSimulator sim : active) {
+            if (sim.getLevel() != level) {
+                continue;
+            }
+
+            sim.tick(deltaTime);
+            if (sim.particleCount() == 0) {
+                active.remove(sim);
+            }
+        }
+    }
+
     /**
      * Retrieves an unmodifiable view of all currently running simulations.
      * Mostly used by the rendering engine to loop through and draw particles.
@@ -248,6 +263,16 @@ public class SPHSimulationManager {
      */
     public List<SPHSimulator> getActive() {
         return Collections.unmodifiableList(active);
+    }
+
+    public List<SPHSimulator> getActive(BlockGetter level) {
+        List<SPHSimulator> result = new ArrayList<>();
+        for (SPHSimulator sim : active) {
+            if (sim.getLevel() == level) {
+                result.add(sim);
+            }
+        }
+        return Collections.unmodifiableList(result);
     }
 
     /**

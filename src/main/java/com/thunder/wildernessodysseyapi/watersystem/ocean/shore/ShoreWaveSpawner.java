@@ -27,6 +27,8 @@ import java.util.Random;
 @EventBusSubscriber(modid = "wildernessodysseyapi")
 public final class ShoreWaveSpawner {
 
+    private static final boolean ENABLED = false;
+
     private static final int SEA_LEVEL = 62;
     private static final int TICK_INTERVAL = 160;
     private static final int SCAN_RANGE = 18;
@@ -42,6 +44,7 @@ public final class ShoreWaveSpawner {
 
     @SubscribeEvent
     public static void onLevelTick(LevelTickEvent.Post event) {
+        if (!ENABLED) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         if (level.players().isEmpty()) return;
 
