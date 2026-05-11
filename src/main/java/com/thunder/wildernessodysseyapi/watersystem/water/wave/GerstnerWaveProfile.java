@@ -83,32 +83,32 @@ public class GerstnerWaveProfile {
     /** Large rolling ocean swells with secondary chop */
     public static final GerstnerWaveProfile OCEAN = new Builder(4)
         // Primary swell — large, slow
-        .wave(0, 0.22f, 0.55f, 0.9f,  0.85f,  0.53f,  0.55f)
+        .wave(0, 0.035f, 0.38f, 0.55f,  0.85f,  0.53f,  0.30f)
         // Secondary swell — different angle
-        .wave(1, 0.14f, 0.80f, 1.1f, -0.60f,  0.80f,  0.45f)
+        .wave(1, 0.024f, 0.56f, 0.72f, -0.60f,  0.80f,  0.24f)
         // Chop — short, fast
-        .wave(2, 0.06f, 1.50f, 2.0f,  0.50f, -0.87f,  0.30f)
+        .wave(2, 0.012f, 1.10f, 1.35f,  0.50f, -0.87f,  0.16f)
         // Cross-chop
-        .wave(3, 0.04f, 2.00f, 2.5f, -0.70f, -0.71f,  0.20f)
-        .entityPush(0.06f)
-        .boatBob(0.18f)
+        .wave(3, 0.008f, 1.55f, 1.70f, -0.70f, -0.71f,  0.12f)
+        .entityPush(0.018f)
+        .boatBob(0.055f)
         .build();
 
     /** Gentle directional river current with small ripples */
     public static final GerstnerWaveProfile RIVER = new Builder(3)
-        .wave(0, 0.055f, 1.20f, 1.8f,  1.00f,  0.00f,  0.20f)
-        .wave(1, 0.030f, 1.80f, 2.2f,  0.95f,  0.31f,  0.15f)
-        .wave(2, 0.015f, 2.50f, 3.0f,  0.98f, -0.20f,  0.10f)
-        .entityPush(0.018f)
-        .boatBob(0.04f)
+        .wave(0, 0.020f, 1.00f, 1.10f,  1.00f,  0.00f,  0.12f)
+        .wave(1, 0.012f, 1.50f, 1.35f,  0.95f,  0.31f,  0.10f)
+        .wave(2, 0.006f, 2.10f, 1.70f,  0.98f, -0.20f,  0.06f)
+        .entityPush(0.008f)
+        .boatBob(0.018f)
         .build();
 
     /** Very subtle surface texture for ponds */
     public static final GerstnerWaveProfile POND = new Builder(2)
-        .wave(0, 0.012f, 1.80f, 0.6f,  0.71f,  0.71f,  0.08f)
-        .wave(1, 0.008f, 2.40f, 0.8f, -0.71f,  0.71f,  0.05f)
-        .entityPush(0.003f)
-        .boatBob(0.008f)
+        .wave(0, 0.006f, 1.40f, 0.35f,  0.71f,  0.71f,  0.04f)
+        .wave(1, 0.004f, 2.00f, 0.45f, -0.71f,  0.71f,  0.03f)
+        .entityPush(0.001f)
+        .boatBob(0.003f)
         .build();
 
     // -------------------------------------------------------------------------

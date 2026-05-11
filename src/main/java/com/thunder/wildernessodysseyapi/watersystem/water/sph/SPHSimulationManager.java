@@ -101,13 +101,34 @@ public class SPHSimulationManager {
         return sim;
     }
 
+    public SPHSimulator createTransientSimulation(float x, float y, float z, BlockGetter level,
+                                                  int requestedCount, float impulseX, float impulseY, float impulseZ,
+                                                  int lifetimeTicks) {
+        runPendingSettleCallbacks();
+        removeEmptySimulations();
+
+        if (countTransientSimulations(level) >= SPHConstants.MAX_TRANSIENT_SHORE_SIMULATIONS) {
+            removeFirstTransientSimulation(level);
+        }
+
+        if (countTransientSimulations(level) >= SPHConstants.MAX_TRANSIENT_SHORE_SIMULATIONS) {
+            return null;
+        }
+
+        SPHSimulator sim = new SPHSimulator(level);
+        sim.setTransientLifetimeTicks(lifetimeTicks);
+        sim.spawnPulse(x, y, z, requestedCount, impulseX, impulseY, impulseZ);
+        active.add(sim);
+        return sim;
+    }
+
     private SPHSimulator findMergeTarget(float x, float y, float z, BlockGetter level, float radius) {
         float mergeRadius2 = radius * radius;
 
         SPHSimulator best = null;
         float bestDistance2 = mergeRadius2;
         for (SPHSimulator sim : active) {
-            if (sim.getLevel() != level || !sim.hasCapacity()) {
+            if (sim.isTransientSimulation() || sim.getLevel() != level || !sim.hasCapacity()) {
                 continue;
             }
 
@@ -125,7 +146,7 @@ public class SPHSimulationManager {
         SPHSimulator best = null;
         float bestDistance2 = Float.MAX_VALUE;
         for (SPHSimulator sim : active) {
-            if (sim.getLevel() != level || !sim.hasCapacity()) {
+            if (sim.isTransientSimulation() || sim.getLevel() != level || !sim.hasCapacity()) {
                 continue;
             }
 
@@ -142,7 +163,7 @@ public class SPHSimulationManager {
         SPHSimulator best = null;
         float bestDistance2 = Float.MAX_VALUE;
         for (SPHSimulator sim : active) {
-            if (sim.getLevel() != level) {
+            if (sim.isTransientSimulation() || sim.getLevel() != level) {
                 continue;
             }
 
@@ -158,9 +179,27 @@ public class SPHSimulationManager {
     private int countSimulations(BlockGetter level) {
         int count = 0;
         for (SPHSimulator sim : active) {
-            if (sim.getLevel() == level) count++;
+            if (!sim.isTransientSimulation() && sim.getLevel() == level) count++;
         }
         return count;
+    }
+
+    private int countTransientSimulations(BlockGetter level) {
+        int count = 0;
+        for (SPHSimulator sim : active) {
+            if (sim.isTransientSimulation() && sim.getLevel() == level) count++;
+        }
+        return count;
+    }
+
+    private boolean removeFirstTransientSimulation(BlockGetter level) {
+        for (SPHSimulator sim : active) {
+            if (sim.getLevel() == level && sim.isTransientSimulation()) {
+                active.remove(sim);
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean removeFirstSettledSimulation(BlockGetter level) {

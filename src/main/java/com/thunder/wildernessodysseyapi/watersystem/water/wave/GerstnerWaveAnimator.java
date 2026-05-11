@@ -53,7 +53,7 @@ public class GerstnerWaveAnimator {
         float tideContrib = (type == WaterBodyClassifier.WaterType.OCEAN)
                             ? clientTideOffset * 0.025f  // visual ripple only — real tide is server-side
                             : 0f;
-        return waveHeight + tideContrib;
+        return waveHeight + tideContrib * 0.4f;
     }
 
     /**

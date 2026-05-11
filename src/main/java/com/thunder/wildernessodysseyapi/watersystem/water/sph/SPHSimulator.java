@@ -44,6 +44,8 @@ public class SPHSimulator {
     private float centerX = 0.0f;
     private float centerY = 0.0f;
     private float centerZ = 0.0f;
+    private boolean transientSimulation = false;
+    private int remainingLifetimeTicks = -1;
 
     /**
      * Callback interface triggered when the fluid slows down enough to be converted
@@ -65,6 +67,12 @@ public class SPHSimulator {
     public float getCenterX()                        { return centerX; }
     public float getCenterY()                        { return centerY; }
     public float getCenterZ()                        { return centerZ; }
+    public boolean isTransientSimulation()           { return transientSimulation; }
+
+    public void setTransientLifetimeTicks(int ticks) {
+        transientSimulation = true;
+        remainingLifetimeTicks = Math.max(1, ticks);
+    }
 
     /**
      * Returns a thread-safe snapshot of the particle states.
@@ -132,6 +140,13 @@ public class SPHSimulator {
      * @param deltaTime The time elapsed since the last tick in seconds.
      */
     public void tick(float deltaTime) {
+        if (remainingLifetimeTicks > 0 && --remainingLifetimeTicks == 0) {
+            particles.clear();
+            settled = true;
+            updateRenderSnapshot();
+            return;
+        }
+
         if (settled) return;
         if (particles.isEmpty()) {
             settle(Collections.emptyList());

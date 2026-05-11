@@ -134,7 +134,13 @@ public final class SPHConstants {
     public static final int   OVERLOAD_PARTICLES_PER_BUCKET = 72;
 
     /** Small SPH pulse used for shoreline wave wash and tide surge visuals. */
-    public static final int   SHORE_WAVE_PARTICLES = 42;
+    public static final int   SHORE_WAVE_PARTICLES = 14;
+
+    /** Hard cap for automatic shore wash so bucket water keeps priority. */
+    public static final int   MAX_TRANSIENT_SHORE_SIMULATIONS = 4;
+
+    /** Lifetime for automatic shore wash pulses before they are removed. */
+    public static final int   SHORE_WAVE_LIFETIME_TICKS = 70;
 
     // -------------------------------------------------------------------------
     // Marching Cubes / mesh
