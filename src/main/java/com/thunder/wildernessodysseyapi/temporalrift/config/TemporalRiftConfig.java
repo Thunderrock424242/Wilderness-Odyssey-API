@@ -10,6 +10,11 @@ public final class TemporalRiftConfig {
     public static final ModConfigSpec.IntValue RIFT_INTERVAL_DAYS;
     public static final ModConfigSpec.IntValue RIFT_OPEN_DURATION_TICKS;
     public static final ModConfigSpec.IntValue RIFT_SPAWN_RADIUS;
+    public static final ModConfigSpec.BooleanValue ENABLE_RIFT_SINKHOLE;
+    public static final ModConfigSpec.IntValue RIFT_SINKHOLE_RADIUS;
+    public static final ModConfigSpec.IntValue RIFT_SINKHOLE_DEPTH;
+    public static final ModConfigSpec.BooleanValue ENABLE_RIFT_PULL_EFFECT;
+    public static final ModConfigSpec.BooleanValue ENABLE_RIFT_TERRAIN_AGING;
     public static final ModConfigSpec.IntValue TIME_CAPSULE_DELAY_DAYS;
     public static final ModConfigSpec.BooleanValue RETURN_ONLY_ACTIVE_RIFT;
     public static final ModConfigSpec.BooleanValue CHAT_BROADCASTS;
@@ -33,6 +38,26 @@ public final class TemporalRiftConfig {
         RIFT_SPAWN_RADIUS = BUILDER
                 .comment("Max block radius from world spawn where the rift can appear.")
                 .defineInRange("riftSpawnRadius", 64, 0, 10_000);
+
+        ENABLE_RIFT_SINKHOLE = BUILDER
+                .comment("If true, opening a rift carves a small sinkhole and places the rift in its center.")
+                .define("enableRiftSinkhole", true);
+
+        RIFT_SINKHOLE_RADIUS = BUILDER
+                .comment("Radius, in blocks, of the terrain collapse around a newly opened rift.")
+                .defineInRange("riftSinkholeRadius", 7, 3, 24);
+
+        RIFT_SINKHOLE_DEPTH = BUILDER
+                .comment("Maximum depth, in blocks, of the rift sinkhole.")
+                .defineInRange("riftSinkholeDepth", 6, 3, 32);
+
+        ENABLE_RIFT_PULL_EFFECT = BUILDER
+                .comment("If true, an open rift gently pulls nearby players toward the tear.")
+                .define("enableRiftPullEffect", true);
+
+        ENABLE_RIFT_TERRAIN_AGING = BUILDER
+                .comment("If true, an open rift slowly ages nearby stone and soil into darker materials.")
+                .define("enableRiftTerrainAging", true);
 
         TIME_CAPSULE_DELAY_DAYS = BUILDER
                 .comment("Minecraft days before a sealed time capsule transfers to the Overworld.")

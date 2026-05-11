@@ -39,6 +39,8 @@ public final class TemporalRiftManager {
         } else if (data.isRiftOpen()) {
             if (gameTime >= data.getRiftCloseGameTime()) {
                 closeRift(server, overworld, data);
+            } else if (data.getRiftPosition() != null) {
+                RiftEffectHelper.tickOpenRift(overworld, data.getRiftPosition());
             }
         } else if (currentDay >= data.getNextRiftDay()) {
             openRift(server, overworld, data, gameTime);
@@ -59,11 +61,13 @@ public final class TemporalRiftManager {
         }
 
         long gameTime = overworld.getGameTime();
-        overworld.setBlock(pos, TemporalRiftBlocks.RIFT_CORE.get().defaultBlockState(), 3);
+        BlockPos riftPos = prepareRiftSite(overworld, pos);
+        overworld.setBlock(riftPos, TemporalRiftBlocks.RIFT_CORE.get().defaultBlockState(), 3);
+        RiftEffectHelper.playOpeningEffects(overworld, riftPos);
         data.setRiftOpen(true);
-        data.setRiftPosition(pos);
+        data.setRiftPosition(riftPos);
         data.setRiftCloseGameTime(gameTime + TemporalRiftConfig.RIFT_OPEN_DURATION_TICKS.get());
-        LOGGER.info("[TemporalRift] Rift force-opened at {}.", pos);
+        LOGGER.info("[TemporalRift] Rift force-opened at {}.", riftPos);
     }
 
     public static void forceCloseRift(MinecraftServer server) {
@@ -81,9 +85,11 @@ public final class TemporalRiftManager {
     private static void openRift(MinecraftServer server, ServerLevel overworld, TemporalRiftSavedData data, long currentGameTime) {
         int radius = TemporalRiftConfig.RIFT_SPAWN_RADIUS.get();
         int duration = TemporalRiftConfig.RIFT_OPEN_DURATION_TICKS.get();
-        BlockPos riftPos = RiftSpawnHelper.findRiftSpawnPosition(overworld, radius);
+        BlockPos surfacePos = RiftSpawnHelper.findRiftSpawnPosition(overworld, radius);
+        BlockPos riftPos = prepareRiftSite(overworld, surfacePos);
 
         overworld.setBlock(riftPos, TemporalRiftBlocks.RIFT_CORE.get().defaultBlockState(), 3);
+        RiftEffectHelper.playOpeningEffects(overworld, riftPos);
         data.setRiftOpen(true);
         data.setRiftPosition(riftPos);
         data.setRiftCloseGameTime(currentGameTime + duration);
@@ -100,6 +106,7 @@ public final class TemporalRiftManager {
         BlockPos riftPos = data.getRiftPosition();
         if (riftPos != null && overworld.getBlockState(riftPos).is(TemporalRiftBlocks.RIFT_CORE.get())) {
             overworld.removeBlock(riftPos, false);
+            RiftEffectHelper.playClosingEffects(overworld, riftPos);
             LOGGER.info("[TemporalRift] Rift core removed at {}.", riftPos);
         }
 
@@ -127,5 +134,18 @@ public final class TemporalRiftManager {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             player.sendSystemMessage(message);
         }
+    }
+
+    private static BlockPos prepareRiftSite(ServerLevel overworld, BlockPos surfacePos) {
+        if (!TemporalRiftConfig.ENABLE_RIFT_SINKHOLE.get()) {
+            return surfacePos;
+        }
+
+        return RiftTerrainHelper.createSinkhole(
+                overworld,
+                surfacePos,
+                TemporalRiftConfig.RIFT_SINKHOLE_RADIUS.get(),
+                TemporalRiftConfig.RIFT_SINKHOLE_DEPTH.get()
+        );
     }
 }
