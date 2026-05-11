@@ -20,9 +20,11 @@ import java.util.Set;
 public class CryoSpawnData extends SavedData {
     private static final String DATA_NAME = "wildernessodyssey_cryo_spawn_data";
     private static final String VERSION_KEY = "version";
-    private static final int CURRENT_VERSION = 2;
+    private static final String STARTER_BUNKER_PLACED_KEY = "starter_bunker_placed";
+    private static final int CURRENT_VERSION = 3;
     private final Set<Long> cryoPositions = new HashSet<>();
     private int version = CURRENT_VERSION;
+    private boolean starterBunkerPlaced;
 
     public CryoSpawnData() {
     }
@@ -33,12 +35,14 @@ public class CryoSpawnData extends SavedData {
         for (long entry : entries) {
             cryoPositions.add(entry);
         }
+        this.starterBunkerPlaced = tag.getBoolean(STARTER_BUNKER_PLACED_KEY) || !cryoPositions.isEmpty();
         migrateIfNeeded();
     }
 
     @Override
     public @NotNull CompoundTag save(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         tag.putInt(VERSION_KEY, version);
+        tag.putBoolean(STARTER_BUNKER_PLACED_KEY, starterBunkerPlaced);
         tag.putLongArray("cryo_positions", cryoPositions.stream().mapToLong(Long::longValue).toArray());
         return tag;
     }
@@ -94,6 +98,23 @@ public class CryoSpawnData extends SavedData {
             positions.add(BlockPos.of(entry));
         }
         return List.copyOf(positions);
+    }
+
+    /**
+     * @return {@code true} after the starter bunker has been successfully handled for this world.
+     */
+    public boolean hasStarterBunkerPlaced() {
+        return starterBunkerPlaced;
+    }
+
+    /**
+     * Marks starter bunker placement as complete so existing saves do not repeat bunker spawn checks.
+     */
+    public void markStarterBunkerPlaced() {
+        if (!starterBunkerPlaced) {
+            starterBunkerPlaced = true;
+            setDirty();
+        }
     }
 
     /**

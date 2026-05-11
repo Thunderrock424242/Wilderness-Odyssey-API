@@ -9,7 +9,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.LiquidBlockContainer;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.gameevent.GameEvent;
@@ -59,8 +61,13 @@ public abstract class BucketPlaceMixin {
                         pos.getZ() + 0.5f,
                         level,
                         settlePos -> {
-                            // Callback: When the fluid particles settle, place the real block
-                            level.setBlock(settlePos, Blocks.WATER.defaultBlockState(), 3);
+                            BlockState state = level.getBlockState(settlePos);
+                            if (state.getBlock() instanceof LiquidBlockContainer liquidContainer
+                                    && liquidContainer.canPlaceLiquid(player, level, settlePos, state, Fluids.WATER)) {
+                                liquidContainer.placeLiquid(level, settlePos, state, Fluids.WATER.getSource(false));
+                            } else if (state.isAir() || state.canBeReplaced(Fluids.WATER) || state.is(Blocks.WATER)) {
+                                level.setBlock(settlePos, Blocks.WATER.defaultBlockState(), 3);
+                            }
                         }
                 );
             }

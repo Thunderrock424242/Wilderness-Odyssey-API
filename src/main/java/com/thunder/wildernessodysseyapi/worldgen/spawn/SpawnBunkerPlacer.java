@@ -66,6 +66,13 @@ public final class SpawnBunkerPlacer {
         if (!level.dimension().equals(Level.OVERWORLD)) return;
         if (StructureConfig.DEBUG_DISABLE_STARTER_BUNKER.get()) return;
 
+        CryoSpawnData data = CryoSpawnData.get(level);
+        if (data.hasStarterBunkerPlaced()) {
+            WorldSpawnHandler.refreshWorldSpawn(level);
+            event.setCanceled(true);
+            return;
+        }
+
         BlockPos anchor = resolveAnchor(level);
         NBTStructurePlacer.PlacementResult result = placeBunker(level, anchor);
         if (result == null) {
@@ -142,9 +149,11 @@ public final class SpawnBunkerPlacer {
 
     static void applySpawnData(ServerLevel level, NBTStructurePlacer.PlacementResult result) {
         List<BlockPos> cryoPositions = result.cryoPositions();
+        CryoSpawnData data = CryoSpawnData.get(level);
+        data.markStarterBunkerPlaced();
+        data.replaceAll(cryoPositions);
+
         if (!cryoPositions.isEmpty()) {
-            CryoSpawnData data = CryoSpawnData.get(level);
-            data.replaceAll(cryoPositions);
             PlayerSpawnHandler.setSpawnBlocks(cryoPositions);
             WorldSpawnHandler.refreshWorldSpawn(level);
         } else {

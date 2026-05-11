@@ -9,11 +9,8 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 /**
  * ClientTickHandler
  *
- * Advances the client-side SPH simulation on every client tick.
- * The simulation runs ahead of the render tick on a thread pool,
- * so this just feeds the elapsed time as a delta.
- *
- * 1 Minecraft client tick = 1/20 second = 0.05s
+ * Advances lightweight client-only water animation state. SPH simulation is
+ * driven by the logical server tick because it queries world collision data.
  */
 @EventBusSubscriber(modid = "wildernessodysseyapi", value = Dist.CLIENT)
 public class ClientTickHandler {

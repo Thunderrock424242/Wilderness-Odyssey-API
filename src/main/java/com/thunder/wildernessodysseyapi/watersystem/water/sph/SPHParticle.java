@@ -28,6 +28,9 @@ public class SPHParticle {
     // Whether this particle has detached from the main body (airborne droplet)
     public boolean isDroplet = false;
 
+    // True for the current step when collision resolution touched floor-like geometry.
+    public boolean onGround = false;
+
     // Lifetime counter for droplets (ticks); -1 = permanent
     public int dropletLife = -1;
 
@@ -40,11 +43,24 @@ public class SPHParticle {
         position.set(x, y, z);
     }
 
+    public SPHParticle(SPHParticle other) {
+        position.set(other.position);
+        velocity.set(other.velocity);
+        acceleration.set(other.acceleration);
+        density = other.density;
+        pressure = other.pressure;
+        isDroplet = other.isDroplet;
+        onGround = other.onGround;
+        dropletLife = other.dropletLife;
+        lastQueryId = other.lastQueryId;
+    }
+
     /** Reset per-step accumulated quantities before the force pass. */
     public void resetStep() {
         acceleration.set(0f, 0f, 0f);
         density  = 0f;
         pressure = 0f;
+        onGround = false;
     }
 
     @Override

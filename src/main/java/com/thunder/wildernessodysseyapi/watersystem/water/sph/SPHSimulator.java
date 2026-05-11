@@ -39,6 +39,11 @@ public class SPHSimulator {
 
     private SettleListener settleListener;
     private float timeAccumulator = 0f;
+    private final Random random = new Random();
+    private long renderRevision = 0L;
+    private float centerX = 0.0f;
+    private float centerY = 0.0f;
+    private float centerZ = 0.0f;
 
     /**
      * Callback interface triggered when the fluid slows down enough to be converted
@@ -54,7 +59,12 @@ public class SPHSimulator {
 
     public void setSettleListener(SettleListener l) { this.settleListener = l; }
     public void setLevel(BlockGetter level)          { this.level = level; }
+    public BlockGetter getLevel()                    { return level; }
     public boolean isSettled()                       { return settled; }
+    public long getRenderRevision()                  { return renderRevision; }
+    public float getCenterX()                        { return centerX; }
+    public float getCenterY()                        { return centerY; }
+    public float getCenterZ()                        { return centerZ; }
 
     /**
      * Returns a thread-safe snapshot of the particle states.
@@ -74,31 +84,45 @@ public class SPHSimulator {
      * @param cz The center Z coordinate.
      */
     public void spawnBucket(float cx, float cy, float cz) {
+        spawnPulse(cx, cy, cz, SPHConstants.PARTICLES_PER_BUCKET, 0.0f, 0.0f, 0.0f);
+    }
+
+    public void spawnBucket(float cx, float cy, float cz, int requestedCount) {
+        spawnPulse(cx, cy, cz, requestedCount, 0.0f, 0.0f, 0.0f);
+    }
+
+    public void spawnPulse(float cx, float cy, float cz, int requestedCount,
+                           float impulseX, float impulseY, float impulseZ) {
         if (particles.size() >= SPHConstants.MAX_PARTICLES) return;
 
-        int count = Math.min(SPHConstants.PARTICLES_PER_BUCKET, SPHConstants.MAX_PARTICLES - particles.size());
-        Random rng = new Random();
+        int count = Math.min(requestedCount, SPHConstants.MAX_PARTICLES - particles.size());
         float r = SPHConstants.SPAWN_RADIUS;
 
         for (int i = 0; i < count; i++) {
-            float px, py, pz;
+            float px, pz;
             do {
-                px = (rng.nextFloat() * 2 - 1) * r;
-                py = (rng.nextFloat() * 2 - 1) * r;
-                pz = (rng.nextFloat() * 2 - 1) * r;
-            } while (px*px + py*py + pz*pz > r*r);
+                px = (random.nextFloat() * 2 - 1) * r;
+                pz = (random.nextFloat() * 2 - 1) * r;
+            } while (px*px + pz*pz > r*r);
+
+            float py = (random.nextFloat() - 0.5f) * 0.12f;
+            float radial = (float)Math.sqrt(px * px + pz * pz);
+            float outX = radial > 0.0001f ? px / radial : 0.0f;
+            float outZ = radial > 0.0001f ? pz / radial : 0.0f;
 
             SPHParticle p = new SPHParticle(cx + px, cy + py, cz + pz);
             p.velocity.set(
-                    (rng.nextFloat() - 0.5f) * 0.3f,
-                    -rng.nextFloat() * 1.5f - 0.5f,
-                    (rng.nextFloat() - 0.5f) * 0.3f
+                    impulseX + outX * (0.45f + random.nextFloat() * 0.35f),
+                    impulseY - random.nextFloat() * 2.0f - 1.0f,
+                    impulseZ + outZ * (0.45f + random.nextFloat() * 0.35f)
             );
             particles.add(p);
         }
 
         settled = false;
         settleCounter = 0;
+        timeAccumulator = 0.0f;
+        updateRenderSnapshot();
     }
 
     /**
@@ -108,7 +132,12 @@ public class SPHSimulator {
      * @param deltaTime The time elapsed since the last tick in seconds.
      */
     public void tick(float deltaTime) {
-        if (settled || particles.isEmpty()) return;
+        if (settled) return;
+        if (particles.isEmpty()) {
+            settle(Collections.emptyList());
+            updateRenderSnapshot();
+            return;
+        }
 
         timeAccumulator += deltaTime;
         int steps = 0;
@@ -118,10 +147,48 @@ public class SPHSimulator {
             step();
             timeAccumulator -= SPHConstants.TIMESTEP;
             steps++;
+            if (settled) break;
         }
 
-        // Double Buffering: Provide the renderer with a fresh, safe snapshot
-        renderParticles = new ArrayList<>(particles);
+        updateRenderSnapshot();
+    }
+
+    private void updateRenderSnapshot() {
+        List<SPHParticle> snapshot = new ArrayList<>(particles.size());
+        float sx = 0.0f;
+        float sy = 0.0f;
+        float sz = 0.0f;
+        for (SPHParticle particle : particles) {
+            snapshot.add(new SPHParticle(particle));
+            sx += particle.position.x;
+            sy += particle.position.y;
+            sz += particle.position.z;
+        }
+        if (!particles.isEmpty()) {
+            float inv = 1.0f / particles.size();
+            centerX = sx * inv;
+            centerY = sy * inv;
+            centerZ = sz * inv;
+        }
+        renderParticles = snapshot;
+        renderRevision++;
+    }
+
+    public int particleCount() {
+        return particles.size();
+    }
+
+    public float distanceSquaredTo(float x, float y, float z) {
+        if (particles.isEmpty()) return Float.MAX_VALUE;
+
+        float dx = centerX - x;
+        float dy = centerY - y;
+        float dz = centerZ - z;
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    public boolean hasCapacity() {
+        return particles.size() < SPHConstants.MAX_PARTICLES;
     }
 
     /**
@@ -204,6 +271,15 @@ public class SPHSimulator {
         // 4. Integration & Collision
         float dt = SPHConstants.TIMESTEP;
         float totalSpeed = 0f;
+        float centerX = 0.0f;
+        float centerZ = 0.0f;
+
+        for (SPHParticle p : pts) {
+            centerX += p.position.x;
+            centerZ += p.position.z;
+        }
+        centerX /= n;
+        centerZ /= n;
 
         for (int i = 0; i < n; i++) {
             SPHParticle p = pts.get(i);
@@ -225,6 +301,8 @@ public class SPHSimulator {
             p.position.z += p.velocity.z * dt;
 
             resolveBlockCollision(p);
+            applyGroundSpread(p, centerX, centerZ, dt);
+            clampHorizontalSpeed(p);
 
             totalSpeed += p.velocity.length();
         }
@@ -241,12 +319,18 @@ public class SPHSimulator {
         if (avgSpeed < SPHConstants.SETTLE_SPEED) {
             settleCounter++;
             if (settleCounter >= SPHConstants.SETTLE_FRAMES) {
-                settled = true;
-                if (settleListener != null) settleListener.onSettle(new ArrayList<>(pts));
+                settle(new ArrayList<>(pts));
             }
         } else {
             settleCounter = 0;
         }
+    }
+
+    private void settle(List<SPHParticle> finalParticles) {
+        if (settled) return;
+        settled = true;
+        timeAccumulator = 0.0f;
+        if (settleListener != null) settleListener.onSettle(finalParticles);
     }
 
     /**
@@ -296,7 +380,7 @@ public class SPHSimulator {
                         if      (minOverlap == overlapNX) { nx = -1; p.position.x -= push; }
                         else if (minOverlap == overlapPX) { nx =  1; p.position.x += push; }
                         else if (minOverlap == overlapNY) { ny = -1; p.position.y -= push; }
-                        else if (minOverlap == overlapPY) { ny =  1; p.position.y += push; }
+                        else if (minOverlap == overlapPY) { ny =  1; p.position.y += push; p.onGround = true; }
                         else if (minOverlap == overlapNZ) { nz = -1; p.position.z -= push; }
                         else                              { nz =  1; p.position.z += push; }
 
@@ -306,13 +390,41 @@ public class SPHSimulator {
                             p.velocity.y -= (1 + SPHConstants.RESTITUTION) * vDotN * ny;
                             p.velocity.z -= (1 + SPHConstants.RESTITUTION) * vDotN * nz;
 
-                            p.velocity.x *= (1 - SPHConstants.FRICTION * Math.abs(nx == 0 ? 1 : 0));
-                            p.velocity.z *= (1 - SPHConstants.FRICTION * Math.abs(nz == 0 ? 1 : 0));
+                            if (ny != 0) {
+                                p.velocity.x *= (1 - SPHConstants.FRICTION);
+                                p.velocity.z *= (1 - SPHConstants.FRICTION);
+                            } else {
+                                p.velocity.x *= (1 - SPHConstants.FRICTION * Math.abs(nx));
+                                p.velocity.z *= (1 - SPHConstants.FRICTION * Math.abs(nz));
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    private void applyGroundSpread(SPHParticle p, float centerX, float centerZ, float dt) {
+        if (!p.onGround) return;
+
+        float dx = p.position.x - centerX;
+        float dz = p.position.z - centerZ;
+        float len = (float)Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.0001f) return;
+
+        float strength = SPHConstants.GROUND_SPREAD_FORCE * dt;
+        p.velocity.x += (dx / len) * strength;
+        p.velocity.z += (dz / len) * strength;
+    }
+
+    private void clampHorizontalSpeed(SPHParticle p) {
+        float speed2 = p.velocity.x * p.velocity.x + p.velocity.z * p.velocity.z;
+        float max = SPHConstants.MAX_HORIZONTAL_SPEED;
+        if (speed2 <= max * max) return;
+
+        float scale = max / (float)Math.sqrt(speed2);
+        p.velocity.x *= scale;
+        p.velocity.z *= scale;
     }
 
     private void classifyDroplets(List<SPHParticle> pts) {

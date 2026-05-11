@@ -35,7 +35,6 @@
     "LightTextureTrueDarknessMixin",
     "MixinWorldCreationUiState",
     "OptionsScreenTelemetryButtonMixin",
-    "StructureBlockRendererMixin",
-    "WaveRenderMixin"
+    "StructureBlockRendererMixin"
   ]
 }

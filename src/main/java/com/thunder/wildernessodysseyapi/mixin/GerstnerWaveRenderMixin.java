@@ -39,7 +39,8 @@ public class GerstnerWaveRenderMixin {
 
     @Inject(
         method = "tesselate",
-        at = @At("HEAD")
+        at = @At("HEAD"),
+        require = 0
     )
     private void onTesselate(BlockAndTintGetter level, BlockPos pos,
                               VertexConsumer consumer, BlockState blockState,
@@ -58,7 +59,8 @@ public class GerstnerWaveRenderMixin {
         method = "tesselate",
         at = @At("HEAD"),
         argsOnly = true,
-        index = 3
+        index = 3,
+        require = 0
     )
     private VertexConsumer wrapWaterVertexConsumer(VertexConsumer originalConsumer,
                                                    BlockAndTintGetter level,

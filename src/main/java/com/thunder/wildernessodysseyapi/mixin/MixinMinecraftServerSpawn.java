@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.worldgen.spawn.CryoSpawnData;
 import com.mojang.datafixers.util.Pair;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -24,6 +25,7 @@ public class MixinMinecraftServerSpawn {
                                         CallbackInfo ci) {
         // Only run on overworld
         if (!level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)) return;
+        if (CryoSpawnData.get(level).hasStarterBunkerPlaced()) return;
 
         BlockPos current = level.getSharedSpawnPos();
 

@@ -23,6 +23,7 @@ public class FluidMesh {
 
     // Latest extracted mesh data [x,y,z,nx,ny,nz, ...]
     public volatile float[] meshData = new float[0];
+    private long builtRevision = -1L;
 
     // The simulator this mesh belongs to
     public final SPHSimulator simulator;
@@ -36,11 +37,19 @@ public class FluidMesh {
      * Called every render frame.
      */
     public void rebuild() {
-        List<SPHParticle> particles = simulator.particles;
-        if (particles.isEmpty()) { meshData = new float[0]; return; }
+        long revision = simulator.getRenderRevision();
+        if (revision == builtRevision) return;
+
+        List<SPHParticle> particles = simulator.getRenderParticles();
+        if (particles.isEmpty()) {
+            meshData = new float[0];
+            builtRevision = revision;
+            return;
+        }
 
         field.rebuild(particles);
         meshData = mc.extract(field);
+        builtRevision = revision;
     }
 
     /** @return true if there is renderable geometry */

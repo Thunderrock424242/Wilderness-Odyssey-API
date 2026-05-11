@@ -25,6 +25,13 @@ public final class OceanSpawnLocator {
     public static void onServerStarted(ServerStartedEvent event) {
         ServerLevel level = event.getServer().overworld();
         if (StructureConfig.DEBUG_DISABLE_STARTER_BUNKER.get()) return;
+
+        CryoSpawnData data = CryoSpawnData.get(level);
+        if (data.hasStarterBunkerPlaced()) {
+            WorldSpawnHandler.refreshWorldSpawn(level);
+            return;
+        }
+
         if (StarterStructureSpawnGuard.hasPlacedBunker(level)) return;
         if (hasRun) return;
         hasRun = true;

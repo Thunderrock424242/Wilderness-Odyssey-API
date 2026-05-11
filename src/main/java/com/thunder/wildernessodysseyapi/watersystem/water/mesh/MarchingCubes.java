@@ -3,8 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.mesh;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHConstants;
 import org.joml.Vector3f;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
 
 /**
  * MarchingCubes
@@ -22,12 +21,26 @@ public class MarchingCubes {
 
     // Scratch edge vertex positions (12 possible per cube)
     private final Vector3f[] edgeVerts = new Vector3f[12];
+    private final Vector3f[] corners = new Vector3f[8];
 
     // Output buffer — rebuilt each frame
-    private final List<Float> vertices = new ArrayList<>(4096);
+    private float[] vertices = new float[4096];
+    private int vertexCount = 0;
+
+    private static final int[][] CORNER_OFFSETS = {
+            {0,0,0},{1,0,0},{1,0,1},{0,0,1},
+            {0,1,0},{1,1,0},{1,1,1},{0,1,1}
+    };
+
+    private static final int[][] EDGES = {
+            {0,1},{1,2},{2,3},{3,0},
+            {4,5},{5,6},{6,7},{7,4},
+            {0,4},{1,5},{2,6},{3,7}
+    };
 
     public MarchingCubes() {
         for (int i = 0; i < 12; i++) edgeVerts[i] = new Vector3f();
+        for (int i = 0; i < 8; i++) corners[i] = new Vector3f();
     }
 
     /**
@@ -36,7 +49,7 @@ public class MarchingCubes {
      * @return       float[] of interleaved position+normal data, length % 18 == 0
      */
     public float[] extract(DensityField field) {
-        vertices.clear();
+        vertexCount = 0;
         if (field.nx < 2 || field.ny < 2 || field.nz < 2) return new float[0];
 
         float iso = SPHConstants.ISO_THRESHOLD;
@@ -49,9 +62,7 @@ public class MarchingCubes {
             }
         }
 
-        float[] result = new float[vertices.size()];
-        for (int i = 0; i < result.length; i++) result[i] = vertices.get(i);
-        return result;
+        return Arrays.copyOf(vertices, vertexCount);
     }
 
     // -------------------------------------------------------------------------
@@ -86,27 +97,16 @@ public class MarchingCubes {
         if (edgeMask == 0) return;
 
         // Compute world positions of the 8 corners
-        Vector3f[] corners = new Vector3f[8];
-        int[][] offsets = {
-            {0,0,0},{1,0,0},{1,0,1},{0,0,1},
-            {0,1,0},{1,1,0},{1,1,1},{0,1,1}
-        };
         for (int i = 0; i < 8; i++) {
-            corners[i] = new Vector3f();
-            field.gridToWorld(gx + offsets[i][0],
-                              gy + offsets[i][1],
-                              gz + offsets[i][2], corners[i]);
+            field.gridToWorld(gx + CORNER_OFFSETS[i][0],
+                              gy + CORNER_OFFSETS[i][1],
+                              gz + CORNER_OFFSETS[i][2], corners[i]);
         }
 
         // Interpolate edge vertices
-        int[][] edges = {
-            {0,1},{1,2},{2,3},{3,0},
-            {4,5},{5,6},{6,7},{7,4},
-            {0,4},{1,5},{2,6},{3,7}
-        };
         for (int i = 0; i < 12; i++) {
             if ((edgeMask & (1 << i)) != 0) {
-                int a = edges[i][0], b = edges[i][1];
+                int a = EDGES[i][0], b = EDGES[i][1];
                 float t = (iso - val[a]) / (val[b] - val[a] + 1e-8f);
                 t = Math.max(0f, Math.min(1f, t));
                 edgeVerts[i].set(
@@ -141,7 +141,22 @@ public class MarchingCubes {
 
     private void emitVertex(float x, float y, float z,
                              float nx, float ny, float nz) {
-        vertices.add(x); vertices.add(y); vertices.add(z);
-        vertices.add(nx); vertices.add(ny); vertices.add(nz);
+        ensureCapacity(vertexCount + 6);
+        vertices[vertexCount++] = x;
+        vertices[vertexCount++] = y;
+        vertices[vertexCount++] = z;
+        vertices[vertexCount++] = nx;
+        vertices[vertexCount++] = ny;
+        vertices[vertexCount++] = nz;
+    }
+
+    private void ensureCapacity(int needed) {
+        if (needed <= vertices.length) return;
+
+        int newSize = vertices.length;
+        while (newSize < needed) {
+            newSize *= 2;
+        }
+        vertices = Arrays.copyOf(vertices, newSize);
     }
 }

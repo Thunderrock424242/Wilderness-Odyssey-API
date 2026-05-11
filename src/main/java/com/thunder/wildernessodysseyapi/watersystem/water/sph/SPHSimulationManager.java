@@ -1,18 +1,18 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.sph;
 
-import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * A Singleton manager that oversees all active SPH fluid simulations in the world.
  * <p>
  * When a player places a water bucket, this manager creates an isolated {@link SPHSimulator}.
- * To prevent the server or client from lagging, it offloads the heavy physics math
- * into the centralized {@link AsyncTaskManager} CPU pool.
+ * Simulations tick on the logical server thread because the collision pass queries
+ * Minecraft block states and voxel shapes, which are not safe to read from worker threads.
  */
 public class SPHSimulationManager {
 
@@ -40,65 +40,165 @@ public class SPHSimulationManager {
      * @return The newly created simulator instance.
      */
     public SPHSimulator createSimulation(float x, float y, float z, BlockGetter level, SettleBlockPlacer placer) {
+        return createSimulation(x, y, z, level, placer,
+                SPHConstants.PARTICLES_PER_BUCKET, 0.0f, 0.0f, 0.0f);
+    }
+
+    public SPHSimulator createSimulation(float x, float y, float z, BlockGetter level, SettleBlockPlacer placer,
+                                         int requestedCount, float impulseX, float impulseY, float impulseZ) {
+        runPendingSettleCallbacks();
+        removeEmptySimulations();
+
+        SPHSimulator existing = findMergeTarget(x, y, z, level, SPHConstants.MERGE_RADIUS);
+        if (existing != null) {
+            existing.spawnPulse(x, y, z, requestedCount, impulseX, impulseY, impulseZ);
+            return existing;
+        }
+
+        if (countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
+            SPHSimulator overloaded = findMergeTarget(x, y, z, level, SPHConstants.OVERLOAD_MERGE_RADIUS);
+            if (overloaded == null) {
+                boolean madeRoom = removeFirstSettledSimulation(level);
+                overloaded = madeRoom ? null : findClosestReusable(x, y, z, level);
+            }
+
+            if (overloaded != null) {
+                overloaded.spawnPulse(x, y, z, Math.min(requestedCount, SPHConstants.OVERLOAD_PARTICLES_PER_BUCKET),
+                        impulseX, impulseY, impulseZ);
+                return overloaded;
+            }
+
+            if (countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
+                SPHSimulator closest = findClosestSimulation(x, y, z, level);
+                return closest != null ? closest : new SPHSimulator(level);
+            }
+        }
+
         SPHSimulator sim = new SPHSimulator(level);
 
-        sim.setSettleListener(finalParticles -> {
-            pendingSettleCallbacks.add(() -> {
-                Set<BlockPos> placed = new HashSet<>();
-                for (SPHParticle p : finalParticles) {
-                    BlockPos bp = new BlockPos(
-                            (int)Math.floor(p.position.x),
-                            (int)Math.floor(p.position.y),
-                            (int)Math.floor(p.position.z)
-                    );
-                    if (!placed.contains(bp)) {
-                        placed.add(bp);
-                        placer.placeBlock(bp);
+        if (SPHConstants.CONVERT_SETTLED_TO_BLOCKS) {
+            sim.setSettleListener(finalParticles -> {
+                pendingSettleCallbacks.add(() -> {
+                    Set<BlockPos> placed = new HashSet<>();
+                    for (SPHParticle p : finalParticles) {
+                        BlockPos bp = new BlockPos(
+                                (int)Math.floor(p.position.x),
+                                (int)Math.floor(p.position.y),
+                                (int)Math.floor(p.position.z)
+                        );
+                        if (!placed.contains(bp)) {
+                            placed.add(bp);
+                            placer.placeBlock(bp);
+                        }
                     }
-                }
-                active.remove(sim);
+                    active.remove(sim);
+                });
             });
-        });
+        }
 
-        sim.spawnBucket(x, y, z);
+        sim.spawnPulse(x, y, z, requestedCount, impulseX, impulseY, impulseZ);
         active.add(sim);
         return sim;
     }
 
+    private SPHSimulator findMergeTarget(float x, float y, float z, BlockGetter level, float radius) {
+        float mergeRadius2 = radius * radius;
+
+        SPHSimulator best = null;
+        float bestDistance2 = mergeRadius2;
+        for (SPHSimulator sim : active) {
+            if (sim.getLevel() != level || !sim.hasCapacity()) {
+                continue;
+            }
+
+            float distance2 = sim.distanceSquaredTo(x, y, z);
+            if (distance2 < bestDistance2) {
+                bestDistance2 = distance2;
+                best = sim;
+            }
+        }
+
+        return best;
+    }
+
+    private SPHSimulator findClosestReusable(float x, float y, float z, BlockGetter level) {
+        SPHSimulator best = null;
+        float bestDistance2 = Float.MAX_VALUE;
+        for (SPHSimulator sim : active) {
+            if (sim.getLevel() != level || !sim.hasCapacity()) {
+                continue;
+            }
+
+            float distance2 = sim.distanceSquaredTo(x, y, z);
+            if (distance2 < bestDistance2) {
+                bestDistance2 = distance2;
+                best = sim;
+            }
+        }
+        return best;
+    }
+
+    private SPHSimulator findClosestSimulation(float x, float y, float z, BlockGetter level) {
+        SPHSimulator best = null;
+        float bestDistance2 = Float.MAX_VALUE;
+        for (SPHSimulator sim : active) {
+            if (sim.getLevel() != level) {
+                continue;
+            }
+
+            float distance2 = sim.distanceSquaredTo(x, y, z);
+            if (distance2 < bestDistance2) {
+                bestDistance2 = distance2;
+                best = sim;
+            }
+        }
+        return best;
+    }
+
+    private int countSimulations(BlockGetter level) {
+        int count = 0;
+        for (SPHSimulator sim : active) {
+            if (sim.getLevel() == level) count++;
+        }
+        return count;
+    }
+
+    private boolean removeFirstSettledSimulation(BlockGetter level) {
+        for (SPHSimulator sim : active) {
+            if (sim.getLevel() == level && sim.isSettled()) {
+                active.remove(sim);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void removeEmptySimulations() {
+        active.removeIf(sim -> sim.particleCount() == 0);
+    }
+
+    private void runPendingSettleCallbacks() {
+        Runnable cb;
+        while ((cb = pendingSettleCallbacks.poll()) != null) {
+            cb.run();
+        }
+    }
+
     /**
-     * Triggers the physics step for all active simulations simultaneously.
-     * <p>
-     * <b>Performance Note:</b> Each simulation's math is dispatched to the background async thread pool.
-     * The main thread waits for them to finish to ensure deterministic visual rendering, but
-     * does not waste main-thread CPU cycles doing the math itself.
+     * Triggers the physics step for all active simulations.
      *
      * @param deltaTime The time elapsed since the last tick.
      */
     public void tickAll(float deltaTime) {
         // First, safely place blocks on the main thread for any simulations that finished last tick.
-        Runnable cb;
-        while ((cb = pendingSettleCallbacks.poll()) != null) {
-            cb.run();
-        }
+        runPendingSettleCallbacks();
 
-        if (!AsyncTaskManager.snapshot().enabled()) {
-            for (SPHSimulator sim : active) {
-                sim.tick(deltaTime);
-            }
-            return;
-        }
-
-        // Dispatch all physics math to the background CPU pool.
-        List<CompletableFuture<Boolean>> futures = new ArrayList<>();
         for (SPHSimulator sim : active) {
-            futures.add(AsyncTaskManager.submitCpuTask("SPH_Tick", () -> {
-                sim.tick(deltaTime);
-                return Optional.empty(); // No main-thread task needed; state is read by renderer
-            }));
+            sim.tick(deltaTime);
+            if (sim.particleCount() == 0) {
+                active.remove(sim);
+            }
         }
-
-        // Wait for the background pool to finish before moving on to rendering.
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
     }
 
     /**
