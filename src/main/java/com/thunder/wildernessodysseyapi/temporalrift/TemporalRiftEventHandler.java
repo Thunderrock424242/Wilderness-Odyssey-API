@@ -35,4 +35,13 @@ public final class TemporalRiftEventHandler {
             TemporalEchoManager.recordPlayerPlacedBlock(level, event.getPos(), event.getPlacedBlock(), player);
         }
     }
+
+    @SubscribeEvent
+    public static void onBlockBroken(BlockEvent.BreakEvent event) {
+        if (event.getLevel() instanceof ServerLevel level
+                && level.dimension().equals(TemporalRiftDimensions.THE_BEFORE_KEY)
+                && event.getPlayer() instanceof ServerPlayer player) {
+            TemporalEchoManager.recordPlayerBrokenBlock(level, event.getPos(), event.getState(), player);
+        }
+    }
 }

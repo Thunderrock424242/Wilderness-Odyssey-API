@@ -1,7 +1,7 @@
 {
   "type": "wildernessodysseyapi:the_before",
   "generator": {
-    "type": "minecraft:noise",
+    "type": "wildernessodysseyapi:before_noise",
     "settings": "minecraft:overworld",
     "biome_source": {
       "type": "minecraft:multi_noise",

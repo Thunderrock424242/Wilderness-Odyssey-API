@@ -38,6 +38,7 @@ import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
 import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockEntities;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
+import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftWorldgen;
 import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
 import com.thunder.wildernessodysseyapi.ai.AI_story.AIBackendCommand;
 import com.thunder.wildernessodysseyapi.ai.AI_story.AIChatListener;
@@ -152,6 +153,7 @@ public class WildernessOdysseyAPIMainModClass {
         ModLootConditions.LOOT_CONDITIONS.register(modEventBus);
         TemporalRiftBlocks.register(modEventBus);
         TemporalRiftBlockEntities.register(modEventBus);
+        TemporalRiftWorldgen.register(modEventBus);
 
         CryoTubeBlock.register(modEventBus);
         ModItems.register(modEventBus);

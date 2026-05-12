@@ -2,6 +2,8 @@ package com.thunder.wildernessodysseyapi.temporalrift.config;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import java.util.List;
+
 public final class TemporalRiftConfig {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
     public static final ModConfigSpec CONFIG_SPEC;
@@ -20,6 +22,8 @@ public final class TemporalRiftConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_TEMPORAL_ECHOES;
     public static final ModConfigSpec.IntValue TEMPORAL_ECHO_DELAY_DAYS;
     public static final ModConfigSpec.IntValue TEMPORAL_ECHO_BURIAL_DEPTH;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> BEFORE_ALLOWED_MOBS;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> BEFORE_ALLOWED_STRUCTURES;
     public static final ModConfigSpec.BooleanValue RETURN_ONLY_ACTIVE_RIFT;
     public static final ModConfigSpec.BooleanValue CHAT_BROADCASTS;
     public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
@@ -82,6 +86,14 @@ public final class TemporalRiftConfig {
         TEMPORAL_ECHO_BURIAL_DEPTH = BUILDER
                 .comment("How far below the original Y level temporal echoes are placed in the Overworld.")
                 .defineInRange("temporalEchoBurialDepth", 2, 0, 32);
+
+        BEFORE_ALLOWED_MOBS = BUILDER
+                .comment("Entity ids allowed to spawn naturally in The Before. Empty by default, so mobs are disabled until explicitly listed.")
+                .defineListAllowEmpty("beforeAllowedMobs", List.of(), value -> value instanceof String string && string.contains(":"));
+
+        BEFORE_ALLOWED_STRUCTURES = BUILDER
+                .comment("Structure ids intended to be allowed in The Before. Empty by default. Runtime structure filtering requires a dedicated biome-source/structure layer; this list is stored now for that bridge.")
+                .defineListAllowEmpty("beforeAllowedStructures", List.of(), value -> value instanceof String string && string.contains(":"));
 
         RETURN_ONLY_ACTIVE_RIFT = BUILDER
                 .comment("If true, players can only return from the past dimension during an active rift.")
