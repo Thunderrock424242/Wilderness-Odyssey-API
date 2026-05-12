@@ -15,6 +15,7 @@ public final class TemporalRiftConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_RIFT_SINKHOLE;
     public static final ModConfigSpec.IntValue RIFT_SINKHOLE_RADIUS;
     public static final ModConfigSpec.IntValue RIFT_SINKHOLE_DEPTH;
+    public static final ModConfigSpec.BooleanValue ENABLE_RIFT_OPENING_DISASTER;
     public static final ModConfigSpec.BooleanValue ENABLE_RIFT_PULL_EFFECT;
     public static final ModConfigSpec.BooleanValue ENABLE_RIFT_TERRAIN_AGING;
     public static final ModConfigSpec.IntValue TIME_CAPSULE_DELAY_DAYS;
@@ -48,16 +49,20 @@ public final class TemporalRiftConfig {
                 .defineInRange("riftSpawnRadius", 64, 0, 10_000);
 
         ENABLE_RIFT_SINKHOLE = BUILDER
-                .comment("If true, opening a rift carves a small sinkhole and places the rift in its center.")
+                .comment("If true, opening a rift tears open a major sinkhole and places the rift in its basin.")
                 .define("enableRiftSinkhole", true);
 
         RIFT_SINKHOLE_RADIUS = BUILDER
                 .comment("Radius, in blocks, of the terrain collapse around a newly opened rift.")
-                .defineInRange("riftSinkholeRadius", 7, 3, 24);
+                .defineInRange("riftSinkholeRadius", 18, 6, 48);
 
         RIFT_SINKHOLE_DEPTH = BUILDER
                 .comment("Maximum depth, in blocks, of the rift sinkhole.")
-                .defineInRange("riftSinkholeDepth", 6, 3, 32);
+                .defineInRange("riftSinkholeDepth", 14, 6, 48);
+
+        ENABLE_RIFT_OPENING_DISASTER = BUILDER
+                .comment("If true, a new Overworld rift triggers a brief large-scale disaster pulse: shockwave, dust, startled wildlife, and light rim damage.")
+                .define("enableRiftOpeningDisaster", true);
 
         ENABLE_RIFT_PULL_EFFECT = BUILDER
                 .comment("If true, an open rift gently pulls nearby players toward the tear.")

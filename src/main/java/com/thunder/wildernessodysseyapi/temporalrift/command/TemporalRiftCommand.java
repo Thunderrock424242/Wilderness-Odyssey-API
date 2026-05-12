@@ -18,6 +18,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.Vec3;
 
 public final class TemporalRiftCommand {
     private TemporalRiftCommand() {
@@ -58,11 +59,18 @@ public final class TemporalRiftCommand {
             }
 
             ServerLevel overworld = player.serverLevel();
-            float yaw = player.getYRot() * Mth.DEG_TO_RAD;
-            double dx = -Mth.sin(yaw);
-            double dz = Mth.cos(yaw);
-            int x = Mth.floor(player.getX() + dx * distance);
-            int z = Mth.floor(player.getZ() + dz * distance);
+            Vec3 look = player.getLookAngle();
+            Vec3 horizontalLook = new Vec3(look.x, 0.0D, look.z);
+            if (horizontalLook.lengthSqr() < 1.0E-6D) {
+                float yaw = player.getYRot() * Mth.DEG_TO_RAD;
+                horizontalLook = new Vec3(-Mth.sin(yaw), 0.0D, Mth.cos(yaw));
+            } else {
+                horizontalLook = horizontalLook.normalize();
+            }
+
+            Vec3 offset = horizontalLook.scale(distance);
+            int x = Mth.floor(player.getX() + offset.x);
+            int z = Mth.floor(player.getZ() + offset.z);
             int y = overworld.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
             BlockPos pos = new BlockPos(x, y, z);
 
@@ -89,6 +97,8 @@ public final class TemporalRiftCommand {
         String message = "[Temporal Rift Status]\n"
                 + "Rift Open: " + riftData.isRiftOpen() + "\n"
                 + "Position: " + riftData.getRiftPosition() + "\n"
+                + "Before Sky Rift: " + riftData.getBeforeSkyRiftPosition() + "\n"
+                + "Before Ground Rift: " + riftData.getBeforeGroundRiftPosition() + "\n"
                 + "Close At Tick: " + riftData.getRiftCloseGameTime() + "\n"
                 + "Next Rift Day: " + riftData.getNextRiftDay() + "\n"
                 + "Pending Capsules: " + transferData.getPendingTransfers().size();

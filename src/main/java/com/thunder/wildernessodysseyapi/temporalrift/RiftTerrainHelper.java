@@ -13,8 +13,8 @@ public final class RiftTerrainHelper {
     }
 
     public static BlockPos createSinkhole(ServerLevel level, BlockPos aroundPos, int radius, int depth) {
-        int safeRadius = Mth.clamp(radius, 3, 24);
-        int safeDepth = Mth.clamp(depth, 3, 32);
+        int safeRadius = Mth.clamp(radius, 6, 48);
+        int safeDepth = Mth.clamp(depth, 6, 48);
         BlockPos centerSurface = surfaceAt(level, aroundPos);
         int minY = level.getMinBuildHeight() + 4;
         int maxY = level.getMaxBuildHeight() - 2;
@@ -37,11 +37,11 @@ public final class RiftTerrainHelper {
                 }
 
                 double edge = Mth.clamp(distance / safeRadius, 0.0D, 1.0D);
-                double collapse = Math.pow(1.0D - edge, 0.58D);
-                int columnDepth = Math.max(1, (int) Math.round(safeDepth * collapse));
+                double collapse = Math.pow(1.0D - edge, 0.40D);
+                int columnDepth = Math.max(2, (int) Math.round(safeDepth * collapse));
                 int floorY = Math.max(minY, surfaceY - columnDepth);
 
-                if (edge < 0.94D) {
+                if (edge < 0.98D) {
                     for (int y = floorY + 1; y <= Math.min(surfaceY + 3, maxY); y++) {
                         mutable.set(x, y, z);
                         if (!level.getBlockState(mutable).is(Blocks.BEDROCK)) {
@@ -53,7 +53,7 @@ public final class RiftTerrainHelper {
                 mutable.set(x, floorY, z);
                 level.setBlock(mutable, floorMaterial(edge, random), 3);
 
-                if (edge > 0.72D && edge < 1.04D) {
+                if (edge > 0.64D && edge < 1.08D) {
                     mutable.set(x, surfaceY, z);
                     BlockState rimState = rimMaterial(random);
                     if (!level.getBlockState(mutable).isAir() && !level.getBlockState(mutable).liquid()) {
@@ -63,7 +63,47 @@ public final class RiftTerrainHelper {
             }
         }
 
-        buildRiftPedestal(level, centerSurface, centerFloorY);
+        buildRiftBasin(level, centerSurface, centerFloorY);
+        return new BlockPos(centerSurface.getX(), centerFloorY + 1, centerSurface.getZ());
+    }
+
+    public static BlockPos createReturnScar(ServerLevel level, BlockPos aroundPos) {
+        int radius = 4;
+        int depth = 3;
+        BlockPos centerSurface = surfaceAt(level, aroundPos);
+        int minY = level.getMinBuildHeight() + 4;
+        int maxY = level.getMaxBuildHeight() - 2;
+        int centerFloorY = Mth.clamp(centerSurface.getY() - depth, minY, maxY);
+        RandomSource random = RandomSource.create(level.getSeed() ^ centerSurface.asLong() ^ 0x5A17D3L);
+        BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
+
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                double distance = Math.sqrt(dx * dx + dz * dz);
+                if (distance > radius + 0.35D) {
+                    continue;
+                }
+
+                int x = centerSurface.getX() + dx;
+                int z = centerSurface.getZ() + dz;
+                int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+                double edge = Mth.clamp(distance / radius, 0.0D, 1.0D);
+                int floorY = Math.max(minY, surfaceY - Math.max(1, (int) Math.round(depth * Math.pow(1.0D - edge, 0.65D))));
+
+                for (int y = floorY + 1; y <= Math.min(surfaceY + 2, maxY); y++) {
+                    mutable.set(x, y, z);
+                    if (!level.getBlockState(mutable).is(Blocks.BEDROCK)) {
+                        level.setBlock(mutable, Blocks.AIR.defaultBlockState(), 3);
+                    }
+                }
+
+                mutable.set(x, floorY, z);
+                level.setBlock(mutable, edge < 0.45D
+                        ? Blocks.CRYING_OBSIDIAN.defaultBlockState()
+                        : rimMaterial(random), 3);
+            }
+        }
+
         return new BlockPos(centerSurface.getX(), centerFloorY + 1, centerSurface.getZ());
     }
 
@@ -72,18 +112,22 @@ public final class RiftTerrainHelper {
         return new BlockPos(pos.getX(), y, pos.getZ());
     }
 
-    private static void buildRiftPedestal(ServerLevel level, BlockPos centerSurface, int floorY) {
+    private static void buildRiftBasin(ServerLevel level, BlockPos centerSurface, int floorY) {
         BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
+        for (int dx = -3; dx <= 3; dx++) {
+            for (int dz = -3; dz <= 3; dz++) {
                 int x = centerSurface.getX() + dx;
                 int z = centerSurface.getZ() + dz;
                 mutable.set(x, floorY, z);
-                level.setBlock(mutable, Math.abs(dx) + Math.abs(dz) == 0
+                int manhattan = Math.abs(dx) + Math.abs(dz);
+                BlockState basinState = manhattan <= 2
                         ? Blocks.CRYING_OBSIDIAN.defaultBlockState()
-                        : Blocks.OBSIDIAN.defaultBlockState(), 3);
+                        : manhattan <= 4
+                        ? Blocks.SCULK.defaultBlockState()
+                        : Blocks.DEEPSLATE.defaultBlockState();
+                level.setBlock(mutable, basinState, 3);
 
-                for (int y = floorY + 1; y <= floorY + 4; y++) {
+                for (int y = floorY + 1; y <= floorY + 6; y++) {
                     mutable.set(x, y, z);
                     level.setBlock(mutable, Blocks.AIR.defaultBlockState(), 3);
                 }

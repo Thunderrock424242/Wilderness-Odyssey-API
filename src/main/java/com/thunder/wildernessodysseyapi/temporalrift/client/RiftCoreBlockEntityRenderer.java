@@ -25,9 +25,12 @@ public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCore
 
         poseStack.pushPose();
         poseStack.translate(0.5D, 0.02D, 0.5D);
+        float renderScale = blockEntity.getRenderScale();
+        poseStack.scale(renderScale, renderScale, renderScale);
+        poseStack.scale(2.8F, 1.0F, 2.8F);
 
         drawSinkGlow(buffer, poseStack, age);
-        drawVerticalTears(buffer, poseStack, age);
+        drawHorizontalTears(buffer, poseStack, age);
 
         poseStack.popPose();
     }
@@ -42,32 +45,43 @@ public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCore
         return 96;
     }
 
-    private static void drawVerticalTears(VertexConsumer buffer, PoseStack poseStack, float age) {
-        for (int i = 0; i < 5; i++) {
-            float rotation = age * (2.8F + i * 0.22F) + i * 36.0F;
-            float width = 0.38F + i * 0.055F;
-            float height = 1.75F + (float) Math.sin(age * 0.08F + i) * 0.18F;
+    private static void drawHorizontalTears(VertexConsumer buffer, PoseStack poseStack, float age) {
+        for (int i = 0; i < 6; i++) {
+            float rotation = age * (1.65F + i * 0.14F) + i * 29.0F;
+            float halfLength = 0.44F + i * 0.07F;
+            float halfWidth = 0.05F + i * 0.012F;
+            float shimmer = 0.02F + (float) Math.sin(age * 0.08F + i) * 0.01F;
             int color = i % 2 == 0 ? VIOLET : CYAN;
 
             poseStack.pushPose();
             poseStack.mulPose(Axis.YP.rotationDegrees(rotation));
-            poseStack.translate(0.0D, 0.02D + i * 0.025D, 0.0D);
-            quad(buffer, poseStack.last(), -width, 0.0F, 0.0F, width, 0.06F, 0.0F, width * 0.34F, height, 0.0F, -width * 0.34F, height, 0.0F, color, 0.0F, 0.0F, 1.0F);
-            quad(buffer, poseStack.last(), -width * 0.42F, 0.22F, 0.0F, width * 0.42F, 0.22F, 0.0F, width * 0.18F, height + 0.28F, 0.0F, -width * 0.18F, height + 0.28F, 0.0F, WHITE_CORE, 0.0F, 0.0F, 1.0F);
+            poseStack.translate(0.0D, 0.02D + i * 0.002D, 0.0D);
+            quad(buffer, poseStack.last(),
+                    -halfLength, shimmer, -halfWidth,
+                    halfLength, shimmer, -halfWidth * 0.72F,
+                    halfLength * 0.82F, shimmer, halfWidth,
+                    -halfLength * 0.84F, shimmer, halfWidth * 0.78F,
+                    color, 0.0F, 1.0F, 0.0F);
+            quad(buffer, poseStack.last(),
+                    -halfLength * 0.52F, shimmer + 0.01F, -halfWidth * 0.45F,
+                    halfLength * 0.52F, shimmer + 0.01F, -halfWidth * 0.35F,
+                    halfLength * 0.44F, shimmer + 0.01F, halfWidth * 0.45F,
+                    -halfLength * 0.44F, shimmer + 0.01F, halfWidth * 0.35F,
+                    WHITE_CORE, 0.0F, 1.0F, 0.0F);
             poseStack.popPose();
         }
     }
 
     private static void drawSinkGlow(VertexConsumer buffer, PoseStack poseStack, float age) {
-        float pulse = 0.82F + (float) Math.sin(age * 0.16F) * 0.12F;
-        for (int i = 0; i < 4; i++) {
-            float radius = pulse * (0.58F + i * 0.22F);
-            int alpha = Math.max(28, 112 - i * 22);
+        float pulse = 0.86F + (float) Math.sin(age * 0.16F) * 0.10F;
+        for (int i = 0; i < 5; i++) {
+            float radius = pulse * (0.34F + i * 0.18F);
+            int alpha = Math.max(24, 132 - i * 20);
             int ringColor = color(94 + i * 24, 20 + i * 12, 255, alpha);
 
             poseStack.pushPose();
-            poseStack.mulPose(Axis.YP.rotationDegrees(-age * (1.1F + i * 0.18F) + i * 18.0F));
-            ring(buffer, poseStack.last(), radius, radius * 0.68F, ringColor);
+            poseStack.mulPose(Axis.YP.rotationDegrees(-age * (0.90F + i * 0.14F) + i * 18.0F));
+            ring(buffer, poseStack.last(), radius, Math.max(0.05F, radius * 0.56F), ringColor);
             poseStack.popPose();
         }
     }

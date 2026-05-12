@@ -17,8 +17,15 @@ public class TemporalRiftSavedData extends SavedData {
     private boolean riftOpen;
     private long nextRiftDay;
     private long riftCloseGameTime;
+    private long transientReturnRiftCloseGameTime;
     @Nullable
     private BlockPos riftPosition;
+    @Nullable
+    private BlockPos beforeSkyRiftPosition;
+    @Nullable
+    private BlockPos beforeGroundRiftPosition;
+    @Nullable
+    private BlockPos transientReturnRiftPosition;
 
     public boolean isRiftOpen() {
         return riftOpen;
@@ -32,8 +39,24 @@ public class TemporalRiftSavedData extends SavedData {
         return riftCloseGameTime;
     }
 
+    public long getTransientReturnRiftCloseGameTime() {
+        return transientReturnRiftCloseGameTime;
+    }
+
     public @Nullable BlockPos getRiftPosition() {
         return riftPosition;
+    }
+
+    public @Nullable BlockPos getBeforeSkyRiftPosition() {
+        return beforeSkyRiftPosition;
+    }
+
+    public @Nullable BlockPos getBeforeGroundRiftPosition() {
+        return beforeGroundRiftPosition;
+    }
+
+    public @Nullable BlockPos getTransientReturnRiftPosition() {
+        return transientReturnRiftPosition;
     }
 
     public void setRiftOpen(boolean riftOpen) {
@@ -51,8 +74,28 @@ public class TemporalRiftSavedData extends SavedData {
         setDirty();
     }
 
+    public void setTransientReturnRiftCloseGameTime(long transientReturnRiftCloseGameTime) {
+        this.transientReturnRiftCloseGameTime = transientReturnRiftCloseGameTime;
+        setDirty();
+    }
+
     public void setRiftPosition(@Nullable BlockPos riftPosition) {
         this.riftPosition = riftPosition == null ? null : riftPosition.immutable();
+        setDirty();
+    }
+
+    public void setBeforeSkyRiftPosition(@Nullable BlockPos beforeSkyRiftPosition) {
+        this.beforeSkyRiftPosition = beforeSkyRiftPosition == null ? null : beforeSkyRiftPosition.immutable();
+        setDirty();
+    }
+
+    public void setBeforeGroundRiftPosition(@Nullable BlockPos beforeGroundRiftPosition) {
+        this.beforeGroundRiftPosition = beforeGroundRiftPosition == null ? null : beforeGroundRiftPosition.immutable();
+        setDirty();
+    }
+
+    public void setTransientReturnRiftPosition(@Nullable BlockPos transientReturnRiftPosition) {
+        this.transientReturnRiftPosition = transientReturnRiftPosition == null ? null : transientReturnRiftPosition.immutable();
         setDirty();
     }
 
@@ -61,8 +104,30 @@ public class TemporalRiftSavedData extends SavedData {
         data.riftOpen = tag.getBoolean("riftOpen");
         data.nextRiftDay = tag.getLong("nextRiftDay");
         data.riftCloseGameTime = tag.getLong("riftCloseGameTime");
+        data.transientReturnRiftCloseGameTime = tag.getLong("transientReturnRiftCloseGameTime");
         if (tag.contains("riftPosX")) {
             data.riftPosition = new BlockPos(tag.getInt("riftPosX"), tag.getInt("riftPosY"), tag.getInt("riftPosZ"));
+        }
+        if (tag.contains("beforeSkyRiftPosX")) {
+            data.beforeSkyRiftPosition = new BlockPos(
+                    tag.getInt("beforeSkyRiftPosX"),
+                    tag.getInt("beforeSkyRiftPosY"),
+                    tag.getInt("beforeSkyRiftPosZ")
+            );
+        }
+        if (tag.contains("beforeGroundRiftPosX")) {
+            data.beforeGroundRiftPosition = new BlockPos(
+                    tag.getInt("beforeGroundRiftPosX"),
+                    tag.getInt("beforeGroundRiftPosY"),
+                    tag.getInt("beforeGroundRiftPosZ")
+            );
+        }
+        if (tag.contains("transientReturnRiftPosX")) {
+            data.transientReturnRiftPosition = new BlockPos(
+                    tag.getInt("transientReturnRiftPosX"),
+                    tag.getInt("transientReturnRiftPosY"),
+                    tag.getInt("transientReturnRiftPosZ")
+            );
         }
         return data;
     }
@@ -72,10 +137,26 @@ public class TemporalRiftSavedData extends SavedData {
         tag.putBoolean("riftOpen", riftOpen);
         tag.putLong("nextRiftDay", nextRiftDay);
         tag.putLong("riftCloseGameTime", riftCloseGameTime);
+        tag.putLong("transientReturnRiftCloseGameTime", transientReturnRiftCloseGameTime);
         if (riftPosition != null) {
             tag.putInt("riftPosX", riftPosition.getX());
             tag.putInt("riftPosY", riftPosition.getY());
             tag.putInt("riftPosZ", riftPosition.getZ());
+        }
+        if (beforeSkyRiftPosition != null) {
+            tag.putInt("beforeSkyRiftPosX", beforeSkyRiftPosition.getX());
+            tag.putInt("beforeSkyRiftPosY", beforeSkyRiftPosition.getY());
+            tag.putInt("beforeSkyRiftPosZ", beforeSkyRiftPosition.getZ());
+        }
+        if (beforeGroundRiftPosition != null) {
+            tag.putInt("beforeGroundRiftPosX", beforeGroundRiftPosition.getX());
+            tag.putInt("beforeGroundRiftPosY", beforeGroundRiftPosition.getY());
+            tag.putInt("beforeGroundRiftPosZ", beforeGroundRiftPosition.getZ());
+        }
+        if (transientReturnRiftPosition != null) {
+            tag.putInt("transientReturnRiftPosX", transientReturnRiftPosition.getX());
+            tag.putInt("transientReturnRiftPosY", transientReturnRiftPosition.getY());
+            tag.putInt("transientReturnRiftPosZ", transientReturnRiftPosition.getZ());
         }
         return tag;
     }

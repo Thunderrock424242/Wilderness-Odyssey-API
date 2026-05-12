@@ -9,11 +9,13 @@ in float facing;
 out vec4 fragColor;
 
 void main() {
-    float verticalPulse = 0.68 + 0.32 * sin(GameTime * 620.0 + localPos.y * 6.0);
-    float scanline = 0.78 + 0.22 * sin((localPos.y + GameTime * 34.0) * 22.0);
-    float core = 1.0 - smoothstep(0.02, 1.55, length(localPos.xz));
+    float radial = length(localPos.xz);
+    float angle = atan(localPos.z, localPos.x);
+    float temporalPulse = 0.68 + 0.32 * sin(GameTime * 620.0 + radial * 9.0 + angle * 2.0);
+    float ripple = 0.78 + 0.22 * sin((radial - GameTime * 12.0) * 26.0);
+    float core = 1.0 - smoothstep(0.02, 1.55, radial);
     vec3 cyanShift = vec3(0.18, 0.88, 1.0);
     vec3 color = mix(vertexColor.rgb, cyanShift, core * 0.42);
-    float alpha = vertexColor.a * verticalPulse * scanline * facing;
+    float alpha = vertexColor.a * temporalPulse * ripple * facing;
     fragColor = vec4(color, alpha);
 }
