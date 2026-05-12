@@ -13,6 +13,7 @@ import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.RelativeMovement;
+import net.minecraft.world.level.levelgen.Heightmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,10 +42,11 @@ public final class TemporalRiftTeleporter {
             int fallbackY = Math.min(toLevel.getMaxBuildHeight() - 16, (int) Math.floor(sourceY) + 64);
             skyRiftPos = new BlockPos((int) Math.floor(sourceX), fallbackY, (int) Math.floor(sourceZ));
         }
+        int surfaceY = toLevel.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, skyRiftPos.getX(), skyRiftPos.getZ());
         BlockPos respawnPos = SafeTeleportHelper.findSafePositionNearby(
                 toLevel,
                 skyRiftPos.getX(),
-                Math.max(toLevel.getMinBuildHeight() + 2, skyRiftPos.getY() - 64),
+                Math.max(toLevel.getMinBuildHeight() + 2, surfaceY),
                 skyRiftPos.getZ(),
                 12
         );

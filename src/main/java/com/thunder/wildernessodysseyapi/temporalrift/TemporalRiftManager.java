@@ -79,6 +79,7 @@ public final class TemporalRiftManager {
         long gameTime = overworld.getGameTime();
         BlockPos riftPos = prepareRiftSite(overworld, pos);
         overworld.setBlock(riftPos, TemporalRiftBlocks.RIFT_CORE.get().defaultBlockState(), 3);
+        setRiftVisualMode(overworld, riftPos, RiftCoreBlockEntity.VisualMode.OVERWORLD_SINKHOLE);
         RiftEffectHelper.playOpeningEffects(overworld, riftPos);
         data.setRiftOpen(true);
         data.setRiftPosition(riftPos);
@@ -106,6 +107,7 @@ public final class TemporalRiftManager {
         BlockPos riftPos = prepareRiftSite(overworld, surfacePos);
 
         overworld.setBlock(riftPos, TemporalRiftBlocks.RIFT_CORE.get().defaultBlockState(), 3);
+        setRiftVisualMode(overworld, riftPos, RiftCoreBlockEntity.VisualMode.OVERWORLD_SINKHOLE);
         RiftEffectHelper.playOpeningEffects(overworld, riftPos);
         data.setRiftOpen(true);
         data.setRiftPosition(riftPos);
@@ -177,12 +179,14 @@ public final class TemporalRiftManager {
 
         BlockPos skyRiftPos = findSkyRiftPosition(beforeLevel, overworldRiftPos);
         beforeLevel.setBlock(skyRiftPos, TemporalRiftBlocks.RIFT_CORE.get().defaultBlockState(), 3);
+        setRiftVisualMode(beforeLevel, skyRiftPos, RiftCoreBlockEntity.VisualMode.BEFORE_SKY_TEAR);
         setBeforeRiftScale(beforeLevel, skyRiftPos, 1.0F);
         data.setBeforeSkyRiftPosition(skyRiftPos);
 
         int mountainSearchRadius = Math.max(256, TemporalRiftConfig.RIFT_SPAWN_RADIUS.get() * 4);
         BlockPos groundRiftPos = RiftSpawnHelper.findHighestMountainRiftPosition(beforeLevel, mountainSearchRadius);
         beforeLevel.setBlock(groundRiftPos, TemporalRiftBlocks.RIFT_CORE.get().defaultBlockState(), 3);
+        setRiftVisualMode(beforeLevel, groundRiftPos, RiftCoreBlockEntity.VisualMode.BEFORE_GROUND_RETURN);
         setBeforeRiftScale(beforeLevel, groundRiftPos, 1.0F);
         data.setBeforeGroundRiftPosition(groundRiftPos);
 
@@ -236,6 +240,12 @@ public final class TemporalRiftManager {
         }
     }
 
+    private static void setRiftVisualMode(ServerLevel level, BlockPos pos, RiftCoreBlockEntity.VisualMode visualMode) {
+        if (level.getBlockEntity(pos) instanceof RiftCoreBlockEntity rift) {
+            rift.setVisualMode(visualMode);
+        }
+    }
+
     public static void returnPlayerThroughTransientRift(ServerPlayer player, ServerLevel overworld) {
         BlockPos exitRiftPos = openTransientReturnRift(overworld);
         TemporalRiftTeleporter.teleportToOverworld(player, overworld, exitRiftPos);
@@ -249,6 +259,7 @@ public final class TemporalRiftManager {
         BlockPos randomSurface = RiftSpawnHelper.findRiftSpawnPosition(overworld, TemporalRiftConfig.RIFT_SPAWN_RADIUS.get());
         BlockPos riftPos = RiftTerrainHelper.createReturnScar(overworld, randomSurface);
         overworld.setBlock(riftPos, TemporalRiftBlocks.RIFT_CORE.get().defaultBlockState(), 3);
+        setRiftVisualMode(overworld, riftPos, RiftCoreBlockEntity.VisualMode.TRANSIENT_RETURN);
         RiftEffectHelper.playOpeningEffects(overworld, riftPos);
         data.setTransientReturnRiftPosition(riftPos);
         data.setTransientReturnRiftCloseGameTime(overworld.getGameTime() + TRANSIENT_RETURN_RIFT_TICKS);

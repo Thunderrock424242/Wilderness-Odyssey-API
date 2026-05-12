@@ -27,10 +27,25 @@ public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCore
         poseStack.translate(0.5D, 0.02D, 0.5D);
         float renderScale = blockEntity.getRenderScale();
         poseStack.scale(renderScale, renderScale, renderScale);
-        poseStack.scale(2.8F, 1.0F, 2.8F);
-
-        drawSinkGlow(buffer, poseStack, age);
-        drawHorizontalTears(buffer, poseStack, age);
+        switch (blockEntity.getVisualMode()) {
+            case BEFORE_SKY_TEAR -> {
+                poseStack.translate(0.0D, 0.5D, 0.0D);
+                poseStack.scale(4.2F, 4.8F, 1.0F);
+                drawSkyTear(buffer, poseStack, age);
+            }
+            case BEFORE_GROUND_RETURN -> {
+                poseStack.scale(2.2F, 1.0F, 2.2F);
+                drawHorizontalTears(buffer, poseStack, age);
+            }
+            case TRANSIENT_RETURN -> {
+                poseStack.scale(1.8F, 1.0F, 1.8F);
+                drawHorizontalTears(buffer, poseStack, age);
+            }
+            case OVERWORLD_SINKHOLE -> {
+                poseStack.scale(2.8F, 1.0F, 2.8F);
+                drawHorizontalTears(buffer, poseStack, age);
+            }
+        }
 
         poseStack.popPose();
     }
@@ -72,35 +87,29 @@ public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCore
         }
     }
 
-    private static void drawSinkGlow(VertexConsumer buffer, PoseStack poseStack, float age) {
-        float pulse = 0.86F + (float) Math.sin(age * 0.16F) * 0.10F;
-        for (int i = 0; i < 5; i++) {
-            float radius = pulse * (0.34F + i * 0.18F);
-            int alpha = Math.max(24, 132 - i * 20);
-            int ringColor = color(94 + i * 24, 20 + i * 12, 255, alpha);
+    private static void drawSkyTear(VertexConsumer buffer, PoseStack poseStack, float age) {
+        for (int i = 0; i < 7; i++) {
+            float sway = (float) Math.sin(age * 0.045F + i * 0.8F) * 0.035F;
+            float topOffset = 0.28F + i * 0.045F;
+            float baseOffset = 0.16F + i * 0.025F;
+            float height = 0.96F + i * 0.06F;
+            int color = i % 2 == 0 ? VIOLET : CYAN;
 
             poseStack.pushPose();
-            poseStack.mulPose(Axis.YP.rotationDegrees(-age * (0.90F + i * 0.14F) + i * 18.0F));
-            ring(buffer, poseStack.last(), radius, Math.max(0.05F, radius * 0.56F), ringColor);
+            poseStack.mulPose(Axis.YP.rotationDegrees(i * 4.0F));
+            quad(buffer, poseStack.last(),
+                    -baseOffset + sway, -height * 0.54F, 0.0F,
+                    baseOffset + sway, -height * 0.50F, 0.0F,
+                    topOffset - sway, height * 0.48F, 0.0F,
+                    -topOffset - sway, height * 0.54F, 0.0F,
+                    color, 0.0F, 0.0F, 1.0F);
+            quad(buffer, poseStack.last(),
+                    -baseOffset * 0.45F + sway * 0.35F, -height * 0.40F, 0.01F,
+                    baseOffset * 0.45F + sway * 0.35F, -height * 0.36F, 0.01F,
+                    topOffset * 0.40F - sway * 0.35F, height * 0.36F, 0.01F,
+                    -topOffset * 0.40F - sway * 0.35F, height * 0.40F, 0.01F,
+                    WHITE_CORE, 0.0F, 0.0F, 1.0F);
             poseStack.popPose();
-        }
-    }
-
-    private static void ring(VertexConsumer buffer, PoseStack.Pose pose, float outer, float inner, int color) {
-        int segments = 28;
-        for (int i = 0; i < segments; i++) {
-            double a0 = Math.PI * 2.0D * i / segments;
-            double a1 = Math.PI * 2.0D * (i + 1) / segments;
-            float ox0 = (float) Math.cos(a0);
-            float oz0 = (float) Math.sin(a0);
-            float ox1 = (float) Math.cos(a1);
-            float oz1 = (float) Math.sin(a1);
-            quad(buffer, pose,
-                    ox0 * outer, 0.01F, oz0 * outer,
-                    ox1 * outer, 0.01F, oz1 * outer,
-                    ox1 * inner, 0.01F, oz1 * inner,
-                    ox0 * inner, 0.01F, oz0 * inner,
-                    color, 0.0F, 1.0F, 0.0F);
         }
     }
 
