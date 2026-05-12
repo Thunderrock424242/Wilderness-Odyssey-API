@@ -47,6 +47,7 @@ public final class TemporalRiftManager {
         }
 
         TemporalTransferManager.tick(server);
+        TemporalEchoManager.tick(server);
     }
 
     public static void forceOpenRift(MinecraftServer server, BlockPos pos) {

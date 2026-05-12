@@ -16,6 +16,10 @@ public final class TemporalRiftConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_RIFT_PULL_EFFECT;
     public static final ModConfigSpec.BooleanValue ENABLE_RIFT_TERRAIN_AGING;
     public static final ModConfigSpec.IntValue TIME_CAPSULE_DELAY_DAYS;
+    public static final ModConfigSpec.IntValue TIME_CAPSULE_BURIAL_DEPTH;
+    public static final ModConfigSpec.BooleanValue ENABLE_TEMPORAL_ECHOES;
+    public static final ModConfigSpec.IntValue TEMPORAL_ECHO_DELAY_DAYS;
+    public static final ModConfigSpec.IntValue TEMPORAL_ECHO_BURIAL_DEPTH;
     public static final ModConfigSpec.BooleanValue RETURN_ONLY_ACTIVE_RIFT;
     public static final ModConfigSpec.BooleanValue CHAT_BROADCASTS;
     public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
@@ -62,6 +66,22 @@ public final class TemporalRiftConfig {
         TIME_CAPSULE_DELAY_DAYS = BUILDER
                 .comment("Minecraft days before a sealed time capsule transfers to the Overworld.")
                 .defineInRange("timeCapsuleDelayDays", 3, 1, 1000);
+
+        TIME_CAPSULE_BURIAL_DEPTH = BUILDER
+                .comment("How many blocks below the Overworld surface delivered ancient time capsules are buried.")
+                .defineInRange("timeCapsuleBurialDepth", 3, 1, 16);
+
+        ENABLE_TEMPORAL_ECHOES = BUILDER
+                .comment("If true, player-placed blocks in The Before later appear in the Overworld as buried ruined echoes.")
+                .define("enableTemporalEchoes", true);
+
+        TEMPORAL_ECHO_DELAY_DAYS = BUILDER
+                .comment("Minecraft days before player-built changes in The Before echo into the Overworld.")
+                .defineInRange("temporalEchoDelayDays", 5, 1, 1000);
+
+        TEMPORAL_ECHO_BURIAL_DEPTH = BUILDER
+                .comment("How far below the original Y level temporal echoes are placed in the Overworld.")
+                .defineInRange("temporalEchoBurialDepth", 2, 0, 32);
 
         RETURN_ONLY_ACTIVE_RIFT = BUILDER
                 .comment("If true, players can only return from the past dimension during an active rift.")

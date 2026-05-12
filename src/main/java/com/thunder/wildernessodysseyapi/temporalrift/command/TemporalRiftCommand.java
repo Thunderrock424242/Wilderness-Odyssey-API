@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.temporalrift.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.thunder.wildernessodysseyapi.temporalrift.TemporalRiftManager;
 import com.thunder.wildernessodysseyapi.temporalrift.TemporalRiftSavedData;
@@ -14,7 +15,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 public final class TemporalRiftCommand {
     private TemporalRiftCommand() {
@@ -25,6 +28,10 @@ public final class TemporalRiftCommand {
                 Commands.literal("wildernessrift")
                         .requires(source -> source.hasPermission(2))
                         .then(Commands.literal("open").executes(TemporalRiftCommand::cmdOpen))
+                        .then(Commands.literal("debug_open_near")
+                                .executes(context -> cmdDebugOpenNear(context, 10))
+                                .then(Commands.argument("distance", IntegerArgumentType.integer(3, 64))
+                                        .executes(context -> cmdDebugOpenNear(context, IntegerArgumentType.getInteger(context, "distance")))))
                         .then(Commands.literal("close").executes(TemporalRiftCommand::cmdClose))
                         .then(Commands.literal("status").executes(TemporalRiftCommand::cmdStatus))
                         .then(Commands.literal("teleport_past").executes(TemporalRiftCommand::cmdTeleportPast))
@@ -39,6 +46,33 @@ public final class TemporalRiftCommand {
         TemporalRiftManager.forceOpenRift(source.getServer(), pos);
         source.sendSuccess(() -> Component.literal("Temporal rift force-opened at " + pos + "."), true);
         return 1;
+    }
+
+    private static int cmdDebugOpenNear(CommandContext<CommandSourceStack> context, int distance) {
+        CommandSourceStack source = context.getSource();
+        try {
+            ServerPlayer player = source.getPlayerOrException();
+            if (!player.level().dimension().equals(Level.OVERWORLD)) {
+                source.sendFailure(Component.literal("Debug rifts must be opened from the Overworld."));
+                return 0;
+            }
+
+            ServerLevel overworld = player.serverLevel();
+            float yaw = player.getYRot() * Mth.DEG_TO_RAD;
+            double dx = -Mth.sin(yaw);
+            double dz = Mth.cos(yaw);
+            int x = Mth.floor(player.getX() + dx * distance);
+            int z = Mth.floor(player.getZ() + dz * distance);
+            int y = overworld.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            BlockPos pos = new BlockPos(x, y, z);
+
+            TemporalRiftManager.forceOpenRift(source.getServer(), pos);
+            source.sendSuccess(() -> Component.literal("Debug rift opened " + distance + " blocks ahead at " + pos + "."), true);
+            return 1;
+        } catch (Exception exception) {
+            source.sendFailure(Component.literal("Debug rift failed: " + exception.getMessage()));
+            return 0;
+        }
     }
 
     private static int cmdClose(CommandContext<CommandSourceStack> context) {
