@@ -27,6 +27,7 @@ public final class TemporalRiftTeleporter {
     private static final int ARRIVAL_FADE_IN_TICKS = 10;
     private static final int ARRIVAL_STAY_TICKS = 50;
     private static final int ARRIVAL_FADE_OUT_TICKS = 20;
+    private static final int DEFAULT_BEFORE_SKY_RIFT_CLOUD_Y = 192;
 
     private TemporalRiftTeleporter() {
     }
@@ -39,7 +40,10 @@ public final class TemporalRiftTeleporter {
         TemporalRiftSavedData riftData = server == null ? null : TemporalRiftSavedData.get(server);
         BlockPos skyRiftPos = riftData == null ? null : riftData.getBeforeSkyRiftPosition();
         if (skyRiftPos == null) {
-            int fallbackY = Math.min(toLevel.getMaxBuildHeight() - 16, (int) Math.floor(sourceY) + 64);
+            int fallbackY = Math.max(
+                    toLevel.getMinBuildHeight() + 16,
+                    Math.min(DEFAULT_BEFORE_SKY_RIFT_CLOUD_Y, toLevel.getMaxBuildHeight() - 16)
+            );
             skyRiftPos = new BlockPos((int) Math.floor(sourceX), fallbackY, (int) Math.floor(sourceZ));
         }
         int surfaceY = toLevel.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, skyRiftPos.getX(), skyRiftPos.getZ());
@@ -51,7 +55,15 @@ public final class TemporalRiftTeleporter {
                 12
         );
         if (respawnPos == null) {
-            respawnPos = BlockPos.containing(sourceX, sourceY, sourceZ);
+            int fallbackSurfaceY = Math.min(
+                    toLevel.getMaxBuildHeight() - 2,
+                    toLevel.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, skyRiftPos.getX(), skyRiftPos.getZ()) + 1
+            );
+            respawnPos = new BlockPos(
+                    skyRiftPos.getX(),
+                    Math.max(toLevel.getMinBuildHeight() + 2, fallbackSurfaceY),
+                    skyRiftPos.getZ()
+            );
         }
 
         CompoundTag persistentData = player.getPersistentData();

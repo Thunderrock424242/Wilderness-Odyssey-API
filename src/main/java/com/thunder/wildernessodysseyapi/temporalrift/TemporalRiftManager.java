@@ -23,6 +23,7 @@ public final class TemporalRiftManager {
     private static final long BEFORE_RIFT_SHRINK_TICKS = 240L;
     private static final long TRANSIENT_RETURN_RIFT_TICKS = 100L;
     private static final double BASIN_CAPTURE_RADIUS = 4.25D;
+    private static final int BEFORE_SKY_RIFT_CLOUD_Y = 192;
 
     private TemporalRiftManager() {
     }
@@ -212,12 +213,10 @@ public final class TemporalRiftManager {
     }
 
     private static BlockPos findSkyRiftPosition(ServerLevel beforeLevel, BlockPos overworldRiftPos) {
-        int surfaceY = beforeLevel.getHeight(
-                Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                overworldRiftPos.getX(),
-                overworldRiftPos.getZ()
+        int skyY = Math.max(
+                beforeLevel.getMinBuildHeight() + 16,
+                Math.min(BEFORE_SKY_RIFT_CLOUD_Y, beforeLevel.getMaxBuildHeight() - 16)
         );
-        int skyY = Math.min(beforeLevel.getMaxBuildHeight() - 16, surfaceY + 64);
         return new BlockPos(overworldRiftPos.getX(), skyY, overworldRiftPos.getZ());
     }
 

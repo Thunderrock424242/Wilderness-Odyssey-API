@@ -58,6 +58,6 @@ public final class SafeTeleportHelper {
     }
 
     private static boolean isPassable(BlockState state) {
-        return state.isAir() || !state.isSolid();
+        return state.isAir() || (!state.isSolid() && !state.liquid());
     }
 }
