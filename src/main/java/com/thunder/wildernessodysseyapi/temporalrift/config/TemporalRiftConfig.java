@@ -54,11 +54,11 @@ public final class TemporalRiftConfig {
 
         RIFT_SINKHOLE_RADIUS = BUILDER
                 .comment("Radius, in blocks, of the terrain collapse around a newly opened rift.")
-                .defineInRange("riftSinkholeRadius", 18, 6, 48);
+                .defineInRange("riftSinkholeRadius", 42, 6, 96);
 
         RIFT_SINKHOLE_DEPTH = BUILDER
                 .comment("Maximum depth, in blocks, of the rift sinkhole.")
-                .defineInRange("riftSinkholeDepth", 14, 6, 48);
+                .defineInRange("riftSinkholeDepth", 30, 6, 64);
 
         ENABLE_RIFT_OPENING_DISASTER = BUILDER
                 .comment("If true, a new Overworld rift triggers a brief large-scale disaster pulse: shockwave, dust, startled wildlife, and light rim damage.")

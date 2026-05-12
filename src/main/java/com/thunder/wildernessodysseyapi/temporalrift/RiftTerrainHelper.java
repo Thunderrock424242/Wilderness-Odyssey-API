@@ -13,8 +13,8 @@ public final class RiftTerrainHelper {
     }
 
     public static BlockPos createSinkhole(ServerLevel level, BlockPos aroundPos, int radius, int depth) {
-        int safeRadius = Mth.clamp(radius, 6, 48);
-        int safeDepth = Mth.clamp(depth, 6, 48);
+        int safeRadius = Mth.clamp(radius, 6, 96);
+        int safeDepth = Mth.clamp(depth, 6, 64);
         BlockPos centerSurface = surfaceAt(level, aroundPos);
         int minY = level.getMinBuildHeight() + 4;
         int maxY = level.getMaxBuildHeight() - 2;
@@ -63,7 +63,7 @@ public final class RiftTerrainHelper {
             }
         }
 
-        buildRiftBasin(level, centerSurface, centerFloorY);
+        buildRiftBasin(level, centerSurface, centerFloorY, Mth.clamp(safeRadius / 5, 5, 12));
         return new BlockPos(centerSurface.getX(), centerFloorY + 1, centerSurface.getZ());
     }
 
@@ -112,22 +112,22 @@ public final class RiftTerrainHelper {
         return new BlockPos(pos.getX(), y, pos.getZ());
     }
 
-    private static void buildRiftBasin(ServerLevel level, BlockPos centerSurface, int floorY) {
+    private static void buildRiftBasin(ServerLevel level, BlockPos centerSurface, int floorY, int basinRadius) {
         BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
-        for (int dx = -3; dx <= 3; dx++) {
-            for (int dz = -3; dz <= 3; dz++) {
+        for (int dx = -basinRadius; dx <= basinRadius; dx++) {
+            for (int dz = -basinRadius; dz <= basinRadius; dz++) {
                 int x = centerSurface.getX() + dx;
                 int z = centerSurface.getZ() + dz;
                 mutable.set(x, floorY, z);
                 int manhattan = Math.abs(dx) + Math.abs(dz);
-                BlockState basinState = manhattan <= 2
+                BlockState basinState = manhattan <= Math.max(3, basinRadius / 2)
                         ? Blocks.CRYING_OBSIDIAN.defaultBlockState()
-                        : manhattan <= 4
+                        : manhattan <= Math.max(5, basinRadius)
                         ? Blocks.SCULK.defaultBlockState()
                         : Blocks.DEEPSLATE.defaultBlockState();
                 level.setBlock(mutable, basinState, 3);
 
-                for (int y = floorY + 1; y <= floorY + 6; y++) {
+                for (int y = floorY + 1; y <= floorY + Math.max(6, basinRadius / 2 + 3); y++) {
                     mutable.set(x, y, z);
                     level.setBlock(mutable, Blocks.AIR.defaultBlockState(), 3);
                 }

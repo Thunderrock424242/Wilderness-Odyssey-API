@@ -35,6 +35,13 @@ public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCore
             {0.58F, 0.16F},
             {0.88F, 0.24F}
     };
+    private static final float[][] SKY_CROSS_SWEEP = {
+            {-0.74F, -0.18F},
+            {-0.34F, -0.06F},
+            {0.02F, 0.06F},
+            {0.34F, 0.20F},
+            {0.72F, 0.28F}
+    };
     private static final float[][] GROUND_MAIN_PATH = {
             {-0.72F, -0.10F},
             {-0.38F, -0.02F},
@@ -69,20 +76,20 @@ public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCore
         poseStack.scale(renderScale, renderScale, renderScale);
         switch (blockEntity.getVisualMode()) {
             case BEFORE_SKY_TEAR -> {
-                poseStack.translate(0.0D, 0.5D, 0.0D);
-                poseStack.scale(8.6F, 6.8F, 1.0F);
+                poseStack.translate(0.0D, 0.20D, 0.0D);
+                poseStack.scale(34.0F, 1.0F, 26.0F);
                 drawSkyTear(buffer, poseStack, age);
             }
             case BEFORE_GROUND_RETURN -> {
-                poseStack.scale(2.0F, 1.0F, 2.0F);
+                poseStack.scale(3.4F, 1.0F, 2.8F);
                 drawGroundTear(buffer, poseStack, age);
             }
             case TRANSIENT_RETURN -> {
-                poseStack.scale(1.55F, 1.0F, 1.55F);
+                poseStack.scale(2.8F, 1.0F, 2.3F);
                 drawGroundTear(buffer, poseStack, age);
             }
             case OVERWORLD_SINKHOLE -> {
-                poseStack.scale(2.45F, 1.0F, 2.45F);
+                poseStack.scale(7.4F, 1.0F, 6.0F);
                 drawGroundTear(buffer, poseStack, age);
             }
         }
@@ -97,44 +104,50 @@ public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCore
 
     @Override
     public int getViewDistance() {
-        return 320;
+        return 512;
     }
 
     private static void drawGroundTear(VertexConsumer buffer, PoseStack poseStack, float age) {
         float pulse = 1.0F + (float) Math.sin(age * 0.08F) * 0.08F;
+        float sway = (float) Math.sin(age * 0.022F) * 2.2F;
         poseStack.pushPose();
-        poseStack.mulPose(Axis.YP.rotationDegrees(18.0F));
-        drawHorizontalRibbon(buffer, poseStack, GROUND_MAIN_PATH, 0.10F * pulse, 0.018F, VIOLET);
-        drawHorizontalRibbon(buffer, poseStack, GROUND_MAIN_PATH, 0.055F * pulse, 0.024F, CYAN);
-        drawHorizontalRibbon(buffer, poseStack, GROUND_MAIN_PATH, 0.022F * pulse, 0.030F, WHITE_CORE);
-        drawHorizontalRibbon(buffer, poseStack, GROUND_BRANCH_LEFT, 0.055F * pulse, 0.022F, CYAN);
-        drawHorizontalRibbon(buffer, poseStack, GROUND_BRANCH_RIGHT, 0.055F * pulse, 0.022F, CYAN);
-        drawHorizontalRibbon(buffer, poseStack, GROUND_BRANCH_LEFT, 0.025F * pulse, 0.028F, WHITE_CORE);
-        drawHorizontalRibbon(buffer, poseStack, GROUND_BRANCH_RIGHT, 0.025F * pulse, 0.028F, WHITE_CORE);
+        poseStack.mulPose(Axis.YP.rotationDegrees(18.0F + sway));
+        drawHorizontalRibbon(buffer, poseStack, GROUND_MAIN_PATH, 0.34F * pulse, -0.12F, AURORA_VIOLET);
+        drawHorizontalRibbon(buffer, poseStack, GROUND_MAIN_PATH, 0.28F * pulse, 0.10F, AURORA_CYAN);
+        drawHorizontalRibbonVolume(buffer, poseStack, GROUND_MAIN_PATH, 0.20F * pulse, 0.12F, VIOLET);
+        drawHorizontalRibbonVolume(buffer, poseStack, GROUND_MAIN_PATH, 0.12F * pulse, 0.08F, CYAN);
+        drawHorizontalRibbonVolume(buffer, poseStack, GROUND_MAIN_PATH, 0.050F * pulse, 0.035F, WHITE_CORE);
+        drawHorizontalRibbonVolume(buffer, poseStack, GROUND_BRANCH_LEFT, 0.10F * pulse, 0.060F, CYAN);
+        drawHorizontalRibbonVolume(buffer, poseStack, GROUND_BRANCH_RIGHT, 0.10F * pulse, 0.060F, CYAN);
+        drawHorizontalRibbonVolume(buffer, poseStack, GROUND_BRANCH_LEFT, 0.040F * pulse, 0.028F, WHITE_CORE);
+        drawHorizontalRibbonVolume(buffer, poseStack, GROUND_BRANCH_RIGHT, 0.040F * pulse, 0.028F, WHITE_CORE);
         poseStack.popPose();
     }
 
     private static void drawSkyTear(VertexConsumer buffer, PoseStack poseStack, float age) {
         float pulse = 1.0F + (float) Math.sin(age * 0.05F) * 0.10F;
         float driftX = (float) Math.sin(age * 0.014F) * 0.052F;
-        float driftY = (float) Math.cos(age * 0.011F) * 0.028F;
-        float twist = (float) Math.sin(age * 0.012F) * 2.6F;
+        float driftY = (float) Math.cos(age * 0.011F) * 0.060F;
+        float driftZ = (float) Math.cos(age * 0.017F) * 0.048F;
+        float twist = (float) Math.sin(age * 0.012F) * 3.4F;
 
         poseStack.pushPose();
-        poseStack.translate(driftX, driftY, 0.0D);
-        poseStack.mulPose(Axis.ZP.rotationDegrees(twist));
-        for (float rotation : new float[] {-24.0F, 0.0F, 24.0F}) {
+        poseStack.translate(driftX, driftY, driftZ);
+        poseStack.mulPose(Axis.YP.rotationDegrees(twist));
+        for (float rotation : new float[] {-12.0F, 0.0F, 12.0F}) {
             poseStack.pushPose();
             poseStack.mulPose(Axis.YP.rotationDegrees(rotation));
-            drawVerticalRibbon(buffer, poseStack, SKY_MAIN_PATH, 0.185F * pulse, -0.180F, AURORA_VIOLET);
-            drawVerticalRibbon(buffer, poseStack, SKY_MAIN_PATH, 0.165F * pulse, 0.180F, AURORA_CYAN);
-            drawVerticalRibbonVolume(buffer, poseStack, SKY_MAIN_PATH, 0.102F * pulse, 0.105F, VIOLET);
-            drawVerticalRibbonVolume(buffer, poseStack, SKY_MAIN_PATH, 0.058F * pulse, 0.066F, CYAN);
-            drawVerticalRibbonVolume(buffer, poseStack, SKY_MAIN_PATH, 0.022F * pulse, 0.028F, WHITE_CORE);
-            drawVerticalRibbonVolume(buffer, poseStack, SKY_BRANCH_LEFT, 0.060F * pulse, 0.050F, CYAN);
-            drawVerticalRibbonVolume(buffer, poseStack, SKY_BRANCH_RIGHT, 0.060F * pulse, 0.050F, CYAN);
-            drawVerticalRibbonVolume(buffer, poseStack, SKY_BRANCH_LEFT, 0.026F * pulse, 0.022F, WHITE_CORE);
-            drawVerticalRibbonVolume(buffer, poseStack, SKY_BRANCH_RIGHT, 0.026F * pulse, 0.022F, WHITE_CORE);
+            drawHorizontalRibbon(buffer, poseStack, SKY_MAIN_PATH, 0.58F * pulse, -0.26F, AURORA_VIOLET);
+            drawHorizontalRibbon(buffer, poseStack, SKY_MAIN_PATH, 0.48F * pulse, 0.18F, AURORA_CYAN);
+            drawHorizontalRibbon(buffer, poseStack, SKY_CROSS_SWEEP, 0.40F * pulse, -0.18F, AURORA_CYAN);
+            drawHorizontalRibbonVolume(buffer, poseStack, SKY_MAIN_PATH, 0.34F * pulse, 0.22F, VIOLET);
+            drawHorizontalRibbonVolume(buffer, poseStack, SKY_MAIN_PATH, 0.22F * pulse, 0.16F, CYAN);
+            drawHorizontalRibbonVolume(buffer, poseStack, SKY_MAIN_PATH, 0.090F * pulse, 0.070F, WHITE_CORE);
+            drawHorizontalRibbonVolume(buffer, poseStack, SKY_BRANCH_LEFT, 0.18F * pulse, 0.12F, CYAN);
+            drawHorizontalRibbonVolume(buffer, poseStack, SKY_BRANCH_RIGHT, 0.18F * pulse, 0.12F, CYAN);
+            drawHorizontalRibbonVolume(buffer, poseStack, SKY_CROSS_SWEEP, 0.16F * pulse, 0.10F, VIOLET);
+            drawHorizontalRibbonVolume(buffer, poseStack, SKY_BRANCH_LEFT, 0.072F * pulse, 0.050F, WHITE_CORE);
+            drawHorizontalRibbonVolume(buffer, poseStack, SKY_BRANCH_RIGHT, 0.072F * pulse, 0.050F, WHITE_CORE);
             poseStack.popPose();
         }
         poseStack.popPose();
@@ -232,6 +245,53 @@ public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCore
                     x1 - px, y, z1 - pz,
                     x0 - px, y, z0 - pz,
                     color, 0.0F, 1.0F, 0.0F);
+        }
+    }
+
+    private static void drawHorizontalRibbonVolume(VertexConsumer buffer, PoseStack poseStack, float[][] points, float halfWidth, float halfHeight, int color) {
+        for (int i = 0; i < points.length - 1; i++) {
+            float x0 = points[i][0];
+            float z0 = points[i][1];
+            float x1 = points[i + 1][0];
+            float z1 = points[i + 1][1];
+            float dx = x1 - x0;
+            float dz = z1 - z0;
+            float length = (float) Math.sqrt(dx * dx + dz * dz);
+            if (length <= 0.0001F) {
+                continue;
+            }
+
+            float nx = -dz / length;
+            float nz = dx / length;
+            float px = nx * halfWidth;
+            float pz = nz * halfWidth;
+            float topY = halfHeight;
+            float bottomY = -halfHeight;
+
+            quad(buffer, poseStack.last(),
+                    x0 + px, topY, z0 + pz,
+                    x1 + px, topY, z1 + pz,
+                    x1 - px, topY, z1 - pz,
+                    x0 - px, topY, z0 - pz,
+                    color, 0.0F, 1.0F, 0.0F);
+            quad(buffer, poseStack.last(),
+                    x0 - px, bottomY, z0 - pz,
+                    x1 - px, bottomY, z1 - pz,
+                    x1 + px, bottomY, z1 + pz,
+                    x0 + px, bottomY, z0 + pz,
+                    color, 0.0F, -1.0F, 0.0F);
+            quad(buffer, poseStack.last(),
+                    x0 + px, bottomY, z0 + pz,
+                    x1 + px, bottomY, z1 + pz,
+                    x1 + px, topY, z1 + pz,
+                    x0 + px, topY, z0 + pz,
+                    color, nx, 0.0F, nz);
+            quad(buffer, poseStack.last(),
+                    x0 - px, topY, z0 - pz,
+                    x1 - px, topY, z1 - pz,
+                    x1 - px, bottomY, z1 - pz,
+                    x0 - px, bottomY, z0 - pz,
+                    color, -nx, 0.0F, -nz);
         }
     }
 

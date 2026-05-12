@@ -12,8 +12,11 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.RelativeMovement;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.portal.DimensionTransition;
+import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,35 +39,8 @@ public final class TemporalRiftTeleporter {
         double sourceX = player.getX();
         double sourceY = player.getY();
         double sourceZ = player.getZ();
-        MinecraftServer server = player.getServer();
-        TemporalRiftSavedData riftData = server == null ? null : TemporalRiftSavedData.get(server);
-        BlockPos skyRiftPos = riftData == null ? null : riftData.getBeforeSkyRiftPosition();
-        if (skyRiftPos == null) {
-            int fallbackY = Math.max(
-                    toLevel.getMinBuildHeight() + 16,
-                    Math.min(DEFAULT_BEFORE_SKY_RIFT_CLOUD_Y, toLevel.getMaxBuildHeight() - 16)
-            );
-            skyRiftPos = new BlockPos((int) Math.floor(sourceX), fallbackY, (int) Math.floor(sourceZ));
-        }
-        int surfaceY = toLevel.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, skyRiftPos.getX(), skyRiftPos.getZ());
-        BlockPos respawnPos = SafeTeleportHelper.findSafePositionNearby(
-                toLevel,
-                skyRiftPos.getX(),
-                Math.max(toLevel.getMinBuildHeight() + 2, surfaceY),
-                skyRiftPos.getZ(),
-                12
-        );
-        if (respawnPos == null) {
-            int fallbackSurfaceY = Math.min(
-                    toLevel.getMaxBuildHeight() - 2,
-                    toLevel.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, skyRiftPos.getX(), skyRiftPos.getZ()) + 1
-            );
-            respawnPos = new BlockPos(
-                    skyRiftPos.getX(),
-                    Math.max(toLevel.getMinBuildHeight() + 2, fallbackSurfaceY),
-                    skyRiftPos.getZ()
-            );
-        }
+        ArrivalTarget arrival = resolveBeforeArrival(toLevel, sourceX, sourceY, sourceZ);
+        BlockPos respawnPos = arrival.position();
 
         CompoundTag persistentData = player.getPersistentData();
         persistentData.putDouble(NBT_RETURN_X, sourceX);
@@ -86,9 +62,31 @@ public final class TemporalRiftTeleporter {
         player.setRespawnPosition(toLevel.dimension(), respawnPos, player.getYRot(), true, false);
         playArrivalWakeUp(player);
         if (TemporalRiftConfig.DEBUG_LOGGING.get()) {
-            LOGGER.info("[TemporalRift] {} woke in The Before at {} beneath sky tear {}", player.getName().getString(), respawnPos, skyRiftPos);
+            LOGGER.info("[TemporalRift] {} woke in The Before at {} beneath sky tear {}", player.getName().getString(), respawnPos, arrival.skyRiftPos());
         }
         player.sendSystemMessage(Component.literal("[Temporal Rift] You wake in The Before. Above you, the sky is still torn open."));
+    }
+
+    public static void teleportEntityToPastDimension(Entity entity, ServerLevel toLevel) {
+        if (entity instanceof ServerPlayer player) {
+            teleportToPastDimension(player, toLevel);
+            return;
+        }
+
+        ArrivalTarget arrival = resolveBeforeArrival(toLevel, entity.getX(), entity.getY(), entity.getZ());
+        BlockPos respawnPos = arrival.position();
+        Vec3 destination = new Vec3(respawnPos.getX() + 0.5D, respawnPos.getY(), respawnPos.getZ() + 0.5D);
+        Entity moved = entity.changeDimension(new DimensionTransition(
+                toLevel,
+                destination,
+                Vec3.ZERO,
+                entity.getYRot(),
+                entity.getXRot(),
+                DimensionTransition.DO_NOTHING
+        ));
+        if (moved != null) {
+            moved.resetFallDistance();
+        }
     }
 
     public static void teleportToOverworld(ServerPlayer player, ServerLevel overworldLevel) {
@@ -137,5 +135,43 @@ public final class TemporalRiftTeleporter {
         ServerGamePacketListenerImpl connection = player.connection;
         connection.send(new ClientboundSetTitlesAnimationPacket(ARRIVAL_FADE_IN_TICKS, ARRIVAL_STAY_TICKS, ARRIVAL_FADE_OUT_TICKS));
         connection.send(new ClientboundSetTitleTextPacket(Component.literal("You wake beneath a broken sky")));
+    }
+
+    private static ArrivalTarget resolveBeforeArrival(ServerLevel toLevel, double sourceX, double sourceY, double sourceZ) {
+        MinecraftServer server = toLevel.getServer();
+        TemporalRiftSavedData riftData = server == null ? null : TemporalRiftSavedData.get(server);
+        BlockPos skyRiftPos = riftData == null ? null : riftData.getBeforeSkyRiftPosition();
+        if (skyRiftPos == null) {
+            int fallbackY = Math.max(
+                    toLevel.getMinBuildHeight() + 16,
+                    Math.min(DEFAULT_BEFORE_SKY_RIFT_CLOUD_Y, toLevel.getMaxBuildHeight() - 16)
+            );
+            skyRiftPos = new BlockPos((int) Math.floor(sourceX), fallbackY, (int) Math.floor(sourceZ));
+        }
+
+        int surfaceY = toLevel.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, skyRiftPos.getX(), skyRiftPos.getZ());
+        BlockPos respawnPos = SafeTeleportHelper.findSafePositionNearby(
+                toLevel,
+                skyRiftPos.getX(),
+                Math.max(toLevel.getMinBuildHeight() + 2, surfaceY),
+                skyRiftPos.getZ(),
+                12
+        );
+        if (respawnPos == null) {
+            int fallbackSurfaceY = Math.min(
+                    toLevel.getMaxBuildHeight() - 2,
+                    toLevel.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, skyRiftPos.getX(), skyRiftPos.getZ()) + 1
+            );
+            respawnPos = new BlockPos(
+                    skyRiftPos.getX(),
+                    Math.max(toLevel.getMinBuildHeight() + 2, fallbackSurfaceY),
+                    skyRiftPos.getZ()
+            );
+        }
+
+        return new ArrivalTarget(skyRiftPos, respawnPos);
+    }
+
+    private record ArrivalTarget(BlockPos skyRiftPos, BlockPos position) {
     }
 }

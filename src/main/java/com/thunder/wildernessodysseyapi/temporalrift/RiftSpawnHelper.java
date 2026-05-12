@@ -31,24 +31,25 @@ public final class RiftSpawnHelper {
         return new BlockPos(spawn.getX(), y, spawn.getZ());
     }
 
-    public static BlockPos findHighestMountainRiftPosition(ServerLevel level, int requestedRadius) {
-        BlockPos spawn = level.getSharedSpawnPos();
-        int radius = Mth.clamp(requestedRadius, 128, 1024);
+    public static BlockPos findHighestMountainRiftPosition(ServerLevel level, BlockPos searchCenter, int requestedRadius, int minimumDistance) {
+        int radius = Mth.clamp(requestedRadius, 512, 2048);
+        int minDistance = Mth.clamp(minimumDistance, 128, radius - 32);
         int step = 16;
         BlockPos best = new BlockPos(
-                spawn.getX(),
-                level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, spawn.getX(), spawn.getZ()),
-                spawn.getZ()
+                searchCenter.getX() + minDistance,
+                level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, searchCenter.getX() + minDistance, searchCenter.getZ()),
+                searchCenter.getZ()
         );
 
         for (int dx = -radius; dx <= radius; dx += step) {
             for (int dz = -radius; dz <= radius; dz += step) {
-                if ((long) dx * dx + (long) dz * dz > (long) radius * radius) {
+                long distanceSquared = (long) dx * dx + (long) dz * dz;
+                if (distanceSquared > (long) radius * radius || distanceSquared < (long) minDistance * minDistance) {
                     continue;
                 }
 
-                int x = spawn.getX() + dx;
-                int z = spawn.getZ() + dz;
+                int x = searchCenter.getX() + dx;
+                int z = searchCenter.getZ() + dz;
                 int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
                 BlockPos candidate = new BlockPos(x, y, z);
                 if (candidate.getY() > best.getY() && isValidRiftPosition(level, candidate)) {

@@ -9,8 +9,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,8 +24,8 @@ public final class TemporalRiftManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("TemporalRift");
     private static final long BEFORE_RIFT_SHRINK_TICKS = 240L;
     private static final long TRANSIENT_RETURN_RIFT_TICKS = 100L;
-    private static final double BASIN_CAPTURE_RADIUS = 4.25D;
     private static final int BEFORE_SKY_RIFT_CLOUD_Y = 192;
+    private static final int BEFORE_GROUND_RIFT_MIN_DISTANCE = 640;
 
     private TemporalRiftManager() {
     }
@@ -55,6 +57,7 @@ public final class TemporalRiftManager {
                 if (data.getBeforeSkyRiftPosition() == null || data.getBeforeGroundRiftPosition() == null) {
                     placeBeforeRifts(server, data, data.getRiftPosition());
                 }
+                keepBeforeGroundRiftAwayFromArrival(server, data);
                 updateBeforeRiftClosingVisuals(server, data, data.getRiftCloseGameTime() - gameTime);
             }
         } else if (currentDay >= data.getNextRiftDay()) {
@@ -184,8 +187,13 @@ public final class TemporalRiftManager {
         setBeforeRiftScale(beforeLevel, skyRiftPos, 1.0F);
         data.setBeforeSkyRiftPosition(skyRiftPos);
 
-        int mountainSearchRadius = Math.max(256, TemporalRiftConfig.RIFT_SPAWN_RADIUS.get() * 4);
-        BlockPos groundRiftPos = RiftSpawnHelper.findHighestMountainRiftPosition(beforeLevel, mountainSearchRadius);
+        int mountainSearchRadius = Math.max(1024, TemporalRiftConfig.RIFT_SPAWN_RADIUS.get() * 8);
+        BlockPos groundRiftPos = RiftSpawnHelper.findHighestMountainRiftPosition(
+                beforeLevel,
+                skyRiftPos,
+                mountainSearchRadius,
+                BEFORE_GROUND_RIFT_MIN_DISTANCE
+        );
         beforeLevel.setBlock(groundRiftPos, TemporalRiftBlocks.RIFT_CORE.get().defaultBlockState(), 3);
         setRiftVisualMode(beforeLevel, groundRiftPos, RiftCoreBlockEntity.VisualMode.BEFORE_GROUND_RETURN);
         setBeforeRiftScale(beforeLevel, groundRiftPos, 1.0F);
@@ -210,6 +218,40 @@ public final class TemporalRiftManager {
             beforeLevel.removeBlock(pos, false);
             RiftEffectHelper.playClosingEffects(beforeLevel, pos);
         }
+    }
+
+    private static void keepBeforeGroundRiftAwayFromArrival(MinecraftServer server, TemporalRiftSavedData data) {
+        BlockPos skyRiftPos = data.getBeforeSkyRiftPosition();
+        BlockPos groundRiftPos = data.getBeforeGroundRiftPosition();
+        if (skyRiftPos == null || groundRiftPos == null) {
+            return;
+        }
+
+        long dx = groundRiftPos.getX() - skyRiftPos.getX();
+        long dz = groundRiftPos.getZ() - skyRiftPos.getZ();
+        if (dx * dx + dz * dz >= (long) BEFORE_GROUND_RIFT_MIN_DISTANCE * BEFORE_GROUND_RIFT_MIN_DISTANCE) {
+            return;
+        }
+
+        ServerLevel beforeLevel = server.getLevel(TemporalRiftDimensions.THE_BEFORE_KEY);
+        if (beforeLevel == null) {
+            return;
+        }
+
+        removeBeforeRiftBlock(beforeLevel, groundRiftPos);
+        int mountainSearchRadius = Math.max(1024, TemporalRiftConfig.RIFT_SPAWN_RADIUS.get() * 8);
+        BlockPos relocatedGroundRift = RiftSpawnHelper.findHighestMountainRiftPosition(
+                beforeLevel,
+                skyRiftPos,
+                mountainSearchRadius,
+                BEFORE_GROUND_RIFT_MIN_DISTANCE
+        );
+        beforeLevel.setBlock(relocatedGroundRift, TemporalRiftBlocks.RIFT_CORE.get().defaultBlockState(), 3);
+        setRiftVisualMode(beforeLevel, relocatedGroundRift, RiftCoreBlockEntity.VisualMode.BEFORE_GROUND_RETURN);
+        setBeforeRiftScale(beforeLevel, relocatedGroundRift, 1.0F);
+        data.setBeforeGroundRiftPosition(relocatedGroundRift);
+        LOGGER.info("[TemporalRift] Relocated The Before ground return rift from {} to {} to keep the arrival area clear.",
+                groundRiftPos, relocatedGroundRift);
     }
 
     private static BlockPos findSkyRiftPosition(ServerLevel beforeLevel, BlockPos overworldRiftPos) {
@@ -292,26 +334,44 @@ public final class TemporalRiftManager {
         }
 
         Vec3 center = Vec3.atCenterOf(riftPos);
-        double captureY = riftPos.getY() + 1.65D;
-        List<ServerPlayer> playersToCapture = new ArrayList<>();
-        for (ServerPlayer player : overworld.players()) {
-            if (player.isSpectator()) {
-                continue;
-            }
+        double captureRadius = Math.max(7.0D, TemporalRiftConfig.RIFT_SINKHOLE_RADIUS.get() * 0.26D);
+        double captureY = riftPos.getY() + 2.35D;
+        AABB captureBox = new AABB(
+                center.x - captureRadius,
+                riftPos.getY() - 3.0D,
+                center.z - captureRadius,
+                center.x + captureRadius,
+                captureY,
+                center.z + captureRadius
+        );
+        List<ServerPlayer> playersToCapture = new ArrayList<>(overworld.getEntitiesOfClass(
+                ServerPlayer.class,
+                captureBox,
+                player -> !player.isSpectator() && isInsideSinkholeCapture(player, center, captureRadius, captureY)
+        ));
+        List<Entity> entitiesToCapture = new ArrayList<>(overworld.getEntitiesOfClass(
+                Entity.class,
+                captureBox,
+                entity -> !(entity instanceof ServerPlayer)
+                        && entity.isAlive()
+                        && isInsideSinkholeCapture(entity, center, captureRadius, captureY)
+        ));
 
-            double dx = player.getX() - center.x;
-            double dz = player.getZ() - center.z;
-            double horizontalDistance = Math.sqrt(dx * dx + dz * dz);
-            if (horizontalDistance > BASIN_CAPTURE_RADIUS || player.getY() > captureY) {
-                continue;
-            }
-
-            playersToCapture.add(player);
-        }
-
-        for (ServerPlayer player : playersToCapture) {
+        if (!playersToCapture.isEmpty() || !entitiesToCapture.isEmpty()) {
             RiftEffectHelper.playTransitEarthquake(overworld, riftPos);
+        }
+        for (ServerPlayer player : playersToCapture) {
             TemporalRiftTeleporter.teleportToPastDimension(player, beforeLevel);
         }
+        for (Entity entity : entitiesToCapture) {
+            TemporalRiftTeleporter.teleportEntityToPastDimension(entity, beforeLevel);
+        }
+    }
+
+    private static boolean isInsideSinkholeCapture(Entity entity, Vec3 center, double captureRadius, double captureY) {
+        double dx = entity.getX() - center.x;
+        double dz = entity.getZ() - center.z;
+        double horizontalDistance = Math.sqrt(dx * dx + dz * dz);
+        return horizontalDistance <= captureRadius && entity.getY() <= captureY;
     }
 }
