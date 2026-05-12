@@ -15,6 +15,9 @@ import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public final class TemporalRiftManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("TemporalRift");
     private static final long BEFORE_RIFT_SHRINK_TICKS = 240L;
@@ -280,6 +283,7 @@ public final class TemporalRiftManager {
 
         Vec3 center = Vec3.atCenterOf(riftPos);
         double captureY = riftPos.getY() + 1.65D;
+        List<ServerPlayer> playersToCapture = new ArrayList<>();
         for (ServerPlayer player : overworld.players()) {
             if (player.isSpectator()) {
                 continue;
@@ -292,6 +296,10 @@ public final class TemporalRiftManager {
                 continue;
             }
 
+            playersToCapture.add(player);
+        }
+
+        for (ServerPlayer player : playersToCapture) {
             RiftEffectHelper.playTransitEarthquake(overworld, riftPos);
             TemporalRiftTeleporter.teleportToPastDimension(player, beforeLevel);
         }
