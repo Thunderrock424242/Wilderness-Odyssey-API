@@ -13,11 +13,11 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 
 /**
- * Hostile entity implementation used during purple-storm weather events.
+ * Hostile entity implementation used during Riftfall weather events.
  */
-public class PurpleStormMonsterEntity extends Zombie {
+public class RiftbornEntity extends Zombie {
 
-    public PurpleStormMonsterEntity(EntityType<? extends Zombie> entityType, Level level) {
+    public RiftbornEntity(EntityType<? extends Zombie> entityType, Level level) {
         super(entityType, level);
         this.xpReward = 8;
     }
@@ -30,11 +30,11 @@ public class PurpleStormMonsterEntity extends Zombie {
                 .add(Attributes.FOLLOW_RANGE, 40.0D);
     }
 
-    public static boolean checkPurpleStormSpawnRules(EntityType<PurpleStormMonsterEntity> type,
-                                                     ServerLevelAccessor level,
-                                                     MobSpawnType reason,
-                                                     BlockPos pos,
-                                                     RandomSource random) {
+    public static boolean checkRiftbornSpawnRules(EntityType<RiftbornEntity> type,
+                                                  ServerLevelAccessor level,
+                                                  MobSpawnType reason,
+                                                  BlockPos pos,
+                                                  RandomSource random) {
         return Monster.isDarkEnoughToSpawn(level, pos, random)
                 && checkMobSpawnRules(type, level, reason, pos, random)
                 && level.getLevel().isRaining();

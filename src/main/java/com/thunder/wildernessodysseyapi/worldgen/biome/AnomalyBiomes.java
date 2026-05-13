@@ -24,7 +24,7 @@ public final class AnomalyBiomes {
 
     public static Biome anomalyForest() {
         MobSpawnSettings.Builder spawns = new MobSpawnSettings.Builder();
-        AnomalyBiomeMobSettings.addPlainsSpawns(spawns);
+        AnomalyBiomeMobSettings.addForestSpawns(spawns);
 
         BiomeGenerationSettings.Builder generation = generationBuilder();
         BiomeDefaultFeatures.addDefaultCarversAndLakes(generation);
@@ -43,52 +43,6 @@ public final class AnomalyBiomes {
         BiomeDefaultFeatures.addDefaultExtraVegetation(generation);
 
         return baseBiome(true, 0.7F, 0.8F, spawns, generation);
-    }
-
-    public static Biome anomalyTundra() {
-        MobSpawnSettings.Builder spawns = new MobSpawnSettings.Builder();
-        AnomalyBiomeMobSettings.addTundraSpawns(spawns);
-
-        BiomeGenerationSettings.Builder generation = generationBuilder();
-        BiomeDefaultFeatures.addDefaultCarversAndLakes(generation);
-        BiomeDefaultFeatures.addDefaultCrystalFormations(generation);
-        BiomeDefaultFeatures.addDefaultMonsterRoom(generation);
-        BiomeDefaultFeatures.addDefaultUndergroundVariety(generation);
-        BiomeDefaultFeatures.addDefaultSprings(generation);
-        BiomeDefaultFeatures.addSurfaceFreezing(generation);
-        BiomeDefaultFeatures.addDefaultOres(generation);
-        BiomeDefaultFeatures.addDefaultSoftDisks(generation);
-        BiomeDefaultFeatures.addSnowyTrees(generation);
-        BiomeDefaultFeatures.addDefaultFlowers(generation);
-        BiomeDefaultFeatures.addTaigaGrass(generation);
-        BiomeDefaultFeatures.addDefaultMushrooms(generation);
-        BiomeDefaultFeatures.addDefaultExtraVegetation(generation);
-
-        return baseBiome(true, -0.45F, 0.8F, spawns, generation);
-    }
-
-    public static Biome anomalyRainforest() {
-        MobSpawnSettings.Builder spawns = new MobSpawnSettings.Builder();
-        AnomalyBiomeMobSettings.addRainforestSpawns(spawns);
-
-        BiomeGenerationSettings.Builder generation = generationBuilder();
-        BiomeDefaultFeatures.addDefaultCarversAndLakes(generation);
-        BiomeDefaultFeatures.addDefaultCrystalFormations(generation);
-        BiomeDefaultFeatures.addDefaultMonsterRoom(generation);
-        BiomeDefaultFeatures.addDefaultUndergroundVariety(generation);
-        BiomeDefaultFeatures.addDefaultSprings(generation);
-        BiomeDefaultFeatures.addSurfaceFreezing(generation);
-        BiomeDefaultFeatures.addDefaultOres(generation);
-        BiomeDefaultFeatures.addDefaultSoftDisks(generation);
-        BiomeDefaultFeatures.addBambooVegetation(generation);
-        BiomeDefaultFeatures.addLightBambooVegetation(generation);
-        BiomeDefaultFeatures.addJungleTrees(generation);
-        BiomeDefaultFeatures.addWarmFlowers(generation);
-        BiomeDefaultFeatures.addJungleGrass(generation);
-        BiomeDefaultFeatures.addDefaultMushrooms(generation);
-        BiomeDefaultFeatures.addJungleVines(generation);
-
-        return baseBiome(true, 0.95F, 0.9F, spawns, generation);
     }
 
     private static Biome baseBiome(boolean hasPrecipitation, float temperature, float downfall,

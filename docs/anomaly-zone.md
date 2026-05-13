@@ -1,14 +1,12 @@
-# Anomaly Zone biomes
+# Anomaly Forest biome
 
-This mod now registers three anomaly-zone biome variants:
+This mod now registers one anomaly biome:
 
-- `wildernessodysseyapi:anomaly_plains`
-- `wildernessodysseyapi:anomaly_tundra`
-- `wildernessodysseyapi:anomaly_rainforest`
+- `wildernessodysseyapi:anomaly_forest`
 
 ## Biome vibe note
 
-- `anomaly_plains` is tuned as a jungle + forest + plains hybrid (rolling plains, forest flowers/grass, and sparse jungle trees).
+- `anomaly_forest` is tuned as a forest anomaly biome with vanilla-like forest vegetation and subtle anomaly ambience.
 
 ## Mob control (hard-coded)
 
@@ -16,15 +14,13 @@ All spawn lists are hard-coded in:
 
 - `com.thunder.wildernessodysseyapi.worldgen.biome.AnomalyBiomeMobSettings`
 
-You can edit each biome method to control exactly which vanilla mobs and custom mobs can spawn:
+You can edit the forest spawn method to control exactly which vanilla mobs and custom mobs can spawn:
 
-- `addPlainsSpawns`
-- `addTundraSpawns`
-- `addRainforestSpawns`
+- `addForestSpawns`
 
 Custom mob example already included:
 
-- `ModEntities.PURPLE_STORM_MONSTER`
+- `ModEntities.RIFTBORN`
 
 ## Biome visual effect behavior
 
@@ -42,7 +38,7 @@ Effects disable automatically when the player leaves anomaly biomes.
 
 ## Compatibility notes
 
-- TerraBlender: the mod now registers an overworld region that maps vanilla climate slots to anomaly biomes, so anomaly biomes can participate in normal and Large Biomes world presets.
+- TerraBlender: the mod now registers an overworld region that maps forest-like vanilla climate slots to the anomaly forest, so it can participate in normal and Large Biomes world presets.
 - Biolith/Lithostitched: anomaly biomes are exposed in both `minecraft:is_overworld` and common `c:is_overworld` biome tags for easier cross-mod biome matching.
 
 ## Note on world generation

@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.riftfall;
 
 import com.thunder.wildernessodysseyapi.config.RiftfallConfig;
 import com.thunder.wildernessodysseyapi.core.ModEntities;
-import com.thunder.wildernessodysseyapi.entity.PurpleStormMonsterEntity;
+import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -201,8 +201,8 @@ public final class RiftfallSystem {
         if (!stage.isActiveDanger()) return;
         if ((level.getGameTime() % RiftfallConfig.CONFIG.riftbornSpawnIntervalTicks()) != 0) return;
 
-        EntityType<PurpleStormMonsterEntity> type = ModEntities.PURPLE_STORM_MONSTER.get();
-        int globalCount = level.getEntities(type, new AABB(-30_000_000, level.getMinBuildHeight(), -30_000_000, 30_000_000, level.getMaxBuildHeight(), 30_000_000), PurpleStormMonsterEntity::isAlive).size();
+        EntityType<RiftbornEntity> type = ModEntities.RIFTBORN.get();
+        int globalCount = level.getEntities(type, new AABB(-30_000_000, level.getMinBuildHeight(), -30_000_000, 30_000_000, level.getMaxBuildHeight(), 30_000_000), RiftbornEntity::isAlive).size();
         if (globalCount >= RiftfallConfig.CONFIG.maxRiftbornGlobal()) return;
 
         int budget = stage == RiftfallStage.METEOR_SURGE
@@ -213,13 +213,13 @@ public final class RiftfallSystem {
         for (ServerPlayer player : level.players()) {
             if (budget <= 0) break;
             if (!playerCanSeeSky(level, player)) continue;
-            int nearby = level.getEntities(type, new AABB(player.blockPosition()).inflate(32), PurpleStormMonsterEntity::isAlive).size();
+            int nearby = level.getEntities(type, new AABB(player.blockPosition()).inflate(32), RiftbornEntity::isAlive).size();
             if (nearby >= RiftfallConfig.CONFIG.maxRiftbornPerPlayer()) continue;
 
             BlockPos spawn = findGroundNear(level, player.blockPosition(), 18, 36);
             if (spawn == null) continue;
 
-            PurpleStormMonsterEntity mob = type.create(level);
+            RiftbornEntity mob = type.create(level);
             if (mob == null) continue;
             mob.moveTo(spawn.getX() + 0.5D, spawn.getY(), spawn.getZ() + 0.5D, level.random.nextFloat() * 360F, 0F);
             if (mob.checkSpawnRules(level, net.minecraft.world.entity.MobSpawnType.EVENT) && mob.checkSpawnObstruction(level)) {

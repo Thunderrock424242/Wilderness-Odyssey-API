@@ -6,19 +6,19 @@ import net.minecraft.world.level.saveddata.SavedData;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Persistent world data container for tracking purple-storm state across saves.
+ * Persistent world data container for tracking Riftfall weather state across saves.
  */
-public class PurpleStormSavedData extends SavedData {
-    public static final String DATA_NAME = "wildernessodysseyapi_purple_storm";
+public class RiftfallWeatherSavedData extends SavedData {
+    public static final String DATA_NAME = "wildernessodysseyapi_riftfall_weather";
 
     private long nextRollGameTime;
     private long eventEndGameTime;
     private boolean active;
 
-    public PurpleStormSavedData() {
+    public RiftfallWeatherSavedData() {
     }
 
-    public PurpleStormSavedData(CompoundTag tag, HolderLookup.Provider registries) {
+    public RiftfallWeatherSavedData(CompoundTag tag, HolderLookup.Provider registries) {
         this.nextRollGameTime = tag.getLong("NextRollGameTime");
         this.eventEndGameTime = tag.getLong("EventEndGameTime");
         this.active = tag.getBoolean("Active");

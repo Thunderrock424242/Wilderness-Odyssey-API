@@ -3,7 +3,7 @@
     "id": "meteor_location",
     "category": "meteor",
     "question": "Where does the meteor crash?",
-    "answer": "It happens once per world in the anomaly_zone biome.",
+    "answer": "Meteor impacts can appear near players during meteor events; they are no longer tied to old anomaly biome variants.",
     "aliases": ["impact", "crash site", "meteor spawn"]
   },
   {

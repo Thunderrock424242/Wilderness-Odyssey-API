@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.core;
 
-import com.thunder.wildernessodysseyapi.entity.PurpleStormMonsterEntity;
+import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
 import com.thunder.wildernessodysseyapi.meteor.entity.MeteorEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
@@ -32,12 +32,12 @@ public final class ModEntities {
                             .build("meteor")
             );
 
-    public static final DeferredHolder<EntityType<?>, EntityType<PurpleStormMonsterEntity>> PURPLE_STORM_MONSTER =
-            ENTITY_TYPES.register("purple_storm_monster",
-                    () -> EntityType.Builder.of(PurpleStormMonsterEntity::new, MobCategory.MONSTER)
+    public static final DeferredHolder<EntityType<?>, EntityType<RiftbornEntity>> RIFTBORN =
+            ENTITY_TYPES.register("riftborn",
+                    () -> EntityType.Builder.of(RiftbornEntity::new, MobCategory.MONSTER)
                             .sized(0.6F, 1.95F)
                             .clientTrackingRange(8)
-                            .build("purple_storm_monster"));
+                            .build("riftborn"));
 
     public static void register(IEventBus eventBus) {
         ENTITY_TYPES.register(eventBus);
@@ -50,16 +50,16 @@ public final class ModEntities {
 
         @SubscribeEvent
         public static void onAttributeCreate(EntityAttributeCreationEvent event) {
-            event.put(PURPLE_STORM_MONSTER.get(), PurpleStormMonsterEntity.createAttributes().build());
+            event.put(RIFTBORN.get(), RiftbornEntity.createAttributes().build());
         }
 
         @SubscribeEvent
         public static void registerSpawnPlacements(RegisterSpawnPlacementsEvent event) {
             event.register(
-                    PURPLE_STORM_MONSTER.get(),
+                    RIFTBORN.get(),
                     SpawnPlacementTypes.ON_GROUND,
                     Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                    PurpleStormMonsterEntity::checkPurpleStormSpawnRules,
+                    RiftbornEntity::checkRiftbornSpawnRules,
                     RegisterSpawnPlacementsEvent.Operation.REPLACE
             );
         }
