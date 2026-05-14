@@ -1,0 +1,82 @@
+{
+  "textures": {
+    "particle": "minecraft:block/nether_portal",
+    "portal": "minecraft:block/nether_portal",
+    "frame": "minecraft:block/crying_obsidian",
+    "rune": "minecraft:block/amethyst_block"
+  },
+  "elements": [
+    {
+      "from": [3, 3, 3],
+      "to": [13, 13, 13],
+      "faces": {
+        "down": { "texture": "#portal" },
+        "up": { "texture": "#portal" },
+        "north": { "texture": "#portal" },
+        "south": { "texture": "#portal" },
+        "west": { "texture": "#portal" },
+        "east": { "texture": "#portal" }
+      }
+    },
+    {
+      "from": [0, 0, 0],
+      "to": [16, 3, 16],
+      "faces": {
+        "down": { "texture": "#frame", "cullface": "down" },
+        "up": { "texture": "#frame" },
+        "north": { "texture": "#frame", "cullface": "north" },
+        "south": { "texture": "#frame", "cullface": "south" },
+        "west": { "texture": "#frame", "cullface": "west" },
+        "east": { "texture": "#frame", "cullface": "east" }
+      }
+    },
+    {
+      "from": [0, 13, 0],
+      "to": [16, 16, 16],
+      "faces": {
+        "down": { "texture": "#frame" },
+        "up": { "texture": "#frame", "cullface": "up" },
+        "north": { "texture": "#frame", "cullface": "north" },
+        "south": { "texture": "#frame", "cullface": "south" },
+        "west": { "texture": "#frame", "cullface": "west" },
+        "east": { "texture": "#frame", "cullface": "east" }
+      }
+    },
+    {
+      "from": [0, 3, 0],
+      "to": [3, 13, 16],
+      "faces": {
+        "down": { "texture": "#frame" },
+        "up": { "texture": "#frame" },
+        "north": { "texture": "#frame", "cullface": "north" },
+        "south": { "texture": "#frame", "cullface": "south" },
+        "west": { "texture": "#frame", "cullface": "west" },
+        "east": { "texture": "#frame" }
+      }
+    },
+    {
+      "from": [13, 3, 0],
+      "to": [16, 13, 16],
+      "faces": {
+        "down": { "texture": "#frame" },
+        "up": { "texture": "#frame" },
+        "north": { "texture": "#frame", "cullface": "north" },
+        "south": { "texture": "#frame", "cullface": "south" },
+        "west": { "texture": "#frame" },
+        "east": { "texture": "#frame", "cullface": "east" }
+      }
+    },
+    {
+      "from": [6, 0, 6],
+      "to": [10, 16, 10],
+      "faces": {
+        "down": { "texture": "#rune", "cullface": "down" },
+        "up": { "texture": "#rune", "cullface": "up" },
+        "north": { "texture": "#rune" },
+        "south": { "texture": "#rune" },
+        "west": { "texture": "#rune" },
+        "east": { "texture": "#rune" }
+      }
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.command;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -206,11 +207,9 @@ public final class MeteorCommand {
                         continue;
                     }
 
-                    // Crying obsidian is both the shell and the inner core.
-                    BlockState state = Blocks.CRYING_OBSIDIAN.defaultBlockState();
-                    if (distSq >= (radiusSq - Math.max(2, size))) {
-                        state = Blocks.CRYING_OBSIDIAN.defaultBlockState();
-                    }
+                    BlockState state = random.nextFloat() < 0.08F && distSq < radiusSq * 0.55F
+                            ? AnomalyBlocks.ANOMALY_ORE.get().defaultBlockState()
+                            : Blocks.CRYING_OBSIDIAN.defaultBlockState();
                     level.setBlock(cursor, state, 3);
                 }
             }

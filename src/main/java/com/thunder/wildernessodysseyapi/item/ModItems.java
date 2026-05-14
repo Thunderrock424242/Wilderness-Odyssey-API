@@ -37,6 +37,10 @@ public class ModItems {
             "breathing_mask",
             () -> new BreathingMaskItem(new Item.Properties().stacksTo(1))
     );
+    public static final DeferredItem<Item> FIELD_CODEX = ITEMS.register(
+            "field_codex",
+            () -> new FieldCodexItem(new Item.Properties().stacksTo(1).rarity(Rarity.UNCOMMON))
+    );
 
     public static final DeferredItem<Item> MUSIC_DISC_DUSTWINDS = ITEMS.register(
             "music_disc_dustwinds",

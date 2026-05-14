@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "OAO",
+    "ACA",
+    "OAO"
+  ],
+  "key": {
+    "O": {
+      "item": "minecraft:crying_obsidian"
+    },
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    },
+    "C": {
+      "item": "wildernessodysseyapi:anomaly_ore"
+    }
+  },
+  "result": {
+    "id": "wildernessodysseyapi:anomaly_gateway",
+    "count": 1
+  }
+}

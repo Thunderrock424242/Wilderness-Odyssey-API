@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.core;
 
 import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
+import com.thunder.wildernessodysseyapi.entity.RiftListenerEntity;
+import com.thunder.wildernessodysseyapi.entity.RiftMawEntity;
 import com.thunder.wildernessodysseyapi.meteor.entity.MeteorEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
@@ -39,6 +41,22 @@ public final class ModEntities {
                             .clientTrackingRange(8)
                             .build("riftborn"));
 
+    public static final DeferredHolder<EntityType<?>, EntityType<RiftListenerEntity>> RIFT_LISTENER =
+            ENTITY_TYPES.register("rift_listener",
+                    () -> EntityType.Builder.of(RiftListenerEntity::new, MobCategory.MONSTER)
+                            .sized(0.9F, 3.2F)
+                            .clientTrackingRange(12)
+                            .fireImmune()
+                            .build("rift_listener"));
+
+    public static final DeferredHolder<EntityType<?>, EntityType<RiftMawEntity>> RIFT_MAW =
+            ENTITY_TYPES.register("rift_maw",
+                    () -> EntityType.Builder.of(RiftMawEntity::new, MobCategory.MONSTER)
+                            .sized(2.2F, 3.8F)
+                            .clientTrackingRange(12)
+                            .fireImmune()
+                            .build("rift_maw"));
+
     public static void register(IEventBus eventBus) {
         ENTITY_TYPES.register(eventBus);
     }
@@ -51,6 +69,8 @@ public final class ModEntities {
         @SubscribeEvent
         public static void onAttributeCreate(EntityAttributeCreationEvent event) {
             event.put(RIFTBORN.get(), RiftbornEntity.createAttributes().build());
+            event.put(RIFT_LISTENER.get(), RiftListenerEntity.createAttributes().build());
+            event.put(RIFT_MAW.get(), RiftMawEntity.createAttributes().build());
         }
 
         @SubscribeEvent
@@ -60,6 +80,13 @@ public final class ModEntities {
                     SpawnPlacementTypes.ON_GROUND,
                     Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                     RiftbornEntity::checkRiftbornSpawnRules,
+                    RegisterSpawnPlacementsEvent.Operation.REPLACE
+            );
+            event.register(
+                    RIFT_LISTENER.get(),
+                    SpawnPlacementTypes.ON_GROUND,
+                    Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    RiftListenerEntity::checkRiftListenerSpawnRules,
                     RegisterSpawnPlacementsEvent.Operation.REPLACE
             );
         }

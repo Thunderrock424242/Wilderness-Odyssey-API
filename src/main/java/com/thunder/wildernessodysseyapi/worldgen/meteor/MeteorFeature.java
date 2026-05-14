@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.worldgen.meteor;
 
+import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.util.SimplexNoise;
 import net.minecraft.core.BlockPos;
@@ -210,6 +211,11 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
     }
 
     private BlockState pickMeteorBlock(float progress, RandomSource rng) {
+        float anomalyChance = progress > 0.65F ? 0.025F : 0.055F;
+        if (rng.nextFloat() < anomalyChance) {
+            return AnomalyBlocks.ANOMALY_ORE.get().defaultBlockState();
+        }
+
         int r = rng.nextInt(10);
         if (progress > 0.7f) return switch (r) { case 0, 1 -> OBSIDIAN; case 2 -> COBBLED_DEEP; default -> DEEPSLATE; };
         else                 return switch (r) { case 0, 1 -> BLACKSTONE; case 2 -> OBSIDIAN; case 3 -> COBBLED_DEEP; default -> DEEPSLATE; };

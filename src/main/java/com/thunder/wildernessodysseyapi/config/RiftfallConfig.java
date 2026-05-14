@@ -37,6 +37,11 @@ public class RiftfallConfig {
     private final ModConfigSpec.IntValue riftbornSpawnBudgetSurge;
     private final ModConfigSpec.IntValue maxRiftbornPerPlayer;
     private final ModConfigSpec.IntValue maxRiftbornGlobal;
+    private final ModConfigSpec.IntValue riftListenerSpawnIntervalTicks;
+    private final ModConfigSpec.DoubleValue riftListenerSpawnChance;
+    private final ModConfigSpec.IntValue maxRiftListenersPerPlayer;
+    private final ModConfigSpec.IntValue maxRiftListenersGlobal;
+    private final ModConfigSpec.IntValue riftMawLifetimeTicks;
 
     RiftfallConfig(ModConfigSpec.Builder builder) {
         builder.push("riftfall");
@@ -64,6 +69,11 @@ public class RiftfallConfig {
         riftbornSpawnBudgetSurge = builder.defineInRange("riftbornSpawnBudgetSurge", 2, 0, 20);
         maxRiftbornPerPlayer = builder.defineInRange("maxRiftbornPerPlayer", 6, 1, 64);
         maxRiftbornGlobal = builder.defineInRange("maxRiftbornGlobal", 60, 1, 512);
+        riftListenerSpawnIntervalTicks = builder.defineInRange("riftListenerSpawnIntervalTicks", 360, 40, 6000);
+        riftListenerSpawnChance = builder.defineInRange("riftListenerSpawnChance", 0.35D, 0D, 1D);
+        maxRiftListenersPerPlayer = builder.defineInRange("maxRiftListenersPerPlayer", 1, 0, 8);
+        maxRiftListenersGlobal = builder.defineInRange("maxRiftListenersGlobal", 8, 0, 64);
+        riftMawLifetimeTicks = builder.defineInRange("riftMawLifetimeTicks", 600, 100, 2400);
         builder.pop();
     }
 
@@ -89,4 +99,9 @@ public class RiftfallConfig {
     public int riftbornSpawnBudgetSurge() { return riftbornSpawnBudgetSurge.get(); }
     public int maxRiftbornPerPlayer() { return maxRiftbornPerPlayer.get(); }
     public int maxRiftbornGlobal() { return maxRiftbornGlobal.get(); }
+    public int riftListenerSpawnIntervalTicks() { return riftListenerSpawnIntervalTicks.get(); }
+    public double riftListenerSpawnChance() { return riftListenerSpawnChance.get(); }
+    public int maxRiftListenersPerPlayer() { return maxRiftListenersPerPlayer.get(); }
+    public int maxRiftListenersGlobal() { return maxRiftListenersGlobal.get(); }
+    public int riftMawLifetimeTicks() { return riftMawLifetimeTicks.get(); }
 }

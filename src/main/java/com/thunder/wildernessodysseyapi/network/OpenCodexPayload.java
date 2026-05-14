@@ -7,14 +7,15 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
-public record SyncLoreBookPayload(String bookId) implements CustomPacketPayload {
-    public static final Type<SyncLoreBookPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "sync_lore_book"));
+public record OpenCodexPayload(boolean open) implements CustomPacketPayload {
+    public static final Type<OpenCodexPayload> TYPE =
+            new Type<>(ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "open_codex"));
 
-    public static final StreamCodec<FriendlyByteBuf, SyncLoreBookPayload> STREAM_CODEC =
+    public static final StreamCodec<FriendlyByteBuf, OpenCodexPayload> STREAM_CODEC =
             StreamCodec.composite(
-                    ByteBufCodecs.STRING_UTF8,
-                    SyncLoreBookPayload::bookId,
-                    SyncLoreBookPayload::new
+                    ByteBufCodecs.BOOL,
+                    OpenCodexPayload::open,
+                    OpenCodexPayload::new
             );
 
     @Override

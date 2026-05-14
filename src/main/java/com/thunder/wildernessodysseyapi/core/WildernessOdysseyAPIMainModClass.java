@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.ModPackPatches.faq.FaqReloadListener;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.ModPackPatches.ModListTracker.commands.ConfigAuditCommand;
+import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
 import com.thunder.wildernessodysseyapi.command.*;
 import com.thunder.wildernessodysseyapi.effect.RadiationEffect;
 import com.thunder.wildernessodysseyapi.effect.RadiationTickHandler;
@@ -30,10 +31,13 @@ import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
 import com.thunder.wildernessodysseyapi.item.cloak.CloakState;
+import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootConditions;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootFunctions;
 import com.thunder.wildernessodysseyapi.network.CloakInputPayload;
+import com.thunder.wildernessodysseyapi.network.OpenCodexPayload;
+import com.thunder.wildernessodysseyapi.network.SyncLoreBookPayload;
 import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
 import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockEntities;
@@ -154,6 +158,7 @@ public class WildernessOdysseyAPIMainModClass {
         TemporalRiftBlocks.register(modEventBus);
         TemporalRiftBlockEntities.register(modEventBus);
         TemporalRiftWorldgen.register(modEventBus);
+        AnomalyBlocks.register(modEventBus);
 
         CryoTubeBlock.register(modEventBus);
         ModItems.register(modEventBus);
@@ -213,12 +218,22 @@ public class WildernessOdysseyAPIMainModClass {
                         CloakState.setHoldingBreath(serverPlayer, payload.altDown());
                     }
                 }));
+        registrar.playToClient(SyncLoreBookPayload.TYPE, SyncLoreBookPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> CodexClientState.markCollected(payload.bookId())));
+        registrar.playToClient(OpenCodexPayload.TYPE, OpenCodexPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (payload.open()) {
+                        CodexClientState.requestOpen();
+                    }
+                }));
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(CryoTubeBlock.CRYO_TUBE.get());
             event.accept(TemporalRiftBlocks.TIME_CAPSULE.get());
+            event.accept(AnomalyBlocks.ANOMALY_GATEWAY.get());
+            event.accept(ModItems.FIELD_CODEX.get());
         }
     }
 

@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.item;
 
+import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
 import com.thunder.wildernessodysseyapi.worldgen.blocks.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
 import net.minecraft.core.registries.Registries;
@@ -34,9 +35,12 @@ public class ModCreativeTabs {
                     .displayItems((parameters, output) -> {
                         output.accept(CryoTubeBlock.CRYO_TUBE.get());
                         output.accept(TemporalRiftBlocks.TIME_CAPSULE.get());
+                        output.accept(AnomalyBlocks.ANOMALY_ORE.get());
+                        output.accept(AnomalyBlocks.ANOMALY_GATEWAY.get());
                         output.accept(ModItems.CLOAK_ITEM.get());
                         output.accept(ModItems.INHALER.get());
                         output.accept(ModItems.BREATHING_MASK.get());
+                        output.accept(ModItems.FIELD_CODEX.get());
                         output.accept(ModItems.MUSIC_DISC_DUSTWINDS.get());
                         output.accept(ModItems.MUSIC_DISC_STARFALL.get());
                     })

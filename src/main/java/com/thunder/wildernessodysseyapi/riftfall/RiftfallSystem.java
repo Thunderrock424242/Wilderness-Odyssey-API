@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.riftfall;
 import com.thunder.wildernessodysseyapi.config.RiftfallConfig;
 import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
+import com.thunder.wildernessodysseyapi.entity.RiftListenerEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -63,6 +64,7 @@ public final class RiftfallSystem {
         tickExposure(level);
         tickCorrosion(level);
         tickRiftbornSpawning(level);
+        tickRiftListenerSpawning(level);
     }
 
     private static void maybeStartRiftfall(ServerLevel level) {
@@ -225,6 +227,39 @@ public final class RiftfallSystem {
             if (mob.checkSpawnRules(level, net.minecraft.world.entity.MobSpawnType.EVENT) && mob.checkSpawnObstruction(level)) {
                 level.addFreshEntity(mob);
                 budget--;
+            }
+        }
+    }
+
+    private static void tickRiftListenerSpawning(ServerLevel level) {
+        if (!stage.isActiveDanger()) return;
+        if (RiftfallConfig.CONFIG.maxRiftListenersGlobal() <= 0) return;
+        if ((level.getGameTime() % RiftfallConfig.CONFIG.riftListenerSpawnIntervalTicks()) != 0) return;
+
+        double chance = RiftfallConfig.CONFIG.riftListenerSpawnChance();
+        if (stage == RiftfallStage.METEOR_SURGE) {
+            chance = Math.min(1.0D, chance * 1.5D);
+        }
+        if (level.random.nextDouble() > chance) return;
+
+        EntityType<RiftListenerEntity> type = ModEntities.RIFT_LISTENER.get();
+        int globalCount = level.getEntities(type, new AABB(-30_000_000, level.getMinBuildHeight(), -30_000_000, 30_000_000, level.getMaxBuildHeight(), 30_000_000), RiftListenerEntity::isAlive).size();
+        if (globalCount >= RiftfallConfig.CONFIG.maxRiftListenersGlobal()) return;
+
+        for (ServerPlayer player : level.players()) {
+            if (!playerCanSeeSky(level, player)) continue;
+            int nearby = level.getEntities(type, new AABB(player.blockPosition()).inflate(56), RiftListenerEntity::isAlive).size();
+            if (nearby >= RiftfallConfig.CONFIG.maxRiftListenersPerPlayer()) continue;
+
+            BlockPos spawn = findGroundNear(level, player.blockPosition(), 24, 44);
+            if (spawn == null) continue;
+
+            RiftListenerEntity listener = type.create(level);
+            if (listener == null) continue;
+            listener.moveTo(spawn.getX() + 0.5D, spawn.getY(), spawn.getZ() + 0.5D, level.random.nextFloat() * 360F, 0F);
+            if (listener.checkSpawnRules(level, net.minecraft.world.entity.MobSpawnType.EVENT) && listener.checkSpawnObstruction(level)) {
+                level.addFreshEntity(listener);
+                return;
             }
         }
     }

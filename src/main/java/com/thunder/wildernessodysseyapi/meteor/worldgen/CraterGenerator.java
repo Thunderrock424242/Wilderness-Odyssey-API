@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.meteor.worldgen;
 
+import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
@@ -182,7 +183,8 @@ public class CraterGenerator {
 
         if (normalized < 0.35) {
             // Deep center: heavy magma and crying obsidian
-            if (r < 0.45f)      level.setBlock(pos, MAGMA, 3);
+            if (r < 0.04f)      level.setBlock(pos, AnomalyBlocks.ANOMALY_ORE.get().defaultBlockState(), 3);
+            else if (r < 0.45f) level.setBlock(pos, MAGMA, 3);
             else if (r < 0.75f) level.setBlock(pos, CRYING_OBSIDIAN, 3);
             else if (r < 0.90f) level.setBlock(pos, OBSIDIAN, 3);
             // else leave excavated air
@@ -248,7 +250,8 @@ public class CraterGenerator {
                     if (level.isOutsideBuildHeight(pos)) continue;
 
                     float r = random.nextFloat();
-                    if (r < 0.55f)      level.setBlock(pos, CRYING_OBSIDIAN, 3);
+                    if (r < 0.08f)      level.setBlock(pos, AnomalyBlocks.ANOMALY_ORE.get().defaultBlockState(), 3);
+                    else if (r < 0.55f) level.setBlock(pos, CRYING_OBSIDIAN, 3);
                     else if (r < 0.90f) level.setBlock(pos, MAGMA, 3);
                     else                level.setBlock(pos, OBSIDIAN, 3);
                 }
