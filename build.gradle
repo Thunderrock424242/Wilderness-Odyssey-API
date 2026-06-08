@@ -154,7 +154,6 @@ dependencies {
     // Dev runtime shader stack for testing Iris screen/selection behavior.
     localRuntime "curse.maven:sodium-394468:6382651"
     localRuntime "curse.maven:irisshaders-455508:6661598"
-    implementation "curse.maven:curios-309927:6529130"
     // Bundle third-party libraries into the final mod jar (Jar-in-Jar) to avoid missing-class errors at runtime.
     jarJar(implementation('com.squareup.okhttp3:okhttp:4.12.0'))
     jarJar(implementation('com.squareup.okio:okio:3.9.0'))
