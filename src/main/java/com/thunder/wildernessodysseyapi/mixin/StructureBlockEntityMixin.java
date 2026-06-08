@@ -1,11 +1,11 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.bridge.StructureBlockCornerCacheBridge;
+import com.thunder.wildernessodysseyapi.structureblock.bridge.StructureBlockCornerCacheBridge;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.util.StructureBlockCornerCache;
+import com.thunder.wildernessodysseyapi.structureblock.StructureBlockCornerCache;
 import com.thunder.wildernessodysseyapi.util.NbtCompressionUtils;
-import com.thunder.wildernessodysseyapi.util.StructureBlockHostileSpawnContext;
-import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
+import com.thunder.wildernessodysseyapi.structureblock.StructureBlockHostileSpawnContext;
+import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;

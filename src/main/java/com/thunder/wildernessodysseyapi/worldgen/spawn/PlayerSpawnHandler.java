@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.worldgen.spawn;
 
 import com.thunder.ticktoklib.api.TickTokAPI;
-import com.thunder.wildernessodysseyapi.worldgen.blocks.CryoTubeBlock;
+import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;

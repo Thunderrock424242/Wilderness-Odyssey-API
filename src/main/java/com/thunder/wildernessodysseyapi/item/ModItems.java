@@ -1,9 +1,10 @@
 package com.thunder.wildernessodysseyapi.item;
 
 import com.thunder.wildernessodysseyapi.core.ModEntities;
-import com.thunder.wildernessodysseyapi.item.cloak.CloakItem;
-import com.thunder.wildernessodysseyapi.item.cloak.BreathingMaskItem;
-import com.thunder.wildernessodysseyapi.item.cloak.InhalerItem;
+import com.thunder.wildernessodysseyapi.cloak.item.CloakItem;
+import com.thunder.wildernessodysseyapi.cloak.item.BreathingMaskItem;
+import com.thunder.wildernessodysseyapi.cloak.item.InhalerItem;
+import com.thunder.wildernessodysseyapi.lorebook.item.FieldCodexItem;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;

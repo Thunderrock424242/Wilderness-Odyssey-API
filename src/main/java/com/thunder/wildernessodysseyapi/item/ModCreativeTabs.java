@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.item;
 
 import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
-import com.thunder.wildernessodysseyapi.worldgen.blocks.CryoTubeBlock;
+import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;

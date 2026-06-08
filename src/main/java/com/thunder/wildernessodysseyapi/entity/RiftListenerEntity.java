@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.entity;
 
 import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.crouching.CrouchNoiseHelper;
-import com.thunder.wildernessodysseyapi.item.cloak.CloakState;
+import com.thunder.wildernessodysseyapi.cloak.item.CloakState;
 import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;

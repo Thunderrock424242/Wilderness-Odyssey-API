@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.FileSecurity;
+package com.thunder.wildernessodysseyapi.filesecurity;
 
 import java.io.IOException;
 import java.io.InputStream;

@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.worldgen.structure;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
+import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobCategory;

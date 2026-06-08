@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.bridge.StructureBlockHostileSpawnToggleBridge;
-import com.thunder.wildernessodysseyapi.util.StructureBlockHostileSpawnContext;
+import com.thunder.wildernessodysseyapi.structureblock.bridge.StructureBlockHostileSpawnToggleBridge;
+import com.thunder.wildernessodysseyapi.structureblock.StructureBlockHostileSpawnContext;
 import net.minecraft.network.protocol.game.ServerboundSetStructureBlockPacket;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.spongepowered.asm.mixin.Mixin;

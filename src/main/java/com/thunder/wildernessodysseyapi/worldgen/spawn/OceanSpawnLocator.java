@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.worldgen.spawn;
 
 import com.mojang.datafixers.util.Pair;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
+import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import com.thunder.wildernessodysseyapi.worldgen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.worldgen.structure.StarterStructureSpawnGuard;
 import net.minecraft.core.BlockPos;

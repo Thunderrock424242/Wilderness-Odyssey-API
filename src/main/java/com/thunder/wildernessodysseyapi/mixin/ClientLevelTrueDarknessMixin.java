@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.config.TrueDarknessConfig;
+import com.thunder.wildernessodysseyapi.truedarkness.config.TrueDarknessConfig;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;
 import org.spongepowered.asm.mixin.Mixin;

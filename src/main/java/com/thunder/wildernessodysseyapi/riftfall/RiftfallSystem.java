@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.riftfall;
 
-import com.thunder.wildernessodysseyapi.config.RiftfallConfig;
+import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
 import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
 import com.thunder.wildernessodysseyapi.entity.RiftboundWraithEntity;

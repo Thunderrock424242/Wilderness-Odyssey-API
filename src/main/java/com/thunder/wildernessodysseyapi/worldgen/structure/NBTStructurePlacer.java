@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.worldgen.structure;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.util.ChunkErrorReporter;
-import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
+import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import com.thunder.wildernessodysseyapi.worldgen.structure.StructurePlacementDebugger.PlacementAttempt;
 import com.thunder.wildernessodysseyapi.worldgen.structure.TerrainReplacerEngine.SurfaceSample;
 import com.thunder.wildernessodysseyapi.mixin.StructureTemplateAccessor;

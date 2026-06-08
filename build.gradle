@@ -196,7 +196,7 @@ tasks.register('obfuscateFiles', JavaExec) {
     description = "Runs the in-place obfuscation (XOR) on two hardcoded files."
 
     // Use the fully qualified main class name:
-    mainClass.set('com.thunder.wildernessodysseyapi.FileSecurity.SaferInPlaceObfuscateMulti')
+    mainClass.set('com.thunder.wildernessodysseyapi.filesecurity.SaferInPlaceObfuscateMulti')
 
     // The more traditional way to set the classpath in build.gradle (Groovy DSL):
     classpath = sourceSets.main.runtimeClasspath

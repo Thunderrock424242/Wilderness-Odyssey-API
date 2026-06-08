@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.lorebook;
 
 import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.network.SyncLoreBookPayload;
+import com.thunder.wildernessodysseyapi.lorebook.network.SyncLoreBookPayload;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;

@@ -1,8 +1,8 @@
 package com.thunder.wildernessodysseyapi.core;
 
-import com.thunder.wildernessodysseyapi.client.entity.RiftListenerRenderer;
-import com.thunder.wildernessodysseyapi.client.entity.RiftMawRenderer;
-import com.thunder.wildernessodysseyapi.client.entity.RiftboundWraithRenderer;
+import com.thunder.wildernessodysseyapi.entity.client.RiftListenerRenderer;
+import com.thunder.wildernessodysseyapi.entity.client.RiftMawRenderer;
+import com.thunder.wildernessodysseyapi.entity.client.RiftboundWraithRenderer;
 import com.thunder.wildernessodysseyapi.meteor.renderer.MeteorRenderer;
 import com.thunder.wildernessodysseyapi.temporalrift.client.RiftCoreBlockEntityRenderer;
 import com.thunder.wildernessodysseyapi.temporalrift.client.TemporalRiftShaders;
