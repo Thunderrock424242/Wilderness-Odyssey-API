@@ -11,6 +11,7 @@ import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
 import com.thunder.wildernessodysseyapi.command.*;
 import com.thunder.wildernessodysseyapi.effect.RadiationEffect;
 import com.thunder.wildernessodysseyapi.effect.RadiationTickHandler;
+import com.thunder.wildernessodysseyapi.effect.SimpleStatusEffect;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideWorldUpdater;
@@ -31,6 +32,7 @@ import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
 import com.thunder.wildernessodysseyapi.item.cloak.CloakState;
+import com.thunder.wildernessodysseyapi.item.cloak.CloakTickHandler;
 import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootConditions;
@@ -109,6 +111,15 @@ public class WildernessOdysseyAPIMainModClass {
     // ---- Registered objects ----
     public static final DeferredHolder<MobEffect, RadiationEffect> RADIATION_EFFECT =
             MOB_EFFECTS.register("radiation", RadiationEffect::new);
+
+    public static final DeferredHolder<MobEffect, SimpleStatusEffect> CRYO_SHAKES_EFFECT =
+            MOB_EFFECTS.register("cryo_shakes", () -> SimpleStatusEffect.harmful(0x8BD7FF));
+
+    public static final DeferredHolder<MobEffect, SimpleStatusEffect> ECHO_HYPOXIA_EFFECT =
+            MOB_EFFECTS.register("echo_hypoxia", () -> SimpleStatusEffect.harmful(0x6A37C8));
+
+    public static final DeferredHolder<MobEffect, SimpleStatusEffect> DESYNCED_EFFECT =
+            MOB_EFFECTS.register("desynced", () -> SimpleStatusEffect.harmful(0xB24CFF));
 
     public static final DeferredHolder<Feature<?>, MeteorFeature> METEOR_IMPACT_FEATURE =
             FEATURES.register("meteor_impact", MeteorFeature::new);
@@ -215,7 +226,10 @@ public class WildernessOdysseyAPIMainModClass {
         registrar.playToServer(CloakInputPayload.TYPE, CloakInputPayload.STREAM_CODEC, (payload, context) ->
                 context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer serverPlayer) {
-                        CloakState.setHoldingBreath(serverPlayer, payload.altDown());
+                        CloakState.setHoldingBreath(serverPlayer, payload.holdingBreathDown());
+                        if (payload.cloakTogglePressed()) {
+                            CloakTickHandler.tryToggleCloak(serverPlayer);
+                        }
                     }
                 }));
         registrar.playToClient(SyncLoreBookPayload.TYPE, SyncLoreBookPayload.STREAM_CODEC, (payload, context) ->

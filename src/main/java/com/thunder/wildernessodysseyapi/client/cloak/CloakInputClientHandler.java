@@ -12,7 +12,7 @@ import org.lwjgl.glfw.GLFW;
 
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public final class CloakInputClientHandler {
-    private static boolean lastSentAltState = false;
+    private static boolean lastSentHoldBreathState = false;
 
     private CloakInputClientHandler() {
     }
@@ -21,17 +21,18 @@ public final class CloakInputClientHandler {
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) {
-            lastSentAltState = false;
+            lastSentHoldBreathState = false;
             return;
         }
 
         long windowHandle = minecraft.getWindow().getWindow();
         boolean rightAltDown = GLFW.glfwGetKey(windowHandle, GLFW.GLFW_KEY_RIGHT_ALT) == GLFW.GLFW_PRESS;
-        boolean altDown = CloakKeyMappings.CLOAK_ALT.isDown() || rightAltDown;
+        boolean holdingBreathDown = CloakKeyMappings.HOLD_BREATH.isDown() || rightAltDown;
+        boolean cloakTogglePressed = CloakKeyMappings.CLOAK_TOGGLE.consumeClick();
 
-        if (altDown != lastSentAltState) {
-            PacketDistributor.sendToServer(new CloakInputPayload(altDown));
-            lastSentAltState = altDown;
+        if (holdingBreathDown != lastSentHoldBreathState || cloakTogglePressed) {
+            PacketDistributor.sendToServer(new CloakInputPayload(holdingBreathDown, cloakTogglePressed));
+            lastSentHoldBreathState = holdingBreathDown;
         }
     }
 }

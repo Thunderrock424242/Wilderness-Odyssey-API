@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.item;
 
+import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.item.cloak.CloakItem;
 import com.thunder.wildernessodysseyapi.item.cloak.BreathingMaskItem;
 import com.thunder.wildernessodysseyapi.item.cloak.InhalerItem;
@@ -10,6 +11,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.JukeboxSong;
 import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.SpawnEggItem;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -35,11 +37,16 @@ public class ModItems {
     );
     public static final DeferredItem<Item> BREATHING_MASK = ITEMS.register(
             "breathing_mask",
-            () -> new BreathingMaskItem(new Item.Properties().stacksTo(1))
+            () -> new BreathingMaskItem(new Item.Properties().stacksTo(1).durability(720).rarity(Rarity.EPIC).fireResistant())
     );
     public static final DeferredItem<Item> FIELD_CODEX = ITEMS.register(
             "field_codex",
             () -> new FieldCodexItem(new Item.Properties().stacksTo(1).rarity(Rarity.UNCOMMON))
+    );
+
+    public static final DeferredItem<Item> RIFTBOUND_WRAITH_SPAWN_EGG = ITEMS.register(
+            "riftbound_wraith_spawn_egg",
+            () -> new SpawnEggItem(ModEntities.RIFTBOUND_WRAITH.get(), 0x080512, 0x7E4CFF, new Item.Properties())
     );
 
     public static final DeferredItem<Item> MUSIC_DISC_DUSTWINDS = ITEMS.register(

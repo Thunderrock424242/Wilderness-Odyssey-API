@@ -41,6 +41,10 @@ public class RiftfallConfig {
     private final ModConfigSpec.DoubleValue riftListenerSpawnChance;
     private final ModConfigSpec.IntValue maxRiftListenersPerPlayer;
     private final ModConfigSpec.IntValue maxRiftListenersGlobal;
+    private final ModConfigSpec.IntValue riftboundWraithSpawnIntervalTicks;
+    private final ModConfigSpec.DoubleValue riftboundWraithSpawnChance;
+    private final ModConfigSpec.IntValue maxRiftboundWraithsPerPlayer;
+    private final ModConfigSpec.IntValue maxRiftboundWraithsGlobal;
     private final ModConfigSpec.IntValue riftMawLifetimeTicks;
 
     RiftfallConfig(ModConfigSpec.Builder builder) {
@@ -73,6 +77,10 @@ public class RiftfallConfig {
         riftListenerSpawnChance = builder.defineInRange("riftListenerSpawnChance", 0.35D, 0D, 1D);
         maxRiftListenersPerPlayer = builder.defineInRange("maxRiftListenersPerPlayer", 1, 0, 8);
         maxRiftListenersGlobal = builder.defineInRange("maxRiftListenersGlobal", 8, 0, 64);
+        riftboundWraithSpawnIntervalTicks = builder.defineInRange("riftboundWraithSpawnIntervalTicks", 520, 80, 6000);
+        riftboundWraithSpawnChance = builder.defineInRange("riftboundWraithSpawnChance", 0.18D, 0D, 1D);
+        maxRiftboundWraithsPerPlayer = builder.defineInRange("maxRiftboundWraithsPerPlayer", 1, 0, 4);
+        maxRiftboundWraithsGlobal = builder.defineInRange("maxRiftboundWraithsGlobal", 4, 0, 32);
         riftMawLifetimeTicks = builder.defineInRange("riftMawLifetimeTicks", 600, 100, 2400);
         builder.pop();
     }
@@ -103,5 +111,9 @@ public class RiftfallConfig {
     public double riftListenerSpawnChance() { return riftListenerSpawnChance.get(); }
     public int maxRiftListenersPerPlayer() { return maxRiftListenersPerPlayer.get(); }
     public int maxRiftListenersGlobal() { return maxRiftListenersGlobal.get(); }
+    public int riftboundWraithSpawnIntervalTicks() { return riftboundWraithSpawnIntervalTicks.get(); }
+    public double riftboundWraithSpawnChance() { return riftboundWraithSpawnChance.get(); }
+    public int maxRiftboundWraithsPerPlayer() { return maxRiftboundWraithsPerPlayer.get(); }
+    public int maxRiftboundWraithsGlobal() { return maxRiftboundWraithsGlobal.get(); }
     public int riftMawLifetimeTicks() { return riftMawLifetimeTicks.get(); }
 }

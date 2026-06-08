@@ -11,7 +11,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
- * Legacy cloak focus item. Cloaking behavior is controlled by the cloak Alt key.
+ * Handheld cloak focus. Cloaking can be toggled with this item or the cloak key.
  */
 public class CloakItem extends Item {
     private static final int CLOAK_TOGGLE_COOLDOWN_TICKS = TickTokAPI.toTicks(1);
@@ -27,8 +27,11 @@ public class CloakItem extends Item {
             return InteractionResultHolder.success(stack);
         }
 
-        player.displayClientMessage(Component.translatable("message.wildernessodysseyapi.cloak_hold_breath_hint"), true);
-        player.getCooldowns().addCooldown(this, CLOAK_TOGGLE_COOLDOWN_TICKS);
+        if (CloakTickHandler.tryToggleCloak(player)) {
+            player.getCooldowns().addCooldown(this, CLOAK_TOGGLE_COOLDOWN_TICKS);
+        } else {
+            player.displayClientMessage(Component.translatable("message.wildernessodysseyapi.cloak_hold_breath_hint"), true);
+        }
         return InteractionResultHolder.success(stack);
     }
 

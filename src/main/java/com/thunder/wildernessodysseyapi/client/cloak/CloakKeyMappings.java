@@ -13,10 +13,17 @@ import org.lwjgl.glfw.GLFW;
 public final class CloakKeyMappings {
     private static final String CATEGORY = "key.categories.wildernessodysseyapi";
 
-    public static final KeyMapping CLOAK_ALT = new KeyMapping(
-            "key.wildernessodysseyapi.cloak_alt",
+    public static final KeyMapping HOLD_BREATH = new KeyMapping(
+            "key.wildernessodysseyapi.hold_breath",
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_LEFT_ALT,
+            CATEGORY
+    );
+
+    public static final KeyMapping CLOAK_TOGGLE = new KeyMapping(
+            "key.wildernessodysseyapi.cloak_toggle",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_G,
             CATEGORY
     );
 
@@ -25,6 +32,7 @@ public final class CloakKeyMappings {
 
     @SubscribeEvent
     public static void register(RegisterKeyMappingsEvent event) {
-        event.register(CLOAK_ALT);
+        event.register(HOLD_BREATH);
+        event.register(CLOAK_TOGGLE);
     }
 }

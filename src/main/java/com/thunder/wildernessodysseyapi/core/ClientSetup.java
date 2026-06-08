@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.core;
 
 import com.thunder.wildernessodysseyapi.client.entity.RiftListenerRenderer;
 import com.thunder.wildernessodysseyapi.client.entity.RiftMawRenderer;
+import com.thunder.wildernessodysseyapi.client.entity.RiftboundWraithRenderer;
 import com.thunder.wildernessodysseyapi.meteor.renderer.MeteorRenderer;
 import com.thunder.wildernessodysseyapi.temporalrift.client.RiftCoreBlockEntityRenderer;
 import com.thunder.wildernessodysseyapi.temporalrift.client.TemporalRiftShaders;
@@ -22,6 +23,7 @@ public class ClientSetup {
         event.registerEntityRenderer(ModEntities.METEOR.get(), MeteorRenderer::new);
         event.registerEntityRenderer(ModEntities.RIFT_LISTENER.get(), RiftListenerRenderer::new);
         event.registerEntityRenderer(ModEntities.RIFT_MAW.get(), RiftMawRenderer::new);
+        event.registerEntityRenderer(ModEntities.RIFTBOUND_WRAITH.get(), RiftboundWraithRenderer::new);
         event.registerBlockEntityRenderer(TemporalRiftBlockEntities.RIFT_CORE.get(), RiftCoreBlockEntityRenderer::new);
     }
 

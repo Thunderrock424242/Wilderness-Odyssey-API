@@ -41,6 +41,7 @@ public class ModCreativeTabs {
                         output.accept(ModItems.INHALER.get());
                         output.accept(ModItems.BREATHING_MASK.get());
                         output.accept(ModItems.FIELD_CODEX.get());
+                        output.accept(ModItems.RIFTBOUND_WRAITH_SPAWN_EGG.get());
                         output.accept(ModItems.MUSIC_DISC_DUSTWINDS.get());
                         output.accept(ModItems.MUSIC_DISC_STARFALL.get());
                     })

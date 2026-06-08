@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.core;
 
 import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
+import com.thunder.wildernessodysseyapi.entity.RiftboundWraithEntity;
 import com.thunder.wildernessodysseyapi.entity.RiftListenerEntity;
 import com.thunder.wildernessodysseyapi.entity.RiftMawEntity;
 import com.thunder.wildernessodysseyapi.meteor.entity.MeteorEntity;
@@ -57,6 +58,15 @@ public final class ModEntities {
                             .fireImmune()
                             .build("rift_maw"));
 
+    public static final DeferredHolder<EntityType<?>, EntityType<RiftboundWraithEntity>> RIFTBOUND_WRAITH =
+            ENTITY_TYPES.register("riftbound_wraith",
+                    () -> EntityType.Builder.of(RiftboundWraithEntity::new, MobCategory.MONSTER)
+                            .sized(0.9F, 3.1F)
+                            .clientTrackingRange(16)
+                            .updateInterval(2)
+                            .fireImmune()
+                            .build("riftbound_wraith"));
+
     public static void register(IEventBus eventBus) {
         ENTITY_TYPES.register(eventBus);
     }
@@ -71,6 +81,7 @@ public final class ModEntities {
             event.put(RIFTBORN.get(), RiftbornEntity.createAttributes().build());
             event.put(RIFT_LISTENER.get(), RiftListenerEntity.createAttributes().build());
             event.put(RIFT_MAW.get(), RiftMawEntity.createAttributes().build());
+            event.put(RIFTBOUND_WRAITH.get(), RiftboundWraithEntity.createAttributes().build());
         }
 
         @SubscribeEvent
@@ -87,6 +98,13 @@ public final class ModEntities {
                     SpawnPlacementTypes.ON_GROUND,
                     Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                     RiftListenerEntity::checkRiftListenerSpawnRules,
+                    RegisterSpawnPlacementsEvent.Operation.REPLACE
+            );
+            event.register(
+                    RIFTBOUND_WRAITH.get(),
+                    SpawnPlacementTypes.ON_GROUND,
+                    Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    RiftboundWraithEntity::checkRiftboundWraithSpawnRules,
                     RegisterSpawnPlacementsEvent.Operation.REPLACE
             );
         }

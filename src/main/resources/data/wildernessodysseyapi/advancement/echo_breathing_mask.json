@@ -1,0 +1,36 @@
+{
+  "display": {
+    "icon": {
+      "id": "wildernessodysseyapi:breathing_mask"
+    },
+    "title": {
+      "translate": "advancements.wildernessodysseyapi.echo_breathing_mask.title"
+    },
+    "description": {
+      "translate": "advancements.wildernessodysseyapi.echo_breathing_mask.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "has_echo_breathing_mask": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "wildernessodysseyapi:breathing_mask"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_echo_breathing_mask"
+    ]
+  ]
+}

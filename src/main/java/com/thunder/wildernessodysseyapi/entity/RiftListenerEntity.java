@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.entity;
 
 import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.crouching.CrouchNoiseHelper;
+import com.thunder.wildernessodysseyapi.item.cloak.CloakState;
 import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -227,6 +228,10 @@ public class RiftListenerEntity extends Monster {
             sound += 1.0D;
         }
 
+        if (CloakState.isBreathStealthed(player)) {
+            sound *= breathStealthSoundMultiplier(player, horizontalSpeed);
+        }
+
         if (player.isCrouching()) {
             double armorNoise = CrouchNoiseHelper.getCrouchVisibilityMultiplier(player);
             sound *= Mth.clamp(0.12D + armorNoise * 0.25D, 0.08D, 0.45D);
@@ -236,6 +241,20 @@ public class RiftListenerEntity extends Monster {
 
         double attenuation = 1.0D - distance / LISTEN_RANGE;
         return Math.max(0.0D, sound * attenuation);
+    }
+
+    private static double breathStealthSoundMultiplier(ServerPlayer player, double horizontalSpeed) {
+        double multiplier = 0.0D;
+        if (horizontalSpeed > 0.03D || player.isSwimming() || !player.onGround()) {
+            multiplier = 0.25D;
+        }
+        if (player.isSprinting()) {
+            multiplier = Math.max(multiplier, 0.45D);
+        }
+        if (player.isUsingItem() || player.hurtTime > 0) {
+            multiplier = Math.max(multiplier, 0.55D);
+        }
+        return multiplier;
     }
 
     private record SoundSample(ServerPlayer player, double score, BlockPos pos) {

@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.riftfall;
 import com.thunder.wildernessodysseyapi.config.RiftfallConfig;
 import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
+import com.thunder.wildernessodysseyapi.entity.RiftboundWraithEntity;
 import com.thunder.wildernessodysseyapi.entity.RiftListenerEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.ChatFormatting;
@@ -65,6 +66,7 @@ public final class RiftfallSystem {
         tickCorrosion(level);
         tickRiftbornSpawning(level);
         tickRiftListenerSpawning(level);
+        tickRiftboundWraithSpawning(level);
     }
 
     private static void maybeStartRiftfall(ServerLevel level) {
@@ -259,6 +261,39 @@ public final class RiftfallSystem {
             listener.moveTo(spawn.getX() + 0.5D, spawn.getY(), spawn.getZ() + 0.5D, level.random.nextFloat() * 360F, 0F);
             if (listener.checkSpawnRules(level, net.minecraft.world.entity.MobSpawnType.EVENT) && listener.checkSpawnObstruction(level)) {
                 level.addFreshEntity(listener);
+                return;
+            }
+        }
+    }
+
+    private static void tickRiftboundWraithSpawning(ServerLevel level) {
+        if (!stage.isActiveDanger()) return;
+        if (RiftfallConfig.CONFIG.maxRiftboundWraithsGlobal() <= 0) return;
+        if ((level.getGameTime() % RiftfallConfig.CONFIG.riftboundWraithSpawnIntervalTicks()) != 0) return;
+
+        double chance = RiftfallConfig.CONFIG.riftboundWraithSpawnChance();
+        if (stage == RiftfallStage.METEOR_SURGE) {
+            chance = Math.min(1.0D, chance * 1.6D);
+        }
+        if (level.random.nextDouble() > chance) return;
+
+        EntityType<RiftboundWraithEntity> type = ModEntities.RIFTBOUND_WRAITH.get();
+        int globalCount = level.getEntities(type, new AABB(-30_000_000, level.getMinBuildHeight(), -30_000_000, 30_000_000, level.getMaxBuildHeight(), 30_000_000), RiftboundWraithEntity::isAlive).size();
+        if (globalCount >= RiftfallConfig.CONFIG.maxRiftboundWraithsGlobal()) return;
+
+        for (ServerPlayer player : level.players()) {
+            if (!playerCanSeeSky(level, player)) continue;
+            int nearby = level.getEntities(type, new AABB(player.blockPosition()).inflate(64), RiftboundWraithEntity::isAlive).size();
+            if (nearby >= RiftfallConfig.CONFIG.maxRiftboundWraithsPerPlayer()) continue;
+
+            BlockPos spawn = findGroundNear(level, player.blockPosition(), 28, 52);
+            if (spawn == null) continue;
+
+            RiftboundWraithEntity wraith = type.create(level);
+            if (wraith == null) continue;
+            wraith.moveTo(spawn.getX() + 0.5D, spawn.getY(), spawn.getZ() + 0.5D, level.random.nextFloat() * 360F, 0F);
+            if (wraith.checkSpawnRules(level, net.minecraft.world.entity.MobSpawnType.EVENT) && wraith.checkSpawnObstruction(level)) {
+                level.addFreshEntity(wraith);
                 return;
             }
         }
