@@ -88,7 +88,8 @@ public class RiftboundWraithEntity extends Monster implements GeoEntity {
                                                          RandomSource random) {
         return Monster.isDarkEnoughToSpawn(level, pos, random)
                 && checkMobSpawnRules(type, level, reason, pos, random)
-                && level.getLevel().isRaining();
+                && RiftfallSystem.stage().isActiveDanger()
+                && (level.getLevel().isRaining() || level.getLevel().isThundering());
     }
 
     @Override

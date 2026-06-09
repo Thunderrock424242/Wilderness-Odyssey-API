@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.temporalrift.command.TemporalRiftCommand
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftDimensions;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -20,6 +21,7 @@ public final class TemporalRiftEventHandler {
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         TemporalRiftManager.tick(event.getServer());
+        EchoBuildEchoManager.tick(event.getServer());
     }
 
     @SubscribeEvent
@@ -33,6 +35,10 @@ public final class TemporalRiftEventHandler {
                 && level.dimension().equals(TemporalRiftDimensions.THE_BEFORE_KEY)
                 && event.getEntity() instanceof ServerPlayer player) {
             TemporalEchoManager.recordPlayerPlacedBlock(level, event.getPos(), event.getPlacedBlock(), player);
+        } else if (event.getLevel() instanceof ServerLevel level
+                && level.dimension().equals(Level.OVERWORLD)
+                && event.getEntity() instanceof ServerPlayer player) {
+            EchoBuildEchoManager.recordOverworldPlacedBlock(level, event.getPos(), event.getPlacedBlock(), player);
         }
     }
 
@@ -42,6 +48,10 @@ public final class TemporalRiftEventHandler {
                 && level.dimension().equals(TemporalRiftDimensions.THE_BEFORE_KEY)
                 && event.getPlayer() instanceof ServerPlayer player) {
             TemporalEchoManager.recordPlayerBrokenBlock(level, event.getPos(), event.getState(), player);
+        } else if (event.getLevel() instanceof ServerLevel level
+                && level.dimension().equals(Level.OVERWORLD)
+                && event.getPlayer() instanceof ServerPlayer player) {
+            EchoBuildEchoManager.recordOverworldBrokenBlock(level, event.getPos(), event.getState(), player);
         }
     }
 }

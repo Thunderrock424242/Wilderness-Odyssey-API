@@ -4,13 +4,13 @@ import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
+import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.level.GameRules;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -27,7 +27,7 @@ public final class RiftfallWeatherHandler {
 
     @SubscribeEvent
     public static void onLevelTick(LevelTickEvent.Post event) {
-        if (!(event.getLevel() instanceof ServerLevel serverLevel) || serverLevel.dimension() != Level.OVERWORLD) {
+        if (!(event.getLevel() instanceof ServerLevel serverLevel) || !RiftfallSystem.canRunIn(serverLevel)) {
             return;
         }
 

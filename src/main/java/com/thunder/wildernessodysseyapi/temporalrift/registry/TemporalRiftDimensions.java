@@ -19,6 +19,16 @@ public final class TemporalRiftDimensions {
             ResourceLocation.fromNamespaceAndPath(MOD_ID, "the_before")
     );
 
+    public static final ResourceKey<Level> THE_ECHO_KEY = ResourceKey.create(
+            Registries.DIMENSION,
+            ResourceLocation.fromNamespaceAndPath(MOD_ID, "the_echo")
+    );
+
+    public static final ResourceKey<DimensionType> THE_ECHO_TYPE_KEY = ResourceKey.create(
+            Registries.DIMENSION_TYPE,
+            ResourceLocation.fromNamespaceAndPath(MOD_ID, "the_echo")
+    );
+
     private TemporalRiftDimensions() {
     }
 }

@@ -5,12 +5,14 @@ import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
 import com.thunder.wildernessodysseyapi.entity.RiftboundWraithEntity;
 import com.thunder.wildernessodysseyapi.entity.RiftListenerEntity;
+import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftDimensions;
 import net.minecraft.core.BlockPos;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -26,53 +28,66 @@ import java.util.UUID;
 public final class RiftfallSystem {
     private static final int EXPOSURE_EFFECT_REFRESH_INTERVAL_TICKS = 20;
 
-    private static RiftfallStage stage = RiftfallStage.CLEAR;
-    private static int stageTicksRemaining = 0;
-    private static int cooldownTicksRemaining = 0;
-
+    private static final Map<net.minecraft.resources.ResourceKey<Level>, RiftfallState> states = new HashMap<>();
     private static final Map<UUID, Float> playerExposure = new HashMap<>();
 
     private RiftfallSystem() {}
 
     public static RiftfallStage stage() {
-        return stage;
+        return states.values().stream()
+                .map(state -> state.stage)
+                .filter(stage -> stage != RiftfallStage.CLEAR)
+                .findFirst()
+                .orElse(RiftfallStage.CLEAR);
     }
 
     public static float getExposure(ServerPlayer player) {
         return playerExposure.getOrDefault(player.getUUID(), 0F);
     }
 
+    public static boolean canRunIn(ServerLevel level) {
+        return level.dimension().equals(Level.OVERWORLD) || level.dimension().equals(TemporalRiftDimensions.THE_ECHO_KEY);
+    }
+
     public static void tick(ServerLevel level) {
+        if (!canRunIn(level)) {
+            return;
+        }
+
         if (!RiftfallConfig.CONFIG.enabled()) {
             resetToClear();
             return;
         }
 
-        if (cooldownTicksRemaining > 0) cooldownTicksRemaining--;
+        RiftfallState state = stateFor(level);
+
+        if (state.cooldownTicksRemaining > 0) state.cooldownTicksRemaining--;
 
         boolean vanillaWet = level.isRaining() || level.isThundering();
-        if (!vanillaWet && stage != RiftfallStage.CLEAR) {
+        if (!vanillaWet && state.stage != RiftfallStage.CLEAR) {
             enterStage(level, RiftfallStage.ENDING, RiftfallConfig.CONFIG.endingTicks());
         }
 
-        if (stage == RiftfallStage.CLEAR) {
+        if (state.stage == RiftfallStage.CLEAR) {
             maybeStartRiftfall(level);
         } else {
-            stageTicksRemaining--;
-            if (stageTicksRemaining <= 0) {
+            state.stageTicksRemaining--;
+            if (state.stageTicksRemaining <= 0) {
                 advanceStage(level);
             }
         }
 
-        tickExposure(level);
-        tickCorrosion(level);
-        tickRiftbornSpawning(level);
-        tickRiftListenerSpawning(level);
-        tickRiftboundWraithSpawning(level);
+        RiftfallStage currentStage = stateFor(level).stage;
+        tickExposure(level, currentStage);
+        tickCorrosion(level, currentStage);
+        tickRiftbornSpawning(level, currentStage);
+        tickRiftListenerSpawning(level, currentStage);
+        tickRiftboundWraithSpawning(level, currentStage);
     }
 
     private static void maybeStartRiftfall(ServerLevel level) {
-        if (cooldownTicksRemaining > 0) return;
+        RiftfallState state = stateFor(level);
+        if (state.cooldownTicksRemaining > 0) return;
         if (!level.isRaining() && !level.isThundering()) return;
         if ((level.getGameTime() % RiftfallConfig.CONFIG.checkIntervalTicks()) != 0) return;
 
@@ -86,7 +101,8 @@ public final class RiftfallSystem {
     }
 
     private static void advanceStage(ServerLevel level) {
-        switch (stage) {
+        RiftfallState state = stateFor(level);
+        switch (state.stage) {
             case WARNING -> {
                 enterStage(level, RiftfallStage.ACTIVE, RiftfallConfig.CONFIG.activeTicks());
                 broadcast(level, "Riftfall formation detected. Chrono Corrosion levels rising.", ChatFormatting.DARK_PURPLE);
@@ -102,7 +118,7 @@ public final class RiftfallSystem {
             case METEOR_SURGE -> enterStage(level, RiftfallStage.ENDING, RiftfallConfig.CONFIG.endingTicks());
             case ENDING -> {
                 enterStage(level, RiftfallStage.CLEAR, 0);
-                cooldownTicksRemaining = RiftfallConfig.CONFIG.cooldownTicks();
+                stateFor(level).cooldownTicksRemaining = RiftfallConfig.CONFIG.cooldownTicks();
                 broadcast(level, "Storm intensity decreasing. Remain cautious.", ChatFormatting.GRAY);
             }
             case CLEAR -> {
@@ -111,15 +127,16 @@ public final class RiftfallSystem {
     }
 
     private static void enterStage(ServerLevel level, RiftfallStage nextStage, int ticks) {
-        stage = nextStage;
-        stageTicksRemaining = ticks;
+        RiftfallState state = stateFor(level);
+        state.stage = nextStage;
+        state.stageTicksRemaining = ticks;
 
         if (nextStage == RiftfallStage.METEOR_SURGE && (level.getGameTime() % 100 == 0)) {
             spawnMeteorFlavor(level);
         }
     }
 
-    private static void tickExposure(ServerLevel level) {
+    private static void tickExposure(ServerLevel level, RiftfallStage stage) {
         for (ServerPlayer player : level.players()) {
             float value = getExposure(player);
             boolean exposed = playerCanSeeSky(level, player) && stage.isActiveDanger();
@@ -167,13 +184,11 @@ public final class RiftfallSystem {
     }
 
     private static void resetToClear() {
-        stage = RiftfallStage.CLEAR;
-        stageTicksRemaining = 0;
-        cooldownTicksRemaining = 0;
+        states.clear();
         playerExposure.clear();
     }
 
-    private static void tickCorrosion(ServerLevel level) {
+    private static void tickCorrosion(ServerLevel level, RiftfallStage stage) {
         if (!stage.isActiveDanger() || !RiftfallConfig.CONFIG.allowNaturalBlockCorrosion()) return;
         if ((level.getGameTime() % RiftfallConfig.CONFIG.corrosionIntervalTicks()) != 0) return;
 
@@ -206,7 +221,7 @@ public final class RiftfallSystem {
         return null;
     }
 
-    private static void tickRiftbornSpawning(ServerLevel level) {
+    private static void tickRiftbornSpawning(ServerLevel level, RiftfallStage stage) {
         if (!stage.isActiveDanger()) return;
         if ((level.getGameTime() % RiftfallConfig.CONFIG.riftbornSpawnIntervalTicks()) != 0) return;
 
@@ -238,7 +253,7 @@ public final class RiftfallSystem {
         }
     }
 
-    private static void tickRiftListenerSpawning(ServerLevel level) {
+    private static void tickRiftListenerSpawning(ServerLevel level, RiftfallStage stage) {
         if (!stage.isActiveDanger()) return;
         if (RiftfallConfig.CONFIG.maxRiftListenersGlobal() <= 0) return;
         if ((level.getGameTime() % RiftfallConfig.CONFIG.riftListenerSpawnIntervalTicks()) != 0) return;
@@ -271,7 +286,7 @@ public final class RiftfallSystem {
         }
     }
 
-    private static void tickRiftboundWraithSpawning(ServerLevel level) {
+    private static void tickRiftboundWraithSpawning(ServerLevel level, RiftfallStage stage) {
         if (!stage.isActiveDanger()) return;
         if (RiftfallConfig.CONFIG.maxRiftboundWraithsGlobal() <= 0) return;
         if ((level.getGameTime() % RiftfallConfig.CONFIG.riftboundWraithSpawnIntervalTicks()) != 0) return;
@@ -317,5 +332,15 @@ public final class RiftfallSystem {
             }
         }
         return null;
+    }
+
+    private static RiftfallState stateFor(ServerLevel level) {
+        return states.computeIfAbsent(level.dimension(), ignored -> new RiftfallState());
+    }
+
+    private static final class RiftfallState {
+        private RiftfallStage stage = RiftfallStage.CLEAR;
+        private int stageTicksRemaining = 0;
+        private int cooldownTicksRemaining = 0;
     }
 }

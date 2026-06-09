@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.temporalrift.TemporalRiftSavedData;
 import com.thunder.wildernessodysseyapi.temporalrift.TemporalRiftTeleporter;
 import com.thunder.wildernessodysseyapi.temporalrift.TemporalTransferManager;
 import com.thunder.wildernessodysseyapi.temporalrift.TemporalTransferSavedData;
+import com.thunder.wildernessodysseyapi.temporalrift.SafeTeleportHelper;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftDimensions;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -16,9 +17,12 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.RelativeMovement;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
+
+import java.util.Set;
 
 public final class TemporalRiftCommand {
     private TemporalRiftCommand() {
@@ -36,6 +40,7 @@ public final class TemporalRiftCommand {
                         .then(Commands.literal("close").executes(TemporalRiftCommand::cmdClose))
                         .then(Commands.literal("status").executes(TemporalRiftCommand::cmdStatus))
                         .then(Commands.literal("teleport_past").executes(TemporalRiftCommand::cmdTeleportPast))
+                        .then(Commands.literal("teleport_echo").executes(TemporalRiftCommand::cmdTeleportEcho))
                         .then(Commands.literal("teleport_overworld").executes(TemporalRiftCommand::cmdTeleportOverworld))
                         .then(Commands.literal("force_transfer_capsules").executes(TemporalRiftCommand::cmdForceTransfer))
         );
@@ -117,6 +122,40 @@ public final class TemporalRiftCommand {
             }
             TemporalRiftTeleporter.teleportToPastDimension(player, pastLevel);
             source.sendSuccess(() -> Component.literal("Teleported to The Before."), true);
+            return 1;
+        } catch (Exception exception) {
+            source.sendFailure(Component.literal("Teleport failed: " + exception.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int cmdTeleportEcho(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        try {
+            ServerPlayer player = source.getPlayerOrException();
+            ServerLevel echoLevel = source.getServer().getLevel(TemporalRiftDimensions.THE_ECHO_KEY);
+            if (echoLevel == null) {
+                source.sendFailure(Component.literal("The Echo dimension is not loaded."));
+                return 0;
+            }
+
+            int x = player.blockPosition().getX();
+            int z = player.blockPosition().getZ();
+            int surfaceY = echoLevel.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            BlockPos safePos = SafeTeleportHelper.findSafePositionNearby(
+                    echoLevel,
+                    x,
+                    Math.max(echoLevel.getMinBuildHeight() + 2, surfaceY),
+                    z,
+                    12
+            );
+            if (safePos == null) {
+                safePos = new BlockPos(x, Math.max(echoLevel.getMinBuildHeight() + 2, surfaceY), z);
+            }
+
+            player.teleportTo(echoLevel, safePos.getX() + 0.5D, safePos.getY(), safePos.getZ() + 0.5D, Set.<RelativeMovement>of(), player.getYRot(), player.getXRot());
+            player.sendSystemMessage(Component.literal("[Temporal Rift] You cross into The Echo. Everything remembers you incorrectly."));
+            source.sendSuccess(() -> Component.literal("Teleported to The Echo."), true);
             return 1;
         } catch (Exception exception) {
             source.sendFailure(Component.literal("Teleport failed: " + exception.getMessage()));
