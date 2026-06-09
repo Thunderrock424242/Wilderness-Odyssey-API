@@ -14,7 +14,6 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.bus.api.SubscribeEvent;
 
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -48,7 +47,7 @@ public class WildernessFluidRegistry {
     public static void onServerLevelTick(LevelTickEvent.Post event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
 
-        List<BlockPos> waterBlocks = gatherSurfaceWaterBlocks(level, MAX_BLOCKS_PER_TICK);
+        Set<BlockPos> waterBlocks = gatherSurfaceWaterBlocks(level, MAX_BLOCKS_PER_TICK);
 
         for (BlockPos pos : waterBlocks) {
             FluidState fluid = level.getFluidState(pos);
@@ -61,7 +60,7 @@ public class WildernessFluidRegistry {
     /**
      * Collect a sample of loaded water blocks near active chunks.
      */
-    private static List<BlockPos> gatherSurfaceWaterBlocks(ServerLevel level, int limit) {
+    private static Set<BlockPos> gatherSurfaceWaterBlocks(ServerLevel level, int limit) {
         Set<BlockPos> uniquePositions = new LinkedHashSet<>();
         List<ServerPlayer> players = level.players();
         int playerCount = Math.max(1, players.size());
@@ -80,21 +79,22 @@ public class WildernessFluidRegistry {
             collectNearbyWater(level, level.getSharedSpawnPos(), limit, limit, uniquePositions);
         }
 
-        return new ArrayList<>(uniquePositions);
+        return uniquePositions;
     }
 
     private static void collectNearbyWater(ServerLevel level, BlockPos center, int scanLimit, int totalLimit, Set<BlockPos> result) {
         int added = 0;
+        BlockPos.MutableBlockPos check = new BlockPos.MutableBlockPos();
         for (int dx = -8; dx <= 8 && result.size() < totalLimit && added < scanLimit; dx += 2) {
             for (int dz = -8; dz <= 8 && result.size() < totalLimit && added < scanLimit; dz += 2) {
                 for (int dy = -4; dy <= 4; dy++) {
-                    BlockPos check = center.offset(dx, dy, dz);
+                    check.set(center.getX() + dx, center.getY() + dy, center.getZ() + dz);
                     if (!level.hasChunkAt(check)) {
                         continue;
                     }
                     FluidState fs = level.getFluidState(check);
                     if (fs.is(Fluids.WATER) || fs.is(Fluids.FLOWING_WATER)) {
-                        if (result.add(check)) {
+                        if (result.add(check.immutable())) {
                             added++;
                         }
                         break;

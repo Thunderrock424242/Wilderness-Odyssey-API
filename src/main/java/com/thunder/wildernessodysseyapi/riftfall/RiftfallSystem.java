@@ -24,6 +24,8 @@ import java.util.Map;
 import java.util.UUID;
 
 public final class RiftfallSystem {
+    private static final int EXPOSURE_EFFECT_REFRESH_INTERVAL_TICKS = 20;
+
     private static RiftfallStage stage = RiftfallStage.CLEAR;
     private static int stageTicksRemaining = 0;
     private static int cooldownTicksRemaining = 0;
@@ -131,12 +133,15 @@ public final class RiftfallSystem {
 
             value = Mth.clamp(value, 0F, 100F);
             playerExposure.put(player.getUUID(), value);
-            applyExposureEffects(player, value);
+            if (player.tickCount % EXPOSURE_EFFECT_REFRESH_INTERVAL_TICKS == 0) {
+                applyExposureEffects(player, value);
+            }
         }
     }
 
     private static boolean playerCanSeeSky(ServerLevel level, ServerPlayer player) {
-        return level.canSeeSky(player.blockPosition()) || level.canSeeSky(player.blockPosition().above());
+        BlockPos pos = player.blockPosition();
+        return level.canSeeSky(pos) || level.canSeeSky(pos.above());
     }
 
     private static void applyExposureEffects(ServerPlayer player, float exposure) {

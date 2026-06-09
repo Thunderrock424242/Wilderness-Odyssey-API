@@ -371,7 +371,6 @@ public final class TemporalRiftManager {
     private static boolean isInsideSinkholeCapture(Entity entity, Vec3 center, double captureRadius, double captureY) {
         double dx = entity.getX() - center.x;
         double dz = entity.getZ() - center.z;
-        double horizontalDistance = Math.sqrt(dx * dx + dz * dz);
-        return horizontalDistance <= captureRadius && entity.getY() <= captureY;
+        return dx * dx + dz * dz <= captureRadius * captureRadius && entity.getY() <= captureY;
     }
 }

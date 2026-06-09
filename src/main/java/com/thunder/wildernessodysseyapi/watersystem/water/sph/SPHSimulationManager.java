@@ -275,6 +275,18 @@ public class SPHSimulationManager {
         return Collections.unmodifiableList(result);
     }
 
+    public void collectActive(List<SPHSimulator> result) {
+        result.addAll(active);
+    }
+
+    public void collectActive(BlockGetter level, List<SPHSimulator> result) {
+        for (SPHSimulator sim : active) {
+            if (sim.getLevel() == level) {
+                result.add(sim);
+            }
+        }
+    }
+
     /**
      * Terminates all physics processing. Should be called during server/client shutdown.
      */

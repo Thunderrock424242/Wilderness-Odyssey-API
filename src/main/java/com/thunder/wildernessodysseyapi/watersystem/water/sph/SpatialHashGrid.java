@@ -44,17 +44,18 @@ public class SpatialHashGrid {
      * to the {@link #listPool} to be reused in the next step.
      */
     public void clear() {
+        int released = 0;
         for (List<Integer> list : cells.values()) {
             list.clear();
-            if (poolIndex == listPool.size()) {
+            if (released == listPool.size()) {
                 listPool.add(list);
             } else {
-                listPool.set(poolIndex, list);
+                listPool.set(released, list);
             }
-            poolIndex++;
+            released++;
         }
         cells.clear();
-        poolIndex = 0;
+        poolIndex = released;
     }
 
     /**
@@ -72,8 +73,7 @@ public class SpatialHashGrid {
         if (bucket == null) {
             // Retrieve a list from the pool instead of creating a new one
             if (poolIndex > 0) {
-                poolIndex--;
-                bucket = listPool.get(poolIndex);
+                bucket = listPool.get(--poolIndex);
             } else {
                 bucket = new ArrayList<>(8);
             }
@@ -133,6 +133,6 @@ public class SpatialHashGrid {
      * with prime multipliers to minimize cell collisions.
      */
     private long cellKey(int cx, int cy, int cz) {
-        return ((long)(cx * 92837111)) ^ ((long)(cy * 689287499)) ^ ((long)(cz * 283923481));
+        return ((long) cx * 92837111L) ^ ((long) cy * 689287499L) ^ ((long) cz * 283923481L);
     }
 }

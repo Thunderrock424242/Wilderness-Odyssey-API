@@ -39,6 +39,7 @@ public class RadiationTickHandler {
 
             for (ServerPlayer player : level.players()) {
                 Vec3 playerPos = player.position();
+                int strongestAmplifier = -1;
 
                 for (MeteorSavedData.MeteorRecord meteor : meteors) {
                     double radiationRadius   = meteor.craterRadius() * RADIATION_ZONE_MULTIPLIER;
@@ -51,15 +52,19 @@ public class RadiationTickHandler {
 
                     if (distSq <= radiationRadiusSq) {
                         int amplifier = RadiationEffect.getAmplifierForDistance(distSq, radiationRadius);
-                        player.addEffect(new MobEffectInstance(
-                            RADIATION_EFFECT,
-                            EFFECT_DURATION,
-                            amplifier,
-                            false, // not ambient
-                            true,  // show particles
-                            true   // show icon
-                        ));
+                        strongestAmplifier = Math.max(strongestAmplifier, amplifier);
                     }
+                }
+
+                if (strongestAmplifier >= 0) {
+                    player.addEffect(new MobEffectInstance(
+                        RADIATION_EFFECT,
+                        EFFECT_DURATION,
+                        strongestAmplifier,
+                        false, // not ambient
+                        true,  // show particles
+                        true   // show icon
+                    ));
                 }
             }
         }

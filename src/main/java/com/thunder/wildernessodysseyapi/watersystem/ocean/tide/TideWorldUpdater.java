@@ -89,13 +89,14 @@ public class TideWorldUpdater {
      */
     private static void applyColumnTide(ServerLevel level, BlockPos surface, int targetY) {
         int topY = surface.getY();
+        BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
 
         if (topY < targetY) {
             for (int y = topY + 1; y <= targetY; y++) {
-                BlockPos pos = new BlockPos(surface.getX(), y, surface.getZ());
-                BlockState state = level.getBlockState(pos);
+                mutablePos.set(surface.getX(), y, surface.getZ());
+                BlockState state = level.getBlockState(mutablePos);
                 if (state.isAir()) {
-                    level.setBlock(pos, Blocks.WATER.defaultBlockState(), 2);
+                    level.setBlock(mutablePos, Blocks.WATER.defaultBlockState(), 2);
                 }
             }
             return;
@@ -103,9 +104,9 @@ public class TideWorldUpdater {
 
         if (topY > targetY) {
             for (int y = topY; y > targetY; y--) {
-                BlockPos pos = new BlockPos(surface.getX(), y, surface.getZ());
-                if (level.getFluidState(pos).is(Fluids.WATER)) {
-                    level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+                mutablePos.set(surface.getX(), y, surface.getZ());
+                if (level.getFluidState(mutablePos).is(Fluids.WATER)) {
+                    level.setBlock(mutablePos, Blocks.AIR.defaultBlockState(), 2);
                 }
             }
         }
@@ -116,10 +117,11 @@ public class TideWorldUpdater {
      * Returns null if no water found in Y range.
      */
     private static BlockPos findShoreline(ServerLevel level, int x, int z) {
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int y = SEA_LEVEL + 3; y >= SEA_LEVEL - 2; y--) {
-            BlockPos pos = new BlockPos(x, y, z);
+            pos.set(x, y, z);
             if (level.getFluidState(pos).is(Fluids.WATER)) {
-                return pos;
+                return pos.immutable();
             }
         }
         return null;
