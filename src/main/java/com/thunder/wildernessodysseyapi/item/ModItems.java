@@ -1,7 +1,6 @@
 package com.thunder.wildernessodysseyapi.item;
 
 import com.thunder.wildernessodysseyapi.core.ModEntities;
-import com.thunder.wildernessodysseyapi.cloak.item.CloakItem;
 import com.thunder.wildernessodysseyapi.cloak.item.BreathingMaskItem;
 import com.thunder.wildernessodysseyapi.cloak.item.InhalerItem;
 import com.thunder.wildernessodysseyapi.lorebook.item.FieldCodexItem;
@@ -28,10 +27,6 @@ public class ModItems {
      */
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MOD_ID);
 
-    public static final DeferredItem<Item> CLOAK_ITEM = ITEMS.register(
-            "cloak_item",
-            () -> new CloakItem(new Item.Properties().stacksTo(1))
-    );
     public static final DeferredItem<Item> INHALER = ITEMS.register(
             "inhaler",
             () -> new InhalerItem(new Item.Properties().stacksTo(1).durability(50))

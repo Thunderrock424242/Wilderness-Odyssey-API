@@ -37,7 +37,6 @@ public class ModCreativeTabs {
                         output.accept(TemporalRiftBlocks.TIME_CAPSULE.get());
                         output.accept(AnomalyBlocks.ANOMALY_ORE.get());
                         output.accept(AnomalyBlocks.ANOMALY_GATEWAY.get());
-                        output.accept(ModItems.CLOAK_ITEM.get());
                         output.accept(ModItems.INHALER.get());
                         output.accept(ModItems.BREATHING_MASK.get());
                         output.accept(ModItems.FIELD_CODEX.get());
