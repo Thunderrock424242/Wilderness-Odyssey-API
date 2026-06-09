@@ -2,7 +2,6 @@ package com.thunder.wildernessodysseyapi.cloak.item;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.core.WildernessOdysseyAPIMainModClass;
-import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.cloak.item.module.EchoMaskModuleModifiers;
 import com.thunder.wildernessodysseyapi.cloak.item.module.EchoMaskModuleStorage;
 import net.minecraft.core.particles.ParticleTypes;
@@ -49,11 +48,6 @@ public final class CloakTickHandler {
         if (CloakState.isCloaked(player)) {
             disableCloak(player, true);
             return true;
-        }
-
-        if (!CloakItem.isHoldingCloak(player)) {
-            player.displayClientMessage(Component.translatable("message.wildernessodysseyapi.cloak_missing"), true);
-            return false;
         }
 
         if (CloakState.isMaskCoolingDown(player)) {
@@ -111,11 +105,6 @@ public final class CloakTickHandler {
 
         if (!CloakState.isCloaked(player)) {
             recoverAir(player, maxBreath);
-            return;
-        }
-
-        if (!CloakItem.isHoldingCloak(player)) {
-            disableCloak(player, false);
             return;
         }
 

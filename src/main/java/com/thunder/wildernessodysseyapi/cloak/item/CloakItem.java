@@ -2,7 +2,6 @@ package com.thunder.wildernessodysseyapi.cloak.item;
 
 import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.item.ModItems;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
@@ -11,7 +10,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
- * Handheld cloak focus. Cloaking can be toggled with this item or the cloak key.
+ * Legacy handheld cloak focus. Cloaking no longer requires this item.
  */
 public class CloakItem extends Item {
     private static final int CLOAK_TOGGLE_COOLDOWN_TICKS = TickTokAPI.toTicks(1);
@@ -29,8 +28,6 @@ public class CloakItem extends Item {
 
         if (CloakTickHandler.tryToggleCloak(player)) {
             player.getCooldowns().addCooldown(this, CLOAK_TOGGLE_COOLDOWN_TICKS);
-        } else {
-            player.displayClientMessage(Component.translatable("message.wildernessodysseyapi.cloak_hold_breath_hint"), true);
         }
         return InteractionResultHolder.success(stack);
     }

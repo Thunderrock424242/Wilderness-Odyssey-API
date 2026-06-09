@@ -23,7 +23,7 @@ public final class CloakKeyMappings {
     public static final KeyMapping CLOAK_TOGGLE = new KeyMapping(
             "key.wildernessodysseyapi.cloak_toggle",
             InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_G,
+            GLFW.GLFW_KEY_LEFT_ALT,
             CATEGORY
     );
 
