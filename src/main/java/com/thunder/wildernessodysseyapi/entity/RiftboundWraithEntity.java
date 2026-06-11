@@ -40,6 +40,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * A riftfall predator that behaves like a BT: quiet until it hears breath or movement,
@@ -52,6 +53,10 @@ public class RiftboundWraithEntity extends Monster implements GeoEntity {
     public static final int STATE_GRASPING = 3;
 
     private static final RawAnimation IDLE_ANIMATION = RawAnimation.begin().thenLoop("idle");
+    private static final RawAnimation LISTEN_ANIMATION = RawAnimation.begin().thenLoop("listen");
+    private static final RawAnimation MOVE_ANIMATION = RawAnimation.begin().thenLoop("move");
+    private static final RawAnimation HUNT_ANIMATION = RawAnimation.begin().thenLoop("hunt");
+    private static final RawAnimation GRASP_ANIMATION = RawAnimation.begin().thenLoop("grasp");
     private static final EntityDataAccessor<Integer> DATA_WRAITH_STATE =
             SynchedEntityData.defineId(RiftboundWraithEntity.class, EntityDataSerializers.INT);
 
@@ -60,12 +65,21 @@ public class RiftboundWraithEntity extends Monster implements GeoEntity {
     private static final double HUNT_SCORE = 0.48D;
     private static final double GRASP_DISTANCE_SQR = 5.76D;
     private static final int GRASP_COOLDOWN_TICKS = 120;
+    private static final int DRAG_DURATION_TICKS = 100;
+    private static final int ESCAPE_JUMPS_REQUIRED = 5;
+    private static final int JUMP_DETECT_COOLDOWN_TICKS = 7;
+    private static final int DRAG_DAMAGE_INTERVAL_TICKS = 20;
 
     private final AnimatableInstanceCache animatableCache = GeckoLibUtil.createInstanceCache(this);
     private BlockPos investigatePos;
+    private UUID draggedTarget;
     private int attentionTicks;
     private int graspCooldown;
     private int graspTicks;
+    private int dragTicks;
+    private int escapeJumpCount;
+    private int jumpDetectCooldown;
+    private boolean draggedTargetWasGrounded;
 
     public RiftboundWraithEntity(EntityType<? extends RiftboundWraithEntity> entityType, Level level) {
         super(entityType, level);
@@ -114,9 +128,13 @@ public class RiftboundWraithEntity extends Monster implements GeoEntity {
             graspTicks--;
         }
 
-        LivingEntity target = getTarget();
-        if (target instanceof ServerPlayer player && isValidHuntTarget(player) && distanceToSqr(player) <= GRASP_DISTANCE_SQR) {
-            triggerGrasp(player);
+        if (draggedTarget != null) {
+            tickDragging();
+        } else {
+            LivingEntity target = getTarget();
+            if (target instanceof ServerPlayer player && isValidHuntTarget(player) && distanceToSqr(player) <= GRASP_DISTANCE_SQR) {
+                triggerGrasp(player);
+            }
         }
 
         if (level() instanceof ServerLevel serverLevel && tickCount % 6 == 0) {
@@ -155,7 +173,14 @@ public class RiftboundWraithEntity extends Monster implements GeoEntity {
         attentionTicks = tag.getInt("AttentionTicks");
         graspCooldown = tag.getInt("GraspCooldown");
         graspTicks = tag.getInt("GraspTicks");
+        dragTicks = tag.getInt("DragTicks");
+        escapeJumpCount = tag.getInt("EscapeJumpCount");
+        jumpDetectCooldown = tag.getInt("JumpDetectCooldown");
+        draggedTargetWasGrounded = tag.getBoolean("DraggedTargetWasGrounded");
         entityData.set(DATA_WRAITH_STATE, tag.getInt("WraithState"));
+        if (tag.hasUUID("DraggedTarget")) {
+            draggedTarget = tag.getUUID("DraggedTarget");
+        }
         if (tag.contains("InvestigateX")) {
             investigatePos = new BlockPos(tag.getInt("InvestigateX"), tag.getInt("InvestigateY"), tag.getInt("InvestigateZ"));
         }
@@ -167,7 +192,14 @@ public class RiftboundWraithEntity extends Monster implements GeoEntity {
         tag.putInt("AttentionTicks", attentionTicks);
         tag.putInt("GraspCooldown", graspCooldown);
         tag.putInt("GraspTicks", graspTicks);
+        tag.putInt("DragTicks", dragTicks);
+        tag.putInt("EscapeJumpCount", escapeJumpCount);
+        tag.putInt("JumpDetectCooldown", jumpDetectCooldown);
+        tag.putBoolean("DraggedTargetWasGrounded", draggedTargetWasGrounded);
         tag.putInt("WraithState", getWraithState());
+        if (draggedTarget != null) {
+            tag.putUUID("DraggedTarget", draggedTarget);
+        }
         if (investigatePos != null) {
             tag.putInt("InvestigateX", investigatePos.getX());
             tag.putInt("InvestigateY", investigatePos.getY());
@@ -183,7 +215,7 @@ public class RiftboundWraithEntity extends Monster implements GeoEntity {
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
         controllers.add(new AnimationController<>(this, "wraith_controller", 5,
-                animationState -> animationState.setAndContinue(IDLE_ANIMATION)));
+                animationState -> animationState.setAndContinue(animationForState(animationState.isMoving()))));
     }
 
     @Override
@@ -205,17 +237,20 @@ public class RiftboundWraithEntity extends Monster implements GeoEntity {
         }
 
         graspCooldown = GRASP_COOLDOWN_TICKS;
-        graspTicks = 28;
+        graspTicks = DRAG_DURATION_TICKS;
+        dragTicks = DRAG_DURATION_TICKS;
+        escapeJumpCount = 0;
+        jumpDetectCooldown = 0;
+        draggedTargetWasGrounded = player.onGround();
+        draggedTarget = player.getUUID();
         attentionTicks = 120;
         setWraithState(STATE_GRASPING);
         setTarget(player);
         getNavigation().stop();
 
-        player.addEffect(new MobEffectInstance(MobEffects.DARKNESS, 160, 0, true, false, true));
-        player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 100, 2, true, false, true));
-        player.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 120, 0, true, false, true));
         player.hurt(player.damageSources().mobAttack(this), (float) getAttributeValue(Attributes.ATTACK_DAMAGE));
-        player.displayClientMessage(Component.translatable("message.wildernessodysseyapi.riftbound_wraith_grasp"), true);
+        player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 60, 1, true, false, true));
+        player.displayClientMessage(Component.translatable("message.wildernessodysseyapi.riftbound_wraith_grasp", ESCAPE_JUMPS_REQUIRED), true);
 
         pullVictim(player);
 
@@ -227,14 +262,96 @@ public class RiftboundWraithEntity extends Monster implements GeoEntity {
         }
     }
 
+    private RawAnimation animationForState(boolean moving) {
+        return switch (getWraithState()) {
+            case STATE_LISTENING -> LISTEN_ANIMATION;
+            case STATE_HUNTING -> HUNT_ANIMATION;
+            case STATE_GRASPING -> GRASP_ANIMATION;
+            default -> moving ? MOVE_ANIMATION : IDLE_ANIMATION;
+        };
+    }
+
+    private void tickDragging() {
+        ServerPlayer victim = resolveDraggedTarget();
+        if (victim == null || !isValidHuntTarget(victim) || distanceToSqr(victim) > 144.0D || dragTicks <= 0) {
+            releaseDraggedTarget(STATE_HUNTING);
+            return;
+        }
+
+        dragTicks--;
+        graspTicks = Math.max(graspTicks, 2);
+        attentionTicks = Math.max(attentionTicks, 80);
+        setWraithState(STATE_GRASPING);
+        setTarget(victim);
+        getNavigation().stop();
+
+        pullVictim(victim);
+        detectEscapeJump(victim);
+
+        if (escapeJumpCount >= ESCAPE_JUMPS_REQUIRED) {
+            victim.displayClientMessage(Component.translatable("message.wildernessodysseyapi.riftbound_wraith_escaped"), true);
+            releaseDraggedTarget(STATE_HUNTING);
+            return;
+        }
+
+        if (tickCount % 10 == 0) {
+            victim.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40, 1, true, false, true));
+        }
+
+        if (dragTicks > 0 && dragTicks % DRAG_DAMAGE_INTERVAL_TICKS == 0) {
+            float dragDamage = (float) Math.max(2.0D, getAttributeValue(Attributes.ATTACK_DAMAGE) * 0.55D);
+            victim.hurt(victim.damageSources().mobAttack(this), dragDamage);
+        }
+    }
+
+    private ServerPlayer resolveDraggedTarget() {
+        if (draggedTarget == null || level().getServer() == null) {
+            return null;
+        }
+        return level().getServer().getPlayerList().getPlayer(draggedTarget);
+    }
+
+    private void detectEscapeJump(ServerPlayer victim) {
+        if (jumpDetectCooldown > 0) {
+            jumpDetectCooldown--;
+        }
+
+        boolean jumped = draggedTargetWasGrounded && !victim.onGround() && victim.getDeltaMovement().y > 0.12D;
+        if (jumped && jumpDetectCooldown <= 0) {
+            escapeJumpCount++;
+            jumpDetectCooldown = JUMP_DETECT_COOLDOWN_TICKS;
+            draggedTargetWasGrounded = false;
+            victim.displayClientMessage(Component.translatable(
+                    "message.wildernessodysseyapi.riftbound_wraith_escape_progress",
+                    escapeJumpCount,
+                    ESCAPE_JUMPS_REQUIRED
+            ), true);
+            return;
+        }
+
+        if (victim.onGround()) {
+            draggedTargetWasGrounded = true;
+        }
+    }
+
+    private void releaseDraggedTarget(int nextState) {
+        draggedTarget = null;
+        dragTicks = 0;
+        graspTicks = 0;
+        escapeJumpCount = 0;
+        jumpDetectCooldown = 0;
+        draggedTargetWasGrounded = false;
+        setWraithState(nextState);
+    }
+
     private void pullVictim(ServerPlayer victim) {
-        Vec3 direction = position().add(0.0D, getBbHeight() * 0.45D, 0.0D).subtract(victim.position());
+        Vec3 direction = new Vec3(getX() - victim.getX(), 0.0D, getZ() - victim.getZ());
         if (direction.lengthSqr() < 0.001D) {
             return;
         }
 
-        Vec3 pull = direction.normalize().scale(0.42D);
-        victim.push(pull.x, 0.08D, pull.z);
+        Vec3 pull = direction.normalize().scale(0.18D);
+        victim.push(pull.x, 0.015D, pull.z);
     }
 
     private SoundSample findLoudestPlayer() {
@@ -337,7 +454,7 @@ public class RiftboundWraithEntity extends Monster implements GeoEntity {
 
         @Override
         public void tick() {
-            if (graspTicks > 0) {
+            if (draggedTarget != null || graspTicks > 0) {
                 getNavigation().stop();
                 return;
             }

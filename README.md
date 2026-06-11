@@ -35,6 +35,26 @@ Global Chat:
 See `docs/globalchat/beginner.md` for a quickstart on hosting the relay, binding servers, and getting players talking.
 Read `docs/globalchat/operations.md` for the full operations guide (anchoring, cluster tokens, moderation, opt-in controls, and whitelisting external tools).
 
+Discord-to-Minecraft Playtest Verification:
+-------------------------------------------
+For singleplayer playtesting, players can link their local Minecraft identity to the separately hosted Discord support bot:
+
+1. In Discord, run `/minecraft link`.
+2. Copy the one-time code returned by the bot.
+3. In Minecraft, run `/wo link CODE`.
+
+The client config lives at `config/wildernessodysseyapi/wildernessodysseyapi-playtest-client.toml`:
+
+```toml
+[verification]
+enabled = true
+apiBaseUrl = "https://your-bot-api.example.com"
+requestTimeoutSeconds = 10
+rememberLinkedAccount = true
+```
+
+The mod posts only the one-time code, Minecraft UUID, and Minecraft username to `${apiBaseUrl}/api/minecraft/verify`. No Discord bot token, Discord webhook URL, or shared secret is stored in the client.
+
 Multithreaded Task System:
 --------------------------
 An opt-in async task system now ships with the mod. Enable or tune it in `config/wildernessodysseyapi/wildernessodysseyapi-async.toml`.
