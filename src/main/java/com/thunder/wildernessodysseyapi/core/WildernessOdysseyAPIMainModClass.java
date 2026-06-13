@@ -22,7 +22,8 @@ import com.thunder.wildernessodysseyapi.lorebook.command.LoreBookCommand;
 import com.thunder.wildernessodysseyapi.meteor.command.MeteorCommand;
 import com.thunder.wildernessodysseyapi.modpack.structure.command.ModpackStructureCommand;
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
-import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationConfig;
+import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationCommands;
+import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationRelayConfig;
 import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
 import com.thunder.wildernessodysseyapi.structureblock.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.truedarkness.config.TrueDarknessConfig;
@@ -213,9 +214,8 @@ public class WildernessOdysseyAPIMainModClass {
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TelemetryConsentConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-telemetry-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DebugOverlayConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-debug-overlay-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TrueDarknessConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-true-darkness-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, MinecraftVerificationConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-playtest-client.toml");
-
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, MinecraftVerificationRelayConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-verification-relay-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PlayerTelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-telemetry-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, EventTelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-event-telemetry-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-telemetry-master-server.toml");
@@ -329,6 +329,7 @@ public class WildernessOdysseyAPIMainModClass {
         MeteorCommand.register(dispatcher);
         UnstuckCommand.register(dispatcher);
         AIBackendCommand.register(dispatcher);
+        MinecraftVerificationCommands.register(dispatcher);
     }
 
     // =========================================

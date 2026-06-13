@@ -37,23 +37,22 @@ Read `docs/globalchat/operations.md` for the full operations guide (anchoring, c
 
 Discord-to-Minecraft Playtest Verification:
 -------------------------------------------
-For singleplayer playtesting, players can link their local Minecraft identity to the separately hosted Discord support bot:
+On the official playtest server, players can link their Minecraft identity through the private Discord verification relay:
 
 1. In Discord, run `/minecraft link`.
 2. Copy the one-time code returned by the bot.
-3. In Minecraft, run `/wo link CODE`.
+3. On the playtest server, run `/wo link CODE`.
 
-The client config lives at `config/wildernessodysseyapi/wildernessodysseyapi-playtest-client.toml`:
+The server config lives at `config/wildernessodysseyapi/wildernessodysseyapi-verification-relay-server.toml`:
 
 ```toml
-[verification]
-enabled = true
-apiBaseUrl = "https://your-bot-api.example.com"
+[verificationRelay]
+enableServerVerificationRelay = true
+discordVerificationWebhookUrl = ""
 requestTimeoutSeconds = 10
-rememberLinkedAccount = true
 ```
 
-The mod posts only the one-time code, Minecraft UUID, and Minecraft username to `${apiBaseUrl}/api/minecraft/verify`. No Discord bot token, Discord webhook URL, or shared secret is stored in the client.
+The server sends a Discord webhook message to the private verification relay channel. The payload contains only the one-time code, Minecraft UUID, and Minecraft profile name. No Discord bot token is stored in the mod, and the webhook URL belongs only in server config, never in client config.
 
 Multithreaded Task System:
 --------------------------
