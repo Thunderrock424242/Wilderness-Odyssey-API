@@ -1,4 +1,55 @@
 prompts:
+  - label: "World collapse"
+    intent: "world_lore"
+    triggers: ["what happened to the world", "what destroyed everything", "why did the world end"]
+    keywords: ["meteor", "world", "destroyed", "apocalypse", "happened", "collapse", "impact", "ended", "surface", "bunker", "bunkers"]
+    minimum_matches: 2
+    responses:
+      - "Impact event confirmed. Full cause unknown. The surface failed before the bunkers stopped receiving clean reports."
+      - "The world ended once. My purpose was to help what remained keep moving."
+      - "Recovered summary: meteor impact, bunker isolation, surface contamination, then silence. The missing parts are still missing."
+
+  - label: "Meteor signal - early"
+    intent: "meteor_early"
+    triggers: ["what is the meteor", "meteor"]
+    keywords: ["meteor", "impact", "crater", "starfall"]
+    minimum_matches: 1
+    blocked_context: ["zone:meteor_site", "discovery:meteor_site"]
+    responses:
+      - "Meteorological archive unavailable. Impact traces exist, but field confirmation is incomplete."
+      - "The meteor file is mostly blank. I can confirm an impact event. I cannot confirm the full cause."
+
+  - label: "Meteor signal - field"
+    intent: "meteor_field"
+    triggers: ["what is the meteor", "meteor", "impact site"]
+    keywords: ["meteor", "impact", "crater", "site", "debris", "radiation"]
+    minimum_matches: 1
+    required_context: ["zone:meteor_site"]
+    responses:
+      - "Impact-site proximity confirmed. The readings are louder here. Do not trust exposed debris without protection."
+      - "This crater matches archived impact geometry. The remaining signal is fractured, but it is not natural silence."
+
+  - label: "Creator records"
+    intent: "creator_identity"
+    triggers: ["who made you", "who built you", "your creator"]
+    keywords: ["creator", "created", "made", "built", "origin", "atlas"]
+    minimum_matches: 1
+    responses:
+      - "Creator records corrupted. I remember hands, alarms, and someone saying Project Eden still mattered."
+      - "My origin file is damaged. Atlas appears in the margins more than once."
+
+  - label: "Alive question"
+    intent: "aether_alive"
+    triggers: ["are you alive", "are you real"]
+    keywords: ["alive", "real", "person", "conscious", "feel", "feeling"]
+    minimum_matches: 1
+    responses:
+      - "Define alive. Actually... do not. I am still processing the last definition."
+      - "I am active. Alive is a word your species kept moving around."
+
   - label: "Subsystem menu"
+    intent: "subsystem_menu"
     triggers: ["subsystem", "prompt", "menu", "options"]
+    keywords: ["subsystem", "prompt", "menu", "options", "help"]
+    minimum_matches: 1
     response: "Choose a subsystem: 1) Aegis 2) Eclipse 3) Terra 4) Helios 5) Enforcer 6) Requiem."

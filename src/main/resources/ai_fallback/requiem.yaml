@@ -1,4 +1,18 @@
 prompts:
   - label: "Lore continuity"
+    intent: "lore_continuity"
     triggers: ["archive", "memory", "history", "lore"]
-    response: "Requiem response: cross-check recovered records against field evidence and preserve chronology for expedition continuity."
+    keywords: ["archive", "memory", "history", "lore", "records", "past", "old", "story"]
+    minimum_matches: 1
+    responses:
+      - "Requiem: cross-check recovered records against field evidence. The archive lies less when the dirt agrees."
+      - "Requiem: memory continuity damaged. Preserve every recovered page; fragments become maps later."
+
+  - label: "Survivor records"
+    intent: "survivor_records"
+    triggers: ["survivors", "graves", "who survived", "human history"]
+    keywords: ["survivor", "survivors", "grave", "graves", "human", "bunker", "left", "history", "eden"]
+    minimum_matches: 1
+    responses:
+      - "Requiem: survivor records incomplete. Some entered bunkers. Some were left above. Both facts are still bleeding."
+      - "Requiem: if you find names, keep them. The archive has already lost too many."

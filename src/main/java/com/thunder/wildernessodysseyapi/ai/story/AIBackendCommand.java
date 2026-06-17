@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.ai.story;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -12,19 +13,24 @@ public final class AIBackendCommand {
     }
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("atlasbackend")
+        dispatcher.register(buildCommand("aetherbackend"));
+        dispatcher.register(buildCommand("atlasbackend"));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildCommand(String commandName) {
+        return Commands.literal(commandName)
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("status")
                         .executes(context -> sendStatus(context.getSource())))
                 .then(Commands.literal("start")
                         .executes(context -> triggerStart(context.getSource())))
                 .then(Commands.literal("probe")
-                        .executes(context -> runProbe(context.getSource()))));
+                        .executes(context -> runProbe(context.getSource())));
     }
 
     private static int sendStatus(CommandSourceStack source) {
         AIClient.BackendStatus status = AIChatListener.getClient().getBackendStatus();
-        source.sendSuccess(() -> Component.literal("[AtlasBackend] enabled=" + status.enabled()
+        source.sendSuccess(() -> Component.literal("[AetherBackend] enabled=" + status.enabled()
                 + ", clientInitialized=" + status.clientInitialized()
                 + ", autoStart=" + status.autoStart()
                 + ", serverRunning=" + status.serverRunning()
@@ -37,21 +43,21 @@ public final class AIBackendCommand {
     private static int triggerStart(CommandSourceStack source) {
         boolean started = AIChatListener.getClient().triggerBackendStart();
         if (started) {
-            source.sendSuccess(() -> Component.literal("[AtlasBackend] Start command issued."), true);
+            source.sendSuccess(() -> Component.literal("[AetherBackend] Start command issued."), true);
             return 1;
         }
-        source.sendFailure(Component.literal("[AtlasBackend] Start skipped. Configure local_model.auto_start and start command/bundled resource."));
+        source.sendFailure(Component.literal("[AetherBackend] Start skipped. Configure local_model.auto_start and start command/bundled resource."));
         return 0;
     }
 
     private static int runProbe(CommandSourceStack source) {
         AIClient.BackendStatus status = AIChatListener.getClient().getBackendStatus();
         if (status.reachable()) {
-            source.sendSuccess(() -> Component.literal("[AtlasBackend] Probe succeeded: " + status.endpoint()), false);
+            source.sendSuccess(() -> Component.literal("[AetherBackend] Probe succeeded: " + status.endpoint()), false);
             return 1;
         }
-        ModConstants.LOGGER.warn("[AtlasBackend] Probe failed for endpoint {}", status.endpoint());
-        source.sendFailure(Component.literal("[AtlasBackend] Probe failed. Verify your local sidecar service is running."));
+        ModConstants.LOGGER.warn("[AetherBackend] Probe failed for endpoint {}", status.endpoint());
+        source.sendFailure(Component.literal("[AetherBackend] Probe failed. Verify your local sidecar service is running."));
         return 0;
     }
 }

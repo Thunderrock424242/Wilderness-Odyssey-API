@@ -60,35 +60,30 @@ An opt-in async task system now ships with the mod. Enable or tune it in `config
 Use `/asyncstats` (level 2 permission) to view worker usage, queue depth, and rejected tasks. See `docs/async-threading-plan.md`
 for architecture and tuning notes, including guidance on keeping main-thread mutations safe when scheduling heavy jobs.
 
-AI Helper Dependencies (Optional):
--------------------------
-The build already includes lightweight HTTP/JSON and fault-tolerance libraries for optional AI advisors:
-- OkHttp (HTTP client)
-- Moshi (JSON serialization)
-- Resilience4j Circuit Breaker
-
-These are pulled from Maven Central and can be used by any local or sidecar AI helper you run alongside the mod. The game still runs normally if you choose not to enable an AI helper.
-
-Self-hosted AI chatbot (custom local LLM required)
+A.E.T.H.E.R scripted companion (current MVP):
 -------------------------------------
 AI purpose checklist: see `docs/ai/purpose-scope.md` for A.E.T.H.E.R core + subsystem scope, boundaries, and MVP definition.
-A.E.T.H.E.R. can use a local custom LLM backend for full runtime responses, and it now also supports deterministic fallback personas when players prefer a lighter-weight menu flow.
 
-Local LLM support is sidecar-based:
-- This repo does **not** bundle custom-trained LLM model weight files.
-- You must run/provide a compatible local model server (for example an Ollama-style `/api/generate` endpoint).
-- `local_model.base_url` is honored (defaults to `http://127.0.0.1:11434` if omitted).
-- `local_model.auto_start` can launch a configured sidecar command/resource, but only if you provide that executable.
-- For a better packaging workflow, you can set `model_download_url`, `model_download_sha256`, and `model_file_name` so the model artifact is bootstrapped into `config/wildernessodysseyapi/local-model/models/` at runtime.
-- You can use `{model_path}`, `{model_name}`, and `{base_url}` placeholders in `start_command` / `bundled_server_args`.
+A.E.T.H.E.R is currently a scripted recovered-intent system, not a full LLM chatbot. Player messages are cleaned, scored against intent keywords, checked against lightweight game context, and answered from authored response banks. This keeps the first version safer, cheaper, lore-consistent, and easier to expand through updates.
 
-If the local model is unavailable, players can still address Aether to open a subsystem menu and route deterministic replies from Aegis, Eclipse, Terra, Helios, Enforcer, or Requiem via `ai_config.yaml`.
-Each subsystem can keep its own prompt library in a separate file under `src/main/resources/ai_fallback/`, referenced by `fallback.personas[].prompt_file`.
+Scripted response data lives in:
+- `src/main/resources/ai_config.yaml`
+- `src/main/resources/ai_fallback/aether.yaml`
+- `src/main/resources/ai_fallback/aegis.yaml`
+- `src/main/resources/ai_fallback/eclipse.yaml`
+- `src/main/resources/ai_fallback/terra.yaml`
+- `src/main/resources/ai_fallback/helios.yaml`
+- `src/main/resources/ai_fallback/enforcer.yaml`
+- `src/main/resources/ai_fallback/requiem.yaml`
 
-Admin commands for sidecar operations:
-- `/atlasbackend status`
-- `/atlasbackend probe`
-- `/atlasbackend start`
+The optional local-model sidecar remains available for a future funded version, but `local_model.enabled` and `local_model.auto_start` default to `false`. This repo does **not** bundle custom-trained LLM model weight files.
+
+Future sidecar admin commands:
+- `/aetherbackend status`
+- `/aetherbackend probe`
+- `/aetherbackend start`
+
+The old `/atlasbackend` command remains registered as a compatibility alias.
 Secrets:
 -------
 For local development, copy `.env.example` to `.env` and fill in required tokens.

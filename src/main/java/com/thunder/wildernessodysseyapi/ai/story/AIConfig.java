@@ -326,6 +326,8 @@ public class AIConfig {
         private Boolean enabled;
         private String menuPrompt;
         private String unavailableHint;
+        private Integer minimumKeywordMatches;
+        private final List<String> unknownResponses = new ArrayList<>();
         private final List<FallbackPersona> personas = new ArrayList<>();
 
         public Boolean getEnabled() {
@@ -350,6 +352,18 @@ public class AIConfig {
 
         public void setUnavailableHint(String unavailableHint) {
             this.unavailableHint = unavailableHint;
+        }
+
+        public Integer getMinimumKeywordMatches() {
+            return minimumKeywordMatches;
+        }
+
+        public void setMinimumKeywordMatches(Integer minimumKeywordMatches) {
+            this.minimumKeywordMatches = minimumKeywordMatches;
+        }
+
+        public List<String> getUnknownResponses() {
+            return unknownResponses;
         }
 
         public List<FallbackPersona> getPersonas() {
@@ -399,8 +413,14 @@ public class AIConfig {
 
     public static class FallbackPrompt {
         private String label;
+        private String intent;
         private String response;
+        private Integer minimumMatches;
         private final List<String> triggers = new ArrayList<>();
+        private final List<String> keywords = new ArrayList<>();
+        private final List<String> responses = new ArrayList<>();
+        private final List<String> requiredContext = new ArrayList<>();
+        private final List<String> blockedContext = new ArrayList<>();
 
         public String getLabel() {
             return label;
@@ -408,6 +428,14 @@ public class AIConfig {
 
         public void setLabel(String label) {
             this.label = label;
+        }
+
+        public String getIntent() {
+            return intent;
+        }
+
+        public void setIntent(String intent) {
+            this.intent = intent;
         }
 
         public String getResponse() {
@@ -418,8 +446,32 @@ public class AIConfig {
             this.response = response;
         }
 
+        public Integer getMinimumMatches() {
+            return minimumMatches;
+        }
+
+        public void setMinimumMatches(Integer minimumMatches) {
+            this.minimumMatches = minimumMatches;
+        }
+
         public List<String> getTriggers() {
             return triggers;
+        }
+
+        public List<String> getKeywords() {
+            return keywords;
+        }
+
+        public List<String> getResponses() {
+            return responses;
+        }
+
+        public List<String> getRequiredContext() {
+            return requiredContext;
+        }
+
+        public List<String> getBlockedContext() {
+            return blockedContext;
         }
     }
 }

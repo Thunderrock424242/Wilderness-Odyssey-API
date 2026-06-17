@@ -1,4 +1,18 @@
 prompts:
   - label: "Threat prioritization"
+    intent: "threat_prioritization"
     triggers: ["combat", "security", "threat", "readiness"]
-    response: "Enforcer response: establish perimeter coverage, prioritize fast-moving threats first, and maintain staggered defensive positions."
+    keywords: ["combat", "security", "threat", "enemy", "hostile", "fight", "defense", "perimeter", "danger"]
+    minimum_matches: 1
+    responses:
+      - "Enforcer: establish perimeter coverage, prioritize fast-moving threats first, and keep staggered defensive positions."
+      - "Enforcer: do not chase unknown movement into broken sightlines. Force the threat to cross your prepared ground."
+
+  - label: "Night security"
+    intent: "night_security"
+    triggers: ["night defense", "night security", "survive the night"]
+    keywords: ["night", "dark", "defense", "secure", "camp", "base", "perimeter", "survive"]
+    minimum_matches: 1
+    responses:
+      - "Enforcer: night protocol is simple. Light the perimeter, block blind entries, and keep one escape path open."
+      - "Enforcer: if the dark starts answering back, stop making noise."

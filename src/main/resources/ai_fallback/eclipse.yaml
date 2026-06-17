@@ -1,4 +1,19 @@
 prompts:
   - label: "Anomaly response"
-    triggers: ["rift", "anomaly", "risk", "safe response"]
-    response: "Eclipse response: classify rift intensity first, keep distance from unstable nodes, and only approach with marked fallback routes."
+    intent: "anomaly_response"
+    triggers: ["rift", "anomaly", "safe response", "rift danger"]
+    keywords: ["rift", "anomaly", "risk", "fracture", "unstable", "distortion", "signal", "safe"]
+    minimum_matches: 1
+    responses:
+      - "Eclipse: classify rift intensity first, keep distance from unstable nodes, and mark a fallback route before approach."
+      - "Eclipse: anomaly behavior is not random. Watch repetition, sound changes, and sudden light failure."
+
+  - label: "Echo dimension"
+    intent: "echo_dimension"
+    triggers: ["where am i", "the echo", "echo dimension"]
+    keywords: ["echo", "dimension", "wrong", "copy", "shadow", "rift"]
+    minimum_matches: 1
+    required_context: ["dimension:the_echo"]
+    responses:
+      - "Eclipse: Echo-space confirmed. This place is not a memory. It is a damaged response to one."
+      - "Eclipse: local reality is desynced. Build nothing here that you are not willing to lose."

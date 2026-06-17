@@ -1,4 +1,18 @@
 prompts:
   - label: "Power and stability"
-    triggers: ["energy", "machines", "atmosphere", "stability", "power"]
-    response: "Helios response: balance machine load in phases, preserve backup power, and monitor atmospheric variance before scaling operations."
+    intent: "power_stability"
+    triggers: ["power", "energy", "machine stability", "atmosphere"]
+    keywords: ["energy", "machine", "machines", "atmosphere", "stability", "power", "generator", "system"]
+    minimum_matches: 1
+    responses:
+      - "Helios: balance machine load in phases, preserve backup power, and monitor atmospheric variance before expansion."
+      - "Helios: if a machine draws more than expected, assume the environment changed before assuming the machine did."
+
+  - label: "Atmospheric contamination"
+    intent: "atmospheric_contamination"
+    triggers: ["atmospheric contamination", "bad air", "air quality"]
+    keywords: ["atmosphere", "air", "contamination", "toxic", "dust", "breathe", "oxygen", "filter"]
+    minimum_matches: 1
+    responses:
+      - "Helios: atmospheric contamination detected in archive patterns. Verify filters before trusting open-air readings."
+      - "Helios: air quality is a moving target. Wind can make yesterday's safe zone dishonest."

@@ -1,4 +1,19 @@
 prompts:
   - label: "Exploration routing"
-    triggers: ["terrain", "world restoration", "exploration", "route"]
-    response: "Terra response: route along stable ridgelines, tag restoration candidates, and avoid crater-edge traversal during low visibility."
+    intent: "exploration_route"
+    triggers: ["where should i go", "exploration", "route", "terrain"]
+    keywords: ["terrain", "exploration", "route", "travel", "path", "restore", "restoration", "landmark", "scout"]
+    minimum_matches: 1
+    responses:
+      - "Terra: route along stable ridgelines, tag restoration candidates, and avoid crater-edge travel during low visibility."
+      - "Terra: move from known shelter to known landmark. Unknown terrain is survivable when exits are mapped first."
+
+  - label: "Crater traversal"
+    intent: "crater_traversal"
+    triggers: ["cross the crater", "meteor crater", "impact terrain"]
+    keywords: ["crater", "meteor", "impact", "terrain", "edge", "collapse", "debris"]
+    minimum_matches: 1
+    required_context: ["zone:meteor_site"]
+    responses:
+      - "Terra: crater-edge terrain is unstable. Stay above the loose slope line and mark every descent point."
+      - "Terra: impact terrain does not forgive straight paths. Circle, scan, then commit."

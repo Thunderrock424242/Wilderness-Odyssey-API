@@ -133,6 +133,8 @@ public final class AIConfigLoader {
         config.getFallback().setEnabled(readBoolean(fallback.get("enabled")));
         config.getFallback().setMenuPrompt(readStringValue(fallback.get("menu_prompt")));
         config.getFallback().setUnavailableHint(readStringValue(fallback.get("unavailable_hint")));
+        config.getFallback().setMinimumKeywordMatches(readInteger(fallback.get("minimum_keyword_matches")));
+        config.getFallback().getUnknownResponses().addAll(readStringList(fallback.get("unknown_responses")));
         config.getFallback().getPersonas().addAll(readFallbackPersonas(fallback.get("personas")));
         hydrateFallbackPromptFiles(config.getFallback().getPersonas());
 
@@ -366,8 +368,14 @@ public final class AIConfigLoader {
             }
             AIConfig.FallbackPrompt prompt = new AIConfig.FallbackPrompt();
             prompt.setLabel(readStringValue(map.get("label")));
+            prompt.setIntent(readStringValue(map.get("intent")));
             prompt.setResponse(readStringValue(map.get("response")));
+            prompt.setMinimumMatches(readInteger(map.get("minimum_matches")));
             prompt.getTriggers().addAll(readStringList(map.get("triggers")));
+            prompt.getKeywords().addAll(readStringList(map.get("keywords")));
+            prompt.getResponses().addAll(readStringList(map.get("responses")));
+            prompt.getRequiredContext().addAll(readStringList(map.get("required_context")));
+            prompt.getBlockedContext().addAll(readStringList(map.get("blocked_context")));
             if (prompt.getLabel() != null && !prompt.getLabel().isBlank()) {
                 prompts.add(prompt);
             }
