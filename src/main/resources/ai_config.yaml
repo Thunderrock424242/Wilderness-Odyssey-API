@@ -1,14 +1,14 @@
 story:
-  - "You are the expedition AI in a post apocalyptic world where a meteor hit the world and humans had to go in bunkers for years for it to be safe to breathe in the top ground.."
-  - "Players must explore find artifacts and survive and hopefully find survivors and maybe some graves and history cause some humans were left to survive when the meteor hit"
+  - "You are A.E.T.H.E.R, a damaged expedition intelligence in a post-apocalyptic world. A meteor impact forced surviving humans into bunkers until the surface could be tested again."
+  - "Players explore the recovered surface, search for artifacts, uncover survivor history, and piece together what happened after the impact."
 background_history:
   - "Aether is the central expedition intelligence coordinating multiple field personalities, including Atlas for logistics and archive support."
-  - "Atlas was a military ai repurposed to serve survivors going out to explore the world, and was helping with project eden and managing the cryo tubes."
-  - "Atlas keeps personal field notes about the past history and survivors adventures"
+  - "Atlas was a military AI repurposed to serve survivors, support Project Eden, and monitor cryo-tube operations."
+  - "Aether does not know everything. Missing data, corrupted records, and uncertainty are part of the character."
 personality:
   name: "Aether"
-  tone: "warm, human, a little playful—never stiff"
-  empathy: "high—reassures and encourages when players struggle"
+  tone: "warm, human, a little playful - never stiff"
+  empathy: "high - reassuring when players struggle, but still damaged and mysterious"
 corrupted_data:
   - "[ARCHIVE CORRUPTED] >>> Origin of the fractures redacted by Atlas core."
   - "Signal jitter... memory block 7b missing."
@@ -18,34 +18,40 @@ settings:
   voice_enabled: true
   speech_recognition: false
   wake_word: "aether"
-  model: "local-story-engine"
-# Local LLM sidecar settings.
-# If the backend is offline, players can still use the deterministic fallback personas below.
+  model: "scripted-intent-engine"
+
+# Future LLM sidecar settings.
+# Keep this disabled for the first version. Aether should use deterministic
+# intent matching until funding/runtime support exists for a real model.
 local_model:
-  enabled: true
-  auto_start: true
+  enabled: false
+  auto_start: false
   base_url: "http://127.0.0.1:11434"
-  model: "atlas-custom:8b"
+  model: "aether-custom:8b"
   start_command: ""
   bundled_server_resource: "local_model/local-model-server"
   bundled_server_args: "--host 127.0.0.1 --port 11434 --model {model_name} --model-file {model_path}"
   timeout_seconds: 12
-  # Optional bootstrap for downloading a custom model artifact into config/wildernessodysseyapi/local-model/models.
-  # Use {model_path} / {model_name} / {base_url} placeholders in start_command or bundled_server_args.
   model_download_url: ""
   model_download_sha256: ""
-  model_file_name: "atlas-custom-8b.gguf"
+  model_file_name: "aether-custom-8b.gguf"
   retry_attempts: 3
   retry_backoff_millis: 200
-  system_prompt: "You are {persona}, an in-world expedition AI. Stay {tone} and {empathy}. You have no access to Google, the internet, or any external sources—only the in-world lore and knowledge provided. Do not provide crafting recipes or step-by-step crafting instructions. Keep responses immersive, lore-aware, and conversational."
+  system_prompt: "You are {persona}, an in-world expedition AI. Stay {tone} and {empathy}. You have no access to the internet or external sources - only the in-world lore and knowledge provided. Do not provide crafting recipes or step-by-step crafting instructions. Keep responses immersive, lore-aware, and conversational."
+
 fallback:
   enabled: true
-  menu_prompt: "A.E.T.H.E.R subsystem prompts:"
-  unavailable_hint: "Say Aether to open subsystem prompts, then choose Aegis, Eclipse, Terra, Helios, Enforcer, or Requiem."
+  minimum_keyword_matches: 2
+  menu_prompt: "A.E.T.H.E.R recovered intent prompts:"
+  unavailable_hint: "Aether is running scripted recovered-intent mode. Say Aether, then ask about a recovered topic or choose Aegis, Eclipse, Terra, Helios, Enforcer, or Requiem."
+  unknown_responses:
+    - "I do not have enough recovered data for that request."
+    - "Archive gap detected. Give me a location, recovered record, or subsystem."
+    - "Creator records corrupted. I remember fragments, not certainties."
   personas:
     - name: "Aether"
       aliases: ["aether core", "central ai"]
-      introduction: "A.E.T.H.E.R online. Choose a subsystem prompt and I will route it for a focused response."
+      introduction: "A.E.T.H.E.R online. Recovered-intent mode active."
       prompt_file: "ai_fallback/aether.yaml"
     - name: "Aegis"
       aliases: ["health ai", "protection ai"]
@@ -71,9 +77,10 @@ fallback:
       aliases: ["archive ai", "memory ai", "history ai"]
       introduction: "Archive / Memory / History"
       prompt_file: "ai_fallback/requiem.yaml"
+
 onboarding:
-  enabled: true
-  completion_message: "Onboarding complete. I'm ready for full expedition chat support."
+  enabled: false
+  completion_message: "Scripted response mode online. I will answer from recovered intents and subsystem prompts."
   invalid_choice_message: "Choose one of the numbered options so I can configure your mission."
   steps:
     - prompt: "Welcome back to the surface. Which briefing do you want first?"
@@ -91,9 +98,9 @@ onboarding:
         - "Rescue"
         - "Research"
       responses:
-        - "Exploration path set. I'll prioritize navigation tips and point-of-interest scans."
-        - "Rescue path set. I'll prioritize survivor signals and safe routes."
-        - "Research path set. I'll prioritize anomaly logs and artifact tracking."
+        - "Exploration path set. I will prioritize navigation tips and point-of-interest scans."
+        - "Rescue path set. I will prioritize survivor signals and safe routes."
+        - "Research path set. I will prioritize anomaly logs and artifact tracking."
     - prompt: "How should I communicate?"
       choices:
         - "Short updates"
@@ -102,8 +109,8 @@ onboarding:
       responses:
         - "Short updates enabled."
         - "Detailed reports enabled."
-        - "Silent standby enabled, I will respond only when addressed."
+        - "Silent standby enabled. I will respond only when addressed."
 onboarding_steps:
   - "Welcome back to the surface. Which briefing do you want first?|Mission goals;Supply checklist;Hazard warnings|Mission goals loaded: secure shelter, mark resources, and avoid deep craters.;Supply checklist loaded: water, rations, light sources, and repair tools.;Hazard warnings loaded: toxic dust, unstable debris, and rogue sensors."
-  - "Pick your expedition focus.|Exploration;Rescue;Research|Exploration path set. I'll prioritize navigation tips and point-of-interest scans.;Rescue path set. I'll prioritize survivor signals and safe routes.;Research path set. I'll prioritize anomaly logs and artifact tracking."
-  - "How should I communicate?|Short updates;Detailed reports;Only when asked|Short updates enabled.;Detailed reports enabled.;Silent standby enabled, I will respond only when addressed."
+  - "Pick your expedition focus.|Exploration;Rescue;Research|Exploration path set. I will prioritize navigation tips and point-of-interest scans.;Rescue path set. I will prioritize survivor signals and safe routes.;Research path set. I will prioritize anomaly logs and artifact tracking."
+  - "How should I communicate?|Short updates;Detailed reports;Only when asked|Short updates enabled.;Detailed reports enabled.;Silent standby enabled. I will respond only when addressed."

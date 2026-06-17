@@ -217,9 +217,16 @@ public class AIClient {
     }
 
     public VoiceIntegration.VoiceResult sendMessageWithVoice(String world, String player, String message) {
+        return sendMessageWithVoice(world, player, message, AIFallbackResponder.ResponseContext.empty());
+    }
+
+    public VoiceIntegration.VoiceResult sendMessageWithVoice(String world, String player, String message,
+                                                            AIFallbackResponder.ResponseContext responseContext) {
         if (!settings.isAtlasEnabled()) {
             return voiceIntegration.wrap(settings.getPersonaName(), "");
         }
+        AIFallbackResponder.ResponseContext safeResponseContext =
+                responseContext == null ? AIFallbackResponder.ResponseContext.empty() : responseContext;
         String speaker = resolveSpeaker(message);
         String learnedFact = knowledgeStore.extractLearnedFact(message);
         if (learnedFact != null) {
@@ -236,7 +243,7 @@ public class AIClient {
         if (!knowledgeContext.isBlank()) {
             context = context.isBlank() ? knowledgeContext : context + "\n" + knowledgeContext;
         }
-        var deterministicFallback = fallbackResponder.buildReply(message);
+        var deterministicFallback = fallbackResponder.buildReply(message, safeResponseContext);
         if (localModelClient == null) {
             String reply = deterministicFallback.map(AIFallbackResponder.FallbackReply::text)
                     .orElseGet(() -> buildModelUnavailableReply(false, false, message));
@@ -250,7 +257,7 @@ public class AIClient {
             return voiceIntegration.wrap(deterministicFallback.get().speaker(), reply);
         }
         String prompt = formatSystemPrompt(localSystemPrompt);
-        String localContext = buildLocalModelContext(world, context);
+        String localContext = buildLocalModelContext(world, context, safeResponseContext);
         boolean startAttempted = ensureLocalServerStarted();
         var response = requestLocalReplyWithRetry(prompt, message, localContext);
         if (response.isPresent()) {
@@ -491,10 +498,19 @@ public class AIClient {
         }
     }
 
-    private String buildLocalModelContext(String world, String conversationContext) {
+    private String buildLocalModelContext(String world, String conversationContext,
+                                          AIFallbackResponder.ResponseContext responseContext) {
         StringBuilder builder = new StringBuilder();
         if (world != null && !world.isBlank()) {
             builder.append("World: ").append(world.trim()).append("\n");
+        }
+        if (responseContext != null && !responseContext.describe().isBlank()) {
+            builder.append("Game context tags:\n");
+            for (String tag : responseContext.describe().split(", ")) {
+                if (!tag.isBlank()) {
+                    builder.append("- ").append(tag).append("\n");
+                }
+            }
         }
         if (!story.isEmpty()) {
             builder.append("Lore:\n");

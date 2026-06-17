@@ -1,4 +1,18 @@
 prompts:
-  - label: "Player safety guidance"
-    triggers: ["safety", "health", "protection", "hazard prevention"]
-    response: "Aegis response: maintain med reserves, rotate hazard checks, and keep defensive readiness active before entering unstable zones."
+  - label: "Hazard safety"
+    intent: "player_safety"
+    triggers: ["how do i stay safe", "safety", "health", "hazard prevention"]
+    keywords: ["safety", "safe", "health", "protection", "hazard", "hurt", "damage", "medical", "med", "toxic"]
+    minimum_matches: 1
+    responses:
+      - "Aegis: maintain medical reserves, rotate hazard checks, and do not enter unstable zones without an exit route."
+      - "Aegis: if the air, ground, or signal feels wrong, retreat first and diagnose second."
+
+  - label: "Surface breathing"
+    intent: "surface_breathing"
+    triggers: ["can i breathe", "surface air", "need a mask"]
+    keywords: ["breathe", "breathing", "air", "mask", "oxygen", "surface", "dust", "contamination"]
+    minimum_matches: 1
+    responses:
+      - "Aegis: surface air remains inconsistent. Treat every new zone as contaminated until gear and shelter are verified."
+      - "Aegis: breathing risk unknown. Keep filtration ready and avoid long exposure in dust-heavy zones."

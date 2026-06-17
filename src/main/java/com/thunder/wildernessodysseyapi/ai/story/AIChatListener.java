@@ -1,6 +1,9 @@
 package com.thunder.wildernessodysseyapi.ai.story;
 
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
+import com.thunder.wildernessodysseyapi.lorebook.LoreBookManager;
+import com.thunder.wildernessodysseyapi.meteor.worldgen.MeteorSavedData;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -10,6 +13,7 @@ import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -43,6 +47,7 @@ public class AIChatListener {
 
         ACTIVE_SESSIONS.add(player.getUUID());
         String worldKey = player.serverLevel().dimension().location().toString();
+        AIFallbackResponder.ResponseContext responseContext = new AIFallbackResponder.ResponseContext(buildContextTags(player, worldKey));
         UUID playerId = player.getUUID();
         String playerName = player.getName().getString();
 
@@ -56,7 +61,7 @@ public class AIChatListener {
         // --- THE FIX: OFFLOAD TO ASYNC MANAGER ---
         AsyncTaskManager.submitIoTask("AI_Chat_" + playerName, () -> {
             // 1. This block runs on a background IO thread! No server freezing!
-            VoiceIntegration.VoiceResult reply = CLIENT.sendMessageWithVoice(worldKey, playerName, message);
+            VoiceIntegration.VoiceResult reply = CLIENT.sendMessageWithVoice(worldKey, playerName, message, responseContext);
 
             if (reply.text() == null || reply.text().isBlank()) {
                 return java.util.Optional.empty();
@@ -88,6 +93,61 @@ public class AIChatListener {
     private static boolean isConversational(String message) {
         String lower = message.toLowerCase(Locale.ROOT);
         return message.endsWith("?") || lower.startsWith("hey") || lower.startsWith("hi") || lower.contains("help") || lower.contains("you") || lower.contains("can i") || lower.contains("can you") || lower.contains("should i") || lower.contains("what") || lower.contains("how");
+    }
+
+    private static Set<String> buildContextTags(ServerPlayer player, String worldKey) {
+        Set<String> tags = new LinkedHashSet<>();
+        addContextTag(tags, "dimension:" + worldKey);
+
+        String dimensionPath = player.serverLevel().dimension().location().getPath();
+        addContextTag(tags, "dimension:" + dimensionPath);
+        if ("overworld".equals(dimensionPath)) {
+            addContextTag(tags, "surface");
+        } else {
+            addContextTag(tags, dimensionPath);
+        }
+
+        player.serverLevel().getBiome(player.blockPosition()).unwrapKey()
+                .ifPresent(key -> addContextTag(tags, "biome:" + key.location().getPath()));
+
+        LoreBookManager.scanInventory(player);
+        Set<String> collectedLore = LoreBookManager.getCollected(player);
+        if (!collectedLore.isEmpty()) {
+            addContextTag(tags, "has_lore");
+            for (String loreId : collectedLore) {
+                addContextTag(tags, "lore:" + loreId);
+            }
+        }
+
+        if (isNearMeteorSite(player)) {
+            addContextTag(tags, "zone:meteor_site");
+            addContextTag(tags, "discovery:meteor_site");
+        }
+
+        if (isHoldingActivationItem(player)) {
+            addContextTag(tags, "interface:aether_relay");
+        }
+        return tags;
+    }
+
+    private static boolean isNearMeteorSite(ServerPlayer player) {
+        BlockPos pos = player.blockPosition();
+        for (MeteorSavedData.MeteorRecord record : MeteorSavedData.get(player.serverLevel()).getMeteors()) {
+            BlockPos center = record.center();
+            long dx = center.getX() - pos.getX();
+            long dz = center.getZ() - pos.getZ();
+            long radius = Math.max(96L, record.craterRadius() + 32L);
+            if (dx * dx + dz * dz <= radius * radius) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void addContextTag(Set<String> tags, String tag) {
+        if (tag != null && !tag.isBlank()) {
+            tags.add(tag.trim().toLowerCase(Locale.ROOT));
+        }
     }
 
     private static boolean isHoldingActivationItem(ServerPlayer player) {
