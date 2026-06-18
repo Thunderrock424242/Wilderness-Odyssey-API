@@ -15,29 +15,10 @@ corrupted_data:
 corrupted_prefix: "[Signal noise]"
 settings:
   atlas_enabled: true
-  voice_enabled: true
+  voice_enabled: false
   speech_recognition: false
   wake_word: "aether"
   model: "scripted-intent-engine"
-
-# Future LLM sidecar settings.
-# Keep this disabled for the first version. Aether should use deterministic
-# intent matching until funding/runtime support exists for a real model.
-local_model:
-  enabled: false
-  auto_start: false
-  base_url: "http://127.0.0.1:11434"
-  model: "aether-custom:8b"
-  start_command: ""
-  bundled_server_resource: "local_model/local-model-server"
-  bundled_server_args: "--host 127.0.0.1 --port 11434 --model {model_name} --model-file {model_path}"
-  timeout_seconds: 12
-  model_download_url: ""
-  model_download_sha256: ""
-  model_file_name: "aether-custom-8b.gguf"
-  retry_attempts: 3
-  retry_backoff_millis: 200
-  system_prompt: "You are {persona}, an in-world expedition AI. Stay {tone} and {empathy}. You have no access to the internet or external sources - only the in-world lore and knowledge provided. Do not provide crafting recipes or step-by-step crafting instructions. Keep responses immersive, lore-aware, and conversational."
 
 fallback:
   enabled: true

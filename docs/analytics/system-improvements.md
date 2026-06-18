@@ -158,6 +158,6 @@ Analytics can support operational automation:
 
 If you want, the next step can be a concrete implementation PR that adds:
 
-1. JSONL event persistence in `GlobalChatRelayServer`,
+1. JSONL event persistence for analytics snapshots,
 2. a daily rollup job,
 3. and a `/analytics/summary` endpoint returning DAU/peak/health metrics.

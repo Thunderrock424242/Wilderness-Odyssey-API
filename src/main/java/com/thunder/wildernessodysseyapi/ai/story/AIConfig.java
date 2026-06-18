@@ -14,7 +14,6 @@ public class AIConfig {
     private String corruptedPrefix;
     private final Personality personality = new Personality();
     private final Settings settings = new Settings();
-    private final LocalModel localModel = new LocalModel();
     private final Onboarding onboarding = new Onboarding();
     private final Fallback fallback = new Fallback();
 
@@ -46,145 +45,12 @@ public class AIConfig {
         return settings;
     }
 
-    public LocalModel getLocalModel() {
-        return localModel;
-    }
-
     public Onboarding getOnboarding() {
         return onboarding;
     }
 
     public Fallback getFallback() {
         return fallback;
-    }
-
-    public static class LocalModel {
-        private Boolean enabled;
-        private Boolean autoStart;
-        private String baseUrl;
-        private String model;
-        private String systemPrompt;
-        private String startCommand;
-        private String bundledServerResource;
-        private String bundledServerArgs;
-        private Integer timeoutSeconds;
-        private Integer retryAttempts;
-        private Integer retryBackoffMillis;
-        private String modelDownloadUrl;
-        private String modelDownloadSha256;
-        private String modelFileName;
-
-        public Boolean getEnabled() {
-            return enabled;
-        }
-
-        public void setEnabled(Boolean enabled) {
-            this.enabled = enabled;
-        }
-
-        public Boolean getAutoStart() {
-            return autoStart;
-        }
-
-        public void setAutoStart(Boolean autoStart) {
-            this.autoStart = autoStart;
-        }
-
-        public String getBaseUrl() {
-            return baseUrl;
-        }
-
-        public void setBaseUrl(String baseUrl) {
-            this.baseUrl = baseUrl;
-        }
-
-        public String getModel() {
-            return model;
-        }
-
-        public void setModel(String model) {
-            this.model = model;
-        }
-
-        public String getSystemPrompt() {
-            return systemPrompt;
-        }
-
-        public void setSystemPrompt(String systemPrompt) {
-            this.systemPrompt = systemPrompt;
-        }
-
-        public String getStartCommand() {
-            return startCommand;
-        }
-
-        public void setStartCommand(String startCommand) {
-            this.startCommand = startCommand;
-        }
-
-        public String getBundledServerResource() {
-            return bundledServerResource;
-        }
-
-        public void setBundledServerResource(String bundledServerResource) {
-            this.bundledServerResource = bundledServerResource;
-        }
-
-        public String getBundledServerArgs() {
-            return bundledServerArgs;
-        }
-
-        public void setBundledServerArgs(String bundledServerArgs) {
-            this.bundledServerArgs = bundledServerArgs;
-        }
-
-        public Integer getTimeoutSeconds() {
-            return timeoutSeconds;
-        }
-
-        public void setTimeoutSeconds(Integer timeoutSeconds) {
-            this.timeoutSeconds = timeoutSeconds;
-        }
-
-        public Integer getRetryAttempts() {
-            return retryAttempts;
-        }
-
-        public void setRetryAttempts(Integer retryAttempts) {
-            this.retryAttempts = retryAttempts;
-        }
-
-        public Integer getRetryBackoffMillis() {
-            return retryBackoffMillis;
-        }
-
-        public void setRetryBackoffMillis(Integer retryBackoffMillis) {
-            this.retryBackoffMillis = retryBackoffMillis;
-        }
-
-        public String getModelDownloadUrl() {
-            return modelDownloadUrl;
-        }
-
-        public void setModelDownloadUrl(String modelDownloadUrl) {
-            this.modelDownloadUrl = modelDownloadUrl;
-        }
-
-        public String getModelDownloadSha256() {
-            return modelDownloadSha256;
-        }
-
-        public void setModelDownloadSha256(String modelDownloadSha256) {
-            this.modelDownloadSha256 = modelDownloadSha256;
-        }
-
-        public String getModelFileName() {
-            return modelFileName;
-        }
-
-        public void setModelFileName(String modelFileName) {
-            this.modelFileName = modelFileName;
-        }
     }
 
     public static class Personality {

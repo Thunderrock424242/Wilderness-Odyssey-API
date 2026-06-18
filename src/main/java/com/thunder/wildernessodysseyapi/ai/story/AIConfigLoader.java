@@ -103,22 +103,6 @@ public final class AIConfigLoader {
         config.getSettings().setWakeWord(readStringValue(settings.get("wake_word")));
         config.getSettings().setModel(readStringValue(settings.get("model")));
 
-        Map<String, Object> localModel = readStringObjectMap(root.get("local_model"));
-        config.getLocalModel().setEnabled(readBoolean(localModel.get("enabled")));
-        config.getLocalModel().setAutoStart(readBoolean(localModel.get("auto_start")));
-        config.getLocalModel().setBaseUrl(readStringValue(localModel.get("base_url")));
-        config.getLocalModel().setModel(readStringValue(localModel.get("model")));
-        config.getLocalModel().setSystemPrompt(readStringValue(localModel.get("system_prompt")));
-        config.getLocalModel().setStartCommand(readStringValue(localModel.get("start_command")));
-        config.getLocalModel().setBundledServerResource(readStringValue(localModel.get("bundled_server_resource")));
-        config.getLocalModel().setBundledServerArgs(readStringValue(localModel.get("bundled_server_args")));
-        config.getLocalModel().setTimeoutSeconds(readInteger(localModel.get("timeout_seconds")));
-        config.getLocalModel().setRetryAttempts(readInteger(localModel.get("retry_attempts")));
-        config.getLocalModel().setRetryBackoffMillis(readInteger(localModel.get("retry_backoff_millis")));
-        config.getLocalModel().setModelDownloadUrl(readStringValue(localModel.get("model_download_url")));
-        config.getLocalModel().setModelDownloadSha256(readStringValue(localModel.get("model_download_sha256")));
-        config.getLocalModel().setModelFileName(readStringValue(localModel.get("model_file_name")));
-
         Map<String, Object> onboarding = readStringObjectMap(root.get("onboarding"));
         config.getOnboarding().setEnabled(readBoolean(onboarding.get("enabled")));
         config.getOnboarding().setCompletionMessage(readStringValue(onboarding.get("completion_message")));
