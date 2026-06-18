@@ -30,11 +30,6 @@ If the loading screen stays up for 10+ minutes (common with 200+ mod packs), the
 Each report includes a thread dump and the active mod list so you can spot which thread/mod was executing when the hang occurred.
 Use `-Dwilderness.loadingstall.minutes=5` (for example) to lower the timeout; the suspects section lists the jar path for the top threads to speed up mod identification during loader hangs.
 
-Global Chat:
-------------
-See `docs/globalchat/beginner.md` for a quickstart on hosting the relay, binding servers, and getting players talking.
-Read `docs/globalchat/operations.md` for the full operations guide (anchoring, cluster tokens, moderation, opt-in controls, and whitelisting external tools).
-
 Discord-to-Minecraft Playtest Verification:
 -------------------------------------------
 On the official playtest server, players can link their Minecraft identity through the private Discord verification relay:
@@ -76,14 +71,7 @@ Scripted response data lives in:
 - `src/main/resources/ai_fallback/enforcer.yaml`
 - `src/main/resources/ai_fallback/requiem.yaml`
 
-The optional local-model sidecar remains available for a future funded version, but `local_model.enabled` and `local_model.auto_start` default to `false`. This repo does **not** bundle custom-trained LLM model weight files.
-
-Future sidecar admin commands:
-- `/aetherbackend status`
-- `/aetherbackend probe`
-- `/aetherbackend start`
-
-The old `/atlasbackend` command remains registered as a compatibility alias.
+A.E.T.H.E.R uses only authored local responses and does not call an online AI service. The old backend management commands were removed so the CurseForge build stays scripted-only.
 Secrets:
 -------
 For local development, copy `.env.example` to `.env` and fill in required tokens.

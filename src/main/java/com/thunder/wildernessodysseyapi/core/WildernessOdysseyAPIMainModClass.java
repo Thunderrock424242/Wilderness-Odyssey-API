@@ -16,8 +16,6 @@ import com.thunder.wildernessodysseyapi.radiation.RadiationTickHandler;
 import com.thunder.wildernessodysseyapi.effect.SimpleStatusEffect;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
-import com.thunder.wildernessodysseyapi.globalchat.command.GlobalChatCommand;
-import com.thunder.wildernessodysseyapi.globalchat.command.GlobalChatOptToggleCommand;
 import com.thunder.wildernessodysseyapi.lorebook.command.LoreBookCommand;
 import com.thunder.wildernessodysseyapi.meteor.command.MeteorCommand;
 import com.thunder.wildernessodysseyapi.modpack.structure.command.ModpackStructureCommand;
@@ -59,10 +57,8 @@ import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockE
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftWorldgen;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
-import com.thunder.wildernessodysseyapi.ai.story.AIBackendCommand;
 import com.thunder.wildernessodysseyapi.ai.story.AIChatListener;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
-import com.thunder.wildernessodysseyapi.globalchat.GlobalChatManager;
 import com.thunder.wildernessodysseyapi.gamerules.GameRulesListManager;
 import com.thunder.wildernessodysseyapi.server.ServerPropertiesTemplateManager;
 import com.thunder.wildernessodysseyapi.telemetry.*;
@@ -80,7 +76,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.level.levelgen.feature.Feature;
@@ -95,7 +90,6 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
@@ -116,7 +110,6 @@ public class WildernessOdysseyAPIMainModClass {
 
     private static final String CONFIG_FOLDER = MOD_ID + "/";
     private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
-    private final GlobalChatManager globalChatManager = GlobalChatManager.getInstance();
 
     // ---- DeferredRegisters ----
     public static final DeferredRegister<MobEffect> MOB_EFFECTS =
@@ -275,7 +268,6 @@ public class WildernessOdysseyAPIMainModClass {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
-        globalChatManager.initialize(event.getServer(), event.getServer().getFile("config"));
         ServerPropertiesTemplateManager.ensureManagedServerProperties(event.getServer());
         GameRulesListManager.ensureRulesFileExists(event.getServer());
         GameRulesListManager.applyConfiguredRules(event.getServer());
@@ -302,7 +294,6 @@ public class WildernessOdysseyAPIMainModClass {
 
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
-        globalChatManager.shutdown();
         AsyncTaskManager.shutdown();
     }
 
@@ -318,8 +309,6 @@ public class WildernessOdysseyAPIMainModClass {
         ChangelogCommand.register(dispatcher);
         WorldGenScanCommand.register(dispatcher);
         StructurePlacementDebugCommand.register(dispatcher);
-        GlobalChatCommand.register(dispatcher);
-        GlobalChatOptToggleCommand.register(dispatcher);
         LoreBookCommand.register(dispatcher);
         ModpackStructureCommand.register(dispatcher);
         TelemetryConsentCommand.register(dispatcher);
@@ -328,20 +317,12 @@ public class WildernessOdysseyAPIMainModClass {
         WorldUpgradeCommand.register(dispatcher);
         MeteorCommand.register(dispatcher);
         UnstuckCommand.register(dispatcher);
-        AIBackendCommand.register(dispatcher);
         MinecraftVerificationCommands.register(dispatcher);
     }
 
     // =========================================
     // PLAYER & WORLD EVENTS
     // =========================================
-
-    @SubscribeEvent
-    public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) {
-            player.sendSystemMessage(Component.literal("[GlobalChat] Global chat is opt-in. Use /globalchatoptin to join or /globalchatoptout to leave."));
-        }
-    }
 
     @SubscribeEvent
     public void onLevelUnload(LevelEvent.Unload event) {

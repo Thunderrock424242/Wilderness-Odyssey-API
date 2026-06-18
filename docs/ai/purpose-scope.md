@@ -41,7 +41,7 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 - Config-driven controls through `ai_config.yaml`.
 - Prompt libraries split by persona under `ai_fallback/`.
 - Lightweight deterministic behavior that does not require external services.
-- Optional future local-model sidecar remains configurable, but is disabled by default.
+- No external model runtime, script launcher, or external AI dependency in the CurseForge build.
 - Async execution only; never block the server tick/world thread for response work.
 
 ## 6) Boundaries
@@ -51,17 +51,8 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 - Do not invent authoritative mechanics if uncertain; use uncertainty plus guidance.
 - Do not make the first version depend on a local or hosted LLM.
 
-## 7) Future external AI service
-When funding/runtime support exists, the sidecar path can be re-enabled behind config:
-- `POST /generate`
-  - Input: prompt, player/session context, requested subsystem, optional world summary.
-  - Output: response text and optional metadata.
-- `GET /health`
-  - Liveness/readiness signal for status commands.
-- `GET /version`
-  - Backend build/model identifier for troubleshooting.
-
-The scripted intent layer should remain as the safe fallback even after an LLM exists.
+## 7) External AI policy
+The release build is scripted-only. Any future external AI experiment should live outside the CurseForge artifact unless moderation policy explicitly allows it.
 
 ## 8) Definition of done (MVP)
 - A.E.T.H.E.R responds in-world with consistent tone and roleplay behavior.
@@ -74,8 +65,7 @@ The scripted intent layer should remain as the safe fallback even after an LLM e
 ## 9) Nice-to-have after MVP
 - More discovery/progression context tags.
 - Event-triggered hints for new biome, anomaly detected, first night, meteor site, or lore pickup.
-- Optional voice I/O integration where available.
-- Optional LLM sidecar for richer responses when funding and moderation support exist.
+- More authored response banks for richer persona coverage.
 
 ## One-line summary
 "A.E.T.H.E.R is a scripted recovered-intent companion made of six sub-systems that provide survival guidance, anomaly awareness, world intelligence, machine/atmosphere support, combat/security help, and lore memory without requiring a full LLM."
