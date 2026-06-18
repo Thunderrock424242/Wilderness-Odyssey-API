@@ -90,3 +90,10 @@ mandatory=true
 versionRange="[4.8.2,)"
 ordering="AFTER"
 side="BOTH"
+
+[[dependencies.wildernessodysseyapi]]
+modId="create"
+mandatory=true
+versionRange="[6.0.10,)"
+ordering="AFTER"
+side="BOTH"
