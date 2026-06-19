@@ -30,6 +30,17 @@ If the loading screen stays up for 10+ minutes (common with 200+ mod packs), the
 Each report includes a thread dump and the active mod list so you can spot which thread/mod was executing when the hang occurred.
 Use `-Dwilderness.loadingstall.minutes=5` (for example) to lower the timeout; the suspects section lists the jar path for the top threads to speed up mod identification during loader hangs.
 
+Client VRAM Profiler:
+---------------------
+Use the opt-in `/wovram` client command to correlate VRAM increases with live OpenGL allocations, mod IDs, resources, and Java source lines:
+
+1. Run `/wovram start` immediately before reproducing the increase.
+2. Run `/wovram top` to list the largest live allocation sites.
+3. Run `/wovram snapshot before_action`, reproduce one action, then run `/wovram diff`.
+4. Run `/wovram stop` and `/wovram export` to write a detailed JSON report under `logs/wildernessodysseyapi/gpu-profiler/`.
+
+While a session is active, the F3 system panel shows the driver VRAM delta and the top tracked sites. NVIDIA and AMD OpenGL memory extensions are sampled when available. Per-object byte counts are logical estimates because drivers may compress, align, share, cache, or delay releasing GPU resources. Calls made directly to raw LWJGL instead of Minecraft's rendering wrappers may not appear in the first profiler version.
+
 Discord-to-Minecraft Playtest Verification:
 -------------------------------------------
 On the official playtest server, players can link their Minecraft identity through the private Discord verification relay:
