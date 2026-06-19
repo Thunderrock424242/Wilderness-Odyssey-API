@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.worldgen.secretordervillage;
+package com.thunder.wildernessodysseyapi.worldgen.SecretOrderVillage;
 
 import com.thunder.wildernessodysseyapi.worldgen.structure.NBTStructurePlacer;
 import net.minecraft.core.BlockPos;
