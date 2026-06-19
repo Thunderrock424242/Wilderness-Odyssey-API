@@ -16,7 +16,7 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = "4.1.0"
+version = "4.1.1"
 group = "com.thunder.wildernessodysseyapi"
 
 base {
@@ -136,7 +136,7 @@ dependencies {
 
     implementation "curse.maven:worldedit-225608:5830452"
     implementation "curse.maven:tick-tok-lib-1298954:7547386"
-    implementation "curse.maven:create-328085:7408951"
+    implementation "curse.maven:create-328085:7963363"
     implementation "curse.maven:regions-unexplored-659110:7826194"
     implementation "curse.maven:lithostitched-936015:7832789"
     implementation "curse.maven:biolith-852512:7074761"
@@ -144,6 +144,10 @@ dependencies {
     implementation "curse.maven:geckolib-388172:7023453"
     implementation "curse.maven:locate-fixer-1301683:6762552"
     implementation "curse.maven:curios-309927:6529130"
+    implementation "curse.maven:amendments-896746:7461027"
+    implementation "curse.maven:selene-499980:8261785"
+    implementation "curse.maven:supplementaries-412082:8244187"
+    implementation "curse.maven:multipart-machines-cooking-885587:5686941"
     jarJar(implementation("org.yaml:snakeyaml:2.2")) {
         version {
             strictly '[2.2,3.0)'
@@ -152,9 +156,6 @@ dependencies {
     }
     compileOnly "curse.maven:spark-361579:6225208"
     localRuntime "curse.maven:spark-361579:6225208"
-    // Dev runtime shader stack for testing Iris screen/selection behavior.
-    localRuntime "curse.maven:sodium-394468:6382651"
-    localRuntime "curse.maven:irisshaders-455508:6661598"
     // Bundle third-party libraries into the final mod jar (Jar-in-Jar) to avoid missing-class errors at runtime.
     jarJar(implementation('com.squareup.okhttp3:okhttp:4.12.0'))
     jarJar(implementation('com.squareup.okio:okio:3.9.0'))
@@ -176,7 +177,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_id                 : "wildernessodysseyapi",
             mod_name               : "Wilderness Odyssey API",
             mod_license            : "APR",
-            mod_version            : "4.1.0",
+            mod_version            : "4.1.1",
             mod_authors            : "thunderrock424242",
             mod_description        : "a api for my modpack"
     ]

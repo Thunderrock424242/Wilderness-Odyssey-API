@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.thunder.wildernessodysseyapi.structureblock.bridge.StructureBlockCornerCacheBridge;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockCornerCache;
+import com.thunder.wildernessodysseyapi.structureblock.StructureBlockDetectionContext;
 import com.thunder.wildernessodysseyapi.util.NbtCompressionUtils;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockHostileSpawnContext;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
@@ -20,7 +21,6 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.StructureBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.StructureBlock;
 import net.minecraft.world.level.block.state.properties.StructureMode;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.util.Mth;
@@ -73,8 +73,6 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         super(type, pos, state);
     }
 
-    @Unique
-    private final java.util.Set<BlockPos> wildernessodysseyapi$cornerMarkers = new java.util.HashSet<>();
     @Unique
     private boolean wildernessodysseyapi$cacheRegistered;
     @Unique
@@ -183,14 +181,65 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
                     cornerMarkers.add(cachedCorner);
                 }
             }
-            if (cornerMarkers.isEmpty()) {
-                wildernessodysseyapi$scanCornersInCube(serverLevel, blockPos, structureNameKey, minXBound, maxXBound,
-                        minYBound, maxYBound, minZBound, maxZBound, cornerMarkers, knownCorners);
-            }
+            wildernessodysseyapi$scanCornersInCube(serverLevel, blockPos, structureNameKey, minXBound, maxXBound,
+                    minYBound, maxYBound, minZBound, maxZBound, cornerMarkers, knownCorners);
         }
 
         wildernessodysseyapi$collectFarCorners(serverLevel, blockPos, structureNameKey, cornerMarkers, knownCorners,
                 detectionRadius);
+
+        if (structureNameKey != null && cornerMarkers.size() < 2) {
+            wildernessodysseyapi$reportCornerScanDiagnostics(serverLevel, blockPos, structureNameKey, detectionRadius,
+                    cornerMarkers.size());
+        }
+
+        if (!cornerMarkers.isEmpty()) {
+            boolean hasBounds = false;
+            int minX = structureX;
+            int minY = structureY;
+            int minZ = structureZ;
+            int maxX = structureX;
+            int maxY = structureY;
+            int maxZ = structureZ;
+
+            for (BlockPos corner : cornerMarkers) {
+                if (corner.equals(blockPos)) {
+                    continue;
+                }
+                hasBounds = true;
+                int x = corner.getX();
+                int y = corner.getY();
+                int z = corner.getZ();
+                if (x < minX) {
+                    minX = x;
+                }
+                if (y < minY) {
+                    minY = y;
+                }
+                if (z < minZ) {
+                    minZ = z;
+                }
+                if (x > maxX) {
+                    maxX = x;
+                }
+                if (y > maxY) {
+                    maxY = y;
+                }
+                if (z > maxZ) {
+                    maxZ = z;
+                }
+            }
+
+            if (hasBounds) {
+                BlockPos newStart = new BlockPos(minX, minY, minZ);
+                BlockPos newSize = new BlockPos(maxX - minX + 1, maxY - minY + 1, maxZ - minZ + 1);
+                wildernessodysseyapi$reportCornerDetection(cornerMarkers.size(), blockPos, newStart, newSize);
+                wildernessodysseyapi$applyDetectedBounds(serverLevel, blockPos, newStart, newSize, cir);
+                return;
+            }
+        }
+
+        StructureBlockDetectionContext.send("WO Detect: found no matching CORNER blocks; using content scan.");
 
         boolean restrictToCornerBounds = false;
         int cornerBoundMinX = structureX;
@@ -428,19 +477,19 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         }
 
         if (hasBounds && !cornerMarkers.isEmpty()) {
-            if (!cornerBelowX && cornerAboveX && !contentBelowX) {
+            if (!cornerBelowX && cornerAboveX) {
                 minX = structureX;
-            } else if (!cornerAboveX && cornerBelowX && !contentAboveX) {
+            } else if (!cornerAboveX && cornerBelowX) {
                 maxX = structureX;
             }
-            if (!cornerBelowY && cornerAboveY && !contentBelowY) {
+            if (!cornerBelowY && cornerAboveY) {
                 minY = structureY;
-            } else if (!cornerAboveY && cornerBelowY && !contentAboveY) {
+            } else if (!cornerAboveY && cornerBelowY) {
                 maxY = structureY;
             }
-            if (!cornerBelowZ && cornerAboveZ && !contentBelowZ) {
+            if (!cornerBelowZ && cornerAboveZ) {
                 minZ = structureZ;
-            } else if (!cornerAboveZ && cornerBelowZ && !contentAboveZ) {
+            } else if (!cornerAboveZ && cornerBelowZ) {
                 maxZ = structureZ;
             }
         }
@@ -472,34 +521,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
 
         BlockPos newStart = new BlockPos(minX, minY, minZ);
         BlockPos newSize = new BlockPos(maxX - minX + 1, maxY - minY + 1, maxZ - minZ + 1);
-        BlockPos relativePos = newStart.subtract(blockPos);
-
-        boolean changed = false;
-        if (!relativePos.equals(this.structurePos)) {
-            this.setStructurePos(relativePos);
-            changed = true;
-        }
-        if (!newSize.equals(this.structureSize)) {
-            this.setStructureSize(newSize);
-            changed = true;
-        }
-
-        if (changed) {
-            this.setChanged();
-            BlockState state = this.getBlockState();
-            serverLevel.sendBlockUpdated(blockPos, state, state, 3);
-        }
-
-        wildernessodysseyapi$placeCornerBlocks(serverLevel, blockPos, newStart, newSize);
-
-        if (!changed) {
-            cir.setReturnValue(true);
-            cir.cancel();
-            return;
-        }
-
-        cir.setReturnValue(true);
-        cir.cancel();
+        wildernessodysseyapi$applyDetectedBounds(serverLevel, blockPos, newStart, newSize, cir);
     }
 
     @Inject(method = "saveStructure", at = @At("HEAD"))
@@ -519,6 +541,11 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         BlockPos blockPos = this.getBlockPos();
         BlockPos start = blockPos.offset(this.structurePos);
         BlockPos end = start.offset(this.structureSize.getX() - 1, this.structureSize.getY() - 1, this.structureSize.getZ() - 1);
+        String structureNameKey = wildernessodysseyapi$normalizeStructureName(this.getStructureName());
+        if (structureNameKey != null
+                && wildernessodysseyapi$hasManualCornerBounds(serverLevel, blockPos, structureNameKey, start, end)) {
+            return;
+        }
 
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         boolean found = false;
@@ -589,38 +616,144 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
     }
 
     @Unique
-    private void wildernessodysseyapi$scanCornersInCube(ServerLevel serverLevel, BlockPos origin, String structureNameKey,
-            int minX, int maxX, int minY, int maxY, int minZ, int maxZ, java.util.List<BlockPos> cornerMarkers,
-            java.util.Set<BlockPos> knownCorners) {
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        StructureBlockCornerCache cache = StructureBlockCornerCache.get(serverLevel);
+    private void wildernessodysseyapi$applyDetectedBounds(ServerLevel serverLevel, BlockPos blockPos, BlockPos newStart,
+            BlockPos newSize, CallbackInfoReturnable<Boolean> cir) {
+        BlockPos relativePos = newStart.subtract(blockPos);
 
-        for (int x = minX; x <= maxX; x++) {
-            for (int y = minY; y <= maxY; y++) {
-                for (int z = minZ; z <= maxZ; z++) {
-                    cursor.set(x, y, z);
-                    if (cursor.equals(origin)) {
+        boolean changed = false;
+        if (!relativePos.equals(this.structurePos)) {
+            this.setStructurePos(relativePos);
+            changed = true;
+        }
+        if (!newSize.equals(this.structureSize)) {
+            this.setStructureSize(newSize);
+            changed = true;
+        }
+
+        if (changed) {
+            this.setChanged();
+            BlockState state = this.getBlockState();
+            serverLevel.sendBlockUpdated(blockPos, state, state, 3);
+        }
+
+        cir.setReturnValue(true);
+        cir.cancel();
+    }
+
+    @Unique
+    private void wildernessodysseyapi$reportCornerDetection(int cornerCount, BlockPos blockPos, BlockPos newStart,
+            BlockPos newSize) {
+        BlockPos relativePos = newStart.subtract(blockPos);
+        StructureBlockDetectionContext.send("WO Detect: found " + cornerCount + " CORNER marker(s); offset="
+                + wildernessodysseyapi$formatVec(relativePos) + " size=" + wildernessodysseyapi$formatVec(newSize));
+        if (cornerCount < 2 || newSize.getX() <= 1 || newSize.getY() <= 1 || newSize.getZ() <= 1) {
+            StructureBlockDetectionContext.send(
+                    "WO Detect: one axis is still 1 block; add/name a CORNER marker on the missing width/height/depth.");
+        }
+    }
+
+    @Unique
+    private static String wildernessodysseyapi$formatVec(Vec3i vec) {
+        return vec.getX() + "," + vec.getY() + "," + vec.getZ();
+    }
+
+    @Unique
+    private void wildernessodysseyapi$reportCornerScanDiagnostics(ServerLevel serverLevel, BlockPos origin,
+            String structureNameKey, int detectionRadius, int acceptedCount) {
+        int searchRadius = Math.max(detectionRadius, StructureBlockSettings.getCornerSearchRadius());
+        int minX = origin.getX() - searchRadius;
+        int maxX = origin.getX() + searchRadius;
+        int minZ = origin.getZ() - searchRadius;
+        int maxZ = origin.getZ() + searchRadius;
+        int minY = Math.max(serverLevel.getMinBuildHeight(), origin.getY() - searchRadius);
+        int maxY = Math.min(serverLevel.getMaxBuildHeight() - 1, origin.getY() + searchRadius);
+
+        ServerChunkCache chunkSource = serverLevel.getChunkSource();
+        int minChunkX = minX >> 4;
+        int maxChunkX = maxX >> 4;
+        int minChunkZ = minZ >> 4;
+        int maxChunkZ = maxZ >> 4;
+
+        int unloadedChunks = 0;
+        int structureBlocks = 0;
+        int cornerMode = 0;
+        int matchingName = 0;
+        int blankName = 0;
+        int wrongName = 0;
+        int otherMode = 0;
+        java.util.LinkedHashSet<String> wrongNames = new java.util.LinkedHashSet<>();
+
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                LevelChunk chunk = chunkSource.getChunkNow(chunkX, chunkZ);
+                if (chunk == null) {
+                    unloadedChunks++;
+                    continue;
+                }
+                for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
+                    if (!(blockEntity instanceof StructureBlockEntity structureBlockEntity)) {
                         continue;
                     }
-                    java.lang.Boolean validation = wildernessodysseyapi$validateCorner(serverLevel, cursor,
-                            structureNameKey);
-                    if (!java.lang.Boolean.TRUE.equals(validation)) {
+                    BlockPos pos = blockEntity.getBlockPos();
+                    if (pos.equals(origin)) {
                         continue;
                     }
-                    BlockPos immutable = cursor.immutable();
-                    if (!knownCorners.add(immutable)) {
+                    if (pos.getY() < minY || pos.getY() > maxY) {
                         continue;
                     }
-                    cornerMarkers.add(immutable);
-                    cache.addCorner(immutable, structureNameKey);
+                    if (pos.getX() < minX || pos.getX() > maxX || pos.getZ() < minZ || pos.getZ() > maxZ) {
+                        continue;
+                    }
+
+                    structureBlocks++;
+                    if (structureBlockEntity.getMode() != StructureMode.CORNER) {
+                        otherMode++;
+                        continue;
+                    }
+
+                    cornerMode++;
+                    String otherName = wildernessodysseyapi$normalizeStructureName(structureBlockEntity.getStructureName());
+                    if (structureNameKey.equals(otherName)) {
+                        matchingName++;
+                    } else if (otherName == null) {
+                        blankName++;
+                    } else {
+                        wrongName++;
+                        if (wrongNames.size() < 3) {
+                            wrongNames.add(otherName);
+                        }
+                    }
                 }
             }
         }
+
+        StructureBlockDetectionContext.send("WO Detect debug: accepted=" + acceptedCount + " radius=" + searchRadius
+                + " structureBlocks=" + structureBlocks + " cornerMode=" + cornerMode + " unloadedChunks="
+                + unloadedChunks);
+        StructureBlockDetectionContext.send("WO Detect debug: matchingName=" + matchingName + " blankName="
+                + blankName + " wrongName=" + wrongName + " otherMode=" + otherMode);
+        if (!wrongNames.isEmpty()) {
+            StructureBlockDetectionContext.send("WO Detect debug: sample wrong names=" + String.join(", ", wrongNames));
+        }
+    }
+
+    @Unique
+    private void wildernessodysseyapi$scanCornersInCube(ServerLevel serverLevel, BlockPos origin, String structureNameKey,
+            int minX, int maxX, int minY, int maxY, int minZ, int maxZ, java.util.List<BlockPos> cornerMarkers,
+            java.util.Set<BlockPos> knownCorners) {
+        wildernessodysseyapi$collectLoadedCornersInBox(serverLevel, origin, structureNameKey, minX, maxX, minY, maxY,
+                minZ, maxZ, cornerMarkers, knownCorners, true);
     }
 
     @Unique
     private java.lang.Boolean wildernessodysseyapi$validateCorner(ServerLevel serverLevel, BlockPos position,
             String structureNameKey) {
+        return wildernessodysseyapi$validateCorner(serverLevel, position, structureNameKey, false);
+    }
+
+    @Unique
+    private java.lang.Boolean wildernessodysseyapi$validateCorner(ServerLevel serverLevel, BlockPos position,
+            String structureNameKey, boolean allowUnnamedCorner) {
         ChunkPos chunkPos = new ChunkPos(position);
         if (!serverLevel.hasChunk(chunkPos.x, chunkPos.z)) {
             return null;
@@ -636,11 +769,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         if (structureBlockEntity.getMode() != StructureMode.CORNER) {
             return Boolean.FALSE;
         }
-        String otherName = structureBlockEntity.getStructureName();
-        if (otherName == null) {
-            return Boolean.FALSE;
-        }
-        if (!otherName.equals(structureNameKey)) {
+        if (!wildernessodysseyapi$cornerNameMatches(structureBlockEntity, structureNameKey, allowUnnamedCorner)) {
             return Boolean.FALSE;
         }
         return Boolean.TRUE;
@@ -659,7 +788,6 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         }
 
         StructureBlockCornerCache cache = StructureBlockCornerCache.getIfPresent(serverLevel);
-        boolean addedFromCache = false;
         if (cache != null) {
             java.util.List<BlockPos> cachedCorners = cache.findCornersUnsorted(structureNameKey, origin, searchRadius);
             for (BlockPos cachedCorner : cachedCorners) {
@@ -680,14 +808,9 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
                 }
                 knownCorners.add(cachedCorner);
                 cornerMarkers.add(cachedCorner);
-                addedFromCache = true;
             }
         }
-        if (addedFromCache) {
-            return;
-        }
 
-        ServerChunkCache chunkSource = serverLevel.getChunkSource();
         int minX = origin.getX() - searchRadius;
         int maxX = origin.getX() + searchRadius;
         int minZ = origin.getZ() - searchRadius;
@@ -695,11 +818,19 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         int minY = Math.max(serverLevel.getMinBuildHeight(), origin.getY() - searchRadius);
         int maxY = Math.min(serverLevel.getMaxBuildHeight() - 1, origin.getY() + searchRadius);
 
+        wildernessodysseyapi$collectLoadedCornersInBox(serverLevel, origin, structureNameKey, minX, maxX, minY, maxY,
+                minZ, maxZ, cornerMarkers, knownCorners, true);
+    }
+
+    @Unique
+    private void wildernessodysseyapi$collectLoadedCornersInBox(ServerLevel serverLevel, BlockPos origin,
+            String structureNameKey, int minX, int maxX, int minY, int maxY, int minZ, int maxZ,
+            java.util.List<BlockPos> cornerMarkers, java.util.Set<BlockPos> knownCorners, boolean allowUnnamedCorners) {
+        ServerChunkCache chunkSource = serverLevel.getChunkSource();
         int minChunkX = minX >> 4;
         int maxChunkX = maxX >> 4;
         int minChunkZ = minZ >> 4;
         int maxChunkZ = maxZ >> 4;
-
         StructureBlockCornerCache fallbackCache = StructureBlockCornerCache.get(serverLevel);
 
         for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
@@ -719,10 +850,6 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
                     if (structureBlockEntity.getMode() != StructureMode.CORNER) {
                         continue;
                     }
-                    String otherName = structureBlockEntity.getStructureName();
-                    if (otherName == null || !otherName.equals(structureNameKey)) {
-                        continue;
-                    }
                     BlockPos pos = blockEntity.getBlockPos();
                     if (pos.equals(origin)) {
                         continue;
@@ -733,14 +860,43 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
                     if (pos.getX() < minX || pos.getX() > maxX || pos.getZ() < minZ || pos.getZ() > maxZ) {
                         continue;
                     }
+                    if (!wildernessodysseyapi$cornerNameMatches(structureBlockEntity, structureNameKey,
+                            allowUnnamedCorners)) {
+                        continue;
+                    }
                     BlockPos immutablePos = pos.immutable();
                     if (knownCorners.add(immutablePos)) {
                         cornerMarkers.add(immutablePos);
                     }
-                    fallbackCache.addCorner(immutablePos, structureNameKey);
+                    if (wildernessodysseyapi$cornerNameMatches(structureBlockEntity, structureNameKey, false)) {
+                        fallbackCache.addCorner(immutablePos, structureNameKey);
+                    }
                 }
             }
         }
+    }
+
+    @Unique
+    private boolean wildernessodysseyapi$hasManualCornerBounds(ServerLevel serverLevel, BlockPos origin,
+            String structureNameKey, BlockPos start, BlockPos end) {
+        int minX = Math.min(start.getX(), end.getX());
+        int maxX = Math.max(start.getX(), end.getX());
+        int minY = Math.min(start.getY(), end.getY());
+        int maxY = Math.max(start.getY(), end.getY());
+        int minZ = Math.min(start.getZ(), end.getZ());
+        int maxZ = Math.max(start.getZ(), end.getZ());
+        java.util.List<BlockPos> cornerMarkers = new java.util.ArrayList<>();
+        java.util.Set<BlockPos> knownCorners = new java.util.HashSet<>();
+        wildernessodysseyapi$collectLoadedCornersInBox(serverLevel, origin, structureNameKey, minX, maxX, minY, maxY,
+                minZ, maxZ, cornerMarkers, knownCorners, true);
+        return !cornerMarkers.isEmpty();
+    }
+
+    @Unique
+    private boolean wildernessodysseyapi$cornerNameMatches(StructureBlockEntity structureBlockEntity,
+            String structureNameKey, boolean allowUnnamedCorner) {
+        String otherName = wildernessodysseyapi$normalizeStructureName(structureBlockEntity.getStructureName());
+        return structureNameKey.equals(otherName) || allowUnnamedCorner && otherName == null;
     }
 
     @Unique
@@ -899,93 +1055,11 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
     @Unique
     private static @org.jetbrains.annotations.Nullable String wildernessodysseyapi$normalizeStructureName(
             @org.jetbrains.annotations.Nullable String name) {
-        if (name == null || name.isEmpty()) {
+        if (name == null || name.isBlank()) {
             return null;
         }
-        return name;
+        ResourceLocation location = ResourceLocation.tryParse(name);
+        return location == null ? name : location.toString();
     }
 
-    @Unique
-    private void wildernessodysseyapi$placeCornerBlocks(ServerLevel serverLevel, BlockPos structureBlockPos, BlockPos minCorner, Vec3i size) {
-        ResourceLocation structureName = this.structureName;
-        if (structureName == null) {
-            return;
-        }
-
-        BlockPos maxCorner = minCorner.offset(size.getX() - 1, size.getY() - 1, size.getZ() - 1);
-        java.util.List<BlockPos> bottomCorners = new java.util.ArrayList<>(4);
-        bottomCorners.add(new BlockPos(minCorner.getX(), minCorner.getY(), minCorner.getZ()));
-        bottomCorners.add(new BlockPos(maxCorner.getX(), minCorner.getY(), minCorner.getZ()));
-        bottomCorners.add(new BlockPos(minCorner.getX(), minCorner.getY(), maxCorner.getZ()));
-        bottomCorners.add(new BlockPos(maxCorner.getX(), minCorner.getY(), maxCorner.getZ()));
-
-        bottomCorners.sort(java.util.Comparator.comparingInt(pos -> pos.distManhattan(structureBlockPos)));
-
-        java.util.LinkedHashSet<BlockPos> desiredCorners = new java.util.LinkedHashSet<>();
-
-        for (int i = 1; i < bottomCorners.size() && desiredCorners.size() < 2; i++) {
-            BlockPos candidate = bottomCorners.get(i);
-            if (!candidate.equals(structureBlockPos)) {
-                desiredCorners.add(candidate);
-            }
-        }
-
-        if (size.getY() > 1) {
-            BlockPos topCorner = new BlockPos(maxCorner.getX(), maxCorner.getY(), maxCorner.getZ());
-            if (!topCorner.equals(structureBlockPos)) {
-                desiredCorners.add(topCorner);
-            }
-        }
-
-        if (desiredCorners.isEmpty()) {
-            return;
-        }
-
-        java.util.Set<BlockPos> retainedMarkers = new java.util.HashSet<>();
-
-        for (BlockPos target : desiredCorners) {
-            retainedMarkers.add(target.immutable());
-        }
-
-        java.util.Iterator<BlockPos> existing = this.wildernessodysseyapi$cornerMarkers.iterator();
-        while (existing.hasNext()) {
-            BlockPos tracked = existing.next();
-            if (retainedMarkers.contains(tracked)) {
-                continue;
-            }
-            BlockState state = serverLevel.getBlockState(tracked);
-            if (state.is(Blocks.STRUCTURE_BLOCK)) {
-                BlockEntity entity = serverLevel.getBlockEntity(tracked);
-                if (entity instanceof StructureBlockEntity structureBlockEntity && structureBlockEntity.getMode() == StructureMode.CORNER) {
-                    serverLevel.setBlock(tracked, Blocks.AIR.defaultBlockState(), 3);
-                }
-            }
-            existing.remove();
-        }
-
-        BlockState cornerState = Blocks.STRUCTURE_BLOCK.defaultBlockState().setValue(StructureBlock.MODE, StructureMode.CORNER);
-
-        for (BlockPos target : desiredCorners) {
-            ChunkPos chunkPos = new ChunkPos(target);
-            if (!serverLevel.hasChunk(chunkPos.x, chunkPos.z)) {
-                continue;
-            }
-            BlockState state = serverLevel.getBlockState(target);
-            if (!state.isAir() && !state.is(Blocks.STRUCTURE_BLOCK) && !state.is(Blocks.STRUCTURE_VOID)) {
-                continue;
-            }
-            if (!state.is(cornerState.getBlock())) {
-                serverLevel.setBlock(target, cornerState, 3);
-            }
-            BlockEntity entity = serverLevel.getBlockEntity(target);
-            if (entity instanceof StructureBlockEntity structureBlockEntity) {
-                structureBlockEntity.setStructureName(structureName);
-                structureBlockEntity.setMode(StructureMode.CORNER);
-                structureBlockEntity.setStructurePos(BlockPos.ZERO);
-                structureBlockEntity.setStructureSize(Vec3i.ZERO);
-                structureBlockEntity.setChanged();
-            }
-            this.wildernessodysseyapi$cornerMarkers.add(target.immutable());
-        }
-    }
 }
