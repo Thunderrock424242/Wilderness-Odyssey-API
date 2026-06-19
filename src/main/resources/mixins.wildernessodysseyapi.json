@@ -31,11 +31,14 @@
     "ClientLevelWeatherColorMixin",
     "DebugMixin",
     "DebugScreenOverlayMixin",
+    "GlStateManagerGpuProfilerMixin",
     "GerstnerWaveRenderMixin",
     "LightTextureTrueDarknessMixin",
     "MixinWorldCreationUiState",
     "OptionsScreenTelemetryButtonMixin",
     "RenderChunkRegionAccessor",
-    "StructureBlockRendererMixin"
+    "SimpleTextureGpuProfilerMixin",
+    "StructureBlockRendererMixin",
+    "TextureAtlasGpuProfilerMixin"
   ]
 }

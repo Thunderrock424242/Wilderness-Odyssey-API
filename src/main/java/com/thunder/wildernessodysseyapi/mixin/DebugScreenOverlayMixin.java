@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.thunder.wildernessodysseyapi.debugoverlay.client.DebugOverlayAnimator;
 import com.thunder.wildernessodysseyapi.debugoverlay.client.DebugOverlayLineFilter;
+import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuProfiler;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.DebugScreenOverlay;
 import org.spongepowered.asm.mixin.Mixin;
@@ -11,6 +12,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Mixin(DebugScreenOverlay.class)
@@ -33,6 +35,8 @@ public abstract class DebugScreenOverlayMixin {
 
     @Inject(method = "getSystemInformation", at = @At("RETURN"), cancellable = true)
     private void wildernessOdysseyApi$filterSystemInformation(CallbackInfoReturnable<List<String>> cir) {
-        cir.setReturnValue(DebugOverlayLineFilter.filterSystemLines(cir.getReturnValue()));
+        List<String> lines = new ArrayList<>(DebugOverlayLineFilter.filterSystemLines(cir.getReturnValue()));
+        lines.addAll(GpuProfiler.debugLines());
+        cir.setReturnValue(lines);
     }
 }
