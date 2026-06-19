@@ -1,4 +1,4 @@
-package com.thunder.wildernessodysseyapi.worldgen.secretordervillage;
+package com.thunder.wildernessodysseyapi.worldgen.SecretOrderVillage;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
