@@ -3,9 +3,11 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerVertexConsumer;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
+import net.minecraft.client.renderer.chunk.RenderChunkRegion;
 import net.minecraft.client.renderer.block.LiquidBlockRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
@@ -72,7 +74,20 @@ public class GerstnerWaveRenderMixin {
             return originalConsumer;
         }
 
-        WaterBodyClassifier.WaterType waterType = WaterBodyClassifier.classify((LevelReader) level, pos);
+        WaterBodyClassifier.WaterType waterType = classifyWater(level, pos);
         return new GerstnerVertexConsumer(originalConsumer, pos.getX(), pos.getZ(), waterType);
+    }
+
+    private static WaterBodyClassifier.WaterType classifyWater(BlockAndTintGetter level, BlockPos pos) {
+        if (level instanceof LevelReader levelReader) {
+            return WaterBodyClassifier.classify(levelReader, pos);
+        }
+
+        if (level instanceof RenderChunkRegion renderChunkRegion) {
+            Level clientLevel = ((RenderChunkRegionAccessor) renderChunkRegion).wildernessodysseyapi$getLevel();
+            return WaterBodyClassifier.classify(clientLevel, pos);
+        }
+
+        return WaterBodyClassifier.WaterType.POND;
     }
 }

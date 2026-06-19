@@ -35,6 +35,7 @@
     "LightTextureTrueDarknessMixin",
     "MixinWorldCreationUiState",
     "OptionsScreenTelemetryButtonMixin",
+    "RenderChunkRegionAccessor",
     "StructureBlockRendererMixin"
   ]
 }
