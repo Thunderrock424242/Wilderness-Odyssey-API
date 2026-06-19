@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.wave;
 
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
+import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import net.minecraft.client.Minecraft;
 
 /**
@@ -48,8 +49,12 @@ public class GerstnerWaveAnimator {
      */
     public static float getHeightAt(float worldX, float worldZ,
                                      WaterBodyClassifier.WaterType type) {
+        if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()) {
+            return 0.0f;
+        }
+
         GerstnerWaveProfile profile = profileFor(type);
-        float waveHeight  = profile.getHeightAt(worldX, worldZ, currentTime);
+        float waveHeight  = profile.getHeightAt(worldX, worldZ, currentTime, WaterRenderingConfig.waveTrainLimit(type));
         float tideContrib = (type == WaterBodyClassifier.WaterType.OCEAN)
                             ? clientTideOffset * 0.025f  // visual ripple only — real tide is server-side
                             : 0f;
@@ -62,7 +67,11 @@ public class GerstnerWaveAnimator {
      */
     public static float[] getPushAt(float worldX, float worldZ,
                                      WaterBodyClassifier.WaterType type) {
-        return profileFor(type).getPushAt(worldX, worldZ, currentTime);
+        if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()) {
+            return new float[]{0.0f, 0.0f};
+        }
+
+        return profileFor(type).getPushAt(worldX, worldZ, currentTime, WaterRenderingConfig.waveTrainLimit(type));
     }
 
     public static float getTime()            { return currentTime; }

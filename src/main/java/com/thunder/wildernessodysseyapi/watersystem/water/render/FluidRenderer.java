@@ -23,6 +23,7 @@ import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtension
 import net.neoforged.neoforge.client.textures.FluidSpriteCache;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,11 +49,14 @@ public class FluidRenderer {
     private static final float BASE_R = 0.46f;
     private static final float BASE_G = 0.76f;
     private static final float BASE_B = 1.00f;
-    private static final float MAX_RENDER_DISTANCE_SQUARED = 128.0f * 128.0f;
 
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
+        if (!WaterRenderingConfig.ENABLE_SPH_WATER_RENDERING.get()) {
+            meshMap.clear();
+            return;
+        }
 
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
@@ -71,6 +75,7 @@ public class FluidRenderer {
         }
 
         meshMap.keySet().retainAll(ACTIVE_SIMULATIONS);
+        ACTIVE_SIMULATIONS.sort(Comparator.comparingDouble(sim -> distanceSquaredTo(sim, event.getCamera().getPosition().x, event.getCamera().getPosition().y, event.getCamera().getPosition().z)));
 
         PoseStack poseStack = event.getPoseStack();
         var camera = event.getCamera().getPosition();
@@ -82,13 +87,20 @@ public class FluidRenderer {
         poseStack.translate(-camera.x, -camera.y, -camera.z);
 
         boolean drew = false;
+        int renderedSimulations = 0;
+        int maxRenderedSimulations = WaterRenderingConfig.maxRenderedSphSimulations();
+        int meshRevisionInterval = WaterRenderingConfig.sphMeshRevisionInterval();
         for (SPHSimulator sim : ACTIVE_SIMULATIONS) {
+            if (renderedSimulations >= maxRenderedSimulations) {
+                break;
+            }
+
             if (!isNearCamera(sim, camera.x, camera.y, camera.z)) {
                 continue;
             }
 
             FluidMesh mesh = meshMap.computeIfAbsent(sim, FluidMesh::new);
-            mesh.rebuild();
+            mesh.rebuild(meshRevisionInterval);
 
             if (mesh.hasGeometry()) {
                 drawFluidMesh(mesh, poseStack.last(), buffer, waterSprite, level);
@@ -96,6 +108,7 @@ public class FluidRenderer {
             }
 
             drew |= drawDroplets(sim, poseStack.last(), buffer, waterSprite, level);
+            renderedSimulations++;
         }
 
         poseStack.popPose();
@@ -106,10 +119,16 @@ public class FluidRenderer {
     }
 
     private static boolean isNearCamera(SPHSimulator sim, double cameraX, double cameraY, double cameraZ) {
+        int renderDistance = WaterRenderingConfig.sphRenderDistanceBlocks();
+        double maxDistanceSquared = renderDistance * renderDistance;
+        return distanceSquaredTo(sim, cameraX, cameraY, cameraZ) <= maxDistanceSquared;
+    }
+
+    private static double distanceSquaredTo(SPHSimulator sim, double cameraX, double cameraY, double cameraZ) {
         double dx = sim.getCenterX() - cameraX;
         double dy = sim.getCenterY() - cameraY;
         double dz = sim.getCenterZ() - cameraZ;
-        return dx * dx + dy * dy + dz * dz <= MAX_RENDER_DISTANCE_SQUARED;
+        return dx * dx + dy * dy + dz * dz;
     }
 
     private static void drawFluidMesh(FluidMesh mesh, PoseStack.Pose pose, VertexConsumer buffer, TextureAtlasSprite sprite, ClientLevel level) {

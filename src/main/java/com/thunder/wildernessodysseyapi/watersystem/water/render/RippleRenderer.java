@@ -27,17 +27,33 @@ public class RippleRenderer {
     private static final float MAX_RADIUS = 1.8f;
     private static final float EXPAND_SPEED = 0.06f;  // radius per frame
     private static final float FADE_START = 0.6f;     // fraction of life when fading begins
-    private static final int   RING_SEGMENTS = 24;
 
     private static final List<Ripple> activeRipples = new ArrayList<>();
 
     public static void spawnRipple(double x, double y, double z) {
+        if (!WaterRenderingConfig.ENABLE_RIPPLES.get()) {
+            return;
+        }
+
+        int maxRipples = WaterRenderingConfig.maxRipples();
+        if (maxRipples <= 0) {
+            return;
+        }
+
+        while (activeRipples.size() >= maxRipples) {
+            activeRipples.remove(0);
+        }
+
         activeRipples.add(new Ripple(x, y, z));
     }
 
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
+        if (!WaterRenderingConfig.ENABLE_RIPPLES.get()) {
+            activeRipples.clear();
+            return;
+        }
         if (activeRipples.isEmpty()) return;
 
         PoseStack poseStack = event.getPoseStack();
@@ -70,7 +86,7 @@ public class RippleRenderer {
             poseStack.pushPose();
             poseStack.translate(rx, ry, rz);
 
-            drawRing(buffer, poseStack, ripple.radius, alphaByte);
+            drawRing(buffer, poseStack, ripple.radius, alphaByte, WaterRenderingConfig.rippleSegments());
 
             poseStack.popPose();
         }
@@ -80,13 +96,14 @@ public class RippleRenderer {
     }
 
     private static void drawRing(VertexConsumer buffer, PoseStack poseStack,
-                                  float radius, int alpha) {
+                                  float radius, int alpha, int segments) {
         var matrix = poseStack.last().pose();
         float innerRadius = radius * 0.82f;
+        int ringSegments = Math.max(6, segments);
 
-        for (int i = 0; i < RING_SEGMENTS; i++) {
-            double a0 = (2 * Math.PI * i)       / RING_SEGMENTS;
-            double a1 = (2 * Math.PI * (i + 1)) / RING_SEGMENTS;
+        for (int i = 0; i < ringSegments; i++) {
+            double a0 = (2 * Math.PI * i)       / ringSegments;
+            double a1 = (2 * Math.PI * (i + 1)) / ringSegments;
 
             float ox0 = (float) Math.cos(a0), oz0 = (float) Math.sin(a0);
             float ox1 = (float) Math.cos(a1), oz1 = (float) Math.sin(a1);

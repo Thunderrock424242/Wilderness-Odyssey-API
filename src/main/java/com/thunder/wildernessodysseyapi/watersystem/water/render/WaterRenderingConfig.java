@@ -1,0 +1,176 @@
+package com.thunder.wildernessodysseyapi.watersystem.water.render;
+
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
+import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.common.ModConfigSpec;
+
+public final class WaterRenderingConfig {
+    public static final ModConfigSpec CONFIG_SPEC;
+
+    public static final ModConfigSpec.BooleanValue ENABLE_GERSTNER_WAVES;
+    public static final ModConfigSpec.BooleanValue ENABLE_SPH_WATER_RENDERING;
+    public static final ModConfigSpec.BooleanValue ENABLE_RIPPLES;
+    public static final ModConfigSpec.BooleanValue AUTO_OPTIMIZE_WITH_RENDERER_MODS;
+
+    public static final ModConfigSpec.IntValue NORMAL_SPH_RENDER_DISTANCE_BLOCKS;
+    public static final ModConfigSpec.IntValue NORMAL_MAX_RENDERED_SPH_SIMULATIONS;
+    public static final ModConfigSpec.IntValue NORMAL_SPH_MESH_REVISION_INTERVAL;
+    public static final ModConfigSpec.IntValue NORMAL_MAX_RIPPLES;
+    public static final ModConfigSpec.IntValue NORMAL_RIPPLE_SEGMENTS;
+    public static final ModConfigSpec.IntValue NORMAL_SPLASH_PARTICLES;
+    public static final ModConfigSpec.IntValue NORMAL_WAVE_TRAINS;
+
+    public static final ModConfigSpec.IntValue OPTIMIZED_SPH_RENDER_DISTANCE_BLOCKS;
+    public static final ModConfigSpec.IntValue OPTIMIZED_MAX_RENDERED_SPH_SIMULATIONS;
+    public static final ModConfigSpec.IntValue OPTIMIZED_SPH_MESH_REVISION_INTERVAL;
+    public static final ModConfigSpec.IntValue OPTIMIZED_MAX_RIPPLES;
+    public static final ModConfigSpec.IntValue OPTIMIZED_RIPPLE_SEGMENTS;
+    public static final ModConfigSpec.IntValue OPTIMIZED_SPLASH_PARTICLES;
+    public static final ModConfigSpec.IntValue OPTIMIZED_WAVE_TRAINS;
+    public static final ModConfigSpec.BooleanValue OPTIMIZED_UPDATE_WAVES_DURING_TESSELLATION;
+
+    static {
+        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+
+        builder.comment("Client-side water rendering options.")
+                .push("water_rendering");
+
+        ENABLE_GERSTNER_WAVES = builder
+                .comment("Enable Gerstner displacement for vanilla water vertices.")
+                .define("enableGerstnerWaves", true);
+        ENABLE_SPH_WATER_RENDERING = builder
+                .comment("Render transient SPH water meshes from bucket pours and shore wash.")
+                .define("enableSphWaterRendering", true);
+        ENABLE_RIPPLES = builder
+                .comment("Render cosmetic ripple rings and splash particles when entities enter water.")
+                .define("enableRipples", true);
+        AUTO_OPTIMIZE_WITH_RENDERER_MODS = builder
+                .comment("Use the optimized profile automatically when Sodium or Embeddium is loaded.")
+                .define("autoOptimizeWithRendererMods", true);
+
+        builder.comment("Normal quality profile.")
+                .push("normal_profile");
+        NORMAL_SPH_RENDER_DISTANCE_BLOCKS = builder
+                .comment("Maximum distance for rendering SPH water meshes.")
+                .defineInRange("sphRenderDistanceBlocks", 128, 16, 256);
+        NORMAL_MAX_RENDERED_SPH_SIMULATIONS = builder
+                .comment("Maximum SPH simulations drawn per frame.")
+                .defineInRange("maxRenderedSphSimulations", 28, 1, 64);
+        NORMAL_SPH_MESH_REVISION_INTERVAL = builder
+                .comment("Render mesh rebuild interval in SPH simulation revisions. 1 means every updated snapshot.")
+                .defineInRange("sphMeshRevisionInterval", 1, 1, 8);
+        NORMAL_MAX_RIPPLES = builder
+                .comment("Maximum active cosmetic ripple rings.")
+                .defineInRange("maxRipples", 48, 0, 256);
+        NORMAL_RIPPLE_SEGMENTS = builder
+                .comment("Segments per ripple ring.")
+                .defineInRange("rippleSegments", 24, 6, 64);
+        NORMAL_SPLASH_PARTICLES = builder
+                .comment("Splash particles spawned when an entity enters water.")
+                .defineInRange("splashParticles", 8, 0, 64);
+        NORMAL_WAVE_TRAINS = builder
+                .comment("Maximum Gerstner wave trains evaluated per water vertex.")
+                .defineInRange("waveTrains", 4, 1, 4);
+        builder.pop();
+
+        builder.comment("Optimized profile used when Sodium or Embeddium is loaded.")
+                .push("optimized_profile");
+        OPTIMIZED_SPH_RENDER_DISTANCE_BLOCKS = builder
+                .comment("Maximum distance for rendering SPH water meshes.")
+                .defineInRange("sphRenderDistanceBlocks", 96, 16, 256);
+        OPTIMIZED_MAX_RENDERED_SPH_SIMULATIONS = builder
+                .comment("Maximum SPH simulations drawn per frame.")
+                .defineInRange("maxRenderedSphSimulations", 10, 1, 64);
+        OPTIMIZED_SPH_MESH_REVISION_INTERVAL = builder
+                .comment("Render mesh rebuild interval in SPH simulation revisions. 2 halves SPH mesh rebuild frequency.")
+                .defineInRange("sphMeshRevisionInterval", 2, 1, 8);
+        OPTIMIZED_MAX_RIPPLES = builder
+                .comment("Maximum active cosmetic ripple rings.")
+                .defineInRange("maxRipples", 16, 0, 256);
+        OPTIMIZED_RIPPLE_SEGMENTS = builder
+                .comment("Segments per ripple ring.")
+                .defineInRange("rippleSegments", 12, 6, 64);
+        OPTIMIZED_SPLASH_PARTICLES = builder
+                .comment("Splash particles spawned when an entity enters water.")
+                .defineInRange("splashParticles", 4, 0, 64);
+        OPTIMIZED_WAVE_TRAINS = builder
+                .comment("Maximum Gerstner wave trains evaluated per water vertex.")
+                .defineInRange("waveTrains", 2, 1, 4);
+        OPTIMIZED_UPDATE_WAVES_DURING_TESSELLATION = builder
+                .comment("Also advance wave time while water chunks are being tessellated. Keep false for renderer-mod compatibility.")
+                .define("updateWavesDuringTessellation", false);
+        builder.pop();
+
+        builder.pop();
+        CONFIG_SPEC = builder.build();
+    }
+
+    private WaterRenderingConfig() {
+    }
+
+    public static boolean usesOptimizedProfile() {
+        return AUTO_OPTIMIZE_WITH_RENDERER_MODS.get() && isRendererOptimizationModLoaded();
+    }
+
+    public static boolean isRendererOptimizationModLoaded() {
+        ModList modList = ModList.get();
+        return modList.isLoaded("sodium") || modList.isLoaded("embeddium");
+    }
+
+    public static String profileName() {
+        return usesOptimizedProfile() ? "optimized" : "normal";
+    }
+
+    public static int sphRenderDistanceBlocks() {
+        return usesOptimizedProfile()
+                ? OPTIMIZED_SPH_RENDER_DISTANCE_BLOCKS.get()
+                : NORMAL_SPH_RENDER_DISTANCE_BLOCKS.get();
+    }
+
+    public static int maxRenderedSphSimulations() {
+        return usesOptimizedProfile()
+                ? OPTIMIZED_MAX_RENDERED_SPH_SIMULATIONS.get()
+                : NORMAL_MAX_RENDERED_SPH_SIMULATIONS.get();
+    }
+
+    public static int sphMeshRevisionInterval() {
+        return usesOptimizedProfile()
+                ? OPTIMIZED_SPH_MESH_REVISION_INTERVAL.get()
+                : NORMAL_SPH_MESH_REVISION_INTERVAL.get();
+    }
+
+    public static int maxRipples() {
+        return usesOptimizedProfile()
+                ? OPTIMIZED_MAX_RIPPLES.get()
+                : NORMAL_MAX_RIPPLES.get();
+    }
+
+    public static int rippleSegments() {
+        return usesOptimizedProfile()
+                ? OPTIMIZED_RIPPLE_SEGMENTS.get()
+                : NORMAL_RIPPLE_SEGMENTS.get();
+    }
+
+    public static int splashParticles() {
+        return usesOptimizedProfile()
+                ? OPTIMIZED_SPLASH_PARTICLES.get()
+                : NORMAL_SPLASH_PARTICLES.get();
+    }
+
+    public static int waveTrainLimit(WaterBodyClassifier.WaterType type) {
+        int requested = usesOptimizedProfile()
+                ? OPTIMIZED_WAVE_TRAINS.get()
+                : NORMAL_WAVE_TRAINS.get();
+
+        int profileMaximum = switch (type) {
+            case OCEAN -> 4;
+            case RIVER -> 3;
+            case POND -> 2;
+        };
+        return Math.max(1, Math.min(requested, profileMaximum));
+    }
+
+    public static boolean updateWavesDuringTessellation() {
+        return !usesOptimizedProfile() || OPTIMIZED_UPDATE_WAVES_DURING_TESSELLATION.get();
+    }
+}
