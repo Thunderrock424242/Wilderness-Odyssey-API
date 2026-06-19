@@ -37,8 +37,13 @@ public class FluidMesh {
      * Called every render frame.
      */
     public void rebuild() {
+        rebuild(1);
+    }
+
+    public void rebuild(int revisionInterval) {
         long revision = simulator.getRenderRevision();
         if (revision == builtRevision) return;
+        if (builtRevision >= 0L && revision - builtRevision < Math.max(1, revisionInterval)) return;
 
         List<SPHParticle> particles = simulator.getRenderParticles();
         if (particles.isEmpty()) {

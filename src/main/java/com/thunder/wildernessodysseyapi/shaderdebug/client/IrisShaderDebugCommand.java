@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.shaderdebug.client;
 import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.modconflictchecker.util.LoggerUtil;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.commands.CommandSourceStack;
@@ -84,6 +85,11 @@ public class IrisShaderDebugCommand {
         successSink.accept("[WO Shader Debug] Oculus loaded: " + oculusLoaded);
         successSink.accept("[WO Shader Debug] Embeddium loaded: " + embeddiumLoaded);
         successSink.accept("[WO Shader Debug] Sodium loaded: " + sodiumLoaded);
+        successSink.accept("[WO Shader Debug] Water rendering profile: " + WaterRenderingConfig.profileName());
+        successSink.accept("[WO Shader Debug] Water SPH render cap: " + WaterRenderingConfig.maxRenderedSphSimulations()
+                + " sims @ " + WaterRenderingConfig.sphRenderDistanceBlocks() + " blocks");
+        successSink.accept("[WO Shader Debug] Water ripples: max " + WaterRenderingConfig.maxRipples()
+                + ", segments " + WaterRenderingConfig.rippleSegments());
 
         Path gameDir = FMLPaths.GAMEDIR.get();
         Path shaderpacksDir = gameDir.resolve("shaderpacks");

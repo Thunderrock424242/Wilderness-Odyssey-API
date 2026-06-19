@@ -51,8 +51,13 @@ public class GerstnerWaveProfile {
     // -------------------------------------------------------------------------
 
     public float getHeightAt(float worldX, float worldZ, float time) {
+        return getHeightAt(worldX, worldZ, time, waveCount);
+    }
+
+    public float getHeightAt(float worldX, float worldZ, float time, int maxWaveTrains) {
         float y = 0f;
-        for (int i = 0; i < waveCount; i++) {
+        int count = Math.max(1, Math.min(waveCount, maxWaveTrains));
+        for (int i = 0; i < count; i++) {
             float phase = (dirX[i] * worldX + dirZ[i] * worldZ) * frequency[i]
                         + time * speed[i];
             y += amplitude[i] * (float) Math.cos(phase);
@@ -65,8 +70,13 @@ public class GerstnerWaveProfile {
      * This is what nudges boats and entities sideways with the wave.
      */
     public float[] getPushAt(float worldX, float worldZ, float time) {
+        return getPushAt(worldX, worldZ, time, waveCount);
+    }
+
+    public float[] getPushAt(float worldX, float worldZ, float time, int maxWaveTrains) {
         float px = 0f, pz = 0f;
-        for (int i = 0; i < waveCount; i++) {
+        int count = Math.max(1, Math.min(waveCount, maxWaveTrains));
+        for (int i = 0; i < count; i++) {
             float phase = (dirX[i] * worldX + dirZ[i] * worldZ) * frequency[i]
                         + time * speed[i];
             float s = steepness[i] * amplitude[i] * (float) Math.sin(phase);

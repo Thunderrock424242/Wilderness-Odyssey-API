@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerVertexConsumer;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
+import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import net.minecraft.client.renderer.chunk.RenderChunkRegion;
 import net.minecraft.client.renderer.block.LiquidBlockRenderer;
 import net.minecraft.core.BlockPos;
@@ -48,6 +49,7 @@ public class GerstnerWaveRenderMixin {
                               VertexConsumer consumer, BlockState blockState,
                               FluidState fluidState, CallbackInfo ci) {
         if (!fluidState.is(Fluids.WATER) && !fluidState.is(Fluids.FLOWING_WATER)) return;
+        if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get() || !WaterRenderingConfig.updateWavesDuringTessellation()) return;
 
         // Throttle animator update to once per ~16ms (one frame at 60fps)
         long now = System.nanoTime();
@@ -71,6 +73,9 @@ public class GerstnerWaveRenderMixin {
                                                    BlockState blockState,
                                                    FluidState fluidState) {
         if (!fluidState.is(Fluids.WATER) && !fluidState.is(Fluids.FLOWING_WATER)) {
+            return originalConsumer;
+        }
+        if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()) {
             return originalConsumer;
         }
 

@@ -54,6 +54,8 @@ public class WaterEntryEventHandler {
     }
 
     private static void spawnSplashParticles(Entity entity, double x, double y, double z) {
+        if (!WaterRenderingConfig.ENABLE_RIPPLES.get()) return;
+
         var level = entity.level();
         if (!level.isClientSide()) return;
 
@@ -61,7 +63,8 @@ public class WaterEntryEventHandler {
         if (mc.level == null) return;
 
         // Spawn a burst of water drip / splash particles
-        for (int i = 0; i < 8; i++) {
+        int splashParticles = WaterRenderingConfig.splashParticles();
+        for (int i = 0; i < splashParticles; i++) {
             double vx = (Math.random() - 0.5) * 0.4;
             double vy = Math.random() * 0.3 + 0.15;
             double vz = (Math.random() - 0.5) * 0.4;
