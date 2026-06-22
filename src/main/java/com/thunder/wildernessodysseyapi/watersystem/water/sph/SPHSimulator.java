@@ -19,6 +19,12 @@ import java.util.*;
  */
 public class SPHSimulator {
 
+    /** Stable identity used by persistence and server-to-client snapshots. */
+    private final UUID simulationId;
+
+    /** Remote mirrors interpolate snapshots but never run authoritative SPH physics. */
+    private final boolean remoteMirror;
+
     /** The internal array of particles. Fast and non-allocating. Modified ONLY by the physics thread. */
     public final List<SPHParticle> particles = new ArrayList<>();
 
@@ -30,7 +36,7 @@ public class SPHSimulator {
     // Scratch buffers (reused to avoid allocation per step)
     private final List<Integer> neighbours = new ArrayList<>(64);
     private final float[] gradBuf = new float[3];
-    private final BlockPos.MutableBlockPos collisionPos = new BlockPos.MutableBlockPos();
+    private BlockPos.MutableBlockPos collisionPos;
 
     /** The Minecraft level used for querying block boundaries and collisions. */
     private BlockGetter level;
@@ -47,6 +53,9 @@ public class SPHSimulator {
     private float centerZ = 0.0f;
     private boolean transientSimulation = false;
     private int remainingLifetimeTicks = -1;
+    private List<SPHParticle> remotePreviousParticles = List.of();
+    private float remoteInterpolationAlpha = 1.0f;
+    private int remoteSnapshotAgeTicks = 0;
 
     /**
      * Callback interface triggered when the fluid slows down enough to be converted
@@ -57,10 +66,49 @@ public class SPHSimulator {
     }
 
     public SPHSimulator(BlockGetter level) {
+        this(UUID.randomUUID(), level, false);
+    }
+
+    private SPHSimulator(UUID simulationId, BlockGetter level, boolean remoteMirror) {
+        this.simulationId = Objects.requireNonNull(simulationId, "simulationId");
         this.level = level;
+        this.remoteMirror = remoteMirror;
+    }
+
+    /**
+     * Creates a client-side mirror that can only be updated from server snapshots.
+     *
+     * @param simulationId stable server-owned fluid-body ID
+     * @param level client level used by rendering and distance filtering
+     * @return a non-authoritative simulator mirror
+     */
+    public static SPHSimulator createRemoteMirror(UUID simulationId, BlockGetter level) {
+        return new SPHSimulator(simulationId, level, true);
+    }
+
+    /**
+     * Reconstructs a server-owned body from persistent particle state.
+     *
+     * @param simulationId identity stored in the level's SavedData
+     * @param level server level used for collision queries
+     * @param snapshot last persisted particle state
+     * @return restored authoritative simulator
+     */
+    public static SPHSimulator restoreAuthoritative(
+            UUID simulationId,
+            BlockGetter level,
+            List<SPHParticle> snapshot
+    ) {
+        SPHSimulator simulator = new SPHSimulator(simulationId, level, false);
+        for (SPHParticle particle : snapshot) {
+            simulator.particles.add(new SPHParticle(particle));
+        }
+        simulator.updateRenderSnapshot();
+        return simulator;
     }
 
     public void setSettleListener(SettleListener l) { this.settleListener = l; }
+    public UUID getSimulationId()                   { return simulationId; }
     public void setLevel(BlockGetter level)          { this.level = level; }
     public BlockGetter getLevel()                    { return level; }
     public boolean isSettled()                       { return settled; }
@@ -69,6 +117,10 @@ public class SPHSimulator {
     public float getCenterY()                        { return centerY; }
     public float getCenterZ()                        { return centerZ; }
     public boolean isTransientSimulation()           { return transientSimulation; }
+    public boolean isRemoteMirror()                  { return remoteMirror; }
+    public boolean isRemoteExpired() {
+        return remoteMirror && remoteSnapshotAgeTicks > SPHConstants.REMOTE_SNAPSHOT_EXPIRY_TICKS;
+    }
 
     public void setTransientLifetimeTicks(int ticks) {
         transientSimulation = true;
@@ -114,16 +166,18 @@ public class SPHSimulator {
                 pz = (random.nextFloat() * 2 - 1) * r;
             } while (px*px + pz*pz > r*r);
 
-            float py = (random.nextFloat() - 0.5f) * 0.12f;
+            // A three-dimensional spawn volume keeps normalized 3-D kernel
+            // density near REST_DENSITY instead of disabling pressure.
+            float py = (random.nextFloat() - 0.5f) * SPHConstants.SPAWN_HEIGHT;
             float radial = (float)Math.sqrt(px * px + pz * pz);
             float outX = radial > 0.0001f ? px / radial : 0.0f;
             float outZ = radial > 0.0001f ? pz / radial : 0.0f;
 
             SPHParticle p = new SPHParticle(cx + px, cy + py, cz + pz);
             p.velocity.set(
-                    impulseX + outX * (0.45f + random.nextFloat() * 0.35f),
-                    impulseY - random.nextFloat() * 2.0f - 1.0f,
-                    impulseZ + outZ * (0.45f + random.nextFloat() * 0.35f)
+                    impulseX + outX * (0.12f + random.nextFloat() * 0.20f),
+                    impulseY - (0.35f + random.nextFloat() * 0.65f),
+                    impulseZ + outZ * (0.12f + random.nextFloat() * 0.20f)
             );
             particles.add(p);
         }
@@ -141,6 +195,11 @@ public class SPHSimulator {
      * @param deltaTime The time elapsed since the last tick in seconds.
      */
     public void tick(float deltaTime) {
+        if (remoteMirror) {
+            tickRemoteMirror();
+            return;
+        }
+
         if (remainingLifetimeTicks > 0 && --remainingLifetimeTicks == 0) {
             particles.clear();
             settled = true;
@@ -170,18 +229,69 @@ public class SPHSimulator {
     }
 
     private void updateRenderSnapshot() {
-        List<SPHParticle> snapshot = new ArrayList<>(particles.size());
+        publishRenderSnapshot(particles);
+    }
+
+    /**
+     * Applies a complete authoritative snapshot to this client mirror.
+     * Particle indices remain stable between most SPH steps, allowing inexpensive
+     * interpolation without predicting collision-sensitive server physics.
+     *
+     * @param snapshot authoritative particle state decoded from the server packet
+     */
+    public void applyRemoteSnapshot(List<SPHParticle> snapshot) {
+        if (!remoteMirror) {
+            throw new IllegalStateException("Cannot apply a remote snapshot to an authoritative simulator");
+        }
+
+        remotePreviousParticles = renderParticles;
+        particles.clear();
+        for (SPHParticle particle : snapshot) {
+            particles.add(new SPHParticle(particle));
+        }
+        remoteSnapshotAgeTicks = 0;
+        remoteInterpolationAlpha = remotePreviousParticles.size() == particles.size() ? 0.0f : 1.0f;
+
+        if (remoteInterpolationAlpha >= 1.0f) {
+            publishRenderSnapshot(particles);
+        }
+    }
+
+    // Client mirrors blend toward the latest server state instead of running a
+    // second divergent collision simulation with a different random history.
+    private void tickRemoteMirror() {
+        remoteSnapshotAgeTicks++;
+        if (remoteInterpolationAlpha >= 1.0f || remotePreviousParticles.size() != particles.size()) {
+            return;
+        }
+
+        remoteInterpolationAlpha = Math.min(1.0f,
+                remoteInterpolationAlpha + 1.0f / SPHConstants.NETWORK_SNAPSHOT_INTERVAL_TICKS);
+        List<SPHParticle> interpolated = new ArrayList<>(particles.size());
+        for (int i = 0; i < particles.size(); i++) {
+            SPHParticle from = remotePreviousParticles.get(i);
+            SPHParticle to = particles.get(i);
+            SPHParticle result = new SPHParticle(to);
+            result.position.set(from.position).lerp(to.position, remoteInterpolationAlpha);
+            result.velocity.set(from.velocity).lerp(to.velocity, remoteInterpolationAlpha);
+            interpolated.add(result);
+        }
+        publishRenderSnapshot(interpolated);
+    }
+
+    private void publishRenderSnapshot(List<SPHParticle> source) {
+        List<SPHParticle> snapshot = new ArrayList<>(source.size());
         float sx = 0.0f;
         float sy = 0.0f;
         float sz = 0.0f;
-        for (SPHParticle particle : particles) {
+        for (SPHParticle particle : source) {
             snapshot.add(new SPHParticle(particle));
             sx += particle.position.x;
             sy += particle.position.y;
             sz += particle.position.z;
         }
-        if (!particles.isEmpty()) {
-            float inv = 1.0f / particles.size();
+        if (!source.isEmpty()) {
+            float inv = 1.0f / source.size();
             centerX = sx * inv;
             centerY = sy * inv;
             centerZ = sz * inv;
@@ -366,6 +476,9 @@ public class SPHSimulator {
         int bx = (int)Math.floor(p.position.x);
         int by = (int)Math.floor(p.position.y);
         int bz = (int)Math.floor(p.position.z);
+        if (collisionPos == null) {
+            collisionPos = new BlockPos.MutableBlockPos();
+        }
         BlockPos.MutableBlockPos pos = collisionPos;
 
         // Check the 3x3x3 area around the particle for solid geometry

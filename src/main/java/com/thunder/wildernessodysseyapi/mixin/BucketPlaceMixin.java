@@ -2,82 +2,62 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import net.minecraft.core.BlockPos;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.LiquidBlockContainer;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
-import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.BlockHitResult;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import net.neoforged.neoforge.common.SoundActions;
 
 import javax.annotation.Nullable;
 
 /**
- * BucketPlaceMixin
- * <p>
- * Intercepts BucketItem#emptyContents to detect when a water bucket is poured.
- * On placement:
- * - Spawns an SPH simulation at the placement position
- * - Cancels the vanilla static block placement
- * - Allows vanilla to handle the empty bucket inventory math safely
+ * Creates a server-authoritative volumetric body after vanilla water placement.
+ *
+ * <p>Vanilla remains responsible for the persistent source block, inventory,
+ * sounds, game events, permissions, and fluid-container behavior. The earlier
+ * implementation cancelled placement and replaced the source with an SPH body;
+ * that body could disappear because settled-particle block conversion is
+ * intentionally disabled. The source remains as a safety fallback until SPH
+ * persistence is enabled in the next water-system phase.</p>
  */
 @Mixin(BucketItem.class)
 public abstract class BucketPlaceMixin {
 
     /**
-     * Inject into emptyContents. This is the method Vanilla uses right before a fluid block appears.
+     * Spawns authoritative SPH only after vanilla confirms that placement worked.
      */
     @Inject(
-            method = "emptyContents(Lnet/minecraft/world/entity/player/Player;Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/phys/BlockHitResult;Lnet/minecraft/world/item/ItemStack;)Z",
-            at = @At("HEAD"),
-            cancellable = true
+            method = "emptyContents(Lnet/minecraft/world/entity/player/Player;"
+                    + "Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;"
+                    + "Lnet/minecraft/world/phys/BlockHitResult;"
+                    + "Lnet/minecraft/world/item/ItemStack;)Z",
+            at = @At("RETURN")
     )
-    private void onBucketEmpty(@Nullable Player player, Level level, BlockPos pos, @Nullable BlockHitResult result, @Nullable ItemStack container, CallbackInfoReturnable<Boolean> cir) {
+    private void onBucketEmpty(@Nullable Player player, Level level, BlockPos pos,
+                               @Nullable BlockHitResult result, @Nullable ItemStack container,
+                               CallbackInfoReturnable<Boolean> callbackInfo) {
         Fluid content = ((BucketItem) (Object) this).content;
-
-        // Only intercept if the bucket actually contains WATER
-        if (content == Fluids.WATER) {
-
-            SPHSimulationManager.get().createSimulation(
-                    pos.getX() + 0.5f,
-                    pos.getY() + 0.5f,
-                    pos.getZ() + 0.5f,
-                    level,
-                    settlePos -> {
-                        if (level.isClientSide) return;
-
-                        BlockState state = level.getBlockState(settlePos);
-                        if (state.getBlock() instanceof LiquidBlockContainer liquidContainer
-                                && liquidContainer.canPlaceLiquid(player, level, settlePos, state, Fluids.WATER)) {
-                            liquidContainer.placeLiquid(level, settlePos, state, Fluids.WATER.getSource(false));
-                        } else if (state.isAir() || state.canBeReplaced(Fluids.WATER) || state.is(Blocks.WATER)) {
-                            level.setBlock(settlePos, Blocks.WATER.defaultBlockState(), 3);
-                        }
-                    }
-            );
-
-            // Play the vanilla pouring sound so it feels normal to the player
-            SoundEvent soundEvent = content.getFluidType().getSound(player, level, pos, SoundActions.BUCKET_EMPTY);
-            if (soundEvent == null) soundEvent = SoundEvents.BUCKET_EMPTY;
-            level.playSound(player, pos, soundEvent, SoundSource.BLOCKS, 1.0F, 1.0F);
-            level.gameEvent(player, GameEvent.FLUID_PLACE, pos);
-
-            // CRITICAL: Cancel the original method!
-            // This stops Vanilla from instantly placing a square water block over our simulation,
-            // but still allows the game to give the player their empty bucket back safely.
-            cir.setReturnValue(true);
+        if (content != Fluids.WATER
+                || level.isClientSide
+                || !Boolean.TRUE.equals(callbackInfo.getReturnValue())) {
+            return;
         }
+
+        // Server physics owns collision and particle history. Clients receive
+        // interpolated snapshots instead of creating a divergent local splash.
+        SPHSimulationManager.get().createSimulation(
+                pos.getX() + 0.5f,
+                pos.getY() + 0.65f,
+                pos.getZ() + 0.5f,
+                level,
+                settledPos -> level.setBlockAndUpdate(settledPos, Blocks.WATER.defaultBlockState())
+        );
     }
 }

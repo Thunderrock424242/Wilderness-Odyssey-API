@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.meteor.renderer.MeteorRenderer;
 import com.thunder.wildernessodysseyapi.temporalrift.client.RiftCoreBlockEntityRenderer;
 import com.thunder.wildernessodysseyapi.temporalrift.client.TemporalRiftShaders;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockEntities;
+import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterShaders;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -33,6 +34,14 @@ public class ClientSetup {
             TemporalRiftShaders.register(event);
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to load temporal rift shader", exception);
+        }
+
+        try {
+            WaterShaders.register(event);
+        } catch (IOException exception) {
+            // Enhanced water optics are optional. Keeping registration failure
+            // non-fatal preserves the standard translucent fallback path.
+            ModConstants.LOGGER.warn("Unable to load built-in water shader; using compatibility rendering", exception);
         }
     }
 }

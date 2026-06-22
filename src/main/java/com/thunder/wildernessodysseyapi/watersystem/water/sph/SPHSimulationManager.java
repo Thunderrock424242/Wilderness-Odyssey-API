@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.sph;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.BlockGetter;
 
 import java.util.*;
@@ -26,6 +27,10 @@ public class SPHSimulationManager {
      * These must be executed on the main thread so we can safely place Minecraft blocks.
      */
     private final Queue<Runnable> pendingSettleCallbacks = new ConcurrentLinkedQueue<>();
+
+    /** Level identities already restored from SavedData during this server session. */
+    private final Set<BlockGetter> restoredPersistentLevels =
+            Collections.newSetFromMap(new IdentityHashMap<>());
 
     private SPHSimulationManager() {}
 
@@ -249,10 +254,77 @@ public class SPHSimulationManager {
             }
 
             sim.tick(deltaTime);
-            if (sim.particleCount() == 0) {
+            if (sim.particleCount() == 0 || sim.isRemoteExpired()) {
                 active.remove(sim);
             }
         }
+    }
+
+    /**
+     * Creates or updates the client-side mirror for one server-owned fluid body.
+     *
+     * @param simulationId stable ID assigned by the authoritative server simulator
+     * @param level client level that owns the mirror
+     * @param particles complete decoded particle snapshot
+     */
+    public void applyRemoteSnapshot(UUID simulationId, BlockGetter level, List<SPHParticle> particles) {
+        SPHSimulator mirror = null;
+        for (SPHSimulator sim : active) {
+            if (sim.isRemoteMirror()
+                    && sim.getLevel() == level
+                    && sim.getSimulationId().equals(simulationId)) {
+                mirror = sim;
+                break;
+            }
+        }
+
+        if (mirror == null) {
+            mirror = SPHSimulator.createRemoteMirror(simulationId, level);
+            active.add(mirror);
+        }
+        mirror.applyRemoteSnapshot(particles);
+    }
+
+    /**
+     * Restores a dimension's volumetric bodies exactly once per loaded level instance.
+     *
+     * @param level server level whose SavedData should be loaded
+     */
+    public void ensurePersistentLevelLoaded(ServerLevel level) {
+        if (restoredPersistentLevels.add(level)) {
+            SphWaterSavedData.get(level).restoreInto(this, level);
+        }
+    }
+
+    /**
+     * Captures the current authoritative state into dimension-scoped SavedData.
+     *
+     * @param level server level whose bodies should be persisted
+     */
+    public void capturePersistentLevel(ServerLevel level) {
+        SphWaterSavedData.get(level).capture(getActive(level));
+    }
+
+    void restorePersistentSimulation(UUID simulationId, ServerLevel level, List<SPHParticle> particles) {
+        if (particles.isEmpty() || countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
+            return;
+        }
+        for (SPHSimulator sim : active) {
+            if (sim.getLevel() == level && sim.getSimulationId().equals(simulationId)) {
+                return;
+            }
+        }
+        active.add(SPHSimulator.restoreAuthoritative(simulationId, level, particles));
+    }
+
+    /**
+     * Removes every body owned by an unloading level.
+     *
+     * @param level level instance being discarded
+     */
+    public void clearLevel(BlockGetter level) {
+        active.removeIf(sim -> sim.getLevel() == level);
+        restoredPersistentLevels.remove(level);
     }
 
     /**
@@ -293,6 +365,7 @@ public class SPHSimulationManager {
     public void shutdown() {
         active.clear();
         pendingSettleCallbacks.clear();
+        restoredPersistentLevels.clear();
     }
 
     /**

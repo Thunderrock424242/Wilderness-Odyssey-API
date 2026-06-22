@@ -7,6 +7,9 @@ import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.material.Fluids;
 
+import java.util.Collections;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -31,7 +34,8 @@ public class WaterBodyClassifier {
     }
 
     // Cache: packed chunk XZ → WaterType
-    private static final ConcurrentHashMap<Long, WaterType> cache = new ConcurrentHashMap<>(256);
+    private static final Map<LevelReader, ConcurrentHashMap<Long, WaterType>> CACHES =
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     /**
      * Classify the water body at the given block position.
@@ -39,12 +43,21 @@ public class WaterBodyClassifier {
      */
     public static WaterType classify(LevelReader level, BlockPos pos) {
         long key = chunkKey(pos.getX() >> 4, pos.getZ() >> 4);
+        ConcurrentHashMap<Long, WaterType> cache;
+        synchronized (CACHES) {
+            cache = CACHES.computeIfAbsent(level, ignored -> new ConcurrentHashMap<>(256));
+        }
         return cache.computeIfAbsent(key, k -> doClassify(level, pos));
     }
 
     /** Clear the cache (call on world unload). */
     public static void clearCache() {
-        cache.clear();
+        CACHES.clear();
+    }
+
+    /** Clears classification state for one unloading level. */
+    public static void clearCache(LevelReader level) {
+        CACHES.remove(level);
     }
 
     // -------------------------------------------------------------------------

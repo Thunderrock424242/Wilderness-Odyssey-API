@@ -126,8 +126,9 @@ public class TideSystem {
         float angle = moonPhase / 8f * 2f * (float)Math.PI;
 
         // cos²(angle/2) maps: 0→1, π/2→0.5, π→0, ...  then re-map to [neap, spring]
-        float t = (float)Math.cos(angle);  // -1 to 1
-        float normalised = (t + 1f) * 0.5f; // 0 to 1
+        // Absolute alignment is maximal at both full and new moon and minimal
+        // at both quarter moons, matching the real spring-neap tide cycle.
+        float normalised = Math.abs((float) Math.cos(angle));
 
         return MAX_NEAP_AMPLITUDE + normalised * (MAX_SPRING_AMPLITUDE - MAX_NEAP_AMPLITUDE);
     }

@@ -68,6 +68,33 @@ public final class GerstnerWaveAnimator {
     }
 
     /**
+     * Samples the deterministic wave phase used by Minecraft's baked terrain
+     * mesh. Chunk sections compile at different times, so using live animation
+     * time here would leave permanent phase seams between neighboring sections.
+     *
+     * @param worldX world X coordinate in blocks
+     * @param worldZ world Z coordinate in blocks
+     * @param type classified water-body type
+     * @return a time-independent terrain surface sample
+     */
+    public static WaveSurfaceSample getTerrainSurfaceSampleAt(
+            float worldX,
+            float worldZ,
+            WaterBodyClassifier.WaterType type
+    ) {
+        if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()) {
+            return WaveSurfaceSample.flat();
+        }
+
+        return profileFor(type).sampleAt(
+                worldX,
+                worldZ,
+                0.0f,
+                WaterRenderingConfig.waveTrainLimit(type)
+        );
+    }
+
+    /**
      * Returns the vertical surface displacement at a world position.
      *
      * @param worldX world X coordinate in blocks

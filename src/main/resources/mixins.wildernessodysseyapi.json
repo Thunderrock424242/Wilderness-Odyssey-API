@@ -27,7 +27,6 @@
   },
   "client": [
     "BoatRenderMixin",
-    "BoatRenderStateMixin",
     "ClientLevelTrueDarknessMixin",
     "ClientLevelWeatherColorMixin",
     "DebugScreenOverlayMixin",

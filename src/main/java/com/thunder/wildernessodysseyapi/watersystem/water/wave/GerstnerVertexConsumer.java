@@ -22,6 +22,7 @@ public final class GerstnerVertexConsumer implements VertexConsumer {
     private final int sectionOriginZ;
     private final int blockLocalY;
     private final WaterBodyClassifier.WaterType waterType;
+    private final boolean dynamicOceanSurface;
 
     private boolean currentVertexIsSurface;
     private WaveSurfaceSample currentSample = WaveSurfaceSample.flat();
@@ -36,18 +37,26 @@ public final class GerstnerVertexConsumer implements VertexConsumer {
      * @param waterType classified water-body type
      */
     public GerstnerVertexConsumer(VertexConsumer delegate, int blockX, int blockY, int blockZ,
-                                  WaterBodyClassifier.WaterType waterType) {
+                                  WaterBodyClassifier.WaterType waterType,
+                                  boolean dynamicOceanSurface) {
         this.delegate = delegate;
         this.sectionOriginX = blockX & ~15;
         this.sectionOriginZ = blockZ & ~15;
         this.blockLocalY = blockY & 15;
         this.waterType = waterType;
+        this.dynamicOceanSurface = dynamicOceanSurface;
     }
 
     @Override
     public VertexConsumer addVertex(float x, float y, float z) {
         float localSurfaceHeight = y - blockLocalY;
         currentVertexIsSurface = localSurfaceHeight > SURFACE_VERTEX_EPSILON;
+
+        if (currentVertexIsSurface && dynamicOceanSurface) {
+            currentSample = WaveSurfaceSample.flat();
+            delegate.addVertex(x, y, z);
+            return this;
+        }
 
         if (currentVertexIsSurface) {
             float worldX = sectionOriginX + x;
@@ -58,7 +67,7 @@ public final class GerstnerVertexConsumer implements VertexConsumer {
                     localSurfaceHeight
             );
             currentSample = GerstnerWaveAnimator
-                    .getSurfaceSampleAt(worldX, worldZ, waterType)
+                    .getTerrainSurfaceSampleAt(worldX, worldZ, waterType)
                     .attenuated(waveBlend);
 
             delegate.addVertex(
@@ -78,6 +87,9 @@ public final class GerstnerVertexConsumer implements VertexConsumer {
 
     @Override
     public VertexConsumer setColor(int red, int green, int blue, int alpha) {
+        // Keep the flat baked surface as the distant/failure-safe ocean. The
+        // per-frame pass adds animated crests near the camera, while troughs
+        // naturally depth-test behind this stable base instead of exposing gaps.
         delegate.setColor(red, green, blue, alpha);
         return this;
     }
