@@ -2,8 +2,14 @@
 
 ## Goal
 
-The water system uses a hybrid model rather than attempting a full
-Navier-Stokes simulation for every ocean block. A hybrid is the practical and
+The finished water system replaces Minecraft's visible surface and canonical
+water-volume behavior. Vanilla fluid blocks are a migration and compatibility
+bridge while the replacement gains complete bucket, swimming, redstone, world
+save, and third-party-mod integration; they are not the final renderer or
+simulation authority.
+
+The replacement uses a hybrid numerical model rather than attempting a full
+Navier-Stokes simulation for every ocean cell. That is the practical and
 technically appropriate model for a large Minecraft world:
 
 - Gerstner gravity waves model the continuous far-field ocean, river, and pond
@@ -29,11 +35,12 @@ Each sample returns vertical and horizontal displacement, an analytic normal,
 and orbital velocity. Ocean swell, river ripples, pond motion, vertex geometry,
 and boat response therefore use one coherent wave field.
 
-Vanilla liquid geometry remains as the stable distant and failure-safe surface.
-Near the camera, ocean crests use a cached per-frame mesh sampled from the same
-world-space Gerstner spectrum. Iris/Oculus keeps the standard translucent path;
-without an external shader pack, the optional core shader adds Fresnel,
-depth-colored absorption, foam, lighting, and animated micro-normal detail.
+The per-frame surface renderer owns exposed water near the camera. Vanilla
+liquid geometry currently remains behind it as a distant and failure-safe
+compatibility surface until replacement coverage reaches the full rendered
+world. Iris/Oculus keeps the standard translucent shader path; without an
+external shader pack, the optional core shader adds Fresnel, depth-colored
+absorption, foam, lighting, and animated micro-normal detail.
 
 ## Rendering phases
 
@@ -52,7 +59,7 @@ depth-colored absorption, foam, lighting, and animated micro-normal detail.
 ### Phase 2: per-frame surface detail
 
 Vanilla liquid chunks are static meshes, so live phase is no longer baked into
-them. `OceanSurfaceRenderer` adds a bounded camera-local pass with:
+them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass with:
 
 - Per-frame world-space positions and analytic wave normals.
 - Cached water/bathymetry scans, circular range culling, and renderer-mod-aware
@@ -94,16 +101,26 @@ tide edit grid was removed; tides no longer place or delete water blocks.
 - Static bodies refresh less often and remote mirrors expire when tracking ends.
 - Non-transient bodies persist per dimension in compact `SavedData` arrays and
   restore their identity, position, velocity, and droplet state.
-- The vanilla source block remains the gameplay/interoperability fallback while
-  SPH owns the volumetric visual body. A future custom fluid capability is
-  required before buckets, swimming, redstone, and other mods can treat SPH as
-  the only canonical water state.
+- The vanilla source block remains a temporary gameplay/interoperability bridge
+  while SPH owns the volumetric visual body.
+- A chunk-persistent custom volume capability is required before buckets,
+  swimming, redstone, and other mods can treat the replacement as canonical.
 
 ### Phase 6: synchronized weather and sea state
 
 Base boat and entity forces run from server world time. Wind direction and a
 weather-driven sea-state spectrum remain follow-up work; the deterministic
 gravity-wave spectrum itself does not need per-wave network packets.
+
+### Phase 7: canonical replacement state
+
+- Store water volume, surface height, and velocity in chunk-persistent cells.
+- Make buckets, displacement, swimming, entities, and shoreline exchange read
+  and mutate that state on the logical server.
+- Mesh the shared volume state on clients instead of treating vanilla liquid
+  tops as the primary geometry.
+- Keep a bounded vanilla-fluid adapter only for world migration and mods that
+  have not integrated with the replacement API.
 
 ## Validation targets
 

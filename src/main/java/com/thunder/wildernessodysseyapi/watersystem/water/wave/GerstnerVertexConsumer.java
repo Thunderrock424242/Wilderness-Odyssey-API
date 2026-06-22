@@ -22,7 +22,7 @@ public final class GerstnerVertexConsumer implements VertexConsumer {
     private final int sectionOriginZ;
     private final int blockLocalY;
     private final WaterBodyClassifier.WaterType waterType;
-    private final boolean dynamicOceanSurface;
+    private final boolean dynamicWaterSurface;
 
     private boolean currentVertexIsSurface;
     private WaveSurfaceSample currentSample = WaveSurfaceSample.flat();
@@ -38,13 +38,13 @@ public final class GerstnerVertexConsumer implements VertexConsumer {
      */
     public GerstnerVertexConsumer(VertexConsumer delegate, int blockX, int blockY, int blockZ,
                                   WaterBodyClassifier.WaterType waterType,
-                                  boolean dynamicOceanSurface) {
+                                  boolean dynamicWaterSurface) {
         this.delegate = delegate;
         this.sectionOriginX = blockX & ~15;
         this.sectionOriginZ = blockZ & ~15;
         this.blockLocalY = blockY & 15;
         this.waterType = waterType;
-        this.dynamicOceanSurface = dynamicOceanSurface;
+        this.dynamicWaterSurface = dynamicWaterSurface;
     }
 
     @Override
@@ -52,7 +52,7 @@ public final class GerstnerVertexConsumer implements VertexConsumer {
         float localSurfaceHeight = y - blockLocalY;
         currentVertexIsSurface = localSurfaceHeight > SURFACE_VERTEX_EPSILON;
 
-        if (currentVertexIsSurface && dynamicOceanSurface) {
+        if (currentVertexIsSurface && dynamicWaterSurface) {
             currentSample = WaveSurfaceSample.flat();
             delegate.addVertex(x, y, z);
             return this;
@@ -87,9 +87,8 @@ public final class GerstnerVertexConsumer implements VertexConsumer {
 
     @Override
     public VertexConsumer setColor(int red, int green, int blue, int alpha) {
-        // Keep the flat baked surface as the distant/failure-safe ocean. The
-        // per-frame pass adds animated crests near the camera, while troughs
-        // naturally depth-test behind this stable base instead of exposing gaps.
+        // Keep the baked top only as a distant/failure-safe compatibility base.
+        // The continuous per-frame pass is authoritative wherever it has coverage.
         delegate.setColor(red, green, blue, alpha);
         return this;
     }

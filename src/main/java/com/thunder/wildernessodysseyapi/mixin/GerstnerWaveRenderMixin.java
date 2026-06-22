@@ -9,6 +9,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
@@ -55,18 +56,26 @@ public class GerstnerWaveRenderMixin {
         WaterBodyClassifier.WaterType waterType = waterLevel == null
                 ? WaterBodyClassifier.WaterType.POND
                 : WaterBodyClassifier.classify(waterLevel, pos);
-        boolean dynamicOceanSurface = waterLevel != null
-                && waterType == WaterBodyClassifier.WaterType.OCEAN
+        boolean dynamicWaterSurface = waterLevel != null
                 && WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()
-                && Math.abs(pos.getY() - (waterLevel.getSeaLevel() - 1)) <= 3;
+                && ownsWorldSurface(waterLevel, pos);
         return new GerstnerVertexConsumer(
                 originalConsumer,
                 pos.getX(),
                 pos.getY(),
                 pos.getZ(),
                 waterType,
-                dynamicOceanSurface
+                dynamicWaterSurface
         );
+    }
+
+    // The replacement renderer currently owns exposed world-surface water.
+    // Covered and subterranean water keeps the baked path as a safe fallback.
+    private static boolean ownsWorldSurface(LevelReader level, BlockPos pos) {
+        if (level.getFluidState(pos.above()).is(Fluids.WATER)) {
+            return false;
+        }
+        return level.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ()) - 1 == pos.getY();
     }
 
     private static LevelReader resolveLevelReader(BlockAndTintGetter level) {
