@@ -1,11 +1,14 @@
 #version 150
 
+#moj_import <light.glsl>
+
 in vec3 Position;
 in vec4 Color;
 in vec2 UV0;
 in ivec2 UV2;
 in vec3 Normal;
 
+uniform sampler2D Sampler2;
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
 uniform float GameTime;
@@ -13,7 +16,7 @@ uniform float GameTime;
 out float vertexDistance;
 out vec4 vertexColor;
 out vec2 texCoord0;
-out ivec2 lightCoord;
+out vec3 lightColor;
 out vec3 viewPosition;
 out vec3 viewNormal;
 
@@ -27,6 +30,7 @@ void main() {
         sin(GameTime * 0.35 + Position.z * 0.18),
         cos(GameTime * 0.27 + Position.x * 0.16)
     ) * 0.0035;
-    lightCoord = UV2;
+    // Match vanilla's lightmap path and interpolate sampled color, not packed integers.
+    lightColor = minecraft_sample_lightmap(Sampler2, UV2).rgb;
     gl_Position = ProjMat * view;
 }

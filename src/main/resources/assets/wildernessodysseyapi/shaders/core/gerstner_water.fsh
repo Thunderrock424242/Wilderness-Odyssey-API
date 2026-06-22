@@ -1,7 +1,6 @@
 #version 150
 
 uniform sampler2D Sampler0;
-uniform sampler2D Sampler2;
 uniform vec4 ColorModulator;
 uniform float FogStart;
 uniform float FogEnd;
@@ -11,7 +10,7 @@ uniform float GameTime;
 in float vertexDistance;
 in vec4 vertexColor;
 in vec2 texCoord0;
-in ivec2 lightCoord;
+in vec3 lightColor;
 in vec3 viewPosition;
 in vec3 viewNormal;
 
@@ -32,7 +31,6 @@ void main() {
         sin(texCoord0.x * 42.0 + GameTime * 1.4)
         * cos(texCoord0.y * 39.0 + GameTime * 1.1)), 12.0);
 
-    vec3 lightColor = textureLod(Sampler2, clamp(lightCoord / 256.0, 0.0, 1.0), 0).rgb;
     vec3 color = mix(vertexColor.rgb, vertexColor.rgb * waterTexture.rgb, 0.34);
     color = mix(color, vec3(0.80, 0.91, 0.98), fresnel * 0.34 + slopeFoam * 0.16);
     color += vec3(0.20, 0.24, 0.31) * microShimmer;

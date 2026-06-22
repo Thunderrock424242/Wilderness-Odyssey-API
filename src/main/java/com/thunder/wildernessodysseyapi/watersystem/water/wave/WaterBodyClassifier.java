@@ -23,9 +23,13 @@ import java.util.concurrent.ConcurrentHashMap;
  *   RIVER  — river biome, OR long narrow water (aspect ratio check)
  *   POND   — small enclosed water body (shallow, not ocean/river biome)
  *
- * Results are cached per chunk-column to avoid repeated biome lookups.
+ * Results are cached in small horizontal cells to avoid repeated biome lookups
+ * without forcing one biome sample to classify an entire chunk of shoreline.
  */
 public class WaterBodyClassifier {
+
+    private static final int CACHE_CELL_SHIFT = 2;
+    private static final int MAX_CACHED_CELLS_PER_LEVEL = 16_384;
 
     public enum WaterType {
         OCEAN,
@@ -33,7 +37,7 @@ public class WaterBodyClassifier {
         POND
     }
 
-    // Cache: packed chunk XZ → WaterType
+    // Cache: packed 4x4-block XZ cell to water type.
     private static final Map<LevelReader, ConcurrentHashMap<Long, WaterType>> CACHES =
             Collections.synchronizedMap(new WeakHashMap<>());
 
@@ -42,10 +46,13 @@ public class WaterBodyClassifier {
      * Returns POND if the position is not water.
      */
     public static WaterType classify(LevelReader level, BlockPos pos) {
-        long key = chunkKey(pos.getX() >> 4, pos.getZ() >> 4);
+        long key = cellKey(pos.getX() >> CACHE_CELL_SHIFT, pos.getZ() >> CACHE_CELL_SHIFT);
         ConcurrentHashMap<Long, WaterType> cache;
         synchronized (CACHES) {
             cache = CACHES.computeIfAbsent(level, ignored -> new ConcurrentHashMap<>(256));
+        }
+        if (cache.size() >= MAX_CACHED_CELLS_PER_LEVEL && !cache.containsKey(key)) {
+            cache.clear();
         }
         return cache.computeIfAbsent(key, k -> doClassify(level, pos));
     }
@@ -89,12 +96,15 @@ public class WaterBodyClassifier {
         }
 
         // Large water body in non-ocean biome → treat as river-like
+        // Broad connected water is ocean-like even when a modded biome forgot
+        // the vanilla ocean tag. Narrower connected bands remain river-like.
+        if (waterCount > 50) return WaterType.OCEAN;
         if (waterCount > 30) return WaterType.RIVER;
 
         return WaterType.POND;
     }
 
-    private static long chunkKey(int cx, int cz) {
-        return ((long) cx & 0xFFFFFFFFL) | (((long) cz & 0xFFFFFFFFL) << 32);
+    private static long cellKey(int cellX, int cellZ) {
+        return ((long) cellX & 0xFFFFFFFFL) | (((long) cellZ & 0xFFFFFFFFL) << 32);
     }
 }

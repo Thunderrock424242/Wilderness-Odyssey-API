@@ -47,10 +47,10 @@ public final class WaterRenderingConfig {
                 .push("water_rendering");
 
         ENABLE_GERSTNER_WAVES = builder
-                .comment("Enable Gerstner displacement for vanilla water vertices.")
+                .comment("Enable physically based Gerstner displacement for water surfaces.")
                 .define("enableGerstnerWaves", true);
         ENABLE_DYNAMIC_OCEAN_SURFACE = builder
-                .comment("Overlay baked ocean tops near the camera with a seam-free per-frame Gerstner mesh.")
+                .comment("Replace visible open-water tops near the camera with the per-frame water surface.")
                 .define("enableDynamicOceanSurface", true);
         ENABLE_WATER_CORE_SHADER = builder
                 .comment("Use the built-in Fresnel/absorption water shader when no external shader pack owns water rendering.")

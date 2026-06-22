@@ -14,6 +14,7 @@ import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.api.distmarker.Dist;
@@ -29,12 +30,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Draws a continuous, per-frame Gerstner ocean crest surface around the camera.
+ * Draws the authoritative, per-frame surface for exposed open water around the camera.
  *
  * <p>World scanning is cached and only refreshed after movement or water-state
  * age thresholds. Geometry is regenerated every frame from one world-space
- * wave function, so neighboring chunks cannot bake different phases. The same
- * mesh works with a standard translucent RenderType under external shader
+ * wave function, so neighboring chunks cannot bake different phases. Water-body
+ * classification selects wave physics but never removes surface coverage. The
+ * same mesh works with a standard translucent RenderType under external shader
  * packs and with the mod's optional optical core shader otherwise.</p>
  */
 @EventBusSubscriber(modid = "wildernessodysseyapi", value = Dist.CLIENT)
@@ -43,6 +45,7 @@ public final class OceanSurfaceRenderer {
     private static final FluidState WATER_STATE = Fluids.WATER.defaultFluidState();
     private static final int CACHE_LIFETIME_TICKS = 20;
     private static final int MAX_DEPTH_SAMPLE = 16;
+    private static final float MAX_SURFACE_STEP = 0.75f;
     private static final float UV_SCALE = 0.28f;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
 
@@ -57,7 +60,7 @@ public final class OceanSurfaceRenderer {
     private OceanSurfaceRenderer() {
     }
 
-    /** Renders dynamic ocean tops after vanilla translucent terrain. */
+    /** Renders replacement open-water tops after translucent terrain. */
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS
@@ -66,7 +69,7 @@ public final class OceanSurfaceRenderer {
             return;
         }
 
-        try (GpuDiagnostics.Scope ignored = GpuDiagnostics.scope("water.ocean.dynamic")) {
+        try (GpuDiagnostics.Scope ignored = GpuDiagnostics.scope("water.surface.dynamic")) {
             render(event);
         }
     }
@@ -90,7 +93,6 @@ public final class OceanSurfaceRenderer {
         float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
         float timeSeconds = (level.getGameTime() + partialTick) / 20.0f;
         float tideOffset = TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE;
-        int waveLimit = WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.OCEAN);
 
         boolean coreShader = WaterShaders.shouldUseCoreShader();
         RenderType renderType = coreShader ? WaterRenderTypes.dynamicOcean() : RenderType.translucent();
@@ -110,7 +112,7 @@ public final class OceanSurfaceRenderer {
         poseStack.translate(-camera.x, -camera.y, -camera.z);
 
         for (SurfacePatch patch : PATCHES) {
-            drawPatch(level, patch, timeSeconds, tideOffset, waveLimit, camera.x, camera.y, camera.z,
+            drawPatch(level, patch, timeSeconds, tideOffset, camera.x, camera.y, camera.z,
                     sprite, poseStack.last(), buffer);
         }
 
@@ -123,7 +125,6 @@ public final class OceanSurfaceRenderer {
             SurfacePatch patch,
             float timeSeconds,
             float tideOffset,
-            int waveLimit,
             double cameraX,
             double cameraY,
             double cameraZ,
@@ -132,19 +133,24 @@ public final class OceanSurfaceRenderer {
             VertexConsumer buffer
     ) {
         float waveBlend = smoothStep(0.35f, 4.0f, patch.depth);
+        int waveLimit = WaterRenderingConfig.waveTrainLimit(patch.waterType);
+        GerstnerWaveProfile waveProfile = profileFor(patch.waterType);
+        float localTideOffset = patch.waterType == WaterBodyClassifier.WaterType.OCEAN
+                ? tideOffset
+                : 0.0f;
         float x0 = patch.x;
         float z0 = patch.z;
         float x1 = patch.x + patch.size;
         float z1 = patch.z + patch.size;
 
-        VertexData first = vertex(level, x0, patch.surfaceY, z0, patch.depth, waveBlend,
-                timeSeconds, tideOffset, waveLimit, cameraX, cameraY, cameraZ);
-        VertexData second = vertex(level, x0, patch.surfaceY, z1, patch.depth, waveBlend,
-                timeSeconds, tideOffset, waveLimit, cameraX, cameraY, cameraZ);
-        VertexData third = vertex(level, x1, patch.surfaceY, z1, patch.depth, waveBlend,
-                timeSeconds, tideOffset, waveLimit, cameraX, cameraY, cameraZ);
-        VertexData fourth = vertex(level, x1, patch.surfaceY, z0, patch.depth, waveBlend,
-                timeSeconds, tideOffset, waveLimit, cameraX, cameraY, cameraZ);
+        VertexData first = vertex(level, x0, patch.firstY, z0, patch.depth, waveBlend,
+                waveProfile, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
+        VertexData second = vertex(level, x0, patch.secondY, z1, patch.depth, waveBlend,
+                waveProfile, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
+        VertexData third = vertex(level, x1, patch.thirdY, z1, patch.depth, waveBlend,
+                waveProfile, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
+        VertexData fourth = vertex(level, x1, patch.fourthY, z0, patch.depth, waveBlend,
+                waveProfile, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
 
         emitVertex(buffer, pose, sprite, first);
         emitVertex(buffer, pose, sprite, second);
@@ -159,6 +165,7 @@ public final class OceanSurfaceRenderer {
             float baseZ,
             float depth,
             float waveBlend,
+            GerstnerWaveProfile waveProfile,
             float timeSeconds,
             float tideOffset,
             int waveLimit,
@@ -166,7 +173,7 @@ public final class OceanSurfaceRenderer {
             double cameraY,
             double cameraZ
     ) {
-        WaveSurfaceSample sample = GerstnerWaveProfile.OCEAN
+        WaveSurfaceSample sample = waveProfile
                 .sampleAt(baseX, baseZ, timeSeconds, waveLimit)
                 .withHeightOffset(tideOffset)
                 .attenuated(waveBlend);
@@ -306,14 +313,26 @@ public final class OceanSurfaceRenderer {
                 if (!first.valid || !second.valid || !third.valid || !fourth.valid) {
                     continue;
                 }
-                if (first.surfaceBlockY != second.surfaceBlockY
-                        || first.surfaceBlockY != third.surfaceBlockY
-                        || first.surfaceBlockY != fourth.surfaceBlockY) {
+                float minimumSurface = Math.min(Math.min(first.surfaceY, second.surfaceY),
+                        Math.min(third.surfaceY, fourth.surfaceY));
+                float maximumSurface = Math.max(Math.max(first.surfaceY, second.surfaceY),
+                        Math.max(third.surfaceY, fourth.surfaceY));
+                if (maximumSurface - minimumSurface > MAX_SURFACE_STEP) {
                     continue;
                 }
 
                 float depth = Math.min(Math.min(first.depth, second.depth), Math.min(third.depth, fourth.depth));
-                PATCHES.add(new SurfacePatch(x, z, first.surfaceBlockY + 1.001f, cellSize, depth));
+                PATCHES.add(new SurfacePatch(
+                        x,
+                        z,
+                        first.surfaceY,
+                        second.surfaceY,
+                        third.surfaceY,
+                        fourth.surfaceY,
+                        cellSize,
+                        depth,
+                        dominantType(first, second, third, fourth)
+                ));
             }
         }
     }
@@ -329,31 +348,35 @@ public final class OceanSurfaceRenderer {
     }
 
     private static WaterColumn scanColumn(ClientLevel level, int x, int z) {
-        int seaSurfaceY = level.getSeaLevel() - 1;
+        int surfaceBlockY = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
-        for (int y = seaSurfaceY + 3; y >= seaSurfaceY - 4; y--) {
-            pos.set(x, y, z);
-            if (!level.hasChunkAt(pos)
-                    || !level.getFluidState(pos).is(Fluids.WATER)
-                    || level.getFluidState(above.set(x, y + 1, z)).is(Fluids.WATER)) {
-                continue;
-            }
-            if (WaterBodyClassifier.classify(level, pos) != WaterBodyClassifier.WaterType.OCEAN) {
-                return WaterColumn.INVALID;
-            }
-
-            float depth = MAX_DEPTH_SAMPLE;
-            for (int offset = 1; offset <= MAX_DEPTH_SAMPLE; offset++) {
-                pos.set(x, y - offset, z);
-                if (!level.getBlockState(pos).getCollisionShape(level, pos).isEmpty()) {
-                    depth = offset;
-                    break;
-                }
-            }
-            return new WaterColumn(true, y, depth);
+        pos.set(x, surfaceBlockY, z);
+        if (!level.hasChunkAt(pos)) {
+            return WaterColumn.INVALID;
         }
-        return WaterColumn.INVALID;
+
+        FluidState surfaceFluid = level.getFluidState(pos);
+        if (!surfaceFluid.is(Fluids.WATER)
+                || level.getFluidState(above.set(x, surfaceBlockY + 1, z)).is(Fluids.WATER)) {
+            return WaterColumn.INVALID;
+        }
+
+        WaterBodyClassifier.WaterType waterType = WaterBodyClassifier.classify(level, pos);
+        float depth = MAX_DEPTH_SAMPLE;
+        for (int offset = 1; offset <= MAX_DEPTH_SAMPLE; offset++) {
+            pos.set(x, surfaceBlockY - offset, z);
+            if (!level.getBlockState(pos).getCollisionShape(level, pos).isEmpty()) {
+                depth = offset;
+                break;
+            }
+        }
+        return new WaterColumn(
+                true,
+                surfaceBlockY + surfaceFluid.getOwnHeight() + 0.001f,
+                depth,
+                waterType
+        );
     }
 
     private static int waterLight(ClientLevel level, float x, float y, float z) {
@@ -366,6 +389,40 @@ public final class OceanSurfaceRenderer {
                 Math.max(7, LightTexture.block(packed)),
                 Math.max(7, LightTexture.sky(packed))
         );
+    }
+
+    // Classification changes wave behavior only; coverage remains continuous
+    // across biome and cache-cell boundaries.
+    private static WaterBodyClassifier.WaterType dominantType(
+            WaterColumn first,
+            WaterColumn second,
+            WaterColumn third,
+            WaterColumn fourth
+    ) {
+        int ocean = 0;
+        int river = 0;
+        int pond = 0;
+        for (WaterColumn column : new WaterColumn[]{first, second, third, fourth}) {
+            switch (column.waterType) {
+                case OCEAN -> ocean++;
+                case RIVER -> river++;
+                case POND -> pond++;
+            }
+        }
+        if (ocean >= river && ocean >= pond) {
+            return WaterBodyClassifier.WaterType.OCEAN;
+        }
+        return river >= pond
+                ? WaterBodyClassifier.WaterType.RIVER
+                : WaterBodyClassifier.WaterType.POND;
+    }
+
+    private static GerstnerWaveProfile profileFor(WaterBodyClassifier.WaterType waterType) {
+        return switch (waterType) {
+            case OCEAN -> GerstnerWaveProfile.OCEAN;
+            case RIVER -> GerstnerWaveProfile.RIVER;
+            case POND -> GerstnerWaveProfile.POND;
+        };
     }
 
     private static void clearCache() {
@@ -403,11 +460,31 @@ public final class OceanSurfaceRenderer {
         return value - (float) Math.floor(value);
     }
 
-    private record SurfacePatch(int x, int z, float surfaceY, int size, float depth) {
+    private record SurfacePatch(
+            int x,
+            int z,
+            float firstY,
+            float secondY,
+            float thirdY,
+            float fourthY,
+            int size,
+            float depth,
+            WaterBodyClassifier.WaterType waterType
+    ) {
     }
 
-    private record WaterColumn(boolean valid, int surfaceBlockY, float depth) {
-        private static final WaterColumn INVALID = new WaterColumn(false, 0, 0.0f);
+    private record WaterColumn(
+            boolean valid,
+            float surfaceY,
+            float depth,
+            WaterBodyClassifier.WaterType waterType
+    ) {
+        private static final WaterColumn INVALID = new WaterColumn(
+                false,
+                0.0f,
+                0.0f,
+                WaterBodyClassifier.WaterType.POND
+        );
     }
 
     private record VertexData(

@@ -7,6 +7,7 @@ import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.client.event.RegisterShadersEvent;
+import org.lwjgl.opengl.GL20;
 
 import java.io.IOException;
 
@@ -31,8 +32,20 @@ public final class WaterShaders {
                         ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "gerstner_water"),
                         DefaultVertexFormat.BLOCK
                 ),
-                shader -> oceanShader = shader
+                WaterShaders::acceptOceanShader
         );
+    }
+
+    // A failed GLSL link can still produce a ShaderInstance. Reject it here so
+    // the per-frame ocean pass falls back instead of retrying an invalid program.
+    private static void acceptOceanShader(ShaderInstance shader) {
+        int programId = shader.getId();
+        if (!GL20.glIsProgram(programId) || GL20.glGetProgrami(programId, GL20.GL_LINK_STATUS) == 0) {
+            ModConstants.LOGGER.error("Ocean shader failed to link; using the vanilla translucent fallback");
+            oceanShader = null;
+            return;
+        }
+        oceanShader = shader;
     }
 
     /** Returns the shader used by the custom ocean RenderType. */
