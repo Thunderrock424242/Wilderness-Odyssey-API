@@ -4,157 +4,182 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.vehicle.Boat;
+import net.minecraft.world.entity.vehicle.AbstractBoat;
 import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
 /**
- * WaveEntityPhysics
- * <p>
- * Applies wave-driven forces to entities in water:
- * <p>
- *   Boats     — rock (pitch/roll) and bob vertically with the wave profile.
- *               Horizontal push from wave direction.
- * <p>
- *   Items     — float and drift with the surface current.
- * <p>
- *   Living    — slight push when wading in ocean/river water.
- *               Stronger at high tide (tidal current effect).
+ * Couples boats and floating entities to the shared wave surface.
+ *
+ * <p>The client computes only boat pitch, roll, and render bobbing. Horizontal
+ * motion is applied on the logical server from the deterministic world-time
+ * wave field, preventing client movement from fighting server corrections.</p>
  */
 @EventBusSubscriber(modid = "wildernessodysseyapi")
-public class WaveEntityPhysics {
+public final class WaveEntityPhysics {
 
+    private static final float TICKS_PER_SECOND = 20.0f;
+
+    private WaveEntityPhysics() {
+    }
+
+    /**
+     * Updates visual boat response on the client and authoritative water forces
+     * on the server after vanilla finishes each entity tick.
+     */
     @SubscribeEvent
     public static void onEntityTick(EntityTickEvent.Post event) {
         Entity entity = event.getEntity();
-        Level level   = entity.level();
+        Level level = entity.level();
 
-        if (!level.isClientSide()) return; // visual only — server handles real movement
-        if (!entity.isInWater() && !(entity instanceof Boat)) return;
+        if (entity instanceof AbstractBoat boat && !isBoatTouchingWater(boat)) {
+            if (level.isClientSide()) {
+                BoatTiltStore.remove(boat.getId());
+            }
+            return;
+        }
+        if (!entity.isInWater() && !(entity instanceof AbstractBoat)) {
+            return;
+        }
 
         WaterBodyClassifier.WaterType type =
-            WaterBodyClassifier.classify(level, entity.blockPosition());
+                WaterBodyClassifier.classify(level, entity.blockPosition());
 
-        if (entity instanceof Boat boat) {
-            tickBoat(boat, type, level);
+        // Rendering state is client-owned; gameplay movement is server-owned.
+        if (level.isClientSide()) {
+            if (entity instanceof AbstractBoat boat) {
+                updateBoatVisuals(boat, type);
+            }
+            return;
+        }
+
+        if (entity instanceof AbstractBoat boat) {
+            applyBoatForces(boat, type, level);
         } else if (entity instanceof ItemEntity item) {
-            tickItem(item, type);
-        } else if (entity.isInWater()) {
-            tickLivingInWater(entity, type, level);
+            applyItemForces(item, type, level);
+        } else if (entity instanceof LivingEntity livingEntity) {
+            applyWadingForces(livingEntity, type, level);
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Boats
-    // -------------------------------------------------------------------------
+    // Client rendering follows the analytic surface normal in boat-local axes.
 
-    private static void tickBoat(Boat boat, WaterBodyClassifier.WaterType type, Level level) {
-        float bx = (float) boat.getX();
-        float bz = (float) boat.getZ();
-        float time = GerstnerWaveAnimator.getTime();
-
+    private static void updateBoatVisuals(AbstractBoat boat, WaterBodyClassifier.WaterType type) {
+        float worldX = (float) boat.getX();
+        float worldZ = (float) boat.getZ();
         GerstnerWaveProfile profile = profileFor(type);
+        WaveSurfaceSample surface = GerstnerWaveAnimator.getSurfaceSampleAt(worldX, worldZ, type);
 
-        // Sample wave height at boat position and at two offset points for tilt
-        float hCenter = GerstnerWaveAnimator.getHeightAt(bx,        bz,        type);
-        float hFront  = GerstnerWaveAnimator.getHeightAt(bx,        bz + 0.8f, type);
-        float hRight  = GerstnerWaveAnimator.getHeightAt(bx + 0.8f, bz,        type);
+        float inverseNormalY = 1.0f / Math.max(0.01f, surface.normalY());
+        float slopeX = -surface.normalX() * inverseNormalY;
+        float slopeZ = -surface.normalZ() * inverseNormalY;
+        float yawRadians = (float) Math.toRadians(boat.getYRot());
+        float forwardX = -(float) Math.sin(yawRadians);
+        float forwardZ = (float) Math.cos(yawRadians);
+        float rightX = (float) Math.cos(yawRadians);
+        float rightZ = (float) Math.sin(yawRadians);
+        float forwardSlope = slopeX * forwardX + slopeZ * forwardZ;
+        float rightSlope = slopeX * rightX + slopeZ * rightZ;
 
-        // Pitch (nose up/down) and roll (lean sideways)
-        float pitch = (float) Math.toDegrees(Math.atan2(hFront - hCenter, 0.8f));
-        float roll  = (float) Math.toDegrees(Math.atan2(hRight - hCenter, 0.8f));
+        float pitch = clamp((float) Math.toDegrees(Math.atan(forwardSlope)), -25.0f, 25.0f);
+        float roll = clamp((float) Math.toDegrees(Math.atan(rightSlope)), -20.0f, 20.0f);
+        float bob = surface.height() * profile.boatBobStrength;
+        BoatTiltStore.set(boat.getId(), pitch, roll, bob);
+    }
 
-        // Clamp tilt angles so they look natural
-        pitch = Math.max(-25f, Math.min(25f, pitch));
-        roll  = Math.max(-20f, Math.min(20f, roll));
+    // Server movement uses the same spectrum evaluated from authoritative time.
 
-        // Apply vertical bob
-        float bobTarget = hCenter * profile.boatBobStrength;
-        double newY = boat.getY() + bobTarget * 0.08f;
-        boat.setPos(boat.getX(), newY, boat.getZ());
+    private static void applyBoatForces(AbstractBoat boat, WaterBodyClassifier.WaterType type, Level level) {
+        float[] push = getServerPush(level, (float) boat.getX(), (float) boat.getZ(), type);
 
-        // Apply horizontal push from wave
-        float[] push = profile.getPushAt(bx, bz, time);
-
-        // Tidal current adds directional push in oceans
         if (type == WaterBodyClassifier.WaterType.OCEAN) {
-            float tideRate = TideSystem.getTideRate(level);
-            float[] tidalDir = TideSystem.getTidalCurrentDirection(level);
-            push[0] += tidalDir[0] * tideRate * 0.002f;
-            push[1] += tidalDir[1] * tideRate * 0.002f;
+            addTidalCurrent(level, push, 0.002f);
         }
 
         boat.setDeltaMovement(
-            boat.getDeltaMovement().x + push[0],
-            boat.getDeltaMovement().y,
-            boat.getDeltaMovement().z + push[1]
+                boat.getDeltaMovement().x + push[0],
+                boat.getDeltaMovement().y,
+                boat.getDeltaMovement().z + push[1]
         );
-
-        // Store pitch/roll for the render mixin to read
-        BoatTiltStore.set(boat.getId(), pitch, roll);
     }
 
-    // -------------------------------------------------------------------------
-    // Item entities
-    // -------------------------------------------------------------------------
-
-    private static void tickItem(ItemEntity item, WaterBodyClassifier.WaterType type) {
-        if (!item.isInWater()) return;
-
-        float ix = (float) item.getX();
-        float iz = (float) item.getZ();
-
-        float[] push = GerstnerWaveAnimator.getPushAt(ix, iz, type);
-
-        // Items drift gently with the current
+    private static void applyItemForces(ItemEntity item, WaterBodyClassifier.WaterType type, Level level) {
+        float[] push = getServerPush(level, (float) item.getX(), (float) item.getZ(), type);
         item.setDeltaMovement(
-            item.getDeltaMovement().x + push[0] * 0.4f,
-            item.getDeltaMovement().y,
-            item.getDeltaMovement().z + push[1] * 0.4f
+                item.getDeltaMovement().x + push[0] * 0.4f,
+                item.getDeltaMovement().y,
+                item.getDeltaMovement().z + push[1] * 0.4f
         );
     }
 
-    // -------------------------------------------------------------------------
-    // Living entities wading in water
-    // -------------------------------------------------------------------------
+    private static void applyWadingForces(
+            LivingEntity entity,
+            WaterBodyClassifier.WaterType type,
+            Level level
+    ) {
+        if (type == WaterBodyClassifier.WaterType.POND || entity.isSwimming()) {
+            return;
+        }
 
-    private static void tickLivingInWater(Entity entity,
-                                           WaterBodyClassifier.WaterType type,
-                                           Level level) {
-        // Only push if wading (not swimming) and in ocean or river
-        if (type == WaterBodyClassifier.WaterType.POND) return;
-
-        float ex = (float) entity.getX();
-        float ez = (float) entity.getZ();
-        float[] push = GerstnerWaveAnimator.getPushAt(ex, ez, type);
-
-        // Tidal current in ocean
-        float tidalBoost = 1f;
+        float[] push = getServerPush(level, (float) entity.getX(), (float) entity.getZ(), type);
         if (type == WaterBodyClassifier.WaterType.OCEAN) {
-            float tideRate = TideSystem.getTideRate(level);
-            tidalBoost = 1f + Math.abs(tideRate) * 0.5f;
+            float tidalBoost = 1.0f + Math.abs(TideSystem.getTideRate(level)) * 0.5f;
+            push[0] *= tidalBoost;
+            push[1] *= tidalBoost;
         }
 
         entity.setDeltaMovement(
-            entity.getDeltaMovement().x + push[0] * tidalBoost,
-            entity.getDeltaMovement().y,
-            entity.getDeltaMovement().z + push[1] * tidalBoost
+                entity.getDeltaMovement().x + push[0],
+                entity.getDeltaMovement().y,
+                entity.getDeltaMovement().z + push[1]
         );
     }
 
-    // -------------------------------------------------------------------------
-    // Helper
-    // -------------------------------------------------------------------------
+    private static float[] getServerPush(
+            Level level,
+            float worldX,
+            float worldZ,
+            WaterBodyClassifier.WaterType type
+    ) {
+        GerstnerWaveProfile profile = profileFor(type);
+        float timeSeconds = level.getGameTime() / TICKS_PER_SECOND;
+        WaveSurfaceSample sample = profile.sampleAt(worldX, worldZ, timeSeconds);
+        return new float[]{
+                sample.velocityX() * profile.entityPushStrength,
+                sample.velocityZ() * profile.entityPushStrength
+        };
+    }
+
+    private static void addTidalCurrent(Level level, float[] push, float strength) {
+        float tideRate = TideSystem.getTideRate(level);
+        float[] tidalDirection = TideSystem.getTidalCurrentDirection(level);
+        push[0] += tidalDirection[0] * tideRate * strength;
+        push[1] += tidalDirection[1] * tideRate * strength;
+    }
+
+    private static boolean isBoatTouchingWater(AbstractBoat boat) {
+        // A floating boat's block position can sit just above the surface, so
+        // check both its feet and the block immediately beneath the hull.
+        return boat.level().getFluidState(boat.blockPosition()).is(FluidTags.WATER)
+                || boat.level().getFluidState(boat.blockPosition().below()).is(FluidTags.WATER);
+    }
 
     private static GerstnerWaveProfile profileFor(WaterBodyClassifier.WaterType type) {
         return switch (type) {
             case OCEAN -> GerstnerWaveProfile.OCEAN;
             case RIVER -> GerstnerWaveProfile.RIVER;
-            case POND  -> GerstnerWaveProfile.POND;
+            case POND -> GerstnerWaveProfile.POND;
         };
+    }
+
+    private static float clamp(float value, float minimum, float maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
     }
 }

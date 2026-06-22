@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
@@ -51,6 +52,12 @@ public class RippleRenderer {
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
+        try (GpuDiagnostics.Scope ignored = GpuDiagnostics.scope("water.ripples")) {
+            renderScoped(event);
+        }
+    }
+
+    private static void renderScoped(RenderLevelStageEvent event) {
         if (!WaterRenderingConfig.ENABLE_RIPPLES.get()) {
             activeRipples.clear();
             return;

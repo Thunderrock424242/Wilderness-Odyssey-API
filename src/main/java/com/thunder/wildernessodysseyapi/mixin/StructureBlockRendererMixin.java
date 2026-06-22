@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -19,19 +20,29 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.lwjgl.opengl.GL11;
 
 @Mixin(StructureBlockRenderer.class)
 public abstract class StructureBlockRendererMixin {
 
     @Unique
     private boolean wildernessodysseyapi$depthForced;
+    @Unique
+    private boolean wildernessodysseyapi$depthTestWasEnabled;
+    @Unique
+    private boolean wildernessodysseyapi$depthMaskWasEnabled;
+    @Unique
+    private GpuDiagnostics.Scope wildernessodysseyapi$diagnosticScope;
 
     @Inject(method = "render(Lnet/minecraft/world/level/block/entity/StructureBlockEntity;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V", at = @At("HEAD"))
     private void wildernessodysseyapi$startOverlayRender(StructureBlockEntity blockEntity, float partialTick,
             PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay, CallbackInfo ci) {
+        wildernessodysseyapi$diagnosticScope = GpuDiagnostics.scope("structure_overlay");
         if (!wildernessodysseyapi$shouldForceOverlay(blockEntity)) {
             return;
         }
+        wildernessodysseyapi$depthTestWasEnabled = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
+        wildernessodysseyapi$depthMaskWasEnabled = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
         RenderSystem.disableDepthTest();
         RenderSystem.depthMask(false);
         wildernessodysseyapi$depthForced = true;
@@ -40,12 +51,20 @@ public abstract class StructureBlockRendererMixin {
     @Inject(method = "render(Lnet/minecraft/world/level/block/entity/StructureBlockEntity;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V", at = @At("TAIL"))
     private void wildernessodysseyapi$finishOverlayRender(StructureBlockEntity blockEntity, float partialTick,
             PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay, CallbackInfo ci) {
-        if (!wildernessodysseyapi$depthForced) {
-            return;
+        if (wildernessodysseyapi$depthForced) {
+            RenderSystem.depthMask(wildernessodysseyapi$depthMaskWasEnabled);
+            if (wildernessodysseyapi$depthTestWasEnabled) {
+                RenderSystem.enableDepthTest();
+            } else {
+                RenderSystem.disableDepthTest();
+            }
+            wildernessodysseyapi$depthForced = false;
         }
-        RenderSystem.depthMask(true);
-        RenderSystem.enableDepthTest();
-        wildernessodysseyapi$depthForced = false;
+        GpuDiagnostics.Scope scope = wildernessodysseyapi$diagnosticScope;
+        wildernessodysseyapi$diagnosticScope = null;
+        if (scope != null) {
+            scope.close();
+        }
     }
 
     @Inject(method = "getViewDistance", at = @At("HEAD"), cancellable = true)

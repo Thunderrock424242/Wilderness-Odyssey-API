@@ -44,6 +44,18 @@ public final class GpuProfilerClientEvents {
                         .executes(context -> showDiff(context.getSource(), DEFAULT_LIMIT))
                         .then(Commands.argument("limit", IntegerArgumentType.integer(1, 25))
                                 .executes(context -> showDiff(context.getSource(), IntegerArgumentType.getInteger(context, "limit")))))
+                .then(Commands.literal("gpu")
+                        .executes(context -> showGpu(context.getSource(), DEFAULT_LIMIT))
+                        .then(Commands.argument("limit", IntegerArgumentType.integer(1, 25))
+                                .executes(context -> showGpu(context.getSource(), IntegerArgumentType.getInteger(context, "limit")))))
+                .then(Commands.literal("errors")
+                        .executes(context -> showErrors(context.getSource(), DEFAULT_LIMIT))
+                        .then(Commands.argument("limit", IntegerArgumentType.integer(1, 25))
+                                .executes(context -> showErrors(context.getSource(), IntegerArgumentType.getInteger(context, "limit")))))
+                .then(Commands.literal("leaks")
+                        .executes(context -> showLeaks(context.getSource(), DEFAULT_LIMIT))
+                        .then(Commands.argument("limit", IntegerArgumentType.integer(1, 25))
+                                .executes(context -> showLeaks(context.getSource(), IntegerArgumentType.getInteger(context, "limit")))))
                 .then(Commands.literal("export").executes(context -> export(context.getSource()))));
     }
 
@@ -56,7 +68,7 @@ public final class GpuProfilerClientEvents {
         GpuProfiler.StartResult result = GpuProfiler.start();
         send(source, result.message());
         if (result.started()) {
-            send(source, "Reproduce the VRAM increase, then run /wovram top, /wovram diff, or /wovram stop.");
+            send(source, "Reproduce the issue, then run /wovram top, /wovram gpu, /wovram errors, or /wovram leaks.");
         }
         return result.started() ? 1 : 0;
     }
@@ -91,6 +103,9 @@ public final class GpuProfilerClientEvents {
                     + " (provider: " + status.hardwareProvider() + ").");
         }
         send(source, "GPU: " + status.gpuVendor() + " / " + status.gpuRenderer());
+        GpuDiagnostics.DiagnosticsStatus diagnostics = GpuDiagnostics.status();
+        send(source, "GPU timing: " + (diagnostics.timerAvailable() ? "sampled" : "unavailable")
+                + "; driver debug: " + diagnostics.debugProvider() + ".");
         if (status.hookErrors() > 0) {
             send(source, "Profiler hook errors suppressed: " + status.hookErrors() + ".");
         }
@@ -139,11 +154,70 @@ public final class GpuProfilerClientEvents {
         return 1;
     }
 
+    private static int showGpu(CommandSourceStack source, int limit) {
+        if (!GpuProfiler.status().hasSession()) {
+            send(source, "Start a session with /wovram start first.");
+            return 0;
+        }
+        List<GpuDiagnostics.GpuModSummary> rows = GpuDiagnostics.topGpuMods(limit);
+        if (rows.isEmpty()) {
+            GpuDiagnostics.DiagnosticsStatus status = GpuDiagnostics.status();
+            send(source, status.timerAvailable()
+                    ? "No GPU draw samples have resolved yet. Keep the session running for several frames."
+                    : "GPU timer queries are unavailable on this driver/context.");
+            return 1;
+        }
+        send(source, "Spark-style sampled GPU time by mod (shared Minecraft batches remain shared):");
+        for (int i = 0; i < rows.size(); i++) {
+            GpuDiagnostics.GpuModSummary row = rows.get(i);
+            send(source, (i + 1) + ". " + row.modId() + " — " + formatMillis(row.totalNanos()) + " ms sampled, "
+                    + String.format("%.1f", row.percentOfSamples()) + "% of sampled draw time — "
+                    + row.samples() + " draw(s); hottest: " + row.hottestLocation());
+        }
+        return 1;
+    }
+
+    private static int showErrors(CommandSourceStack source, int limit) {
+        if (!GpuProfiler.status().hasSession()) {
+            send(source, "Start a session with /wovram start first.");
+            return 0;
+        }
+        List<GpuDiagnostics.DebugEvent> events = GpuDiagnostics.debugEvents(limit);
+        if (events.isEmpty()) {
+            send(source, "No OpenGL debug messages were captured (provider: " + GpuDiagnostics.status().debugProvider() + ").");
+            return 1;
+        }
+        send(source, "Recent OpenGL driver messages:");
+        for (GpuDiagnostics.DebugEvent event : events) {
+            String owner = event.scope().isBlank() ? event.modId() : event.modId() + "/" + event.scope();
+            send(source, event.severity() + " " + event.type() + " #" + event.id() + " — " + owner
+                    + " @ " + event.location() + " — " + abbreviate(event.message(), 220));
+        }
+        return 1;
+    }
+
+    private static int showLeaks(CommandSourceStack source, int limit) {
+        if (!GpuProfiler.status().hasSession()) {
+            send(source, "Start a session with /wovram start first.");
+            return 0;
+        }
+        List<GpuDiagnostics.StateLeak> leaks = GpuDiagnostics.stateLeaks(limit);
+        if (leaks.isEmpty()) {
+            send(source, "No scoped render-state leaks were detected.");
+            return 1;
+        }
+        send(source, "Recent Wilderness Odyssey render-state leaks:");
+        for (GpuDiagnostics.StateLeak leak : leaks) {
+            send(source, leak.systemId() + " — " + leak.differences() + " @ " + leak.location());
+        }
+        return 1;
+    }
+
     private static int export(CommandSourceStack source) {
         Path reportDirectory = FMLPaths.GAMEDIR.get().resolve("logs").resolve("wildernessodysseyapi").resolve("gpu-profiler");
         try {
             Path report = GpuProfiler.export(reportDirectory);
-            send(source, "Exported WO VRAM report to " + report + ".");
+            send(source, "Exported WO GPU report to " + report + " with a sibling .folded flamegraph file.");
             return 1;
         } catch (IllegalStateException | IOException exception) {
             source.sendFailure(Component.literal("Could not export WO VRAM report: " + exception.getMessage()));
@@ -166,5 +240,16 @@ public final class GpuProfilerClientEvents {
     private static String formatDuration(long elapsedNanos) {
         double seconds = elapsedNanos / 1_000_000_000.0;
         return String.format("%.1fs", seconds);
+    }
+
+    private static String formatMillis(long nanos) {
+        return String.format("%.3f", nanos / 1_000_000.0);
+    }
+
+    private static String abbreviate(String value, int maximum) {
+        if (value == null || value.length() <= maximum) {
+            return String.valueOf(value);
+        }
+        return value.substring(0, maximum - 3) + "...";
     }
 }

@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerVertexConsumer;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
@@ -16,48 +15,21 @@ import net.minecraft.world.level.material.Fluids;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * GerstnerWaveRenderMixin
  * <p>
- * Replaces the simple sine WaveRenderMixin from the first system.
- * Injects into LiquidBlockRenderer#tesselate to:
- *   1. Classify the water body at this block position
- *   2. Update the Gerstner animator (once per frame guard)
- *   3. The actual vertex displacement is applied via GerstnerVertexConsumer
- *      which wraps the passed VertexConsumer.
+ * Wraps the consumer passed to {@code LiquidBlockRenderer#tesselate} so water
+ * geometry receives the mod's Gerstner displacement and analytic normals.
  * <p>
- * NOTE: The @ModifyArg redirect to wrap the VertexConsumer requires
- * the GerstnerVertexConsumer. We inject at HEAD to update timing,
- * and a separate @ModifyArg targets the consumer parameter.
+ * A narrow mixin is necessary because NeoForge has no event for transforming
+ * vertices while vanilla builds a liquid chunk mesh. Wave time is advanced by
+ * the client tick handler; chunk compilation may run on worker threads and must
+ * never mutate global animation state.
  */
 @Mixin(LiquidBlockRenderer.class)
 public class GerstnerWaveRenderMixin {
-
-    // Track last update time in nanoseconds to throttle to once per render frame
-    private static long lastUpdateNanos = -1L;
-
-    @Inject(
-        method = "tesselate",
-        at = @At("HEAD"),
-        require = 0
-    )
-    private void onTesselate(BlockAndTintGetter level, BlockPos pos,
-                              VertexConsumer consumer, BlockState blockState,
-                              FluidState fluidState, CallbackInfo ci) {
-        if (!fluidState.is(Fluids.WATER) && !fluidState.is(Fluids.FLOWING_WATER)) return;
-        if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get() || !WaterRenderingConfig.updateWavesDuringTessellation()) return;
-
-        // Throttle animator update to once per ~16ms (one frame at 60fps)
-        long now = System.nanoTime();
-        if (now - lastUpdateNanos > 8_000_000L) { // 8ms minimum gap
-            GerstnerWaveAnimator.update();
-            lastUpdateNanos = now;
-        }
-    }
 
     @ModifyVariable(
         method = "tesselate",
@@ -80,7 +52,13 @@ public class GerstnerWaveRenderMixin {
         }
 
         WaterBodyClassifier.WaterType waterType = classifyWater(level, pos);
-        return new GerstnerVertexConsumer(originalConsumer, pos.getX(), pos.getZ(), waterType);
+        return new GerstnerVertexConsumer(
+                originalConsumer,
+                pos.getX(),
+                pos.getY(),
+                pos.getZ(),
+                waterType
+        );
     }
 
     private static WaterBodyClassifier.WaterType classifyWater(BlockAndTintGetter level, BlockPos pos) {

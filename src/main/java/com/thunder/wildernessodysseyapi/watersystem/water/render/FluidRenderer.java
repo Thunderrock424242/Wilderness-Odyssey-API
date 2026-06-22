@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
 import com.thunder.wildernessodysseyapi.watersystem.water.mesh.FluidMesh;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
@@ -53,6 +54,12 @@ public class FluidRenderer {
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
+        try (GpuDiagnostics.Scope ignored = GpuDiagnostics.scope("water.sph")) {
+            renderScoped(event);
+        }
+    }
+
+    private static void renderScoped(RenderLevelStageEvent event) {
         if (!WaterRenderingConfig.ENABLE_SPH_WATER_RENDERING.get()) {
             meshMap.clear();
             return;

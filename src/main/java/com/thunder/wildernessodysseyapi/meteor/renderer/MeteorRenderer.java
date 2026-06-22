@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.meteor.renderer;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
 import com.thunder.wildernessodysseyapi.meteor.entity.MeteorEntity;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -59,6 +60,7 @@ public class MeteorRenderer extends EntityRenderer<MeteorEntity> {
     @Override
     public void render(MeteorEntity entity, float entityYaw, float partialTick,
                        PoseStack poseStack, MultiBufferSource buffers, int packedLight) {
+        try (GpuDiagnostics.Scope ignored = GpuDiagnostics.scope("meteor.renderer")) {
 
         poseStack.pushPose();
 
@@ -101,6 +103,7 @@ public class MeteorRenderer extends EntityRenderer<MeteorEntity> {
         poseStack.popPose();
 
         super.render(entity, entityYaw, partialTick, poseStack, buffers, packedLight);
+        }
     }
 
     @Override
