@@ -6,11 +6,16 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 import net.neoforged.neoforge.common.ModConfigSpec.BooleanValue;
 
 import java.util.HashMap;
+import java.util.Map;
 
-/****
- * StructureConfig for the Wilderness Odyssey API mod.
+/**
+ * Defines common structure-placement and point-of-interest settings.
+ *
+ * <p>NeoForge owns the generated config file through {@link #CONFIG_SPEC};
+ * worldgen and placement systems read typed values instead of hardcoding
+ * balance or debug behavior.</p>
  */
-public class StructureConfig {
+public final class StructureConfig {
     public static final ModConfigSpec CONFIG_SPEC;
 
     /** Debug toggle to skip meteor impact site placement */
@@ -35,9 +40,11 @@ public class StructureConfig {
     public static final ModConfigSpec.IntValue STARTER_STRUCTURE_SPAWN_DENY_RADIUS;
     /** Vertical half-height where hostile mobs may not spawn around the placed starter bunker */
     public static final ModConfigSpec.IntValue STARTER_STRUCTURE_SPAWN_DENY_HEIGHT;
+    /** Per-chunk placement chance for Secret Order villages in eligible jungle biomes. */
+    public static final ModConfigSpec.DoubleValue SECRET_ORDER_VILLAGE_SPAWN_CHANCE;
 
-    private static final HashMap<String, BooleanValue> STRUCTURES = new HashMap<>();
-    private static final HashMap<String, BooleanValue> POIS = new HashMap<>();
+    private static final Map<String, BooleanValue> STRUCTURES = new HashMap<>();
+    private static final Map<String, BooleanValue> POIS = new HashMap<>();
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
     static {
@@ -95,10 +102,17 @@ public class StructureConfig {
                         "Vertical half-height (in blocks up and down) where hostile mob spawns are denied around the starter bunker."
                 )
                 .defineInRange("starterStructureSpawnDenyHeight", 12, 1, 128);
+        SECRET_ORDER_VILLAGE_SPAWN_CHANCE = BUILDER.comment(
+                        "Chance per eligible jungle chunk to attempt Secret Order village placement."
+                )
+                .defineInRange("secretOrderVillageSpawnChance", 0.001D, 0.0D, 1.0D);
         BUILDER.pop();
 
         registerAll();
         CONFIG_SPEC = BUILDER.build();
+    }
+
+    private StructureConfig() {
     }
 
     private static void registerAll() {
@@ -127,13 +141,25 @@ public class StructureConfig {
         });
     }
 
+    /**
+     * Checks whether a registered structure type is enabled in the common config.
+     *
+     * @param id the structure type resource location
+     * @return {@code true} when no override exists or the override is enabled
+     */
     public static boolean isStructureEnabled(ResourceLocation id) {
         BooleanValue value = STRUCTURES.get(id.toString());
-        return value == null ? true : value.get(); // Fixed: No lambda, simple null-check
+        return value == null || value.get();
     }
 
-    public static boolean isPOIEnabled(ResourceLocation id) {
+    /**
+     * Checks whether a registered point-of-interest type is enabled in the common config.
+     *
+     * @param id the point-of-interest type resource location
+     * @return {@code true} when no override exists or the override is enabled
+     */
+    public static boolean isPoiEnabled(ResourceLocation id) {
         BooleanValue value = POIS.get(id.toString());
-        return value == null ? true : value.get(); // Fixed: No lambda, simple null-check
+        return value == null || value.get();
     }
 }

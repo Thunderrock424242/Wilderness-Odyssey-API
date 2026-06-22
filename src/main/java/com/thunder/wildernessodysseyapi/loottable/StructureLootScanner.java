@@ -15,13 +15,18 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
+
 /**
  * Scans structure files for references to loot tables.
  * <p>
  * This utility parses vanilla structure templates (NBT files) and collects
  * any loot tables referenced within block entity or entity data.
  */
-public class StructureLootScanner {
+public final class StructureLootScanner {
+
+    private StructureLootScanner() {
+    }
 
     /**
      * Searches the given directory for structure files and collects any loot table
@@ -39,12 +44,12 @@ public class StructureLootScanner {
                 try {
                     CompoundTag nbt = NbtIo.readCompressed(path, NbtAccounter.unlimitedHeap());
                     scanTemplate(nbt, foundLootTables);
-                } catch (Exception e) {
-                    System.err.println("[StructureLootScanner] Failed reading structure: " + path + ": " + e.getMessage());
+                } catch (Exception exception) {
+                    LOGGER.warn("Unable to scan structure {} for loot-table references", path, exception);
                 }
             }
-        } catch (IOException e) {
-            System.err.println("[StructureLootScanner] Failed listing structure directory: " + e.getMessage());
+        } catch (IOException exception) {
+            LOGGER.warn("Unable to list structure directory {}", structuresDir, exception);
         }
         return foundLootTables;
     }

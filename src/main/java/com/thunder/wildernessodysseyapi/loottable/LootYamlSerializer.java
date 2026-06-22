@@ -14,14 +14,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
+
 /**
  * Utility for round-tripping Minecraft loot tables between codec-backed JSON
  * and human-editable YAML files.
  */
-public class LootYamlSerializer {
+public final class LootYamlSerializer {
 
     private static final DumperOptions OPTIONS = new DumperOptions();
     private static final Yaml YAML;
+
+    private LootYamlSerializer() {
+    }
 
     static {
         OPTIONS.setPrettyFlow(true);
@@ -61,20 +66,15 @@ public class LootYamlSerializer {
             String json = gson.toJson(parsed);
             JsonElement element = JsonParser.parseString(json);
             return LootTable.DIRECT_CODEC.parse(JsonOps.INSTANCE, element).getOrThrow(error -> new IllegalStateException(error));
-        } catch (YAMLException | IllegalStateException e) {
-            System.err.println("[LootYamlSerializer] Invalid YAML: " + yamlPath + ": " + e.getMessage());
+        } catch (YAMLException | IllegalStateException exception) {
+            LOGGER.warn("Invalid loot-table YAML at {}; attempting JSON fallback", yamlPath, exception);
             if (Files.exists(jsonFallbackPath)) {
-                System.err.println("[LootYamlSerializer] Fallback to JSON: " + jsonFallbackPath);
+                LOGGER.info("Loading loot-table JSON fallback from {}", jsonFallbackPath);
                 JsonElement element = JsonParser.parseString(Files.readString(jsonFallbackPath));
                 return LootTable.DIRECT_CODEC.parse(JsonOps.INSTANCE, element).getOrThrow(error -> new IllegalStateException(error));
             } else {
                 throw new IOException("YAML failed and JSON fallback not found for: " + yamlPath);
             }
         }
-    }
-
-    private static Object treeToJson(LootTable table) {
-        JsonElement json = LootTable.DIRECT_CODEC.encodeStart(JsonOps.INSTANCE, table).getOrThrow(error -> new IllegalStateException(error));
-        return JsonParser.parseString(json.toString());
     }
 }

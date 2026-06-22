@@ -15,13 +15,18 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
+
 /**
  * Exports vanilla/modded chest loot tables into config files so pack makers can
  * inspect and override loot behavior outside of code.
  */
-public class LootTableExporter {
+public final class LootTableExporter {
 
     private static final Path CONFIG_DIR = Path.of("config", "loot_tables");
+
+    private LootTableExporter() {
+    }
 
     /**
      * Registers a reload listener that exports loot tables asynchronously during
@@ -42,14 +47,16 @@ public class LootTableExporter {
                 LootTable table = LootTable.DIRECT_CODEC.parse(JsonOps.INSTANCE, json)
                         .getOrThrow(error -> new IllegalStateException(error));
                 tables.put(entry.getKey(), table);
-            } catch (IOException ex) {
-                System.err.println("[LootTableExporter] Failed to read loot table " + entry.getKey() + ": " + ex.getMessage());
+            } catch (IOException exception) {
+                LOGGER.warn("Unable to read loot table {} during export", entry.getKey(), exception);
             }
         }
 
         for (var entry : tables.entrySet()) {
             ResourceLocation id = entry.getKey();
-            if (!id.getPath().startsWith("chests/")) continue;
+            if (!id.getPath().startsWith("chests/")) {
+                continue;
+            }
 
             String modId = id.getNamespace();
             String name = id.getPath().substring("chests/".length());
@@ -68,8 +75,8 @@ public class LootTableExporter {
                     Files.writeString(json, gson.toJson(entry.getValue()));
                 }
 
-            } catch (IOException e) {
-                System.err.println("[LootTableExporter] Failed to export " + id + ": " + e.getMessage());
+            } catch (IOException exception) {
+                LOGGER.warn("Unable to export loot table {}", id, exception);
             }
         }
     }

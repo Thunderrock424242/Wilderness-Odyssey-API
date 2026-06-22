@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.cloak.item;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.core.WildernessOdysseyAPIMainModClass;
+import com.thunder.wildernessodysseyapi.core.ModRegistries;
 import com.thunder.wildernessodysseyapi.cloak.item.module.EchoMaskModuleModifiers;
 import com.thunder.wildernessodysseyapi.cloak.item.module.EchoMaskModuleStorage;
 import net.minecraft.core.particles.ParticleTypes;
@@ -160,7 +160,7 @@ public final class CloakTickHandler {
 
         sendBreathMaskOveruseWarningIfNeeded(player, breathTicks);
         player.addEffect(new MobEffectInstance(
-                WildernessOdysseyAPIMainModClass.CRYO_SHAKES_EFFECT,
+                ModRegistries.CRYO_SHAKES_EFFECT,
                 80,
                 0,
                 true,
@@ -190,7 +190,7 @@ public final class CloakTickHandler {
 
         if (cloakTicks >= NO_MASK_CRYO_SHAKES_TICKS || player.getAirSupply() <= LOW_OXYGEN_TICKS) {
             player.addEffect(new MobEffectInstance(
-                    WildernessOdysseyAPIMainModClass.CRYO_SHAKES_EFFECT,
+                    ModRegistries.CRYO_SHAKES_EFFECT,
                     80,
                     0,
                     true,
@@ -219,7 +219,7 @@ public final class CloakTickHandler {
 
         sendMaskOveruseWarningIfNeeded(player, cloakTicks);
         player.addEffect(new MobEffectInstance(
-                WildernessOdysseyAPIMainModClass.CRYO_SHAKES_EFFECT,
+                ModRegistries.CRYO_SHAKES_EFFECT,
                 80,
                 0,
                 true,
@@ -261,7 +261,7 @@ public final class CloakTickHandler {
 
     private static void applyEchoHypoxia(Player player, int airCeilingTicks) {
         player.addEffect(new MobEffectInstance(
-                WildernessOdysseyAPIMainModClass.ECHO_HYPOXIA_EFFECT,
+                ModRegistries.ECHO_HYPOXIA_EFFECT,
                 100,
                 0,
                 true,
@@ -279,7 +279,7 @@ public final class CloakTickHandler {
         CloakState.resetBreathMaskSession(player);
         CloakState.setMaskCooldownTicks(player, getMaskCooldownTicks(mask));
         player.addEffect(new MobEffectInstance(
-                WildernessOdysseyAPIMainModClass.DESYNCED_EFFECT,
+                ModRegistries.DESYNCED_EFFECT,
                 getMaskCooldownTicks(mask),
                 0,
                 false,
@@ -310,7 +310,7 @@ public final class CloakTickHandler {
     }
 
     private static void recoverAir(Player player, int maxBreath) {
-        if (player.hasEffect(WildernessOdysseyAPIMainModClass.ECHO_HYPOXIA_EFFECT)) {
+        if (player.hasEffect(ModRegistries.ECHO_HYPOXIA_EFFECT)) {
             if (player.getAirSupply() > ECHO_HYPOXIA_AIR_TICKS) {
                 player.setAirSupply(ECHO_HYPOXIA_AIR_TICKS);
             }

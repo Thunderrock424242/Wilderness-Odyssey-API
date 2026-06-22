@@ -1,11 +1,25 @@
 # Wilderness Odyssey Changelog
+<!-- changelog-generator version=0.0.4 previous=0.0.3 base=since:2026-05-22 head=0a4a426b91c6f8b315b3a43bbcc6af85bcd54d14 generated=2026-06-21 -->
+
 ## 0.0.4
+Initial automatic snapshot (committed changes since 2026-05-22):
 Added:
-- Welcome to Wilderness Odyssey!
+- Add this so we can merge the dev [Documentation, Build, AI]
+- Add create to dependcy
+- Added playtesting stuff and ai updates [Documentation, AI]
+- Added playtesting stuff [Assets]
 Changed:
-- Update this file in config/wildernessodysseyapi/changelog.txt to customize releases.
+- Performance tweaks [Build, Mixins, Water system]
+- Weird issues [Build, Mixins, World generation]
+- Updated new dimesnion [Documentation, Mixins, Rift systems]
+- Optomaztions [Rift systems, Water system]
+- Re orgnized files [Build, Documentation, Telemetry]
+- Small fix [Build]
+- Updated systems and added our new entity [World generation, Cloak, Configuration]
 Fixed:
-- 
+- Fixed cloak issue [Cloak, Assets]
+Removed:
+- Removed not needed for now [Build]
 
 ## 0.0.3
 Added:
@@ -13,4 +27,4 @@ Added:
 Changed:
 - 
 Fixed:
-- 
+-

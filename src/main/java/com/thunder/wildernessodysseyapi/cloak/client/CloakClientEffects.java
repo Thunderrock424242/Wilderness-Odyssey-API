@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.cloak.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.core.WildernessOdysseyAPIMainModClass;
+import com.thunder.wildernessodysseyapi.core.ModRegistries;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.Mth;
@@ -28,9 +28,9 @@ public final class CloakClientEffects {
             return;
         }
 
-        boolean cryoShakes = player.hasEffect(WildernessOdysseyAPIMainModClass.CRYO_SHAKES_EFFECT);
-        boolean echoHypoxia = player.hasEffect(WildernessOdysseyAPIMainModClass.ECHO_HYPOXIA_EFFECT);
-        boolean desynced = player.hasEffect(WildernessOdysseyAPIMainModClass.DESYNCED_EFFECT);
+        boolean cryoShakes = player.hasEffect(ModRegistries.CRYO_SHAKES_EFFECT);
+        boolean echoHypoxia = player.hasEffect(ModRegistries.ECHO_HYPOXIA_EFFECT);
+        boolean desynced = player.hasEffect(ModRegistries.DESYNCED_EFFECT);
         boolean cloaked = player.hasEffect(MobEffects.INVISIBILITY);
 
         if (!cryoShakes && !echoHypoxia && !desynced && !cloaked) {
@@ -64,13 +64,13 @@ public final class CloakClientEffects {
         }
 
         float strength = 0.0F;
-        if (player.hasEffect(WildernessOdysseyAPIMainModClass.CRYO_SHAKES_EFFECT)) {
+        if (player.hasEffect(ModRegistries.CRYO_SHAKES_EFFECT)) {
             strength = 0.9F;
         }
-        if (player.hasEffect(WildernessOdysseyAPIMainModClass.ECHO_HYPOXIA_EFFECT)) {
+        if (player.hasEffect(ModRegistries.ECHO_HYPOXIA_EFFECT)) {
             strength = Math.max(strength, 1.6F);
         }
-        if (player.hasEffect(WildernessOdysseyAPIMainModClass.DESYNCED_EFFECT)) {
+        if (player.hasEffect(ModRegistries.DESYNCED_EFFECT)) {
             strength = Math.max(strength, 2.4F);
         }
 
@@ -92,9 +92,9 @@ public final class CloakClientEffects {
             return;
         }
 
-        if (player.hasEffect(WildernessOdysseyAPIMainModClass.DESYNCED_EFFECT)) {
+        if (player.hasEffect(ModRegistries.DESYNCED_EFFECT)) {
             event.setFOV(event.getFOV() * 0.68D);
-        } else if (player.hasEffect(WildernessOdysseyAPIMainModClass.ECHO_HYPOXIA_EFFECT)) {
+        } else if (player.hasEffect(ModRegistries.ECHO_HYPOXIA_EFFECT)) {
             event.setFOV(event.getFOV() * 0.76D);
         }
     }

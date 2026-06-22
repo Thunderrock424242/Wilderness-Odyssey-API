@@ -10,13 +10,18 @@ import net.neoforged.neoforge.common.NeoForge;
 import java.io.IOException;
 import java.nio.file.Path;
 
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
+
 /**
  * Loads per-table config overrides from disk and swaps chest loot tables at
  * load time.
  */
-public class LootTableOverrideHandler {
+public final class LootTableOverrideHandler {
 
     private static final Path CONFIG_DIR = Path.of("config", "loot_tables");
+
+    private LootTableOverrideHandler() {
+    }
 
     /**
      * Registers the loot-table replacement listener.
@@ -31,7 +36,9 @@ public class LootTableOverrideHandler {
      */
     public static void onLootLoad(LootTableLoadEvent event) {
         ResourceLocation id = event.getName();
-        if (!id.getPath().startsWith("chests/")) return;
+        if (!id.getPath().startsWith("chests/")) {
+            return;
+        }
 
         String modId = id.getNamespace();
         String name = id.getPath().substring("chests/".length());
@@ -42,8 +49,8 @@ public class LootTableOverrideHandler {
         try {
             LootTable table = LootYamlSerializer.readLootTableWithFallback(yamlPath, jsonPath);
             event.setTable(table);
-        } catch (IOException e) {
-            System.err.println("[LootTableOverrideHandler] Failed to load override for " + id + ": " + e.getMessage());
+        } catch (IOException exception) {
+            LOGGER.warn("Unable to load loot-table override for {}", id, exception);
         }
     }
 }

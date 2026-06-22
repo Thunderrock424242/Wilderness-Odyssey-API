@@ -1,195 +1,93 @@
 package com.thunder.wildernessodysseyapi.core;
 
-import com.mojang.brigadier.CommandDispatcher;
-import com.thunder.wildernessodysseyapi.bugfixes.InfiniteSourceHandler;
-import com.thunder.wildernessodysseyapi.faq.FaqCommand;
-import com.thunder.wildernessodysseyapi.faq.FaqReloadListener;
-import com.thunder.wildernessodysseyapi.modlisttracker.commands.ModListDiffCommand;
-import com.thunder.wildernessodysseyapi.modlisttracker.commands.ModListVersionCommand;
-import com.thunder.wildernessodysseyapi.modlisttracker.commands.ConfigAuditCommand;
-import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
-import com.thunder.wildernessodysseyapi.changelog.command.ChangelogCommand;
-import com.thunder.wildernessodysseyapi.command.UnstuckCommand;
-import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
-import com.thunder.wildernessodysseyapi.radiation.RadiationEffect;
-import com.thunder.wildernessodysseyapi.radiation.RadiationTickHandler;
-import com.thunder.wildernessodysseyapi.effect.SimpleStatusEffect;
-import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
-import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
-import com.thunder.wildernessodysseyapi.lorebook.command.LoreBookCommand;
-import com.thunder.wildernessodysseyapi.meteor.command.MeteorCommand;
-import com.thunder.wildernessodysseyapi.modpack.structure.command.ModpackStructureCommand;
-import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
-import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationCommands;
-import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationRelayConfig;
-import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
-import com.thunder.wildernessodysseyapi.structureblock.config.StructureBlockConfig;
-import com.thunder.wildernessodysseyapi.truedarkness.config.TrueDarknessConfig;
-import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideWorldUpdater;
-import com.thunder.wildernessodysseyapi.watersystem.water.entity.BoatTiltStore;
-import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
-import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
-import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
-import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
-import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
-import com.thunder.wildernessodysseyapi.meteor.worldgen.MeteorFeature;
-import com.thunder.wildernessodysseyapi.worldgen.processor.ModProcessors;
-import com.thunder.wildernessodysseyapi.worldgen.biome.BiomeCompatibilityBootstrap;
-import com.thunder.wildernessodysseyapi.modpack.structure.ModpackStructureRegistry;
-import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
-import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
-import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
-import com.thunder.wildernessodysseyapi.config.ConfigRegistrationValidator;
-import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
-import com.thunder.wildernessodysseyapi.item.ModItems;
-import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
-import com.thunder.wildernessodysseyapi.cloak.item.CloakState;
-import com.thunder.wildernessodysseyapi.cloak.item.CloakTickHandler;
-import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
-import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
-import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootConditions;
-import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootFunctions;
-import com.thunder.wildernessodysseyapi.cloak.network.CloakInputPayload;
-import com.thunder.wildernessodysseyapi.lorebook.network.OpenCodexPayload;
-import com.thunder.wildernessodysseyapi.lorebook.network.SyncLoreBookPayload;
-import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
-import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
-import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockEntities;
-import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
-import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftWorldgen;
-import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
 import com.thunder.wildernessodysseyapi.ai.story.AIChatListener;
+import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
+import com.thunder.wildernessodysseyapi.bugfixes.InfiniteSourceHandler;
+import com.thunder.wildernessodysseyapi.command.ModCommands;
+import com.thunder.wildernessodysseyapi.config.ModConfigRegistration;
+import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
-import com.thunder.wildernessodysseyapi.gamerules.GameRulesListManager;
-import com.thunder.wildernessodysseyapi.server.ServerPropertiesTemplateManager;
-import com.thunder.wildernessodysseyapi.telemetry.*;
-import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
-
-import com.thunder.wildernessodysseyapi.worldgen.command.StructureInfoCommand;
-import com.thunder.wildernessodysseyapi.worldgen.command.StructurePlacementDebugCommand;
-import com.thunder.wildernessodysseyapi.worldgen.command.WorldGenScanCommand;
+import com.thunder.wildernessodysseyapi.item.ModItems;
+import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
+import com.thunder.wildernessodysseyapi.network.ModPayloads;
+import com.thunder.wildernessodysseyapi.radiation.RadiationTickHandler;
+import com.thunder.wildernessodysseyapi.server.ServerLifecycleEvents;
+import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryReporter;
+import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryReporter;
+import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueProcessor;
+import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideWorldUpdater;
+import com.thunder.wildernessodysseyapi.worldgen.biome.BiomeCompatibilityBootstrap;
 import com.thunder.wildernessodysseyapi.worldgen.spawn.OceanSpawnLocator;
-import com.thunder.wildernessodysseyapi.worldupgrade.command.WorldUpgradeCommand;
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.item.CreativeModeTabs;
-import net.minecraft.world.level.levelgen.feature.Feature;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.config.ModConfig;
-import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import net.neoforged.neoforge.event.level.LevelEvent;
-import net.neoforged.neoforge.event.server.ServerStartingEvent;
-import net.neoforged.neoforge.event.server.ServerStoppingEvent;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
-import net.neoforged.neoforge.network.handling.IPayloadHandler;
-import net.neoforged.neoforge.network.registration.PayloadRegistrar;
-import net.neoforged.neoforge.registries.DeferredHolder;
-import net.neoforged.neoforge.registries.DeferredRegister;
 
-import java.util.HashMap;
-import java.util.Map;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
 
-import static com.thunder.wildernessodysseyapi.core.ModConstants.*;
-
+/**
+ * Wires the Wilderness Odyssey API modules into NeoForge.
+ *
+ * <p>The entrypoint deliberately owns only startup orchestration. Registries,
+ * configs, payloads, commands, and runtime events live in focused classes so
+ * feature code does not accumulate in the mod constructor.</p>
+ */
 @Mod(MOD_ID)
-public class WildernessOdysseyAPIMainModClass {
+public final class WildernessOdysseyAPIMainModClass {
 
-    private static final String CONFIG_FOLDER = MOD_ID + "/";
-    private static final Map<CustomPacketPayload.Type<?>, NetworkMessage<?>> MESSAGES = new HashMap<>();
-
-    // ---- DeferredRegisters ----
-    public static final DeferredRegister<MobEffect> MOB_EFFECTS =
-            DeferredRegister.create(Registries.MOB_EFFECT, MOD_ID);
-
-    public static final DeferredRegister<Feature<?>> FEATURES =
-            DeferredRegister.create(Registries.FEATURE, MOD_ID);
-
-    // ---- Registered objects ----
-    public static final DeferredHolder<MobEffect, RadiationEffect> RADIATION_EFFECT =
-            MOB_EFFECTS.register("radiation", RadiationEffect::new);
-
-    public static final DeferredHolder<MobEffect, SimpleStatusEffect> CRYO_SHAKES_EFFECT =
-            MOB_EFFECTS.register("cryo_shakes", () -> SimpleStatusEffect.harmful(0x8BD7FF));
-
-    public static final DeferredHolder<MobEffect, SimpleStatusEffect> ECHO_HYPOXIA_EFFECT =
-            MOB_EFFECTS.register("echo_hypoxia", () -> SimpleStatusEffect.harmful(0x6A37C8));
-
-    public static final DeferredHolder<MobEffect, SimpleStatusEffect> DESYNCED_EFFECT =
-            MOB_EFFECTS.register("desynced", () -> SimpleStatusEffect.harmful(0xB24CFF));
-
-    public static final DeferredHolder<Feature<?>, MeteorFeature> METEOR_IMPACT_FEATURE =
-            FEATURES.register("meteor_impact", MeteorFeature::new);
-
-    private record NetworkMessage<T extends CustomPacketPayload>(StreamCodec<? extends FriendlyByteBuf, T> reader, IPayloadHandler<T> handler) {}
-
+    /**
+     * Creates the mod and registers its NeoForge integration points.
+     *
+     * @param modEventBus the mod-scoped lifecycle and registry event bus
+     * @param container the active mod container used for config registration
+     */
     public WildernessOdysseyAPIMainModClass(IEventBus modEventBus, ModContainer container) {
-        LOGGER.info("WildernessOdysseyAPI initialized. I will also start to track mod conflicts");
+        LOGGER.info("Initializing Wilderness Odyssey API and mod-conflict tracking");
 
-        // 1. Mod Bus Events
+        // Mod-bus listeners handle lifecycle work that NeoForge runs during startup.
         modEventBus.addListener(this::commonSetup);
-        modEventBus.addListener(this::registerPayloads);
-        modEventBus.addListener(this::onConfigLoaded);
-        modEventBus.addListener(this::addCreative);
+        modEventBus.addListener(ModPayloads::register);
+        modEventBus.addListener(ModConfigRegistration::onConfigLoaded);
+        modEventBus.addListener(ModConfigRegistration::onConfigReloaded);
+        modEventBus.addListener(this::addCreativeTabEntries);
 
-        // 2. Registries
-        registerRegistries(modEventBus);
-
-        // 3. Forge Bus Events
-        registerEventHandlers();
-
-        // 4. Configs
-        registerConfigs(container);
-
-        // Register deferred registers to the mod event bus
-        MOB_EFFECTS.register(modEventBus);
-        FEATURES.register(modEventBus);
-
-        // Register server tick event for radiation zone checks
+        ModRegistries.register(modEventBus);
+        ModConfigRegistration.register(container);
+        registerGameEventHandlers();
         RadiationTickHandler.register();
 
         DonationReminderConfig.validateVersion();
     }
 
-
-    // =========================================
-    // REGISTRATION HELPERS
-    // =========================================
-
-    private void registerRegistries(IEventBus modEventBus) {
-        ModProcessors.PROCESSORS.register(modEventBus);
-        ModCreativeTabs.register(modEventBus);
-        ModAttachments.ATTACHMENTS.register(modEventBus);
-        ModEntities.register(modEventBus);
-        ModLootFunctions.LOOT_FUNCTIONS.register(modEventBus);
-        ModLootConditions.LOOT_CONDITIONS.register(modEventBus);
-        TemporalRiftBlocks.register(modEventBus);
-        TemporalRiftBlockEntities.register(modEventBus);
-        TemporalRiftWorldgen.register(modEventBus);
-        AnomalyBlocks.register(modEventBus);
-
-        CryoTubeBlock.register(modEventBus);
-        ModItems.register(modEventBus);
-        ModSoundEvents.register(modEventBus);
-        WildernessFluidRegistry.register(modEventBus);
+    // Common setup is queued because biome compatibility touches registries after construction.
+    private void commonSetup(FMLCommonSetupEvent event) {
+        event.enqueueWork(() -> {
+            BiomeCompatibilityBootstrap.initialize();
+            LOGGER.info("Wilderness Odyssey API setup complete");
+        });
+        LOGGER.info("Mod pack version: {}", VERSION);
     }
 
-    private void registerEventHandlers() {
-        NeoForge.EVENT_BUS.register(this);
+    // Adds the mod's utility items only when NeoForge is building the matching vanilla tab.
+    private void addCreativeTabEntries(BuildCreativeModeTabContentsEvent event) {
+        if (event.getTabKey() != CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            return;
+        }
+
+        event.accept(CryoTubeBlock.CRYO_TUBE.get());
+        event.accept(TemporalRiftBlocks.TIME_CAPSULE.get());
+        event.accept(AnomalyBlocks.ANOMALY_GATEWAY.get());
+        event.accept(ModItems.FIELD_CODEX.get());
+    }
+
+    // The game bus owns live server/world events after mod construction is complete.
+    private static void registerGameEventHandlers() {
         NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
         NeoForge.EVENT_BUS.register(AIChatListener.class);
         NeoForge.EVENT_BUS.register(PlayerTelemetryReporter.class);
@@ -198,159 +96,7 @@ public class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(LoreBookEvents.class);
         NeoForge.EVENT_BUS.register(TideWorldUpdater.class);
         NeoForge.EVENT_BUS.register(OceanSpawnLocator.class);
-    }
-
-    private void registerConfigs(ModContainer container) {
-        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-structures.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-async.toml");
-
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-donations-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TelemetryConsentConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-telemetry-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DebugOverlayConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-debug-overlay-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TrueDarknessConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-true-darkness-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, WaterRenderingConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-water-rendering-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, MinecraftVerificationRelayConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-verification-relay-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PlayerTelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-telemetry-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, EventTelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-event-telemetry-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TelemetryConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-telemetry-master-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, FeedbackConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-feedback-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, RiftfallConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-riftfall-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TemporalRiftConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-temporal-rift-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, OwnershipConfig.CONFIG_SPEC, CONFIG_FOLDER + "wildernessodysseyapi-ownership.toml");
-    }
-
-    // =========================================
-    // LIFECYCLE & SETUP
-    // =========================================
-
-    private void commonSetup(final FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> {
-            BiomeCompatibilityBootstrap.initialize();
-            LOGGER.info("Wilderness Odyssey setup complete!");
-        });
-        LOGGER.warn("Mod Pack Version: {}", VERSION);
-        LOGGER.warn("This message is for development purposes only.");
-    }
-
-    private void registerPayloads(final RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("1");
-        registrar.playToServer(CloakInputPayload.TYPE, CloakInputPayload.STREAM_CODEC, (payload, context) ->
-                context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer serverPlayer) {
-                        CloakState.setHoldingBreath(serverPlayer, payload.holdingBreathDown());
-                        if (payload.cloakTogglePressed()) {
-                            CloakTickHandler.tryToggleCloak(serverPlayer);
-                        }
-                    }
-                }));
-        registrar.playToClient(SyncLoreBookPayload.TYPE, SyncLoreBookPayload.STREAM_CODEC, (payload, context) ->
-                context.enqueueWork(() -> CodexClientState.markCollected(payload.bookId())));
-        registrar.playToClient(OpenCodexPayload.TYPE, OpenCodexPayload.STREAM_CODEC, (payload, context) ->
-                context.enqueueWork(() -> {
-                    if (payload.open()) {
-                        CodexClientState.requestOpen();
-                    }
-                }));
-    }
-
-    private void addCreative(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(CryoTubeBlock.CRYO_TUBE.get());
-            event.accept(TemporalRiftBlocks.TIME_CAPSULE.get());
-            event.accept(AnomalyBlocks.ANOMALY_GATEWAY.get());
-            event.accept(ModItems.FIELD_CODEX.get());
-        }
-    }
-
-    // =========================================
-    // SERVER EVENTS
-    // =========================================
-
-    @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {
-        AsyncTaskManager.initialize(AsyncThreadingConfig.values());
-        ServerPropertiesTemplateManager.ensureManagedServerProperties(event.getServer());
-        GameRulesListManager.ensureRulesFileExists(event.getServer());
-        GameRulesListManager.applyConfiguredRules(event.getServer());
-        ModpackStructureRegistry.loadAll();
-
-        if (OwnershipConfig.CONFIG.showNoticeOnStartup()) {
-            LOGGER.info("[Ownership] Project: {}", OwnershipConfig.CONFIG.projectName());
-            LOGGER.info("[Ownership] Owner: {}", OwnershipConfig.CONFIG.ownerName());
-            LOGGER.info("[Ownership] Notice: {}", OwnershipConfig.CONFIG.ownershipNotice());
-            LOGGER.info("[Ownership] Contact: {}", OwnershipConfig.CONFIG.supportContact());
-        }
-    }
-
-    @SubscribeEvent
-    public void onServerTick(ServerTickEvent.Post event) {
-        // Phase 1 Fix: Flushes the async queue on the main thread safely
-        if (event.hasTime() && event.getServer() != null) {
-            AsyncTaskManager.drainMainThreadQueue(event.getServer());
-            for (ServerLevel level : event.getServer().getAllLevels()) {
-                RiftfallSystem.tick(level);
-            }
-        }
-    }
-
-    @SubscribeEvent
-    public void onServerStopping(ServerStoppingEvent event) {
-        AsyncTaskManager.shutdown();
-    }
-
-    @SubscribeEvent
-    public void onRegisterCommands(RegisterCommandsEvent event) {
-        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
-        ModListDiffCommand.register(dispatcher);
-        ModListVersionCommand.register(dispatcher);
-        ConfigAuditCommand.register(dispatcher);
-        StructureInfoCommand.register(dispatcher);
-        FaqCommand.register(dispatcher);
-        DonateCommand.register(dispatcher);
-        ChangelogCommand.register(dispatcher);
-        WorldGenScanCommand.register(dispatcher);
-        StructurePlacementDebugCommand.register(dispatcher);
-        LoreBookCommand.register(dispatcher);
-        ModpackStructureCommand.register(dispatcher);
-        TelemetryConsentCommand.register(dispatcher);
-        TelemetryQueueStatsCommand.register(dispatcher);
-        FeedbackCommand.register(dispatcher);
-        WorldUpgradeCommand.register(dispatcher);
-        MeteorCommand.register(dispatcher);
-        UnstuckCommand.register(dispatcher);
-        MinecraftVerificationCommands.register(dispatcher);
-    }
-
-    // =========================================
-    // PLAYER & WORLD EVENTS
-    // =========================================
-
-    @SubscribeEvent
-    public void onLevelUnload(LevelEvent.Unload event) {
-        WaterBodyClassifier.clearCache();
-        BoatTiltStore.clear();
-        SPHSimulationManager.get().shutdown();
-    }
-
-    @SubscribeEvent
-    public void onReload(AddReloadListenerEvent event) {
-        event.addListener(new FaqReloadListener());
-    }
-
-    public void onConfigLoaded(ModConfigEvent.Loading event) {
-        handleConfigUpdate(event.getConfig());
-    }
-
-    public void onConfigReloaded(ModConfigEvent.Reloading event) {
-        handleConfigUpdate(event.getConfig());
-    }
-
-    private void handleConfigUpdate(ModConfig config) {
-        if (config.getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
-            AsyncTaskManager.initialize(AsyncThreadingConfig.values());
-        } else if (config.getSpec() == StructureBlockConfig.CONFIG_SPEC) {
-            StructureBlockSettings.reloadFromConfig();
-        }
+        NeoForge.EVENT_BUS.register(ModCommands.class);
+        NeoForge.EVENT_BUS.register(ServerLifecycleEvents.class);
     }
 }

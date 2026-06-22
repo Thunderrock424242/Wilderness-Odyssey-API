@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.sph;
 
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -11,7 +12,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * The server simulation is what ultimately places real water blocks
  * when the fluid settles.
  */
-@EventBusSubscriber(modid = "wildernessodysseyapi", bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber(modid = ModConstants.MOD_ID)
 public class ServerTickHandler {
 
     private static final float SERVER_TICK_DELTA = 0.05f;

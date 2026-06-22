@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -23,7 +24,7 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
  *
  * Can be toggled with a config option (defaults on).
  */
-@EventBusSubscriber(modid = "wildernessodysseyapi", bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
+@EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public class TideHudOverlay {
 
     private static boolean hudEnabled = false;

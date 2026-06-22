@@ -12,8 +12,11 @@ import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 /**
  * Utility window for viewing logged mod list changes.
  */
-public class ModDiffViewer {
+public final class ModDiffViewer {
     private static final Path LOG_FILE = Paths.get("logs/mod-changes.log");
+
+    private ModDiffViewer() {
+    }
 
     /**
      * Creates and shows the swing window displaying the diff log.
@@ -71,8 +74,8 @@ public class ModDiffViewer {
                 }
                 doc.insertString(doc.getLength(), line + "\n", style);
             }
-        } catch (IOException | BadLocationException e) {
-            e.printStackTrace();
+        } catch (IOException | BadLocationException exception) {
+            LOGGER.error("Unable to display the mod-list change log from {}", LOG_FILE, exception);
         }
     }
 }

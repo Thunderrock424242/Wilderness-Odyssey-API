@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.api.distmarker.Dist;
@@ -21,7 +22,7 @@ import java.util.WeakHashMap;
  * Uses a WeakHashMap to track previous-tick water state per entity
  * so we catch the exact frame of entry without ticking every entity.
  */
-@EventBusSubscriber(modid = "wildernessodysseyapi", bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
+@EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public class WaterEntryEventHandler {
 
     private static final WeakHashMap<Entity, Boolean> wasInWater = new WeakHashMap<>();
