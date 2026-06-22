@@ -1,15 +1,17 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.entity;
 
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.shore.ShorelineWaterManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.vehicle.AbstractBoat;
+import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -39,13 +41,13 @@ public final class WaveEntityPhysics {
         Entity entity = event.getEntity();
         Level level = entity.level();
 
-        if (entity instanceof AbstractBoat boat && !isBoatTouchingWater(boat)) {
+        if (entity instanceof Boat boat && !isBoatTouchingWater(boat)) {
             if (level.isClientSide()) {
                 BoatTiltStore.remove(boat.getId());
             }
             return;
         }
-        if (!entity.isInWater() && !(entity instanceof AbstractBoat)) {
+        if (!entity.isInWater() && !(entity instanceof Boat)) {
             return;
         }
 
@@ -54,13 +56,13 @@ public final class WaveEntityPhysics {
 
         // Rendering state is client-owned; gameplay movement is server-owned.
         if (level.isClientSide()) {
-            if (entity instanceof AbstractBoat boat) {
+            if (entity instanceof Boat boat) {
                 updateBoatVisuals(boat, type);
             }
             return;
         }
 
-        if (entity instanceof AbstractBoat boat) {
+        if (entity instanceof Boat boat) {
             applyBoatForces(boat, type, level);
         } else if (entity instanceof ItemEntity item) {
             applyItemForces(item, type, level);
@@ -71,7 +73,7 @@ public final class WaveEntityPhysics {
 
     // Client rendering follows the analytic surface normal in boat-local axes.
 
-    private static void updateBoatVisuals(AbstractBoat boat, WaterBodyClassifier.WaterType type) {
+    private static void updateBoatVisuals(Boat boat, WaterBodyClassifier.WaterType type) {
         float worldX = (float) boat.getX();
         float worldZ = (float) boat.getZ();
         GerstnerWaveProfile profile = profileFor(type);
@@ -96,11 +98,12 @@ public final class WaveEntityPhysics {
 
     // Server movement uses the same spectrum evaluated from authoritative time.
 
-    private static void applyBoatForces(AbstractBoat boat, WaterBodyClassifier.WaterType type, Level level) {
+    private static void applyBoatForces(Boat boat, WaterBodyClassifier.WaterType type, Level level) {
         float[] push = getServerPush(level, (float) boat.getX(), (float) boat.getZ(), type);
 
         if (type == WaterBodyClassifier.WaterType.OCEAN) {
             addTidalCurrent(level, push, 0.002f);
+            addShorelineFlow(level, push, boat.getX(), boat.getZ(), 0.0025f);
         }
 
         boat.setDeltaMovement(
@@ -112,6 +115,9 @@ public final class WaveEntityPhysics {
 
     private static void applyItemForces(ItemEntity item, WaterBodyClassifier.WaterType type, Level level) {
         float[] push = getServerPush(level, (float) item.getX(), (float) item.getZ(), type);
+        if (type == WaterBodyClassifier.WaterType.OCEAN) {
+            addShorelineFlow(level, push, item.getX(), item.getZ(), 0.0015f);
+        }
         item.setDeltaMovement(
                 item.getDeltaMovement().x + push[0] * 0.4f,
                 item.getDeltaMovement().y,
@@ -133,6 +139,7 @@ public final class WaveEntityPhysics {
             float tidalBoost = 1.0f + Math.abs(TideSystem.getTideRate(level)) * 0.5f;
             push[0] *= tidalBoost;
             push[1] *= tidalBoost;
+            addShorelineFlow(level, push, entity.getX(), entity.getZ(), 0.0012f);
         }
 
         entity.setDeltaMovement(
@@ -164,7 +171,27 @@ public final class WaveEntityPhysics {
         push[1] += tidalDirection[1] * tideRate * strength;
     }
 
-    private static boolean isBoatTouchingWater(AbstractBoat boat) {
+    private static void addShorelineFlow(
+            Level level,
+            float[] push,
+            double worldX,
+            double worldZ,
+            float strength
+    ) {
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return;
+        }
+
+        ShorelineWaterManager.FlowSample flow =
+                ShorelineWaterManager.get().sample(serverLevel, worldX, worldZ);
+        if (!flow.wet()) {
+            return;
+        }
+        push[0] += flow.velocityX() * strength;
+        push[1] += flow.velocityZ() * strength;
+    }
+
+    private static boolean isBoatTouchingWater(Boat boat) {
         // A floating boat's block position can sit just above the surface, so
         // check both its feet and the block immediately beneath the hull.
         return boat.level().getFluidState(boat.blockPosition()).is(FluidTags.WATER)

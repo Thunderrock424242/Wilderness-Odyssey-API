@@ -27,7 +27,7 @@ import java.util.Random;
 @EventBusSubscriber(modid = "wildernessodysseyapi")
 public final class ShoreWaveSpawner {
 
-    private static final boolean ENABLED = false;
+    private static final boolean ENABLED = true;
 
     private static final int SEA_LEVEL = 62;
     private static final int TICK_INTERVAL = 160;
@@ -150,6 +150,15 @@ public final class ShoreWaveSpawner {
         int particleCount = Math.max(8, Math.round(SPHConstants.SHORE_WAVE_PARTICLES * (0.55f + tideMotion * 0.45f)));
         float impulseX = shoreDirection.getStepX() * horizontalImpulse;
         float impulseZ = shoreDirection.getStepZ() * horizontalImpulse;
+        ShorelineWaterManager.FlowSample shallowFlow = ShorelineWaterManager.get().sample(
+                level,
+                candidate.surface().getX() + 0.5,
+                candidate.surface().getZ() + 0.5
+        );
+        if (shallowFlow.wet()) {
+            impulseX += shallowFlow.velocityX() * 0.12f;
+            impulseZ += shallowFlow.velocityZ() * 0.12f;
+        }
 
         SPHSimulationManager.get().createTransientSimulation(
                 spawnX, spawnY, spawnZ,

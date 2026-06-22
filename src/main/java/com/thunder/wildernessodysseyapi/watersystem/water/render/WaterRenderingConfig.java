@@ -14,6 +14,8 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec CONFIG_SPEC;
 
     public static final ModConfigSpec.BooleanValue ENABLE_GERSTNER_WAVES;
+    public static final ModConfigSpec.BooleanValue ENABLE_DYNAMIC_OCEAN_SURFACE;
+    public static final ModConfigSpec.BooleanValue ENABLE_WATER_CORE_SHADER;
     public static final ModConfigSpec.BooleanValue ENABLE_SPH_WATER_RENDERING;
     public static final ModConfigSpec.BooleanValue ENABLE_RIPPLES;
     public static final ModConfigSpec.BooleanValue AUTO_OPTIMIZE_WITH_RENDERER_MODS;
@@ -25,6 +27,8 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.IntValue NORMAL_RIPPLE_SEGMENTS;
     public static final ModConfigSpec.IntValue NORMAL_SPLASH_PARTICLES;
     public static final ModConfigSpec.IntValue NORMAL_WAVE_TRAINS;
+    public static final ModConfigSpec.IntValue NORMAL_OCEAN_RENDER_DISTANCE_BLOCKS;
+    public static final ModConfigSpec.IntValue NORMAL_OCEAN_CELL_SIZE;
 
     public static final ModConfigSpec.IntValue OPTIMIZED_SPH_RENDER_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue OPTIMIZED_MAX_RENDERED_SPH_SIMULATIONS;
@@ -33,6 +37,8 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.IntValue OPTIMIZED_RIPPLE_SEGMENTS;
     public static final ModConfigSpec.IntValue OPTIMIZED_SPLASH_PARTICLES;
     public static final ModConfigSpec.IntValue OPTIMIZED_WAVE_TRAINS;
+    public static final ModConfigSpec.IntValue OPTIMIZED_OCEAN_RENDER_DISTANCE_BLOCKS;
+    public static final ModConfigSpec.IntValue OPTIMIZED_OCEAN_CELL_SIZE;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -43,8 +49,14 @@ public final class WaterRenderingConfig {
         ENABLE_GERSTNER_WAVES = builder
                 .comment("Enable Gerstner displacement for vanilla water vertices.")
                 .define("enableGerstnerWaves", true);
+        ENABLE_DYNAMIC_OCEAN_SURFACE = builder
+                .comment("Overlay baked ocean tops near the camera with a seam-free per-frame Gerstner mesh.")
+                .define("enableDynamicOceanSurface", true);
+        ENABLE_WATER_CORE_SHADER = builder
+                .comment("Use the built-in Fresnel/absorption water shader when no external shader pack owns water rendering.")
+                .define("enableWaterCoreShader", true);
         ENABLE_SPH_WATER_RENDERING = builder
-                .comment("Render transient SPH water meshes from bucket pours and shore wash.")
+                .comment("Render synchronized SPH water meshes from persistent pours and transient shore wash.")
                 .define("enableSphWaterRendering", true);
         ENABLE_RIPPLES = builder
                 .comment("Render cosmetic ripple rings and splash particles when entities enter water.")
@@ -76,6 +88,12 @@ public final class WaterRenderingConfig {
         NORMAL_WAVE_TRAINS = builder
                 .comment("Maximum Gerstner wave trains evaluated per water vertex.")
                 .defineInRange("waveTrains", 4, 1, 4);
+        NORMAL_OCEAN_RENDER_DISTANCE_BLOCKS = builder
+                .comment("Radius of the per-frame ocean surface around the camera.")
+                .defineInRange("oceanRenderDistanceBlocks", 40, 12, 96);
+        NORMAL_OCEAN_CELL_SIZE = builder
+                .comment("Horizontal ocean mesh spacing. One gives block-resolution shore edges.")
+                .defineInRange("oceanCellSize", 1, 1, 4);
         builder.pop();
 
         builder.comment("Optimized profile used when Sodium or Embeddium is loaded.")
@@ -101,6 +119,12 @@ public final class WaterRenderingConfig {
         OPTIMIZED_WAVE_TRAINS = builder
                 .comment("Maximum Gerstner wave trains evaluated per water vertex.")
                 .defineInRange("waveTrains", 2, 1, 4);
+        OPTIMIZED_OCEAN_RENDER_DISTANCE_BLOCKS = builder
+                .comment("Radius of the per-frame ocean surface around the camera.")
+                .defineInRange("oceanRenderDistanceBlocks", 28, 12, 96);
+        OPTIMIZED_OCEAN_CELL_SIZE = builder
+                .comment("Horizontal ocean mesh spacing used with renderer optimization mods.")
+                .defineInRange("oceanCellSize", 2, 1, 4);
         builder.pop();
 
         builder.pop();
@@ -180,5 +204,19 @@ public final class WaterRenderingConfig {
             case POND -> 2;
         };
         return Math.max(1, Math.min(requested, profileMaximum));
+    }
+
+    /** Returns the active per-frame ocean radius in blocks. */
+    public static int oceanRenderDistanceBlocks() {
+        return usesOptimizedProfile()
+                ? OPTIMIZED_OCEAN_RENDER_DISTANCE_BLOCKS.get()
+                : NORMAL_OCEAN_RENDER_DISTANCE_BLOCKS.get();
+    }
+
+    /** Returns the active per-frame ocean mesh spacing in blocks. */
+    public static int oceanCellSize() {
+        return usesOptimizedProfile()
+                ? OPTIMIZED_OCEAN_CELL_SIZE.get()
+                : NORMAL_OCEAN_CELL_SIZE.get();
     }
 }

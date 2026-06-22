@@ -51,26 +51,34 @@ public class GerstnerWaveRenderMixin {
             return originalConsumer;
         }
 
-        WaterBodyClassifier.WaterType waterType = classifyWater(level, pos);
+        LevelReader waterLevel = resolveLevelReader(level);
+        WaterBodyClassifier.WaterType waterType = waterLevel == null
+                ? WaterBodyClassifier.WaterType.POND
+                : WaterBodyClassifier.classify(waterLevel, pos);
+        boolean dynamicOceanSurface = waterLevel != null
+                && waterType == WaterBodyClassifier.WaterType.OCEAN
+                && WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()
+                && Math.abs(pos.getY() - (waterLevel.getSeaLevel() - 1)) <= 3;
         return new GerstnerVertexConsumer(
                 originalConsumer,
                 pos.getX(),
                 pos.getY(),
                 pos.getZ(),
-                waterType
+                waterType,
+                dynamicOceanSurface
         );
     }
 
-    private static WaterBodyClassifier.WaterType classifyWater(BlockAndTintGetter level, BlockPos pos) {
+    private static LevelReader resolveLevelReader(BlockAndTintGetter level) {
         if (level instanceof LevelReader levelReader) {
-            return WaterBodyClassifier.classify(levelReader, pos);
+            return levelReader;
         }
 
         if (level instanceof RenderChunkRegion renderChunkRegion) {
             Level clientLevel = ((RenderChunkRegionAccessor) renderChunkRegion).wildernessodysseyapi$getLevel();
-            return WaterBodyClassifier.classify(clientLevel, pos);
+            return clientLevel;
         }
 
-        return WaterBodyClassifier.WaterType.POND;
+        return null;
     }
 }

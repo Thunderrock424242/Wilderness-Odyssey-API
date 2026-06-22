@@ -72,9 +72,6 @@ public class FluidRenderer {
         SPHSimulationManager manager = SPHSimulationManager.get();
         ACTIVE_SIMULATIONS.clear();
         manager.collectActive(level, ACTIVE_SIMULATIONS);
-        if (ACTIVE_SIMULATIONS.isEmpty()) {
-            manager.collectActive(ACTIVE_SIMULATIONS);
-        }
 
         if (ACTIVE_SIMULATIONS.isEmpty()) {
             meshMap.clear();

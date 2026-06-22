@@ -29,11 +29,11 @@ Each sample returns vertical and horizontal displacement, an analytic normal,
 and orbital velocity. Ocean swell, river ripples, pond motion, vertex geometry,
 and boat response therefore use one coherent wave field.
 
-Vanilla liquid geometry remains in Minecraft's normal translucent terrain
-buffer. This is intentional: Sodium/Embeddium and Iris/Oculus can continue to
-recognize and shade water instead of receiving an incompatible private draw
-pipeline. Without a shader pack, the displaced geometry and normals still
-improve silhouette, lighting, and boat response.
+Vanilla liquid geometry remains as the stable distant and failure-safe surface.
+Near the camera, ocean crests use a cached per-frame mesh sampled from the same
+world-space Gerstner spectrum. Iris/Oculus keeps the standard translucent path;
+without an external shader pack, the optional core shader adds Fresnel,
+depth-colored absorption, foam, lighting, and animated micro-normal detail.
 
 ## Rendering phases
 
@@ -51,15 +51,14 @@ improve silhouette, lighting, and boat response.
 
 ### Phase 2: per-frame surface detail
 
-Vanilla liquid chunks are static meshes, so their CPU-displaced shape changes
-only when a section rebuilds. The next renderer should add a bounded,
-camera-local dynamic detail surface rather than forcing chunk rebuilds:
+Vanilla liquid chunks are static meshes, so live phase is no longer baked into
+them. `OceanSurfaceRenderer` adds a bounded camera-local pass with:
 
-- A near field with per-frame wave normals and crest highlights.
-- Distance-based tessellation and a strict vertex budget.
-- Shore-distance and depth inputs for shoaling, refraction, and wave damping.
-- Foam generated from crest steepness and shoreline breaking, not absolute
-  world height.
+- Per-frame world-space positions and analytic wave normals.
+- Cached water/bathymetry scans, circular range culling, and renderer-mod-aware
+  cell size/radius limits.
+- Depth attenuation that fades deep-ocean waves into shallow water.
+- Foam generated from depth and crest slope rather than absolute world height.
 - A standard translucent compatibility path plus an optional built-in core
   shader when no third-party shader pack owns water shading.
 
@@ -68,8 +67,9 @@ camera-local dynamic detail surface rather than forcing chunk rebuilds:
 - Fresnel reflection based on view angle.
 - Beer-Lambert absorption using estimated water depth.
 - Normal-driven sun and moon specular highlights.
-- Underwater fog color and visibility derived from the same absorption values.
-- Caustics limited to shallow, lit water to avoid a full-screen cost.
+- CPU optical color remains active in the shader-pack compatibility path.
+- The built-in shader adds angle-dependent Fresnel, animated shimmer, lightmap
+  response, and fog without becoming mandatory for startup.
 
 Shader packs should receive material-friendly water geometry and normals; they
 remain responsible for their own reflection, refraction, and screen-space
@@ -80,19 +80,30 @@ not use shaders without pretending it can reproduce a pack's deferred renderer.
 
 ### Phase 4: shallow-water shoreline coupling
 
-- Cache depth and shore distance at chunk scale.
-- Slow and amplify incoming swell as depth decreases.
-- Rotate wave direction toward the shore normal (refraction).
-- Transfer breaking-wave energy into SPH shore wash and foam events.
-- Keep tide edits rate-limited and server-authoritative.
+`ShallowWaterGrid` solves depth-averaged surface elevation and X/Z velocity on
+CFL-limited 32-block regions. `ShorelineWaterManager` samples bathymetry around
+players, couples open boundaries to tide plus ocean swell, and supplies flow to
+boats, items, wading entities, and breaking-wave SPH pulses. The old four-block
+tide edit grid was removed; tides no longer place or delete water blocks.
 
-### Phase 5: synchronized weather and sea state
+### Phase 5: persistent local volumes
 
-Base boat and entity forces now run from server world time. The next gameplay
-step is a compact environment state containing wind direction, sea state, and
-tide phase. Clients can reproduce that deterministic spectrum at render
-frequency while the server remains authoritative; individual wave samples do
-not need network packets.
+- Bucket pours are simulated on the logical server and identified by UUID.
+- Nearby clients receive quantized, bounded particle snapshots every four
+  ticks and interpolate rather than re-running divergent SPH physics.
+- Static bodies refresh less often and remote mirrors expire when tracking ends.
+- Non-transient bodies persist per dimension in compact `SavedData` arrays and
+  restore their identity, position, velocity, and droplet state.
+- The vanilla source block remains the gameplay/interoperability fallback while
+  SPH owns the volumetric visual body. A future custom fluid capability is
+  required before buckets, swimming, redstone, and other mods can treat SPH as
+  the only canonical water state.
+
+### Phase 6: synchronized weather and sea state
+
+Base boat and entity forces run from server world time. Wind direction and a
+weather-driven sea-state spectrum remain follow-up work; the deterministic
+gravity-wave spectrum itself does not need per-wave network packets.
 
 ## Validation targets
 
@@ -102,5 +113,10 @@ not need network packets.
 - Thin flowing water attenuates to a flat edge before intersecting terrain.
 - Sodium/Embeddium and Iris/Oculus retain the standard terrain-water path.
 - Boat bobbing never mutates the client entity position.
+- Bucket water remains after its transient motion settles and after save/reload.
+- Removing/placing tide water never produces a four-block checkerboard because
+  tide simulation does not mutate world blocks.
+- Multiplayer clients observe the server particle body rather than a separately
+  randomized local simulation.
 - Frame budgets are measured separately for surface rendering, SPH mesh
   rebuilds, ripple geometry, and shader passes.

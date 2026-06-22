@@ -16,7 +16,7 @@ public final class SPHConstants {
     // -------------------------------------------------------------------------
 
     /** Mass of each particle (kg equivalent). */
-    public static final float PARTICLE_MASS       = 0.08f;
+    public static final float PARTICLE_MASS       = 4.0f;
 
     /** Rest density — target density at equilibrium (kg/m³ equivalent). */
     public static final float REST_DENSITY        = 1000f;
@@ -62,7 +62,7 @@ public final class SPHConstants {
     public static final int   MAX_STEPS_PER_FRAME = 4;
 
     /** Gravity (blocks/s²). Minecraft uses ~20 blocks/s², real is ~9.8. */
-    public static final float GRAVITY             = 30f;
+    public static final float GRAVITY             = 9.81f;
 
     /** Velocity damping applied each step (0 = no damping, 1 = freeze). */
     public static final float DAMPING             = 0.004f;
@@ -127,6 +127,9 @@ public final class SPHConstants {
      */
     public static final float SPAWN_RADIUS        = 0.4f;
 
+    /** Vertical extent of a bucket's initial three-dimensional particle volume. */
+    public static final float SPAWN_HEIGHT        = 0.8f;
+
     /** Number of particles spawned per bucket placement. */
     public static final int   PARTICLES_PER_BUCKET = 140;
 
@@ -141,6 +144,22 @@ public final class SPHConstants {
 
     /** Lifetime for automatic shore wash pulses before they are removed. */
     public static final int   SHORE_WAVE_LIFETIME_TICKS = 70;
+
+    // -------------------------------------------------------------------------
+    // Network synchronization
+    // -------------------------------------------------------------------------
+
+    /** Server ticks between authoritative SPH particle snapshots. */
+    public static final int NETWORK_SNAPSHOT_INTERVAL_TICKS = 4;
+
+    /** Distance at which a player receives volumetric-water snapshots. */
+    public static final double NETWORK_TRACKING_DISTANCE = 96.0;
+
+    /** Client grace period before a remote body with no new snapshot is discarded. */
+    public static final int REMOTE_SNAPSHOT_EXPIRY_TICKS = 40;
+
+    /** Server ticks between persistent SavedData captures. */
+    public static final int PERSISTENCE_CAPTURE_INTERVAL_TICKS = 20;
 
     // -------------------------------------------------------------------------
     // Marching Cubes / mesh

@@ -6,6 +6,8 @@ import com.thunder.wildernessodysseyapi.cloak.network.CloakInputPayload;
 import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
 import com.thunder.wildernessodysseyapi.lorebook.network.OpenCodexPayload;
 import com.thunder.wildernessodysseyapi.lorebook.network.SyncLoreBookPayload;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.SphSimulationSnapshotPayload;
+import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -51,5 +53,16 @@ public final class ModPayloads {
                         CodexClientState.requestOpen();
                     }
                 }));
+
+        registrar.playToClient(
+                SphSimulationSnapshotPayload.TYPE,
+                SphSimulationSnapshotPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        SPHSimulationManager.get().applyRemoteSnapshot(
+                                payload.simulationId(),
+                                context.player().level(),
+                                payload.toParticles()
+                        ))
+        );
     }
 }
