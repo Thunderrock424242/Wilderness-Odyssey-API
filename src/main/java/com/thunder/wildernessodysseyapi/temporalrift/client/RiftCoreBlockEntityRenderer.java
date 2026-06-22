@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.temporalrift.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
 import com.thunder.wildernessodysseyapi.temporalrift.blockentity.RiftCoreBlockEntity;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
@@ -66,6 +67,7 @@ public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCore
 
     @Override
     public void render(RiftCoreBlockEntity blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
+        try (GpuDiagnostics.Scope ignored = GpuDiagnostics.scope("temporal_rift.geometry")) {
         Level level = blockEntity.getLevel();
         float age = (level == null ? 0.0F : level.getGameTime()) + partialTick;
         VertexConsumer buffer = bufferSource.getBuffer(TemporalRiftRenderTypes.rift());
@@ -95,6 +97,7 @@ public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCore
         }
 
         poseStack.popPose();
+        }
     }
 
     @Override

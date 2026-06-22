@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.cloak.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.PlayerModel;
@@ -45,20 +46,23 @@ public class CloakRenderLayer extends RenderLayer<AbstractClientPlayer, PlayerMo
             return;
         }
 
-        float time = ageInTicks + partialTick;
-        float pulse = 0.5F + 0.5F * Mth.sin(time * 0.22F + player.getId());
+        try (GpuDiagnostics.Scope ignored = GpuDiagnostics.scope("cloak.outline")) {
 
-        renderDistortionPass(poseStack, buffer, packedLight, 0.0D, 0.0D, 0.0D,
-                1.0F + pulse * 0.01F, CORE_ALPHA, 178, 62, 255);
+            float time = ageInTicks + partialTick;
+            float pulse = 0.5F + 0.5F * Mth.sin(time * 0.22F + player.getId());
 
-        float horizontalWave = Mth.sin(time * 0.73F + player.getId() * 0.41F) * 0.026F;
-        float verticalWave = Mth.cos(time * 0.47F) * 0.018F;
-        renderDistortionPass(poseStack, buffer, packedLight, horizontalWave, verticalWave, -horizontalWave * 0.45D,
-                1.018F, ECHO_ALPHA, 110, 210, 255);
+            renderDistortionPass(poseStack, buffer, packedLight, 0.0D, 0.0D, 0.0D,
+                    1.0F + pulse * 0.01F, CORE_ALPHA, 178, 62, 255);
 
-        float counterWave = Mth.cos(time * 0.61F + 1.8F) * 0.022F;
-        renderDistortionPass(poseStack, buffer, packedLight, -counterWave, -verticalWave * 0.7D, counterWave * 0.35D,
-                1.012F, ECHO_ALPHA, 225, 76, 255);
+            float horizontalWave = Mth.sin(time * 0.73F + player.getId() * 0.41F) * 0.026F;
+            float verticalWave = Mth.cos(time * 0.47F) * 0.018F;
+            renderDistortionPass(poseStack, buffer, packedLight, horizontalWave, verticalWave, -horizontalWave * 0.45D,
+                    1.018F, ECHO_ALPHA, 110, 210, 255);
+
+            float counterWave = Mth.cos(time * 0.61F + 1.8F) * 0.022F;
+            renderDistortionPass(poseStack, buffer, packedLight, -counterWave, -verticalWave * 0.7D, counterWave * 0.35D,
+                    1.012F, ECHO_ALPHA, 225, 76, 255);
+        }
     }
 
     private void renderDistortionPass(PoseStack poseStack,

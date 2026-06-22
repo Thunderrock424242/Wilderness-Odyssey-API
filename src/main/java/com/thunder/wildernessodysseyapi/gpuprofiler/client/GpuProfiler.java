@@ -100,6 +100,7 @@ public final class GpuProfiler {
             baselineSample = null;
             latestSample = null;
             active = true;
+            GpuDiagnostics.start();
             sampleLocked(startedNanos);
             lastSnapshot = createSnapshotLocked("start");
             SNAPSHOTS.add(lastSnapshot);
@@ -115,6 +116,7 @@ public final class GpuProfiler {
                 return new StopResult(false, "No WO VRAM profiling session is running.", statusLocked());
             }
             sampleLocked(System.nanoTime());
+            GpuDiagnostics.stop();
             active = false;
             stoppedAt = Instant.now();
             cachedDebugLines = List.of();
@@ -127,14 +129,14 @@ public final class GpuProfiler {
             return;
         }
         long now = System.nanoTime();
-        if (now < nextSampleNanos) {
-            return;
-        }
-        synchronized (LOCK) {
-            if (active && now >= nextSampleNanos) {
-                sampleLocked(now);
+        if (now >= nextSampleNanos) {
+            synchronized (LOCK) {
+                if (active && now >= nextSampleNanos) {
+                    sampleLocked(now);
+                }
             }
         }
+        GpuDiagnostics.onFrame();
     }
 
     public static void onTextureStorage(int target, int level, int internalFormat, int width, int height, int format, int type) {
@@ -292,25 +294,43 @@ public final class GpuProfiler {
         }
     }
 
+    /**
+     * Exports the complete JSON report and a sibling flamegraph-compatible folded stack file.
+     */
     public static Path export(Path directory) throws IOException {
         Map<String, Object> report;
+        List<String> foldedStackLines;
         String filename;
         synchronized (LOCK) {
             if (startedAt == null) {
                 throw new IllegalStateException("Start a WO VRAM profiling session first.");
             }
             report = buildReportLocked();
+            foldedStackLines = GpuDiagnostics.foldedStackLines();
             filename = "gpu-profile-" + FILE_TIME.format(startedAt) + ".json";
         }
 
         Files.createDirectories(directory);
         Path output = directory.resolve(filename);
+        Path foldedOutput = directory.resolve(filename.replace(".json", ".folded"));
         Files.writeString(output, GSON.toJson(report), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        Files.write(foldedOutput, foldedStackLines, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         return output.toAbsolutePath().normalize();
     }
 
     public static List<String> debugLines() {
-        return active ? cachedDebugLines : List.of();
+        if (!active) {
+            return List.of();
+        }
+        List<String> lines = new ArrayList<>(cachedDebugLines);
+        lines.addAll(GpuDiagnostics.debugLines());
+        return List.copyOf(lines);
+    }
+
+    static DiagnosticAttribution captureDiagnosticAttribution() {
+        AllocationSite site = captureSite();
+        return new DiagnosticAttribution(site.modId, site.label == null ? "" : site.label,
+                site.className, site.methodName, site.fileName, site.lineNumber, site.stack);
     }
 
     public static String formatBytes(long bytes) {
@@ -566,7 +586,8 @@ public final class GpuProfiler {
                 || className.startsWith("org.spongepowered.")
                 || className.startsWith("net.neoforged.")
                 || className.startsWith("com.thunder.wildernessodysseyapi.gpuprofiler.")
-                || className.endsWith("GlStateManagerGpuProfilerMixin");
+                || className.endsWith("GlStateManagerGpuProfilerMixin")
+                || className.endsWith("RenderSystemGpuDiagnosticsMixin");
     }
 
     private static boolean isExternalFrame(String className) {
@@ -614,8 +635,8 @@ public final class GpuProfiler {
     private static Map<String, Object> buildReportLocked() {
         Status status = statusLocked();
         Map<String, Object> report = new LinkedHashMap<>();
-        report.put("schemaVersion", 1);
-        report.put("coverage", "Minecraft/Mojang GlStateManager texture, buffer, and renderbuffer allocation paths; direct raw-LWJGL calls may be absent");
+        report.put("schemaVersion", 2);
+        report.put("coverage", "Minecraft/Mojang allocation paths plus sampled RenderSystem draw timing, named WO scopes, KHR_debug messages, and scoped state-leak checks; raw-LWJGL draws and shared vanilla batches may be unattributed");
         report.put("estimateNotice", "Tracked byte counts are logical allocation estimates; driver compression, alignment, sharing, and delayed release can differ");
         report.put("session", Map.of(
                 "startedAt", startedAt.toString(),
@@ -653,6 +674,7 @@ public final class GpuProfiler {
                 .sorted(Comparator.comparingLong(TrackedResource::totalBytes).reversed())
                 .map(TrackedResource::toReportRow).toList());
         report.put("snapshots", SNAPSHOTS.stream().map(SnapshotData::toReportRow).toList());
+        report.put("diagnostics", GpuDiagnostics.reportData());
         return report;
     }
 
@@ -813,6 +835,13 @@ public final class GpuProfiler {
         private static String simpleClassName(String className) {
             int separator = className == null ? -1 : className.lastIndexOf('.');
             return separator >= 0 ? className.substring(separator + 1) : String.valueOf(className);
+        }
+    }
+
+    record DiagnosticAttribution(String modId, String label, String className, String methodName,
+                                 String fileName, int lineNumber, List<String> stack) {
+        String location() {
+            return this.lineNumber > 0 ? this.fileName + ":" + this.lineNumber : this.fileName;
         }
     }
 }

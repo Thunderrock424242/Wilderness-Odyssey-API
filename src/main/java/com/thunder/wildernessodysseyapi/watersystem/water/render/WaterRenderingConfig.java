@@ -4,6 +4,12 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifi
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+/**
+ * Defines client water-quality limits and renderer-mod compatibility defaults.
+ *
+ * <p>The normal and optimized profiles keep visual choices centralized instead
+ * of scattering Sodium/Embeddium checks through render and simulation code.</p>
+ */
 public final class WaterRenderingConfig {
     public static final ModConfigSpec CONFIG_SPEC;
 
@@ -27,7 +33,6 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.IntValue OPTIMIZED_RIPPLE_SEGMENTS;
     public static final ModConfigSpec.IntValue OPTIMIZED_SPLASH_PARTICLES;
     public static final ModConfigSpec.IntValue OPTIMIZED_WAVE_TRAINS;
-    public static final ModConfigSpec.BooleanValue OPTIMIZED_UPDATE_WAVES_DURING_TESSELLATION;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -96,9 +101,6 @@ public final class WaterRenderingConfig {
         OPTIMIZED_WAVE_TRAINS = builder
                 .comment("Maximum Gerstner wave trains evaluated per water vertex.")
                 .defineInRange("waveTrains", 2, 1, 4);
-        OPTIMIZED_UPDATE_WAVES_DURING_TESSELLATION = builder
-                .comment("Also advance wave time while water chunks are being tessellated. Keep false for renderer-mod compatibility.")
-                .define("updateWavesDuringTessellation", false);
         builder.pop();
 
         builder.pop();
@@ -108,55 +110,65 @@ public final class WaterRenderingConfig {
     private WaterRenderingConfig() {
     }
 
+    /** Returns whether renderer-mod-aware quality limits are currently active. */
     public static boolean usesOptimizedProfile() {
         return AUTO_OPTIMIZE_WITH_RENDERER_MODS.get() && isRendererOptimizationModLoaded();
     }
 
+    /** Returns whether Sodium or Embeddium is present at runtime. */
     public static boolean isRendererOptimizationModLoaded() {
         ModList modList = ModList.get();
         return modList.isLoaded("sodium") || modList.isLoaded("embeddium");
     }
 
+    /** Returns the human-readable active quality profile name. */
     public static String profileName() {
         return usesOptimizedProfile() ? "optimized" : "normal";
     }
 
+    /** Returns the active SPH mesh render distance in blocks. */
     public static int sphRenderDistanceBlocks() {
         return usesOptimizedProfile()
                 ? OPTIMIZED_SPH_RENDER_DISTANCE_BLOCKS.get()
                 : NORMAL_SPH_RENDER_DISTANCE_BLOCKS.get();
     }
 
+    /** Returns the maximum SPH simulations drawn in one frame. */
     public static int maxRenderedSphSimulations() {
         return usesOptimizedProfile()
                 ? OPTIMIZED_MAX_RENDERED_SPH_SIMULATIONS.get()
                 : NORMAL_MAX_RENDERED_SPH_SIMULATIONS.get();
     }
 
+    /** Returns how many SPH revisions pass between mesh rebuilds. */
     public static int sphMeshRevisionInterval() {
         return usesOptimizedProfile()
                 ? OPTIMIZED_SPH_MESH_REVISION_INTERVAL.get()
                 : NORMAL_SPH_MESH_REVISION_INTERVAL.get();
     }
 
+    /** Returns the active cosmetic ripple count cap. */
     public static int maxRipples() {
         return usesOptimizedProfile()
                 ? OPTIMIZED_MAX_RIPPLES.get()
                 : NORMAL_MAX_RIPPLES.get();
     }
 
+    /** Returns the active segment count for each ripple ring. */
     public static int rippleSegments() {
         return usesOptimizedProfile()
                 ? OPTIMIZED_RIPPLE_SEGMENTS.get()
                 : NORMAL_RIPPLE_SEGMENTS.get();
     }
 
+    /** Returns the active splash-particle burst count. */
     public static int splashParticles() {
         return usesOptimizedProfile()
                 ? OPTIMIZED_SPLASH_PARTICLES.get()
                 : NORMAL_SPLASH_PARTICLES.get();
     }
 
+    /** Returns the wave-component limit for a classified water body. */
     public static int waveTrainLimit(WaterBodyClassifier.WaterType type) {
         int requested = usesOptimizedProfile()
                 ? OPTIMIZED_WAVE_TRAINS.get()
@@ -168,9 +180,5 @@ public final class WaterRenderingConfig {
             case POND -> 2;
         };
         return Math.max(1, Math.min(requested, profileMaximum));
-    }
-
-    public static boolean updateWavesDuringTessellation() {
-        return !usesOptimizedProfile() || OPTIMIZED_UPDATE_WAVES_DURING_TESSELLATION.get();
     }
 }

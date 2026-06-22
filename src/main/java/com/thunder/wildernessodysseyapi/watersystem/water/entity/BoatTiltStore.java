@@ -3,38 +3,45 @@ package com.thunder.wildernessodysseyapi.watersystem.water.entity;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * BoatTiltStore
+ * Stores client-computed boat surface response for the boat render mixin.
  *
- * Stores the computed pitch and roll angles for each boat entity
- * so the render mixin can read them when drawing the boat model.
- *
- * Keyed by entity ID (integer). Old entries are evicted when the
- * entity is no longer tracked (on death/dismount the entity tick
- * stops calling BoatTiltStore.set, so entries go stale but are
- * harmless — they're never read for removed entities).
+ * <p>Bobbing is kept render-only rather than changing the entity position each
+ * tick. That avoids cumulative vertical drift and server correction while the
+ * boat still appears to follow the modeled water surface.</p>
  */
-public class BoatTiltStore {
+public final class BoatTiltStore {
 
-    // Packed float pair: [pitch, roll] per entity ID
-    private static final ConcurrentHashMap<Integer, float[]> tilts =
-        new ConcurrentHashMap<>(32);
+    private static final float[] FLAT = new float[]{0.0f, 0.0f, 0.0f};
+    private static final ConcurrentHashMap<Integer, float[]> RESPONSES =
+            new ConcurrentHashMap<>(32);
 
-    public static void set(int entityId, float pitch, float roll) {
-        float[] angles = tilts.computeIfAbsent(entityId, k -> new float[2]);
-        angles[0] = pitch;
-        angles[1] = roll;
+    private BoatTiltStore() {
     }
 
-    /** Returns [pitch, roll] for the given entity, or [0, 0] if not tracked. */
+    /**
+     * Stores pitch, roll, and vertical render offset for one boat.
+     */
+    public static void set(int entityId, float pitch, float roll, float bob) {
+        float[] response = RESPONSES.computeIfAbsent(entityId, key -> new float[3]);
+        response[0] = pitch;
+        response[1] = roll;
+        response[2] = bob;
+    }
+
+    /**
+     * Returns {@code [pitch, roll, bob]} or a shared flat response when absent.
+     */
     public static float[] get(int entityId) {
-        return tilts.getOrDefault(entityId, new float[]{0f, 0f});
+        return RESPONSES.getOrDefault(entityId, FLAT);
     }
 
+    /** Removes response state for an entity that is no longer tracked. */
     public static void remove(int entityId) {
-        tilts.remove(entityId);
+        RESPONSES.remove(entityId);
     }
 
+    /** Clears all client boat response state during world shutdown. */
     public static void clear() {
-        tilts.clear();
+        RESPONSES.clear();
     }
 }

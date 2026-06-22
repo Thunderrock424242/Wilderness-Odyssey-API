@@ -37,9 +37,13 @@ Use the opt-in `/wovram` client command to correlate VRAM increases with live Op
 1. Run `/wovram start` immediately before reproducing the increase.
 2. Run `/wovram top` to list the largest live allocation sites.
 3. Run `/wovram snapshot before_action`, reproduce one action, then run `/wovram diff`.
-4. Run `/wovram stop` and `/wovram export` to write a detailed JSON report under `logs/wildernessodysseyapi/gpu-profiler/`.
+4. Run `/wovram gpu` to rank mods by sampled GPU time, including other mods when their render stack is still present.
+5. Run `/wovram errors` for OpenGL driver/shader messages and `/wovram leaks` for Wilderness Odyssey render-state leaks.
+6. Run `/wovram stop` and `/wovram export` to write detailed `.json` and flamegraph-compatible `.folded` reports under `logs/wildernessodysseyapi/gpu-profiler/`.
 
-While a session is active, the F3 system panel shows the driver VRAM delta and the top tracked sites. NVIDIA and AMD OpenGL memory extensions are sampled when available. Per-object byte counts are logical estimates because drivers may compress, align, share, cache, or delay releasing GPU resources. Calls made directly to raw LWJGL instead of Minecraft's rendering wrappers may not appear in the first profiler version.
+While a session is active, the F3 system panel shows the driver VRAM delta, top tracked allocations, sampled draw counts, driver messages, state leaks, and the current top GPU-time mod. NVIDIA and AMD OpenGL memory extensions are sampled when available. KHR_debug messages and asynchronous timestamp-query timings are enabled only when supported and do not replace another mod's existing debug callback. The JSON export includes mod rollups, detailed callsites, and folded Java stacks weighted by sampled GPU nanoseconds for flamegraph tooling.
+
+Per-object byte counts are logical estimates because drivers may compress, align, share, cache, or delay releasing GPU resources. GPU-time attribution is sampled to keep profiler overhead bounded. Direct render calls can normally be mapped to a mod JAR and source line; geometry combined into a shared Minecraft batch is intentionally reported as shared because assigning the whole batch to one contributing mod would be misleading. Raw LWJGL calls that bypass Minecraft's wrappers can still be absent.
 
 Discord-to-Minecraft Playtest Verification:
 -------------------------------------------

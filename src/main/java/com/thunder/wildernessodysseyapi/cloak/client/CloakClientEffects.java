@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.cloak.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.core.ModRegistries;
+import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.Mth;
@@ -37,21 +38,23 @@ public final class CloakClientEffects {
             return;
         }
 
-        GuiGraphics graphics = event.getGuiGraphics();
-        int width = minecraft.getWindow().getGuiScaledWidth();
-        int height = minecraft.getWindow().getGuiScaledHeight();
+        try (GpuDiagnostics.Scope ignored = GpuDiagnostics.scope("cloak.gui_effects")) {
+            GuiGraphics graphics = event.getGuiGraphics();
+            int width = minecraft.getWindow().getGuiScaledWidth();
+            int height = minecraft.getWindow().getGuiScaledHeight();
 
-        float lowOxygenDarkness = getLowOxygenDarkness(player, cloaked);
-        if (lowOxygenDarkness > 0.0F) {
-            graphics.fill(0, 0, width, height, argb(lowOxygenDarkness, 0x05000A));
-        }
+            float lowOxygenDarkness = getLowOxygenDarkness(player, cloaked);
+            if (lowOxygenDarkness > 0.0F) {
+                graphics.fill(0, 0, width, height, argb(lowOxygenDarkness, 0x05000A));
+            }
 
-        if (echoHypoxia || desynced) {
-            drawTunnelVision(graphics, width, height, desynced ? 0.64F : 0.48F);
-        }
+            if (echoHypoxia || desynced) {
+                drawTunnelVision(graphics, width, height, desynced ? 0.64F : 0.48F);
+            }
 
-        if (cryoShakes || desynced) {
-            drawBrightnessPulse(graphics, width, height, minecraft.level == null ? 0L : minecraft.level.getGameTime(), desynced);
+            if (cryoShakes || desynced) {
+                drawBrightnessPulse(graphics, width, height, minecraft.level == null ? 0L : minecraft.level.getGameTime(), desynced);
+            }
         }
     }
 

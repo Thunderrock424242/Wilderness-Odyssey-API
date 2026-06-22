@@ -27,6 +27,7 @@
   },
   "client": [
     "BoatRenderMixin",
+    "BoatRenderStateMixin",
     "ClientLevelTrueDarknessMixin",
     "ClientLevelWeatherColorMixin",
     "DebugScreenOverlayMixin",
@@ -36,6 +37,7 @@
     "MixinWorldCreationUiState",
     "OptionsScreenTelemetryButtonMixin",
     "RenderChunkRegionAccessor",
+    "RenderSystemGpuDiagnosticsMixin",
     "SimpleTextureGpuProfilerMixin",
     "StructureBlockRendererMixin",
     "TextureAtlasGpuProfilerMixin"
