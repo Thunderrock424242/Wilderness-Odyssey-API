@@ -29,7 +29,6 @@
     "BoatRenderMixin",
     "ClientLevelTrueDarknessMixin",
     "ClientLevelWeatherColorMixin",
-    "DebugMixin",
     "DebugScreenOverlayMixin",
     "GlStateManagerGpuProfilerMixin",
     "GerstnerWaveRenderMixin",

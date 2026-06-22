@@ -29,7 +29,7 @@ import java.util.Set;
  * Infinite water source behaviour is suppressed by preventing
  * two source blocks from merging into a third (handled in the Mixin).
  */
-@EventBusSubscriber(modid = ModConstants.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber(modid = ModConstants.MOD_ID)
 public class WildernessFluidRegistry {
 
     // How many fluid blocks are processed per tick (tune for performance)

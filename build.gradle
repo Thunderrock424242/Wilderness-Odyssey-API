@@ -201,10 +201,35 @@ tasks.register('obfuscateFiles', JavaExec) {
     description = "Runs the in-place obfuscation (XOR) on two hardcoded files."
 
     // Use the fully qualified main class name:
-    mainClass.set('com.thunder.wildernessodysseyapi.filesecurity.SaferInPlaceObfuscateMulti')
+    mainClass.set('com.thunder.wildernessodysseyapi.tools.filesecurity.SaferInPlaceObfuscateMulti')
 
     // The more traditional way to set the classpath in build.gradle (Groovy DSL):
     classpath = sourceSets.main.runtimeClasspath
+}
+
+tasks.register('generateChangelog', JavaExec) {
+    group = 'documentation'
+    description = 'Generates the versioned in-game changelog from committed Git history.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass.set('com.thunder.wildernessodysseyapi.changelog.tool.ChangelogGenerator')
+    dependsOn tasks.named('classes')
+
+    doFirst {
+        def generatorArgs = []
+        if (providers.gradleProperty('changelogVersion').isPresent()) {
+            generatorArgs.addAll('--version', providers.gradleProperty('changelogVersion').get())
+        }
+        if (providers.gradleProperty('changelogFirstRunDays').isPresent()) {
+            generatorArgs.addAll('--first-run-days', providers.gradleProperty('changelogFirstRunDays').get())
+        }
+        if (providers.gradleProperty('changelogOutput').isPresent()) {
+            generatorArgs.addAll('--output', providers.gradleProperty('changelogOutput').get())
+        }
+        if (providers.gradleProperty('changelogDryRun').map { it.toBoolean() }.getOrElse(false)) {
+            generatorArgs.add('--dry-run')
+        }
+        setArgs(generatorArgs)
+    }
 }
 
 publishing {
