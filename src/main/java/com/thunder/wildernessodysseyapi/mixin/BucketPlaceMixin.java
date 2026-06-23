@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BucketItem;
@@ -18,14 +19,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import javax.annotation.Nullable;
 
 /**
- * Creates a server-authoritative volumetric body after vanilla water placement.
+ * Creates canonical volume and a server-authoritative SPH body after placement.
  *
- * <p>Vanilla remains responsible for the persistent source block, inventory,
- * sounds, game events, permissions, and fluid-container behavior. The earlier
- * implementation cancelled placement and replaced the source with an SPH body;
- * that body could disappear because settled-particle block conversion is
- * intentionally disabled. The source remains as a safety fallback until SPH
- * persistence is enabled in the next water-system phase.</p>
+ * <p>Vanilla remains responsible for inventory, sounds, game events, and
+ * permissions. Its temporary source block is then removed because persistent
+ * SPH owns the mobile bucket volume until it settles into canonical cells.</p>
  */
 @Mixin(BucketItem.class)
 public abstract class BucketPlaceMixin {
@@ -49,6 +47,11 @@ public abstract class BucketPlaceMixin {
                 || !Boolean.TRUE.equals(callbackInfo.getReturnValue())) {
             return;
         }
+        if (!level.getBlockState(pos).is(Blocks.WATER)) {
+            // Waterlogged blocks remain on the vanilla compatibility boundary;
+            // replacing their host block would destroy unrelated block state.
+            return;
+        }
 
         // Server physics owns collision and particle history. Clients receive
         // interpolated snapshots instead of creating a divergent local splash.
@@ -57,7 +60,12 @@ public abstract class BucketPlaceMixin {
                 pos.getY() + 0.65f,
                 pos.getZ() + 0.5f,
                 level,
-                settledPos -> level.setBlockAndUpdate(settledPos, Blocks.WATER.defaultBlockState())
+                settledPos -> { }
         );
+
+        // Vanilla completed permissions, inventory, sound, and game events.
+        // Remove its duplicate source now that persistent SPH owns the bucket.
+        ServerLevel serverLevel = (ServerLevel) level;
+        serverLevel.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
     }
 }

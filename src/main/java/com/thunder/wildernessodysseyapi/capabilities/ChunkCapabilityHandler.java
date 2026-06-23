@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.capabilities;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -21,11 +23,23 @@ public final class ChunkCapabilityHandler {
 
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
-        if (!(event.getLevel() instanceof ServerLevel)) return;
+        if (!(event.getLevel() instanceof ServerLevel level)) return;
         if (!(event.getChunk() instanceof LevelChunk chunk)) return;
 
         // Clear dirty on load to avoid unnecessary saves after hydration.
         chunk.getExistingData(ModAttachments.CHUNK_DATA).ifPresent(ChunkDataCapability::clearDirty);
+        chunk.getExistingData(ModAttachments.WATER_VOLUME).ifPresent(volume -> {
+            volume.clearDirty();
+            for (WaterVolumeChunk.CellEntry entry : volume.snapshot()) {
+                if (!entry.cell().imported()) {
+                    CanonicalWater.schedule(level, WaterVolumeChunk.unpack(
+                            chunk.getPos().x,
+                            chunk.getPos().z,
+                            entry.packedPosition()
+                    ));
+                }
+            }
+        });
     }
 
     @SubscribeEvent
@@ -36,6 +50,11 @@ public final class ChunkCapabilityHandler {
             if (data.isDirty()) {
                 // Reset the flag post-save so we only write when necessary.
                 data.clearDirty();
+            }
+        });
+        chunk.getExistingData(ModAttachments.WATER_VOLUME).ifPresent(volume -> {
+            if (volume.isDirty()) {
+                volume.clearDirty();
             }
         });
     }

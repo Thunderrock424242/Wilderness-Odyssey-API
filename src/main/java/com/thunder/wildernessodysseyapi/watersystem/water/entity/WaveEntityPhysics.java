@@ -6,13 +6,16 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnima
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
-import net.minecraft.tags.FluidTags;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
@@ -40,14 +43,23 @@ public final class WaveEntityPhysics {
     public static void onEntityTick(EntityTickEvent.Post event) {
         Entity entity = event.getEntity();
         Level level = entity.level();
+        var mobileWater = SPHSimulationManager.get().sampleAt(
+                level,
+                entity.getX(),
+                entity.getY() + entity.getBbHeight() * 0.35,
+                entity.getZ()
+        );
 
-        if (entity instanceof Boat boat && !isBoatTouchingWater(boat)) {
+        if (entity instanceof Boat boat && !isBoatTouchingWater(boat) && !mobileWater.wet()) {
             if (level.isClientSide()) {
                 BoatTiltStore.remove(boat.getId());
             }
             return;
         }
-        if (!entity.isInWater() && !(entity instanceof Boat)) {
+        if (!entity.isInWater()
+                && !CanonicalWater.isWater(level, entity.blockPosition())
+                && !mobileWater.wet()
+                && !(entity instanceof Boat)) {
             return;
         }
 
@@ -68,6 +80,14 @@ public final class WaveEntityPhysics {
             applyItemForces(item, type, level);
         } else if (entity instanceof LivingEntity livingEntity) {
             applyWadingForces(livingEntity, type, level);
+        }
+
+        if (mobileWater.wet()) {
+            entity.setDeltaMovement(entity.getDeltaMovement().add(
+                    mobileWater.velocityX() * 0.0025f,
+                    mobileWater.velocityY() * 0.0010f,
+                    mobileWater.velocityZ() * 0.0025f
+            ));
         }
     }
 
@@ -158,10 +178,17 @@ public final class WaveEntityPhysics {
         GerstnerWaveProfile profile = profileFor(type);
         float timeSeconds = level.getGameTime() / TICKS_PER_SECOND;
         WaveSurfaceSample sample = profile.sampleAt(worldX, worldZ, timeSeconds);
-        return new float[]{
+        float[] push = new float[]{
                 sample.velocityX() * profile.entityPushStrength,
                 sample.velocityZ() * profile.entityPushStrength
         };
+        int blockX = (int) Math.floor(worldX);
+        int blockZ = (int) Math.floor(worldZ);
+        int surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE, blockX, blockZ) - 1;
+        var volumeCell = CanonicalWater.get(level, new BlockPos(blockX, surfaceY, blockZ));
+        push[0] += volumeCell.velocityX() * 0.01f;
+        push[1] += volumeCell.velocityZ() * 0.01f;
+        return push;
     }
 
     private static void addTidalCurrent(Level level, float[] push, float strength) {
@@ -194,8 +221,8 @@ public final class WaveEntityPhysics {
     private static boolean isBoatTouchingWater(Boat boat) {
         // A floating boat's block position can sit just above the surface, so
         // check both its feet and the block immediately beneath the hull.
-        return boat.level().getFluidState(boat.blockPosition()).is(FluidTags.WATER)
-                || boat.level().getFluidState(boat.blockPosition().below()).is(FluidTags.WATER);
+        return CanonicalWater.isWater(boat.level(), boat.blockPosition())
+                || CanonicalWater.isWater(boat.level(), boat.blockPosition().below());
     }
 
     private static GerstnerWaveProfile profileFor(WaterBodyClassifier.WaterType type) {

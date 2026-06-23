@@ -15,7 +15,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * Suppresses the vanilla "infinite water source" mechanic.
  * Vanilla creates a new source block whenever a flowing block
  * is surrounded by 2+ source blocks. This mixin cancels that,
- * making all water finite and physically driven.
+ * making all water finite and physically driven. CanonicalWaterFlowMixin also
+ * suppresses vanilla propagation so only the replacement solver moves volume.
  */
 @Mixin(WaterFluid.class)
 public class WaterSourceMixin {

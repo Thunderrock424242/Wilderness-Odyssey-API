@@ -56,6 +56,7 @@ public class SPHSimulator {
     private List<SPHParticle> remotePreviousParticles = List.of();
     private float remoteInterpolationAlpha = 1.0f;
     private int remoteSnapshotAgeTicks = 0;
+    private int canonicalVolumeUnits = 0;
 
     /**
      * Callback interface triggered when the fluid slows down enough to be converted
@@ -99,10 +100,21 @@ public class SPHSimulator {
             BlockGetter level,
             List<SPHParticle> snapshot
     ) {
+        return restoreAuthoritative(simulationId, level, snapshot, 0);
+    }
+
+    /** Restores a server body together with its conserved fixed-point volume. */
+    public static SPHSimulator restoreAuthoritative(
+            UUID simulationId,
+            BlockGetter level,
+            List<SPHParticle> snapshot,
+            int canonicalVolumeUnits
+    ) {
         SPHSimulator simulator = new SPHSimulator(simulationId, level, false);
         for (SPHParticle particle : snapshot) {
             simulator.particles.add(new SPHParticle(particle));
         }
+        simulator.canonicalVolumeUnits = Math.max(0, canonicalVolumeUnits);
         simulator.updateRenderSnapshot();
         return simulator;
     }
@@ -118,6 +130,15 @@ public class SPHSimulator {
     public float getCenterZ()                        { return centerZ; }
     public boolean isTransientSimulation()           { return transientSimulation; }
     public boolean isRemoteMirror()                  { return remoteMirror; }
+    public int getCanonicalVolumeUnits()              { return canonicalVolumeUnits; }
+
+    /** Adds conserved volume represented by a newly merged bucket pour. */
+    public void addCanonicalVolumeUnits(int volumeUnits) {
+        canonicalVolumeUnits = (int) Math.min(
+                Integer.MAX_VALUE,
+                (long) canonicalVolumeUnits + Math.max(0, volumeUnits)
+        );
+    }
     public boolean isRemoteExpired() {
         return remoteMirror && remoteSnapshotAgeTicks > SPHConstants.REMOTE_SNAPSHOT_EXPIRY_TICKS;
     }

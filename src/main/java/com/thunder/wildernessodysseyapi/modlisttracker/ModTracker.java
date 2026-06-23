@@ -75,6 +75,9 @@ public class ModTracker {
         if (history == null) {
             history = new ModTrackingHistory();
         }
+        // Preserve every observed mod id so removed mods can still be matched to their leftover config files.
+        history.knownModIds.addAll(previousMods.keySet());
+        history.knownModIds.addAll(currentMods.keySet());
         history.versionTimestamps.put(com.thunder.wildernessodysseyapi.core.ModConstants.VERSION, System.currentTimeMillis());
         pruneHistory(history);
         history.lastVersion = com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
@@ -100,6 +103,24 @@ public class ModTracker {
         return mods != null ? mods : Collections.emptyMap();
     }
 
+    /**
+     * Returns every mod id observed by the tracker, including mods removed from the current pack.
+     *
+     * <p>Config cleanup uses this persisted history to distinguish an absent mod's stale config from
+     * an unrelated pack-owned file whose name simply does not match a currently loaded mod.</p>
+     */
+    public static Set<String> getKnownModIds() {
+        ModTrackingHistory history = loadHistory();
+        if (history == null) {
+            return Collections.unmodifiableSet(new LinkedHashSet<>(getCurrentMods().keySet()));
+        }
+
+        Set<String> known = new LinkedHashSet<>(history.knownModIds);
+        history.versions.values().forEach(versionMods -> known.addAll(versionMods.keySet()));
+        known.addAll(getCurrentMods().keySet());
+        return Collections.unmodifiableSet(known);
+    }
+
     private static Map<String, String> getCurrentMods() {
         LOGGER.debug("Gathering current mod list.");
         return ModList.get().getMods().stream()
@@ -121,6 +142,12 @@ public class ModTracker {
             ModTrackingHistory history = new Gson().fromJson(reader, ModTrackingHistory.class);
             if (history != null && history.versionTimestamps == null) {
                 history.versionTimestamps = new HashMap<>();
+            }
+            if (history != null && history.knownModIds == null) {
+                history.knownModIds = new LinkedHashSet<>();
+            }
+            if (history != null && history.versions == null) {
+                history.versions = new HashMap<>();
             }
             return history;
         } catch (IOException e) {
@@ -236,5 +263,6 @@ public class ModTracker {
         String lastVersion;
         Map<String, Map<String, String>> versions = new HashMap<>();
         Map<String, Long> versionTimestamps = new HashMap<>();
+        Set<String> knownModIds = new LinkedHashSet<>();
     }
 }

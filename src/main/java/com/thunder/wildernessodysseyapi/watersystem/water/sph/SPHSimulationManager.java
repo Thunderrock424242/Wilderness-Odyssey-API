@@ -1,5 +1,8 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.sph;
 
+import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.BlockGetter;
@@ -57,6 +60,7 @@ public class SPHSimulationManager {
         SPHSimulator existing = findMergeTarget(x, y, z, level, SPHConstants.MERGE_RADIUS);
         if (existing != null) {
             existing.spawnPulse(x, y, z, requestedCount, impulseX, impulseY, impulseZ);
+            existing.addCanonicalVolumeUnits(WaterVolumeChunk.UNITS_PER_BLOCK);
             return existing;
         }
 
@@ -70,36 +74,29 @@ public class SPHSimulationManager {
             if (overloaded != null) {
                 overloaded.spawnPulse(x, y, z, Math.min(requestedCount, SPHConstants.OVERLOAD_PARTICLES_PER_BUCKET),
                         impulseX, impulseY, impulseZ);
+                overloaded.addCanonicalVolumeUnits(WaterVolumeChunk.UNITS_PER_BLOCK);
                 return overloaded;
             }
 
             if (countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
                 SPHSimulator closest = findClosestSimulation(x, y, z, level);
+                if (level instanceof ServerLevel serverLevel) {
+                    CanonicalWater.addVolume(
+                            serverLevel,
+                            BlockPos.containing(x, y, z),
+                            WaterVolumeChunk.UNITS_PER_BLOCK,
+                            impulseX,
+                            impulseY,
+                            impulseZ
+                    );
+                }
                 return closest != null ? closest : new SPHSimulator(level);
             }
         }
 
         SPHSimulator sim = new SPHSimulator(level);
-
-        if (SPHConstants.CONVERT_SETTLED_TO_BLOCKS) {
-            sim.setSettleListener(finalParticles -> {
-                pendingSettleCallbacks.add(() -> {
-                    Set<BlockPos> placed = new HashSet<>();
-                    for (SPHParticle p : finalParticles) {
-                        BlockPos bp = new BlockPos(
-                                (int)Math.floor(p.position.x),
-                                (int)Math.floor(p.position.y),
-                                (int)Math.floor(p.position.z)
-                        );
-                        if (!placed.contains(bp)) {
-                            placed.add(bp);
-                            placer.placeBlock(bp);
-                        }
-                    }
-                    active.remove(sim);
-                });
-            });
-        }
+        sim.addCanonicalVolumeUnits(WaterVolumeChunk.UNITS_PER_BLOCK);
+        configureSettlement(sim, level, placer);
 
         sim.spawnPulse(x, y, z, requestedCount, impulseX, impulseY, impulseZ);
         active.add(sim);
@@ -210,6 +207,9 @@ public class SPHSimulationManager {
     private boolean removeFirstSettledSimulation(BlockGetter level) {
         for (SPHSimulator sim : active) {
             if (sim.getLevel() == level && sim.isSettled()) {
+                if (level instanceof ServerLevel serverLevel && sim.getCanonicalVolumeUnits() > 0) {
+                    materializeCanonicalVolume(serverLevel, sim, sim.getRenderParticles());
+                }
                 active.remove(sim);
                 return true;
             }
@@ -305,7 +305,12 @@ public class SPHSimulationManager {
         SphWaterSavedData.get(level).capture(getActive(level));
     }
 
-    void restorePersistentSimulation(UUID simulationId, ServerLevel level, List<SPHParticle> particles) {
+    void restorePersistentSimulation(
+            UUID simulationId,
+            ServerLevel level,
+            List<SPHParticle> particles,
+            int canonicalVolumeUnits
+    ) {
         if (particles.isEmpty() || countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
             return;
         }
@@ -314,7 +319,120 @@ public class SPHSimulationManager {
                 return;
             }
         }
-        active.add(SPHSimulator.restoreAuthoritative(simulationId, level, particles));
+        SPHSimulator simulator = SPHSimulator.restoreAuthoritative(
+                simulationId,
+                level,
+                particles,
+                canonicalVolumeUnits
+        );
+        configureSettlement(simulator, level, pos -> { });
+        active.add(simulator);
+    }
+
+    // Converts the mobile particle body into exact fixed-point chunk volume
+    // once its motion settles, then removes the redundant SPH representation.
+    private void configureSettlement(SPHSimulator simulator, BlockGetter level, SettleBlockPlacer fallbackPlacer) {
+        simulator.setSettleListener(finalParticles -> pendingSettleCallbacks.add(() -> {
+            if (level instanceof ServerLevel serverLevel && simulator.getCanonicalVolumeUnits() > 0) {
+                materializeCanonicalVolume(serverLevel, simulator, finalParticles);
+            } else if (SPHConstants.CONVERT_SETTLED_TO_BLOCKS) {
+                Set<BlockPos> placed = new HashSet<>();
+                for (SPHParticle particle : finalParticles) {
+                    BlockPos pos = BlockPos.containing(
+                            particle.position.x,
+                            particle.position.y,
+                            particle.position.z
+                    );
+                    if (placed.add(pos)) {
+                        fallbackPlacer.placeBlock(pos);
+                    }
+                }
+            }
+            active.remove(simulator);
+        }));
+    }
+
+    private static void materializeCanonicalVolume(
+            ServerLevel level,
+            SPHSimulator simulator,
+            List<SPHParticle> particles
+    ) {
+        if (particles.isEmpty()) {
+            int remaining = deposit(level, BlockPos.containing(
+                    simulator.getCenterX(),
+                    simulator.getCenterY(),
+                    simulator.getCenterZ()
+            ), simulator.getCanonicalVolumeUnits());
+            warnIfVolumeCouldNotSettle(simulator, remaining);
+            return;
+        }
+
+        Map<BlockPos, Integer> particleCounts = new LinkedHashMap<>();
+        for (SPHParticle particle : particles) {
+            particleCounts.merge(BlockPos.containing(
+                    particle.position.x,
+                    particle.position.y,
+                    particle.position.z
+            ), 1, Integer::sum);
+        }
+
+        int remainingVolume = simulator.getCanonicalVolumeUnits();
+        int remainingParticles = particles.size();
+        for (Map.Entry<BlockPos, Integer> entry : particleCounts.entrySet()) {
+            int share = remainingParticles == entry.getValue()
+                    ? remainingVolume
+                    : (int) ((long) remainingVolume * entry.getValue() / remainingParticles);
+            remainingVolume -= share;
+            remainingParticles -= entry.getValue();
+            remainingVolume += deposit(level, entry.getKey(), share);
+        }
+
+        if (remainingVolume > 0) {
+            remainingVolume = deposit(level, BlockPos.containing(
+                    simulator.getCenterX(),
+                    simulator.getCenterY(),
+                    simulator.getCenterZ()
+            ), remainingVolume);
+        }
+        warnIfVolumeCouldNotSettle(simulator, remainingVolume);
+    }
+
+    // Searches a compact settlement area so a particle body that stops against
+    // terrain keeps its exact volume instead of being written inside solids.
+    private static int deposit(ServerLevel level, BlockPos target, int volumeUnits) {
+        int remaining = volumeUnits;
+        for (int offsetY = 0; offsetY <= 4 && remaining > 0; offsetY++) {
+            for (int radius = 0; radius <= 3 && remaining > 0; radius++) {
+                for (int offsetX = -radius; offsetX <= radius && remaining > 0; offsetX++) {
+                    for (int offsetZ = -radius; offsetZ <= radius && remaining > 0; offsetZ++) {
+                        if (Math.max(Math.abs(offsetX), Math.abs(offsetZ)) != radius) {
+                            continue;
+                        }
+                        int accepted = CanonicalWater.addVolume(
+                                level,
+                                target.offset(offsetX, offsetY, offsetZ),
+                                remaining,
+                                0.0f,
+                                0.0f,
+                                0.0f
+                        );
+                        remaining -= accepted;
+                    }
+                }
+            }
+        }
+        return remaining;
+    }
+
+    private static void warnIfVolumeCouldNotSettle(SPHSimulator simulator, int remainingVolume) {
+        if (remainingVolume > 0) {
+            ModConstants.LOGGER.warn(
+                    "Could not settle {} of {} canonical water units near SPH body {} because the area is full.",
+                    remainingVolume,
+                    simulator.getCanonicalVolumeUnits(),
+                    simulator.getSimulationId()
+            );
+        }
     }
 
     /**
@@ -357,6 +475,51 @@ public class SPHSimulationManager {
                 result.add(sim);
             }
         }
+    }
+
+    /**
+     * Samples mobile SPH water around a point for entity and API integration.
+     * The center-distance rejection keeps the bounded particle scan inexpensive.
+     */
+    public MobileWaterSample sampleAt(BlockGetter level, double x, double y, double z) {
+        int neighbours = 0;
+        float velocityX = 0.0f;
+        float velocityY = 0.0f;
+        float velocityZ = 0.0f;
+        for (SPHSimulator simulator : active) {
+            if (simulator.getLevel() != level
+                    || simulator.isTransientSimulation()
+                    || simulator.distanceSquaredTo((float) x, (float) y, (float) z) > 36.0f) {
+                continue;
+            }
+            for (SPHParticle particle : simulator.getRenderParticles()) {
+                double dx = particle.position.x - x;
+                double dy = particle.position.y - y;
+                double dz = particle.position.z - z;
+                if (dx * dx + dy * dy + dz * dz > 0.25) {
+                    continue;
+                }
+                neighbours++;
+                velocityX += particle.velocity.x;
+                velocityY += particle.velocity.y;
+                velocityZ += particle.velocity.z;
+            }
+        }
+        if (neighbours == 0) {
+            return MobileWaterSample.DRY;
+        }
+        float inverseCount = 1.0f / neighbours;
+        return new MobileWaterSample(
+                true,
+                velocityX * inverseCount,
+                velocityY * inverseCount,
+                velocityZ * inverseCount
+        );
+    }
+
+    /** Point sample from a mobile server-owned or synchronized SPH body. */
+    public record MobileWaterSample(boolean wet, float velocityX, float velocityY, float velocityZ) {
+        private static final MobileWaterSample DRY = new MobileWaterSample(false, 0.0f, 0.0f, 0.0f);
     }
 
     /**
