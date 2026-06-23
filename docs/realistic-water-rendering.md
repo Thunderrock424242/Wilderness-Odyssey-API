@@ -101,10 +101,11 @@ tide edit grid was removed; tides no longer place or delete water blocks.
 - Static bodies refresh less often and remote mirrors expire when tracking ends.
 - Non-transient bodies persist per dimension in compact `SavedData` arrays and
   restore their identity, position, velocity, and droplet state.
-- The vanilla source block remains a temporary gameplay/interoperability bridge
-  while SPH owns the volumetric visual body.
-- A chunk-persistent custom volume capability is required before buckets,
-  swimming, redstone, and other mods can treat the replacement as canonical.
+- Vanilla performs the bucket interaction first for permissions, inventory,
+  sounds, and game events; persistent SPH then owns that exact mobile volume
+  until it settles into the chunk-persistent canonical state.
+- Vanilla fluid levels remain a deliberately lossy compatibility projection
+  for swimming, waterlogging boundaries, redstone, and unintegrated mods.
 
 ### Phase 6: synchronized weather and sea state
 
@@ -114,13 +115,18 @@ gravity-wave spectrum itself does not need per-wave network packets.
 
 ### Phase 7: canonical replacement state
 
-- Store water volume, surface height, and velocity in chunk-persistent cells.
-- Make buckets, displacement, swimming, entities, and shoreline exchange read
-  and mutate that state on the logical server.
-- Mesh the shared volume state on clients instead of treating vanilla liquid
-  tops as the primary geometry.
-- Keep a bounded vanilla-fluid adapter only for world migration and mods that
-  have not integrated with the replacement API.
+Implemented foundation:
+
+- Water volume, velocity, provenance, temperature, and revision are stored in
+  sparse chunk-persistent cells using 4,096 units per full block.
+- Buckets become conserved persistent SPH volume, then materialize into exact
+  canonical cell volume after settling instead of leaving a duplicate source.
+- Disturbed cells use a bounded finite-volume queue; vanilla water ticks are
+  suppressed so a second flow solver cannot create conflicting state.
+- Chunk snapshots synchronize exact fractional fill to nearby clients, and the
+  surface renderer, shoreline sampling, and entity forces read canonical data.
+- Vanilla fluid levels are a bounded compatibility projection and lazy import
+  boundary for old chunks, waterlogged blocks, and unintegrated mods.
 
 ## Validation targets
 

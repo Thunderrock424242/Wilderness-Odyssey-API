@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -357,7 +358,9 @@ public final class OceanSurfaceRenderer {
         }
 
         FluidState surfaceFluid = level.getFluidState(pos);
-        if (!surfaceFluid.is(Fluids.WATER)
+        var canonicalCell = CanonicalWater.getTracked(level, pos);
+        if ((canonicalCell != null && canonicalCell.volumeUnits() <= 0)
+                || (canonicalCell == null && !surfaceFluid.is(Fluids.WATER))
                 || level.getFluidState(above.set(x, surfaceBlockY + 1, z)).is(Fluids.WATER)) {
             return WaterColumn.INVALID;
         }
@@ -373,7 +376,9 @@ public final class OceanSurfaceRenderer {
         }
         return new WaterColumn(
                 true,
-                surfaceBlockY + surfaceFluid.getOwnHeight() + 0.001f,
+                surfaceBlockY + (canonicalCell != null
+                        ? canonicalCell.fillFraction()
+                        : surfaceFluid.getOwnHeight()) + 0.001f,
                 depth,
                 waterType
         );

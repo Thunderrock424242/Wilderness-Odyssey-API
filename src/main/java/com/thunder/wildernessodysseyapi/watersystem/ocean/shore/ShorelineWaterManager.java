@@ -3,9 +3,9 @@ package com.thunder.wildernessodysseyapi.watersystem.ocean.shore;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.material.Fluids;
 
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -192,16 +192,16 @@ public final class ShorelineWaterManager {
                 BlockPos.MutableBlockPos pos,
                 BlockPos.MutableBlockPos neighbour
         ) {
-            if (level.getFluidState(pos).is(Fluids.WATER)) {
+            if (CanonicalWater.isWater(level, pos)) {
                 return true;
             }
             int x = pos.getX();
             int y = pos.getY();
             int z = pos.getZ();
-            return level.getFluidState(neighbour.set(x + 1, y, z)).is(Fluids.WATER)
-                    || level.getFluidState(neighbour.set(x - 1, y, z)).is(Fluids.WATER)
-                    || level.getFluidState(neighbour.set(x, y, z + 1)).is(Fluids.WATER)
-                    || level.getFluidState(neighbour.set(x, y, z - 1)).is(Fluids.WATER);
+            return CanonicalWater.isWater(level, neighbour.set(x + 1, y, z))
+                    || CanonicalWater.isWater(level, neighbour.set(x - 1, y, z))
+                    || CanonicalWater.isWater(level, neighbour.set(x, y, z + 1))
+                    || CanonicalWater.isWater(level, neighbour.set(x, y, z - 1));
         }
     }
 

@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.sph;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -17,8 +18,8 @@ import java.util.UUID;
  *
  * <p>The logical server owns this data. Clients receive bounded snapshots and
  * never save their interpolated mirrors. Raw particle state is used for this
- * first persistent implementation so water resumes without changing volume;
- * a later storage optimization can replace it with compressed volume cells.</p>
+ * mobile representation so a pour resumes without changing volume. Settled
+ * bodies leave this store and materialize into sparse chunk volume cells.</p>
  */
 public final class SphWaterSavedData extends SavedData {
 
@@ -26,6 +27,7 @@ public final class SphWaterSavedData extends SavedData {
     private static final String SIMULATIONS_KEY = "simulations";
     private static final String PARTICLES_KEY = "particles";
     private static final String PARTICLE_DATA_KEY = "particle_data";
+    private static final String VOLUME_UNITS_KEY = "volume_units";
     private static final int PARTICLE_DATA_STRIDE = 8;
 
     private final List<StoredSimulation> simulations = new ArrayList<>();
@@ -55,7 +57,10 @@ public final class SphWaterSavedData extends SavedData {
             );
             List<SPHParticle> particles = loadParticles(simulationTag);
             if (!particles.isEmpty()) {
-                data.simulations.add(new StoredSimulation(simulationId, particles));
+                int volumeUnits = simulationTag.contains(VOLUME_UNITS_KEY, Tag.TAG_INT)
+                        ? Math.max(0, simulationTag.getInt(VOLUME_UNITS_KEY))
+                        : WaterVolumeChunk.UNITS_PER_BLOCK;
+                data.simulations.add(new StoredSimulation(simulationId, particles, volumeUnits));
             }
         }
         return data;
@@ -68,6 +73,7 @@ public final class SphWaterSavedData extends SavedData {
             CompoundTag simulationTag = new CompoundTag();
             simulationTag.putLong("id_most", simulation.simulationId.getMostSignificantBits());
             simulationTag.putLong("id_least", simulation.simulationId.getLeastSignificantBits());
+            simulationTag.putInt(VOLUME_UNITS_KEY, simulation.volumeUnits);
 
             simulationTag.putIntArray(PARTICLE_DATA_KEY, saveParticles(simulation.particles));
             storedSimulations.add(simulationTag);
@@ -93,7 +99,11 @@ public final class SphWaterSavedData extends SavedData {
                 particles.add(new SPHParticle(particle));
             }
             if (!particles.isEmpty()) {
-                simulations.add(new StoredSimulation(simulator.getSimulationId(), particles));
+                simulations.add(new StoredSimulation(
+                        simulator.getSimulationId(),
+                        particles,
+                        simulator.getCanonicalVolumeUnits()
+                ));
             }
         }
         setDirty();
@@ -107,7 +117,12 @@ public final class SphWaterSavedData extends SavedData {
      */
     public void restoreInto(SPHSimulationManager manager, ServerLevel level) {
         for (StoredSimulation simulation : simulations) {
-            manager.restorePersistentSimulation(simulation.simulationId, level, simulation.particles);
+            manager.restorePersistentSimulation(
+                    simulation.simulationId,
+                    level,
+                    simulation.particles,
+                    simulation.volumeUnits
+            );
         }
     }
 
@@ -176,6 +191,6 @@ public final class SphWaterSavedData extends SavedData {
         return particles;
     }
 
-    private record StoredSimulation(UUID simulationId, List<SPHParticle> particles) {
+    private record StoredSimulation(UUID simulationId, List<SPHParticle> particles, int volumeUnits) {
     }
 }

@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
 import com.thunder.wildernessodysseyapi.lorebook.command.LoreBookCommand;
 import com.thunder.wildernessodysseyapi.meteor.command.MeteorCommand;
 import com.thunder.wildernessodysseyapi.modlisttracker.commands.ConfigAuditCommand;
+import com.thunder.wildernessodysseyapi.modlisttracker.commands.ConfigCleanupCommand;
 import com.thunder.wildernessodysseyapi.modlisttracker.commands.ModListDiffCommand;
 import com.thunder.wildernessodysseyapi.modlisttracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.modpack.structure.command.ModpackStructureCommand;
@@ -41,6 +42,7 @@ public final class ModCommands {
         ModListDiffCommand.register(dispatcher);
         ModListVersionCommand.register(dispatcher);
         ConfigAuditCommand.register(dispatcher);
+        ConfigCleanupCommand.register(dispatcher);
         StructureInfoCommand.register(dispatcher);
         FaqCommand.register(dispatcher);
         DonateCommand.register(dispatcher);

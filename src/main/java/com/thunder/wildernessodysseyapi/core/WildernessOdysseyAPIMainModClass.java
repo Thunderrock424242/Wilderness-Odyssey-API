@@ -18,7 +18,6 @@ import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueProcessor;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideWorldUpdater;
 import com.thunder.wildernessodysseyapi.worldgen.biome.BiomeCompatibilityBootstrap;
-import com.thunder.wildernessodysseyapi.worldgen.spawn.OceanSpawnLocator;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -95,7 +94,6 @@ public final class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(TelemetryQueueProcessor.class);
         NeoForge.EVENT_BUS.register(LoreBookEvents.class);
         NeoForge.EVENT_BUS.register(TideWorldUpdater.class);
-        NeoForge.EVENT_BUS.register(OceanSpawnLocator.class);
         NeoForge.EVENT_BUS.register(ModCommands.class);
         NeoForge.EVENT_BUS.register(ServerLifecycleEvents.class);
     }

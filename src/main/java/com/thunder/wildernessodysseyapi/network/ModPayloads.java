@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
 import com.thunder.wildernessodysseyapi.lorebook.network.OpenCodexPayload;
 import com.thunder.wildernessodysseyapi.lorebook.network.SyncLoreBookPayload;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.SphSimulationSnapshotPayload;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.WaterVolumeChunkPayload;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -63,6 +64,12 @@ public final class ModPayloads {
                                 context.player().level(),
                                 payload.toParticles()
                         ))
+        );
+        registrar.playToClient(
+                WaterVolumeChunkPayload.TYPE,
+                WaterVolumeChunkPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        payload.apply(context.player().level()))
         );
     }
 }

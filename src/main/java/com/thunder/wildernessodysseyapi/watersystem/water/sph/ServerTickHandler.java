@@ -2,6 +2,8 @@ package com.thunder.wildernessodysseyapi.watersystem.water.sph;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.SphSnapshotSynchronizer;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.WaterVolumeSynchronizer;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -12,8 +14,7 @@ import net.minecraft.server.level.ServerLevel;
  * ServerTickHandler
  *
  * Advances, synchronizes, and persists server-owned SPH water each tick.
- * Vanilla bucket sources remain the gameplay fallback while settled SPH
- * particles keep their volumetric render body.
+ * Mobile bucket volume remains SPH until it settles into canonical chunk cells.
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public class ServerTickHandler {
@@ -21,6 +22,7 @@ public class ServerTickHandler {
     private static final float SERVER_TICK_DELTA = 0.05f;
     private static int ticksUntilSnapshot = SPHConstants.NETWORK_SNAPSHOT_INTERVAL_TICKS;
     private static int ticksUntilPersistence = SPHConstants.PERSISTENCE_CAPTURE_INTERVAL_TICKS;
+    private static int ticksUntilVolumeSnapshot = 10;
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
@@ -34,6 +36,10 @@ public class ServerTickHandler {
         if (capturePersistence) {
             ticksUntilPersistence = SPHConstants.PERSISTENCE_CAPTURE_INTERVAL_TICKS;
         }
+        boolean publishVolumeSnapshot = --ticksUntilVolumeSnapshot <= 0;
+        if (publishVolumeSnapshot) {
+            ticksUntilVolumeSnapshot = 10;
+        }
 
         for (var level : event.getServer().getAllLevels()) {
             SPHSimulationManager manager = SPHSimulationManager.get();
@@ -41,6 +47,9 @@ public class ServerTickHandler {
             manager.tickLevel(level, SERVER_TICK_DELTA);
             if (publishSnapshot) {
                 SphSnapshotSynchronizer.syncLevel(level);
+            }
+            if (publishVolumeSnapshot) {
+                WaterVolumeSynchronizer.syncLevel(level);
             }
             if (capturePersistence) {
                 manager.capturePersistentLevel(level);
@@ -56,6 +65,7 @@ public class ServerTickHandler {
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel() instanceof ServerLevel serverLevel) {
             SPHSimulationManager.get().clearLevel(serverLevel);
+            CanonicalWater.clearLevel(serverLevel);
         }
     }
 }

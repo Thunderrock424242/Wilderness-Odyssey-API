@@ -22,7 +22,7 @@ import java.util.Random;
 
 /**
  * Adds small, capped SPH pulses at ocean shorelines while tides are moving.
- * The actual ocean remains vanilla water; this only creates local shore wash.
+ * The canonical ocean surface remains the large-scale model; this creates local shore wash.
  */
 @EventBusSubscriber(modid = "wildernessodysseyapi")
 public final class ShoreWaveSpawner {
