@@ -12,6 +12,8 @@ uniform sampler2D Sampler2;
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
 uniform float GameTime;
+uniform float SeaState;
+uniform vec2 WindDirection;
 
 out float vertexDistance;
 out vec4 vertexColor;
@@ -26,7 +28,11 @@ void main() {
     viewNormal = normalize(mat3(ModelViewMat) * Normal);
     vertexDistance = length(view.xyz);
     vertexColor = Color;
-    texCoord0 = UV0 + vec2(
+    float sea = clamp(SeaState, 0.0, 1.0);
+    vec2 wind = normalize(WindDirection + vec2(0.0001, 0.0));
+    float windPhase = dot(Position.xz, wind) * 0.16 + GameTime * (0.30 + sea * 0.90);
+    vec2 windRipple = wind * sin(windPhase) * (0.0015 + sea * 0.0035);
+    texCoord0 = UV0 + windRipple + vec2(
         sin(GameTime * 0.35 + Position.z * 0.18),
         cos(GameTime * 0.27 + Position.x * 0.16)
     ) * 0.0035;

@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.ocean.shore;
 
+import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
@@ -143,7 +144,13 @@ public final class ShorelineWaterManager {
             float centerX = originX + REGION_SPAN * 0.5f;
             float centerZ = originZ + REGION_SPAN * 0.5f;
             float timeSeconds = gameTime / 20.0f;
-            WaveSurfaceSample oceanBoundary = GerstnerWaveProfile.OCEAN.sampleAt(centerX, centerZ, timeSeconds);
+            WaveSurfaceSample oceanBoundary = GerstnerWaveProfile.OCEAN.sampleAt(
+                    centerX,
+                    centerZ,
+                    timeSeconds,
+                    GerstnerWaveProfile.OCEAN.waveCount,
+                    OceanSeaState.sample(level, 0.0f).spectrum()
+            );
             float boundarySurface = TideSystem.getTideOffset(level) + oceanBoundary.height();
             grid.step(0.05f, boundarySurface);
         }

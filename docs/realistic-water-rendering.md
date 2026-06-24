@@ -35,10 +35,11 @@ Each sample returns vertical and horizontal displacement, an analytic normal,
 and orbital velocity. Ocean swell, river ripples, pond motion, vertex geometry,
 and boat response therefore use one coherent wave field.
 
-The per-frame surface renderer owns exposed water near the camera. Vanilla
-liquid geometry currently remains behind it as a distant and failure-safe
-compatibility surface until replacement coverage reaches the full rendered
-world. Iris/Oculus keeps the standard translucent shader path; without an
+The per-frame surface renderer owns exposed water near the camera. Its cache
+suppresses only the exact baked vanilla top faces covered by replacement
+patches, preventing the flat depth surface from clipping animated troughs.
+Vanilla side faces and out-of-range water remain as failure-safe compatibility
+geometry. Iris/Oculus keeps the standard translucent shader path; without an
 external shader pack, the optional core shader adds Fresnel, depth-colored
 absorption, foam, lighting, and animated micro-normal detail.
 
@@ -109,9 +110,19 @@ tide edit grid was removed; tides no longer place or delete water blocks.
 
 ### Phase 6: synchronized weather and sea state
 
-Base boat and entity forces run from server world time. Wind direction and a
-weather-driven sea-state spectrum remain follow-up work; the deterministic
-gravity-wave spectrum itself does not need per-wave network packets.
+Implemented:
+
+- Server rain, thunder, world time, and dimension identity produce a bounded
+  wind direction, wind speed, swell energy, short-wave chop, and breaking-wave
+  strength through `OceanSeaState`.
+- A compact snapshot is sent once per second and interpolated client-side;
+  individual Gerstner components do not require network packets.
+- The same wind-aligned spectrum drives the live ocean mesh, optical shader,
+  boat/item/player forces, shallow-water boundaries, and shoreline SPH.
+- Calm weather favors lower long swell. Rain and thunderstorms progressively
+  add directional short chop, shimmer, foam, stronger shore wash, and currents.
+- Vanilla water blocks and `#minecraft:water` remain the compatibility surface
+  for other mods; sea state changes our simulation and rendering, not fluid IDs.
 
 ### Phase 7: canonical replacement state
 
@@ -128,6 +139,30 @@ Implemented foundation:
 - Vanilla fluid levels are a bounded compatibility projection and lazy import
   boundary for old chunks, waterlogged blocks, and unintegrated mods.
 
+### Phase 8: underwater optics and immersion
+
+Implemented foundation:
+
+- `ClientWaterImmersion` resolves the camera against canonical fractional fill
+  and the same animated Gerstner/tide surface used by visible ocean geometry.
+  Fog and overlays therefore cross a visible crest or trough instead of the
+  hidden flat height of the vanilla compatibility block.
+- `UnderwaterOpticsModel` derives bounded fog color, optical visibility,
+  clarity, caustic strength, and distortion from biome water tint, camera
+  depth, bathymetry, daylight, canonical velocity, and synchronized sea state.
+- Red wavelengths attenuate faster than green and blue, while storms, moving
+  water, and shallow sediment reduce clarity without changing water identity.
+- The optional built-in overlay adds animated optical distortion, caustic
+  interference, and soft light shafts. It falls back to the vanilla overlay
+  when unavailable and leaves Iris/Oculus in control of its shader-pack path.
+- Vanilla `minecraft:water`, fluid tags, swimming, waterlogging, and mod fluid
+  queries remain intact; Phase 8 replaces camera presentation, not the public
+  compatibility contract.
+
+The built-in overlay is intentionally bounded and does not copy the scene
+framebuffer. Full scene refraction remains the responsibility of deferred
+shader packs, avoiding an incompatible second post-processing pipeline.
+
 ## Validation targets
 
 - No visible wave phase seam at 16-block section boundaries.
@@ -141,5 +176,7 @@ Implemented foundation:
   tide simulation does not mutate world blocks.
 - Multiplayer clients observe the server particle body rather than a separately
   randomized local simulation.
+- Underwater fog and overlays transition at the rendered wave surface rather
+  than the flat vanilla compatibility plane.
 - Frame budgets are measured separately for surface rendering, SPH mesh
   rebuilds, ripple geometry, and shader passes.

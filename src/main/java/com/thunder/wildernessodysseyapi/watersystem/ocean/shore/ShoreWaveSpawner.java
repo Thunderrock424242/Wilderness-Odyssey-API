@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.ocean.shore;
 
+import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
@@ -29,7 +30,6 @@ public final class ShoreWaveSpawner {
 
     private static final boolean ENABLED = true;
 
-    private static final int SEA_LEVEL = 62;
     private static final int TICK_INTERVAL = 160;
     private static final int SCAN_RANGE = 18;
     private static final int SAMPLE_STEP = 10;
@@ -56,7 +56,9 @@ public final class ShoreWaveSpawner {
 
         float tideRate = TideSystem.getTideRate(level);
         float tideMotion = Math.min(1.0f, Math.abs(tideRate) * 45.0f);
-        if (tideMotion < 0.20f) return;
+        OceanSeaState.Sample seaState = OceanSeaState.sample(level, 0.0f);
+        float shoreActivity = Math.max(tideMotion, seaState.breakingStrength());
+        if (shoreActivity < 0.20f) return;
 
         Map<Long, Long> levelCooldowns = cooldowns.computeIfAbsent(key, ignored -> new HashMap<>());
         long now = level.getGameTime();
@@ -64,7 +66,15 @@ public final class ShoreWaveSpawner {
             levelCooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
         }
 
-        level.players().forEach(player -> spawnNearPlayer(level, player.blockPosition(), tideRate, tideMotion, levelCooldowns, now));
+        level.players().forEach(player -> spawnNearPlayer(
+                level,
+                player.blockPosition(),
+                tideRate,
+                tideMotion,
+                seaState,
+                levelCooldowns,
+                now
+        ));
     }
 
     @SubscribeEvent
@@ -75,12 +85,20 @@ public final class ShoreWaveSpawner {
         cooldowns.remove(key);
     }
 
-    private static void spawnNearPlayer(ServerLevel level, BlockPos origin, float tideRate, float tideMotion,
-                                        Map<Long, Long> levelCooldowns, long now) {
+    private static void spawnNearPlayer(
+            ServerLevel level,
+            BlockPos origin,
+            float tideRate,
+            float tideMotion,
+            OceanSeaState.Sample seaState,
+            Map<Long, Long> levelCooldowns,
+            long now
+    ) {
         int spawned = 0;
         int offsetX = RANDOM.nextInt(SAMPLE_STEP);
         int offsetZ = RANDOM.nextInt(SAMPLE_STEP);
-        float spawnChance = 0.08f + tideMotion * 0.18f;
+        float shoreActivity = Math.max(tideMotion, seaState.breakingStrength());
+        float spawnChance = 0.06f + shoreActivity * 0.22f;
 
         for (int dx = -SCAN_RANGE + offsetX; dx <= SCAN_RANGE && spawned < MAX_SPAWNS_PER_PLAYER; dx += SAMPLE_STEP) {
             for (int dz = -SCAN_RANGE + offsetZ; dz <= SCAN_RANGE && spawned < MAX_SPAWNS_PER_PLAYER; dz += SAMPLE_STEP) {
@@ -92,7 +110,7 @@ public final class ShoreWaveSpawner {
                 long cooldownKey = cooldownKey(candidate.surface());
                 if (levelCooldowns.getOrDefault(cooldownKey, 0L) > now) continue;
 
-                spawnShorePulse(level, candidate, tideRate, tideMotion);
+                spawnShorePulse(level, candidate, tideRate, tideMotion, seaState);
                 levelCooldowns.put(cooldownKey, now + SHORE_COOLDOWN_TICKS);
                 spawned++;
             }
@@ -115,7 +133,8 @@ public final class ShoreWaveSpawner {
     }
 
     private static BlockPos findTopWaterSurface(ServerLevel level, int x, int z) {
-        for (int y = SEA_LEVEL + 3; y >= SEA_LEVEL - 3; y--) {
+        int seaLevel = level.getSeaLevel();
+        for (int y = seaLevel + 3; y >= seaLevel - 3; y--) {
             BlockPos pos = new BlockPos(x, y, z);
             if (!level.hasChunkAt(pos)) return null;
             if (level.getFluidState(pos).is(Fluids.WATER)) {
@@ -138,18 +157,34 @@ public final class ShoreWaveSpawner {
         return !level.getBlockState(below).getCollisionShape(level, below).isEmpty();
     }
 
-    private static void spawnShorePulse(ServerLevel level, ShoreCandidate candidate, float tideRate, float tideMotion) {
+    private static void spawnShorePulse(
+            ServerLevel level,
+            ShoreCandidate candidate,
+            float tideRate,
+            float tideMotion,
+            OceanSeaState.Sample seaState
+    ) {
         Direction shoreDirection = candidate.shoreDirection();
         float flowSign = tideRate >= 0.0f ? 1.0f : -0.65f;
-        float horizontalImpulse = (0.18f + tideMotion * 0.28f) * flowSign;
+        float horizontalImpulse = (0.16f
+                + tideMotion * 0.22f
+                + seaState.breakingStrength() * 0.24f) * flowSign;
 
         float spawnX = candidate.surface().getX() + 0.5f + shoreDirection.getStepX() * 0.48f;
         float spawnY = candidate.surface().getY() + 1.02f;
         float spawnZ = candidate.surface().getZ() + 0.5f + shoreDirection.getStepZ() * 0.48f;
 
-        int particleCount = Math.max(8, Math.round(SPHConstants.SHORE_WAVE_PARTICLES * (0.55f + tideMotion * 0.45f)));
+        float particleScale = 0.45f
+                + tideMotion * 0.25f
+                + seaState.breakingStrength() * 0.45f;
+        int particleCount = Math.max(8, Math.round(SPHConstants.SHORE_WAVE_PARTICLES * particleScale));
         float impulseX = shoreDirection.getStepX() * horizontalImpulse;
         float impulseZ = shoreDirection.getStepZ() * horizontalImpulse;
+        float onshoreWind = Math.max(0.0f,
+                seaState.windDirectionX() * shoreDirection.getStepX()
+                        + seaState.windDirectionZ() * shoreDirection.getStepZ());
+        impulseX += shoreDirection.getStepX() * onshoreWind * seaState.strength() * 0.10f;
+        impulseZ += shoreDirection.getStepZ() * onshoreWind * seaState.strength() * 0.10f;
         ShorelineWaterManager.FlowSample shallowFlow = ShorelineWaterManager.get().sample(
                 level,
                 candidate.surface().getX() + 0.5,

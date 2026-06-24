@@ -20,6 +20,7 @@ import java.io.IOException;
 public final class WaterShaders {
 
     private static ShaderInstance oceanShader;
+    private static ShaderInstance underwaterShader;
 
     private WaterShaders() {
     }
@@ -34,18 +35,36 @@ public final class WaterShaders {
                 ),
                 WaterShaders::acceptOceanShader
         );
+        event.registerShader(
+                new ShaderInstance(
+                        event.getResourceProvider(),
+                        ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "underwater_optics"),
+                        DefaultVertexFormat.POSITION_TEX
+                ),
+                WaterShaders::acceptUnderwaterShader
+        );
     }
 
     // A failed GLSL link can still produce a ShaderInstance. Reject it here so
     // the per-frame ocean pass falls back instead of retrying an invalid program.
     private static void acceptOceanShader(ShaderInstance shader) {
-        int programId = shader.getId();
-        if (!GL20.glIsProgram(programId) || GL20.glGetProgrami(programId, GL20.GL_LINK_STATUS) == 0) {
+        if (!isLinked(shader)) {
             ModConstants.LOGGER.error("Ocean shader failed to link; using the vanilla translucent fallback");
             oceanShader = null;
             return;
         }
         oceanShader = shader;
+    }
+
+    // Underwater optics are optional for the same reason as the surface shader:
+    // a bad resource reload must not prevent the client from reaching the menu.
+    private static void acceptUnderwaterShader(ShaderInstance shader) {
+        if (!isLinked(shader)) {
+            ModConstants.LOGGER.error("Underwater shader failed to link; using the vanilla water overlay");
+            underwaterShader = null;
+            return;
+        }
+        underwaterShader = shader;
     }
 
     /** Returns the shader used by the custom ocean RenderType. */
@@ -58,14 +77,65 @@ public final class WaterShaders {
         if (!WaterRenderingConfig.ENABLE_WATER_CORE_SHADER.get() || oceanShader == null) {
             return false;
         }
-        ModList mods = ModList.get();
-        return !mods.isLoaded("iris") && !mods.isLoaded("oculus");
+        return !isExternalShaderPackModLoaded();
+    }
+
+    /** Returns whether the built-in underwater overlay should own this frame. */
+    public static boolean shouldUseUnderwaterShader() {
+        return WaterRenderingConfig.ENABLE_UNDERWATER_CAUSTICS.get()
+                && underwaterShader != null
+                && !isExternalShaderPackModLoaded();
+    }
+
+    /** Returns the linked underwater shader, falling back to vanilla position-texture rendering. */
+    public static ShaderInstance getUnderwaterShader() {
+        return underwaterShader != null ? underwaterShader : GameRenderer.getPositionTexShader();
     }
 
     /** Updates uniforms consumed by the built-in optical water pass. */
-    public static void updateOceanUniforms(float timeSeconds) {
+    public static void updateOceanUniforms(
+            float timeSeconds,
+            float seaState,
+            float windDirectionX,
+            float windDirectionZ
+    ) {
         if (oceanShader != null) {
             oceanShader.safeGetUniform("GameTime").set(timeSeconds);
+            oceanShader.safeGetUniform("SeaState").set(seaState);
+            oceanShader.safeGetUniform("WindDirection").set(windDirectionX, windDirectionZ);
         }
+    }
+
+    /** Updates the bounded uniforms consumed by the underwater overlay. */
+    public static void updateUnderwaterUniforms(
+            float timeSeconds,
+            ClientWaterImmersion.ImmersionState state
+    ) {
+        if (underwaterShader == null) {
+            return;
+        }
+        UnderwaterOpticsModel.OpticalProperties optics = state.optics();
+        underwaterShader.safeGetUniform("GameTime").set(timeSeconds);
+        underwaterShader.safeGetUniform("Submersion").set(optics.immersionBlend());
+        underwaterShader.safeGetUniform("Clarity").set(optics.clarity());
+        underwaterShader.safeGetUniform("SeaState").set(state.seaState());
+        underwaterShader.safeGetUniform("CausticStrength").set(optics.causticStrength());
+        underwaterShader.safeGetUniform("DistortionStrength").set(optics.distortionStrength());
+        underwaterShader.safeGetUniform("WaterFogColor").set(
+                optics.fogRed(),
+                optics.fogGreen(),
+                optics.fogBlue()
+        );
+    }
+
+    private static boolean isExternalShaderPackModLoaded() {
+        ModList mods = ModList.get();
+        return mods.isLoaded("iris") || mods.isLoaded("oculus");
+    }
+
+    private static boolean isLinked(ShaderInstance shader) {
+        int programId = shader.getId();
+        return GL20.glIsProgram(programId)
+                && GL20.glGetProgrami(programId, GL20.GL_LINK_STATUS) != 0;
     }
 }

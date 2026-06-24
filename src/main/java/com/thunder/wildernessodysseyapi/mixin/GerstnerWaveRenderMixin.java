@@ -2,21 +2,25 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerVertexConsumer;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
+import com.thunder.wildernessodysseyapi.watersystem.water.render.OceanSurfaceRenderer;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import net.minecraft.client.renderer.chunk.RenderChunkRegion;
 import net.minecraft.client.renderer.block.LiquidBlockRenderer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * GerstnerWaveRenderMixin
@@ -31,6 +35,28 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
  */
 @Mixin(LiquidBlockRenderer.class)
 public class GerstnerWaveRenderMixin {
+
+    // Liquid chunk compilation runs on worker threads. A ThreadLocal carries
+    // top-face ownership to the redirect without sharing mutable positions.
+    private static final ThreadLocal<Boolean> HIDE_VANILLA_TOP =
+            ThreadLocal.withInitial(() -> false);
+
+    @Inject(method = "tesselate", at = @At("HEAD"))
+    private void wildernessOdysseyApi$captureTopOwnership(
+            BlockAndTintGetter level,
+            BlockPos pos,
+            VertexConsumer buffer,
+            BlockState blockState,
+            FluidState fluidState,
+            CallbackInfo callbackInfo
+    ) {
+        HIDE_VANILLA_TOP.set(
+                (fluidState.is(Fluids.WATER) || fluidState.is(Fluids.FLOWING_WATER))
+                        && WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()
+                        && WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()
+                        && OceanSurfaceRenderer.ownsBakedTop(pos)
+        );
+    }
 
     @ModifyVariable(
         method = "tesselate",
@@ -58,7 +84,7 @@ public class GerstnerWaveRenderMixin {
                 : WaterBodyClassifier.classify(waterLevel, pos);
         boolean dynamicWaterSurface = waterLevel != null
                 && WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()
-                && ownsWorldSurface(waterLevel, pos);
+                && OceanSurfaceRenderer.ownsBakedTop(pos);
         return new GerstnerVertexConsumer(
                 originalConsumer,
                 pos.getX(),
@@ -69,13 +95,43 @@ public class GerstnerWaveRenderMixin {
         );
     }
 
-    // The replacement renderer currently owns exposed world-surface water.
-    // Covered and subterranean water keeps the baked path as a safe fallback.
-    private static boolean ownsWorldSurface(LevelReader level, BlockPos pos) {
-        if (level.getFluidState(pos.above()).is(Fluids.WATER)) {
-            return false;
+    /**
+     * Hides the vanilla top only when the live replacement cache contains the
+     * same block. Vanilla side faces and all out-of-range water remain intact.
+     */
+    @Redirect(
+            method = "tesselate",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/renderer/block/LiquidBlockRenderer;"
+                            + "isNeighborStateHidingOverlay("
+                            + "Lnet/minecraft/world/level/material/FluidState;"
+                            + "Lnet/minecraft/world/level/block/state/BlockState;"
+                            + "Lnet/minecraft/core/Direction;)Z",
+                    ordinal = 0
+            )
+    )
+    private boolean wildernessOdysseyApi$hideReplacedVanillaTop(
+            FluidState selfState,
+            BlockState aboveState,
+            Direction neighborFace
+    ) {
+        if (HIDE_VANILLA_TOP.get()) {
+            return true;
         }
-        return level.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ()) - 1 == pos.getY();
+        return aboveState.shouldHideAdjacentFluidFace(neighborFace, selfState);
+    }
+
+    @Inject(method = "tesselate", at = @At("TAIL"))
+    private void wildernessOdysseyApi$clearTopOwnership(
+            BlockAndTintGetter level,
+            BlockPos pos,
+            VertexConsumer buffer,
+            BlockState blockState,
+            FluidState fluidState,
+            CallbackInfo callbackInfo
+    ) {
+        HIDE_VANILLA_TOP.set(false);
     }
 
     private static LevelReader resolveLevelReader(BlockAndTintGetter level) {

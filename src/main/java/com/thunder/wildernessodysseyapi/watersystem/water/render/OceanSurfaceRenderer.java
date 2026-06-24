@@ -3,10 +3,13 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -15,6 +18,7 @@ import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
@@ -27,8 +31,10 @@ import net.neoforged.neoforge.client.textures.FluidSpriteCache;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Draws the authoritative, per-frame surface for exposed open water around the camera.
@@ -51,6 +57,7 @@ public final class OceanSurfaceRenderer {
     private static final float VISUAL_TIDE_SCALE = 0.18f;
 
     private static final List<SurfacePatch> PATCHES = new ArrayList<>();
+    private static volatile Set<Long> ownedVanillaTops = Set.of();
     private static ClientLevel cachedLevel;
     private static int cachedCenterX = Integer.MIN_VALUE;
     private static int cachedCenterZ = Integer.MIN_VALUE;
@@ -64,9 +71,13 @@ public final class OceanSurfaceRenderer {
     /** Renders replacement open-water tops after translucent terrain. */
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS
-                || !WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
+            return;
+        }
+
+        if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()
                 || !WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()) {
+            releaseVanillaTopOwnership(Minecraft.getInstance().level);
             return;
         }
 
@@ -94,11 +105,17 @@ public final class OceanSurfaceRenderer {
         float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
         float timeSeconds = (level.getGameTime() + partialTick) / 20.0f;
         float tideOffset = TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE;
+        OceanSeaState.Sample seaState = ClientOceanSeaState.current(level);
 
         boolean coreShader = WaterShaders.shouldUseCoreShader();
         RenderType renderType = coreShader ? WaterRenderTypes.dynamicOcean() : RenderType.translucent();
         if (coreShader) {
-            WaterShaders.updateOceanUniforms(timeSeconds);
+            WaterShaders.updateOceanUniforms(
+                    timeSeconds,
+                    seaState.strength(),
+                    seaState.windDirectionX(),
+                    seaState.windDirectionZ()
+            );
         }
 
         TextureAtlasSprite sprite = FluidSpriteCache.getFluidSprites(
@@ -113,7 +130,7 @@ public final class OceanSurfaceRenderer {
         poseStack.translate(-camera.x, -camera.y, -camera.z);
 
         for (SurfacePatch patch : PATCHES) {
-            drawPatch(level, patch, timeSeconds, tideOffset, camera.x, camera.y, camera.z,
+            drawPatch(level, patch, timeSeconds, tideOffset, seaState, camera.x, camera.y, camera.z,
                     sprite, poseStack.last(), buffer);
         }
 
@@ -126,6 +143,7 @@ public final class OceanSurfaceRenderer {
             SurfacePatch patch,
             float timeSeconds,
             float tideOffset,
+            OceanSeaState.Sample seaState,
             double cameraX,
             double cameraY,
             double cameraZ,
@@ -144,14 +162,17 @@ public final class OceanSurfaceRenderer {
         float x1 = patch.x + patch.size;
         float z1 = patch.z + patch.size;
 
+        WaveSpectrumState spectrum = patch.waterType == WaterBodyClassifier.WaterType.OCEAN
+                ? seaState.spectrum()
+                : WaveSpectrumState.NEUTRAL;
         VertexData first = vertex(level, x0, patch.firstY, z0, patch.depth, waveBlend,
-                waveProfile, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
         VertexData second = vertex(level, x0, patch.secondY, z1, patch.depth, waveBlend,
-                waveProfile, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
         VertexData third = vertex(level, x1, patch.thirdY, z1, patch.depth, waveBlend,
-                waveProfile, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
         VertexData fourth = vertex(level, x1, patch.fourthY, z0, patch.depth, waveBlend,
-                waveProfile, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
 
         emitVertex(buffer, pose, sprite, first);
         emitVertex(buffer, pose, sprite, second);
@@ -167,6 +188,7 @@ public final class OceanSurfaceRenderer {
             float depth,
             float waveBlend,
             GerstnerWaveProfile waveProfile,
+            WaveSpectrumState spectrum,
             float timeSeconds,
             float tideOffset,
             int waveLimit,
@@ -175,7 +197,7 @@ public final class OceanSurfaceRenderer {
             double cameraZ
     ) {
         WaveSurfaceSample sample = waveProfile
-                .sampleAt(baseX, baseZ, timeSeconds, waveLimit)
+                .sampleAt(baseX, baseZ, timeSeconds, waveLimit, spectrum)
                 .withHeightOffset(tideOffset)
                 .attenuated(waveBlend);
         float x = baseX + sample.displacementX();
@@ -293,6 +315,7 @@ public final class OceanSurfaceRenderer {
         PATCHES.clear();
 
         Map<Long, WaterColumn> columns = new HashMap<>();
+        Set<Long> rebuiltOwnedTops = new HashSet<>();
         int radiusSquared = radius * radius;
         int startX = Math.floorDiv(cameraX - radius, cellSize) * cellSize;
         int endX = Math.floorDiv(cameraX + radius, cellSize) * cellSize;
@@ -334,8 +357,26 @@ public final class OceanSurfaceRenderer {
                         depth,
                         dominantType(first, second, third, fourth)
                 ));
+
+                // The replacement quad spans every block inside the selected
+                // cell. Record only real exposed water tops so the chunk mixin
+                // can omit precisely those vanilla faces, never side walls or
+                // distant compatibility water.
+                for (int offsetX = 0; offsetX < cellSize; offsetX++) {
+                    for (int offsetZ = 0; offsetZ < cellSize; offsetZ++) {
+                        WaterColumn covered = column(level, columns, x + offsetX, z + offsetZ);
+                        if (covered.valid) {
+                            rebuiltOwnedTops.add(BlockPos.asLong(
+                                    x + offsetX,
+                                    covered.surfaceBlockY,
+                                    z + offsetZ
+                            ));
+                        }
+                    }
+                }
             }
         }
+        updateVanillaTopOwnership(level, rebuiltOwnedTops);
     }
 
     private static WaterColumn column(
@@ -376,6 +417,7 @@ public final class OceanSurfaceRenderer {
         }
         return new WaterColumn(
                 true,
+                surfaceBlockY,
                 surfaceBlockY + (canonicalCell != null
                         ? canonicalCell.fillFraction()
                         : surfaceFluid.getOwnHeight()) + 0.001f,
@@ -432,10 +474,63 @@ public final class OceanSurfaceRenderer {
 
     private static void clearCache() {
         PATCHES.clear();
+        ownedVanillaTops = Set.of();
         cachedLevel = null;
         cachedCenterX = Integer.MIN_VALUE;
         cachedCenterZ = Integer.MIN_VALUE;
         cachedGameTime = Long.MIN_VALUE;
+    }
+
+    /** Returns whether the per-frame mesh currently replaces this baked top face. */
+    public static boolean ownsBakedTop(BlockPos pos) {
+        return ownedVanillaTops.contains(pos.asLong());
+    }
+
+    // Rebuild only chunk sections whose top-face ownership changed. The set is
+    // immutable so chunk compilation workers can read it without locking.
+    private static void updateVanillaTopOwnership(ClientLevel level, Set<Long> rebuiltOwnership) {
+        Set<Long> next = Set.copyOf(rebuiltOwnership);
+        Set<Long> previous = ownedVanillaTops;
+        if (previous.equals(next)) {
+            return;
+        }
+        ownedVanillaTops = next;
+
+        Set<Long> changed = new HashSet<>(previous);
+        for (long packedPos : next) {
+            if (!changed.add(packedPos)) {
+                changed.remove(packedPos);
+            }
+        }
+        markSectionsDirty(level, changed);
+    }
+
+    private static void releaseVanillaTopOwnership(ClientLevel level) {
+        Set<Long> previous = ownedVanillaTops;
+        if (previous.isEmpty()) {
+            return;
+        }
+        ownedVanillaTops = Set.of();
+        PATCHES.clear();
+        if (level != null) {
+            markSectionsDirty(level, previous);
+        }
+    }
+
+    private static void markSectionsDirty(ClientLevel level, Set<Long> changedPositions) {
+        Set<Long> dirtySections = new HashSet<>();
+        for (long packedPos : changedPositions) {
+            dirtySections.add(SectionPos.asLong(BlockPos.of(packedPos)));
+        }
+
+        var levelRenderer = Minecraft.getInstance().levelRenderer;
+        for (long packedSection : dirtySections) {
+            levelRenderer.setSectionDirty(
+                    SectionPos.x(packedSection),
+                    SectionPos.y(packedSection),
+                    SectionPos.z(packedSection)
+            );
+        }
     }
 
     private static float smoothStep(float edge0, float edge1, float value) {
@@ -480,12 +575,14 @@ public final class OceanSurfaceRenderer {
 
     private record WaterColumn(
             boolean valid,
+            int surfaceBlockY,
             float surfaceY,
             float depth,
             WaterBodyClassifier.WaterType waterType
     ) {
         private static final WaterColumn INVALID = new WaterColumn(
                 false,
+                0,
                 0.0f,
                 0.0f,
                 WaterBodyClassifier.WaterType.POND

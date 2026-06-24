@@ -87,6 +87,26 @@ class GerstnerWaveProfileTest {
         assertEquals(WaveSurfaceSample.flat(), sample);
     }
 
+    @Test
+    void environmentalEnergyScalesAmplitudeWithoutChangingDispersion() {
+        GerstnerWaveProfile profile = singleWave(12.0f, 8.0f);
+        float originalFrequency = profile.angularFrequency[0];
+        WaveSurfaceSample neutral = profile.sampleAt(2.0f, -3.0f, 1.4f);
+        WaveSurfaceSample energetic = profile.sampleAt(
+                2.0f,
+                -3.0f,
+                1.4f,
+                1,
+                new WaveSpectrumState(2.0f, 2.0f, 1.0f, 0.0f, 0.0f)
+        );
+
+        assertAll(
+                () -> assertEquals(neutral.height() * 2.0f, energetic.height(), 1.0e-6f),
+                () -> assertEquals(neutral.velocityY() * 2.0f, energetic.velocityY(), 1.0e-6f),
+                () -> assertEquals(originalFrequency, profile.angularFrequency[0], 0.0f)
+        );
+    }
+
     private static GerstnerWaveProfile singleWave(float depth, float wavelength) {
         return new GerstnerWaveProfile.Builder(1, depth)
                 .wave(0, 0.2f, wavelength, 0.8f, 0.6f, 0.55f, 0.37f)
