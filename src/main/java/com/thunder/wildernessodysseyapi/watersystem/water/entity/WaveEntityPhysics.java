@@ -1,11 +1,13 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.entity;
 
+import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.shore.ShorelineWaterManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import net.minecraft.core.BlockPos;
@@ -177,7 +179,16 @@ public final class WaveEntityPhysics {
     ) {
         GerstnerWaveProfile profile = profileFor(type);
         float timeSeconds = level.getGameTime() / TICKS_PER_SECOND;
-        WaveSurfaceSample sample = profile.sampleAt(worldX, worldZ, timeSeconds);
+        WaveSpectrumState spectrum = type == WaterBodyClassifier.WaterType.OCEAN
+                ? OceanSeaState.sample(level, 0.0f).spectrum()
+                : WaveSpectrumState.NEUTRAL;
+        WaveSurfaceSample sample = profile.sampleAt(
+                worldX,
+                worldZ,
+                timeSeconds,
+                profile.waveCount,
+                spectrum
+        );
         float[] push = new float[]{
                 sample.velocityX() * profile.entityPushStrength,
                 sample.velocityZ() * profile.entityPushStrength

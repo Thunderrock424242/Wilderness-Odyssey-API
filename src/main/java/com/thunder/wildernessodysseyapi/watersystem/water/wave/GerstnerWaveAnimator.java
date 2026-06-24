@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.wave;
 
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import net.minecraft.client.Minecraft;
 
@@ -15,7 +17,9 @@ import net.minecraft.client.Minecraft;
 public final class GerstnerWaveAnimator {
 
     private static final float TICKS_PER_SECOND = 20.0f;
-    private static final float VISUAL_TIDE_SCALE = 0.01f;
+    // Keep camera immersion, boat response, and the live ocean mesh on the
+    // same deliberately reduced visual tide amplitude.
+    private static final float VISUAL_TIDE_SCALE = 0.18f;
 
     private static volatile float currentTime = 0.0f;
     private static float clientTideOffset = 0.0f;
@@ -55,11 +59,18 @@ public final class GerstnerWaveAnimator {
         }
 
         GerstnerWaveProfile profile = profileFor(type);
+        Minecraft minecraft = Minecraft.getInstance();
+        OceanSeaState.Sample seaState = minecraft.level == null
+                ? OceanSeaState.CALM
+                : ClientOceanSeaState.current(minecraft.level);
         WaveSurfaceSample sample = profile.sampleAt(
                 worldX,
                 worldZ,
                 currentTime,
-                WaterRenderingConfig.waveTrainLimit(type)
+                WaterRenderingConfig.waveTrainLimit(type),
+                type == WaterBodyClassifier.WaterType.OCEAN
+                        ? seaState.spectrum()
+                        : WaveSpectrumState.NEUTRAL
         );
         if (type == WaterBodyClassifier.WaterType.OCEAN) {
             return sample.withHeightOffset(clientTideOffset * VISUAL_TIDE_SCALE);

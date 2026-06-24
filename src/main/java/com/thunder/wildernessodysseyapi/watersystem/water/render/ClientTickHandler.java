@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import net.minecraft.client.Minecraft;
@@ -28,6 +29,7 @@ public class ClientTickHandler {
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.level != null) {
+            ClientOceanSeaState.tick(mc.level);
             SPHSimulationManager.get().tickLevel(mc.level, CLIENT_TICK_DELTA);
         }
     }
@@ -37,6 +39,8 @@ public class ClientTickHandler {
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel() instanceof ClientLevel level) {
             SPHSimulationManager.get().clearLevel(level);
+            ClientOceanSeaState.clear(level);
+            ClientWaterImmersion.clear(level);
             WaterBodyClassifier.clearCache(level);
         }
     }

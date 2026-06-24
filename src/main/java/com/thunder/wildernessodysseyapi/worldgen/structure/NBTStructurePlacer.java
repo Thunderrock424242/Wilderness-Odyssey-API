@@ -167,7 +167,7 @@ public class NBTStructurePlacer {
 
             BoundingBox placementBox = expandPlacementBox(foundation.origin(), data.size(), data.template());
             if (isStarterBunker()) {
-                clearColumnsForStarterBunker(level, foundation.origin(), data.size());
+                clearPlacementVolumeForStarterBunker(level, foundation.origin(), data.size());
             }
             StructurePlaceSettings settings = new StructurePlaceSettings()
                     .setKnownShape(true)
@@ -705,20 +705,29 @@ public class NBTStructurePlacer {
         }
     }
 
-    private void clearColumnsForStarterBunker(ServerLevel level, BlockPos origin, Vec3i size) {
+    private void clearPlacementVolumeForStarterBunker(ServerLevel level, BlockPos origin, Vec3i size) {
         int sizeX = size.getX();
+        int sizeY = size.getY();
         int sizeZ = size.getZ();
-        if (sizeX <= 0 || sizeZ <= 0) {
+        if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) {
             return;
         }
 
-        int minY = level.getMinBuildHeight();
-        int maxY = level.getMaxBuildHeight() - 1;
+        // Only terrain intersecting the template can obstruct placement. Scanning the full world column here
+        // multiplied a large bunker footprint by the entire build height and also removed unrelated terrain.
+        int minY = Math.max(level.getMinBuildHeight(), origin.getY());
+        int placementMaxY = Math.min(level.getMaxBuildHeight() - 1, origin.getY() + sizeY - 1);
+        if (minY > placementMaxY) {
+            return;
+        }
+
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         for (int x = 0; x < sizeX; x++) {
             for (int z = 0; z < sizeZ; z++) {
                 int worldX = origin.getX() + x;
                 int worldZ = origin.getZ() + z;
+                int surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE, worldX, worldZ) - 1;
+                int maxY = Math.min(placementMaxY, surfaceY);
                 for (int y = minY; y <= maxY; y++) {
                     cursor.set(worldX, y, worldZ);
                     BlockState existing = level.getBlockState(cursor);

@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.sph;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.SphSnapshotSynchronizer;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.OceanSeaStateSynchronizer;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.WaterVolumeSynchronizer;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -23,6 +24,7 @@ public class ServerTickHandler {
     private static int ticksUntilSnapshot = SPHConstants.NETWORK_SNAPSHOT_INTERVAL_TICKS;
     private static int ticksUntilPersistence = SPHConstants.PERSISTENCE_CAPTURE_INTERVAL_TICKS;
     private static int ticksUntilVolumeSnapshot = 10;
+    private static int ticksUntilSeaStateSnapshot = 20;
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
@@ -40,6 +42,10 @@ public class ServerTickHandler {
         if (publishVolumeSnapshot) {
             ticksUntilVolumeSnapshot = 10;
         }
+        boolean publishSeaStateSnapshot = --ticksUntilSeaStateSnapshot <= 0;
+        if (publishSeaStateSnapshot) {
+            ticksUntilSeaStateSnapshot = 20;
+        }
 
         for (var level : event.getServer().getAllLevels()) {
             SPHSimulationManager manager = SPHSimulationManager.get();
@@ -50,6 +56,9 @@ public class ServerTickHandler {
             }
             if (publishVolumeSnapshot) {
                 WaterVolumeSynchronizer.syncLevel(level);
+            }
+            if (publishSeaStateSnapshot) {
+                OceanSeaStateSynchronizer.syncLevel(level);
             }
             if (capturePersistence) {
                 manager.capturePersistentLevel(level);

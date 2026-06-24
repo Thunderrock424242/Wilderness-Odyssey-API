@@ -16,9 +16,14 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_GERSTNER_WAVES;
     public static final ModConfigSpec.BooleanValue ENABLE_DYNAMIC_OCEAN_SURFACE;
     public static final ModConfigSpec.BooleanValue ENABLE_WATER_CORE_SHADER;
+    public static final ModConfigSpec.BooleanValue ENABLE_UNDERWATER_OPTICS;
+    public static final ModConfigSpec.BooleanValue ENABLE_UNDERWATER_CAUSTICS;
     public static final ModConfigSpec.BooleanValue ENABLE_SPH_WATER_RENDERING;
     public static final ModConfigSpec.BooleanValue ENABLE_RIPPLES;
     public static final ModConfigSpec.BooleanValue AUTO_OPTIMIZE_WITH_RENDERER_MODS;
+
+    public static final ModConfigSpec.DoubleValue UNDERWATER_VISIBILITY_BLOCKS;
+    public static final ModConfigSpec.DoubleValue UNDERWATER_TURBIDITY_STRENGTH;
 
     public static final ModConfigSpec.IntValue NORMAL_SPH_RENDER_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue NORMAL_MAX_RENDERED_SPH_SIMULATIONS;
@@ -55,6 +60,12 @@ public final class WaterRenderingConfig {
         ENABLE_WATER_CORE_SHADER = builder
                 .comment("Use the built-in Fresnel/absorption water shader when no external shader pack owns water rendering.")
                 .define("enableWaterCoreShader", true);
+        ENABLE_UNDERWATER_OPTICS = builder
+                .comment("Use canonical volume and the animated surface for underwater fog and camera immersion.")
+                .define("enableUnderwaterOptics", true);
+        ENABLE_UNDERWATER_CAUSTICS = builder
+                .comment("Render the built-in underwater distortion and caustic overlay when no external shader pack owns it.")
+                .define("enableUnderwaterCaustics", true);
         ENABLE_SPH_WATER_RENDERING = builder
                 .comment("Render synchronized SPH water meshes from persistent pours and transient shore wash.")
                 .define("enableSphWaterRendering", true);
@@ -64,6 +75,12 @@ public final class WaterRenderingConfig {
         AUTO_OPTIMIZE_WITH_RENDERER_MODS = builder
                 .comment("Use the optimized profile automatically when Sodium or Embeddium is loaded.")
                 .define("autoOptimizeWithRendererMods", true);
+        UNDERWATER_VISIBILITY_BLOCKS = builder
+                .comment("Maximum clear-water visibility used by the underwater optical model.")
+                .defineInRange("underwaterVisibilityBlocks", 44.0, 8.0, 128.0);
+        UNDERWATER_TURBIDITY_STRENGTH = builder
+                .comment("Scales storm, shallow-sediment, and moving-water turbidity. Zero keeps water maximally clear.")
+                .defineInRange("underwaterTurbidityStrength", 1.0, 0.0, 2.0);
 
         builder.comment("Normal quality profile.")
                 .push("normal_profile");

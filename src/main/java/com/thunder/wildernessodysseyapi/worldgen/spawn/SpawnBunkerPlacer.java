@@ -9,12 +9,14 @@ import com.thunder.wildernessodysseyapi.worldgen.structure.StarterStructureSpawn
 import com.thunder.wildernessodysseyapi.worldgen.structure.TerrainReplacerEngine;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.core.QuartPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -36,8 +38,8 @@ public final class SpawnBunkerPlacer {
     private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "bunker");
     private static final int DEEP_OCEAN_SEARCH_RADIUS = 6400;
     private static final int OCEAN_SEARCH_RADIUS = 25000;
-    private static final int BIOME_SEARCH_HORIZONTAL_STEP = 64;
-    private static final int BIOME_SEARCH_VERTICAL_STEP = 256;
+    private static final int BIOME_SEARCH_COARSE_STEP = 256;
+    private static final int BIOME_SEARCH_FINE_STEP = 64;
     private static final int ISLAND_PLATFORM_PADDING = 30;
     private static final int ISLAND_SHORE_RADIUS_PADDING = 48;
     private static final int ISLAND_SLOPE_DEPTH = 4;
@@ -130,12 +132,49 @@ public final class SpawnBunkerPlacer {
                                                                   BlockPos origin,
                                                                   int radius,
                                                                   Predicate<Holder<Biome>> predicate) {
-        return level.findClosestBiome3d(
+        BiomeSource biomeSource = level.getChunkSource().getGenerator().getBiomeSource();
+        if (biomeSource.possibleBiomes().stream().noneMatch(predicate)) {
+            return null;
+        }
+
+        // Ocean biomes are surface targets, so a horizontal climate-noise query avoids sampling the full
+        // build height. Broad vanilla oceans are found by the coarse pass; the fine pass preserves support
+        // for narrow ocean biomes supplied by custom generators.
+        Pair<BlockPos, Holder<Biome>> result = findClosestSurfaceBiome(
+                level,
+                biomeSource,
                 predicate,
                 origin,
                 radius,
-                BIOME_SEARCH_HORIZONTAL_STEP,
-                BIOME_SEARCH_VERTICAL_STEP);
+                BIOME_SEARCH_COARSE_STEP);
+        if (result != null) {
+            return result;
+        }
+        return findClosestSurfaceBiome(
+                level,
+                biomeSource,
+                predicate,
+                origin,
+                radius,
+                BIOME_SEARCH_FINE_STEP);
+    }
+
+    private static Pair<BlockPos, Holder<Biome>> findClosestSurfaceBiome(ServerLevel level,
+                                                                         BiomeSource biomeSource,
+                                                                         Predicate<Holder<Biome>> predicate,
+                                                                         BlockPos origin,
+                                                                         int radius,
+                                                                         int blockStep) {
+        return biomeSource.findBiomeHorizontal(
+                origin.getX(),
+                origin.getY(),
+                origin.getZ(),
+                radius,
+                QuartPos.fromBlock(blockStep),
+                predicate,
+                level.getRandom(),
+                true,
+                level.getChunkSource().randomState().sampler());
     }
 
     private static BlockPos toOceanAnchor(ServerLevel level, BlockPos pos) {
@@ -181,18 +220,23 @@ public final class SpawnBunkerPlacer {
         int shoreRadius = flatRadius + ISLAND_SHORE_RADIUS_PADDING;
         int islandTopY = anchor.getY() - 1;
         int seaLevel = level.getSeaLevel();
+        double flatRadiusSquared = (double) flatRadius * flatRadius;
+        double shoreRadiusSquared = (double) shoreRadius * shoreRadius;
 
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         for (int x = centerX - shoreRadius; x <= centerX + shoreRadius; x++) {
             for (int z = centerZ - shoreRadius; z <= centerZ + shoreRadius; z++) {
                 double dx = x - centerX;
                 double dz = z - centerZ;
-                double distance = Math.sqrt(dx * dx + dz * dz);
-                if (distance > shoreRadius) {
+                double distanceSquared = dx * dx + dz * dz;
+                if (distanceSquared > shoreRadiusSquared) {
                     continue;
                 }
 
-                int seafloorY = TerrainReplacerEngine.sampleSurface(level, new BlockPos(x, anchor.getY(), z)).y();
+                // Reuse one mutable position per island column; this loop covers tens of thousands of blocks.
+                cursor.set(x, anchor.getY(), z);
+                int seafloorY = TerrainReplacerEngine.sampleSurface(level, cursor).y();
+                double distance = distanceSquared <= flatRadiusSquared ? 0.0D : Math.sqrt(distanceSquared);
                 int targetTopY = resolveIslandTopY(distance, flatRadius, shoreRadius, islandTopY, seaLevel);
                 if (targetTopY <= seafloorY) {
                     targetTopY = Math.min(islandTopY, seafloorY + 1);
@@ -203,16 +247,13 @@ public final class SpawnBunkerPlacer {
 
                 for (int y = seafloorY; y <= targetTopY; y++) {
                     cursor.set(x, y, z);
-                    level.setBlock(cursor, selectIslandBlock(level, x, z, distance, flatRadius, shoreRadius, targetTopY, y, seaLevel), 2);
-                }
-
-                if (targetTopY >= seaLevel) {
-                    for (int y = targetTopY + 1; y <= seaLevel; y++) {
-                        cursor.set(x, y, z);
-                        if (!level.getBlockState(cursor).isAir() || !level.getFluidState(cursor).isEmpty()) {
-                            level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
-                        }
-                    }
+                    level.setBlock(cursor, selectIslandBlock(
+                            distance,
+                            flatRadius,
+                            shoreRadius,
+                            targetTopY,
+                            y,
+                            seaLevel), 2);
                 }
             }
         }
@@ -232,16 +273,21 @@ public final class SpawnBunkerPlacer {
         return Math.max(seaLevel - 2, islandTopY - drop);
     }
 
-    private static BlockState selectIslandBlock(ServerLevel level, int x, int z,
-                                                double distance, int flatRadius,
-                                                int shoreRadius, int targetTopY,
-                                                int y, int seaLevel) {
+    private static BlockState selectIslandBlock(double distance,
+                                                int flatRadius,
+                                                int shoreRadius,
+                                                int targetTopY,
+                                                int y,
+                                                int seaLevel) {
         if (y == targetTopY) {
-            // Sample what block naturally exists at this surface position
-            BlockPos surface = new BlockPos(x, targetTopY, z);
-            BlockState natural = level.getBlockState(surface.below());
-            // If it's a recognizable surface block use it, otherwise fall back to sand
-            if (!natural.isAir() && !natural.liquid()) return natural;
+            // The block below was written by this same column pass, so select the equivalent top material
+            // directly instead of allocating a position and reading the block back from the level.
+            if (distance >= flatRadius || targetTopY <= seaLevel) {
+                return Blocks.SANDSTONE.defaultBlockState();
+            }
+            if (targetTopY > seaLevel && distance < shoreRadius - 4) {
+                return Blocks.DIRT.defaultBlockState();
+            }
             return (targetTopY <= seaLevel || distance >= shoreRadius - 4)
                     ? Blocks.SAND.defaultBlockState()
                     : Blocks.GRASS_BLOCK.defaultBlockState();

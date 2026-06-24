@@ -6,6 +6,7 @@ uniform float FogStart;
 uniform float FogEnd;
 uniform vec4 FogColor;
 uniform float GameTime;
+uniform float SeaState;
 
 in float vertexDistance;
 in vec4 vertexColor;
@@ -23,17 +24,18 @@ void main() {
     }
 
     vec3 normal = normalize(viewNormal);
+    float sea = clamp(SeaState, 0.0, 1.0);
     vec3 viewDirection = normalize(-viewPosition);
     float facing = clamp(dot(normal, viewDirection), 0.0, 1.0);
     float fresnel = 0.02 + 0.98 * pow(1.0 - facing, 5.0);
-    float slopeFoam = smoothstep(0.93, 0.985, 1.0 - normal.y + 0.93);
+    float slopeFoam = smoothstep(0.93 - sea * 0.04, 0.985, 1.0 - normal.y + 0.93);
     float microShimmer = pow(max(0.0,
-        sin(texCoord0.x * 42.0 + GameTime * 1.4)
-        * cos(texCoord0.y * 39.0 + GameTime * 1.1)), 12.0);
+        sin(texCoord0.x * 42.0 + GameTime * (1.0 + sea * 2.2))
+        * cos(texCoord0.y * 39.0 + GameTime * (0.8 + sea * 1.8))), 12.0);
 
     vec3 color = mix(vertexColor.rgb, vertexColor.rgb * waterTexture.rgb, 0.34);
-    color = mix(color, vec3(0.80, 0.91, 0.98), fresnel * 0.34 + slopeFoam * 0.16);
-    color += vec3(0.20, 0.24, 0.31) * microShimmer;
+    color = mix(color, vec3(0.80, 0.91, 0.98), fresnel * 0.34 + slopeFoam * (0.10 + sea * 0.18));
+    color += vec3(0.20, 0.24, 0.31) * microShimmer * (0.55 + sea * 0.90);
     color *= max(lightColor, vec3(0.28));
     color *= ColorModulator.rgb;
 

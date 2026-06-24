@@ -97,10 +97,28 @@ public final class GerstnerWaveProfile {
      * @return the complete surface sample
      */
     public WaveSurfaceSample sampleAt(float worldX, float worldZ, float timeSeconds, int maxWaveTrains) {
+        return sampleAt(worldX, worldZ, timeSeconds, maxWaveTrains, WaveSpectrumState.NEUTRAL);
+    }
+
+    /**
+     * Evaluates the profile with synchronized environmental energy and wind.
+     * Wavelength-based dispersion remains unchanged; only component amplitude
+     * and travel heading are blended toward the supplied sea state.
+     */
+    public WaveSurfaceSample sampleAt(
+            float worldX,
+            float worldZ,
+            float timeSeconds,
+            int maxWaveTrains,
+            WaveSpectrumState spectrumState
+    ) {
         int count = Math.max(0, Math.min(waveCount, maxWaveTrains));
         if (count == 0) {
             return WaveSurfaceSample.flat();
         }
+        WaveSpectrumState spectrum = spectrumState == null
+                ? WaveSpectrumState.NEUTRAL
+                : spectrumState;
 
         float displacementX = 0.0f;
         float height = 0.0f;
@@ -119,11 +137,23 @@ public final class GerstnerWaveProfile {
         float tangentZZ = 1.0f;
 
         for (int i = 0; i < count; i++) {
-            float directionX = dirX[i];
-            float directionZ = dirZ[i];
+            float componentBlend = waveCount <= 1 ? 0.0f : i / (float) (waveCount - 1);
+            float windBlend = spectrum.directionBlend() * (0.35f + componentBlend * 0.65f);
+            float directionX = dirX[i] * (1.0f - windBlend)
+                    + spectrum.windDirectionX() * windBlend;
+            float directionZ = dirZ[i] * (1.0f - windBlend)
+                    + spectrum.windDirectionZ() * windBlend;
+            float directionLengthSquared = directionX * directionX + directionZ * directionZ;
+            if (directionLengthSquared > 1.0e-8f) {
+                float inverseDirectionLength = 1.0f / (float) Math.sqrt(directionLengthSquared);
+                directionX *= inverseDirectionLength;
+                directionZ *= inverseDirectionLength;
+            }
             float k = waveNumber[i];
             float omega = angularFrequency[i];
-            float waveAmplitude = amplitude[i];
+            float energyScale = spectrum.swellScale()
+                    + (spectrum.chopScale() - spectrum.swellScale()) * componentBlend;
+            float waveAmplitude = amplitude[i] * energyScale;
             float horizontalScale = steepness[i] * waveAmplitude;
             float phase = k * (directionX * worldX + directionZ * worldZ)
                     - omega * timeSeconds
