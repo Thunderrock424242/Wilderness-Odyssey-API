@@ -106,6 +106,10 @@ tide edit grid was removed; tides no longer place or delete water blocks.
 - Static bodies refresh less often and remote mirrors expire when tracking ends.
 - Non-transient bodies persist per dimension in compact `SavedData` arrays and
   restore their identity, position, velocity, and droplet state.
+- Dimension unload captures mobile bodies before releasing runtime references;
+  unloading one dimension no longer clears simulations in every dimension.
+- Settled SPH conversion is transactional: if nearby canonical cells cannot
+  hold the complete body, partial writes roll back and the body retries later.
 - Vanilla performs the bucket interaction first for permissions, inventory,
   sounds, and game events; persistent SPH then owns that exact mobile volume
   until it settles into the chunk-persistent canonical state.
@@ -140,6 +144,10 @@ Implemented foundation:
   suppressed so a second flow solver cannot create conflicting state.
 - Chunk snapshots synchronize exact fractional fill to nearby clients, and the
   surface renderer, shoreline sampling, and entity forces read canonical data.
+- Large sparse chunks persist every cell and synchronize in bounded pages;
+  packets arriving before their client chunk are reassembled and retained.
+- Bucket pickup drains canonical volume only after vanilla confirms success,
+  so cancelled or incompatible pickup attempts cannot erase water.
 - Vanilla fluid levels are a bounded compatibility projection and lazy import
   boundary for old chunks, waterlogged blocks, and unintegrated mods.
 
@@ -156,6 +164,8 @@ Implemented foundation:
   depth, bathymetry, daylight, canonical velocity, and synchronized sea state.
 - Red wavelengths attenuate faster than green and blue, while storms, moving
   water, and shallow sediment reduce clarity without changing water identity.
+- Synchronized mobile SPH bodies also participate in camera immersion instead
+  of behaving like visible particles with no optical volume.
 - The optional built-in overlay adds animated optical distortion, caustic
   interference, and soft light shafts. It falls back to the vanilla overlay
   when unavailable and leaves Iris/Oculus in control of its shader-pack path.
@@ -180,6 +190,7 @@ shader packs, avoiding an incompatible second post-processing pipeline.
   tide simulation does not mutate world blocks.
 - Multiplayer clients observe the server particle body rather than a separately
   randomized local simulation.
+- Canonical snapshots larger than 16,384 cells round-trip without truncation.
 - Underwater fog and overlays transition at the rendered wave surface rather
   than the flat vanilla compatibility plane.
 - Frame budgets are measured separately for surface rendering, SPH mesh

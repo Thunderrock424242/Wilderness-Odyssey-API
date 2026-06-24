@@ -55,4 +55,20 @@ class WaterVolumeChunkTest {
 
         assertEquals(source, decoded);
     }
+
+    @Test
+    void persistenceDoesNotTruncateLargeSparseChunks() {
+        int cellCount = 16_385;
+        WaterVolumeChunk original = new WaterVolumeChunk();
+        for (int index = 0; index < cellCount; index++) {
+            BlockPos pos = new BlockPos(index & 15, index >>> 8, (index >>> 4) & 15);
+            original.set(pos, WaterVolumeChunk.WaterCell.still(1_024, 0));
+        }
+
+        WaterVolumeChunk decoded = new WaterVolumeChunk();
+        decoded.deserializeNBT(null, original.serializeNBT(null));
+
+        assertEquals(cellCount, decoded.snapshot().size());
+        assertEquals(1_024, decoded.get(new BlockPos(0, 64, 0)).volumeUnits());
+    }
 }

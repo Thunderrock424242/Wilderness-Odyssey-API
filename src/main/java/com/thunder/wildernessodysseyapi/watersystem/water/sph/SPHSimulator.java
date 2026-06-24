@@ -139,6 +139,17 @@ public class SPHSimulator {
                 (long) canonicalVolumeUnits + Math.max(0, volumeUnits)
         );
     }
+
+    // A fully enclosed settled body can remain SPH-owned until canonical
+    // capacity becomes available. Keep one marker so that residual volume is
+    // renderable and included in SavedData even if its particles expired.
+    void ensureResidualMarker() {
+        if (canonicalVolumeUnits <= 0 || !particles.isEmpty()) {
+            return;
+        }
+        particles.add(new SPHParticle(centerX, centerY, centerZ));
+        updateRenderSnapshot();
+    }
     public boolean isRemoteExpired() {
         return remoteMirror && remoteSnapshotAgeTicks > SPHConstants.REMOTE_SNAPSHOT_EXPIRY_TICKS;
     }

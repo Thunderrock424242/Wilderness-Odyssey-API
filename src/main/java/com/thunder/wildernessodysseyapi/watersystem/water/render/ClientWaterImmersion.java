@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
+import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
@@ -85,7 +86,7 @@ public final class ClientWaterImmersion {
             }
         }
         if (waterY == Integer.MIN_VALUE) {
-            return ImmersionState.DRY;
+            return resolveMobileWater(level, cameraPosition);
         }
 
         int topY = waterY;
@@ -151,6 +152,53 @@ public final class ClientWaterImmersion {
                 WaterRenderingConfig.UNDERWATER_TURBIDITY_STRENGTH.get().floatValue()
         );
         return new ImmersionState(true, surfaceY, depthBelowSurface, seaState, optics);
+    }
+
+    private static ImmersionState resolveMobileWater(ClientLevel level, Vec3 cameraPosition) {
+        SPHSimulationManager.MobileWaterSample mobile = SPHSimulationManager.get().sampleAt(
+                level,
+                cameraPosition.x,
+                cameraPosition.y,
+                cameraPosition.z
+        );
+        if (!mobile.wet()) {
+            return ImmersionState.DRY;
+        }
+
+        BlockPos cameraPos = BlockPos.containing(cameraPosition);
+        int tint = IClientFluidTypeExtensions.of(Fluids.WATER).getTintColor(
+                Fluids.WATER.defaultFluidState(),
+                level,
+                cameraPos
+        );
+        float disturbance = clamp((float) Math.sqrt(
+                mobile.velocityX() * mobile.velocityX()
+                        + mobile.velocityY() * mobile.velocityY()
+                        + mobile.velocityZ() * mobile.velocityZ()
+        ) / 1.5f, 0.0f, 1.0f);
+        float daylight = LightTexture.getBrightness(
+                level.dimensionType(),
+                level.getMaxLocalRawBrightness(cameraPos)
+        );
+        UnderwaterOpticsModel.OpticalProperties optics = UnderwaterOpticsModel.evaluate(
+                0.35f,
+                1.0f,
+                disturbance,
+                daylight,
+                ((tint >> 16) & 0xFF) / 255.0f,
+                ((tint >> 8) & 0xFF) / 255.0f,
+                (tint & 0xFF) / 255.0f,
+                0.0f,
+                WaterRenderingConfig.UNDERWATER_VISIBILITY_BLOCKS.get().floatValue(),
+                WaterRenderingConfig.UNDERWATER_TURBIDITY_STRENGTH.get().floatValue()
+        );
+        return new ImmersionState(
+                true,
+                (float) cameraPosition.y + 0.35f,
+                0.35f,
+                0.0f,
+                optics
+        );
     }
 
     private static boolean hasWater(ClientLevel level, BlockPos pos) {

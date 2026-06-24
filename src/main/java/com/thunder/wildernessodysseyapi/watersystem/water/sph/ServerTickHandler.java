@@ -73,7 +73,11 @@ public class ServerTickHandler {
     @SubscribeEvent
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel() instanceof ServerLevel serverLevel) {
-            SPHSimulationManager.get().clearLevel(serverLevel);
+            SPHSimulationManager manager = SPHSimulationManager.get();
+            // Capture the final mobile state before dropping this dimension's
+            // runtime references; the periodic capture may be several ticks old.
+            manager.capturePersistentLevel(serverLevel);
+            manager.clearLevel(serverLevel);
             CanonicalWater.clearLevel(serverLevel);
         }
     }

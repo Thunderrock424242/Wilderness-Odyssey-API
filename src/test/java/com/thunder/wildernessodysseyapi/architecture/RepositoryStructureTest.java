@@ -29,7 +29,13 @@ class RepositoryStructureTest {
 
     @Test
     void productionSourcesFollowPackageAndTypeNamingConventions() throws IOException {
-        Path sourceRoot = Path.of("src", "main", "java").toAbsolutePath().normalize();
+        Path projectRoot = Path.of(System.getProperty(
+                "wildernessodysseyapi.projectDir",
+                System.getProperty("user.dir")
+        ));
+        Path sourceRoot = projectRoot.resolve(Path.of("src", "main", "java"))
+                .toAbsolutePath()
+                .normalize();
         List<String> violations = new ArrayList<>();
 
         try (Stream<Path> paths = Files.walk(sourceRoot)) {

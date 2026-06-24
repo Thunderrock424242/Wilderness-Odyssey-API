@@ -124,6 +124,13 @@ neoForge {
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 sourceSets {
+    test {
+        // NeoForge's JVM test-suite wiring supplies the transformed game
+        // libraries but does not currently add this mod's compiled output.
+        // Tests must see both production classes and their public signatures.
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
 }
 
 // Sets up a dependency configuration called 'localRuntime'.
@@ -132,6 +139,7 @@ sourceSets {
 // "optional", meaning it will not be pulled by dependents of this mod.
 configurations {
     runtimeClasspath.extendsFrom localRuntime
+    testCompileClasspath.extendsFrom compileClasspath
     // NeoForge unit tests load the mod and therefore need the same externally
     // supplied runtime mods (currently Spark) as runClient/runServer.
     testRuntimeClasspath.extendsFrom localRuntime
@@ -272,6 +280,17 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
+    // ModDev launches from build/minecraft-junit, so repository-oriented tests
+    // need the checkout root explicitly instead of relying on user.dir.
+    systemProperty 'wildernessodysseyapi.projectDir', layout.projectDirectory.asFile.absolutePath
+}
+
+// NeoForge's Windows test setup can expose main output to its transforming
+// loader without making that directory discoverable to javac. Compile tests
+// against the main JAR while ModDev continues to own the runtime classpath.
+tasks.named('compileTestJava', JavaCompile) {
+    dependsOn tasks.named('jar')
+    classpath = files(tasks.named('jar').flatMap { it.archiveFile }) + classpath
 }
 
 // Keep packaging available when the NeoForge/JUnit runtime is unhealthy.

@@ -61,9 +61,14 @@ public final class ServerLifecycleEvents {
         }
     }
 
-    /** Stops worker threads when the dedicated or integrated server shuts down. */
+    /** Persists mobile water and stops runtime services during shutdown. */
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
+        SPHSimulationManager waterManager = SPHSimulationManager.get();
+        for (ServerLevel level : event.getServer().getAllLevels()) {
+            waterManager.capturePersistentLevel(level);
+        }
+        waterManager.shutdown();
         AsyncTaskManager.shutdown();
     }
 
@@ -72,7 +77,8 @@ public final class ServerLifecycleEvents {
     public static void onLevelUnload(LevelEvent.Unload event) {
         WaterBodyClassifier.clearCache();
         BoatTiltStore.clear();
-        SPHSimulationManager.get().shutdown();
+        // ServerTickHandler and ClientTickHandler release only the unloading
+        // level. A global shutdown here used to erase water in other dimensions.
     }
 
     /** Adds the FAQ data listener to each server resource reload. */

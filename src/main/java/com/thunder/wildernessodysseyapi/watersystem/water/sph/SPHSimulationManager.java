@@ -35,6 +35,9 @@ public class SPHSimulationManager {
     private final Set<BlockGetter> restoredPersistentLevels =
             Collections.newSetFromMap(new IdentityHashMap<>());
 
+    /** Settled authoritative bodies waiting for nearby canonical capacity. */
+    private final Map<SPHSimulator, Long> settlementRetries = new IdentityHashMap<>();
+
     private SPHSimulationManager() {}
 
     /**
@@ -208,8 +211,13 @@ public class SPHSimulationManager {
         for (SPHSimulator sim : active) {
             if (sim.getLevel() == level && sim.isSettled()) {
                 if (level instanceof ServerLevel serverLevel && sim.getCanonicalVolumeUnits() > 0) {
-                    materializeCanonicalVolume(serverLevel, sim, sim.getRenderParticles());
+                    if (!materializeCanonicalVolume(serverLevel, sim, sim.getRenderParticles(), true)) {
+                        sim.ensureResidualMarker();
+                        settlementRetries.put(sim, serverLevel.getGameTime() + 20L);
+                        continue;
+                    }
                 }
+                settlementRetries.remove(sim);
                 active.remove(sim);
                 return true;
             }
@@ -218,7 +226,8 @@ public class SPHSimulationManager {
     }
 
     private void removeEmptySimulations() {
-        active.removeIf(sim -> sim.particleCount() == 0);
+        active.removeIf(sim -> sim.particleCount() == 0 && sim.getCanonicalVolumeUnits() <= 0);
+        settlementRetries.keySet().removeIf(sim -> !active.contains(sim));
     }
 
     private void runPendingSettleCallbacks() {
@@ -239,8 +248,9 @@ public class SPHSimulationManager {
 
         for (SPHSimulator sim : active) {
             sim.tick(deltaTime);
-            if (sim.particleCount() == 0) {
+            if (sim.particleCount() == 0 && sim.getCanonicalVolumeUnits() <= 0) {
                 active.remove(sim);
+                settlementRetries.remove(sim);
             }
         }
     }
@@ -254,8 +264,11 @@ public class SPHSimulationManager {
             }
 
             sim.tick(deltaTime);
-            if (sim.particleCount() == 0 || sim.isRemoteExpired()) {
+            retrySettlementIfNeeded(level, sim);
+            if ((sim.particleCount() == 0 && sim.getCanonicalVolumeUnits() <= 0)
+                    || sim.isRemoteExpired()) {
                 active.remove(sim);
+                settlementRetries.remove(sim);
             }
         }
     }
@@ -334,7 +347,13 @@ public class SPHSimulationManager {
     private void configureSettlement(SPHSimulator simulator, BlockGetter level, SettleBlockPlacer fallbackPlacer) {
         simulator.setSettleListener(finalParticles -> pendingSettleCallbacks.add(() -> {
             if (level instanceof ServerLevel serverLevel && simulator.getCanonicalVolumeUnits() > 0) {
-                materializeCanonicalVolume(serverLevel, simulator, finalParticles);
+                if (materializeCanonicalVolume(serverLevel, simulator, finalParticles, true)) {
+                    settlementRetries.remove(simulator);
+                    active.remove(simulator);
+                } else {
+                    simulator.ensureResidualMarker();
+                    settlementRetries.put(simulator, serverLevel.getGameTime() + 20L);
+                }
             } else if (SPHConstants.CONVERT_SETTLED_TO_BLOCKS) {
                 Set<BlockPos> placed = new HashSet<>();
                 for (SPHParticle particle : finalParticles) {
@@ -347,24 +366,48 @@ public class SPHSimulationManager {
                         fallbackPlacer.placeBlock(pos);
                     }
                 }
+                active.remove(simulator);
+            } else {
+                active.remove(simulator);
             }
-            active.remove(simulator);
         }));
     }
 
-    private static void materializeCanonicalVolume(
+    private void retrySettlementIfNeeded(BlockGetter level, SPHSimulator simulator) {
+        Long retryAt = settlementRetries.get(simulator);
+        if (retryAt == null
+                || !(level instanceof ServerLevel serverLevel)
+                || serverLevel.getGameTime() < retryAt) {
+            return;
+        }
+
+        if (materializeCanonicalVolume(
+                serverLevel,
+                simulator,
+                new ArrayList<>(simulator.getRenderParticles()),
+                false
+        )) {
+            settlementRetries.remove(simulator);
+            active.remove(simulator);
+        } else {
+            settlementRetries.put(simulator, serverLevel.getGameTime() + 20L);
+        }
+    }
+
+    private static boolean materializeCanonicalVolume(
             ServerLevel level,
             SPHSimulator simulator,
-            List<SPHParticle> particles
+            List<SPHParticle> particles,
+            boolean warnOnFailure
     ) {
+        List<SettlementWrite> writes = new ArrayList<>();
         if (particles.isEmpty()) {
             int remaining = deposit(level, BlockPos.containing(
                     simulator.getCenterX(),
                     simulator.getCenterY(),
                     simulator.getCenterZ()
-            ), simulator.getCanonicalVolumeUnits());
-            warnIfVolumeCouldNotSettle(simulator, remaining);
-            return;
+            ), simulator.getCanonicalVolumeUnits(), writes);
+            return finishSettlement(level, simulator, remaining, writes, warnOnFailure);
         }
 
         Map<BlockPos, Integer> particleCounts = new LinkedHashMap<>();
@@ -384,7 +427,7 @@ public class SPHSimulationManager {
                     : (int) ((long) remainingVolume * entry.getValue() / remainingParticles);
             remainingVolume -= share;
             remainingParticles -= entry.getValue();
-            remainingVolume += deposit(level, entry.getKey(), share);
+            remainingVolume += deposit(level, entry.getKey(), share, writes);
         }
 
         if (remainingVolume > 0) {
@@ -392,14 +435,19 @@ public class SPHSimulationManager {
                     simulator.getCenterX(),
                     simulator.getCenterY(),
                     simulator.getCenterZ()
-            ), remainingVolume);
+            ), remainingVolume, writes);
         }
-        warnIfVolumeCouldNotSettle(simulator, remainingVolume);
+        return finishSettlement(level, simulator, remainingVolume, writes, warnOnFailure);
     }
 
     // Searches a compact settlement area so a particle body that stops against
     // terrain keeps its exact volume instead of being written inside solids.
-    private static int deposit(ServerLevel level, BlockPos target, int volumeUnits) {
+    private static int deposit(
+            ServerLevel level,
+            BlockPos target,
+            int volumeUnits,
+            List<SettlementWrite> writes
+    ) {
         int remaining = volumeUnits;
         for (int offsetY = 0; offsetY <= 4 && remaining > 0; offsetY++) {
             for (int radius = 0; radius <= 3 && remaining > 0; radius++) {
@@ -408,14 +456,19 @@ public class SPHSimulationManager {
                         if (Math.max(Math.abs(offsetX), Math.abs(offsetZ)) != radius) {
                             continue;
                         }
+                        BlockPos destination = target.offset(offsetX, offsetY, offsetZ);
+                        WaterVolumeChunk.WaterCell previous = CanonicalWater.getOrImport(level, destination);
                         int accepted = CanonicalWater.addVolume(
                                 level,
-                                target.offset(offsetX, offsetY, offsetZ),
+                                destination,
                                 remaining,
                                 0.0f,
                                 0.0f,
                                 0.0f
                         );
+                        if (accepted > 0) {
+                            writes.add(new SettlementWrite(destination.immutable(), previous));
+                        }
                         remaining -= accepted;
                     }
                 }
@@ -424,10 +477,33 @@ public class SPHSimulationManager {
         return remaining;
     }
 
+    private static boolean finishSettlement(
+            ServerLevel level,
+            SPHSimulator simulator,
+            int remainingVolume,
+            List<SettlementWrite> writes,
+            boolean warnOnFailure
+    ) {
+        if (remainingVolume <= 0) {
+            return true;
+        }
+
+        // Partial materialization would duplicate or lose volume. Restore every
+        // touched cell and retain the complete settled SPH body for a later retry.
+        for (int index = writes.size() - 1; index >= 0; index--) {
+            SettlementWrite write = writes.get(index);
+            CanonicalWater.set(level, write.pos, write.previous, true);
+        }
+        if (warnOnFailure) {
+            warnIfVolumeCouldNotSettle(simulator, remainingVolume);
+        }
+        return false;
+    }
+
     private static void warnIfVolumeCouldNotSettle(SPHSimulator simulator, int remainingVolume) {
         if (remainingVolume > 0) {
             ModConstants.LOGGER.warn(
-                    "Could not settle {} of {} canonical water units near SPH body {} because the area is full.",
+                    "Could not settle {} of {} canonical water units near SPH body {}; retaining it for retry.",
                     remainingVolume,
                     simulator.getCanonicalVolumeUnits(),
                     simulator.getSimulationId()
@@ -441,6 +517,7 @@ public class SPHSimulationManager {
      * @param level level instance being discarded
      */
     public void clearLevel(BlockGetter level) {
+        settlementRetries.keySet().removeIf(sim -> sim.getLevel() == level);
         active.removeIf(sim -> sim.getLevel() == level);
         restoredPersistentLevels.remove(level);
     }
@@ -522,12 +599,16 @@ public class SPHSimulationManager {
         private static final MobileWaterSample DRY = new MobileWaterSample(false, 0.0f, 0.0f, 0.0f);
     }
 
+    private record SettlementWrite(BlockPos pos, WaterVolumeChunk.WaterCell previous) {
+    }
+
     /**
      * Terminates all physics processing. Should be called during server/client shutdown.
      */
     public void shutdown() {
         active.clear();
         pendingSettleCallbacks.clear();
+        settlementRetries.clear();
         restoredPersistentLevels.clear();
     }
 

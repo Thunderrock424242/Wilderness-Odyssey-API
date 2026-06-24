@@ -97,12 +97,14 @@ public final class WaterShaders {
             float timeSeconds,
             float seaState,
             float windDirectionX,
-            float windDirectionZ
+            float windDirectionZ,
+            float dayTime
     ) {
         if (oceanShader != null) {
             oceanShader.safeGetUniform("GameTime").set(timeSeconds);
             oceanShader.safeGetUniform("SeaState").set(seaState);
             oceanShader.safeGetUniform("WindDirection").set(windDirectionX, windDirectionZ);
+            oceanShader.safeGetUniform("DayTime").set(dayTime);
         }
     }
 
