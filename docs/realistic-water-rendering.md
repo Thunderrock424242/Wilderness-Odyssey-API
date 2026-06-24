@@ -65,8 +65,12 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
 - Per-frame world-space positions and analytic wave normals.
 - Cached water/bathymetry scans, circular range culling, and renderer-mod-aware
   cell size/radius limits.
+- Coarse optimized cells validate their complete footprint and edge grid before
+  rendering, so they cannot bridge beach corners, islands, or unloaded gaps.
 - Depth attenuation that fades deep-ocean waves into shallow water.
 - Foam generated from depth and crest slope rather than absolute world height.
+- Patch-stable material tint avoids exposing the GPU's internal triangle split;
+  view-dependent Fresnel remains a per-pixel shader responsibility.
 - A standard translucent compatibility path plus an optional built-in core
   shader when no third-party shader pack owns water shading.
 
