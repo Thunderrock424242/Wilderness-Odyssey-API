@@ -52,7 +52,11 @@ public final class WaterVolumeSynchronizer {
                     if (syncState.revisions.getOrDefault(chunkKey, Long.MIN_VALUE) == volume.revision()) {
                         continue;
                     }
-                    PacketDistributor.sendToPlayer(player, WaterVolumeChunkPayload.fromChunk(chunk, volume));
+                    // Large sparse chunks are paged so one exact revision never
+                    // exceeds the custom-payload safety bound.
+                    for (WaterVolumeChunkPayload page : WaterVolumeChunkPayload.pagesFromChunk(chunk, volume)) {
+                        PacketDistributor.sendToPlayer(player, page);
+                    }
                     syncState.revisions.put(chunkKey, volume.revision());
                 }
             }

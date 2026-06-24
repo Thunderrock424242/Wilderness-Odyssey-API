@@ -14,6 +14,8 @@ in vec2 texCoord0;
 in vec3 lightColor;
 in vec3 viewPosition;
 in vec3 viewNormal;
+in vec3 celestialDirection;
+in float celestialDaylight;
 
 out vec4 fragColor;
 
@@ -32,10 +34,18 @@ void main() {
     float microShimmer = pow(max(0.0,
         sin(texCoord0.x * 42.0 + GameTime * (1.0 + sea * 2.2))
         * cos(texCoord0.y * 39.0 + GameTime * (0.8 + sea * 1.8))), 12.0);
+    vec3 halfDirection = normalize(celestialDirection + viewDirection);
+    float celestialSpecular = pow(max(dot(normal, halfDirection), 0.0), 88.0);
+    vec3 celestialColor = mix(
+        vec3(0.38, 0.50, 0.72),
+        vec3(1.00, 0.88, 0.68),
+        celestialDaylight
+    );
 
     vec3 color = mix(vertexColor.rgb, vertexColor.rgb * waterTexture.rgb, 0.34);
     color = mix(color, vec3(0.80, 0.91, 0.98), fresnel * 0.34 + slopeFoam * (0.10 + sea * 0.18));
     color += vec3(0.20, 0.24, 0.31) * microShimmer * (0.55 + sea * 0.90);
+    color += celestialColor * celestialSpecular * (0.20 + sea * 0.14);
     color *= max(lightColor, vec3(0.28));
     color *= ColorModulator.rgb;
 

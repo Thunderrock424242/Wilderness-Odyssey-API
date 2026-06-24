@@ -23,7 +23,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModPayloads {
 
-    private static final String NETWORK_VERSION = "2";
+    private static final String NETWORK_VERSION = "3";
 
     private ModPayloads() {
     }

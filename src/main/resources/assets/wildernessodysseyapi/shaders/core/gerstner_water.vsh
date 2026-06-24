@@ -12,6 +12,7 @@ uniform sampler2D Sampler2;
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
 uniform float GameTime;
+uniform float DayTime;
 uniform float SeaState;
 uniform vec2 WindDirection;
 
@@ -21,11 +22,18 @@ out vec2 texCoord0;
 out vec3 lightColor;
 out vec3 viewPosition;
 out vec3 viewNormal;
+out vec3 celestialDirection;
+out float celestialDaylight;
 
 void main() {
     vec4 view = ModelViewMat * vec4(Position, 1.0);
     viewPosition = view.xyz;
     viewNormal = normalize(mat3(ModelViewMat) * Normal);
+    float celestialAngle = DayTime * 6.28318530718;
+    vec3 sunDirection = normalize(vec3(cos(celestialAngle), sin(celestialAngle), 0.20));
+    celestialDaylight = step(0.0, sunDirection.y);
+    vec3 activeLightDirection = celestialDaylight > 0.5 ? sunDirection : -sunDirection;
+    celestialDirection = normalize(mat3(ModelViewMat) * activeLightDirection);
     vertexDistance = length(view.xyz);
     vertexColor = Color;
     float sea = clamp(SeaState, 0.0, 1.0);

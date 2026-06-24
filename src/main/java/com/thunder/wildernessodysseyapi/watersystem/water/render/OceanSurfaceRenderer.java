@@ -114,7 +114,8 @@ public final class OceanSurfaceRenderer {
                     timeSeconds,
                     seaState.strength(),
                     seaState.windDirectionX(),
-                    seaState.windDirectionZ()
+                    seaState.windDirectionZ(),
+                    ((level.getDayTime() + partialTick) % 24_000L) / 24_000.0f
             );
         }
 
@@ -494,6 +495,13 @@ public final class OceanSurfaceRenderer {
         cachedCenterX = Integer.MIN_VALUE;
         cachedCenterZ = Integer.MIN_VALUE;
         cachedGameTime = Long.MIN_VALUE;
+    }
+
+    /** Clears top-face ownership before an old client level is discarded. */
+    public static void clearLevel(ClientLevel level) {
+        if (cachedLevel == level) {
+            clearCache();
+        }
     }
 
     /** Returns whether the per-frame mesh currently replaces this baked top face. */

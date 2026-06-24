@@ -6,7 +6,7 @@ The Wilderness water system is split across several coordinated subsystems:
 - SPH bucket pours: `BucketPlaceMixin`, `SPHSimulator`, `FluidRenderer`
 - Finite fluid simulation: `WildernessFluidRegistry`, `WaterSourceMixin`
 - Compatibility projection: `CanonicalWaterFlowMixin`, `CanonicalWaterBucketPickupMixin`
-- Client volume synchronization: `WaterVolumeChunkPayload`, `WaterVolumeSynchronizer`
+- Client volume synchronization: `WaterVolumeChunkPayload`, `WaterVolumeSynchronizer`, `ClientWaterVolumeSnapshots`
 - Ripple and splash particles: `RippleRenderer`, `WaterEntryEventHandler`
 - Gerstner waves per water body: `GerstnerWaveRenderMixin`, `WaveEntityPhysics`
 - Moon-phase tide system: `TideSystem`, `TideWorldUpdater`, `TideHudOverlay`
@@ -20,6 +20,12 @@ mobile bucket volume; when a body settles, that exact volume is distributed
 into canonical cells. Vanilla water levels are projections for collision,
 swimming, waterlogging boundaries, and third-party compatibility rather than
 the simulation's source of truth.
+
+Canonical persistence is complete rather than capped. Network snapshots split
+large sparse chunks into bounded pages and clients reassemble the newest
+revision even when its packets arrive before the destination chunk. Settled SPH
+conversion uses rollback and retry, preserving exact volume when nearby cells
+are temporarily full.
 
 Ocean weather is likewise server-authoritative. Rain and thunder drive a
 slowly turning wind field, swell/chop energy, and breaking-wave strength. The

@@ -31,8 +31,6 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
 
     private static final String REVISION_KEY = "revision";
     private static final String CELL_DATA_KEY = "cells";
-    private static final int MAX_PERSISTED_CELLS = 16_384;
-
     private final Map<Integer, WaterCell> cells = new HashMap<>();
     private long revision;
     private boolean dirty;
@@ -85,7 +83,7 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
         dirty = false;
     }
 
-    /** Encodes the bounded sparse state for a client snapshot. */
+    /** Encodes the complete sparse state for paged client snapshots. */
     public int[] toNetworkArray() {
         return encodeCells();
     }
@@ -137,13 +135,10 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
     }
 
     private int[] encodeCells() {
-        int cellCount = Math.min(cells.size(), MAX_PERSISTED_CELLS);
+        int cellCount = cells.size();
         int[] data = new int[cellCount * SERIALIZED_CELL_STRIDE];
         int index = 0;
         for (Map.Entry<Integer, WaterCell> entry : cells.entrySet()) {
-            if (index >= cellCount) {
-                break;
-            }
             int offset = index++ * SERIALIZED_CELL_STRIDE;
             WaterCell cell = entry.getValue();
             data[offset] = entry.getKey();
@@ -158,7 +153,7 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
     }
 
     private void decodeCells(int[] data, boolean notify) {
-        int cellCount = Math.min(data.length / SERIALIZED_CELL_STRIDE, MAX_PERSISTED_CELLS);
+        int cellCount = data.length / SERIALIZED_CELL_STRIDE;
         for (int index = 0; index < cellCount; index++) {
             int offset = index * SERIALIZED_CELL_STRIDE;
             setPacked(data[offset], new WaterCell(
