@@ -2,7 +2,6 @@ package com.thunder.wildernessodysseyapi.core;
 
 import com.thunder.wildernessodysseyapi.ai.story.AIChatListener;
 import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
-import com.thunder.wildernessodysseyapi.bugfixes.InfiniteSourceHandler;
 import com.thunder.wildernessodysseyapi.command.ModCommands;
 import com.thunder.wildernessodysseyapi.config.ModConfigRegistration;
 import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
@@ -87,7 +86,6 @@ public final class WildernessOdysseyAPIMainModClass {
 
     // The game bus owns live server/world events after mod construction is complete.
     private static void registerGameEventHandlers() {
-        NeoForge.EVENT_BUS.register(InfiniteSourceHandler.class);
         NeoForge.EVENT_BUS.register(AIChatListener.class);
         NeoForge.EVENT_BUS.register(PlayerTelemetryReporter.class);
         NeoForge.EVENT_BUS.register(EventTelemetryReporter.class);

@@ -130,7 +130,7 @@ public final class OceanSurfaceRenderer {
         poseStack.translate(-camera.x, -camera.y, -camera.z);
 
         for (SurfacePatch patch : PATCHES) {
-            drawPatch(level, patch, timeSeconds, tideOffset, seaState, camera.x, camera.y, camera.z,
+            drawPatch(level, patch, timeSeconds, tideOffset, seaState,
                     sprite, poseStack.last(), buffer);
         }
 
@@ -144,9 +144,6 @@ public final class OceanSurfaceRenderer {
             float timeSeconds,
             float tideOffset,
             OceanSeaState.Sample seaState,
-            double cameraX,
-            double cameraY,
-            double cameraZ,
             TextureAtlasSprite sprite,
             PoseStack.Pose pose,
             VertexConsumer buffer
@@ -165,14 +162,21 @@ public final class OceanSurfaceRenderer {
         WaveSpectrumState spectrum = patch.waterType == WaterBodyClassifier.WaterType.OCEAN
                 ? seaState.spectrum()
                 : WaveSpectrumState.NEUTRAL;
-        VertexData first = vertex(level, x0, patch.firstY, z0, patch.depth, waveBlend,
-                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
-        VertexData second = vertex(level, x0, patch.secondY, z1, patch.depth, waveBlend,
-                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
-        VertexData third = vertex(level, x1, patch.thirdY, z1, patch.depth, waveBlend,
-                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
-        VertexData fourth = vertex(level, x1, patch.fourthY, z0, patch.depth, waveBlend,
-                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, cameraX, cameraY, cameraZ);
+        int patchColor = opticalColor(
+                level,
+                (x0 + x1) * 0.5f,
+                (patch.firstY + patch.secondY + patch.thirdY + patch.fourthY) * 0.25f,
+                (z0 + z1) * 0.5f,
+                patch.depth
+        );
+        VertexData first = vertex(level, x0, patch.firstY, z0, waveBlend,
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor);
+        VertexData second = vertex(level, x0, patch.secondY, z1, waveBlend,
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor);
+        VertexData third = vertex(level, x1, patch.thirdY, z1, waveBlend,
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor);
+        VertexData fourth = vertex(level, x1, patch.fourthY, z0, waveBlend,
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor);
 
         emitVertex(buffer, pose, sprite, first);
         emitVertex(buffer, pose, sprite, second);
@@ -185,16 +189,13 @@ public final class OceanSurfaceRenderer {
             float baseX,
             float baseY,
             float baseZ,
-            float depth,
             float waveBlend,
             GerstnerWaveProfile waveProfile,
             WaveSpectrumState spectrum,
             float timeSeconds,
             float tideOffset,
             int waveLimit,
-            double cameraX,
-            double cameraY,
-            double cameraZ
+            int color
     ) {
         WaveSurfaceSample sample = waveProfile
                 .sampleAt(baseX, baseZ, timeSeconds, waveLimit, spectrum)
@@ -203,7 +204,6 @@ public final class OceanSurfaceRenderer {
         float x = baseX + sample.displacementX();
         float y = baseY + sample.height() + 0.002f;
         float z = baseZ + sample.displacementZ();
-        int color = opticalColor(level, x, y, z, depth, sample, cameraX, cameraY, cameraZ);
         int light = waterLight(level, x, y, z);
         return new VertexData(x, y, z, sample.normalX(), sample.normalY(), sample.normalZ(), color, light);
     }
@@ -233,11 +233,7 @@ public final class OceanSurfaceRenderer {
             float x,
             float y,
             float z,
-            float depth,
-            WaveSurfaceSample sample,
-            double cameraX,
-            double cameraY,
-            double cameraZ
+            float depth
     ) {
         int tint = IClientFluidTypeExtensions.of(Fluids.WATER).getTintColor(
                 WATER_STATE,
@@ -248,15 +244,6 @@ public final class OceanSurfaceRenderer {
         float tintG = ((tint >> 8) & 0xFF) / 255.0f;
         float tintB = (tint & 0xFF) / 255.0f;
 
-        float toCameraX = (float) (cameraX - x);
-        float toCameraY = (float) (cameraY - y);
-        float toCameraZ = (float) (cameraZ - z);
-        float inverseViewLength = inverseLength(toCameraX, toCameraY, toCameraZ);
-        float facing = Math.max(0.0f, Math.min(1.0f,
-                sample.normalX() * toCameraX * inverseViewLength
-                        + sample.normalY() * toCameraY * inverseViewLength
-                        + sample.normalZ() * toCameraZ * inverseViewLength));
-        float fresnel = 0.02f + 0.98f * pow5(1.0f - facing);
         float absorption = 1.0f - (float) Math.exp(-Math.max(0.0f, depth) * 0.32f);
 
         float shallowR = 0.08f + tintR * 0.38f;
@@ -269,17 +256,11 @@ public final class OceanSurfaceRenderer {
         float green = mix(shallowG, deepG, absorption);
         float blue = mix(shallowB, deepB, absorption);
 
-        float foam = Math.max(
-                smoothStep(0.0f, 0.8f, 1.15f - depth),
-                Math.max(0.0f, (0.985f - sample.normalY()) * 7.5f)
-        );
+        float foam = smoothStep(0.0f, 0.8f, 1.15f - depth);
         red = mix(red, 0.86f, foam);
         green = mix(green, 0.94f, foam);
         blue = mix(blue, 1.0f, foam);
-        red += fresnel * 0.18f;
-        green += fresnel * 0.22f;
-        blue += fresnel * 0.28f;
-        float alpha = 0.52f + absorption * 0.12f + fresnel * 0.24f + foam * 0.08f;
+        float alpha = 0.56f + absorption * 0.14f + foam * 0.08f;
 
         return (channel(alpha) << 24)
                 | (channel(red) << 16)
@@ -337,15 +318,18 @@ public final class OceanSurfaceRenderer {
                 if (!first.valid || !second.valid || !third.valid || !fourth.valid) {
                     continue;
                 }
-                float minimumSurface = Math.min(Math.min(first.surfaceY, second.surfaceY),
-                        Math.min(third.surfaceY, fourth.surfaceY));
-                float maximumSurface = Math.max(Math.max(first.surfaceY, second.surfaceY),
-                        Math.max(third.surfaceY, fourth.surfaceY));
-                if (maximumSurface - minimumSurface > MAX_SURFACE_STEP) {
+
+                PatchFootprint footprint = validatePatchFootprint(
+                        level,
+                        columns,
+                        x,
+                        z,
+                        cellSize
+                );
+                if (!footprint.valid) {
                     continue;
                 }
 
-                float depth = Math.min(Math.min(first.depth, second.depth), Math.min(third.depth, fourth.depth));
                 PATCHES.add(new SurfacePatch(
                         x,
                         z,
@@ -354,7 +338,7 @@ public final class OceanSurfaceRenderer {
                         third.surfaceY,
                         fourth.surfaceY,
                         cellSize,
-                        depth,
+                        footprint.minimumDepth,
                         dominantType(first, second, third, fourth)
                 ));
 
@@ -377,6 +361,37 @@ public final class OceanSurfaceRenderer {
             }
         }
         updateVanillaTopOwnership(level, rebuiltOwnedTops);
+    }
+
+    // Coarse optimized cells must never bridge an island, beach corner, or
+    // unloaded gap merely because their four outer corners contain water.
+    // Validate the complete vertex grid and use its shallowest depth so wave
+    // attenuation remains conservative near irregular shorelines.
+    private static PatchFootprint validatePatchFootprint(
+            ClientLevel level,
+            Map<Long, WaterColumn> columns,
+            int startX,
+            int startZ,
+            int cellSize
+    ) {
+        float minimumSurface = Float.POSITIVE_INFINITY;
+        float maximumSurface = Float.NEGATIVE_INFINITY;
+        float minimumDepth = MAX_DEPTH_SAMPLE;
+        for (int offsetX = 0; offsetX <= cellSize; offsetX++) {
+            for (int offsetZ = 0; offsetZ <= cellSize; offsetZ++) {
+                WaterColumn covered = column(level, columns, startX + offsetX, startZ + offsetZ);
+                if (!covered.valid) {
+                    return PatchFootprint.INVALID;
+                }
+                minimumSurface = Math.min(minimumSurface, covered.surfaceY);
+                maximumSurface = Math.max(maximumSurface, covered.surfaceY);
+                minimumDepth = Math.min(minimumDepth, covered.depth);
+            }
+        }
+        if (maximumSurface - minimumSurface > MAX_SURFACE_STEP) {
+            return PatchFootprint.INVALID;
+        }
+        return new PatchFootprint(true, minimumDepth);
     }
 
     private static WaterColumn column(
@@ -538,16 +553,6 @@ public final class OceanSurfaceRenderer {
         return t * t * (3.0f - 2.0f * t);
     }
 
-    private static float inverseLength(float x, float y, float z) {
-        float lengthSquared = x * x + y * y + z * z;
-        return lengthSquared <= 1.0e-8f ? 0.0f : 1.0f / (float) Math.sqrt(lengthSquared);
-    }
-
-    private static float pow5(float value) {
-        float squared = value * value;
-        return squared * squared * value;
-    }
-
     private static float mix(float first, float second, float factor) {
         return first + (second - first) * Math.max(0.0f, Math.min(1.0f, factor));
     }
@@ -587,6 +592,10 @@ public final class OceanSurfaceRenderer {
                 0.0f,
                 WaterBodyClassifier.WaterType.POND
         );
+    }
+
+    private record PatchFootprint(boolean valid, float minimumDepth) {
+        private static final PatchFootprint INVALID = new PatchFootprint(false, 0.0f);
     }
 
     private record VertexData(
