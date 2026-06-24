@@ -6,8 +6,6 @@ import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChun
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -63,7 +61,7 @@ public final class WildernessFluidRegistry {
             int capacity = WaterVolumeChunk.UNITS_PER_BLOCK - target.volumeUnits();
             int transfer = Math.min(current.volumeUnits(), Math.max(0, capacity));
             if (transfer > 0) {
-                transfer(level, pos, current, below, target, transfer, 0.0f, FALL_SPEED, 0.0f);
+                transfer(level, pos, current, below, transfer, 0.0f, FALL_SPEED, 0.0f);
                 return;
             }
         }
@@ -100,7 +98,7 @@ public final class WildernessFluidRegistry {
 
         float velocityX = bestDirection.getStepX() * SIDE_FLOW_SPEED;
         float velocityZ = bestDirection.getStepZ() * SIDE_FLOW_SPEED;
-        transfer(level, pos, current, pos.relative(bestDirection), bestTarget, transfer,
+        transfer(level, pos, current, pos.relative(bestDirection), transfer,
                 velocityX, 0.0f, velocityZ);
     }
 
@@ -109,13 +107,26 @@ public final class WildernessFluidRegistry {
             BlockPos sourcePos,
             WaterVolumeChunk.WaterCell source,
             BlockPos targetPos,
-            WaterVolumeChunk.WaterCell target,
             int transfer,
             float velocityX,
             float velocityY,
             float velocityZ
     ) {
-        int remaining = source.volumeUnits() - transfer;
+        // Commit the destination first. Its accepted amount is authoritative,
+        // so a changed or non-replaceable target can never make volume vanish.
+        int accepted = CanonicalWater.addVolume(
+                level,
+                targetPos,
+                transfer,
+                velocityX,
+                velocityY,
+                velocityZ
+        );
+        if (accepted <= 0) {
+            return;
+        }
+
+        int remaining = source.volumeUnits() - accepted;
         CanonicalWater.set(level, sourcePos, remaining <= 0
                 ? WaterVolumeChunk.WaterCell.EMPTY
                 : new WaterVolumeChunk.WaterCell(
@@ -126,14 +137,9 @@ public final class WildernessFluidRegistry {
                         WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED,
                         source.temperatureMilliKelvin()
                 ), true);
-        CanonicalWater.addVolume(level, targetPos, transfer, velocityX, velocityY, velocityZ);
     }
 
     private static boolean canOccupy(ServerLevel level, BlockPos pos) {
-        if (level.isOutsideBuildHeight(pos)) {
-            return false;
-        }
-        BlockState state = level.getBlockState(pos);
-        return state.isAir() || state.is(Blocks.WATER) || !state.blocksMotion();
+        return CanonicalWater.canAcceptVolume(level, pos);
     }
 }

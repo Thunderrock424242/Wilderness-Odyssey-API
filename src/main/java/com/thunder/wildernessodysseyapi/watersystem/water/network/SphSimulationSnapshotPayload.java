@@ -29,6 +29,7 @@ public record SphSimulationSnapshotPayload(
 ) implements CustomPacketPayload {
 
     private static final float POSITION_QUANTIZATION = 256.0f;
+    private static final float VELOCITY_QUANTIZATION = 256.0f;
 
     public static final Type<SphSimulationSnapshotPayload> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "sph_simulation_snapshot")
@@ -125,15 +126,31 @@ public record SphSimulationSnapshotPayload(
             float x,
             float y,
             float z,
+            float velocityX,
+            float velocityY,
+            float velocityZ,
             boolean droplet,
             int dropletLife
     ) {
+
+        public ParticleSnapshot {
+            x = finiteOrZero(x);
+            y = finiteOrZero(y);
+            z = finiteOrZero(z);
+            velocityX = finiteOrZero(velocityX);
+            velocityY = finiteOrZero(velocityY);
+            velocityZ = finiteOrZero(velocityZ);
+            dropletLife = Math.max(0, dropletLife);
+        }
 
         private static ParticleSnapshot fromParticle(SPHParticle particle) {
             return new ParticleSnapshot(
                     particle.position.x,
                     particle.position.y,
                     particle.position.z,
+                    particle.velocity.x,
+                    particle.velocity.y,
+                    particle.velocity.z,
                     particle.isDroplet,
                     particle.dropletLife
             );
@@ -141,6 +158,7 @@ public record SphSimulationSnapshotPayload(
 
         private SPHParticle toParticle() {
             SPHParticle particle = new SPHParticle(x, y, z);
+            particle.velocity.set(velocityX, velocityY, velocityZ);
             particle.isDroplet = droplet;
             particle.dropletLife = dropletLife;
             return particle;
@@ -150,6 +168,9 @@ public record SphSimulationSnapshotPayload(
             buffer.writeShort(quantize(x - centerX));
             buffer.writeShort(quantize(y - centerY));
             buffer.writeShort(quantize(z - centerZ));
+            buffer.writeShort(quantizeVelocity(velocityX));
+            buffer.writeShort(quantizeVelocity(velocityY));
+            buffer.writeShort(quantizeVelocity(velocityZ));
             buffer.writeBoolean(droplet);
             buffer.writeVarInt(dropletLife);
         }
@@ -164,6 +185,9 @@ public record SphSimulationSnapshotPayload(
                     centerX + buffer.readShort() / POSITION_QUANTIZATION,
                     centerY + buffer.readShort() / POSITION_QUANTIZATION,
                     centerZ + buffer.readShort() / POSITION_QUANTIZATION,
+                    buffer.readShort() / VELOCITY_QUANTIZATION,
+                    buffer.readShort() / VELOCITY_QUANTIZATION,
+                    buffer.readShort() / VELOCITY_QUANTIZATION,
                     buffer.readBoolean(),
                     buffer.readVarInt()
             );
@@ -172,6 +196,15 @@ public record SphSimulationSnapshotPayload(
         private static int quantize(float relativePosition) {
             return Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE,
                     Math.round(relativePosition * POSITION_QUANTIZATION)));
+        }
+
+        private static int quantizeVelocity(float velocity) {
+            return Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE,
+                    Math.round(velocity * VELOCITY_QUANTIZATION)));
+        }
+
+        private static float finiteOrZero(float value) {
+            return Float.isFinite(value) ? value : 0.0f;
         }
     }
 }

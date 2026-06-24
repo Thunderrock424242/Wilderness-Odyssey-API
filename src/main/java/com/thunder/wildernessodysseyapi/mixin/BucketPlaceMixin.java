@@ -55,7 +55,8 @@ public abstract class BucketPlaceMixin {
 
         // Server physics owns collision and particle history. Clients receive
         // interpolated snapshots instead of creating a divergent local splash.
-        SPHSimulationManager.get().createSimulation(
+        SPHSimulationManager.BucketPlacementResult placement =
+                SPHSimulationManager.get().createBucketSimulation(
                 pos.getX() + 0.5f,
                 pos.getY() + 0.65f,
                 pos.getZ() + 0.5f,
@@ -64,8 +65,11 @@ public abstract class BucketPlaceMixin {
         );
 
         // Vanilla completed permissions, inventory, sound, and game events.
-        // Remove its duplicate source now that persistent SPH owns the bucket.
+        // Remove its duplicate source only when persistent SPH owns the bucket.
+        // An overloaded manager deliberately leaves canonical projected water.
         ServerLevel serverLevel = (ServerLevel) level;
-        serverLevel.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
+        if (placement.sphOwnsVolume()) {
+            serverLevel.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
+        }
     }
 }

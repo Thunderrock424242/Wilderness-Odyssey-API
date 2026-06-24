@@ -100,6 +100,22 @@ public final class CanonicalWater {
         ), true);
     }
 
+    /**
+     * Returns whether canonical water may visibly occupy this block position.
+     *
+     * <p>The same predicate is shared by volume transfer and compatibility
+     * projection so a source cell is never drained toward a destination that
+     * later rejects the write. Waterlogged host blocks are deliberately
+     * excluded because replacing them would destroy unrelated block state.</p>
+     */
+    public static boolean canAcceptVolume(ServerLevel level, BlockPos pos) {
+        if (level.isOutsideBuildHeight(pos)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(pos);
+        return state.isAir() || state.is(Blocks.WATER) || state.canBeReplaced();
+    }
+
     /** Adds bounded volume and returns the amount accepted by the target cell. */
     public static int addVolume(
             ServerLevel level,
@@ -116,10 +132,7 @@ public final class CanonicalWater {
         // Canonical water may replace air, replaceable vegetation, and an
         // existing plain-water projection, but it must never hide inside a
         // solid or waterlogged host block where players cannot see it.
-        BlockState targetState = level.getBlockState(pos);
-        if (!targetState.isAir()
-                && !targetState.is(Blocks.WATER)
-                && !targetState.canBeReplaced()) {
+        if (!canAcceptVolume(level, pos)) {
             return 0;
         }
         WaterVolumeChunk.WaterCell previous = getOrImport(level, pos);
@@ -222,7 +235,7 @@ public final class CanonicalWater {
             }
             return;
         }
-        if (!current.isAir() && !current.is(Blocks.WATER) && current.blocksMotion()) {
+        if (!current.isAir() && !current.is(Blocks.WATER) && !current.canBeReplaced()) {
             return;
         }
 

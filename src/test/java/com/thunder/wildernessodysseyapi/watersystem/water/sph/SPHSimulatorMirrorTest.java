@@ -47,4 +47,33 @@ class SPHSimulatorMirrorTest {
         assertEquals(0.75f, restored.getRenderParticles().getFirst().velocity.z, 1.0e-6f);
         assertTrue(!restored.isRemoteMirror());
     }
+
+    @Test
+    void denseParticlePileRemainsFiniteAndSpeedBounded() {
+        SPHParticle seed = new SPHParticle(0.0f, 4.0f, 0.0f);
+        List<SPHParticle> particles = java.util.stream.IntStream.range(0, 48)
+                .mapToObj(index -> new SPHParticle(seed))
+                .toList();
+        SPHSimulator simulator = SPHSimulator.restoreAuthoritative(
+                UUID.randomUUID(),
+                null,
+                particles
+        );
+
+        for (int tick = 0; tick < 20; tick++) {
+            simulator.tick(0.05f);
+        }
+
+        for (SPHParticle particle : simulator.getRenderParticles()) {
+            assertTrue(Float.isFinite(particle.position.x));
+            assertTrue(Float.isFinite(particle.position.y));
+            assertTrue(Float.isFinite(particle.position.z));
+            assertTrue(Math.abs(particle.velocity.y) <= SPHConstants.MAX_VERTICAL_SPEED);
+            float horizontalSpeed = (float) Math.sqrt(
+                    particle.velocity.x * particle.velocity.x
+                            + particle.velocity.z * particle.velocity.z
+            );
+            assertTrue(horizontalSpeed <= SPHConstants.MAX_HORIZONTAL_SPEED + 1.0e-5f);
+        }
+    }
 }

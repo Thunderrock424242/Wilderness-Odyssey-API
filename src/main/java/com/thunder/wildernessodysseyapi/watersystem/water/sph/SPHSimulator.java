@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.sph;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.util.*;
@@ -361,6 +362,7 @@ public class SPHSimulator {
         grid.clear();
         for (int i = 0; i < n; i++) {
             SPHParticle p = pts.get(i);
+            sanitizeParticle(p);
             grid.insert(i, p.position.x, p.position.y, p.position.z);
         }
 
@@ -384,8 +386,10 @@ public class SPHSimulator {
 
             // Tait equation of state for pressure
             float ratio = pi.density / SPHConstants.REST_DENSITY;
-            pi.pressure = SPHConstants.PRESSURE_STIFFNESS * (pressureGamma7(ratio) - 1f);
-            pi.pressure = Math.max(0f, pi.pressure); // Fluid resists compression but doesn't pull inward
+            float pressure = SPHConstants.PRESSURE_STIFFNESS * (pressureGamma7(ratio) - 1f);
+            pi.pressure = Float.isFinite(pressure)
+                    ? Math.max(0f, Math.min(SPHConstants.MAX_PRESSURE, pressure))
+                    : SPHConstants.MAX_PRESSURE;
         }
 
         // 3. Force pass: compute pressure gradients and viscosity
@@ -424,6 +428,7 @@ public class SPHSimulator {
             // Divide force by density to get acceleration
             float invDensity = 1f / pi.density;
             pi.acceleration.set(ax * invDensity, ay * invDensity, az * invDensity);
+            clampAcceleration(pi);
         }
 
         // 4. Integration & Collision
@@ -441,9 +446,13 @@ public class SPHSimulator {
 
         for (int i = 0; i < n; i++) {
             SPHParticle p = pts.get(i);
+            float previousX = p.position.x;
+            float previousY = p.position.y;
+            float previousZ = p.position.z;
 
             // Apply global gravity
             p.acceleration.y -= SPHConstants.GRAVITY;
+            clampAcceleration(p);
 
             // Symplectic Euler integration
             p.velocity.x += p.acceleration.x * dt;
@@ -453,14 +462,21 @@ public class SPHSimulator {
             // Apply environmental damping
             float damp = 1f - SPHConstants.DAMPING;
             p.velocity.mul(damp);
+            clampVelocity(p);
 
             p.position.x += p.velocity.x * dt;
             p.position.y += p.velocity.y * dt;
             p.position.z += p.velocity.z * dt;
 
-            resolveBlockCollision(p);
+            if (!isFinite(p.position.x, p.position.y, p.position.z)) {
+                p.position.set(previousX, previousY, previousZ);
+                p.velocity.zero();
+                p.acceleration.zero();
+            }
+
+            resolveBlockCollision(p, previousX, previousY, previousZ);
             applyGroundSpread(p, centerX, centerZ, dt);
-            clampHorizontalSpeed(p);
+            clampVelocity(p);
 
             totalSpeed += p.velocity.length();
         }
@@ -502,75 +518,125 @@ public class SPHSimulator {
      * Ensures fluid particles respect Minecraft terrain.
      * Prevents particles from phasing through walls or floors by bouncing them back.
      */
-    private void resolveBlockCollision(SPHParticle p) {
+    private void resolveBlockCollision(SPHParticle p, float previousX, float previousY, float previousZ) {
         if (level == null) return;
 
-        int bx = (int)Math.floor(p.position.x);
-        int by = (int)Math.floor(p.position.y);
-        int bz = (int)Math.floor(p.position.z);
+        float targetX = p.position.x;
+        float targetY = p.position.y;
+        float targetZ = p.position.z;
+        float deltaX = targetX - previousX;
+        float deltaY = targetY - previousY;
+        float deltaZ = targetZ - previousZ;
+        float distance = (float) Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+        int samples = Math.max(1, (int) Math.ceil(
+                distance / SPHConstants.MAX_COLLISION_SAMPLE_DISTANCE
+        ));
+
+        // Sweep the point along its bounded step. Sampling prevents thin panes,
+        // fences, and partial block shapes from being skipped at high velocity.
+        for (int sample = 1; sample <= samples; sample++) {
+            float progress = sample / (float) samples;
+            p.position.set(
+                    previousX + deltaX * progress,
+                    previousY + deltaY * progress,
+                    previousZ + deltaZ * progress
+            );
+            if (resolveCollisionAtCurrentPosition(p)) {
+                return;
+            }
+        }
+    }
+
+    private boolean resolveCollisionAtCurrentPosition(SPHParticle p) {
+        int bx = (int) Math.floor(p.position.x);
+        int by = (int) Math.floor(p.position.y);
+        int bz = (int) Math.floor(p.position.z);
         if (collisionPos == null) {
             collisionPos = new BlockPos.MutableBlockPos();
         }
         BlockPos.MutableBlockPos pos = collisionPos;
+        pos.set(bx, by, bz);
+        BlockState state = level.getBlockState(pos);
+        if (state.isAir()) {
+            return false;
+        }
 
-        // Check the 3x3x3 area around the particle for solid geometry
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    pos.set(bx + dx, by + dy, bz + dz);
-                    BlockState state = level.getBlockState(pos);
-                    if (state.isAir()) continue;
-
-                    VoxelShape shape = state.getCollisionShape(level, pos);
-                    if (shape.isEmpty()) continue;
-
-                    double minX = pos.getX() + shape.min(net.minecraft.core.Direction.Axis.X);
-                    double minY = pos.getY() + shape.min(net.minecraft.core.Direction.Axis.Y);
-                    double minZ = pos.getZ() + shape.min(net.minecraft.core.Direction.Axis.Z);
-                    double maxX = pos.getX() + shape.max(net.minecraft.core.Direction.Axis.X);
-                    double maxY = pos.getY() + shape.max(net.minecraft.core.Direction.Axis.Y);
-                    double maxZ = pos.getZ() + shape.max(net.minecraft.core.Direction.Axis.Z);
-
-                    float px = p.position.x, py = p.position.y, pz = p.position.z;
-
-                    if (px > minX && px < maxX && py > minY && py < maxY && pz > minZ && pz < maxZ) {
-                        float overlapNX = (float)(px - minX);
-                        float overlapPX = (float)(maxX - px);
-                        float overlapNY = (float)(py - minY);
-                        float overlapPY = (float)(maxY - py);
-                        float overlapNZ = (float)(pz - minZ);
-                        float overlapPZ = (float)(maxZ - pz);
-
-                        float minOverlap = Math.min(Math.min(Math.min(overlapNX, overlapPX), Math.min(overlapNY, overlapPY)), Math.min(overlapNZ, overlapPZ));
-
-                        float nx = 0, ny = 0, nz = 0;
-                        float push = minOverlap + 0.001f;
-
-                        if      (minOverlap == overlapNX) { nx = -1; p.position.x -= push; }
-                        else if (minOverlap == overlapPX) { nx =  1; p.position.x += push; }
-                        else if (minOverlap == overlapNY) { ny = -1; p.position.y -= push; }
-                        else if (minOverlap == overlapPY) { ny =  1; p.position.y += push; p.onGround = true; }
-                        else if (minOverlap == overlapNZ) { nz = -1; p.position.z -= push; }
-                        else                              { nz =  1; p.position.z += push; }
-
-                        float vDotN = p.velocity.x*nx + p.velocity.y*ny + p.velocity.z*nz;
-                        if (vDotN < 0) {
-                            p.velocity.x -= (1 + SPHConstants.RESTITUTION) * vDotN * nx;
-                            p.velocity.y -= (1 + SPHConstants.RESTITUTION) * vDotN * ny;
-                            p.velocity.z -= (1 + SPHConstants.RESTITUTION) * vDotN * nz;
-
-                            if (ny != 0) {
-                                p.velocity.x *= (1 - SPHConstants.FRICTION);
-                                p.velocity.z *= (1 - SPHConstants.FRICTION);
-                            } else {
-                                p.velocity.x *= (1 - SPHConstants.FRICTION * Math.abs(nx));
-                                p.velocity.z *= (1 - SPHConstants.FRICTION * Math.abs(nz));
-                            }
-                        }
-                    }
-                }
+        VoxelShape shape = state.getCollisionShape(level, pos);
+        if (shape.isEmpty()) {
+            return false;
+        }
+        for (AABB localBox : shape.toAabbs()) {
+            AABB worldBox = localBox.move(pos);
+            if (resolveCollisionBox(p, worldBox)) {
+                return true;
             }
         }
+        return false;
+    }
+
+    private static boolean resolveCollisionBox(SPHParticle p, AABB box) {
+        float px = p.position.x;
+        float py = p.position.y;
+        float pz = p.position.z;
+        if (px <= box.minX || px >= box.maxX
+                || py <= box.minY || py >= box.maxY
+                || pz <= box.minZ || pz >= box.maxZ) {
+            return false;
+        }
+
+        float overlapNX = (float) (px - box.minX);
+        float overlapPX = (float) (box.maxX - px);
+        float overlapNY = (float) (py - box.minY);
+        float overlapPY = (float) (box.maxY - py);
+        float overlapNZ = (float) (pz - box.minZ);
+        float overlapPZ = (float) (box.maxZ - pz);
+        float minOverlap = Math.min(
+                Math.min(Math.min(overlapNX, overlapPX), Math.min(overlapNY, overlapPY)),
+                Math.min(overlapNZ, overlapPZ)
+        );
+
+        float nx = 0.0f;
+        float ny = 0.0f;
+        float nz = 0.0f;
+        float push = minOverlap + 0.001f;
+        if (minOverlap == overlapNX) {
+            nx = -1.0f;
+            p.position.x -= push;
+        } else if (minOverlap == overlapPX) {
+            nx = 1.0f;
+            p.position.x += push;
+        } else if (minOverlap == overlapNY) {
+            ny = -1.0f;
+            p.position.y -= push;
+        } else if (minOverlap == overlapPY) {
+            ny = 1.0f;
+            p.position.y += push;
+            p.onGround = true;
+        } else if (minOverlap == overlapNZ) {
+            nz = -1.0f;
+            p.position.z -= push;
+        } else {
+            nz = 1.0f;
+            p.position.z += push;
+        }
+
+        float velocityIntoSurface = p.velocity.x * nx + p.velocity.y * ny + p.velocity.z * nz;
+        if (velocityIntoSurface < 0.0f) {
+            p.velocity.x -= (1.0f + SPHConstants.RESTITUTION) * velocityIntoSurface * nx;
+            p.velocity.y -= (1.0f + SPHConstants.RESTITUTION) * velocityIntoSurface * ny;
+            p.velocity.z -= (1.0f + SPHConstants.RESTITUTION) * velocityIntoSurface * nz;
+            if (ny != 0.0f) {
+                p.velocity.x *= 1.0f - SPHConstants.FRICTION;
+                p.velocity.z *= 1.0f - SPHConstants.FRICTION;
+            } else if (nx != 0.0f) {
+                p.velocity.y *= 1.0f - SPHConstants.FRICTION;
+                p.velocity.z *= 1.0f - SPHConstants.FRICTION;
+            } else {
+                p.velocity.x *= 1.0f - SPHConstants.FRICTION;
+                p.velocity.y *= 1.0f - SPHConstants.FRICTION;
+            }
+        }
+        return true;
     }
 
     private static float pressureGamma7(float ratio) {
@@ -592,7 +658,7 @@ public class SPHSimulator {
         p.velocity.z += (dz / len) * strength;
     }
 
-    private void clampHorizontalSpeed(SPHParticle p) {
+    private static void clampHorizontalSpeed(SPHParticle p) {
         float speed2 = p.velocity.x * p.velocity.x + p.velocity.z * p.velocity.z;
         float max = SPHConstants.MAX_HORIZONTAL_SPEED;
         if (speed2 <= max * max) return;
@@ -600,6 +666,43 @@ public class SPHSimulator {
         float scale = max / (float)Math.sqrt(speed2);
         p.velocity.x *= scale;
         p.velocity.z *= scale;
+    }
+
+    private static void clampAcceleration(SPHParticle p) {
+        if (!isFinite(p.acceleration.x, p.acceleration.y, p.acceleration.z)) {
+            p.acceleration.zero();
+            return;
+        }
+        float accelerationSquared = p.acceleration.lengthSquared();
+        float maximum = SPHConstants.MAX_ACCELERATION;
+        if (accelerationSquared > maximum * maximum) {
+            p.acceleration.mul(maximum / (float) Math.sqrt(accelerationSquared));
+        }
+    }
+
+    private static void clampVelocity(SPHParticle p) {
+        if (!isFinite(p.velocity.x, p.velocity.y, p.velocity.z)) {
+            p.velocity.zero();
+            return;
+        }
+        clampHorizontalSpeed(p);
+        p.velocity.y = Math.max(-SPHConstants.MAX_VERTICAL_SPEED,
+                Math.min(SPHConstants.MAX_VERTICAL_SPEED, p.velocity.y));
+    }
+
+    private void sanitizeParticle(SPHParticle p) {
+        if (!isFinite(p.position.x, p.position.y, p.position.z)) {
+            p.position.set(
+                    Float.isFinite(centerX) ? centerX : 0.0f,
+                    Float.isFinite(centerY) ? centerY : 0.0f,
+                    Float.isFinite(centerZ) ? centerZ : 0.0f
+            );
+        }
+        clampVelocity(p);
+    }
+
+    private static boolean isFinite(float x, float y, float z) {
+        return Float.isFinite(x) && Float.isFinite(y) && Float.isFinite(z);
     }
 
     private void classifyDroplets(List<SPHParticle> pts) {

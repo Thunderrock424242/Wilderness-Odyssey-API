@@ -21,9 +21,11 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_SPH_WATER_RENDERING;
     public static final ModConfigSpec.BooleanValue ENABLE_RIPPLES;
     public static final ModConfigSpec.BooleanValue AUTO_OPTIMIZE_WITH_RENDERER_MODS;
+    public static final ModConfigSpec.BooleanValue MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE;
 
     public static final ModConfigSpec.DoubleValue UNDERWATER_VISIBILITY_BLOCKS;
     public static final ModConfigSpec.DoubleValue UNDERWATER_TURBIDITY_STRENGTH;
+    public static final ModConfigSpec.IntValue MAX_OCEAN_SURFACE_DISTANCE_BLOCKS;
 
     public static final ModConfigSpec.IntValue NORMAL_SPH_RENDER_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue NORMAL_MAX_RENDERED_SPH_SIMULATIONS;
@@ -75,6 +77,12 @@ public final class WaterRenderingConfig {
         AUTO_OPTIMIZE_WITH_RENDERER_MODS = builder
                 .comment("Use the optimized profile automatically when Sodium or Embeddium is loaded.")
                 .define("autoOptimizeWithRendererMods", true);
+        MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE = builder
+                .comment("Extend the replacement surface to the client view distance using coarser distant LODs.")
+                .define("matchOceanSurfaceToViewDistance", true);
+        MAX_OCEAN_SURFACE_DISTANCE_BLOCKS = builder
+                .comment("Safety cap for view-distance-matched ocean rendering. 512 covers Minecraft's 32-chunk maximum.")
+                .defineInRange("maxOceanSurfaceDistanceBlocks", 512, 96, 512);
         UNDERWATER_VISIBILITY_BLOCKS = builder
                 .comment("Maximum clear-water visibility used by the underwater optical model.")
                 .defineInRange("underwaterVisibilityBlocks", 44.0, 8.0, 128.0);
@@ -235,5 +243,19 @@ public final class WaterRenderingConfig {
         return usesOptimizedProfile()
                 ? OPTIMIZED_OCEAN_CELL_SIZE.get()
                 : NORMAL_OCEAN_CELL_SIZE.get();
+    }
+
+    /**
+     * Returns the full replacement-surface radius for a client view distance.
+     * The quality-profile radius remains the high-detail inner LOD.
+     */
+    public static int dynamicOceanRenderDistanceBlocks(int viewDistanceChunks) {
+        int highDetailRadius = oceanRenderDistanceBlocks();
+        if (!MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE.get()) {
+            return highDetailRadius;
+        }
+        int viewDistanceBlocks = Math.max(1, viewDistanceChunks) * 16 + 16;
+        return Math.max(highDetailRadius,
+                Math.min(MAX_OCEAN_SURFACE_DISTANCE_BLOCKS.get(), viewDistanceBlocks));
     }
 }

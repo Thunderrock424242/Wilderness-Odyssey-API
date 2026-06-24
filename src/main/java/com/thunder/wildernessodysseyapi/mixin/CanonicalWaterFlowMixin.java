@@ -16,13 +16,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Prevents vanilla water ticks from creating a second, competing flow state.
  *
  * <p>NeoForge does not expose an event before {@link FlowingFluid} mutates
- * neighboring blocks, so this narrow mixin redirects only vanilla water to the
- * canonical finite-volume ticker. Lava and third-party fluids remain untouched.</p>
+ * neighboring blocks, so this narrow mixin redirects only water cells already
+ * tracked by the canonical finite-volume ticker. Untracked vanilla water keeps
+ * normal gamerule behavior, preserving mods that intentionally use its flow.</p>
  */
 @Mixin(FlowingFluid.class)
 public abstract class CanonicalWaterFlowMixin {
 
-    /** Imports legacy water once and lets the canonical active queue own later flow. */
+    /** Cancels vanilla propagation only after the replacement system owns this cell. */
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
     private void wildernessOdysseyApi$replaceVanillaWaterTick(
             Level level,
@@ -33,9 +34,8 @@ public abstract class CanonicalWaterFlowMixin {
         if (!state.is(Fluids.WATER) && !state.is(Fluids.FLOWING_WATER)) {
             return;
         }
-        if (level instanceof ServerLevel serverLevel) {
-            CanonicalWater.getOrImport(serverLevel, pos);
+        if (level instanceof ServerLevel serverLevel && CanonicalWater.isTracked(serverLevel, pos)) {
+            callbackInfo.cancel();
         }
-        callbackInfo.cancel();
     }
 }

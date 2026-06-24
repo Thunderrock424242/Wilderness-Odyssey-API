@@ -41,6 +41,9 @@ public final class SPHConstants {
     /** Tait equation gamma exponent. 7 is standard for water. */
     public static final float PRESSURE_GAMMA      = 7f;
 
+    /** Upper pressure bound that prevents dense particle piles from exploding numerically. */
+    public static final float MAX_PRESSURE         = 50_000f;
+
     // -------------------------------------------------------------------------
     // Viscosity
     // -------------------------------------------------------------------------
@@ -85,6 +88,15 @@ public final class SPHConstants {
 
     /** Clamp for horizontal speed so spreading stays stable. */
     public static final float MAX_HORIZONTAL_SPEED = 5.0f;
+
+    /** Maximum vertical speed used by the fixed-step collision integrator. */
+    public static final float MAX_VERTICAL_SPEED = 12.0f;
+
+    /** Maximum SPH acceleration before gravity, integration, and collision. */
+    public static final float MAX_ACCELERATION = 80.0f;
+
+    /** Maximum distance between swept point-collision samples. */
+    public static final float MAX_COLLISION_SAMPLE_DISTANCE = 0.04f;
 
     // -------------------------------------------------------------------------
     // Droplets
