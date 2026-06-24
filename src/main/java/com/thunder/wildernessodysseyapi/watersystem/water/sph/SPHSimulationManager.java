@@ -26,10 +26,10 @@ public class SPHSimulationManager {
     /** A list of all currently active fluid simulations. Thread-safe for iteration. */
     private final List<SPHSimulator> active = new CopyOnWriteArrayList<>();
 
-    /** * Callbacks queued when a fluid simulation comes to a stop.
-     * These must be executed on the main thread so we can safely place Minecraft blocks.
+    /** Settlements queued when a fluid simulation comes to a stop.
+     * These retain their level identity so unload can flush or discard them safely.
      */
-    private final Queue<Runnable> pendingSettleCallbacks = new ConcurrentLinkedQueue<>();
+    private final Queue<PendingSettlement> pendingSettlements = new ConcurrentLinkedQueue<>();
 
     /** Level identities already restored from SavedData during this server session. */
     private final Set<BlockGetter> restoredPersistentLevels =
@@ -51,12 +51,45 @@ public class SPHSimulationManager {
      * @return The newly created simulator instance.
      */
     public SPHSimulator createSimulation(float x, float y, float z, BlockGetter level, SettleBlockPlacer placer) {
-        return createSimulation(x, y, z, level, placer,
-                SPHConstants.PARTICLES_PER_BUCKET, 0.0f, 0.0f, 0.0f);
+        return createSimulationResult(x, y, z, level, placer,
+                SPHConstants.PARTICLES_PER_BUCKET, 0.0f, 0.0f, 0.0f).simulator();
     }
 
     public SPHSimulator createSimulation(float x, float y, float z, BlockGetter level, SettleBlockPlacer placer,
                                          int requestedCount, float impulseX, float impulseY, float impulseZ) {
+        return createSimulationResult(x, y, z, level, placer,
+                requestedCount, impulseX, impulseY, impulseZ).simulator();
+    }
+
+    /**
+     * Creates water for a successful vanilla bucket placement and reports
+     * whether SPH took ownership of the temporary vanilla source block.
+     *
+     * <p>Under extreme body-budget pressure, the bucket remains canonical at
+     * its placement position instead of being deleted into an invisible body.</p>
+     */
+    public BucketPlacementResult createBucketSimulation(
+            float x,
+            float y,
+            float z,
+            BlockGetter level,
+            SettleBlockPlacer placer
+    ) {
+        return createSimulationResult(x, y, z, level, placer,
+                SPHConstants.PARTICLES_PER_BUCKET, 0.0f, 0.0f, 0.0f);
+    }
+
+    private BucketPlacementResult createSimulationResult(
+            float x,
+            float y,
+            float z,
+            BlockGetter level,
+            SettleBlockPlacer placer,
+            int requestedCount,
+            float impulseX,
+            float impulseY,
+            float impulseZ
+    ) {
         runPendingSettleCallbacks();
         removeEmptySimulations();
 
@@ -64,7 +97,7 @@ public class SPHSimulationManager {
         if (existing != null) {
             existing.spawnPulse(x, y, z, requestedCount, impulseX, impulseY, impulseZ);
             existing.addCanonicalVolumeUnits(WaterVolumeChunk.UNITS_PER_BLOCK);
-            return existing;
+            return new BucketPlacementResult(existing, true);
         }
 
         if (countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
@@ -78,22 +111,18 @@ public class SPHSimulationManager {
                 overloaded.spawnPulse(x, y, z, Math.min(requestedCount, SPHConstants.OVERLOAD_PARTICLES_PER_BUCKET),
                         impulseX, impulseY, impulseZ);
                 overloaded.addCanonicalVolumeUnits(WaterVolumeChunk.UNITS_PER_BLOCK);
-                return overloaded;
+                return new BucketPlacementResult(overloaded, true);
             }
 
             if (countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
                 SPHSimulator closest = findClosestSimulation(x, y, z, level);
                 if (level instanceof ServerLevel serverLevel) {
-                    CanonicalWater.addVolume(
-                            serverLevel,
-                            BlockPos.containing(x, y, z),
-                            WaterVolumeChunk.UNITS_PER_BLOCK,
-                            impulseX,
-                            impulseY,
-                            impulseZ
-                    );
+                    CanonicalWater.placeBucket(serverLevel, BlockPos.containing(x, y, z));
                 }
-                return closest != null ? closest : new SPHSimulator(level);
+                return new BucketPlacementResult(
+                        closest != null ? closest : new SPHSimulator(level),
+                        false
+                );
             }
         }
 
@@ -103,7 +132,7 @@ public class SPHSimulationManager {
 
         sim.spawnPulse(x, y, z, requestedCount, impulseX, impulseY, impulseZ);
         active.add(sim);
-        return sim;
+        return new BucketPlacementResult(sim, true);
     }
 
     public SPHSimulator createTransientSimulation(float x, float y, float z, BlockGetter level,
@@ -231,10 +260,25 @@ public class SPHSimulationManager {
     }
 
     private void runPendingSettleCallbacks() {
-        Runnable cb;
-        while ((cb = pendingSettleCallbacks.poll()) != null) {
-            cb.run();
+        PendingSettlement pending;
+        while ((pending = pendingSettlements.poll()) != null) {
+            applyPendingSettlement(pending);
         }
+    }
+
+    // Level unload must resolve that level's queued writes before SavedData is
+    // captured. Other dimensions remain queued for their next server tick.
+    private void flushPendingSettlements(BlockGetter level) {
+        List<PendingSettlement> deferred = new ArrayList<>();
+        PendingSettlement pending;
+        while ((pending = pendingSettlements.poll()) != null) {
+            if (pending.level() == level) {
+                applyPendingSettlement(pending);
+            } else {
+                deferred.add(pending);
+            }
+        }
+        pendingSettlements.addAll(deferred);
     }
 
     /**
@@ -315,6 +359,14 @@ public class SPHSimulationManager {
      * @param level server level whose bodies should be persisted
      */
     public void capturePersistentLevel(ServerLevel level) {
+        flushPendingSettlements(level);
+        for (SPHSimulator simulator : active) {
+            if (simulator.getLevel() == level
+                    && simulator.getCanonicalVolumeUnits() > 0
+                    && simulator.particleCount() == 0) {
+                simulator.ensureResidualMarker();
+            }
+        }
         SphWaterSavedData.get(level).capture(getActive(level));
     }
 
@@ -345,32 +397,52 @@ public class SPHSimulationManager {
     // Converts the mobile particle body into exact fixed-point chunk volume
     // once its motion settles, then removes the redundant SPH representation.
     private void configureSettlement(SPHSimulator simulator, BlockGetter level, SettleBlockPlacer fallbackPlacer) {
-        simulator.setSettleListener(finalParticles -> pendingSettleCallbacks.add(() -> {
-            if (level instanceof ServerLevel serverLevel && simulator.getCanonicalVolumeUnits() > 0) {
-                if (materializeCanonicalVolume(serverLevel, simulator, finalParticles, true)) {
-                    settlementRetries.remove(simulator);
-                    active.remove(simulator);
-                } else {
-                    simulator.ensureResidualMarker();
-                    settlementRetries.put(simulator, serverLevel.getGameTime() + 20L);
-                }
-            } else if (SPHConstants.CONVERT_SETTLED_TO_BLOCKS) {
-                Set<BlockPos> placed = new HashSet<>();
-                for (SPHParticle particle : finalParticles) {
-                    BlockPos pos = BlockPos.containing(
-                            particle.position.x,
-                            particle.position.y,
-                            particle.position.z
-                    );
-                    if (placed.add(pos)) {
-                        fallbackPlacer.placeBlock(pos);
-                    }
-                }
+        simulator.setSettleListener(finalParticles -> pendingSettlements.add(new PendingSettlement(
+                simulator,
+                level,
+                copyParticles(finalParticles),
+                fallbackPlacer
+        )));
+    }
+
+    private void applyPendingSettlement(PendingSettlement pending) {
+        SPHSimulator simulator = pending.simulator();
+        if (!active.contains(simulator)) {
+            return;
+        }
+        if (pending.level() instanceof ServerLevel serverLevel
+                && simulator.getCanonicalVolumeUnits() > 0) {
+            if (materializeCanonicalVolume(serverLevel, simulator, pending.particles(), true)) {
+                settlementRetries.remove(simulator);
                 active.remove(simulator);
             } else {
-                active.remove(simulator);
+                simulator.ensureResidualMarker();
+                settlementRetries.put(simulator, serverLevel.getGameTime() + 20L);
             }
-        }));
+        } else if (SPHConstants.CONVERT_SETTLED_TO_BLOCKS) {
+            Set<BlockPos> placed = new HashSet<>();
+            for (SPHParticle particle : pending.particles()) {
+                BlockPos pos = BlockPos.containing(
+                        particle.position.x,
+                        particle.position.y,
+                        particle.position.z
+                );
+                if (placed.add(pos)) {
+                    pending.fallbackPlacer().placeBlock(pos);
+                }
+            }
+            active.remove(simulator);
+        } else {
+            active.remove(simulator);
+        }
+    }
+
+    private static List<SPHParticle> copyParticles(List<SPHParticle> particles) {
+        List<SPHParticle> copies = new ArrayList<>(particles.size());
+        for (SPHParticle particle : particles) {
+            copies.add(new SPHParticle(particle));
+        }
+        return List.copyOf(copies);
     }
 
     private void retrySettlementIfNeeded(BlockGetter level, SPHSimulator simulator) {
@@ -517,6 +589,7 @@ public class SPHSimulationManager {
      * @param level level instance being discarded
      */
     public void clearLevel(BlockGetter level) {
+        pendingSettlements.removeIf(pending -> pending.level() == level);
         settlementRetries.keySet().removeIf(sim -> sim.getLevel() == level);
         active.removeIf(sim -> sim.getLevel() == level);
         restoredPersistentLevels.remove(level);
@@ -602,12 +675,24 @@ public class SPHSimulationManager {
     private record SettlementWrite(BlockPos pos, WaterVolumeChunk.WaterCell previous) {
     }
 
+    private record PendingSettlement(
+            SPHSimulator simulator,
+            BlockGetter level,
+            List<SPHParticle> particles,
+            SettleBlockPlacer fallbackPlacer
+    ) {
+    }
+
+    /** Result of transferring a successful vanilla bucket placement to the replacement system. */
+    public record BucketPlacementResult(SPHSimulator simulator, boolean sphOwnsVolume) {
+    }
+
     /**
      * Terminates all physics processing. Should be called during server/client shutdown.
      */
     public void shutdown() {
         active.clear();
-        pendingSettleCallbacks.clear();
+        pendingSettlements.clear();
         settlementRetries.clear();
         restoredPersistentLevels.clear();
     }

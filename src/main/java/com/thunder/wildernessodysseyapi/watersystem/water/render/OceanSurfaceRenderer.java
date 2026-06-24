@@ -11,6 +11,9 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifi
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.longs.LongSets;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -31,10 +34,8 @@ import net.neoforged.neoforge.client.textures.FluidSpriteCache;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Draws the authoritative, per-frame surface for exposed open water around the camera.
@@ -50,19 +51,20 @@ import java.util.Set;
 public final class OceanSurfaceRenderer {
 
     private static final FluidState WATER_STATE = Fluids.WATER.defaultFluidState();
-    private static final int CACHE_LIFETIME_TICKS = 20;
+    private static final int CACHE_LIFETIME_TICKS = 40;
     private static final int MAX_DEPTH_SAMPLE = 16;
     private static final float MAX_SURFACE_STEP = 0.75f;
     private static final float UV_SCALE = 0.28f;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
 
     private static final List<SurfacePatch> PATCHES = new ArrayList<>();
-    private static volatile Set<Long> ownedVanillaTops = Set.of();
+    private static volatile LongSet ownedVanillaTops = LongSets.EMPTY_SET;
     private static ClientLevel cachedLevel;
     private static int cachedCenterX = Integer.MIN_VALUE;
     private static int cachedCenterZ = Integer.MIN_VALUE;
-    private static int cachedRadius = -1;
-    private static int cachedCellSize = -1;
+    private static int cachedNearRadius = -1;
+    private static int cachedFarRadius = -1;
+    private static int cachedNearCellSize = -1;
     private static long cachedGameTime = Long.MIN_VALUE;
 
     private OceanSurfaceRenderer() {
@@ -95,9 +97,19 @@ public final class OceanSurfaceRenderer {
         }
 
         var camera = event.getCamera().getPosition();
-        int radius = WaterRenderingConfig.oceanRenderDistanceBlocks();
-        int cellSize = WaterRenderingConfig.oceanCellSize();
-        refreshCacheIfNeeded(level, (int) Math.floor(camera.x), (int) Math.floor(camera.z), radius, cellSize);
+        int nearRadius = WaterRenderingConfig.oceanRenderDistanceBlocks();
+        int farRadius = WaterRenderingConfig.dynamicOceanRenderDistanceBlocks(
+                minecraft.options.getEffectiveRenderDistance()
+        );
+        int nearCellSize = WaterRenderingConfig.oceanCellSize();
+        refreshCacheIfNeeded(
+                level,
+                (int) Math.floor(camera.x),
+                (int) Math.floor(camera.z),
+                nearRadius,
+                farRadius,
+                nearCellSize
+        );
         if (PATCHES.isEmpty()) {
             return;
         }
@@ -273,14 +285,16 @@ public final class OceanSurfaceRenderer {
             ClientLevel level,
             int cameraX,
             int cameraZ,
-            int radius,
-            int cellSize
+            int nearRadius,
+            int farRadius,
+            int nearCellSize
     ) {
         long gameTime = level.getGameTime();
-        int movementThreshold = Math.max(2, cellSize * 2);
+        int movementThreshold = Math.max(8, nearCellSize * 8);
         boolean stale = cachedLevel != level
-                || radius != cachedRadius
-                || cellSize != cachedCellSize
+                || nearRadius != cachedNearRadius
+                || farRadius != cachedFarRadius
+                || nearCellSize != cachedNearCellSize
                 || Math.abs(cameraX - cachedCenterX) >= movementThreshold
                 || Math.abs(cameraZ - cachedCenterZ) >= movementThreshold
                 || gameTime - cachedGameTime >= CACHE_LIFETIME_TICKS;
@@ -291,77 +305,106 @@ public final class OceanSurfaceRenderer {
         cachedLevel = level;
         cachedCenterX = cameraX;
         cachedCenterZ = cameraZ;
-        cachedRadius = radius;
-        cachedCellSize = cellSize;
+        cachedNearRadius = nearRadius;
+        cachedFarRadius = farRadius;
+        cachedNearCellSize = nearCellSize;
         cachedGameTime = gameTime;
         PATCHES.clear();
 
         Map<Long, WaterColumn> columns = new HashMap<>();
-        Set<Long> rebuiltOwnedTops = new HashSet<>();
-        int radiusSquared = radius * radius;
-        int startX = Math.floorDiv(cameraX - radius, cellSize) * cellSize;
-        int endX = Math.floorDiv(cameraX + radius, cellSize) * cellSize;
-        int startZ = Math.floorDiv(cameraZ - radius, cellSize) * cellSize;
-        int endZ = Math.floorDiv(cameraZ + radius, cellSize) * cellSize;
+        Map<Long, SurfaceColumn> surfaces = new HashMap<>();
+        LongOpenHashSet rebuiltOwnedTops = new LongOpenHashSet();
+        int mediumRadius = Math.min(farRadius, Math.max(nearRadius, nearRadius * 2));
+        int mediumCellSize = nearCellSize * 2;
+        int farCellSize = nearCellSize * 4;
+        int paddedFarRadius = farRadius + farCellSize;
+        int paddedFarRadiusSquared = paddedFarRadius * paddedFarRadius;
+        int startX = Math.floorDiv(cameraX - farRadius, farCellSize) * farCellSize;
+        int endX = Math.floorDiv(cameraX + farRadius, farCellSize) * farCellSize;
+        int startZ = Math.floorDiv(cameraZ - farRadius, farCellSize) * farCellSize;
+        int endZ = Math.floorDiv(cameraZ + farRadius, farCellSize) * farCellSize;
 
-        for (int x = startX; x < endX; x += cellSize) {
-            for (int z = startZ; z < endZ; z += cellSize) {
-                int dx = x + cellSize / 2 - cameraX;
-                int dz = z + cellSize / 2 - cameraZ;
-                if (dx * dx + dz * dz > radiusSquared) {
+        // Every far cell is either kept coarse or subdivided completely. That
+        // keeps the LOD rings world-aligned with no overlapping or uncovered
+        // cells in the cached footprint.
+        for (int coarseX = startX; coarseX <= endX; coarseX += farCellSize) {
+            for (int coarseZ = startZ; coarseZ <= endZ; coarseZ += farCellSize) {
+                int dx = coarseX + farCellSize / 2 - cameraX;
+                int dz = coarseZ + farCellSize / 2 - cameraZ;
+                int distanceSquared = dx * dx + dz * dz;
+                if (distanceSquared > paddedFarRadiusSquared) {
                     continue;
                 }
 
-                WaterColumn first = column(level, columns, x, z);
-                WaterColumn second = column(level, columns, x, z + cellSize);
-                WaterColumn third = column(level, columns, x + cellSize, z + cellSize);
-                WaterColumn fourth = column(level, columns, x + cellSize, z);
-                if (!first.valid || !second.valid || !third.valid || !fourth.valid) {
-                    continue;
-                }
-
-                PatchFootprint footprint = validatePatchFootprint(
-                        level,
-                        columns,
-                        x,
-                        z,
-                        cellSize
-                );
-                if (!footprint.valid) {
-                    continue;
-                }
-
-                PATCHES.add(new SurfacePatch(
-                        x,
-                        z,
-                        first.surfaceY,
-                        second.surfaceY,
-                        third.surfaceY,
-                        fourth.surfaceY,
-                        cellSize,
-                        footprint.minimumDepth,
-                        dominantType(first, second, third, fourth)
-                ));
-
-                // The replacement quad spans every block inside the selected
-                // cell. Record only real exposed water tops so the chunk mixin
-                // can omit precisely those vanilla faces, never side walls or
-                // distant compatibility water.
-                for (int offsetX = 0; offsetX < cellSize; offsetX++) {
-                    for (int offsetZ = 0; offsetZ < cellSize; offsetZ++) {
-                        WaterColumn covered = column(level, columns, x + offsetX, z + offsetZ);
-                        if (covered.valid) {
-                            rebuiltOwnedTops.add(BlockPos.asLong(
-                                    x + offsetX,
-                                    covered.surfaceBlockY,
-                                    z + offsetZ
-                            ));
-                        }
+                int selectedCellSize = distanceSquared <= nearRadius * nearRadius
+                        ? nearCellSize
+                        : distanceSquared <= mediumRadius * mediumRadius
+                                ? mediumCellSize
+                                : farCellSize;
+                for (int x = coarseX; x < coarseX + farCellSize; x += selectedCellSize) {
+                    for (int z = coarseZ; z < coarseZ + farCellSize; z += selectedCellSize) {
+                        addPatch(level, columns, surfaces, rebuiltOwnedTops, x, z, selectedCellSize);
                     }
                 }
             }
         }
         updateVanillaTopOwnership(level, rebuiltOwnedTops);
+    }
+
+    private static void addPatch(
+            ClientLevel level,
+            Map<Long, WaterColumn> columns,
+            Map<Long, SurfaceColumn> surfaces,
+            LongOpenHashSet rebuiltOwnedTops,
+            int x,
+            int z,
+            int cellSize
+    ) {
+        WaterColumn first = column(level, columns, surfaces, x, z);
+        WaterColumn second = column(level, columns, surfaces, x, z + cellSize);
+        WaterColumn third = column(level, columns, surfaces, x + cellSize, z + cellSize);
+        WaterColumn fourth = column(level, columns, surfaces, x + cellSize, z);
+        if (!first.valid || !second.valid || !third.valid || !fourth.valid) {
+            return;
+        }
+
+        PatchFootprint footprint = validatePatchFootprint(
+                level,
+                surfaces,
+                x,
+                z,
+                cellSize,
+                Math.min(Math.min(first.depth, second.depth), Math.min(third.depth, fourth.depth))
+        );
+        if (!footprint.valid) {
+            return;
+        }
+
+        PATCHES.add(new SurfacePatch(
+                x,
+                z,
+                first.surfaceY,
+                second.surfaceY,
+                third.surfaceY,
+                fourth.surfaceY,
+                cellSize,
+                footprint.minimumDepth,
+                dominantType(first, second, third, fourth)
+        ));
+
+        // Omit exactly the real water tops covered by the replacement quad.
+        for (int offsetX = 0; offsetX < cellSize; offsetX++) {
+            for (int offsetZ = 0; offsetZ < cellSize; offsetZ++) {
+                SurfaceColumn covered = surfaceColumn(level, surfaces, x + offsetX, z + offsetZ);
+                if (covered.valid) {
+                    rebuiltOwnedTops.add(BlockPos.asLong(
+                            x + offsetX,
+                            covered.surfaceBlockY,
+                            z + offsetZ
+                    ));
+                }
+            }
+        }
     }
 
     // Coarse optimized cells must never bridge an island, beach corner, or
@@ -370,48 +413,71 @@ public final class OceanSurfaceRenderer {
     // attenuation remains conservative near irregular shorelines.
     private static PatchFootprint validatePatchFootprint(
             ClientLevel level,
-            Map<Long, WaterColumn> columns,
+            Map<Long, SurfaceColumn> surfaces,
             int startX,
             int startZ,
-            int cellSize
+            int cellSize,
+            float sampledMinimumDepth
     ) {
         float minimumSurface = Float.POSITIVE_INFINITY;
         float maximumSurface = Float.NEGATIVE_INFINITY;
-        float minimumDepth = MAX_DEPTH_SAMPLE;
         for (int offsetX = 0; offsetX <= cellSize; offsetX++) {
             for (int offsetZ = 0; offsetZ <= cellSize; offsetZ++) {
-                WaterColumn covered = column(level, columns, startX + offsetX, startZ + offsetZ);
+                SurfaceColumn covered = surfaceColumn(
+                        level,
+                        surfaces,
+                        startX + offsetX,
+                        startZ + offsetZ
+                );
                 if (!covered.valid) {
                     return PatchFootprint.INVALID;
                 }
                 minimumSurface = Math.min(minimumSurface, covered.surfaceY);
                 maximumSurface = Math.max(maximumSurface, covered.surfaceY);
-                minimumDepth = Math.min(minimumDepth, covered.depth);
             }
         }
         if (maximumSurface - minimumSurface > MAX_SURFACE_STEP) {
             return PatchFootprint.INVALID;
         }
-        return new PatchFootprint(true, minimumDepth);
+        return new PatchFootprint(true, sampledMinimumDepth);
     }
 
     private static WaterColumn column(
             ClientLevel level,
             Map<Long, WaterColumn> columns,
+            Map<Long, SurfaceColumn> surfaces,
             int x,
             int z
     ) {
         long key = ((long) x & 0xFFFFFFFFL) | (((long) z & 0xFFFFFFFFL) << 32);
-        return columns.computeIfAbsent(key, ignored -> scanColumn(level, x, z));
+        return columns.computeIfAbsent(key, ignored -> scanColumn(
+                level,
+                x,
+                z,
+                surfaceColumn(level, surfaces, x, z)
+        ));
     }
 
-    private static WaterColumn scanColumn(ClientLevel level, int x, int z) {
+    private static SurfaceColumn surfaceColumn(
+            ClientLevel level,
+            Map<Long, SurfaceColumn> surfaces,
+            int x,
+            int z
+    ) {
+        long key = ((long) x & 0xFFFFFFFFL) | (((long) z & 0xFFFFFFFFL) << 32);
+        return surfaces.computeIfAbsent(key, ignored -> scanSurfaceColumn(level, x, z));
+    }
+
+    // Full view-distance coverage needs only height/fluid checks. Expensive
+    // bathymetry and water-body classification are evaluated at mesh vertices,
+    // not for every interior block hidden beneath an LOD patch.
+    private static SurfaceColumn scanSurfaceColumn(ClientLevel level, int x, int z) {
         int surfaceBlockY = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
         pos.set(x, surfaceBlockY, z);
         if (!level.hasChunkAt(pos)) {
-            return WaterColumn.INVALID;
+            return SurfaceColumn.INVALID;
         }
 
         FluidState surfaceFluid = level.getFluidState(pos);
@@ -419,13 +485,34 @@ public final class OceanSurfaceRenderer {
         if ((canonicalCell != null && canonicalCell.volumeUnits() <= 0)
                 || (canonicalCell == null && !surfaceFluid.is(Fluids.WATER))
                 || level.getFluidState(above.set(x, surfaceBlockY + 1, z)).is(Fluids.WATER)) {
+            return SurfaceColumn.INVALID;
+        }
+
+        return new SurfaceColumn(
+                true,
+                surfaceBlockY,
+                surfaceBlockY + (canonicalCell != null
+                        ? canonicalCell.fillFraction()
+                        : surfaceFluid.getOwnHeight()) + 0.001f
+        );
+    }
+
+    private static WaterColumn scanColumn(
+            ClientLevel level,
+            int x,
+            int z,
+            SurfaceColumn surface
+    ) {
+        if (!surface.valid) {
             return WaterColumn.INVALID;
         }
 
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        pos.set(x, surface.surfaceBlockY, z);
         WaterBodyClassifier.WaterType waterType = WaterBodyClassifier.classify(level, pos);
         float depth = MAX_DEPTH_SAMPLE;
         for (int offset = 1; offset <= MAX_DEPTH_SAMPLE; offset++) {
-            pos.set(x, surfaceBlockY - offset, z);
+            pos.set(x, surface.surfaceBlockY - offset, z);
             if (!level.getBlockState(pos).getCollisionShape(level, pos).isEmpty()) {
                 depth = offset;
                 break;
@@ -433,10 +520,8 @@ public final class OceanSurfaceRenderer {
         }
         return new WaterColumn(
                 true,
-                surfaceBlockY,
-                surfaceBlockY + (canonicalCell != null
-                        ? canonicalCell.fillFraction()
-                        : surfaceFluid.getOwnHeight()) + 0.001f,
+                surface.surfaceBlockY,
+                surface.surfaceY,
                 depth,
                 waterType
         );
@@ -490,10 +575,13 @@ public final class OceanSurfaceRenderer {
 
     private static void clearCache() {
         PATCHES.clear();
-        ownedVanillaTops = Set.of();
+        ownedVanillaTops = LongSets.EMPTY_SET;
         cachedLevel = null;
         cachedCenterX = Integer.MIN_VALUE;
         cachedCenterZ = Integer.MIN_VALUE;
+        cachedNearRadius = -1;
+        cachedFarRadius = -1;
+        cachedNearCellSize = -1;
         cachedGameTime = Long.MIN_VALUE;
     }
 
@@ -511,15 +599,15 @@ public final class OceanSurfaceRenderer {
 
     // Rebuild only chunk sections whose top-face ownership changed. The set is
     // immutable so chunk compilation workers can read it without locking.
-    private static void updateVanillaTopOwnership(ClientLevel level, Set<Long> rebuiltOwnership) {
-        Set<Long> next = Set.copyOf(rebuiltOwnership);
-        Set<Long> previous = ownedVanillaTops;
+    private static void updateVanillaTopOwnership(ClientLevel level, LongSet rebuiltOwnership) {
+        LongSet next = LongSets.unmodifiable(rebuiltOwnership);
+        LongSet previous = ownedVanillaTops;
         if (previous.equals(next)) {
             return;
         }
         ownedVanillaTops = next;
 
-        Set<Long> changed = new HashSet<>(previous);
+        LongOpenHashSet changed = new LongOpenHashSet(previous);
         for (long packedPos : next) {
             if (!changed.add(packedPos)) {
                 changed.remove(packedPos);
@@ -529,19 +617,19 @@ public final class OceanSurfaceRenderer {
     }
 
     private static void releaseVanillaTopOwnership(ClientLevel level) {
-        Set<Long> previous = ownedVanillaTops;
+        LongSet previous = ownedVanillaTops;
         if (previous.isEmpty()) {
             return;
         }
-        ownedVanillaTops = Set.of();
+        ownedVanillaTops = LongSets.EMPTY_SET;
         PATCHES.clear();
         if (level != null) {
             markSectionsDirty(level, previous);
         }
     }
 
-    private static void markSectionsDirty(ClientLevel level, Set<Long> changedPositions) {
-        Set<Long> dirtySections = new HashSet<>();
+    private static void markSectionsDirty(ClientLevel level, LongSet changedPositions) {
+        LongOpenHashSet dirtySections = new LongOpenHashSet();
         for (long packedPos : changedPositions) {
             dirtySections.add(SectionPos.asLong(BlockPos.of(packedPos)));
         }
@@ -600,6 +688,10 @@ public final class OceanSurfaceRenderer {
                 0.0f,
                 WaterBodyClassifier.WaterType.POND
         );
+    }
+
+    private record SurfaceColumn(boolean valid, int surfaceBlockY, float surfaceY) {
+        private static final SurfaceColumn INVALID = new SurfaceColumn(false, 0, 0.0f);
     }
 
     private record PatchFootprint(boolean valid, float minimumDepth) {

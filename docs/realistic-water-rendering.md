@@ -35,11 +35,14 @@ Each sample returns vertical and horizontal displacement, an analytic normal,
 and orbital velocity. Ocean swell, river ripples, pond motion, vertex geometry,
 and boat response therefore use one coherent wave field.
 
-The per-frame surface renderer owns exposed water near the camera. Its cache
+The per-frame surface renderer owns exposed water through the active client
+view distance. Its cache
 suppresses only the exact baked vanilla top faces covered by replacement
 patches, preventing the flat depth surface from clipping animated troughs.
-Vanilla side faces and out-of-range water remain as failure-safe compatibility
-geometry. Iris/Oculus keeps the standard translucent shader path; without an
+Near, medium, and far LODs tile the same world-aligned cells without gaps or
+overlaps. Vanilla side faces remain as failure-safe compatibility geometry and
+stay laterally anchored so shoreline triangles cannot stretch across land.
+Iris/Oculus keeps the standard translucent shader path; without an
 external shader pack, the optional core shader adds Fresnel, depth-colored
 absorption, foam, lighting, and animated micro-normal detail.
 
@@ -63,8 +66,10 @@ Vanilla liquid chunks are static meshes, so live phase is no longer baked into
 them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass with:
 
 - Per-frame world-space positions and analytic wave normals.
-- Cached water/bathymetry scans, circular range culling, and renderer-mod-aware
-  cell size/radius limits.
+- Cached water/bathymetry scans, circular range culling, a block-detail inner
+  radius, and view-distance-matched medium/far LODs.
+- LOD cells are recursively tiled from a shared coarse grid, preventing
+  overlapping or uncovered cells where mesh spacing changes.
 - Coarse optimized cells validate their complete footprint and edge grid before
   rendering, so they cannot bridge beach corners, islands, or unloaded gaps.
 - Depth attenuation that fades deep-ocean waves into shallow water.
@@ -101,18 +106,22 @@ tide edit grid was removed; tides no longer place or delete water blocks.
 ### Phase 5: persistent local volumes
 
 - Bucket pours are simulated on the logical server and identified by UUID.
-- Nearby clients receive quantized, bounded particle snapshots every four
-  ticks and interpolate rather than re-running divergent SPH physics.
+- Nearby clients receive quantized, bounded position and velocity snapshots
+  every four ticks and interpolate rather than re-running divergent SPH physics.
 - Static bodies refresh less often and remote mirrors expire when tracking ends.
 - Non-transient bodies persist per dimension in compact `SavedData` arrays and
   restore their identity, position, velocity, and droplet state.
 - Dimension unload captures mobile bodies before releasing runtime references;
   unloading one dimension no longer clears simulations in every dimension.
+- Pending settlement callbacks retain their owning level and are flushed before
+  persistence, preventing unload-time duplication or loss.
 - Settled SPH conversion is transactional: if nearby canonical cells cannot
   hold the complete body, partial writes roll back and the body retries later.
 - Vanilla performs the bucket interaction first for permissions, inventory,
   sounds, and game events; persistent SPH then owns that exact mobile volume
   until it settles into the chunk-persistent canonical state.
+- If the SPH body budget is completely full, the placed bucket stays as visible
+  canonical projected water instead of being removed into a ghost allocation.
 - Vanilla fluid levels remain a deliberately lossy compatibility projection
   for swimming, waterlogging boundaries, redstone, and unintegrated mods.
 
@@ -140,8 +149,9 @@ Implemented foundation:
   sparse chunk-persistent cells using 4,096 units per full block.
 - Buckets become conserved persistent SPH volume, then materialize into exact
   canonical cell volume after settling instead of leaving a duplicate source.
-- Disturbed cells use a bounded finite-volume queue; vanilla water ticks are
-  suppressed so a second flow solver cannot create conflicting state.
+- Disturbed cells use a bounded finite-volume queue; vanilla ticks are
+  suppressed only for tracked canonical cells so a second solver cannot mutate
+  owned state while untracked mod or vanilla water keeps normal behavior.
 - Chunk snapshots synchronize exact fractional fill to nearby clients, and the
   surface renderer, shoreline sampling, and entity forces read canonical data.
 - Large sparse chunks persist every cell and synchronize in bounded pages;

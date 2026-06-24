@@ -9,8 +9,10 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
  * <p>{@code LiquidBlockRenderer} emits section-local coordinates, so this
  * wrapper reconstructs the true world position before sampling. The previous
  * implementation added the block position to an already section-relative
- * coordinate, which changed wave phase at every section boundary. Only top and
- * upper side vertices move; bottom faces remain anchored to terrain.</p>
+ * coordinate, which changed wave phase at every section boundary. Baked
+ * compatibility vertices move vertically but remain laterally anchored; the
+ * per-frame surface owns full horizontal Gerstner displacement. This prevents
+ * upper side-face triangles from stretching across beaches and islands.</p>
  */
 public final class GerstnerVertexConsumer implements VertexConsumer {
 
@@ -70,11 +72,11 @@ public final class GerstnerVertexConsumer implements VertexConsumer {
                     .getTerrainSurfaceSampleAt(worldX, worldZ, waterType)
                     .attenuated(waveBlend);
 
-            delegate.addVertex(
-                    x + currentSample.displacementX(),
-                    y + currentSample.height(),
-                    z + currentSample.displacementZ()
-            );
+            // Chunk liquid geometry contains both top faces and shoreline side
+            // faces. Moving either horizontally can tear shared edges into the
+            // long blue triangles visible over beaches, so baked geometry only
+            // receives the safe vertical component.
+            delegate.addVertex(x, y + currentSample.height(), z);
         } else {
             currentSample = WaveSurfaceSample.flat();
             delegate.addVertex(x, y, z);

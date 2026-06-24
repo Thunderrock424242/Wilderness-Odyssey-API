@@ -4,7 +4,7 @@ The Wilderness water system is split across several coordinated subsystems:
 
 - Canonical chunk volume: `WaterVolumeChunk`, `CanonicalWater`, `ModAttachments.WATER_VOLUME`
 - SPH bucket pours: `BucketPlaceMixin`, `SPHSimulator`, `FluidRenderer`
-- Finite fluid simulation: `WildernessFluidRegistry`, `WaterSourceMixin`
+- Finite fluid simulation: `WildernessFluidRegistry`, `CanonicalWaterFlowMixin`
 - Compatibility projection: `CanonicalWaterFlowMixin`, `CanonicalWaterBucketPickupMixin`
 - Client volume synchronization: `WaterVolumeChunkPayload`, `WaterVolumeSynchronizer`, `ClientWaterVolumeSnapshots`
 - Ripple and splash particles: `RippleRenderer`, `WaterEntryEventHandler`
@@ -25,7 +25,8 @@ Canonical persistence is complete rather than capped. Network snapshots split
 large sparse chunks into bounded pages and clients reassemble the newest
 revision even when its packets arrive before the destination chunk. Settled SPH
 conversion uses rollback and retry, preserving exact volume when nearby cells
-are temporarily full.
+are temporarily full. Queued settlement writes are level-owned and flushed
+before dimension persistence, so unload cannot duplicate or discard a body.
 
 Ocean weather is likewise server-authoritative. Rain and thunder drive a
 slowly turning wind field, swell/chop energy, and breaking-wave strength. The
@@ -33,6 +34,8 @@ server sends one bounded snapshot per second; clients interpolate it and use
 the same spectrum for geometry and shader detail. None of this replaces the
 vanilla water registry entry, fluid tag, collision, or waterlogging contract,
 which remain available to mods through the canonical compatibility projection.
+Untracked vanilla water keeps its normal flow and source-conversion behavior;
+only cells already owned by canonical volume suppress vanilla propagation.
 
 Camera immersion samples that same rendered spectrum on the client. Biome tint,
 depth, local canonical velocity, daylight, and sea state feed a bounded optical
