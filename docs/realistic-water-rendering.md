@@ -72,6 +72,9 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   overlapping or uncovered cells where mesh spacing changes.
 - Coarse optimized cells validate their complete footprint and edge grid before
   rendering, so they cannot bridge beach corners, islands, or unloaded gaps.
+- Shallow or irregular LOD cells automatically subdivide to one-block patches;
+  coarse non-planar quads are reserved for deep open water so their GPU
+  triangle split cannot produce large angular shoreline artifacts.
 - Depth attenuation that fades deep-ocean waves into shallow water.
 - Foam generated from depth and crest slope rather than absolute world height.
 - Patch-stable material tint avoids exposing the GPU's internal triangle split;
