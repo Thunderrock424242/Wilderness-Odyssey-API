@@ -53,6 +53,8 @@ public final class OceanSurfaceRenderer {
     private static final FluidState WATER_STATE = Fluids.WATER.defaultFluidState();
     private static final int CACHE_LIFETIME_TICKS = 40;
     private static final int MAX_DEPTH_SAMPLE = 16;
+    private static final int SHORE_DETAIL_DEPTH = 4;
+    private static final int MAX_DYNAMIC_CELL_SIZE = 4;
     private static final float MAX_SURFACE_STEP = 0.75f;
     private static final float UV_SCALE = 0.28f;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
@@ -144,7 +146,8 @@ public final class OceanSurfaceRenderer {
 
         for (SurfacePatch patch : PATCHES) {
             drawPatch(level, patch, timeSeconds, tideOffset, seaState,
-                    sprite, poseStack.last(), buffer);
+                    sprite, poseStack.last(), buffer,
+                    (float) camera.x, (float) camera.z, nearRadius, farRadius);
         }
 
         poseStack.popPose();
@@ -159,7 +162,11 @@ public final class OceanSurfaceRenderer {
             OceanSeaState.Sample seaState,
             TextureAtlasSprite sprite,
             PoseStack.Pose pose,
-            VertexConsumer buffer
+            VertexConsumer buffer,
+            float cameraX,
+            float cameraZ,
+            int nearRadius,
+            int farRadius
     ) {
         float waveBlend = smoothStep(0.35f, 4.0f, patch.depth);
         int waveLimit = WaterRenderingConfig.waveTrainLimit(patch.waterType);
@@ -183,13 +190,17 @@ public final class OceanSurfaceRenderer {
                 patch.depth
         );
         VertexData first = vertex(level, x0, patch.firstY, z0, waveBlend,
-                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor);
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
+                cameraX, cameraZ, nearRadius, farRadius);
         VertexData second = vertex(level, x0, patch.secondY, z1, waveBlend,
-                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor);
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
+                cameraX, cameraZ, nearRadius, farRadius);
         VertexData third = vertex(level, x1, patch.thirdY, z1, waveBlend,
-                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor);
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
+                cameraX, cameraZ, nearRadius, farRadius);
         VertexData fourth = vertex(level, x1, patch.fourthY, z0, waveBlend,
-                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor);
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
+                cameraX, cameraZ, nearRadius, farRadius);
 
         emitVertex(buffer, pose, sprite, first);
         emitVertex(buffer, pose, sprite, second);
@@ -208,12 +219,26 @@ public final class OceanSurfaceRenderer {
             float timeSeconds,
             float tideOffset,
             int waveLimit,
-            int color
+            int color,
+            float cameraX,
+            float cameraZ,
+            int nearRadius,
+            int farRadius
     ) {
+        float distanceX = baseX - cameraX;
+        float distanceZ = baseZ - cameraZ;
+        float distance = (float) Math.sqrt(distanceX * distanceX + distanceZ * distanceZ);
+        float distanceDetail = farRadius <= nearRadius
+                ? 1.0f
+                : 1.0f - smoothStep(nearRadius, farRadius, distance) * 0.80f;
+
+        // Distant geometry is coarser, so its large gravity-wave curvature is
+        // gradually reduced per world-space vertex. The fragment shader keeps
+        // fine shimmer while the mesh avoids visibly planar triangle halves.
         WaveSurfaceSample sample = waveProfile
                 .sampleAt(baseX, baseZ, timeSeconds, waveLimit, spectrum)
                 .withHeightOffset(tideOffset)
-                .attenuated(waveBlend);
+                .attenuated(waveBlend * distanceDetail);
         float x = baseX + sample.displacementX();
         float y = baseY + sample.height() + 0.002f;
         float z = baseZ + sample.displacementZ();
@@ -315,8 +340,11 @@ public final class OceanSurfaceRenderer {
         Map<Long, SurfaceColumn> surfaces = new HashMap<>();
         LongOpenHashSet rebuiltOwnedTops = new LongOpenHashSet();
         int mediumRadius = Math.min(farRadius, Math.max(nearRadius, nearRadius * 2));
-        int mediumCellSize = nearCellSize * 2;
-        int farCellSize = nearCellSize * 4;
+        // Keep every selected size an exact divisor of the coarse tile. Custom
+        // profile values of three or four therefore stay uniform instead of
+        // producing overlapping partial cells at LOD boundaries.
+        int farCellSize = nearCellSize <= 2 ? MAX_DYNAMIC_CELL_SIZE : nearCellSize;
+        int mediumCellSize = nearCellSize == 1 ? 2 : farCellSize;
         int paddedFarRadius = farRadius + farCellSize;
         int paddedFarRadiusSquared = paddedFarRadius * paddedFarRadius;
         int startX = Math.floorDiv(cameraX - farRadius, farCellSize) * farCellSize;
@@ -365,8 +393,23 @@ public final class OceanSurfaceRenderer {
         WaterColumn third = column(level, columns, surfaces, x + cellSize, z + cellSize);
         WaterColumn fourth = column(level, columns, surfaces, x + cellSize, z);
         if (!first.valid || !second.valid || !third.valid || !fourth.valid) {
+            subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize);
             return;
         }
+
+        WaterColumn center = column(
+                level,
+                columns,
+                surfaces,
+                x + cellSize / 2,
+                z + cellSize / 2
+        );
+        float sampledMinimumDepth = center.valid
+                ? Math.min(
+                        center.depth,
+                        Math.min(Math.min(first.depth, second.depth), Math.min(third.depth, fourth.depth))
+                )
+                : 0.0f;
 
         PatchFootprint footprint = validatePatchFootprint(
                 level,
@@ -374,9 +417,14 @@ public final class OceanSurfaceRenderer {
                 x,
                 z,
                 cellSize,
-                Math.min(Math.min(first.depth, second.depth), Math.min(third.depth, fourth.depth))
+                sampledMinimumDepth
         );
         if (!footprint.valid) {
+            subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize);
+            return;
+        }
+        if (cellSize > 1 && footprint.minimumDepth <= SHORE_DETAIL_DEPTH) {
+            subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize);
             return;
         }
 
@@ -403,6 +451,29 @@ public final class OceanSurfaceRenderer {
                             z + offsetZ
                     ));
                 }
+            }
+        }
+    }
+
+    // Coarse quads are appropriate for deep, visually smooth ocean water. At
+    // shorelines they become non-planar and the GPU's two triangle halves can
+    // expose visibly different sand-colored regions. Unit patches preserve the
+    // exact block shoreline and keep each diagonal too small to notice.
+    private static void subdivideShorePatch(
+            ClientLevel level,
+            Map<Long, WaterColumn> columns,
+            Map<Long, SurfaceColumn> surfaces,
+            LongOpenHashSet rebuiltOwnedTops,
+            int startX,
+            int startZ,
+            int cellSize
+    ) {
+        if (cellSize <= 1) {
+            return;
+        }
+        for (int x = startX; x < startX + cellSize; x++) {
+            for (int z = startZ; z < startZ + cellSize; z++) {
+                addPatch(level, columns, surfaces, rebuiltOwnedTops, x, z, 1);
             }
         }
     }
