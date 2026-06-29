@@ -34,7 +34,6 @@
     "GerstnerWaveRenderMixin",
     "LightTextureTrueDarknessMixin",
     "MixinWorldCreationUiState",
-    "OptionsScreenTelemetryButtonMixin",
     "RenderChunkRegionAccessor",
     "RenderSystemGpuDiagnosticsMixin",
     "SimpleTextureGpuProfilerMixin",

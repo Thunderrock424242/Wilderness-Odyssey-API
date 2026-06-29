@@ -13,7 +13,6 @@ import com.thunder.wildernessodysseyapi.structureblock.config.StructureBlockConf
 import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryConfig;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryConfig;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryConfig;
-import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentConfig;
 import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
 import com.thunder.wildernessodysseyapi.truedarkness.config.TrueDarknessConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
@@ -49,8 +48,6 @@ public final class ModConfigRegistration {
 
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-donations-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TelemetryConsentConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-telemetry-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DebugOverlayConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-debug-overlay-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TrueDarknessConfig.CONFIG_SPEC,

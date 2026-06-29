@@ -2,7 +2,6 @@ package com.thunder.wildernessodysseyapi.telemetry;
 
 import com.google.gson.JsonObject;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
-import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentStore.ConsentDecision;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -67,18 +66,15 @@ public final class EventTelemetryReporter {
         payload.addProperty("server_max_players", server.getMaxPlayers());
 
         if (player != null && config.includePlayerIdentifiers()) {
-            TelemetryConsentStore consentStore = TelemetryConsentStore.get(server);
-            if (consentStore.getDecision(player.getUUID()) == ConsentDecision.ACCEPTED) {
-                String playerName = player.getGameProfile().getName();
-                String playerUuid = player.getUUID().toString();
-                if (config.hashPlayerIdentifiers()) {
-                    playerName = TelemetryHashing.hashIdentifier(playerName, config.identifierHashSalt());
-                    playerUuid = TelemetryHashing.hashIdentifier(playerUuid, config.identifierHashSalt());
-                }
-                payload.addProperty("player_name", playerName);
-                payload.addProperty("player_uuid", playerUuid);
-                payload.addProperty("identifiers_hashed", config.hashPlayerIdentifiers());
+            String playerName = player.getGameProfile().getName();
+            String playerUuid = player.getUUID().toString();
+            if (config.hashPlayerIdentifiers()) {
+                playerName = TelemetryHashing.hashIdentifier(playerName, config.identifierHashSalt());
+                playerUuid = TelemetryHashing.hashIdentifier(playerUuid, config.identifierHashSalt());
             }
+            payload.addProperty("player_name", playerName);
+            payload.addProperty("player_uuid", playerUuid);
+            payload.addProperty("identifiers_hashed", config.hashPlayerIdentifiers());
         }
 
         AsyncTaskManager.submitIoTask("event-telemetry", () -> {

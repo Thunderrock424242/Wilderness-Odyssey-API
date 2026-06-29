@@ -9,7 +9,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
-import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentStore.ConsentDecision;
 import net.minecraft.stats.Stats;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -69,11 +68,6 @@ public final class PlayerTelemetryReporter {
             return;
         }
 
-        TelemetryConsentStore consentStore = TelemetryConsentStore.get(player.server);
-        if (consentStore.getDecision(player.getUUID()) != ConsentDecision.ACCEPTED) {
-            return;
-        }
-
         if (!TelemetrySampling.shouldSample("player_login", config.sampleEveryNth(), config.sampleRatePercent())) {
             return;
         }
@@ -113,11 +107,6 @@ public final class PlayerTelemetryReporter {
         }
 
         if (!config.exportOnLogout()) {
-            return;
-        }
-
-        TelemetryConsentStore consentStore = TelemetryConsentStore.get(player.server);
-        if (consentStore.getDecision(player.getUUID()) != ConsentDecision.ACCEPTED) {
             return;
         }
 
