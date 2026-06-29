@@ -42,14 +42,16 @@ void main() {
         celestialDaylight
     );
 
-    vec3 color = mix(vertexColor.rgb, vertexColor.rgb * waterTexture.rgb, 0.34);
+    vec3 color = mix(vertexColor.rgb, vertexColor.rgb * waterTexture.rgb, 0.16);
     color = mix(color, vec3(0.80, 0.91, 0.98), fresnel * 0.34 + slopeFoam * (0.10 + sea * 0.18));
     color += vec3(0.20, 0.24, 0.31) * microShimmer * (0.55 + sea * 0.90);
     color += celestialColor * celestialSpecular * (0.20 + sea * 0.14);
-    color *= max(lightColor, vec3(0.28));
+    color *= max(lightColor, vec3(0.48));
+    color = max(color, vertexColor.rgb * 0.42);
     color *= ColorModulator.rgb;
 
-    float alpha = clamp(vertexColor.a * waterTexture.a * ColorModulator.a + fresnel * 0.10, 0.0, 0.94);
+    float textureAlpha = mix(0.88, waterTexture.a, 0.35);
+    float alpha = clamp(max(vertexColor.a, 0.72) * textureAlpha * ColorModulator.a + fresnel * 0.08, 0.0, 0.96);
     float fogRange = max(0.001, FogEnd - FogStart);
     float fogFactor = clamp((vertexDistance - FogStart) / fogRange, 0.0, 1.0);
     fragColor = mix(vec4(color, alpha), FogColor, fogFactor);

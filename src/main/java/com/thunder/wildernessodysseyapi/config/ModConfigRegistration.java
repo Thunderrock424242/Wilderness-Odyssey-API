@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
+import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapConfig;
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationRelayConfig;
 import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
@@ -54,6 +55,8 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-true-darkness-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, WaterRenderingConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-water-rendering-client.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, CodexMapConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-codex-map-client.toml");
 
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
