@@ -72,6 +72,10 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   overlapping or uncovered cells where mesh spacing changes.
 - Coarse optimized cells validate their complete footprint and edge grid before
   rendering, so they cannot bridge beach corners, islands, or unloaded gaps.
+- Surface ownership starts from exposed plain water or tracked canonical water,
+  not arbitrary waterlogged blocks. Ice-covered water, lily-pad-covered water,
+  and submerged vegetation keep vanilla rendering so the replacement mesh does
+  not draw dark floor-level patches in frozen or plant-heavy shorelines.
 - Shallow or irregular LOD cells automatically subdivide to one-block patches;
   coarse non-planar quads are reserved for deep open water so their GPU
   triangle split cannot produce large angular shoreline artifacts.

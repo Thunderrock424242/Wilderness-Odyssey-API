@@ -11,6 +11,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifi
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.longs.LongSets;
@@ -22,6 +23,8 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
@@ -539,11 +542,11 @@ public final class OceanSurfaceRenderer {
         return surfaces.computeIfAbsent(key, ignored -> scanSurfaceColumn(level, x, z));
     }
 
-    // Full view-distance coverage needs only height/fluid checks. Expensive
+    // Full view-distance coverage needs only exposed-surface checks. Expensive
     // bathymetry and water-body classification are evaluated at mesh vertices,
     // not for every interior block hidden beneath an LOD patch.
     private static SurfaceColumn scanSurfaceColumn(ClientLevel level, int x, int z) {
-        int surfaceBlockY = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
+        int surfaceBlockY = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1;
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
         pos.set(x, surfaceBlockY, z);
@@ -551,11 +554,11 @@ public final class OceanSurfaceRenderer {
             return SurfaceColumn.INVALID;
         }
 
-        FluidState surfaceFluid = level.getFluidState(pos);
+        BlockState surfaceState = level.getBlockState(pos);
+        FluidState surfaceFluid = surfaceState.getFluidState();
         var canonicalCell = CanonicalWater.getTracked(level, pos);
-        if ((canonicalCell != null && canonicalCell.volumeUnits() <= 0)
-                || (canonicalCell == null && !surfaceFluid.is(Fluids.WATER))
-                || level.getFluidState(above.set(x, surfaceBlockY + 1, z)).is(Fluids.WATER)) {
+        if (!isRenderableWaterSurface(surfaceState, surfaceFluid, canonicalCell)
+                || isSurfaceCovered(level, above.set(x, surfaceBlockY + 1, z))) {
             return SurfaceColumn.INVALID;
         }
 
@@ -566,6 +569,37 @@ public final class OceanSurfaceRenderer {
                         ? canonicalCell.fillFraction()
                         : surfaceFluid.getOwnHeight()) + 0.001f
         );
+    }
+
+    // The dynamic mesh may hide vanilla water tops, so only true exposed water
+    // blocks or tracked canonical cells are allowed to become replacement
+    // surface anchors. Waterlogged plants and decorations keep vanilla rendering
+    // because their fluid state is not an open water surface.
+    private static boolean isRenderableWaterSurface(
+            BlockState surfaceState,
+            FluidState surfaceFluid,
+            WaterVolumeChunk.WaterCell canonicalCell
+    ) {
+        if (canonicalCell != null) {
+            return canonicalCell.volumeUnits() > 0;
+        }
+        return surfaceState.is(Blocks.WATER) && surfaceFluid.is(Fluids.WATER);
+    }
+
+    // Covered water under ice, lily pads, solid blocks, or another water cell
+    // is not visually exposed. Leaving vanilla/collision-owned columns alone
+    // avoids the black, angular floor patches seen in frozen shorelines.
+    private static boolean isSurfaceCovered(ClientLevel level, BlockPos pos) {
+        FluidState aboveFluid = level.getFluidState(pos);
+        if (aboveFluid.is(Fluids.WATER)) {
+            return true;
+        }
+        var aboveCanonicalCell = CanonicalWater.getTracked(level, pos);
+        if (aboveCanonicalCell != null && aboveCanonicalCell.volumeUnits() > 0) {
+            return true;
+        }
+        BlockState aboveState = level.getBlockState(pos);
+        return !aboveState.getCollisionShape(level, pos).isEmpty();
     }
 
     private static WaterColumn scanColumn(

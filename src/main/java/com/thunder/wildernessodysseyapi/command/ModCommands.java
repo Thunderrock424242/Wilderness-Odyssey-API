@@ -13,7 +13,6 @@ import com.thunder.wildernessodysseyapi.modlisttracker.commands.ModListDiffComma
 import com.thunder.wildernessodysseyapi.modlisttracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.modpack.structure.command.ModpackStructureCommand;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationCommands;
-import com.thunder.wildernessodysseyapi.telemetry.TelemetryConsentCommand;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueStatsCommand;
 import com.thunder.wildernessodysseyapi.worldgen.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.worldgen.command.StructurePlacementDebugCommand;
@@ -51,7 +50,6 @@ public final class ModCommands {
         StructurePlacementDebugCommand.register(dispatcher);
         LoreBookCommand.register(dispatcher);
         ModpackStructureCommand.register(dispatcher);
-        TelemetryConsentCommand.register(dispatcher);
         TelemetryQueueStatsCommand.register(dispatcher);
         FeedbackCommand.register(dispatcher);
         WorldUpgradeCommand.register(dispatcher);

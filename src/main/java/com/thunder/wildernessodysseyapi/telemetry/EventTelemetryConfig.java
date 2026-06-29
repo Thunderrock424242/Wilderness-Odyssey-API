@@ -37,7 +37,7 @@ public final class EventTelemetryConfig {
                 .defineInRange("requestTimeoutSeconds", 10, 1, 60);
 
         INCLUDE_PLAYER_IDENTIFIERS = BUILDER.comment(
-                        "When true, include player name/UUID for events if they consented to telemetry.")
+                        "When true, include player name/UUID for player-scoped telemetry events.")
                 .define("includePlayerIdentifiers", false);
 
         SAMPLE_RATE_PERCENT = BUILDER.comment(
