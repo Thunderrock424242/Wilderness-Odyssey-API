@@ -287,12 +287,15 @@ public final class OceanSurfaceRenderer {
 
         float absorption = 1.0f - (float) Math.exp(-Math.max(0.0f, depth) * 0.32f);
 
-        float shallowR = 0.08f + tintR * 0.38f;
-        float shallowG = 0.47f + tintG * 0.30f;
-        float shallowB = 0.62f + tintB * 0.28f;
-        float deepR = 0.025f + tintR * 0.12f;
-        float deepG = 0.12f + tintG * 0.12f;
-        float deepB = 0.30f + tintB * 0.22f;
+        // Keep the replacement surface optically water-colored even over dark
+        // ocean floors. The shader still applies depth, light, and Fresnel, but
+        // the base medium should not become black transparent terrain cutouts.
+        float shallowR = 0.10f + tintR * 0.40f;
+        float shallowG = 0.52f + tintG * 0.30f;
+        float shallowB = 0.70f + tintB * 0.28f;
+        float deepR = 0.04f + tintR * 0.18f;
+        float deepG = 0.25f + tintG * 0.18f;
+        float deepB = 0.52f + tintB * 0.24f;
         float red = mix(shallowR, deepR, absorption);
         float green = mix(shallowG, deepG, absorption);
         float blue = mix(shallowB, deepB, absorption);
@@ -301,7 +304,7 @@ public final class OceanSurfaceRenderer {
         red = mix(red, 0.86f, foam);
         green = mix(green, 0.94f, foam);
         blue = mix(blue, 1.0f, foam);
-        float alpha = 0.56f + absorption * 0.14f + foam * 0.08f;
+        float alpha = 0.72f + absorption * 0.18f + foam * 0.05f;
 
         return (channel(alpha) << 24)
                 | (channel(red) << 16)
@@ -639,8 +642,8 @@ public final class OceanSurfaceRenderer {
         }
         int packed = LevelRenderer.getLightColor(level, pos);
         return LightTexture.pack(
-                Math.max(7, LightTexture.block(packed)),
-                Math.max(7, LightTexture.sky(packed))
+                Math.max(8, LightTexture.block(packed)),
+                Math.max(12, LightTexture.sky(packed))
         );
     }
 

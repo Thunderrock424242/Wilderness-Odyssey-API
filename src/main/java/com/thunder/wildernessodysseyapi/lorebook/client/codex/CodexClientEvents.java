@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.lorebook.client.codex;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
+import com.thunder.wildernessodysseyapi.lorebook.client.map.BlueMapTileClient;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -29,5 +30,6 @@ public final class CodexClientEvents {
     @SubscribeEvent
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         CodexClientState.clear();
+        BlueMapTileClient.get().clear();
     }
 }

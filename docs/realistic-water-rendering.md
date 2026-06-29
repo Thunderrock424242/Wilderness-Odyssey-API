@@ -83,6 +83,9 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
 - Foam generated from depth and crest slope rather than absolute world height.
 - Patch-stable material tint avoids exposing the GPU's internal triangle split;
   view-dependent Fresnel remains a per-pixel shader responsibility.
+- The built-in dynamic-ocean pass writes color only, not depth, and keeps a
+  blue optical floor so transparent quads do not reveal dark terrain as hard
+  triangular shards around ice shelves or shallow ocean floors.
 - A standard translucent compatibility path plus an optional built-in core
   shader when no third-party shader pack owns water shading.
 

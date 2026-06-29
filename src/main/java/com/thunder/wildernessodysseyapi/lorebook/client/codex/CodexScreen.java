@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookConfig;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookManager;
+import com.thunder.wildernessodysseyapi.lorebook.client.map.CodexMapRenderer;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -29,7 +30,9 @@ public class CodexScreen extends Screen {
     private static final int PAPER_DARK = 0xFFD0B787;
     private static final int LEATHER = 0xFF4A251C;
     private static final int LEATHER_DARK = 0xFF24100D;
+    private static final String MAP_SECTION = "Map";
 
+    private final CodexMapRenderer mapRenderer = new CodexMapRenderer();
     private int spreadIndex;
 
     public CodexScreen() {
@@ -47,11 +50,16 @@ public class CodexScreen extends Screen {
         renderBook(graphics, bookX, bookY);
         renderTabs(graphics, bookX, bookY, pages, mouseX, mouseY);
 
-        renderPage(graphics, pages.get(spreadIndex), bookX + LEFT_PAGE_X, bookY + PAGE_TOP, false);
-        if (spreadIndex + 1 < pages.size()) {
-            renderPage(graphics, pages.get(spreadIndex + 1), bookX + RIGHT_PAGE_X, bookY + PAGE_TOP, true);
+        CodexPage leftPage = pages.get(spreadIndex);
+        if (leftPage.map()) {
+            renderMapSpread(graphics, bookX, bookY, mouseX, mouseY);
         } else {
-            renderBlankPage(graphics, bookX + RIGHT_PAGE_X, bookY + PAGE_TOP);
+            renderPage(graphics, leftPage, bookX + LEFT_PAGE_X, bookY + PAGE_TOP, false);
+            if (spreadIndex + 1 < pages.size()) {
+                renderPage(graphics, pages.get(spreadIndex + 1), bookX + RIGHT_PAGE_X, bookY + PAGE_TOP, true);
+            } else {
+                renderBlankPage(graphics, bookX + RIGHT_PAGE_X, bookY + PAGE_TOP);
+            }
         }
 
         renderNavigation(graphics, bookX, bookY, pages.size(), mouseX, mouseY);
@@ -117,6 +125,19 @@ public class CodexScreen extends Screen {
         graphics.drawCenteredString(this.font, Component.literal("End of current file"), x + PAGE_WIDTH / 2, y + 82, FADED_INK);
     }
 
+    private void renderMapSpread(GuiGraphics graphics, int bookX, int bookY, int mouseX, int mouseY) {
+        mapRenderer.render(
+                graphics,
+                this.font,
+                bookX + LEFT_PAGE_X,
+                bookY + PAGE_TOP,
+                BOOK_WIDTH - LEFT_PAGE_X - 34,
+                PAGE_HEIGHT,
+                mouseX,
+                mouseY
+        );
+    }
+
     private int drawWrapped(GuiGraphics graphics, Component text, int x, int y, int width, int color) {
         List<FormattedCharSequence> lines = this.font.split(text, width);
         for (FormattedCharSequence line : lines) {
@@ -156,54 +177,56 @@ public class CodexScreen extends Screen {
         pages.add(new CodexPage("Field Guide", "Wilderness Field Codex", List.of(
                 "Issued to any survivor leaving cryostasis with memory gaps, bad weather, or a suspicious amount of ash on their boots.",
                 "This book is part guide, part archive. The useful pages are open now. The stranger files decrypt as you recover field documents."
-        ), false, true));
+        ), false, true, false));
         pages.add(new CodexPage("Field Guide", "First Hour Protocol", List.of(
                 "1. Find shelter before nightfall.",
                 "2. Mark bunker entrances and impact sites.",
                 "3. Treat purple weather, glassed soil, and humming stone as active hazards.",
                 "4. If a page is redacted, assume the missing part was expensive to learn."
-        ), false, false));
+        ), false, false, false));
+        pages.add(new CodexPage(MAP_SECTION, "BlueMap Field Map", List.of(), false, false, true));
+        pages.add(new CodexPage(MAP_SECTION, "Map Backing Page", List.of(), false, false, false));
         pages.add(new CodexPage("Field Guide", "Cryostasis Exit Notes", List.of(
                 "Waking is not the same as being safe. Expect disorientation, pressure headaches, and false memories for the first few minutes.",
                 "The cryo tube is your anchor. Leave a path back before chasing signals."
-        ), false, false));
+        ), false, false, false));
         pages.add(new CodexPage("Field Guide", "Riftfall Advisory", List.of(
                 "Riftfall events change visibility, sound, and navigation confidence. Do not travel by memory during an active fall.",
                 "If the sky dims without a storm front, get under cover and wait for the air to stop vibrating."
-        ), false, false));
+        ), false, false, false));
         pages.add(new CodexPage("Field Guide", "Impact Site Conduct", List.of(
                 "Meteor sites are valuable and unstable. Approach from high ground, watch for exposed caves, and do not mine the center first.",
                 "Recovered fragments may carry archive keys. Log everything before breaking it."
-        ), false, false));
+        ), false, false, false));
         pages.add(new CodexPage("Redacted Dossiers", "Document WO-7A", List.of(
                 "Subject: post-collapse wilderness adaptation.",
                 "Conclusion: standard survival guidance is insufficient. The subject is not only surviving the wilderness. The wilderness is answering back."
-        ), true, false));
+        ), true, false, false));
         pages.add(new CodexPage("Redacted Dossiers", "Order Signal Fragment", List.of(
                 "The transmission repeats every seventeen minutes from below the old stone line.",
                 "Do not answer with your real name. Do not answer with anyone else's."
-        ), true, false));
+        ), true, false, false));
         pages.add(new CodexPage("Redacted Dossiers", "The Before", List.of(
                 "Cross-reference: temporal rift core, ancient capsule sites, missing expedition rosters.",
                 "The destination is not a place. It is a version."
-        ), true, false));
+        ), true, false, false));
 
         List<LoreBookConfig.LoreBookEntry> entries = LoreBookManager.config().books();
         if (entries.isEmpty()) {
             pages.add(new CodexPage("Recovered Archive", "No Recovered Entries", List.of(
                     "No field documents are configured yet. Add archive entries to lore_books.json and they will appear here as recoverable records."
-            ), false, false));
+            ), false, false, false));
         }
         for (LoreBookConfig.LoreBookEntry entry : entries) {
             String id = entry.id() == null ? "unknown" : entry.id();
             String title = entry.title() == null || entry.title().isBlank() ? "Archive Entry " + id : entry.title();
             if (CodexClientState.hasCollected(id)) {
-                pages.add(new CodexPage("Recovered Archive", title, paragraphs(entry), false, false));
+                pages.add(new CodexPage("Recovered Archive", title, paragraphs(entry), false, false, false));
             } else {
                 pages.add(new CodexPage("Recovered Archive", title + " [LOCKED]", List.of(
                         "A matching field document exists, but this codex only has the index stub.",
                         "Recover the physical page in the world to restore the text."
-                ), true, false));
+                ), true, false, false));
             }
         }
         return pages;
@@ -229,6 +252,7 @@ public class CodexScreen extends Screen {
     private String shortSection(String section) {
         return switch (section) {
             case "Field Guide" -> "Guide";
+            case MAP_SECTION -> "Map";
             case "Redacted Dossiers" -> "Files";
             case "Recovered Archive" -> "Archive";
             default -> section.length() > 7 ? section.substring(0, 7) : section;
@@ -240,6 +264,16 @@ public class CodexScreen extends Screen {
         int bookX = bookX();
         int bookY = bookY();
         List<CodexPage> pages = pages();
+        if (currentSpreadIsMap(pages) && mapRenderer.mouseClicked(
+                (int) mouseX,
+                (int) mouseY,
+                bookX + LEFT_PAGE_X,
+                bookY + PAGE_TOP,
+                BOOK_WIDTH - LEFT_PAGE_X - 34,
+                PAGE_HEIGHT
+        )) {
+            return true;
+        }
         if (isInside((int) mouseX, (int) mouseY, bookX + 35, bookY + BOOK_HEIGHT - 20, 28, 14) && spreadIndex > 0) {
             spreadIndex = Math.max(0, spreadIndex - 2);
             return true;
@@ -264,6 +298,9 @@ public class CodexScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (currentSpreadIsMap(pages()) && mapRenderer.keyPressed(keyCode)) {
+            return true;
+        }
         if (keyCode == 262) {
             List<CodexPage> pages = pages();
             if (spreadIndex + 2 < pages.size()) {
@@ -285,6 +322,10 @@ public class CodexScreen extends Screen {
                 return;
             }
         }
+    }
+
+    private boolean currentSpreadIsMap(List<CodexPage> pages) {
+        return spreadIndex >= 0 && spreadIndex < pages.size() && pages.get(spreadIndex).map();
     }
 
     private boolean isInside(int mouseX, int mouseY, int x, int y, int width, int height) {
@@ -318,6 +359,6 @@ public class CodexScreen extends Screen {
         return false;
     }
 
-    private record CodexPage(String section, String title, List<String> paragraphs, boolean redacted, boolean showIcon) {
+    private record CodexPage(String section, String title, List<String> paragraphs, boolean redacted, boolean showIcon, boolean map) {
     }
 }
