@@ -78,6 +78,13 @@ ordering="NONE"
 side="BOTH"
 
 [[dependencies.wildernessodysseyapi]]
+modId="bluemap"
+mandatory=false
+versionRange="[1.0.0,)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.wildernessodysseyapi]]
 modId="curios"
 mandatory=true
 versionRange="[9.2.0,)"
