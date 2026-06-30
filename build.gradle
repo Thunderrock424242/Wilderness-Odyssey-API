@@ -149,6 +149,9 @@ repositories {
     maven {
         url "https://cursemaven.com"
     }
+    maven {
+        url "https://repo.bluecolored.de/releases"
+    }
 }
 
 dependencies {
@@ -178,6 +181,7 @@ dependencies {
         }
     }
     compileOnly "curse.maven:spark-361579:6225208"
+    compileOnly "de.bluecolored:bluemap-api:${bluemap_api_version}"
     localRuntime "curse.maven:spark-361579:6225208"
     // Bundle third-party libraries into the final mod jar (Jar-in-Jar) to avoid missing-class errors at runtime.
     jarJar(implementation('com.squareup.okhttp3:okhttp:4.12.0'))

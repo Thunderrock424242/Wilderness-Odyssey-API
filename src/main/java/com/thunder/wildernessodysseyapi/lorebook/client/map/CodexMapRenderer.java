@@ -1,6 +1,9 @@
 package com.thunder.wildernessodysseyapi.lorebook.client.map;
 
 import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapConfig;
+import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
+import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapPoi;
+import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -32,7 +35,7 @@ public final class CodexMapRenderer {
     public void render(GuiGraphics graphics, Font font, int x, int y, int width, int height, int mouseX, int mouseY) {
         Minecraft minecraft = Minecraft.getInstance();
         Player player = minecraft.player;
-        CodexMapConfig.Values config = CodexMapConfig.values();
+        CodexMapSettings config = CodexClientState.mapSettings().orElseGet(CodexMapConfig::settings);
 
         graphics.drawString(font, Component.literal("FIELD MAP"), x, y, FADED_INK, false);
         graphics.hLine(x, x + width, y + 12, 0x77664D31);
@@ -99,7 +102,7 @@ public final class CodexMapRenderer {
             GuiGraphics graphics,
             Font font,
             Player player,
-            CodexMapConfig.Values config,
+            CodexMapSettings config,
             int x,
             int y,
             int width,
@@ -156,6 +159,7 @@ public final class CodexMapRenderer {
         }
 
         renderGrid(graphics, x, y, width, height);
+        renderPois(graphics, font, player, config, x, y, width, height, centerScreenX, centerScreenY, scale);
         renderPlayerMarker(graphics, centerScreenX, centerScreenY, player.getYRot());
         graphics.disableScissor();
 
@@ -196,11 +200,48 @@ public final class CodexMapRenderer {
         graphics.vLine(tipX, Math.min(centerY, tipY), Math.max(centerY, tipY), 0xFFE1C15D);
     }
 
+    private void renderPois(
+            GuiGraphics graphics,
+            Font font,
+            Player player,
+            CodexMapSettings config,
+            int x,
+            int y,
+            int width,
+            int height,
+            int centerScreenX,
+            int centerScreenY,
+            double scale
+    ) {
+        String currentDimension = player.level().dimension().location().toString();
+        double pixelsPerBlock = (double) Math.max(1, config.tilePixelSize()) / Math.max(1, config.blocksPerTile()) * scale;
+        for (CodexMapPoi poi : CodexClientState.mapPois()) {
+            if (!currentDimension.equals(poi.dimension().toString())) {
+                continue;
+            }
+
+            int markerX = (int) Math.round(centerScreenX + (poi.x() - player.getX()) * pixelsPerBlock);
+            int markerY = (int) Math.round(centerScreenY + (poi.z() - player.getZ()) * pixelsPerBlock);
+            if (markerX < x - 8 || markerX > x + width + 8 || markerY < y - 8 || markerY > y + height + 8) {
+                continue;
+            }
+
+            int color = poi.color();
+            graphics.fill(markerX - 4, markerY - 4, markerX + 5, markerY + 5, 0xAA000000);
+            graphics.fill(markerX - 3, markerY - 3, markerX + 4, markerY + 4, color);
+            graphics.fill(markerX - 1, markerY - 1, markerX + 2, markerY + 2, 0xFFFFFFFF);
+
+            if (Math.abs(markerX - centerScreenX) < 90 && Math.abs(markerY - centerScreenY) < 52) {
+                graphics.drawString(font, Component.literal(poi.label()), markerX + 6, markerY - 4, 0xFFEAD7AE, true);
+            }
+        }
+    }
+
     private void renderFooter(
             GuiGraphics graphics,
             Font font,
             Player player,
-            CodexMapConfig.Values config,
+            CodexMapSettings config,
             int x,
             int y,
             int width

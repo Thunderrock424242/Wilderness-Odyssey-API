@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapConfig;
+import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapServerConfig;
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationRelayConfig;
 import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
@@ -75,6 +76,8 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-riftfall-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TemporalRiftConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-temporal-rift-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, CodexMapServerConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-codex-map-server.toml");
     }
 
     /** Applies runtime-backed settings after NeoForge loads a config file. */

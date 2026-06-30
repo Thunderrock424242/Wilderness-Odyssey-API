@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.cloak.item.CloakTickHandler;
 import com.thunder.wildernessodysseyapi.cloak.network.CloakInputPayload;
 import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
 import com.thunder.wildernessodysseyapi.lorebook.network.OpenCodexPayload;
+import com.thunder.wildernessodysseyapi.lorebook.network.SyncCodexMapPayload;
 import com.thunder.wildernessodysseyapi.lorebook.network.SyncLoreBookPayload;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.OceanSeaStatePayload;
@@ -23,7 +24,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModPayloads {
 
-    private static final String NETWORK_VERSION = "4";
+    private static final String NETWORK_VERSION = "5";
 
     private ModPayloads() {
     }
@@ -50,6 +51,8 @@ public final class ModPayloads {
 
         registrar.playToClient(SyncLoreBookPayload.TYPE, SyncLoreBookPayload.STREAM_CODEC, (payload, context) ->
                 context.enqueueWork(() -> CodexClientState.markCollected(payload.bookId())));
+        registrar.playToClient(SyncCodexMapPayload.TYPE, SyncCodexMapPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> CodexClientState.syncMap(payload.settings(), payload.pois())));
         registrar.playToClient(OpenCodexPayload.TYPE, OpenCodexPayload.STREAM_CODEC, (payload, context) ->
                 context.enqueueWork(() -> {
                     if (payload.open()) {

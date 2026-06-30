@@ -79,6 +79,10 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
 - Shallow or irregular LOD cells automatically subdivide to one-block patches;
   coarse non-planar quads are reserved for deep open water so their GPU
   triangle split cannot produce large angular shoreline artifacts.
+- Only one-block patches suppress baked vanilla top faces. Coarse far-distance
+  LOD patches now behave as water-colored overlays so the vanilla/cached water
+  surface remains a fallback under them instead of revealing terrain through
+  large transparent triangles.
 - Depth attenuation that fades deep-ocean waves into shallow water.
 - Foam generated from depth and crest slope rather than absolute world height.
 - Patch-stable material tint avoids exposing the GPU's internal triangle split;

@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
+import com.thunder.wildernessodysseyapi.lorebook.map.BlueMapIntegration;
 import com.thunder.wildernessodysseyapi.network.ModPayloads;
 import com.thunder.wildernessodysseyapi.radiation.RadiationTickHandler;
 import com.thunder.wildernessodysseyapi.server.ServerLifecycleEvents;
@@ -19,6 +20,7 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideWorldUpdater;
 import com.thunder.wildernessodysseyapi.worldgen.biome.BiomeCompatibilityBootstrap;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -67,6 +69,9 @@ public final class WildernessOdysseyAPIMainModClass {
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             BiomeCompatibilityBootstrap.initialize();
+            if (ModList.get().isLoaded("bluemap")) {
+                BlueMapIntegration.bootstrap();
+            }
             LOGGER.info("Wilderness Odyssey API setup complete");
         });
         LOGGER.info("Mod pack version: {}", VERSION);

@@ -56,8 +56,8 @@ public final class OceanSurfaceRenderer {
     private static final FluidState WATER_STATE = Fluids.WATER.defaultFluidState();
     private static final int CACHE_LIFETIME_TICKS = 40;
     private static final int MAX_DEPTH_SAMPLE = 16;
-    private static final int SHORE_DETAIL_DEPTH = 4;
-    private static final int MAX_DYNAMIC_CELL_SIZE = 4;
+    private static final int SHORE_DETAIL_DEPTH = 12;
+    private static final int MAX_DYNAMIC_CELL_SIZE = 2;
     private static final float MAX_SURFACE_STEP = 0.75f;
     private static final float UV_SCALE = 0.28f;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
@@ -346,11 +346,13 @@ public final class OceanSurfaceRenderer {
         Map<Long, SurfaceColumn> surfaces = new HashMap<>();
         LongOpenHashSet rebuiltOwnedTops = new LongOpenHashSet();
         int mediumRadius = Math.min(farRadius, Math.max(nearRadius, nearRadius * 2));
-        // Keep every selected size an exact divisor of the coarse tile. Custom
-        // profile values of three or four therefore stay uniform instead of
-        // producing overlapping partial cells at LOD boundaries.
-        int farCellSize = nearCellSize <= 2 ? MAX_DYNAMIC_CELL_SIZE : nearCellSize;
-        int mediumCellSize = nearCellSize == 1 ? 2 : farCellSize;
+        // The true replacement ring stays at one-block detail; only the far
+        // overlay is allowed to use tiny coarse cells. That preserves the
+        // vanilla top under distant LOD water and removes large transparent
+        // triangle artifacts while still covering the full view distance.
+        int detailCellSize = 1;
+        int farCellSize = Math.min(MAX_DYNAMIC_CELL_SIZE, Math.max(1, nearCellSize));
+        int mediumCellSize = 1;
         int paddedFarRadius = farRadius + farCellSize;
         int paddedFarRadiusSquared = paddedFarRadius * paddedFarRadius;
         int startX = Math.floorDiv(cameraX - farRadius, farCellSize) * farCellSize;
@@ -371,7 +373,7 @@ public final class OceanSurfaceRenderer {
                 }
 
                 int selectedCellSize = distanceSquared <= nearRadius * nearRadius
-                        ? nearCellSize
+                        ? detailCellSize
                         : distanceSquared <= mediumRadius * mediumRadius
                                 ? mediumCellSize
                                 : farCellSize;
@@ -446,16 +448,20 @@ public final class OceanSurfaceRenderer {
                 dominantType(first, second, third, fourth)
         ));
 
-        // Omit exactly the real water tops covered by the replacement quad.
-        for (int offsetX = 0; offsetX < cellSize; offsetX++) {
-            for (int offsetZ = 0; offsetZ < cellSize; offsetZ++) {
-                SurfaceColumn covered = surfaceColumn(level, surfaces, x + offsetX, z + offsetZ);
-                if (covered.valid) {
-                    rebuiltOwnedTops.add(BlockPos.asLong(
-                            x + offsetX,
-                            covered.surfaceBlockY,
-                            z + offsetZ
-                    ));
+        // Only one-block patches truly replace vanilla top faces. Coarser LOD
+        // patches are visual overlays; hiding the baked water beneath them
+        // exposes seafloor/ice intersections as large transparent triangles.
+        if (cellSize == 1) {
+            for (int offsetX = 0; offsetX < cellSize; offsetX++) {
+                for (int offsetZ = 0; offsetZ < cellSize; offsetZ++) {
+                    SurfaceColumn covered = surfaceColumn(level, surfaces, x + offsetX, z + offsetZ);
+                    if (covered.valid) {
+                        rebuiltOwnedTops.add(BlockPos.asLong(
+                                x + offsetX,
+                                covered.surfaceBlockY,
+                                z + offsetZ
+                        ));
+                    }
                 }
             }
         }

@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.lorebook.client.map;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapConfig;
+import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
@@ -44,7 +44,7 @@ public final class BlueMapTileClient {
     }
 
     /** Starts a tile request if the tile is not already cached or in-flight. */
-    public TileEntry request(BlueMapTileAddress address, CodexMapConfig.Values config) {
+    public TileEntry request(BlueMapTileAddress address, CodexMapSettings config) {
         TileEntry entry = tiles.computeIfAbsent(address, TileEntry::new);
         entry.touch();
 
@@ -145,7 +145,7 @@ public final class BlueMapTileClient {
         tiles.clear();
     }
 
-    private URI buildTileUri(BlueMapTileAddress address, CodexMapConfig.Values config) {
+    private URI buildTileUri(BlueMapTileAddress address, CodexMapSettings config) {
         String base = config.normalizedBaseUrl();
         String map = config.normalizedMapId();
         String template = config.normalizedTemplate();
