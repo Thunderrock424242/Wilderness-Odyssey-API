@@ -42,6 +42,8 @@ public class CodexScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
+
         List<CodexPage> pages = pages();
         clampSpread(pages.size());
 
@@ -63,7 +65,6 @@ public class CodexScreen extends Screen {
         }
 
         renderNavigation(graphics, bookX, bookY, pages.size(), mouseX, mouseY);
-        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     private void renderBook(GuiGraphics graphics, int bookX, int bookY) {

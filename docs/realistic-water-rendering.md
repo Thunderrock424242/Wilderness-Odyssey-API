@@ -83,6 +83,10 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   LOD patches now behave as water-colored overlays so the vanilla/cached water
   surface remains a fallback under them instead of revealing terrain through
   large transparent triangles.
+- When the per-frame dynamic ocean surface is enabled, baked vanilla liquid
+  vertices are no longer vertically waved. The chunk mesh remains a stable
+  compatibility/fallback layer while the replacement pass owns visible motion;
+  covered water under ice also stays flat.
 - Depth attenuation that fades deep-ocean waves into shallow water.
 - Foam generated from depth and crest slope rather than absolute world height.
 - Patch-stable material tint avoids exposing the GPU's internal triangle split;
