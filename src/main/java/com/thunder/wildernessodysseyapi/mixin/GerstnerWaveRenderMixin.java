@@ -25,13 +25,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * GerstnerWaveRenderMixin
  * <p>
- * Wraps the consumer passed to {@code LiquidBlockRenderer#tesselate} so water
- * geometry receives the mod's Gerstner displacement and analytic normals.
+ * Wraps the consumer passed to {@code LiquidBlockRenderer#tesselate} when the
+ * static compatibility mesh is allowed to receive fallback Gerstner motion.
  * <p>
  * A narrow mixin is necessary because NeoForge has no event for transforming
  * vertices while vanilla builds a liquid chunk mesh. Wave time is advanced by
  * the client tick handler; chunk compilation may run on worker threads and must
- * never mutate global animation state.
+ * never mutate global animation state. When the dynamic ocean surface is
+ * enabled, baked vanilla water stays stable and acts only as compatibility
+ * geometry beneath the per-frame replacement pass.
  */
 @Mixin(LiquidBlockRenderer.class)
 public class GerstnerWaveRenderMixin {
@@ -82,16 +84,16 @@ public class GerstnerWaveRenderMixin {
         WaterBodyClassifier.WaterType waterType = waterLevel == null
                 ? WaterBodyClassifier.WaterType.POND
                 : WaterBodyClassifier.classify(waterLevel, pos);
-        boolean dynamicWaterSurface = waterLevel != null
-                && WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()
-                && OceanSurfaceRenderer.ownsBakedTop(pos);
+        boolean dynamicSurfaceEnabled = WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get();
+        boolean suppressSurfaceDisplacement = dynamicSurfaceEnabled
+                || !isExposedWaterTop(level, pos, fluidState);
         return new GerstnerVertexConsumer(
                 originalConsumer,
                 pos.getX(),
                 pos.getY(),
                 pos.getZ(),
                 waterType,
-                dynamicWaterSurface
+                suppressSurfaceDisplacement
         );
     }
 
@@ -145,5 +147,22 @@ public class GerstnerWaveRenderMixin {
         }
 
         return null;
+    }
+
+    private static boolean isExposedWaterTop(
+            BlockAndTintGetter level,
+            BlockPos pos,
+            FluidState fluidState
+    ) {
+        BlockPos abovePos = pos.above();
+        BlockState aboveState = level.getBlockState(abovePos);
+        FluidState aboveFluid = aboveState.getFluidState();
+        if (aboveFluid.is(Fluids.WATER) || aboveFluid.is(Fluids.FLOWING_WATER)) {
+            return false;
+        }
+        if (aboveState.shouldHideAdjacentFluidFace(Direction.DOWN, fluidState)) {
+            return false;
+        }
+        return aboveState.getCollisionShape(level, abovePos).isEmpty();
     }
 }

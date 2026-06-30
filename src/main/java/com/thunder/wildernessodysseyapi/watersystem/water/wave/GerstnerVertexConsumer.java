@@ -10,9 +10,10 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
  * wrapper reconstructs the true world position before sampling. The previous
  * implementation added the block position to an already section-relative
  * coordinate, which changed wave phase at every section boundary. Baked
- * compatibility vertices move vertically but remain laterally anchored; the
- * per-frame surface owns full horizontal Gerstner displacement. This prevents
- * upper side-face triangles from stretching across beaches and islands.</p>
+ * compatibility vertices can move vertically when the dynamic replacement pass
+ * is disabled, but remain laterally anchored. When the per-frame surface is
+ * active, baked liquid geometry stays stable underneath it so ice shelves and
+ * shoreline fallbacks cannot turn into large translucent triangles.</p>
  */
 public final class GerstnerVertexConsumer implements VertexConsumer {
 
@@ -24,7 +25,7 @@ public final class GerstnerVertexConsumer implements VertexConsumer {
     private final int sectionOriginZ;
     private final int blockLocalY;
     private final WaterBodyClassifier.WaterType waterType;
-    private final boolean dynamicWaterSurface;
+    private final boolean suppressSurfaceDisplacement;
 
     private boolean currentVertexIsSurface;
     private WaveSurfaceSample currentSample = WaveSurfaceSample.flat();
@@ -37,16 +38,18 @@ public final class GerstnerVertexConsumer implements VertexConsumer {
      * @param blockY fluid block world Y
      * @param blockZ fluid block world Z
      * @param waterType classified water-body type
+     * @param suppressSurfaceDisplacement true when baked liquid should remain
+     *                                    stable because another pass owns motion
      */
     public GerstnerVertexConsumer(VertexConsumer delegate, int blockX, int blockY, int blockZ,
                                   WaterBodyClassifier.WaterType waterType,
-                                  boolean dynamicWaterSurface) {
+                                  boolean suppressSurfaceDisplacement) {
         this.delegate = delegate;
         this.sectionOriginX = blockX & ~15;
         this.sectionOriginZ = blockZ & ~15;
         this.blockLocalY = blockY & 15;
         this.waterType = waterType;
-        this.dynamicWaterSurface = dynamicWaterSurface;
+        this.suppressSurfaceDisplacement = suppressSurfaceDisplacement;
     }
 
     @Override
@@ -54,7 +57,7 @@ public final class GerstnerVertexConsumer implements VertexConsumer {
         float localSurfaceHeight = y - blockLocalY;
         currentVertexIsSurface = localSurfaceHeight > SURFACE_VERTEX_EPSILON;
 
-        if (currentVertexIsSurface && dynamicWaterSurface) {
+        if (currentVertexIsSurface && suppressSurfaceDisplacement) {
             currentSample = WaveSurfaceSample.flat();
             delegate.addVertex(x, y, z);
             return this;
