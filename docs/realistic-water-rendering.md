@@ -87,6 +87,20 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   vertices are no longer vertically waved. The chunk mesh remains a stable
   compatibility/fallback layer while the replacement pass owns visible motion;
   covered water under ice also stays flat.
+- Dynamic replacement vertices use Gerstner height and normals but remain
+  laterally anchored. Full horizontal orbital displacement belongs to a future
+  continuous offshore mesh; applying it to block-clipped shoreline topology can
+  pull boundary vertices across missing neighbors and reveal triangular gaps.
+- The replacement mesh treats vanilla/source water and full canonical cells as
+  a compatibility mask, not as final face geometry. It renders only over stable
+  full-water footprints with a one-block continuity border; flowing, partial,
+  covered, shore-adjacent, and ice-adjacent cells remain on the vanilla path
+  until a dedicated local-volume or shoreline mesh owns them.
+- `ShorelineSurfaceRenderer` supplies that local edge layer. It draws one-block
+  overlay quads for exposed shore, ice-adjacent, flowing, and partial cells
+  that the open-ocean mesh refuses to own. It never hides vanilla water, so the
+  compatibility projection remains visible while the overlay adds local color,
+  small vertical motion, and foam-brightened edges.
 - Depth attenuation that fades deep-ocean waves into shallow water.
 - Foam generated from depth and crest slope rather than absolute world height.
 - Patch-stable material tint avoids exposing the GPU's internal triangle split;
