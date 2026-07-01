@@ -180,6 +180,18 @@ public final class CanonicalWater {
         return drained;
     }
 
+    /**
+     * Re-applies the vanilla water compatibility projection for one tracked cell.
+     *
+     * <p>This is primarily used by debug/repair tooling and chunk migration. It
+     * does not change canonical volume; it only makes the vanilla block state
+     * match the canonical cell so other mods can continue detecting water.</p>
+     */
+    public static void reprojectCompatibility(ServerLevel level, BlockPos pos) {
+        WaterVolumeChunk.WaterCell cell = get(level, pos);
+        projectCompatibility(level, pos, cell.volumeUnits());
+    }
+
     /** Replaces one cell and optionally updates the vanilla compatibility block. */
     public static void set(
             ServerLevel level,

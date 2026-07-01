@@ -3,10 +3,12 @@
 The Wilderness water system is split across several coordinated subsystems:
 
 - Canonical chunk volume: `WaterVolumeChunk`, `CanonicalWater`, `ModAttachments.WATER_VOLUME`
+- Canonical world seeding: `CanonicalWaterSeeder`, `WaterSimulationConfig`
 - SPH bucket pours: `BucketPlaceMixin`, `SPHSimulator`, `FluidRenderer`
 - Finite fluid simulation: `WildernessFluidRegistry`, `CanonicalWaterFlowMixin`
 - Compatibility projection: `CanonicalWaterFlowMixin`, `CanonicalWaterBucketPickupMixin`
 - Client volume synchronization: `WaterVolumeChunkPayload`, `WaterVolumeSynchronizer`, `ClientWaterVolumeSnapshots`
+- Live diagnostics: `/wowater inspect`, `/wowater summary`, `/wowater seed`, `/wowater repair`
 - Ripple and splash particles: `RippleRenderer`, `WaterEntryEventHandler`
 - Gerstner waves per water body: `GerstnerWaveRenderMixin`, `WaveEntityPhysics`
 - Moon-phase tide system: `TideSystem`, `TideWorldUpdater`, `TideHudOverlay`
@@ -21,12 +23,24 @@ into canonical cells. Vanilla water levels are projections for collision,
 swimming, waterlogging boundaries, and third-party compatibility rather than
 the simulation's source of truth.
 
+Loaded world water is seeded into canonical volume from exposed plain
+`minecraft:water` columns. The seeder imports a bounded depth from oceans,
+rivers, lakes, and water under thin cover such as ice, but it skips waterlogged
+host blocks by default so modded/vanilla block state is not destroyed. Imported
+worldgen cells are flagged as stable reservoirs and do not tick until disturbed.
+
 Canonical persistence is complete rather than capped. Network snapshots split
 large sparse chunks into bounded pages and clients reassemble the newest
 revision even when its packets arrive before the destination chunk. Settled SPH
 conversion uses rollback and retry, preserving exact volume when nearby cells
 are temporarily full. Queued settlement writes are level-owned and flushed
 before dimension persistence, so unload cannot duplicate or discard a body.
+
+Disturbed canonical cells now prefer gravity, then distribute sideways across
+all lower neighboring cells instead of choosing a single arbitrary direction.
+Enough falling water can transfer a conserved slice into SPH as mobile water;
+when that SPH body settles, it writes exact volume and averaged velocity back
+into canonical cells.
 
 Ocean weather is likewise server-authoritative. Rain and thunder drive a
 slowly turning wind field, swell/chop energy, and breaking-wave strength. The
@@ -42,3 +56,30 @@ depth, local canonical velocity, daylight, and sea state feed a bounded optical
 model for fog distance/color and the optional built-in caustic overlay. External
 shader packs keep their normal water pipeline, while canonical crests above the
 flat compatibility plane receive a standard overlay fallback.
+
+## Debug and manual validation
+
+Use these commands in a dev world:
+
+- `/wowater inspect` or `/wowater inspect <pos>` reports vanilla, canonical,
+  projected, and mobile-SPH water state for one block.
+- `/wowater summary <radius>` counts nearby wet, vanilla, canonical, projected,
+  and mobile-water blocks.
+- `/wowater seed <chunkRadius>` imports loaded world water around the player.
+  This is operator-only because it writes canonical chunk data.
+- `/wowater repair <radius>` reprojects tracked canonical cells back to vanilla
+  water blocks for compatibility. This is also operator-only.
+
+Manual test matrix before calling a water build stable:
+
+1. Place water on a cliff and confirm SPH appears, moves, and later settles
+   into canonical/vanilla-compatible water.
+2. Place water into a shallow basin and verify lateral spread uses multiple
+   lower neighbors.
+3. Inspect ocean, river, lake, and frozen-ocean chunks with `/wowater inspect`
+   to confirm automatic seeding imports plain water while skipping waterlogged
+   hosts.
+4. Swim, use boats, spawn fish/squid, and use buckets against canonical water.
+5. Test with built-in shaders, no shaders, and an external shader pack.
+6. Press `F3+A` near beaches and frozen oceans to verify dynamic surfaces do
+   not reintroduce dark triangular shoreline gaps.

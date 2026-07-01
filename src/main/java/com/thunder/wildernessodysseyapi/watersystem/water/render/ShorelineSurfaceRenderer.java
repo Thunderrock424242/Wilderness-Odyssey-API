@@ -6,8 +6,6 @@ import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
@@ -20,13 +18,10 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.tags.FluidTags;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
@@ -50,10 +45,8 @@ public final class ShorelineSurfaceRenderer {
 
     private static final FluidState WATER_STATE = Fluids.WATER.defaultFluidState();
     private static final int CACHE_LIFETIME_TICKS = 20;
-    private static final int MAX_RENDER_RADIUS_BLOCKS = 64;
+    private static final int MAX_RENDER_RADIUS_BLOCKS = 96;
     private static final int MAX_DEPTH_SAMPLE = 8;
-    private static final int MIN_FULL_VOLUME_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK * 7 / 8;
-    private static final float FULL_WATER_SURFACE_HEIGHT = 0.8888889f;
     private static final float SURFACE_OFFSET = 0.006f;
     private static final float UV_SCALE = 0.28f;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
@@ -69,13 +62,14 @@ public final class ShorelineSurfaceRenderer {
     }
 
     /** Renders local water detail after vanilla translucent terrain. */
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
             return;
         }
         if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()
-                || !WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()) {
+                || !WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()
+                || !WaterRenderingConfig.ENABLE_SHORELINE_SURFACE.get()) {
             clearCache();
             return;
         }
@@ -94,7 +88,7 @@ public final class ShorelineSurfaceRenderer {
         }
 
         var camera = event.getCamera().getPosition();
-        int radius = Math.min(MAX_RENDER_RADIUS_BLOCKS, WaterRenderingConfig.oceanRenderDistanceBlocks());
+        int radius = Math.min(MAX_RENDER_RADIUS_BLOCKS, WaterRenderingConfig.shorelineRenderDistanceBlocks());
         refreshCacheIfNeeded(level, (int) Math.floor(camera.x), (int) Math.floor(camera.z), radius);
         if (PATCHES.isEmpty()) {
             return;
@@ -128,8 +122,10 @@ public final class ShorelineSurfaceRenderer {
         poseStack.pushPose();
         poseStack.translate(-camera.x, -camera.y, -camera.z);
 
+        float shorelineStrength = Math.max(0.0f, WaterRenderingConfig.shorelineOverlayStrength());
         for (ShorePatch patch : PATCHES) {
-            drawPatch(level, patch, timeSeconds, tideOffset, seaState, sprite, poseStack.last(), buffer);
+            drawPatch(level, patch, timeSeconds, tideOffset, seaState, sprite, poseStack.last(), buffer,
+                    (float) camera.x, (float) camera.z, radius, shorelineStrength);
         }
 
         poseStack.popPose();
@@ -185,15 +181,20 @@ public final class ShorelineSurfaceRenderer {
                 x,
                 z,
                 surface.surfaceY,
-                scanDepth(level, x, z, surface.surfaceBlockY),
+                surface.depth,
                 WaterBodyClassifier.classify(level, new BlockPos(x, surface.surfaceBlockY, z)),
                 edge.edgeStrength,
-                surface.fullWater
+                surface.fullWater,
+                surface.fillFraction,
+                surface.velocityX,
+                surface.velocityZ
         ));
     }
 
     private static EdgeSample edgeSample(ClientLevel level, int x, int z, SurfaceColumn surface) {
         int missingOrUneven = 0;
+        float fillMismatch = 0.0f;
+        float velocityMismatch = 0.0f;
         for (Direction direction : Direction.Plane.HORIZONTAL) {
             SurfaceColumn neighbour = surfaceColumn(level, x + direction.getStepX(), z + direction.getStepZ());
             if (!neighbour.valid
@@ -202,71 +203,40 @@ public final class ShorelineSurfaceRenderer {
                     || Math.abs(neighbour.surfaceY - surface.surfaceY) > 0.05f) {
                 missingOrUneven++;
             }
+            if (neighbour.valid) {
+                fillMismatch += Math.abs(neighbour.fillFraction - surface.fillFraction);
+                velocityMismatch += Math.abs(neighbour.velocityX - surface.velocityX)
+                        + Math.abs(neighbour.velocityZ - surface.velocityZ);
+            }
         }
-        return new EdgeSample(missingOrUneven > 0, Math.min(1.0f, missingOrUneven / 3.0f));
+        float edgeStrength = missingOrUneven / 3.0f
+                + fillMismatch * 0.18f
+                + Math.min(0.35f, velocityMismatch * 0.08f);
+        return new EdgeSample(missingOrUneven > 0 || fillMismatch > 0.05f,
+                Math.min(1.0f, edgeStrength));
     }
 
     private static SurfaceColumn surfaceColumn(ClientLevel level, int x, int z) {
-        int surfaceBlockY = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1;
-        BlockPos pos = new BlockPos(x, surfaceBlockY, z);
-        if (!level.hasChunkAt(pos)) {
+        ClientWaterColumnSampler.ColumnSample sample = ClientWaterColumnSampler.sampleExposedSurface(
+                level,
+                x,
+                z,
+                MAX_DEPTH_SAMPLE,
+                SURFACE_OFFSET
+        );
+        if (!sample.valid()) {
             return SurfaceColumn.INVALID;
         }
-
-        BlockState surfaceState = level.getBlockState(pos);
-        FluidState surfaceFluid = surfaceState.getFluidState();
-        var canonicalCell = CanonicalWater.getTracked(level, pos);
-        SurfaceAnchor anchor = surfaceAnchor(surfaceBlockY, surfaceState, surfaceFluid, canonicalCell);
-        if (!anchor.valid || isCovered(level, pos.above())) {
-            return SurfaceColumn.INVALID;
-        }
-        return new SurfaceColumn(true, surfaceBlockY, anchor.surfaceY, anchor.fullWater);
-    }
-
-    private static SurfaceAnchor surfaceAnchor(
-            int surfaceBlockY,
-            BlockState surfaceState,
-            FluidState surfaceFluid,
-            WaterVolumeChunk.WaterCell canonicalCell
-    ) {
-        if (canonicalCell != null) {
-            if (canonicalCell.volumeUnits() <= 0) {
-                return SurfaceAnchor.INVALID;
-            }
-            boolean fullWater = canonicalCell.volumeUnits() >= MIN_FULL_VOLUME_UNITS;
-            float fill = fullWater ? FULL_WATER_SURFACE_HEIGHT : canonicalCell.fillFraction();
-            return new SurfaceAnchor(true, surfaceBlockY + fill + SURFACE_OFFSET, fullWater);
-        }
-        if (!surfaceState.is(Blocks.WATER) || !surfaceFluid.is(FluidTags.WATER)) {
-            return SurfaceAnchor.INVALID;
-        }
-        boolean fullWater = surfaceFluid.isSource();
-        float fill = fullWater ? FULL_WATER_SURFACE_HEIGHT : surfaceFluid.getOwnHeight();
-        return new SurfaceAnchor(true, surfaceBlockY + fill + SURFACE_OFFSET, fullWater);
-    }
-
-    private static boolean isCovered(ClientLevel level, BlockPos pos) {
-        FluidState aboveFluid = level.getFluidState(pos);
-        if (aboveFluid.is(FluidTags.WATER)) {
-            return true;
-        }
-        var aboveCanonicalCell = CanonicalWater.getTracked(level, pos);
-        if (aboveCanonicalCell != null && aboveCanonicalCell.volumeUnits() > 0) {
-            return true;
-        }
-        BlockState aboveState = level.getBlockState(pos);
-        return !aboveState.getCollisionShape(level, pos).isEmpty();
-    }
-
-    private static float scanDepth(ClientLevel level, int x, int z, int surfaceBlockY) {
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        for (int offset = 1; offset <= MAX_DEPTH_SAMPLE; offset++) {
-            pos.set(x, surfaceBlockY - offset, z);
-            if (!level.getBlockState(pos).getCollisionShape(level, pos).isEmpty()) {
-                return offset;
-            }
-        }
-        return MAX_DEPTH_SAMPLE;
+        return new SurfaceColumn(
+                true,
+                sample.surfaceBlockY(),
+                sample.surfaceY(),
+                sample.depth(),
+                sample.fullWater(),
+                sample.fillFraction(),
+                sample.velocityX(),
+                sample.velocityZ()
+        );
     }
 
     private static void drawPatch(
@@ -277,26 +247,50 @@ public final class ShorelineSurfaceRenderer {
             OceanSeaState.Sample seaState,
             TextureAtlasSprite sprite,
             PoseStack.Pose pose,
-            VertexConsumer buffer
+            VertexConsumer buffer,
+            float cameraX,
+            float cameraZ,
+            int renderRadius,
+            float shorelineStrength
     ) {
+        float centerX = patch.x + 0.5f;
+        float centerZ = patch.z + 0.5f;
+        float dx = centerX - cameraX;
+        float dz = centerZ - cameraZ;
+        float distance = (float) Math.sqrt(dx * dx + dz * dz);
+        float distanceFade = 1.0f - smoothStep(renderRadius * 0.72f, renderRadius, distance);
+        float visualStrength = Math.max(0.0f, shorelineStrength * distanceFade);
+        if (visualStrength <= 0.0f) {
+            return;
+        }
+
         GerstnerWaveProfile waveProfile = profileFor(patch.waterType);
         WaveSpectrumState spectrum = patch.waterType == WaterBodyClassifier.WaterType.OCEAN
                 ? seaState.spectrum()
                 : WaveSpectrumState.NEUTRAL;
         int waveLimit = WaterRenderingConfig.waveTrainLimit(patch.waterType);
         float localTideOffset = patch.waterType == WaterBodyClassifier.WaterType.OCEAN ? tideOffset : 0.0f;
-        float waveBlend = smoothStep(0.25f, 3.5f, patch.depth) * (patch.fullWater ? 0.45f : 0.18f);
+        float flowSpeed = (float) Math.sqrt(patch.velocityX * patch.velocityX + patch.velocityZ * patch.velocityZ);
+        float fillWave = smoothStep(0.12f, 1.0f, patch.fillFraction);
+        float flowChop = smoothStep(0.05f, 0.65f, flowSpeed) * 0.16f;
+        float waveBlend = smoothStep(0.25f, 3.5f, patch.depth)
+                * (0.12f + fillWave * 0.33f + flowChop)
+                * Math.min(1.0f, visualStrength);
         int color = opticalColor(level, patch.x + 0.5f, patch.surfaceY, patch.z + 0.5f,
-                patch.depth, patch.edgeStrength, patch.fullWater);
+                patch.depth, patch.edgeStrength, patch.fullWater, patch.fillFraction, flowSpeed, visualStrength);
 
         emitVertex(buffer, pose, sprite, vertex(level, patch.x, patch.surfaceY, patch.z,
-                waveBlend, waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, color));
+                waveBlend, waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, color,
+                patch.velocityX, patch.velocityZ));
         emitVertex(buffer, pose, sprite, vertex(level, patch.x, patch.surfaceY, patch.z + 1.0f,
-                waveBlend, waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, color));
+                waveBlend, waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, color,
+                patch.velocityX, patch.velocityZ));
         emitVertex(buffer, pose, sprite, vertex(level, patch.x + 1.0f, patch.surfaceY, patch.z + 1.0f,
-                waveBlend, waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, color));
+                waveBlend, waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, color,
+                patch.velocityX, patch.velocityZ));
         emitVertex(buffer, pose, sprite, vertex(level, patch.x + 1.0f, patch.surfaceY, patch.z,
-                waveBlend, waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, color));
+                waveBlend, waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, color,
+                patch.velocityX, patch.velocityZ));
     }
 
     private static VertexData vertex(
@@ -310,13 +304,21 @@ public final class ShorelineSurfaceRenderer {
             float timeSeconds,
             float tideOffset,
             int waveLimit,
-            int color
+            int color,
+            float flowX,
+            float flowZ
     ) {
+        float clampedFlowX = Math.max(-1.5f, Math.min(1.5f, flowX));
+        float clampedFlowZ = Math.max(-1.5f, Math.min(1.5f, flowZ));
+        float advectedX = x - clampedFlowX * timeSeconds * 0.35f;
+        float advectedZ = z - clampedFlowZ * timeSeconds * 0.35f;
         WaveSurfaceSample sample = waveProfile
-                .sampleAt(x, z, timeSeconds, waveLimit, spectrum)
+                .sampleAt(advectedX, advectedZ, timeSeconds, waveLimit, spectrum)
                 .withHeightOffset(tideOffset)
                 .attenuated(waveBlend);
         float surfaceY = y + sample.height();
+        float textureU = x * UV_SCALE - clampedFlowX * timeSeconds * 0.08f;
+        float textureV = z * UV_SCALE - clampedFlowZ * timeSeconds * 0.08f;
         return new VertexData(
                 x,
                 surfaceY,
@@ -325,7 +327,9 @@ public final class ShorelineSurfaceRenderer {
                 sample.normalY(),
                 sample.normalZ(),
                 color,
-                waterLight(level, x, surfaceY, z)
+                waterLight(level, x, surfaceY, z),
+                textureU,
+                textureV
         );
     }
 
@@ -335,8 +339,8 @@ public final class ShorelineSurfaceRenderer {
             TextureAtlasSprite sprite,
             VertexData vertex
     ) {
-        float u = sprite.getU(tile(vertex.x * UV_SCALE));
-        float v = sprite.getV(tile(vertex.z * UV_SCALE));
+        float u = sprite.getU(tile(vertex.textureU));
+        float v = sprite.getV(tile(vertex.textureV));
         buffer.addVertex(pose, vertex.x, vertex.y, vertex.z)
                 .setColor(
                         (vertex.color >> 16) & 0xFF,
@@ -356,7 +360,10 @@ public final class ShorelineSurfaceRenderer {
             float z,
             float depth,
             float edgeStrength,
-            boolean fullWater
+            boolean fullWater,
+            float fillFraction,
+            float flowSpeed,
+            float visualStrength
     ) {
         int tint = IClientFluidTypeExtensions.of(Fluids.WATER).getTintColor(
                 WATER_STATE,
@@ -371,11 +378,17 @@ public final class ShorelineSurfaceRenderer {
         float red = mix(0.16f + tintR * 0.36f, 0.06f + tintR * 0.20f, absorption);
         float green = mix(0.58f + tintG * 0.26f, 0.32f + tintG * 0.18f, absorption);
         float blue = mix(0.76f + tintB * 0.22f, 0.60f + tintB * 0.20f, absorption);
-        float foam = Math.max(edgeStrength * 0.35f, smoothStep(0.0f, 0.9f, 1.05f - depth));
+        float fillFoam = smoothStep(0.0f, 0.85f, 1.0f - fillFraction) * 0.20f;
+        float flowFoam = smoothStep(0.08f, 0.70f, flowSpeed) * (0.10f + edgeStrength * 0.18f);
+        float foam = Math.max(Math.max(edgeStrength * 0.35f, smoothStep(0.0f, 0.9f, 1.05f - depth)),
+                fillFoam + flowFoam)
+                * Math.min(1.0f, visualStrength);
         red = mix(red, 0.88f, foam);
         green = mix(green, 0.96f, foam);
         blue = mix(blue, 1.0f, foam);
-        float alpha = fullWater ? 0.52f + edgeStrength * 0.10f : 0.42f;
+        float volumeAlpha = mix(0.28f, fullWater ? 0.52f : 0.44f, smoothStep(0.08f, 1.0f, fillFraction));
+        float alpha = (volumeAlpha + edgeStrength * 0.10f + Math.min(0.06f, flowSpeed * 0.04f))
+                * Math.min(1.0f, visualStrength);
 
         return (channel(alpha) << 24)
                 | (channel(red) << 16)
@@ -429,12 +442,18 @@ public final class ShorelineSurfaceRenderer {
         return value - (float) Math.floor(value);
     }
 
-    private record SurfaceColumn(boolean valid, int surfaceBlockY, float surfaceY, boolean fullWater) {
-        private static final SurfaceColumn INVALID = new SurfaceColumn(false, 0, 0.0f, false);
-    }
-
-    private record SurfaceAnchor(boolean valid, float surfaceY, boolean fullWater) {
-        private static final SurfaceAnchor INVALID = new SurfaceAnchor(false, 0.0f, false);
+    private record SurfaceColumn(
+            boolean valid,
+            int surfaceBlockY,
+            float surfaceY,
+            float depth,
+            boolean fullWater,
+            float fillFraction,
+            float velocityX,
+            float velocityZ
+    ) {
+        private static final SurfaceColumn INVALID = new SurfaceColumn(false, 0, 0.0f, 0.0f, false,
+                0.0f, 0.0f, 0.0f);
     }
 
     private record EdgeSample(boolean localEdge, float edgeStrength) {
@@ -447,7 +466,10 @@ public final class ShorelineSurfaceRenderer {
             float depth,
             WaterBodyClassifier.WaterType waterType,
             float edgeStrength,
-            boolean fullWater
+            boolean fullWater,
+            float fillFraction,
+            float velocityX,
+            float velocityZ
     ) {
     }
 
@@ -459,7 +481,9 @@ public final class ShorelineSurfaceRenderer {
             float normalY,
             float normalZ,
             int color,
-            int light
+            int light,
+            float textureU,
+            float textureV
     ) {
     }
 }

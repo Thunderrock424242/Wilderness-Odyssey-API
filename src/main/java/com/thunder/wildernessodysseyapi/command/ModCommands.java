@@ -14,6 +14,7 @@ import com.thunder.wildernessodysseyapi.modlisttracker.commands.ModListVersionCo
 import com.thunder.wildernessodysseyapi.modpack.structure.command.ModpackStructureCommand;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationCommands;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueStatsCommand;
+import com.thunder.wildernessodysseyapi.watersystem.water.command.WaterDebugCommand;
 import com.thunder.wildernessodysseyapi.worldgen.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.worldgen.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.worldgen.command.WorldGenScanCommand;
@@ -56,5 +57,6 @@ public final class ModCommands {
         MeteorCommand.register(dispatcher);
         UnstuckCommand.register(dispatcher);
         MinecraftVerificationCommands.register(dispatcher);
+        WaterDebugCommand.register(dispatcher);
     }
 }

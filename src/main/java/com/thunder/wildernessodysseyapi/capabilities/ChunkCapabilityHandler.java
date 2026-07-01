@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.capabilities;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterSeeder;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -40,6 +41,7 @@ public final class ChunkCapabilityHandler {
                 }
             }
         });
+        CanonicalWaterSeeder.seedLoadedChunk(level, chunk);
     }
 
     @SubscribeEvent
