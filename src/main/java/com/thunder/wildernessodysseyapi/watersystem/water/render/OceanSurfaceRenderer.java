@@ -58,7 +58,10 @@ public final class OceanSurfaceRenderer {
     private static final int MAX_DEPTH_SAMPLE = 16;
     private static final int SHORE_DETAIL_DEPTH = 12;
     private static final int MAX_DYNAMIC_CELL_SIZE = 2;
-    private static final float MAX_SURFACE_STEP = 0.75f;
+    private static final int MIN_REPLACEMENT_VOLUME_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK * 7 / 8;
+    private static final int CONTINUITY_BORDER = 1;
+    private static final float FULL_WATER_SURFACE_HEIGHT = 0.8888889f;
+    private static final float MAX_SURFACE_STEP = 0.05f;
     private static final float UV_SCALE = 0.28f;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
 
@@ -242,9 +245,15 @@ public final class OceanSurfaceRenderer {
                 .sampleAt(baseX, baseZ, timeSeconds, waveLimit, spectrum)
                 .withHeightOffset(tideOffset)
                 .attenuated(waveBlend * distanceDetail);
-        float x = baseX + sample.displacementX();
+        // Full Gerstner orbital motion assumes a continuous ocean sheet. The
+        // Minecraft replacement mesh is clipped per block by shores, ice, and
+        // compatibility water, so horizontal displacement can pull boundary
+        // vertices across missing neighbors and expose triangular gaps. Keep
+        // this render mesh height-only; entity physics still uses orbital
+        // velocity from the same wave sample.
+        float x = baseX;
         float y = baseY + sample.height() + 0.002f;
-        float z = baseZ + sample.displacementZ();
+        float z = baseZ;
         int light = waterLight(level, x, y, z);
         return new VertexData(x, y, z, sample.normalX(), sample.normalY(), sample.normalZ(), color, light);
     }
@@ -431,6 +440,12 @@ public final class OceanSurfaceRenderer {
             subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize);
             return;
         }
+        if (!footprint.replacementSafe) {
+            if (cellSize > 1) {
+                subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize);
+            }
+            return;
+        }
         if (cellSize > 1 && footprint.minimumDepth <= SHORE_DETAIL_DEPTH) {
             subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize);
             return;
@@ -439,10 +454,10 @@ public final class OceanSurfaceRenderer {
         PATCHES.add(new SurfacePatch(
                 x,
                 z,
-                first.surfaceY,
-                second.surfaceY,
-                third.surfaceY,
-                fourth.surfaceY,
+                footprint.surfaceY,
+                footprint.surfaceY,
+                footprint.surfaceY,
+                footprint.surfaceY,
                 cellSize,
                 footprint.minimumDepth,
                 dominantType(first, second, third, fourth)
@@ -490,10 +505,11 @@ public final class OceanSurfaceRenderer {
         }
     }
 
-    // Coarse optimized cells must never bridge an island, beach corner, or
-    // unloaded gap merely because their four outer corners contain water.
-    // Validate the complete vertex grid and use its shallowest depth so wave
-    // attenuation remains conservative near irregular shorelines.
+    // Dynamic geometry treats vanilla water as a mask, not as final mesh data.
+    // A patch is rendered only when its footprint and a one-block border are
+    // stable full water. This keeps the replacement surface away from clipped
+    // ice, flowing edges, caves, and shore cells where vanilla topology is not
+    // a continuous water sheet.
     private static PatchFootprint validatePatchFootprint(
             ClientLevel level,
             Map<Long, SurfaceColumn> surfaces,
@@ -504,8 +520,9 @@ public final class OceanSurfaceRenderer {
     ) {
         float minimumSurface = Float.POSITIVE_INFINITY;
         float maximumSurface = Float.NEGATIVE_INFINITY;
-        for (int offsetX = 0; offsetX <= cellSize; offsetX++) {
-            for (int offsetZ = 0; offsetZ <= cellSize; offsetZ++) {
+        boolean replacementSafe = true;
+        for (int offsetX = -CONTINUITY_BORDER; offsetX <= cellSize + CONTINUITY_BORDER; offsetX++) {
+            for (int offsetZ = -CONTINUITY_BORDER; offsetZ <= cellSize + CONTINUITY_BORDER; offsetZ++) {
                 SurfaceColumn covered = surfaceColumn(
                         level,
                         surfaces,
@@ -515,14 +532,17 @@ public final class OceanSurfaceRenderer {
                 if (!covered.valid) {
                     return PatchFootprint.INVALID;
                 }
-                minimumSurface = Math.min(minimumSurface, covered.surfaceY);
-                maximumSurface = Math.max(maximumSurface, covered.surfaceY);
+                replacementSafe &= covered.replacementSafe;
+                if (offsetX >= 0 && offsetX <= cellSize && offsetZ >= 0 && offsetZ <= cellSize) {
+                    minimumSurface = Math.min(minimumSurface, covered.surfaceY);
+                    maximumSurface = Math.max(maximumSurface, covered.surfaceY);
+                }
             }
         }
-        if (maximumSurface - minimumSurface > MAX_SURFACE_STEP) {
+        if (!replacementSafe || maximumSurface - minimumSurface > MAX_SURFACE_STEP) {
             return PatchFootprint.INVALID;
         }
-        return new PatchFootprint(true, sampledMinimumDepth);
+        return new PatchFootprint(true, true, sampledMinimumDepth, (minimumSurface + maximumSurface) * 0.5f);
     }
 
     private static WaterColumn column(
@@ -566,7 +586,8 @@ public final class OceanSurfaceRenderer {
         BlockState surfaceState = level.getBlockState(pos);
         FluidState surfaceFluid = surfaceState.getFluidState();
         var canonicalCell = CanonicalWater.getTracked(level, pos);
-        if (!isRenderableWaterSurface(surfaceState, surfaceFluid, canonicalCell)
+        SurfaceAnchor anchor = replacementSurfaceAnchor(surfaceBlockY, surfaceState, surfaceFluid, canonicalCell);
+        if (!anchor.valid
                 || isSurfaceCovered(level, above.set(x, surfaceBlockY + 1, z))) {
             return SurfaceColumn.INVALID;
         }
@@ -574,25 +595,40 @@ public final class OceanSurfaceRenderer {
         return new SurfaceColumn(
                 true,
                 surfaceBlockY,
-                surfaceBlockY + (canonicalCell != null
-                        ? canonicalCell.fillFraction()
-                        : surfaceFluid.getOwnHeight()) + 0.001f
+                anchor.surfaceY,
+                anchor.replacementSafe
         );
     }
 
-    // The dynamic mesh may hide vanilla water tops, so only true exposed water
-    // blocks or tracked canonical cells are allowed to become replacement
-    // surface anchors. Waterlogged plants and decorations keep vanilla rendering
-    // because their fluid state is not an open water surface.
-    private static boolean isRenderableWaterSurface(
+    // Vanilla and canonical water provide a compatibility mask only. The
+    // replacement mesh uses a stable full-water plane instead of the exact
+    // per-face vanilla liquid height, and partial/flowing cells stay on the
+    // vanilla path until a dedicated local-volume mesh owns them.
+    private static SurfaceAnchor replacementSurfaceAnchor(
+            int surfaceBlockY,
             BlockState surfaceState,
             FluidState surfaceFluid,
             WaterVolumeChunk.WaterCell canonicalCell
     ) {
         if (canonicalCell != null) {
-            return canonicalCell.volumeUnits() > 0;
+            if (canonicalCell.volumeUnits() <= 0) {
+                return SurfaceAnchor.INVALID;
+            }
+            boolean fullEnough = canonicalCell.volumeUnits() >= MIN_REPLACEMENT_VOLUME_UNITS;
+            float surfaceY = surfaceBlockY + (fullEnough
+                    ? FULL_WATER_SURFACE_HEIGHT
+                    : canonicalCell.fillFraction()) + 0.001f;
+            return new SurfaceAnchor(true, surfaceY, fullEnough);
         }
-        return surfaceState.is(Blocks.WATER) && surfaceFluid.is(Fluids.WATER);
+        if (!surfaceState.is(Blocks.WATER) || !surfaceFluid.is(Fluids.WATER)) {
+            return SurfaceAnchor.INVALID;
+        }
+        boolean source = surfaceFluid.isSource();
+        return new SurfaceAnchor(
+                true,
+                surfaceBlockY + FULL_WATER_SURFACE_HEIGHT + 0.001f,
+                source
+        );
     }
 
     // Covered water under ice, lily pads, solid blocks, or another water cell
@@ -804,12 +840,16 @@ public final class OceanSurfaceRenderer {
         );
     }
 
-    private record SurfaceColumn(boolean valid, int surfaceBlockY, float surfaceY) {
-        private static final SurfaceColumn INVALID = new SurfaceColumn(false, 0, 0.0f);
+    private record SurfaceColumn(boolean valid, int surfaceBlockY, float surfaceY, boolean replacementSafe) {
+        private static final SurfaceColumn INVALID = new SurfaceColumn(false, 0, 0.0f, false);
     }
 
-    private record PatchFootprint(boolean valid, float minimumDepth) {
-        private static final PatchFootprint INVALID = new PatchFootprint(false, 0.0f);
+    private record SurfaceAnchor(boolean valid, float surfaceY, boolean replacementSafe) {
+        private static final SurfaceAnchor INVALID = new SurfaceAnchor(false, 0.0f, false);
+    }
+
+    private record PatchFootprint(boolean valid, boolean replacementSafe, float minimumDepth, float surfaceY) {
+        private static final PatchFootprint INVALID = new PatchFootprint(false, false, 0.0f, 0.0f);
     }
 
     private record VertexData(
