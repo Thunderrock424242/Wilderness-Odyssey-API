@@ -18,6 +18,10 @@ technically appropriate model for a large Minecraft world:
   splashes, and shore wash.
 - Tide and shoreline systems provide the slower boundary conditions that move
   water toward and away from land.
+- Canonical finite-volume cells own conserved block-scale water amount and the
+  vanilla compatibility projection. Disturbed cells now distribute volume by
+  gravity and lateral height difference, carry damped velocity, and hand
+  energetic falling slices to SPH instead of faking every pour as static blocks.
 
 All three layers should share water-body classification, time, and surface
 samples so boats, particles, foam, and visuals do not drift apart.
@@ -45,6 +49,15 @@ stay laterally anchored so shoreline triangles cannot stretch across land.
 Iris/Oculus keeps the standard translucent shader path; without an
 external shader pack, the optional core shader adds Fresnel, depth-colored
 absorption, foam, lighting, and animated micro-normal detail.
+
+On the server, `WildernessFluidRegistry` advances only disturbed canonical
+cells. Stable imported worldgen water stays as a reservoir until gameplay
+touches it; disturbed water prefers bounded downward transfer, then distributes
+sideways across every lower neighbor instead of picking one arbitrary direction.
+When a falling cell has enough volume and no canonical water below it, the
+solver can transfer a conserved slice into `SPHSimulationManager` as a mobile
+body. That SPH body is ticked, synchronized, persisted, and later settles back
+into canonical cells with averaged particle velocity preserved.
 
 ## Rendering phases
 
@@ -100,7 +113,16 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   overlay quads for exposed shore, ice-adjacent, flowing, and partial cells
   that the open-ocean mesh refuses to own. It never hides vanilla water, so the
   compatibility projection remains visible while the overlay adds local color,
-  small vertical motion, and foam-brightened edges.
+  small vertical motion, and foam-brightened edges. It runs after the open-ocean
+  pass, respects a separate renderer-profile radius, and fades out near its
+  range limit so shoreline detail does not end abruptly.
+- `ClientWaterColumnSampler` is the shared client-side volume lens for
+  shoreline overlays, open-ocean depth checks, and camera immersion. Tracked
+  canonical cells provide fill height, local velocity, and accumulated water
+  depth before the renderers fall back to vanilla fluid state. That lets
+  partial finite-volume cells look thinner, makes shallow foam/fog follow
+  actual water amount, and scrolls local surface texture/wave phase in the
+  direction of flow.
 - Depth attenuation that fades deep-ocean waves into shallow water.
 - Foam generated from depth and crest slope rather than absolute world height.
 - Patch-stable material tint avoids exposing the GPU's internal triangle split;

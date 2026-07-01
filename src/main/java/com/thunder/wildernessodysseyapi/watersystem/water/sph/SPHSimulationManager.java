@@ -156,6 +156,65 @@ public class SPHSimulationManager {
         return sim;
     }
 
+    /**
+     * Converts a slice of canonical finite-volume water into a mobile SPH body.
+     *
+     * <p>This is used by the canonical solver for energetic falling water. The
+     * caller drains the source only after this method succeeds; the SPH body
+     * owns the conserved volume until settlement writes it back into canonical
+     * chunk cells.</p>
+     *
+     * @return {@code true} when SPH accepted ownership of the supplied volume
+     */
+    public boolean createCanonicalFlowSimulation(
+            float x,
+            float y,
+            float z,
+            ServerLevel level,
+            int volumeUnits,
+            float impulseX,
+            float impulseY,
+            float impulseZ
+    ) {
+        int conservedVolume = Math.max(0, volumeUnits);
+        if (conservedVolume <= 0) {
+            return false;
+        }
+
+        runPendingSettleCallbacks();
+        removeEmptySimulations();
+
+        int particleCount = particleCountForVolume(conservedVolume);
+        SPHSimulator existing = findMergeTarget(x, y, z, level, SPHConstants.MERGE_RADIUS);
+        if (existing != null) {
+            existing.spawnPulse(x, y, z, particleCount, impulseX, impulseY, impulseZ);
+            existing.addCanonicalVolumeUnits(conservedVolume);
+            return true;
+        }
+
+        if (countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
+            SPHSimulator overloaded = findMergeTarget(x, y, z, level, SPHConstants.OVERLOAD_MERGE_RADIUS);
+            if (overloaded == null && removeFirstSettledSimulation(level)) {
+                overloaded = findMergeTarget(x, y, z, level, SPHConstants.OVERLOAD_MERGE_RADIUS);
+            }
+            if (overloaded != null) {
+                overloaded.spawnPulse(x, y, z, Math.max(8, particleCount / 2), impulseX, impulseY, impulseZ);
+                overloaded.addCanonicalVolumeUnits(conservedVolume);
+                return true;
+            }
+            if (countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
+                return false;
+            }
+        }
+
+        SPHSimulator sim = new SPHSimulator(level);
+        sim.addCanonicalVolumeUnits(conservedVolume);
+        configureSettlement(sim, level, pos -> { });
+        sim.spawnPulse(x, y, z, particleCount, impulseX, impulseY, impulseZ);
+        active.add(sim);
+        return true;
+    }
+
     private SPHSimulator findMergeTarget(float x, float y, float z, BlockGetter level, float radius) {
         float mergeRadius2 = radius * radius;
 
@@ -478,28 +537,41 @@ public class SPHSimulationManager {
                     simulator.getCenterX(),
                     simulator.getCenterY(),
                     simulator.getCenterZ()
-            ), simulator.getCanonicalVolumeUnits(), writes);
+            ), simulator.getCanonicalVolumeUnits(), writes, 0.0f, 0.0f, 0.0f);
             return finishSettlement(level, simulator, remaining, writes, warnOnFailure);
         }
 
-        Map<BlockPos, Integer> particleCounts = new LinkedHashMap<>();
+        Map<BlockPos, SettlementAccumulator> particleCounts = new LinkedHashMap<>();
+        SettlementAccumulator totalParticles = new SettlementAccumulator();
         for (SPHParticle particle : particles) {
-            particleCounts.merge(BlockPos.containing(
+            BlockPos particlePos = BlockPos.containing(
                     particle.position.x,
                     particle.position.y,
                     particle.position.z
-            ), 1, Integer::sum);
+            );
+            particleCounts.computeIfAbsent(particlePos, ignored -> new SettlementAccumulator())
+                    .add(particle);
+            totalParticles.add(particle);
         }
 
         int remainingVolume = simulator.getCanonicalVolumeUnits();
         int remainingParticles = particles.size();
-        for (Map.Entry<BlockPos, Integer> entry : particleCounts.entrySet()) {
-            int share = remainingParticles == entry.getValue()
+        for (Map.Entry<BlockPos, SettlementAccumulator> entry : particleCounts.entrySet()) {
+            SettlementAccumulator accumulator = entry.getValue();
+            int share = remainingParticles == accumulator.count
                     ? remainingVolume
-                    : (int) ((long) remainingVolume * entry.getValue() / remainingParticles);
+                    : (int) ((long) remainingVolume * accumulator.count / remainingParticles);
             remainingVolume -= share;
-            remainingParticles -= entry.getValue();
-            remainingVolume += deposit(level, entry.getKey(), share, writes);
+            remainingParticles -= accumulator.count;
+            remainingVolume += deposit(
+                    level,
+                    entry.getKey(),
+                    share,
+                    writes,
+                    accumulator.averageVelocityX(),
+                    accumulator.averageVelocityY(),
+                    accumulator.averageVelocityZ()
+            );
         }
 
         if (remainingVolume > 0) {
@@ -507,7 +579,10 @@ public class SPHSimulationManager {
                     simulator.getCenterX(),
                     simulator.getCenterY(),
                     simulator.getCenterZ()
-            ), remainingVolume, writes);
+            ), remainingVolume, writes,
+                    totalParticles.averageVelocityX(),
+                    totalParticles.averageVelocityY(),
+                    totalParticles.averageVelocityZ());
         }
         return finishSettlement(level, simulator, remainingVolume, writes, warnOnFailure);
     }
@@ -518,7 +593,10 @@ public class SPHSimulationManager {
             ServerLevel level,
             BlockPos target,
             int volumeUnits,
-            List<SettlementWrite> writes
+            List<SettlementWrite> writes,
+            float velocityX,
+            float velocityY,
+            float velocityZ
     ) {
         int remaining = volumeUnits;
         for (int offsetY = 0; offsetY <= 4 && remaining > 0; offsetY++) {
@@ -534,9 +612,9 @@ public class SPHSimulationManager {
                                 level,
                                 destination,
                                 remaining,
-                                0.0f,
-                                0.0f,
-                                0.0f
+                                velocityX,
+                                velocityY,
+                                velocityZ
                         );
                         if (accepted > 0) {
                             writes.add(new SettlementWrite(destination.immutable(), previous));
@@ -547,6 +625,14 @@ public class SPHSimulationManager {
             }
         }
         return remaining;
+    }
+
+    private static int particleCountForVolume(int volumeUnits) {
+        float bucketFraction = volumeUnits / (float) WaterVolumeChunk.UNITS_PER_BLOCK;
+        return Math.max(8, Math.min(
+                SPHConstants.PARTICLES_PER_BUCKET,
+                Math.round(SPHConstants.PARTICLES_PER_BUCKET * bucketFraction)
+        ));
     }
 
     private static boolean finishSettlement(
@@ -673,6 +759,32 @@ public class SPHSimulationManager {
     }
 
     private record SettlementWrite(BlockPos pos, WaterVolumeChunk.WaterCell previous) {
+    }
+
+    private static final class SettlementAccumulator {
+        private int count;
+        private float velocityX;
+        private float velocityY;
+        private float velocityZ;
+
+        private void add(SPHParticle particle) {
+            count++;
+            velocityX += particle.velocity.x;
+            velocityY += particle.velocity.y;
+            velocityZ += particle.velocity.z;
+        }
+
+        private float averageVelocityX() {
+            return count == 0 ? 0.0f : velocityX / count;
+        }
+
+        private float averageVelocityY() {
+            return count == 0 ? 0.0f : velocityY / count;
+        }
+
+        private float averageVelocityZ() {
+            return count == 0 ? 0.0f : velocityZ / count;
+        }
     }
 
     private record PendingSettlement(

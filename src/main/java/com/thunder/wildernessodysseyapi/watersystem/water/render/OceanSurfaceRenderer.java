@@ -10,8 +10,6 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfi
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.longs.LongSets;
@@ -23,9 +21,6 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.api.distmarker.Dist;
@@ -58,9 +53,7 @@ public final class OceanSurfaceRenderer {
     private static final int MAX_DEPTH_SAMPLE = 16;
     private static final int SHORE_DETAIL_DEPTH = 12;
     private static final int MAX_DYNAMIC_CELL_SIZE = 2;
-    private static final int MIN_REPLACEMENT_VOLUME_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK * 7 / 8;
     private static final int CONTINUITY_BORDER = 1;
-    private static final float FULL_WATER_SURFACE_HEIGHT = 0.8888889f;
     private static final float MAX_SURFACE_STEP = 0.05f;
     private static final float UV_SCALE = 0.28f;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
@@ -575,76 +568,24 @@ public final class OceanSurfaceRenderer {
     // bathymetry and water-body classification are evaluated at mesh vertices,
     // not for every interior block hidden beneath an LOD patch.
     private static SurfaceColumn scanSurfaceColumn(ClientLevel level, int x, int z) {
-        int surfaceBlockY = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1;
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
-        pos.set(x, surfaceBlockY, z);
-        if (!level.hasChunkAt(pos)) {
-            return SurfaceColumn.INVALID;
-        }
-
-        BlockState surfaceState = level.getBlockState(pos);
-        FluidState surfaceFluid = surfaceState.getFluidState();
-        var canonicalCell = CanonicalWater.getTracked(level, pos);
-        SurfaceAnchor anchor = replacementSurfaceAnchor(surfaceBlockY, surfaceState, surfaceFluid, canonicalCell);
-        if (!anchor.valid
-                || isSurfaceCovered(level, above.set(x, surfaceBlockY + 1, z))) {
+        ClientWaterColumnSampler.ColumnSample sample = ClientWaterColumnSampler.sampleExposedSurface(
+                level,
+                x,
+                z,
+                MAX_DEPTH_SAMPLE,
+                0.001f
+        );
+        if (!sample.valid()) {
             return SurfaceColumn.INVALID;
         }
 
         return new SurfaceColumn(
                 true,
-                surfaceBlockY,
-                anchor.surfaceY,
-                anchor.replacementSafe
+                sample.surfaceBlockY(),
+                sample.surfaceY(),
+                sample.replacementSafe(),
+                sample.depth()
         );
-    }
-
-    // Vanilla and canonical water provide a compatibility mask only. The
-    // replacement mesh uses a stable full-water plane instead of the exact
-    // per-face vanilla liquid height, and partial/flowing cells stay on the
-    // vanilla path until a dedicated local-volume mesh owns them.
-    private static SurfaceAnchor replacementSurfaceAnchor(
-            int surfaceBlockY,
-            BlockState surfaceState,
-            FluidState surfaceFluid,
-            WaterVolumeChunk.WaterCell canonicalCell
-    ) {
-        if (canonicalCell != null) {
-            if (canonicalCell.volumeUnits() <= 0) {
-                return SurfaceAnchor.INVALID;
-            }
-            boolean fullEnough = canonicalCell.volumeUnits() >= MIN_REPLACEMENT_VOLUME_UNITS;
-            float surfaceY = surfaceBlockY + (fullEnough
-                    ? FULL_WATER_SURFACE_HEIGHT
-                    : canonicalCell.fillFraction()) + 0.001f;
-            return new SurfaceAnchor(true, surfaceY, fullEnough);
-        }
-        if (!surfaceState.is(Blocks.WATER) || !surfaceFluid.is(Fluids.WATER)) {
-            return SurfaceAnchor.INVALID;
-        }
-        boolean source = surfaceFluid.isSource();
-        return new SurfaceAnchor(
-                true,
-                surfaceBlockY + FULL_WATER_SURFACE_HEIGHT + 0.001f,
-                source
-        );
-    }
-
-    // Covered water under ice, lily pads, solid blocks, or another water cell
-    // is not visually exposed. Leaving vanilla/collision-owned columns alone
-    // avoids the black, angular floor patches seen in frozen shorelines.
-    private static boolean isSurfaceCovered(ClientLevel level, BlockPos pos) {
-        FluidState aboveFluid = level.getFluidState(pos);
-        if (aboveFluid.is(Fluids.WATER)) {
-            return true;
-        }
-        var aboveCanonicalCell = CanonicalWater.getTracked(level, pos);
-        if (aboveCanonicalCell != null && aboveCanonicalCell.volumeUnits() > 0) {
-            return true;
-        }
-        BlockState aboveState = level.getBlockState(pos);
-        return !aboveState.getCollisionShape(level, pos).isEmpty();
     }
 
     private static WaterColumn scanColumn(
@@ -660,19 +601,11 @@ public final class OceanSurfaceRenderer {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         pos.set(x, surface.surfaceBlockY, z);
         WaterBodyClassifier.WaterType waterType = WaterBodyClassifier.classify(level, pos);
-        float depth = MAX_DEPTH_SAMPLE;
-        for (int offset = 1; offset <= MAX_DEPTH_SAMPLE; offset++) {
-            pos.set(x, surface.surfaceBlockY - offset, z);
-            if (!level.getBlockState(pos).getCollisionShape(level, pos).isEmpty()) {
-                depth = offset;
-                break;
-            }
-        }
         return new WaterColumn(
                 true,
                 surface.surfaceBlockY,
                 surface.surfaceY,
-                depth,
+                surface.depth,
                 waterType
         );
     }
@@ -840,12 +773,14 @@ public final class OceanSurfaceRenderer {
         );
     }
 
-    private record SurfaceColumn(boolean valid, int surfaceBlockY, float surfaceY, boolean replacementSafe) {
-        private static final SurfaceColumn INVALID = new SurfaceColumn(false, 0, 0.0f, false);
-    }
-
-    private record SurfaceAnchor(boolean valid, float surfaceY, boolean replacementSafe) {
-        private static final SurfaceAnchor INVALID = new SurfaceAnchor(false, 0.0f, false);
+    private record SurfaceColumn(
+            boolean valid,
+            int surfaceBlockY,
+            float surfaceY,
+            boolean replacementSafe,
+            float depth
+    ) {
+        private static final SurfaceColumn INVALID = new SurfaceColumn(false, 0, 0.0f, false, 0.0f);
     }
 
     private record PatchFootprint(boolean valid, boolean replacementSafe, float minimumDepth, float surfaceY) {

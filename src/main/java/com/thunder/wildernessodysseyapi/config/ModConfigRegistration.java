@@ -17,6 +17,7 @@ import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryConfig;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryConfig;
 import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
 import com.thunder.wildernessodysseyapi.truedarkness.config.TrueDarknessConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import net.neoforged.fml.ModContainer;
@@ -78,6 +79,8 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-temporal-rift-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, CodexMapServerConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-codex-map-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, WaterSimulationConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-water-simulation-server.toml");
     }
 
     /** Applies runtime-backed settings after NeoForge loads a config file. */

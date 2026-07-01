@@ -2,14 +2,12 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
@@ -80,7 +78,7 @@ public final class ClientWaterImmersion {
         int waterY = Integer.MIN_VALUE;
         for (int offset = 0; offset <= 2; offset++) {
             cursor.set(x, cameraY - offset, z);
-            if (hasWater(level, cursor)) {
+            if (ClientWaterColumnSampler.hasWater(level, cursor)) {
                 waterY = cursor.getY();
                 break;
             }
@@ -93,19 +91,26 @@ public final class ClientWaterImmersion {
         int scanned = 0;
         while (topY + 1 < level.getMaxBuildHeight() && scanned++ < MAX_SURFACE_SCAN) {
             cursor.set(x, topY + 1, z);
-            if (!hasWater(level, cursor)) {
+            if (!ClientWaterColumnSampler.hasWater(level, cursor)) {
                 break;
             }
             topY++;
         }
 
         BlockPos surfacePos = new BlockPos(x, topY, z);
-        var canonicalCell = CanonicalWater.getTracked(level, surfacePos);
-        float fillHeight = canonicalCell != null
-                ? canonicalCell.fillFraction()
-                : level.getFluidState(surfacePos).getOwnHeight();
-        float baseSurfaceY = topY + fillHeight;
-        float columnDepth = sampleColumnDepth(level, surfacePos);
+        ClientWaterColumnSampler.CellSample surfaceCell =
+                ClientWaterColumnSampler.sampleCell(level, surfacePos);
+        if (!surfaceCell.valid()) {
+            return ImmersionState.DRY;
+        }
+
+        float baseSurfaceY = topY + surfaceCell.surfaceFillHeight();
+        float columnDepth = ClientWaterColumnSampler.scanDepthFromSurface(
+                level,
+                surfacePos,
+                surfaceCell.fillFraction(),
+                MAX_DEPTH_SAMPLE
+        );
         WaterBodyClassifier.WaterType waterType = WaterBodyClassifier.classify(level, surfacePos);
 
         float animatedHeight = 0.0f;
@@ -121,11 +126,7 @@ public final class ClientWaterImmersion {
 
         float surfaceY = baseSurfaceY + animatedHeight;
         float depthBelowSurface = surfaceY - (float) cameraPosition.y;
-        float disturbance = canonicalCell == null ? 0.0f : clamp((float) Math.sqrt(
-                canonicalCell.velocityX() * canonicalCell.velocityX()
-                        + canonicalCell.velocityY() * canonicalCell.velocityY()
-                        + canonicalCell.velocityZ() * canonicalCell.velocityZ()
-        ) / 1.5f, 0.0f, 1.0f);
+        float disturbance = clamp(surfaceCell.speed() / 1.5f, 0.0f, 1.0f);
         float daylight = LightTexture.getBrightness(
                 level.dimensionType(),
                 level.getMaxLocalRawBrightness(surfacePos)
@@ -199,26 +200,6 @@ public final class ClientWaterImmersion {
                 0.0f,
                 optics
         );
-    }
-
-    private static boolean hasWater(ClientLevel level, BlockPos pos) {
-        var canonicalCell = CanonicalWater.getTracked(level, pos);
-        if (canonicalCell != null) {
-            return canonicalCell.volumeUnits() > 0;
-        }
-        return level.getFluidState(pos).is(FluidTags.WATER);
-    }
-
-    private static float sampleColumnDepth(ClientLevel level, BlockPos surfacePos) {
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        for (int offset = 1; offset <= MAX_DEPTH_SAMPLE; offset++) {
-            cursor.set(surfacePos.getX(), surfacePos.getY() - offset, surfacePos.getZ());
-            if (level.isOutsideBuildHeight(cursor)
-                    || !level.getBlockState(cursor).getCollisionShape(level, cursor).isEmpty()) {
-                return offset;
-            }
-        }
-        return MAX_DEPTH_SAMPLE;
     }
 
     private static boolean isCached(ClientLevel level, Vec3 cameraPosition, float partialTick) {

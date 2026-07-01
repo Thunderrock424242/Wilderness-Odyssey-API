@@ -15,6 +15,7 @@ public final class WaterRenderingConfig {
 
     public static final ModConfigSpec.BooleanValue ENABLE_GERSTNER_WAVES;
     public static final ModConfigSpec.BooleanValue ENABLE_DYNAMIC_OCEAN_SURFACE;
+    public static final ModConfigSpec.BooleanValue ENABLE_SHORELINE_SURFACE;
     public static final ModConfigSpec.BooleanValue ENABLE_WATER_CORE_SHADER;
     public static final ModConfigSpec.BooleanValue ENABLE_UNDERWATER_OPTICS;
     public static final ModConfigSpec.BooleanValue ENABLE_UNDERWATER_CAUSTICS;
@@ -25,6 +26,7 @@ public final class WaterRenderingConfig {
 
     public static final ModConfigSpec.DoubleValue UNDERWATER_VISIBILITY_BLOCKS;
     public static final ModConfigSpec.DoubleValue UNDERWATER_TURBIDITY_STRENGTH;
+    public static final ModConfigSpec.DoubleValue SHORELINE_OVERLAY_STRENGTH;
     public static final ModConfigSpec.IntValue MAX_OCEAN_SURFACE_DISTANCE_BLOCKS;
 
     public static final ModConfigSpec.IntValue NORMAL_SPH_RENDER_DISTANCE_BLOCKS;
@@ -36,6 +38,7 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.IntValue NORMAL_WAVE_TRAINS;
     public static final ModConfigSpec.IntValue NORMAL_OCEAN_RENDER_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue NORMAL_OCEAN_CELL_SIZE;
+    public static final ModConfigSpec.IntValue NORMAL_SHORELINE_RENDER_DISTANCE_BLOCKS;
 
     public static final ModConfigSpec.IntValue OPTIMIZED_SPH_RENDER_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue OPTIMIZED_MAX_RENDERED_SPH_SIMULATIONS;
@@ -46,6 +49,7 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.IntValue OPTIMIZED_WAVE_TRAINS;
     public static final ModConfigSpec.IntValue OPTIMIZED_OCEAN_RENDER_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue OPTIMIZED_OCEAN_CELL_SIZE;
+    public static final ModConfigSpec.IntValue OPTIMIZED_SHORELINE_RENDER_DISTANCE_BLOCKS;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -59,6 +63,9 @@ public final class WaterRenderingConfig {
         ENABLE_DYNAMIC_OCEAN_SURFACE = builder
                 .comment("Replace visible open-water tops near the camera with the per-frame water surface.")
                 .define("enableDynamicOceanSurface", true);
+        ENABLE_SHORELINE_SURFACE = builder
+                .comment("Render the block-detail shoreline/local-water overlay for cells the open-ocean mesh does not own.")
+                .define("enableShorelineSurface", true);
         ENABLE_WATER_CORE_SHADER = builder
                 .comment("Use the built-in Fresnel/absorption water shader when no external shader pack owns water rendering.")
                 .define("enableWaterCoreShader", true);
@@ -89,6 +96,9 @@ public final class WaterRenderingConfig {
         UNDERWATER_TURBIDITY_STRENGTH = builder
                 .comment("Scales storm, shallow-sediment, and moving-water turbidity. Zero keeps water maximally clear.")
                 .defineInRange("underwaterTurbidityStrength", 1.0, 0.0, 2.0);
+        SHORELINE_OVERLAY_STRENGTH = builder
+                .comment("Scales shoreline overlay alpha, foam, and local vertical motion.")
+                .defineInRange("shorelineOverlayStrength", 1.0, 0.0, 2.0);
 
         builder.comment("Normal quality profile.")
                 .push("normal_profile");
@@ -119,6 +129,9 @@ public final class WaterRenderingConfig {
         NORMAL_OCEAN_CELL_SIZE = builder
                 .comment("Horizontal ocean mesh spacing. One gives block-resolution shore edges.")
                 .defineInRange("oceanCellSize", 1, 1, 4);
+        NORMAL_SHORELINE_RENDER_DISTANCE_BLOCKS = builder
+                .comment("Radius for block-detail shoreline/local-water overlays.")
+                .defineInRange("shorelineRenderDistanceBlocks", 48, 12, 96);
         builder.pop();
 
         builder.comment("Optimized profile used when Sodium or Embeddium is loaded.")
@@ -150,6 +163,9 @@ public final class WaterRenderingConfig {
         OPTIMIZED_OCEAN_CELL_SIZE = builder
                 .comment("Horizontal ocean mesh spacing used with renderer optimization mods.")
                 .defineInRange("oceanCellSize", 2, 1, 4);
+        OPTIMIZED_SHORELINE_RENDER_DISTANCE_BLOCKS = builder
+                .comment("Radius for block-detail shoreline/local-water overlays with renderer optimization mods.")
+                .defineInRange("shorelineRenderDistanceBlocks", 32, 12, 96);
         builder.pop();
 
         builder.pop();
@@ -243,6 +259,18 @@ public final class WaterRenderingConfig {
         return usesOptimizedProfile()
                 ? OPTIMIZED_OCEAN_CELL_SIZE.get()
                 : NORMAL_OCEAN_CELL_SIZE.get();
+    }
+
+    /** Returns the active shoreline/local-water overlay radius in blocks. */
+    public static int shorelineRenderDistanceBlocks() {
+        return usesOptimizedProfile()
+                ? OPTIMIZED_SHORELINE_RENDER_DISTANCE_BLOCKS.get()
+                : NORMAL_SHORELINE_RENDER_DISTANCE_BLOCKS.get();
+    }
+
+    /** Returns the user-controlled shoreline overlay strength multiplier. */
+    public static float shorelineOverlayStrength() {
+        return SHORELINE_OVERLAY_STRENGTH.get().floatValue();
     }
 
     /**
