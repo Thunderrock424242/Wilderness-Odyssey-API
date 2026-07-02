@@ -11,6 +11,8 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  * of scattering Sodium/Embeddium checks through render and simulation code.</p>
  */
 public final class WaterRenderingConfig {
+    private static final int ABSOLUTE_OCEAN_SURFACE_DISTANCE_CAP_BLOCKS = 256;
+
     public static final ModConfigSpec CONFIG_SPEC;
 
     public static final ModConfigSpec.BooleanValue ENABLE_GERSTNER_WAVES;
@@ -38,7 +40,9 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.IntValue NORMAL_WAVE_TRAINS;
     public static final ModConfigSpec.IntValue NORMAL_OCEAN_RENDER_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue NORMAL_OCEAN_CELL_SIZE;
+    public static final ModConfigSpec.IntValue NORMAL_MAX_OCEAN_SURFACE_PATCHES;
     public static final ModConfigSpec.IntValue NORMAL_SHORELINE_RENDER_DISTANCE_BLOCKS;
+    public static final ModConfigSpec.IntValue NORMAL_MAX_SHORELINE_SURFACE_PATCHES;
 
     public static final ModConfigSpec.IntValue OPTIMIZED_SPH_RENDER_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue OPTIMIZED_MAX_RENDERED_SPH_SIMULATIONS;
@@ -49,7 +53,9 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.IntValue OPTIMIZED_WAVE_TRAINS;
     public static final ModConfigSpec.IntValue OPTIMIZED_OCEAN_RENDER_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue OPTIMIZED_OCEAN_CELL_SIZE;
+    public static final ModConfigSpec.IntValue OPTIMIZED_MAX_OCEAN_SURFACE_PATCHES;
     public static final ModConfigSpec.IntValue OPTIMIZED_SHORELINE_RENDER_DISTANCE_BLOCKS;
+    public static final ModConfigSpec.IntValue OPTIMIZED_MAX_SHORELINE_SURFACE_PATCHES;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -85,11 +91,12 @@ public final class WaterRenderingConfig {
                 .comment("Use the optimized profile automatically when Sodium or Embeddium is loaded.")
                 .define("autoOptimizeWithRendererMods", true);
         MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE = builder
-                .comment("Extend the replacement surface to the client view distance using coarser distant LODs.")
+                .comment("Extend the replacement surface toward the client view distance using coarser distant LODs.")
                 .define("matchOceanSurfaceToViewDistance", true);
         MAX_OCEAN_SURFACE_DISTANCE_BLOCKS = builder
-                .comment("Safety cap for view-distance-matched ocean rendering. 512 covers Minecraft's 32-chunk maximum.")
-                .defineInRange("maxOceanSurfaceDistanceBlocks", 512, 96, 512);
+                .comment("Safety cap for view-distance-matched ocean rendering. Higher values cover more distant vanilla water but cost more CPU and vertices.")
+                .defineInRange("maxOceanSurfaceDistanceBlocks", 160, 64,
+                        ABSOLUTE_OCEAN_SURFACE_DISTANCE_CAP_BLOCKS);
         UNDERWATER_VISIBILITY_BLOCKS = builder
                 .comment("Maximum clear-water visibility used by the underwater optical model.")
                 .defineInRange("underwaterVisibilityBlocks", 44.0, 8.0, 128.0);
@@ -125,13 +132,19 @@ public final class WaterRenderingConfig {
                 .defineInRange("waveTrains", 4, 1, 4);
         NORMAL_OCEAN_RENDER_DISTANCE_BLOCKS = builder
                 .comment("Radius of the per-frame ocean surface around the camera.")
-                .defineInRange("oceanRenderDistanceBlocks", 40, 12, 96);
+                .defineInRange("oceanRenderDistanceBlocks", 32, 12, 80);
         NORMAL_OCEAN_CELL_SIZE = builder
                 .comment("Horizontal ocean mesh spacing. One gives block-resolution shore edges.")
                 .defineInRange("oceanCellSize", 1, 1, 4);
+        NORMAL_MAX_OCEAN_SURFACE_PATCHES = builder
+                .comment("Maximum dynamic ocean patches kept in the client cache. This prevents view-distance water from tanking FPS.")
+                .defineInRange("maxOceanSurfacePatches", 12000, 512, 24000);
         NORMAL_SHORELINE_RENDER_DISTANCE_BLOCKS = builder
                 .comment("Radius for block-detail shoreline/local-water overlays.")
-                .defineInRange("shorelineRenderDistanceBlocks", 48, 12, 96);
+                .defineInRange("shorelineRenderDistanceBlocks", 24, 8, 48);
+        NORMAL_MAX_SHORELINE_SURFACE_PATCHES = builder
+                .comment("Maximum shoreline overlay patches kept near the camera. The nearest cells are prioritized first.")
+                .defineInRange("maxShorelineSurfacePatches", 900, 128, 4096);
         builder.pop();
 
         builder.comment("Optimized profile used when Sodium or Embeddium is loaded.")
@@ -159,13 +172,19 @@ public final class WaterRenderingConfig {
                 .defineInRange("waveTrains", 2, 1, 4);
         OPTIMIZED_OCEAN_RENDER_DISTANCE_BLOCKS = builder
                 .comment("Radius of the per-frame ocean surface around the camera.")
-                .defineInRange("oceanRenderDistanceBlocks", 28, 12, 96);
+                .defineInRange("oceanRenderDistanceBlocks", 24, 12, 80);
         OPTIMIZED_OCEAN_CELL_SIZE = builder
                 .comment("Horizontal ocean mesh spacing used with renderer optimization mods.")
                 .defineInRange("oceanCellSize", 2, 1, 4);
+        OPTIMIZED_MAX_OCEAN_SURFACE_PATCHES = builder
+                .comment("Maximum dynamic ocean patches kept when renderer optimization mods are active.")
+                .defineInRange("maxOceanSurfacePatches", 7000, 512, 24000);
         OPTIMIZED_SHORELINE_RENDER_DISTANCE_BLOCKS = builder
                 .comment("Radius for block-detail shoreline/local-water overlays with renderer optimization mods.")
-                .defineInRange("shorelineRenderDistanceBlocks", 32, 12, 96);
+                .defineInRange("shorelineRenderDistanceBlocks", 16, 8, 48);
+        OPTIMIZED_MAX_SHORELINE_SURFACE_PATCHES = builder
+                .comment("Maximum shoreline overlay patches kept when renderer optimization mods are active.")
+                .defineInRange("maxShorelineSurfacePatches", 500, 128, 4096);
         builder.pop();
 
         builder.pop();
@@ -261,11 +280,25 @@ public final class WaterRenderingConfig {
                 : NORMAL_OCEAN_CELL_SIZE.get();
     }
 
+    /** Returns the active cache budget for dynamic ocean surface patches. */
+    public static int maxOceanSurfacePatches() {
+        return usesOptimizedProfile()
+                ? OPTIMIZED_MAX_OCEAN_SURFACE_PATCHES.get()
+                : NORMAL_MAX_OCEAN_SURFACE_PATCHES.get();
+    }
+
     /** Returns the active shoreline/local-water overlay radius in blocks. */
     public static int shorelineRenderDistanceBlocks() {
         return usesOptimizedProfile()
                 ? OPTIMIZED_SHORELINE_RENDER_DISTANCE_BLOCKS.get()
                 : NORMAL_SHORELINE_RENDER_DISTANCE_BLOCKS.get();
+    }
+
+    /** Returns the active cache budget for shoreline/local-water overlay patches. */
+    public static int maxShorelineSurfacePatches() {
+        return usesOptimizedProfile()
+                ? OPTIMIZED_MAX_SHORELINE_SURFACE_PATCHES.get()
+                : NORMAL_MAX_SHORELINE_SURFACE_PATCHES.get();
     }
 
     /** Returns the user-controlled shoreline overlay strength multiplier. */
@@ -283,7 +316,11 @@ public final class WaterRenderingConfig {
             return highDetailRadius;
         }
         int viewDistanceBlocks = Math.max(1, viewDistanceChunks) * 16 + 16;
+        int configuredCap = Math.min(
+                MAX_OCEAN_SURFACE_DISTANCE_BLOCKS.get(),
+                ABSOLUTE_OCEAN_SURFACE_DISTANCE_CAP_BLOCKS
+        );
         return Math.max(highDetailRadius,
-                Math.min(MAX_OCEAN_SURFACE_DISTANCE_BLOCKS.get(), viewDistanceBlocks));
+                Math.min(configuredCap, viewDistanceBlocks));
     }
 }

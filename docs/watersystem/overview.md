@@ -11,6 +11,7 @@ The Wilderness water system is split across several coordinated subsystems:
 - Live diagnostics: `/wowater inspect`, `/wowater summary`, `/wowater seed`, `/wowater repair`
 - Ripple and splash particles: `RippleRenderer`, `WaterEntryEventHandler`
 - Gerstner waves per water body: `GerstnerWaveRenderMixin`, `WaveEntityPhysics`
+- Replacement water surface: `OceanSurfaceRenderer`, `ShorelineSurfaceRenderer`, `WaterRenderingConfig`
 - Moon-phase tide system: `TideSystem`, `TideWorldUpdater`, `TideHudOverlay`
 - Weather-driven sea state: `OceanSeaState`, `OceanSeaStatePayload`, `ClientOceanSeaState`
 - Underwater optics: `ClientWaterImmersion`, `UnderwaterOpticsModel`, `UnderwaterEffectsRenderer`
@@ -83,3 +84,7 @@ Manual test matrix before calling a water build stable:
 5. Test with built-in shaders, no shaders, and an external shader pack.
 6. Press `F3+A` near beaches and frozen oceans to verify dynamic surfaces do
    not reintroduce dark triangular shoreline gaps.
+7. Test at several client render distances and compare FPS/frametime near a
+   beach, an open ocean, and a frozen ocean. The replacement surface should
+   follow render distance through LODs without drawing block-detail water across
+   the entire view.

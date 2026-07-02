@@ -39,13 +39,15 @@ Each sample returns vertical and horizontal displacement, an analytic normal,
 and orbital velocity. Ocean swell, river ripples, pond motion, vertex geometry,
 and boat response therefore use one coherent wave field.
 
-The per-frame surface renderer owns exposed water through the active client
-view distance. Its cache
-suppresses only the exact baked vanilla top faces covered by replacement
-patches, preventing the flat depth surface from clipping animated troughs.
-Near, medium, and far LODs tile the same world-aligned cells without gaps or
-overlaps. Vanilla side faces remain as failure-safe compatibility geometry and
-stay laterally anchored so shoreline triangles cannot stretch across land.
+The per-frame surface renderer follows the active client render distance through
+bounded near, medium, and far LODs instead of rebuilding every distant ocean
+block at full detail. Its cache suppresses only the exact baked vanilla top
+faces covered by one-block replacement patches, preventing the flat depth
+surface from clipping animated troughs. Coarser far LODs remain color-only
+overlays on top of vanilla-compatible water, and patch budgets keep extreme
+view distances from overwhelming the client. Vanilla side faces remain as
+failure-safe compatibility geometry and stay laterally anchored so shoreline
+triangles cannot stretch across land.
 Iris/Oculus keeps the standard translucent shader path; without an
 external shader pack, the optional core shader adds Fresnel, depth-colored
 absorption, foam, lighting, and animated micro-normal detail.
@@ -80,9 +82,12 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
 
 - Per-frame world-space positions and analytic wave normals.
 - Cached water/bathymetry scans, circular range culling, a block-detail inner
-  radius, and view-distance-matched medium/far LODs.
+  radius, and bounded view-distance-matched medium/far LODs.
 - LOD cells are recursively tiled from a shared coarse grid, preventing
   overlapping or uncovered cells where mesh spacing changes.
+- `WaterRenderingConfig` exposes profile-specific patch budgets and distance
+  caps so normal clients and Sodium/Embeddium-style renderer stacks can tune
+  the same compatibility renderer without changing code.
 - Coarse optimized cells validate their complete footprint and edge grid before
   rendering, so they cannot bridge beach corners, islands, or unloaded gaps.
 - Surface ownership starts from exposed plain water or tracked canonical water,
@@ -114,8 +119,9 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   that the open-ocean mesh refuses to own. It never hides vanilla water, so the
   compatibility projection remains visible while the overlay adds local color,
   small vertical motion, and foam-brightened edges. It runs after the open-ocean
-  pass, respects a separate renderer-profile radius, and fades out near its
-  range limit so shoreline detail does not end abruptly.
+  pass, respects a separate renderer-profile radius and patch budget, scans
+  nearest-first, and fades out near its range limit so shoreline detail does not
+  end abruptly.
 - `ClientWaterColumnSampler` is the shared client-side volume lens for
   shoreline overlays, open-ocean depth checks, and camera immersion. Tracked
   canonical cells provide fill height, local velocity, and accumulated water

@@ -52,7 +52,7 @@ public final class OceanSurfaceRenderer {
     private static final int CACHE_LIFETIME_TICKS = 40;
     private static final int MAX_DEPTH_SAMPLE = 16;
     private static final int SHORE_DETAIL_DEPTH = 12;
-    private static final int MAX_DYNAMIC_CELL_SIZE = 2;
+    private static final int MAX_DYNAMIC_CELL_SIZE = 4;
     private static final int CONTINUITY_BORDER = 1;
     private static final float MAX_SURFACE_STEP = 0.05f;
     private static final float UV_SCALE = 0.28f;
@@ -66,6 +66,7 @@ public final class OceanSurfaceRenderer {
     private static int cachedNearRadius = -1;
     private static int cachedFarRadius = -1;
     private static int cachedNearCellSize = -1;
+    private static int cachedMaxPatches = -1;
     private static long cachedGameTime = Long.MIN_VALUE;
 
     private OceanSurfaceRenderer() {
@@ -109,7 +110,8 @@ public final class OceanSurfaceRenderer {
                 (int) Math.floor(camera.z),
                 nearRadius,
                 farRadius,
-                nearCellSize
+                nearCellSize,
+                WaterRenderingConfig.maxOceanSurfacePatches()
         );
         if (PATCHES.isEmpty()) {
             return;
@@ -320,7 +322,8 @@ public final class OceanSurfaceRenderer {
             int cameraZ,
             int nearRadius,
             int farRadius,
-            int nearCellSize
+            int nearCellSize,
+            int maxPatches
     ) {
         long gameTime = level.getGameTime();
         int movementThreshold = Math.max(8, nearCellSize * 8);
@@ -328,6 +331,7 @@ public final class OceanSurfaceRenderer {
                 || nearRadius != cachedNearRadius
                 || farRadius != cachedFarRadius
                 || nearCellSize != cachedNearCellSize
+                || maxPatches != cachedMaxPatches
                 || Math.abs(cameraX - cachedCenterX) >= movementThreshold
                 || Math.abs(cameraZ - cachedCenterZ) >= movementThreshold
                 || gameTime - cachedGameTime >= CACHE_LIFETIME_TICKS;
@@ -341,6 +345,7 @@ public final class OceanSurfaceRenderer {
         cachedNearRadius = nearRadius;
         cachedFarRadius = farRadius;
         cachedNearCellSize = nearCellSize;
+        cachedMaxPatches = maxPatches;
         cachedGameTime = gameTime;
         PATCHES.clear();
 
@@ -348,13 +353,13 @@ public final class OceanSurfaceRenderer {
         Map<Long, SurfaceColumn> surfaces = new HashMap<>();
         LongOpenHashSet rebuiltOwnedTops = new LongOpenHashSet();
         int mediumRadius = Math.min(farRadius, Math.max(nearRadius, nearRadius * 2));
-        // The true replacement ring stays at one-block detail; only the far
-        // overlay is allowed to use tiny coarse cells. That preserves the
-        // vanilla top under distant LOD water and removes large transparent
-        // triangle artifacts while still covering the full view distance.
+        int boundedPatchBudget = Math.max(1, maxPatches);
+        // The high-detail ring stays at one-block detail. Medium and far rings
+        // are coarsened aggressively so render-distance coverage follows the
+        // player's settings without rebuilding huge block-resolution oceans.
         int detailCellSize = 1;
-        int farCellSize = Math.min(MAX_DYNAMIC_CELL_SIZE, Math.max(1, nearCellSize));
-        int mediumCellSize = 1;
+        int mediumCellSize = Math.min(MAX_DYNAMIC_CELL_SIZE, Math.max(2, nearCellSize));
+        int farCellSize = Math.min(MAX_DYNAMIC_CELL_SIZE, Math.max(4, nearCellSize * 2));
         int paddedFarRadius = farRadius + farCellSize;
         int paddedFarRadiusSquared = paddedFarRadius * paddedFarRadius;
         int startX = Math.floorDiv(cameraX - farRadius, farCellSize) * farCellSize;
@@ -364,9 +369,14 @@ public final class OceanSurfaceRenderer {
 
         // Every far cell is either kept coarse or subdivided completely. That
         // keeps the LOD rings world-aligned with no overlapping or uncovered
-        // cells in the cached footprint.
+        // cells in the cached footprint. Patch budgets are a final FPS guard
+        // for extreme configs or unusually expensive shore/ocean borders.
+        outer:
         for (int coarseX = startX; coarseX <= endX; coarseX += farCellSize) {
             for (int coarseZ = startZ; coarseZ <= endZ; coarseZ += farCellSize) {
+                if (PATCHES.size() >= boundedPatchBudget) {
+                    break outer;
+                }
                 int dx = coarseX + farCellSize / 2 - cameraX;
                 int dz = coarseZ + farCellSize / 2 - cameraZ;
                 int distanceSquared = dx * dx + dz * dz;
@@ -381,7 +391,11 @@ public final class OceanSurfaceRenderer {
                                 : farCellSize;
                 for (int x = coarseX; x < coarseX + farCellSize; x += selectedCellSize) {
                     for (int z = coarseZ; z < coarseZ + farCellSize; z += selectedCellSize) {
-                        addPatch(level, columns, surfaces, rebuiltOwnedTops, x, z, selectedCellSize);
+                        if (PATCHES.size() >= boundedPatchBudget) {
+                            break outer;
+                        }
+                        addPatch(level, columns, surfaces, rebuiltOwnedTops, x, z,
+                                selectedCellSize, boundedPatchBudget);
                     }
                 }
             }
@@ -396,14 +410,18 @@ public final class OceanSurfaceRenderer {
             LongOpenHashSet rebuiltOwnedTops,
             int x,
             int z,
-            int cellSize
+            int cellSize,
+            int maxPatches
     ) {
+        if (PATCHES.size() >= maxPatches) {
+            return;
+        }
         WaterColumn first = column(level, columns, surfaces, x, z);
         WaterColumn second = column(level, columns, surfaces, x, z + cellSize);
         WaterColumn third = column(level, columns, surfaces, x + cellSize, z + cellSize);
         WaterColumn fourth = column(level, columns, surfaces, x + cellSize, z);
         if (!first.valid || !second.valid || !third.valid || !fourth.valid) {
-            subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize);
+            subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize, maxPatches);
             return;
         }
 
@@ -430,17 +448,17 @@ public final class OceanSurfaceRenderer {
                 sampledMinimumDepth
         );
         if (!footprint.valid) {
-            subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize);
+            subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize, maxPatches);
             return;
         }
         if (!footprint.replacementSafe) {
             if (cellSize > 1) {
-                subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize);
+                subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize, maxPatches);
             }
             return;
         }
         if (cellSize > 1 && footprint.minimumDepth <= SHORE_DETAIL_DEPTH) {
-            subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize);
+            subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize, maxPatches);
             return;
         }
 
@@ -486,14 +504,18 @@ public final class OceanSurfaceRenderer {
             LongOpenHashSet rebuiltOwnedTops,
             int startX,
             int startZ,
-            int cellSize
+            int cellSize,
+            int maxPatches
     ) {
         if (cellSize <= 1) {
             return;
         }
         for (int x = startX; x < startX + cellSize; x++) {
             for (int z = startZ; z < startZ + cellSize; z++) {
-                addPatch(level, columns, surfaces, rebuiltOwnedTops, x, z, 1);
+                if (PATCHES.size() >= maxPatches) {
+                    return;
+                }
+                addPatch(level, columns, surfaces, rebuiltOwnedTops, x, z, 1, maxPatches);
             }
         }
     }
@@ -665,6 +687,7 @@ public final class OceanSurfaceRenderer {
         cachedNearRadius = -1;
         cachedFarRadius = -1;
         cachedNearCellSize = -1;
+        cachedMaxPatches = -1;
         cachedGameTime = Long.MIN_VALUE;
     }
 
