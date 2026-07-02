@@ -32,8 +32,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * vertices while vanilla builds a liquid chunk mesh. Wave time is advanced by
  * the client tick handler; chunk compilation may run on worker threads and must
  * never mutate global animation state. When the dynamic ocean surface is
- * enabled, baked vanilla water stays stable and acts only as compatibility
- * geometry beneath the per-frame replacement pass.
+ * enabled, baked vanilla water stays stable and acts as the compatibility/base
+ * geometry beneath the per-frame replacement pass. Hiding those vanilla top
+ * faces is an experimental opt-in because it removes the fallback surface that
+ * masks renderer ownership mistakes.
  */
 @Mixin(LiquidBlockRenderer.class)
 public class GerstnerWaveRenderMixin {
@@ -56,6 +58,7 @@ public class GerstnerWaveRenderMixin {
                 (fluidState.is(Fluids.WATER) || fluidState.is(Fluids.FLOWING_WATER))
                         && WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()
                         && WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()
+                        && WaterRenderingConfig.suppressVanillaWaterTopFaces()
                         && OceanSurfaceRenderer.ownsBakedTop(pos)
         );
     }
@@ -98,8 +101,9 @@ public class GerstnerWaveRenderMixin {
     }
 
     /**
-     * Hides the vanilla top only when the live replacement cache contains the
-     * same block. Vanilla side faces and all out-of-range water remain intact.
+     * Hides the vanilla top only when the experimental suppression flag is
+     * enabled and the live replacement cache contains the same block. Vanilla
+     * side faces and all out-of-range water remain intact.
      */
     @Redirect(
             method = "tesselate",

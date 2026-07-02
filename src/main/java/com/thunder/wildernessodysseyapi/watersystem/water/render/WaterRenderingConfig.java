@@ -18,6 +18,7 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_GERSTNER_WAVES;
     public static final ModConfigSpec.BooleanValue ENABLE_DYNAMIC_OCEAN_SURFACE;
     public static final ModConfigSpec.BooleanValue ENABLE_SHORELINE_SURFACE;
+    public static final ModConfigSpec.BooleanValue SUPPRESS_VANILLA_WATER_TOPS;
     public static final ModConfigSpec.BooleanValue ENABLE_WATER_CORE_SHADER;
     public static final ModConfigSpec.BooleanValue ENABLE_UNDERWATER_OPTICS;
     public static final ModConfigSpec.BooleanValue ENABLE_UNDERWATER_CAUSTICS;
@@ -72,6 +73,9 @@ public final class WaterRenderingConfig {
         ENABLE_SHORELINE_SURFACE = builder
                 .comment("Render the block-detail shoreline/local-water overlay for cells the open-ocean mesh does not own.")
                 .define("enableShorelineSurface", true);
+        SUPPRESS_VANILLA_WATER_TOPS = builder
+                .comment("Experimental: hide vanilla top faces covered by the replacement mesh. Disabled by default because the vanilla surface is the compatibility/fallback layer.")
+                .define("suppressVanillaWaterTopFaces", false);
         ENABLE_WATER_CORE_SHADER = builder
                 .comment("Use the built-in Fresnel/absorption water shader when no external shader pack owns water rendering.")
                 .define("enableWaterCoreShader", true);
@@ -278,6 +282,11 @@ public final class WaterRenderingConfig {
         return usesOptimizedProfile()
                 ? OPTIMIZED_OCEAN_CELL_SIZE.get()
                 : NORMAL_OCEAN_CELL_SIZE.get();
+    }
+
+    /** Returns whether the experimental renderer may hide baked vanilla water tops. */
+    public static boolean suppressVanillaWaterTopFaces() {
+        return SUPPRESS_VANILLA_WATER_TOPS.get();
     }
 
     /** Returns the active cache budget for dynamic ocean surface patches. */

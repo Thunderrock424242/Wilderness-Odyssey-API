@@ -6,11 +6,36 @@ import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.item.BucketItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LiquidBlock;
+import net.minecraft.world.level.block.PointedDripstoneBlock;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.material.PushReaction;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.SoundActions;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
+import net.neoforged.neoforge.fluids.BaseFlowingFluid;
+import net.neoforged.neoforge.fluids.FluidType;
+import net.neoforged.neoforge.registries.DeferredBlock;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredItem;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -27,6 +52,77 @@ import java.util.List;
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class WildernessFluidRegistry {
 
+    public static final DeferredRegister<FluidType> FLUID_TYPES =
+            DeferredRegister.create(NeoForgeRegistries.Keys.FLUID_TYPES, ModConstants.MOD_ID);
+    public static final DeferredRegister<Fluid> FLUIDS =
+            DeferredRegister.create(Registries.FLUID, ModConstants.MOD_ID);
+    public static final DeferredRegister.Blocks BLOCKS =
+            DeferredRegister.createBlocks(ModConstants.MOD_ID);
+    public static final DeferredRegister.Items ITEMS =
+            DeferredRegister.createItems(ModConstants.MOD_ID);
+
+    /**
+     * Fluid type used by the namespaced Wilderness water registry entries.
+     *
+     * <p>The type behaves like vanilla water for swimming, boating, hydration,
+     * source conversion, and bucket sounds. Compatibility with tag-aware
+     * systems is supplied by data tags, not by registering anything inside the
+     * {@code minecraft} namespace.</p>
+     */
+    public static final DeferredHolder<FluidType, FluidType> WILDERNESS_WATER_TYPE = FLUID_TYPES.register(
+            "wilderness_water",
+            () -> new FluidType(FluidType.Properties.create()
+                    .descriptionId("block.wildernessodysseyapi.wilderness_water")
+                    .fallDistanceModifier(0.0F)
+                    .canExtinguish(true)
+                    .canConvertToSource(true)
+                    .supportsBoating(true)
+                    .canHydrate(true)
+                    .sound(SoundActions.BUCKET_FILL, SoundEvents.BUCKET_FILL)
+                    .sound(SoundActions.BUCKET_EMPTY, SoundEvents.BUCKET_EMPTY)
+                    .sound(SoundActions.FLUID_VAPORIZE, SoundEvents.FIRE_EXTINGUISH)
+                    .addDripstoneDripping(
+                            PointedDripstoneBlock.WATER_TRANSFER_PROBABILITY_PER_RANDOM_TICK,
+                            ParticleTypes.DRIPPING_DRIPSTONE_WATER,
+                            Blocks.WATER_CAULDRON,
+                            SoundEvents.POINTED_DRIPSTONE_DRIP_WATER_INTO_CAULDRON
+                    )) {
+                @Override
+                public boolean canConvertToSource(FluidState state, LevelReader reader, BlockPos pos) {
+                    if (reader instanceof ServerLevel level) {
+                        return level.getGameRules().getBoolean(GameRules.RULE_WATER_SOURCE_CONVERSION);
+                    }
+                    return super.canConvertToSource(state, reader, pos);
+                }
+            }
+    );
+
+    public static final DeferredHolder<Fluid, BaseFlowingFluid.Source> WILDERNESS_WATER = FLUIDS.register(
+            "wilderness_water",
+            () -> new BaseFlowingFluid.Source(wildernessWaterProperties())
+    );
+    public static final DeferredHolder<Fluid, BaseFlowingFluid.Flowing> FLOWING_WILDERNESS_WATER = FLUIDS.register(
+            "flowing_wilderness_water",
+            () -> new BaseFlowingFluid.Flowing(wildernessWaterProperties())
+    );
+    public static final DeferredBlock<LiquidBlock> WILDERNESS_WATER_BLOCK = BLOCKS.register(
+            "wilderness_water_block",
+            () -> new LiquidBlock(WILDERNESS_WATER.get(), BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.WATER)
+                    .replaceable()
+                    .noCollission()
+                    .strength(100.0F)
+                    .pushReaction(PushReaction.DESTROY)
+                    .noLootTable()
+                    .liquid()
+                    .sound(SoundType.EMPTY))
+    );
+    public static final DeferredItem<BucketItem> WILDERNESS_WATER_BUCKET = ITEMS.register(
+            "wilderness_water_bucket",
+            () -> new BucketItem(WILDERNESS_WATER.get(),
+                    new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1))
+    );
+
     private static final int MAX_CELLS_PER_TICK = 192;
     private static final int MIN_FLOW_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK / 64;
     private static final int MIN_LATERAL_DIFFERENCE_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK / 16;
@@ -42,8 +138,32 @@ public final class WildernessFluidRegistry {
     private WildernessFluidRegistry() {
     }
 
-    /** Reserved for future custom fluid registrations; runtime hooks use events. */
+    /**
+     * Registers the namespaced Wilderness water and its finite-volume runtime.
+     *
+     * <p>The source/flowing fluids give the water system a real registry target
+     * that can be tagged as water without taking over the {@code minecraft}
+     * namespace. The ticker below remains the server-side owner of disturbed
+     * canonical volume.</p>
+     */
     public static void register(IEventBus modEventBus) {
+        FLUID_TYPES.register(modEventBus);
+        FLUIDS.register(modEventBus);
+        BLOCKS.register(modEventBus);
+        ITEMS.register(modEventBus);
+    }
+
+    private static BaseFlowingFluid.Properties wildernessWaterProperties() {
+        return new BaseFlowingFluid.Properties(
+                WILDERNESS_WATER_TYPE::get,
+                WILDERNESS_WATER::get,
+                FLOWING_WILDERNESS_WATER::get
+        ).bucket(WILDERNESS_WATER_BUCKET::get)
+                .block(WILDERNESS_WATER_BLOCK::get)
+                .slopeFindDistance(4)
+                .levelDecreasePerBlock(1)
+                .tickRate(5)
+                .explosionResistance(100.0F);
     }
 
     /** Processes a bounded number of disturbed canonical cells after each level tick. */
