@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.core.BlockPos;
@@ -41,7 +42,7 @@ public abstract class CanonicalWaterBucketPickupMixin {
         PENDING_POS.remove();
         LiquidBlock liquidBlock = (LiquidBlock) (Object) this;
         if (!(level instanceof ServerLevel serverLevel)
-                || !liquidBlock.fluid.isSame(Fluids.WATER)
+                || !isCanonicalPickupWater(liquidBlock)
                 || state.getValue(BlockStateProperties.LEVEL) != 0) {
             return;
         }
@@ -69,9 +70,15 @@ public abstract class CanonicalWaterBucketPickupMixin {
                 || pendingLevel != level
                 || !pendingPos.equals(pos)
                 || result == null
-                || !result.is(Items.WATER_BUCKET)) {
+                || (!result.is(Items.WATER_BUCKET)
+                && !result.is(WildernessFluidRegistry.WILDERNESS_WATER_BUCKET.get()))) {
             return;
         }
         CanonicalWater.drainVolume(pendingLevel, pendingPos, WaterVolumeChunk.UNITS_PER_BLOCK);
+    }
+
+    private static boolean isCanonicalPickupWater(LiquidBlock liquidBlock) {
+        return liquidBlock.fluid.isSame(Fluids.WATER)
+                || liquidBlock.fluid.isSame(WildernessFluidRegistry.WILDERNESS_WATER.get());
     }
 }

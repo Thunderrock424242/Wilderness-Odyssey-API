@@ -4,6 +4,7 @@ The Wilderness water system is split across several coordinated subsystems:
 
 - Canonical chunk volume: `WaterVolumeChunk`, `CanonicalWater`, `ModAttachments.WATER_VOLUME`
 - Canonical world seeding: `CanonicalWaterSeeder`, `WaterSimulationConfig`
+- Namespaced water registry: `WildernessFluidRegistry`
 - SPH bucket pours: `BucketPlaceMixin`, `SPHSimulator`, `FluidRenderer`
 - Finite fluid simulation: `WildernessFluidRegistry`, `CanonicalWaterFlowMixin`
 - Compatibility projection: `CanonicalWaterFlowMixin`, `CanonicalWaterBucketPickupMixin`
@@ -22,7 +23,21 @@ amount, velocity, flags, and temperature in each chunk attachment. SPH owns
 mobile bucket volume; when a body settles, that exact volume is distributed
 into canonical cells. Vanilla water levels are projections for collision,
 swimming, waterlogging boundaries, and third-party compatibility rather than
-the simulation's source of truth.
+the simulation's source of truth. The client renderer keeps vanilla water tops
+visible by default as the stable fallback/base surface, then draws the animated
+replacement ocean and shoreline layers above that compatibility mask.
+
+The long-term replacement path is now namespaced ownership first and tag
+compatibility second. `wildernessodysseyapi:wilderness_water` and
+`wildernessodysseyapi:flowing_wilderness_water` are real NeoForge fluids backed
+by `wildernessodysseyapi:wilderness_water_block` and a bucket item. Canonical
+projection now writes that namespaced block for disturbed/owned water while
+still importing existing vanilla water during migration. The fluids are added to
+`#minecraft:water` so tag-aware biome, structure, spawning, swimming, and
+worldgen checks can still treat them as water without registering anything
+inside the `minecraft` namespace. Hardcoded `Blocks.WATER` or `Fluids.WATER`
+checks remain deliberate follow-up mixin points instead of pretending tag
+compatibility covers every vanilla contract.
 
 Loaded world water is seeded into canonical volume from exposed plain
 `minecraft:water` columns. The seeder imports a bounded depth from oceans,

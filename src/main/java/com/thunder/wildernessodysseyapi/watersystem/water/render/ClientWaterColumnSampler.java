@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChun
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FluidState;
@@ -60,7 +61,8 @@ final class ClientWaterColumnSampler {
                 cell.velocityX,
                 cell.velocityY,
                 cell.velocityZ,
-                cell.canonical
+                cell.canonical,
+                cell.replacementSafe
         );
     }
 
@@ -85,7 +87,8 @@ final class ClientWaterColumnSampler {
                     canonicalCell.velocityX(),
                     canonicalCell.velocityY(),
                     canonicalCell.velocityZ(),
-                    true
+                    true,
+                    fullWater
             );
         }
 
@@ -98,6 +101,7 @@ final class ClientWaterColumnSampler {
         boolean fullWater = fluid.isSource();
         float ownHeight = clamp(fluid.getOwnHeight(), 0.0f, 1.0f);
         Vec3 flow = fluid.getFlow(level, pos);
+        boolean plainSourceWater = fullWater && state.is(Blocks.WATER);
         return new CellSample(
                 true,
                 fullWater,
@@ -106,7 +110,8 @@ final class ClientWaterColumnSampler {
                 (float) flow.x,
                 0.0f,
                 (float) flow.z,
-                false
+                false,
+                plainSourceWater
         );
     }
 
@@ -175,14 +180,15 @@ final class ClientWaterColumnSampler {
             float velocityX,
             float velocityY,
             float velocityZ,
-            boolean canonical
+            boolean canonical,
+            boolean replacementSafe
     ) {
         static final ColumnSample INVALID = new ColumnSample(false, 0, 0.0f, 0.0f,
-                false, 0.0f, 0.0f, 0.0f, 0.0f, false);
+                false, 0.0f, 0.0f, 0.0f, 0.0f, false, false);
 
         /** Returns whether the open-ocean replacement mesh may hide vanilla top faces here. */
-        boolean replacementSafe() {
-            return valid && fullWater;
+        public boolean replacementSafe() {
+            return valid && replacementSafe;
         }
     }
 
@@ -195,10 +201,11 @@ final class ClientWaterColumnSampler {
             float velocityX,
             float velocityY,
             float velocityZ,
-            boolean canonical
+            boolean canonical,
+            boolean replacementSafe
     ) {
         static final CellSample INVALID = new CellSample(false, false, 0.0f,
-                0.0f, 0.0f, 0.0f, 0.0f, false);
+                0.0f, 0.0f, 0.0f, 0.0f, false, false);
 
         /** Returns bounded three-dimensional water motion in blocks per second. */
         float speed() {

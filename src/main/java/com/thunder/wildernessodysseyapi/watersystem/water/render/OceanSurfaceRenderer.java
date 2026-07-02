@@ -179,16 +179,23 @@ public final class OceanSurfaceRenderer {
         float z0 = patch.z;
         float x1 = patch.x + patch.size;
         float z1 = patch.z + patch.size;
+        float centerX = (x0 + x1) * 0.5f;
+        float centerZ = (z0 + z1) * 0.5f;
+        float alphaScale = patchAlphaScale(patch, centerX, centerZ, cameraX, cameraZ, nearRadius, farRadius);
+        if (alphaScale <= 0.01f) {
+            return;
+        }
 
         WaveSpectrumState spectrum = patch.waterType == WaterBodyClassifier.WaterType.OCEAN
                 ? seaState.spectrum()
                 : WaveSpectrumState.NEUTRAL;
         int patchColor = opticalColor(
                 level,
-                (x0 + x1) * 0.5f,
+                centerX,
                 (patch.firstY + patch.secondY + patch.thirdY + patch.fourthY) * 0.25f,
-                (z0 + z1) * 0.5f,
-                patch.depth
+                centerZ,
+                patch.depth,
+                alphaScale
         );
         VertexData first = vertex(level, x0, patch.firstY, z0, waveBlend,
                 waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
@@ -278,7 +285,8 @@ public final class OceanSurfaceRenderer {
             float x,
             float y,
             float z,
-            float depth
+            float depth,
+            float alphaScale
     ) {
         int tint = IClientFluidTypeExtensions.of(Fluids.WATER).getTintColor(
                 WATER_STATE,
@@ -308,12 +316,39 @@ public final class OceanSurfaceRenderer {
         red = mix(red, 0.86f, foam);
         green = mix(green, 0.94f, foam);
         blue = mix(blue, 1.0f, foam);
-        float alpha = 0.72f + absorption * 0.18f + foam * 0.05f;
+        float baseAlpha = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.72f : 0.46f;
+        float depthAlpha = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.18f : 0.10f;
+        float alpha = (baseAlpha + absorption * depthAlpha + foam * 0.05f)
+                * Math.max(0.0f, Math.min(1.0f, alphaScale));
 
         return (channel(alpha) << 24)
                 | (channel(red) << 16)
                 | (channel(green) << 8)
                 | channel(blue);
+    }
+
+    private static float patchAlphaScale(
+            SurfacePatch patch,
+            float centerX,
+            float centerZ,
+            float cameraX,
+            float cameraZ,
+            int nearRadius,
+            int farRadius
+    ) {
+        float distanceX = centerX - cameraX;
+        float distanceZ = centerZ - cameraZ;
+        float distance = (float) Math.sqrt(distanceX * distanceX + distanceZ * distanceZ);
+        float edgeFade = farRadius <= nearRadius
+                ? 1.0f
+                : 1.0f - smoothStep(Math.max(nearRadius, farRadius - 24.0f), farRadius, distance);
+        // Coarse cells are compatibility overlays above vanilla water. They
+        // should cover far-distance seams, not become opaque triangle sheets
+        // over dark seafloor or vegetation.
+        float lodFade = patch.size <= 1
+                ? 1.0f
+                : patch.size <= 2 ? 0.58f : 0.42f;
+        return Math.max(0.0f, Math.min(1.0f, edgeFade * lodFade));
     }
 
     private static void refreshCacheIfNeeded(
@@ -362,45 +397,106 @@ public final class OceanSurfaceRenderer {
         int farCellSize = Math.min(MAX_DYNAMIC_CELL_SIZE, Math.max(4, nearCellSize * 2));
         int paddedFarRadius = farRadius + farCellSize;
         int paddedFarRadiusSquared = paddedFarRadius * paddedFarRadius;
-        int startX = Math.floorDiv(cameraX - farRadius, farCellSize) * farCellSize;
-        int endX = Math.floorDiv(cameraX + farRadius, farCellSize) * farCellSize;
-        int startZ = Math.floorDiv(cameraZ - farRadius, farCellSize) * farCellSize;
-        int endZ = Math.floorDiv(cameraZ + farRadius, farCellSize) * farCellSize;
+        int centerCoarseX = Math.floorDiv(cameraX, farCellSize) * farCellSize;
+        int centerCoarseZ = Math.floorDiv(cameraZ, farCellSize) * farCellSize;
+        int gridRadius = Math.floorDiv(farRadius + farCellSize - 1, farCellSize) + 1;
 
         // Every far cell is either kept coarse or subdivided completely. That
         // keeps the LOD rings world-aligned with no overlapping or uncovered
         // cells in the cached footprint. Patch budgets are a final FPS guard
-        // for extreme configs or unusually expensive shore/ocean borders.
-        outer:
-        for (int coarseX = startX; coarseX <= endX; coarseX += farCellSize) {
-            for (int coarseZ = startZ; coarseZ <= endZ; coarseZ += farCellSize) {
-                if (PATCHES.size() >= boundedPatchBudget) {
-                    break outer;
-                }
-                int dx = coarseX + farCellSize / 2 - cameraX;
-                int dz = coarseZ + farCellSize / 2 - cameraZ;
-                int distanceSquared = dx * dx + dz * dz;
-                if (distanceSquared > paddedFarRadiusSquared) {
-                    continue;
-                }
+        // for extreme configs or unusually expensive shore/ocean borders. The
+        // cache fills nearest-first so hitting the budget fades outward instead
+        // of cutting a hard rectangular seam through the view.
+        for (int ring = 0; ring <= gridRadius && PATCHES.size() < boundedPatchBudget; ring++) {
+            if (ring == 0) {
+                addLodCoarseCell(level, columns, surfaces, rebuiltOwnedTops,
+                        centerCoarseX, centerCoarseZ, cameraX, cameraZ,
+                        nearRadius, mediumRadius, farCellSize, detailCellSize, mediumCellSize,
+                        paddedFarRadiusSquared, boundedPatchBudget);
+                continue;
+            }
 
-                int selectedCellSize = distanceSquared <= nearRadius * nearRadius
-                        ? detailCellSize
-                        : distanceSquared <= mediumRadius * mediumRadius
-                                ? mediumCellSize
-                                : farCellSize;
-                for (int x = coarseX; x < coarseX + farCellSize; x += selectedCellSize) {
-                    for (int z = coarseZ; z < coarseZ + farCellSize; z += selectedCellSize) {
-                        if (PATCHES.size() >= boundedPatchBudget) {
-                            break outer;
-                        }
-                        addPatch(level, columns, surfaces, rebuiltOwnedTops, x, z,
-                                selectedCellSize, boundedPatchBudget);
-                    }
+            int minX = centerCoarseX - ring * farCellSize;
+            int maxX = centerCoarseX + ring * farCellSize;
+            int minZ = centerCoarseZ - ring * farCellSize;
+            int maxZ = centerCoarseZ + ring * farCellSize;
+
+            for (int coarseX = minX; coarseX <= maxX && PATCHES.size() < boundedPatchBudget; coarseX += farCellSize) {
+                addLodCoarseCell(level, columns, surfaces, rebuiltOwnedTops,
+                        coarseX, minZ, cameraX, cameraZ,
+                        nearRadius, mediumRadius, farCellSize, detailCellSize, mediumCellSize,
+                        paddedFarRadiusSquared, boundedPatchBudget);
+                if (minZ != maxZ) {
+                    addLodCoarseCell(level, columns, surfaces, rebuiltOwnedTops,
+                            coarseX, maxZ, cameraX, cameraZ,
+                            nearRadius, mediumRadius, farCellSize, detailCellSize, mediumCellSize,
+                            paddedFarRadiusSquared, boundedPatchBudget);
+                }
+            }
+
+            for (int coarseZ = minZ + farCellSize;
+                    coarseZ < maxZ && PATCHES.size() < boundedPatchBudget;
+                    coarseZ += farCellSize) {
+                addLodCoarseCell(level, columns, surfaces, rebuiltOwnedTops,
+                        minX, coarseZ, cameraX, cameraZ,
+                        nearRadius, mediumRadius, farCellSize, detailCellSize, mediumCellSize,
+                        paddedFarRadiusSquared, boundedPatchBudget);
+                if (minX != maxX) {
+                    addLodCoarseCell(level, columns, surfaces, rebuiltOwnedTops,
+                            maxX, coarseZ, cameraX, cameraZ,
+                            nearRadius, mediumRadius, farCellSize, detailCellSize, mediumCellSize,
+                            paddedFarRadiusSquared, boundedPatchBudget);
                 }
             }
         }
-        updateVanillaTopOwnership(level, rebuiltOwnedTops);
+        if (WaterRenderingConfig.suppressVanillaWaterTopFaces()) {
+            updateVanillaTopOwnership(level, rebuiltOwnedTops);
+        } else {
+            releaseVanillaTopOwnership(level);
+        }
+    }
+
+    private static void addLodCoarseCell(
+            ClientLevel level,
+            Map<Long, WaterColumn> columns,
+            Map<Long, SurfaceColumn> surfaces,
+            LongOpenHashSet rebuiltOwnedTops,
+            int coarseX,
+            int coarseZ,
+            int cameraX,
+            int cameraZ,
+            int nearRadius,
+            int mediumRadius,
+            int farCellSize,
+            int detailCellSize,
+            int mediumCellSize,
+            int paddedFarRadiusSquared,
+            int maxPatches
+    ) {
+        if (PATCHES.size() >= maxPatches) {
+            return;
+        }
+        int dx = coarseX + farCellSize / 2 - cameraX;
+        int dz = coarseZ + farCellSize / 2 - cameraZ;
+        int distanceSquared = dx * dx + dz * dz;
+        if (distanceSquared > paddedFarRadiusSquared) {
+            return;
+        }
+
+        int selectedCellSize = distanceSquared <= nearRadius * nearRadius
+                ? detailCellSize
+                : distanceSquared <= mediumRadius * mediumRadius
+                        ? mediumCellSize
+                        : farCellSize;
+        for (int x = coarseX; x < coarseX + farCellSize; x += selectedCellSize) {
+            for (int z = coarseZ; z < coarseZ + farCellSize; z += selectedCellSize) {
+                if (PATCHES.size() >= maxPatches) {
+                    return;
+                }
+                addPatch(level, columns, surfaces, rebuiltOwnedTops, x, z,
+                        selectedCellSize, maxPatches);
+            }
+        }
     }
 
     private static void addPatch(
@@ -700,7 +796,8 @@ public final class OceanSurfaceRenderer {
 
     /** Returns whether the per-frame mesh currently replaces this baked top face. */
     public static boolean ownsBakedTop(BlockPos pos) {
-        return ownedVanillaTops.contains(pos.asLong());
+        return WaterRenderingConfig.suppressVanillaWaterTopFaces()
+                && ownedVanillaTops.contains(pos.asLong());
     }
 
     // Rebuild only chunk sections whose top-face ownership changed. The set is

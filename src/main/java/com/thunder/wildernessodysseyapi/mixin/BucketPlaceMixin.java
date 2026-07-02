@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
+import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
@@ -42,12 +43,13 @@ public abstract class BucketPlaceMixin {
                                @Nullable BlockHitResult result, @Nullable ItemStack container,
                                CallbackInfoReturnable<Boolean> callbackInfo) {
         Fluid content = ((BucketItem) (Object) this).content;
-        if (content != Fluids.WATER
+        if (!isCanonicalBucketWater(content)
                 || level.isClientSide
                 || !Boolean.TRUE.equals(callbackInfo.getReturnValue())) {
             return;
         }
-        if (!level.getBlockState(pos).is(Blocks.WATER)) {
+        if (!level.getBlockState(pos).is(Blocks.WATER)
+                && !level.getBlockState(pos).is(WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get())) {
             // Waterlogged blocks remain on the vanilla compatibility boundary;
             // replacing their host block would destroy unrelated block state.
             return;
@@ -71,5 +73,9 @@ public abstract class BucketPlaceMixin {
         if (placement.sphOwnsVolume()) {
             serverLevel.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
         }
+    }
+
+    private static boolean isCanonicalBucketWater(Fluid fluid) {
+        return fluid == Fluids.WATER || fluid.isSame(WildernessFluidRegistry.WILDERNESS_WATER.get());
     }
 }

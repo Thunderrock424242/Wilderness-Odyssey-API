@@ -8,6 +8,15 @@ bridge while the replacement gains complete bucket, swimming, redstone, world
 save, and third-party-mod integration; they are not the final renderer or
 simulation authority.
 
+The preferred compatibility model is now tag compatibility, not pretending to
+be vanilla water internally. The mod owns namespaced water IDs such as
+`wildernessodysseyapi:wilderness_water` and adds them to `#minecraft:water` so
+biomes, structures, mob spawning, and other tag-aware checks still classify the
+fluid as water. Canonical projection writes the namespaced water block for
+owned/disturbed water while existing vanilla water remains an import/migration
+source. Exact `Blocks.WATER` / `Fluids.WATER` assumptions are handled with
+targeted mixins only when a system truly needs them.
+
 The replacement uses a hybrid numerical model rather than attempting a full
 Navier-Stokes simulation for every ocean cell. That is the practical and
 technically appropriate model for a large Minecraft world:
@@ -41,12 +50,14 @@ and boat response therefore use one coherent wave field.
 
 The per-frame surface renderer follows the active client render distance through
 bounded near, medium, and far LODs instead of rebuilding every distant ocean
-block at full detail. Its cache suppresses only the exact baked vanilla top
-faces covered by one-block replacement patches, preventing the flat depth
-surface from clipping animated troughs. Coarser far LODs remain color-only
-overlays on top of vanilla-compatible water, and patch budgets keep extreme
-view distances from overwhelming the client. Vanilla side faces remain as
-failure-safe compatibility geometry and stay laterally anchored so shoreline
+block at full detail. Vanilla water remains the stable compatibility/base
+surface by default, while the replacement pass renders animated optical detail
+above it. An experimental config can hide exact baked vanilla top faces covered
+by one-block replacement patches, but that path is off by default because it can
+turn any ownership mistake into visible holes. Coarser far LODs remain
+color-only overlays on top of vanilla-compatible water, and patch budgets keep
+extreme view distances from overwhelming the client. Vanilla side faces remain
+as failure-safe compatibility geometry and stay laterally anchored so shoreline
 triangles cannot stretch across land.
 Iris/Oculus keeps the standard translucent shader path; without an
 external shader pack, the optional core shader adds Fresnel, depth-colored
@@ -97,10 +108,11 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
 - Shallow or irregular LOD cells automatically subdivide to one-block patches;
   coarse non-planar quads are reserved for deep open water so their GPU
   triangle split cannot produce large angular shoreline artifacts.
-- Only one-block patches suppress baked vanilla top faces. Coarse far-distance
-  LOD patches now behave as water-colored overlays so the vanilla/cached water
-  surface remains a fallback under them instead of revealing terrain through
-  large transparent triangles.
+- Vanilla top faces remain visible by default. `suppressVanillaWaterTopFaces`
+  is an experimental opt-in for one-block replacement patches only; coarse
+  far-distance LOD patches always behave as water-colored overlays so the
+  vanilla/cached water surface remains a fallback under them instead of
+  revealing terrain through large transparent triangles.
 - When the per-frame dynamic ocean surface is enabled, baked vanilla liquid
   vertices are no longer vertically waved. The chunk mesh remains a stable
   compatibility/fallback layer while the replacement pass owns visible motion;

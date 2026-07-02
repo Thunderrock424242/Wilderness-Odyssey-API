@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.item;
 import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
 import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
+import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
@@ -40,6 +41,7 @@ public class ModCreativeTabs {
                         output.accept(ModItems.INHALER.get());
                         output.accept(ModItems.BREATHING_MASK.get());
                         output.accept(ModItems.FIELD_CODEX.get());
+                        output.accept(WildernessFluidRegistry.WILDERNESS_WATER_BUCKET.get());
                         output.accept(ModItems.RIFTBOUND_WRAITH_SPAWN_EGG.get());
                         output.accept(ModItems.MUSIC_DISC_DUSTWINDS.get());
                         output.accept(ModItems.MUSIC_DISC_STARFALL.get());

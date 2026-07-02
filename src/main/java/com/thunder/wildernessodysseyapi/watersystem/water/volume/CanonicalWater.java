@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.volume;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
+import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -10,7 +11,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
@@ -23,9 +23,9 @@ import java.util.Set;
  * Public access point for the server-authoritative Wilderness water volume.
  *
  * <p>Canonical cells own water amount and velocity once a position has been
- * imported or changed. Vanilla fluid states are projected from that state so
- * unmodified Minecraft and third-party mods continue to detect water during
- * the replacement transition.</p>
+ * imported or changed. Namespaced Wilderness water is projected from that state
+ * so tag-aware Minecraft and third-party systems can continue to detect water
+ * without requiring the simulation to write vanilla water blocks forever.</p>
  */
 public final class CanonicalWater {
 
@@ -113,7 +113,7 @@ public final class CanonicalWater {
             return false;
         }
         BlockState state = level.getBlockState(pos);
-        return state.isAir() || state.is(Blocks.WATER) || state.canBeReplaced();
+        return state.isAir() || isPlainWaterProjection(state) || state.canBeReplaced();
     }
 
     /** Adds bounded volume and returns the amount accepted by the target cell. */
@@ -237,28 +237,33 @@ public final class CanonicalWater {
         }
     }
 
-    // Projects fixed-point volume back to vanilla's eight fluid levels. The
-    // adapter never replaces solid or waterlogged blocks with plain water.
+    // Projects fixed-point volume back to Minecraft's eight fluid levels. New
+    // writes use the namespaced Wilderness water block; vanilla water remains
+    // accepted here only as a migration/import source for existing worlds.
     private static void projectCompatibility(ServerLevel level, BlockPos pos, int volumeUnits) {
         BlockState current = level.getBlockState(pos);
         if (volumeUnits <= 0) {
-            if (current.is(Blocks.WATER)) {
+            if (isPlainWaterProjection(current)) {
                 level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
             }
             return;
         }
-        if (!current.isAir() && !current.is(Blocks.WATER) && !current.canBeReplaced()) {
+        if (!current.isAir() && !isPlainWaterProjection(current) && !current.canBeReplaced()) {
             return;
         }
 
         int amount = Math.max(1, Math.min(VANILLA_LEVELS,
                 (volumeUnits + VOLUME_PER_VANILLA_LEVEL - 1) / VOLUME_PER_VANILLA_LEVEL));
         BlockState projected = amount >= VANILLA_LEVELS
-                ? Blocks.WATER.defaultBlockState()
-                : Fluids.FLOWING_WATER.getFlowing(amount, false).createLegacyBlock();
+                ? WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get().defaultBlockState()
+                : WildernessFluidRegistry.WILDERNESS_WATER.get().getFlowing(amount, false).createLegacyBlock();
         if (!current.equals(projected)) {
             level.setBlock(pos, projected, 3);
         }
+    }
+
+    private static boolean isPlainWaterProjection(BlockState state) {
+        return state.is(Blocks.WATER) || state.is(WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get());
     }
 
     private static ActiveQueue queue(ServerLevel level) {
