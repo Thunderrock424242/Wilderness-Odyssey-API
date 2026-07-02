@@ -45,8 +45,9 @@ public final class ShorelineSurfaceRenderer {
 
     private static final FluidState WATER_STATE = Fluids.WATER.defaultFluidState();
     private static final int CACHE_LIFETIME_TICKS = 20;
-    private static final int MAX_RENDER_RADIUS_BLOCKS = 96;
+    private static final int MAX_RENDER_RADIUS_BLOCKS = 48;
     private static final int MAX_DEPTH_SAMPLE = 8;
+    private static final float MIN_FULL_WATER_EDGE_STRENGTH = 0.22f;
     private static final float SURFACE_OFFSET = 0.006f;
     private static final float UV_SCALE = 0.28f;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
@@ -56,6 +57,7 @@ public final class ShorelineSurfaceRenderer {
     private static int cachedCenterX = Integer.MIN_VALUE;
     private static int cachedCenterZ = Integer.MIN_VALUE;
     private static int cachedRadius = -1;
+    private static int cachedMaxPatches = -1;
     private static long cachedGameTime = Long.MIN_VALUE;
 
     private ShorelineSurfaceRenderer() {
@@ -89,7 +91,8 @@ public final class ShorelineSurfaceRenderer {
 
         var camera = event.getCamera().getPosition();
         int radius = Math.min(MAX_RENDER_RADIUS_BLOCKS, WaterRenderingConfig.shorelineRenderDistanceBlocks());
-        refreshCacheIfNeeded(level, (int) Math.floor(camera.x), (int) Math.floor(camera.z), radius);
+        refreshCacheIfNeeded(level, (int) Math.floor(camera.x), (int) Math.floor(camera.z), radius,
+                WaterRenderingConfig.maxShorelineSurfacePatches());
         if (PATCHES.isEmpty()) {
             return;
         }
@@ -132,12 +135,20 @@ public final class ShorelineSurfaceRenderer {
         bufferSource.endBatch(renderType);
     }
 
-    private static void refreshCacheIfNeeded(ClientLevel level, int cameraX, int cameraZ, int radius) {
+    private static void refreshCacheIfNeeded(
+            ClientLevel level,
+            int cameraX,
+            int cameraZ,
+            int radius,
+            int maxPatches
+    ) {
         long gameTime = level.getGameTime();
+        int movementThreshold = Math.max(6, Math.min(12, Math.max(1, radius / 4)));
         boolean stale = cachedLevel != level
                 || radius != cachedRadius
-                || Math.abs(cameraX - cachedCenterX) >= 4
-                || Math.abs(cameraZ - cachedCenterZ) >= 4
+                || maxPatches != cachedMaxPatches
+                || Math.abs(cameraX - cachedCenterX) >= movementThreshold
+                || Math.abs(cameraZ - cachedCenterZ) >= movementThreshold
                 || gameTime - cachedGameTime >= CACHE_LIFETIME_TICKS;
         if (!stale) {
             return;
@@ -147,23 +158,60 @@ public final class ShorelineSurfaceRenderer {
         cachedCenterX = cameraX;
         cachedCenterZ = cameraZ;
         cachedRadius = radius;
+        cachedMaxPatches = maxPatches;
         cachedGameTime = gameTime;
         PATCHES.clear();
 
+        int boundedPatchBudget = Math.max(1, maxPatches);
         int radiusSquared = radius * radius;
-        for (int x = cameraX - radius; x <= cameraX + radius; x++) {
-            for (int z = cameraZ - radius; z <= cameraZ + radius; z++) {
-                int dx = x - cameraX;
-                int dz = z - cameraZ;
-                if (dx * dx + dz * dz > radiusSquared) {
-                    continue;
+        // Scan nearest-first so the patch budget preserves local water detail
+        // around the player before spending work on distant shore cells.
+        addPatchCandidate(level, cameraX, cameraZ, cameraX, cameraZ, radiusSquared, boundedPatchBudget);
+        for (int ring = 1; ring <= radius && PATCHES.size() < boundedPatchBudget; ring++) {
+            int minX = cameraX - ring;
+            int maxX = cameraX + ring;
+            int minZ = cameraZ - ring;
+            int maxZ = cameraZ + ring;
+
+            for (int x = minX; x <= maxX && PATCHES.size() < boundedPatchBudget; x++) {
+                addPatchCandidate(level, cameraX, cameraZ, x, minZ, radiusSquared, boundedPatchBudget);
+                if (minZ != maxZ) {
+                    addPatchCandidate(level, cameraX, cameraZ, x, maxZ, radiusSquared, boundedPatchBudget);
                 }
-                addPatchIfLocalEdge(level, x, z);
+            }
+
+            for (int z = minZ + 1; z < maxZ && PATCHES.size() < boundedPatchBudget; z++) {
+                addPatchCandidate(level, cameraX, cameraZ, minX, z, radiusSquared, boundedPatchBudget);
+                if (minX != maxX) {
+                    addPatchCandidate(level, cameraX, cameraZ, maxX, z, radiusSquared, boundedPatchBudget);
+                }
             }
         }
     }
 
-    private static void addPatchIfLocalEdge(ClientLevel level, int x, int z) {
+    private static void addPatchCandidate(
+            ClientLevel level,
+            int cameraX,
+            int cameraZ,
+            int x,
+            int z,
+            int radiusSquared,
+            int maxPatches
+    ) {
+        if (PATCHES.size() >= maxPatches) {
+            return;
+        }
+        int dx = x - cameraX;
+        int dz = z - cameraZ;
+        if (dx * dx + dz * dz <= radiusSquared) {
+            addPatchIfLocalEdge(level, x, z, maxPatches);
+        }
+    }
+
+    private static void addPatchIfLocalEdge(ClientLevel level, int x, int z, int maxPatches) {
+        if (PATCHES.size() >= maxPatches) {
+            return;
+        }
         SurfaceColumn surface = surfaceColumn(level, x, z);
         if (!surface.valid) {
             return;
@@ -174,6 +222,12 @@ public final class ShorelineSurfaceRenderer {
 
         EdgeSample edge = edgeSample(level, x, z, surface);
         if (!edge.localEdge && surface.fullWater) {
+            return;
+        }
+        if (surface.fullWater && edge.edgeStrength < MIN_FULL_WATER_EDGE_STRENGTH) {
+            return;
+        }
+        if (PATCHES.size() >= maxPatches) {
             return;
         }
 
@@ -189,6 +243,29 @@ public final class ShorelineSurfaceRenderer {
                 surface.velocityX,
                 surface.velocityZ
         ));
+    }
+
+    private static SurfaceColumn surfaceColumn(ClientLevel level, int x, int z) {
+        ClientWaterColumnSampler.ColumnSample sample = ClientWaterColumnSampler.sampleExposedSurface(
+                level,
+                x,
+                z,
+                MAX_DEPTH_SAMPLE,
+                SURFACE_OFFSET
+        );
+        if (!sample.valid()) {
+            return SurfaceColumn.INVALID;
+        }
+        return new SurfaceColumn(
+                true,
+                sample.surfaceBlockY(),
+                sample.surfaceY(),
+                sample.depth(),
+                sample.fullWater(),
+                sample.fillFraction(),
+                sample.velocityX(),
+                sample.velocityZ()
+        );
     }
 
     private static EdgeSample edgeSample(ClientLevel level, int x, int z, SurfaceColumn surface) {
@@ -214,29 +291,6 @@ public final class ShorelineSurfaceRenderer {
                 + Math.min(0.35f, velocityMismatch * 0.08f);
         return new EdgeSample(missingOrUneven > 0 || fillMismatch > 0.05f,
                 Math.min(1.0f, edgeStrength));
-    }
-
-    private static SurfaceColumn surfaceColumn(ClientLevel level, int x, int z) {
-        ClientWaterColumnSampler.ColumnSample sample = ClientWaterColumnSampler.sampleExposedSurface(
-                level,
-                x,
-                z,
-                MAX_DEPTH_SAMPLE,
-                SURFACE_OFFSET
-        );
-        if (!sample.valid()) {
-            return SurfaceColumn.INVALID;
-        }
-        return new SurfaceColumn(
-                true,
-                sample.surfaceBlockY(),
-                sample.surfaceY(),
-                sample.depth(),
-                sample.fullWater(),
-                sample.fillFraction(),
-                sample.velocityX(),
-                sample.velocityZ()
-        );
     }
 
     private static void drawPatch(
@@ -422,6 +476,7 @@ public final class ShorelineSurfaceRenderer {
         cachedCenterX = Integer.MIN_VALUE;
         cachedCenterZ = Integer.MIN_VALUE;
         cachedRadius = -1;
+        cachedMaxPatches = -1;
         cachedGameTime = Long.MIN_VALUE;
     }
 
