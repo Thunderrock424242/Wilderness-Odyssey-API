@@ -301,6 +301,18 @@ public final class WaterDebugCommand {
                 + ", last promoted=" + status.lastPlayerScanPromotedChunks()
                 + ", total queued=" + status.playerScanQueuedChunks()
                 + ", total promoted=" + status.playerScanPromotedChunks()), false);
+        CanonicalWaterMigrationQueue.TickResult visible = status.lastVisibleFinalization();
+        source.sendSuccess(() -> Component.literal("  Visible finalization: enabled="
+                + onOff(status.visibleFinalizationEnabled())
+                + ", last chunks=" + visible.touchedChunks()
+                + ", columns=" + visible.scannedColumns()
+                + ", imported=" + visible.importedCells()
+                + ", hosted=" + visible.hostedWaterCells()
+                + ", converted=" + visible.convertedBlocks()
+                + ", total chunks=" + status.visibleFinalizationTouchedChunks()
+                + ", total completed=" + status.visibleFinalizationCompletedChunks()
+                + ", total converted=" + status.visibleFinalizationConvertedBlocks()
+                + ", budget misses=" + status.visibleFinalizationBudgetMisses()), false);
         source.sendSuccess(() -> Component.literal("  Queue health: skipped unloaded="
                 + status.skippedUnloadedChunks()
                 + ", dropped=" + status.droppedChunks()), false);

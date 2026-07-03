@@ -555,10 +555,8 @@ public final class OceanSurfaceRenderer {
             subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize, maxPatches);
             return;
         }
-        if (!footprint.replacementSafe) {
-            if (cellSize > 1) {
-                subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize, maxPatches);
-            }
+        if (!footprint.replacementSafe && cellSize > 1) {
+            subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize, maxPatches);
             return;
         }
         if (cellSize > 1 && footprint.minimumDepth <= SHORE_DETAIL_DEPTH) {
@@ -625,11 +623,11 @@ public final class OceanSurfaceRenderer {
         }
     }
 
-    // Dynamic geometry treats vanilla water as a mask, not as final mesh data.
-    // A patch is rendered only when its footprint and a one-block border are
-    // stable full water. This keeps the replacement surface away from clipped
-    // ice, flowing edges, caves, and shore cells where vanilla topology is not
-    // a continuous water sheet.
+    // Dynamic geometry treats vanilla water as a migration mask, not as final
+    // mesh data. Coarse patches still require fully replacement-safe ownership;
+    // pending migration cells may render only after subdivision to one-block
+    // previews so the Wilderness surface stays visible while authority catches
+    // up without stretching unsafe quads over shore or covered columns.
     private static PatchFootprint validatePatchFootprint(
             ClientLevel level,
             Map<Long, SurfaceColumn> surfaces,
@@ -659,10 +657,10 @@ public final class OceanSurfaceRenderer {
                 }
             }
         }
-        if (!replacementSafe || maximumSurface - minimumSurface > MAX_SURFACE_STEP) {
+        if (maximumSurface - minimumSurface > MAX_SURFACE_STEP) {
             return PatchFootprint.INVALID;
         }
-        return new PatchFootprint(true, true, sampledMinimumDepth, (minimumSurface + maximumSurface) * 0.5f);
+        return new PatchFootprint(true, replacementSafe, sampledMinimumDepth, (minimumSurface + maximumSurface) * 0.5f);
     }
 
     private static WaterColumn column(

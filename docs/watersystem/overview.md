@@ -51,25 +51,36 @@ and client water-column sampling. Direct vanilla constants are still allowed for
 vanilla tint sampling, cauldron/dripstone targets, and migration code that must
 know whether a block is still `minecraft:water`.
 
-Loaded world water is seeded into canonical volume from exposed plain
-`minecraft:water` columns automatically. Chunk-load events only enqueue work
-because they can fire while Minecraft is preparing initial spawn chunks.
-`CanonicalWaterMigrationQueue` then processes loaded chunks after players
-exist, using configurable per-tick budgets for touched chunks, scanned columns,
-and converted blocks. A player-centered priority scan periodically promotes
-already-loaded chunks around each player. By default it follows the player's
-requested view distance, adds a small padding radius, then clamps to the
-server's loaded view distance so visible water converges toward Wilderness
-ownership without force-loading the whole world. The seeder imports a bounded
-depth from oceans, rivers, lakes, and water under thin cover such as ice.
+Generated world water is finalized into canonical volume from exposed plain
+`minecraft:water` columns automatically. Raw chunk-load events stay cheap and
+only enqueue work because they can fire while Minecraft is preparing initial
+spawn chunks. When a loaded chunk starts being watched by a player, the
+visible-chunk finalizer performs a bounded pre-visibility pass that imports
+plain water, rewrites accepted `minecraft:water` blocks to
+`wildernessodysseyapi:wilderness_water_block`, and priority-queues any
+unfinished columns. `CanonicalWaterMigrationQueue` then processes remaining
+loaded chunks after players exist, using configurable per-tick budgets for
+touched chunks, scanned columns, and converted blocks. A player-centered
+priority scan periodically promotes already-loaded chunks around each player.
+By default it follows the player's requested view distance, adds a small
+padding radius, then clamps to the server's loaded view distance so visible
+water converges toward Wilderness ownership without force-loading the whole
+world. The seeder imports a bounded depth from oceans, rivers, lakes, and
+water under thin cover such as ice.
 Waterlogged host blocks, such as kelp, seagrass, and waterloggable modded
 blocks, can be imported directly from the motion-blocking surface scan as
 hosted canonical water for depth and optics, but the host block is not replaced
 and the open-ocean replacement mesh does not treat that cell as an exposed
 surface.
 Canonical authority import is allowed to continue after the per-tick block
-conversion budget is exhausted, so visible loaded water becomes
-Wilderness-owned before slower namespaced block rewrites finish catching up.
+conversion budget is exhausted, but any skipped plain-water rewrites keep the
+chunk in the priority queue from the first skipped column. That prevents
+import-only passes from leaving permanent `minecraft:water` behind.
+While that catch-up is in progress, the client may render a one-block
+replacement-surface preview over exposed pending migration water. Coarse LOD
+patches and vanilla top-face hiding still require canonical or namespaced
+Wilderness ownership, which keeps unsafe shore, covered, and waterlogged cells
+from becoming large stretched replacement quads.
 Imported worldgen cells are flagged as stable reservoirs and do not tick until
 disturbed. When
 `convertSeededWorldWaterToWilderness` and automatic migration are enabled, the
@@ -119,8 +130,8 @@ Use these commands in a dev world:
   SPH water, and replacement-safe visible surface cells.
 - `/wowater migration` reports the automatic migration queue, totals, hosted
   waterlogged imports, player-priority scan counts, skipped unloaded chunks,
-  effective view-distance priority radius, promoted chunks, and the last tick's
-  migration work.
+  effective view-distance priority radius, promoted chunks, watched-chunk
+  visible finalization work, and the last tick's migration work.
 - `/wowater shipcheck <radius>` classifies nearby water as Wilderness-owned,
   vanilla-pending-conversion, hosted-safe, pending import, or projection gaps.
   Use it before visual bug hunting so screenshots can be tied to ownership

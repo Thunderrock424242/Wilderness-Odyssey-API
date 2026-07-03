@@ -16,13 +16,11 @@ import net.minecraft.world.level.material.FluidState;
 /**
  * Imports exposed world water into the canonical chunk-volume store.
  *
- * <p>World generation still creates normal {@code minecraft:water}, which is
- * important for compatibility and modded terrain. This seeder lazily mirrors
- * that stable water into canonical cells when chunks load. Waterlogged host
- * blocks can contribute hosted canonical water without being replaced. When
- * configured, accepted plain water blocks also migrate to the namespaced
- * Wilderness water projection so the replacement system owns the block/fluid
- * identity while keeping {@code #minecraft:water} tag compatibility.</p>
+ * <p>World generation can still create normal {@code minecraft:water} as an
+ * intermediate terrain/aquifer result. This seeder finalizes that stable water
+ * into canonical cells and, on watched chunks or background ticks, rewrites
+ * accepted plain water to the namespaced Wilderness water projection. Waterlogged
+ * host blocks contribute hosted canonical water without being replaced.</p>
  */
 public final class CanonicalWaterSeeder {
 
@@ -43,9 +41,9 @@ public final class CanonicalWaterSeeder {
         if (!WaterSimulationConfig.ENABLE_CANONICAL_WORLD_SEEDING.get()) {
             return SeedStats.EMPTY;
         }
-        // Chunk-load seeding runs on Minecraft's loading/generation path, so it
-        // imports canonical state only. Rewriting world blocks here can stall
-        // spawn preparation when large oceans are being generated.
+        // Raw chunk-load seeding runs on Minecraft's loading/generation path,
+        // so it imports canonical state only. Watched-chunk finalization and
+        // server ticks perform the block rewrites under explicit budgets.
         return seedChunk(level, chunk, WaterSimulationConfig.worldSeedMaxColumnDepth(), false);
     }
 
@@ -115,6 +113,7 @@ public final class CanonicalWaterSeeder {
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         int columnIndex = boundedStart;
         int scannedColumns = 0;
+        int firstPendingConversionColumn = -1;
 
         while (columnIndex < COLUMNS_PER_CHUNK && scannedColumns < boundedColumns) {
             int localX = columnIndex / CHUNK_WIDTH;
@@ -133,10 +132,18 @@ public final class CanonicalWaterSeeder {
                     conversionBudget
             );
             stats = stats.plus(columnResult.stats());
+            if (columnResult.pendingPlainWaterConversion() && firstPendingConversionColumn < 0) {
+                firstPendingConversionColumn = columnIndex;
+            }
             scannedColumns++;
             columnIndex++;
         }
-        return new SeedSlice(stats, columnIndex, columnIndex >= COLUMNS_PER_CHUNK);
+        return new SeedSlice(
+                stats,
+                firstPendingConversionColumn >= 0 ? firstPendingConversionColumn : columnIndex,
+                columnIndex >= COLUMNS_PER_CHUNK && firstPendingConversionColumn < 0,
+                firstPendingConversionColumn >= 0
+        );
     }
 
     private static SeedColumnResult seedColumn(
@@ -154,16 +161,17 @@ public final class CanonicalWaterSeeder {
         int maxScanDepth = Math.max(1, maxColumnDepth + coverScanDepth);
         boolean foundWater = false;
         int waterCellsSeen = 0;
+        boolean pendingPlainWaterConversion = false;
 
         for (int offset = 0; offset < maxScanDepth && waterCellsSeen < maxColumnDepth; offset++) {
             cursor.set(worldX, surfaceY - offset, worldZ);
             if (level.isOutsideBuildHeight(cursor) || !level.hasChunkAt(cursor)) {
-                return new SeedColumnResult(stats);
+                return new SeedColumnResult(stats, pendingPlainWaterConversion);
             }
             WaterCellCandidate candidate = waterCellCandidate(level, cursor);
             if (!candidate.water()) {
                 if (foundWater || offset >= coverScanDepth) {
-                    return new SeedColumnResult(stats);
+                    return new SeedColumnResult(stats, pendingPlainWaterConversion);
                 }
                 continue;
             }
@@ -185,6 +193,7 @@ public final class CanonicalWaterSeeder {
                             conversionBudget
                     );
                     stats = conversion.stats();
+                    pendingPlainWaterConversion |= conversion.pendingPlainWaterConversion();
                 }
                 stats = stats.withSkippedTracked(stats.skippedTracked() + 1);
                 continue;
@@ -203,10 +212,11 @@ public final class CanonicalWaterSeeder {
                             conversionBudget
                     );
                     stats = conversion.stats();
+                    pendingPlainWaterConversion |= conversion.pendingPlainWaterConversion();
                 }
             }
         }
-        return new SeedColumnResult(stats);
+        return new SeedColumnResult(stats, pendingPlainWaterConversion);
     }
 
     private static WaterCellCandidate waterCellCandidate(ServerLevel level, BlockPos pos) {
@@ -237,16 +247,21 @@ public final class CanonicalWaterSeeder {
             return new ConversionResult(stats, false);
         }
         if (conversionBudget.exhausted()) {
-            return new ConversionResult(stats, false);
+            return new ConversionResult(stats, isPendingPlainVanillaWaterBlock(level, pos));
         }
         if (convertPlainVanillaWaterBlock(level, pos)) {
             conversionBudget.recordConversion();
             return new ConversionResult(
                     stats.withConvertedBlocks(stats.convertedBlocks() + 1),
-                    conversionBudget.exhausted()
+                    false
             );
         }
         return new ConversionResult(stats, false);
+    }
+
+    private static boolean isPendingPlainVanillaWaterBlock(ServerLevel level, BlockPos pos) {
+        BlockState current = level.getBlockState(pos);
+        return current.is(Blocks.WATER) && current.getFluidState().is(FluidTags.WATER);
     }
 
     private static boolean convertPlainVanillaWaterBlock(ServerLevel level, BlockPos pos) {
@@ -282,10 +297,10 @@ public final class CanonicalWaterSeeder {
         private static final WaterCellCandidate DRY = new WaterCellCandidate(false, false, false);
     }
 
-    private record SeedColumnResult(SeedStats stats) {
+    private record SeedColumnResult(SeedStats stats, boolean pendingPlainWaterConversion) {
     }
 
-    private record ConversionResult(SeedStats stats, boolean budgetExhausted) {
+    private record ConversionResult(SeedStats stats, boolean pendingPlainWaterConversion) {
     }
 
     private static final class ConversionBudget {
@@ -310,7 +325,8 @@ public final class CanonicalWaterSeeder {
     public record SeedSlice(
             SeedStats stats,
             int nextColumnIndex,
-            boolean complete
+            boolean complete,
+            boolean pendingPlainWaterConversions
     ) {
     }
 

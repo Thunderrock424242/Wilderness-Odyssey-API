@@ -10,6 +10,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.ChunkDataEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.neoforge.event.level.ChunkWatchEvent;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
 
@@ -45,6 +46,14 @@ public final class ChunkCapabilityHandler {
         // Queue water migration here, then let server ticks process it later
         // under explicit budgets so world creation cannot freeze on ocean work.
         CanonicalWaterMigrationQueue.enqueue(level, chunk.getPos());
+    }
+
+    @SubscribeEvent
+    public static void onChunkWatch(ChunkWatchEvent.Watch event) {
+        // A watched chunk is the first safe player-visible boundary: worldgen is
+        // done, the chunk is loaded, and a player is about to see it. Finalize a
+        // bounded water slice here, then priority-queue any unfinished work.
+        CanonicalWaterMigrationQueue.finalizeVisibleChunk(event.getLevel(), event.getChunk());
     }
 
     @SubscribeEvent

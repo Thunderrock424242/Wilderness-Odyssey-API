@@ -12,8 +12,11 @@ import net.minecraft.world.level.levelgen.Heightmap;
  * <p>Keeping this logic in one place prevents shoreline overlays, open-ocean
  * replacement quads, and underwater fog from disagreeing about partial fills,
  * flow velocity, or the surface height of the same block. Surface renderers
- * reject vanilla-only migration candidates; immersion can still see tagged
- * water while the server catches up.</p>
+ * render authoritative cells directly. Exposed plain water that is still
+ * waiting for automatic migration may be sampled as a temporary one-block
+ * visual preview, but it is not reported as replacement-safe until Wilderness
+ * authority owns it. Immersion can still see tagged water while the server
+ * catches up.</p>
  */
 final class ClientWaterColumnSampler {
 
@@ -40,7 +43,7 @@ final class ClientWaterColumnSampler {
         }
 
         CellSample cell = sampleCell(level, surfacePos);
-        if (!cell.valid || !cell.authorityOwned || cell.hostedWater || isCovered(level, surfacePos.above())) {
+        if (!cell.valid || !cell.renderableSurface() || cell.hostedWater || isCovered(level, surfacePos.above())) {
             return ColumnSample.INVALID;
         }
 
@@ -191,6 +194,18 @@ final class ClientWaterColumnSampler {
         /** Returns bounded three-dimensional water motion in blocks per second. */
         float speed() {
             return (float) Math.sqrt(velocityX * velocityX + velocityY * velocityY + velocityZ * velocityZ);
+        }
+
+        /**
+         * Returns whether the client may draw a visible Wilderness surface here.
+         *
+         * <p>Pending migration water is renderable so the replacement system
+         * does not visually disappear while the server imports nearby loaded
+         * chunks. It still remains non-replacement-safe until canonical or
+         * namespaced authority owns the cell.</p>
+         */
+        boolean renderableSurface() {
+            return authorityOwned || migrationCandidate;
         }
     }
 }
