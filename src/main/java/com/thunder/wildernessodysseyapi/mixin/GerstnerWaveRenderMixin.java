@@ -1,9 +1,10 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerVertexConsumer;
-import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.OceanSurfaceRenderer;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerVertexConsumer;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.client.renderer.chunk.RenderChunkRegion;
 import net.minecraft.client.renderer.block.LiquidBlockRenderer;
 import net.minecraft.core.BlockPos;
@@ -13,7 +14,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -55,7 +55,7 @@ public class GerstnerWaveRenderMixin {
             CallbackInfo callbackInfo
     ) {
         HIDE_VANILLA_TOP.set(
-                (fluidState.is(Fluids.WATER) || fluidState.is(Fluids.FLOWING_WATER))
+                WaterCompatibility.isTaggedWater(fluidState)
                         && WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()
                         && WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()
                         && WaterRenderingConfig.suppressVanillaWaterTopFaces()
@@ -76,7 +76,7 @@ public class GerstnerWaveRenderMixin {
                                                    VertexConsumer consumer,
                                                    BlockState blockState,
                                                    FluidState fluidState) {
-        if (!fluidState.is(Fluids.WATER) && !fluidState.is(Fluids.FLOWING_WATER)) {
+        if (!WaterCompatibility.isTaggedWater(fluidState)) {
             return originalConsumer;
         }
         if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()) {
@@ -161,7 +161,7 @@ public class GerstnerWaveRenderMixin {
         BlockPos abovePos = pos.above();
         BlockState aboveState = level.getBlockState(abovePos);
         FluidState aboveFluid = aboveState.getFluidState();
-        if (aboveFluid.is(Fluids.WATER) || aboveFluid.is(Fluids.FLOWING_WATER)) {
+        if (WaterCompatibility.isTaggedWater(aboveFluid)) {
             return false;
         }
         if (aboveState.shouldHideAdjacentFluidFace(Direction.DOWN, fluidState)) {

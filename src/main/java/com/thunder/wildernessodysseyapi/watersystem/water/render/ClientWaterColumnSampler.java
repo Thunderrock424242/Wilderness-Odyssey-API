@@ -1,11 +1,11 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FluidState;
@@ -101,7 +101,7 @@ final class ClientWaterColumnSampler {
         boolean fullWater = fluid.isSource();
         float ownHeight = clamp(fluid.getOwnHeight(), 0.0f, 1.0f);
         Vec3 flow = fluid.getFlow(level, pos);
-        boolean plainSourceWater = fullWater && state.is(Blocks.WATER);
+        boolean plainSourceWater = fullWater && WaterCompatibility.isPlainWaterProjection(state);
         return new CellSample(
                 true,
                 fullWater,

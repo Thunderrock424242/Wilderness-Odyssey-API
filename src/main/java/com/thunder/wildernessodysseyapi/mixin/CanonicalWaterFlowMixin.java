@@ -1,12 +1,12 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -31,7 +31,7 @@ public abstract class CanonicalWaterFlowMixin {
             FluidState state,
             CallbackInfo callbackInfo
     ) {
-        if (!state.is(Fluids.WATER) && !state.is(Fluids.FLOWING_WATER)) {
+        if (!WaterCompatibility.isTaggedWater(state)) {
             return;
         }
         if (level instanceof ServerLevel serverLevel && CanonicalWater.isTracked(serverLevel, pos)) {

@@ -1,16 +1,15 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
-import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.BlockHitResult;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -48,8 +47,7 @@ public abstract class BucketPlaceMixin {
                 || !Boolean.TRUE.equals(callbackInfo.getReturnValue())) {
             return;
         }
-        if (!level.getBlockState(pos).is(Blocks.WATER)
-                && !level.getBlockState(pos).is(WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get())) {
+        if (!WaterCompatibility.isPlainWaterProjection(level.getBlockState(pos))) {
             // Waterlogged blocks remain on the vanilla compatibility boundary;
             // replacing their host block would destroy unrelated block state.
             return;
@@ -76,6 +74,6 @@ public abstract class BucketPlaceMixin {
     }
 
     private static boolean isCanonicalBucketWater(Fluid fluid) {
-        return fluid == Fluids.WATER || fluid.isSame(WildernessFluidRegistry.WILDERNESS_WATER.get());
+        return WaterCompatibility.isCanonicalWaterFluid(fluid);
     }
 }

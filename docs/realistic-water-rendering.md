@@ -13,9 +13,18 @@ be vanilla water internally. The mod owns namespaced water IDs such as
 `wildernessodysseyapi:wilderness_water` and adds them to `#minecraft:water` so
 biomes, structures, mob spawning, and other tag-aware checks still classify the
 fluid as water. Canonical projection writes the namespaced water block for
-owned/disturbed water while existing vanilla water remains an import/migration
-source. Exact `Blocks.WATER` / `Fluids.WATER` assumptions are handled with
-targeted mixins only when a system truly needs them.
+owned/disturbed water, and deferred automatic seeding can migrate accepted
+plain vanilla world water into the same namespaced block after the world is
+running. Existing vanilla water therefore remains an import source, not the
+long-term ownership target. Exact
+`Blocks.WATER` / `Fluids.WATER` assumptions are handled with targeted mixins
+only when a system truly needs them.
+
+Within the mod codebase, gameplay and renderer-ownership checks should prefer
+`WaterCompatibility` or `FluidTags.WATER` over vanilla-only fluid identity.
+Vanilla water constants are reserved for art/tint defaults, dripstone/cauldron
+targets, and migration paths that intentionally detect remaining
+`minecraft:water` blocks before converting them to Wilderness water.
 
 The replacement uses a hybrid numerical model rather than attempting a full
 Navier-Stokes simulation for every ocean cell. That is the practical and
