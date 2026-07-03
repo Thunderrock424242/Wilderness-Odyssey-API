@@ -10,6 +10,7 @@ The Wilderness water system is split across several coordinated subsystems:
 - Compatibility projection: `CanonicalWaterFlowMixin`, `CanonicalWaterBucketPickupMixin`
 - Client volume synchronization: `WaterVolumeChunkPayload`, `WaterVolumeSynchronizer`, `ClientWaterVolumeSnapshots`
 - Live diagnostics: `/wowater inspect`, `/wowater summary`, `/wowater migration`, `/wowater seed`, `/wowater repair`
+- Release diagnostics: `/wowater shipcheck`
 - Ripple and splash particles: `RippleRenderer`, `WaterEntryEventHandler`
 - Gerstner waves per water body: `GerstnerWaveRenderMixin`, `WaveEntityPhysics`
 - Replacement water surface: `OceanSurfaceRenderer`, `ShorelineSurfaceRenderer`, `WaterRenderingConfig`
@@ -49,14 +50,20 @@ vanilla tint sampling, cauldron/dripstone targets, and migration code that must
 know whether a block is still `minecraft:water`.
 
 Loaded world water is seeded into canonical volume from exposed plain
-`minecraft:water` columns. Chunk-load events only enqueue work because they can
-fire while Minecraft is preparing initial spawn chunks. `CanonicalWaterMigrationQueue`
-then processes loaded chunks after players exist, using configurable per-tick
-budgets for touched chunks, scanned columns, and converted blocks. The seeder
-imports a bounded depth from oceans, rivers, lakes, and water under thin cover
-such as ice, and skips waterlogged host blocks by default so modded/vanilla
-block state is not destroyed. Imported worldgen cells are flagged as stable
-reservoirs and do not tick until disturbed. When
+`minecraft:water` columns automatically. Chunk-load events only enqueue work
+because they can fire while Minecraft is preparing initial spawn chunks.
+`CanonicalWaterMigrationQueue` then processes loaded chunks after players
+exist, using configurable per-tick budgets for touched chunks, scanned columns,
+and converted blocks. A player-centered priority scan periodically promotes
+already-loaded chunks around each player, clamped to the server view distance,
+so visible water converges toward Wilderness ownership without force-loading
+the whole world. The seeder imports a bounded depth from oceans, rivers, lakes,
+and water under thin cover such as ice. Waterlogged host blocks, such as kelp,
+seagrass, and waterloggable modded blocks, can be imported as hosted canonical
+water for depth and optics, but the host block is not replaced and the
+open-ocean replacement mesh does not treat that cell as an exposed surface.
+Imported worldgen cells are flagged as stable reservoirs and do not tick until
+disturbed. When
 `convertSeededWorldWaterToWilderness` and automatic migration are enabled, the
 queued pass gradually migrates accepted plain vanilla cells to
 `wildernessodysseyapi:wilderness_water_block` or its flowing Wilderness state.
@@ -99,8 +106,13 @@ Use these commands in a dev world:
   one block.
 - `/wowater summary <radius>` counts nearby wet, tag-water, canonical, projected,
   and mobile-water blocks.
-- `/wowater migration` reports the automatic migration queue, totals, skipped
-  unloaded chunks, and the last tick's migration work.
+- `/wowater migration` reports the automatic migration queue, totals, hosted
+  waterlogged imports, player-priority scan counts, skipped unloaded chunks,
+  and the last tick's migration work.
+- `/wowater shipcheck <radius>` classifies nearby water as Wilderness-owned,
+  vanilla-pending-conversion, hosted-safe, pending import, or projection gaps.
+  Use it before visual bug hunting so screenshots can be tied to ownership
+  state instead of guesswork.
 - `/wowater seed <chunkRadius>` imports loaded world water around the player.
   This is operator-only because it writes canonical chunk data and can force
   migration of nearby plain vanilla water blocks to Wilderness water.
@@ -115,8 +127,11 @@ Manual test matrix before calling a water build stable:
    lower neighbors.
 3. Inspect ocean, river, lake, and frozen-ocean chunks with `/wowater inspect`
    to confirm automatic migration imports plain water, gradually converts
-   accepted vanilla water into Wilderness water, and skips waterlogged hosts.
-   Use `/wowater migration` to confirm the queue is draining.
+   accepted vanilla water into Wilderness water, and imports waterlogged hosts
+   as hosted cells without replacing the host block. Use `/wowater migration`
+   to confirm the queue is draining and reporting hosted cell counts.
+   Use `/wowater shipcheck 16` to decide whether the local area is still
+   migrating, clean enough for visual testing, or needs `/wowater repair`.
 4. Swim, use boats, spawn fish/squid, and use buckets against canonical water.
 5. Test with built-in shaders, no shaders, and an external shader pack.
 6. Press `F3+A` near beaches and frozen oceans to verify dynamic surfaces do

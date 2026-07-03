@@ -20,7 +20,7 @@ class WaterVolumeChunkTest {
                 0.25f,
                 -0.5f,
                 1.25f,
-                WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED,
+                WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED | WaterVolumeChunk.FLAG_HOSTED_WATER,
                 288_150
         ));
 
@@ -30,6 +30,7 @@ class WaterVolumeChunkTest {
 
         assertTrue(decoded.contains(pos));
         assertEquals(original.get(pos), decoded.get(pos));
+        assertTrue(decoded.get(pos).hostedWater());
         assertEquals(original.revision(), decoded.revision());
     }
 

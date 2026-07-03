@@ -38,6 +38,7 @@
     "RenderSystemGpuDiagnosticsMixin",
     "SimpleTextureGpuProfilerMixin",
     "StructureBlockRendererMixin",
+    "TaggedWaterFaceCullingMixin",
     "TextureAtlasGpuProfilerMixin"
   ]
 }

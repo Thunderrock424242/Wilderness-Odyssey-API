@@ -53,6 +53,11 @@ public final class WaterDebugCommand {
                                         IntegerArgumentType.getInteger(context, "chunkRadius")))))
                 .then(Commands.literal("migration")
                         .executes(WaterDebugCommand::migrationStatus))
+                .then(Commands.literal("shipcheck")
+                        .executes(context -> shipcheck(context, 16))
+                        .then(Commands.argument("radius", IntegerArgumentType.integer(1, 64))
+                                .executes(context -> shipcheck(context,
+                                        IntegerArgumentType.getInteger(context, "radius")))))
                 .then(Commands.literal("repair")
                         .requires(source -> source.hasPermission(2))
                         .executes(context -> repair(context, 4))
@@ -78,7 +83,8 @@ public final class WaterDebugCommand {
                 + "/" + com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk.UNITS_PER_BLOCK
                 + ", fill=" + format(snapshot.fillFraction())
                 + ", imported=" + snapshot.imported()
-                + ", projected=" + snapshot.compatibilityProjected()), false);
+                + ", projected=" + snapshot.compatibilityProjected()
+                + ", hosted=" + snapshot.hostedWater()), false);
         source.sendSuccess(() -> Component.literal("  canonicalSpeed=" + format(snapshot.canonicalSpeed())
                 + ", mobileSpeed=" + format(snapshot.mobileSpeed())), false);
         return 1;
@@ -94,6 +100,7 @@ public final class WaterDebugCommand {
         int wet = 0;
         int tagWater = 0;
         int canonical = 0;
+        int hosted = 0;
         int mobile = 0;
         int projected = 0;
         for (BlockPos pos : BlockPos.betweenClosed(
@@ -105,6 +112,7 @@ public final class WaterDebugCommand {
             if (snapshot.wet()) wet++;
             if (snapshot.tagWater()) tagWater++;
             if (snapshot.canonicalTracked()) canonical++;
+            if (snapshot.hostedWater()) hosted++;
             if (snapshot.mobileWater()) mobile++;
             if (snapshot.compatibilityProjected()) projected++;
         }
@@ -114,6 +122,7 @@ public final class WaterDebugCommand {
         int finalWet = wet;
         int finalTagWater = tagWater;
         int finalCanonical = canonical;
+        int finalHosted = hosted;
         int finalMobile = mobile;
         int finalProjected = projected;
         source.sendSuccess(() -> Component.literal("WO water summary radius=" + finalRadius
@@ -121,6 +130,7 @@ public final class WaterDebugCommand {
                 + " wet=" + finalWet
                 + " tagWater=" + finalTagWater
                 + " canonical=" + finalCanonical
+                + " hosted=" + finalHosted
                 + " projected=" + finalProjected
                 + " mobile=" + finalMobile), false);
         return 1;
@@ -147,6 +157,7 @@ public final class WaterDebugCommand {
         source.sendSuccess(() -> Component.literal("WO water seeded chunks=" + finalTotal.loadedChunks()
                 + " columns=" + finalTotal.scannedColumns()
                 + " importedCells=" + finalTotal.importedCells()
+                + " hostedCells=" + finalTotal.hostedWaterCells()
                 + " convertedBlocks=" + finalTotal.convertedBlocks()
                 + " skippedTracked=" + finalTotal.skippedTracked()
                 + " skippedWaterlogged=" + finalTotal.skippedWaterlogged()), true);
@@ -158,19 +169,110 @@ public final class WaterDebugCommand {
         CanonicalWaterMigrationQueue.MigrationStatus status = CanonicalWaterMigrationQueue.status();
         CanonicalWaterMigrationQueue.TickResult lastTick = status.lastTick();
 
-        source.sendSuccess(() -> Component.literal("WO water migration seeding=" + status.seedingEnabled()
-                + " blockConversion=" + status.blockConversionEnabled()
-                + " queuedChunks=" + status.queuedChunks()
-                + " touchedChunks=" + status.touchedChunks()
-                + " completedChunks=" + status.completedChunks()
-                + " importedCells=" + status.importedCells()
-                + " convertedBlocks=" + status.convertedBlocks()), false);
-        source.sendSuccess(() -> Component.literal("  skippedUnloaded=" + status.skippedUnloadedChunks()
-                + " droppedChunks=" + status.droppedChunks()
-                + " lastTickChunks=" + lastTick.touchedChunks()
-                + " lastTickColumns=" + lastTick.scannedColumns()
-                + " lastTickConverted=" + lastTick.convertedBlocks()), false);
+        source.sendSuccess(() -> Component.literal("WO water migration"), false);
+        source.sendSuccess(() -> Component.literal("  Status: seeding=" + onOff(status.seedingEnabled())
+                + ", block conversion=" + onOff(status.blockConversionEnabled())
+                + ", queued chunks=" + status.queuedChunks()), false);
+        source.sendSuccess(() -> Component.literal("  Totals: touched=" + status.touchedChunks()
+                + ", completed=" + status.completedChunks()
+                + ", imported=" + status.importedCells()
+                + ", hosted=" + status.hostedWaterCells()
+                + ", converted=" + status.convertedBlocks()), false);
+        source.sendSuccess(() -> Component.literal("  Last tick: chunks=" + lastTick.touchedChunks()
+                + ", columns=" + lastTick.scannedColumns()
+                + ", imported=" + lastTick.importedCells()
+                + ", hosted=" + lastTick.hostedWaterCells()
+                + ", converted=" + lastTick.convertedBlocks()), false);
+        source.sendSuccess(() -> Component.literal("  Player priority: radius=" + status.playerScanRadius()
+                + ", interval=" + status.playerScanIntervalTicks() + " ticks"
+                + ", last checked=" + status.lastPlayerScanCheckedChunks()
+                + ", last queued=" + status.lastPlayerScanQueuedChunks()
+                + ", total queued=" + status.playerScanQueuedChunks()), false);
+        source.sendSuccess(() -> Component.literal("  Queue health: skipped unloaded="
+                + status.skippedUnloadedChunks()
+                + ", dropped=" + status.droppedChunks()), false);
         return Math.max(1, status.queuedChunks());
+    }
+
+    private static int shipcheck(CommandContext<CommandSourceStack> context, int requestedRadius) {
+        CommandSourceStack source = context.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos center = sourceBlockPos(source);
+        int radius = Math.min(requestedRadius, WaterSimulationConfig.debugCommandMaxRadius());
+        ShipCheckStats stats = scanShipCheck(level, center, radius);
+
+        source.sendSuccess(() -> Component.literal("WO water shipcheck radius=" + radius
+                + " state=" + stats.stateLabel()), false);
+        source.sendSuccess(() -> Component.literal("  Coverage: sampled=" + stats.sampled()
+                + ", wet=" + stats.wet()
+                + ", tag water=" + stats.tagWater()
+                + ", canonical=" + stats.canonicalWater()
+                + ", mobile=" + stats.mobileWater()), false);
+        source.sendSuccess(() -> Component.literal("  Ownership: Wilderness blocks="
+                + stats.wildernessPlainWater()
+                + ", vanilla pending=" + stats.vanillaPlainWater()
+                + ", hosted safe=" + stats.hostedWater()
+                + ", projected=" + stats.projected()), false);
+        source.sendSuccess(() -> Component.literal("  Action items: pending import="
+                + stats.pendingImport()
+                + ", pending hosted import=" + stats.pendingHostedImport()
+                + ", pending conversion=" + stats.pendingConversion()
+                + ", projection gaps=" + stats.projectionGaps()), false);
+        source.sendSuccess(() -> Component.literal("  Advice: " + stats.advice()), false);
+        return Math.max(1, stats.wet());
+    }
+
+    private static ShipCheckStats scanShipCheck(ServerLevel level, BlockPos center, int radius) {
+        int sampled = 0;
+        int wet = 0;
+        int tagWater = 0;
+        int canonicalWater = 0;
+        int mobileWater = 0;
+        int vanillaPlainWater = 0;
+        int wildernessPlainWater = 0;
+        int hostedWater = 0;
+        int projected = 0;
+        int pendingImport = 0;
+        int pendingHostedImport = 0;
+        int pendingConversion = 0;
+        int projectionGaps = 0;
+
+        for (BlockPos pos : BlockPos.betweenClosed(
+                center.offset(-radius, -radius, -radius),
+                center.offset(radius, radius, radius)
+        )) {
+            sampled++;
+            WaterCompatibility.Snapshot snapshot = WaterCompatibility.describe(level, pos);
+            if (snapshot.wet()) wet++;
+            if (snapshot.tagWater()) tagWater++;
+            if (snapshot.canonicalWater()) canonicalWater++;
+            if (snapshot.mobileWater()) mobileWater++;
+            if (snapshot.vanillaWaterBlock()) vanillaPlainWater++;
+            if (snapshot.wildernessWaterBlock()) wildernessPlainWater++;
+            if (snapshot.hostedWater()) hostedWater++;
+            if (snapshot.compatibilityProjected()) projected++;
+            boolean pendingHosted = snapshot.nonPlainTaggedWater() && !snapshot.hostedWater();
+            if (snapshot.pendingCanonicalImport() && !pendingHosted) pendingImport++;
+            if (pendingHosted) pendingHostedImport++;
+            if (snapshot.pendingPlainVanillaConversion()) pendingConversion++;
+            if (snapshot.projectionGap()) projectionGaps++;
+        }
+
+        return new ShipCheckStats(
+                sampled,
+                wet,
+                tagWater,
+                canonicalWater,
+                mobileWater,
+                vanillaPlainWater,
+                wildernessPlainWater,
+                hostedWater,
+                projected,
+                pendingImport,
+                pendingHostedImport,
+                pendingConversion,
+                projectionGaps
+        );
     }
 
     private static int repair(CommandContext<CommandSourceStack> context, int requestedRadius) {
@@ -197,6 +299,10 @@ public final class WaterDebugCommand {
         return Math.max(1, repaired);
     }
 
+    private static String onOff(boolean value) {
+        return value ? "ON" : "OFF";
+    }
+
     private static BlockPos sourceBlockPos(CommandSourceStack source) {
         return BlockPos.containing(source.getPosition());
     }
@@ -207,5 +313,45 @@ public final class WaterDebugCommand {
 
     private static String format(float value) {
         return String.format(Locale.ROOT, "%.3f", value);
+    }
+
+    /** Compact local readiness summary for ship-track water validation. */
+    private record ShipCheckStats(
+            int sampled,
+            int wet,
+            int tagWater,
+            int canonicalWater,
+            int mobileWater,
+            int vanillaPlainWater,
+            int wildernessPlainWater,
+            int hostedWater,
+            int projected,
+            int pendingImport,
+            int pendingHostedImport,
+            int pendingConversion,
+            int projectionGaps
+    ) {
+        private String stateLabel() {
+            if (projectionGaps > 0) {
+                return "ACTION_NEEDED";
+            }
+            if (pendingImport > 0 || pendingConversion > 0 || pendingHostedImport > 0) {
+                return "MIGRATING";
+            }
+            return "CLEAN";
+        }
+
+        private String advice() {
+            if (projectionGaps > 0) {
+                return "run /wowater repair nearby, then inspect any remaining gap positions";
+            }
+            if (pendingImport > 0 || pendingConversion > 0 || pendingHostedImport > 0) {
+                return "wait for automatic migration, or use /wowater seed 1 for a local force pass";
+            }
+            if (wet == 0) {
+                return "no local water sampled";
+            }
+            return "local water ownership looks ready for visual testing";
+        }
     }
 }

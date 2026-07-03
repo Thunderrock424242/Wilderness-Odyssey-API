@@ -78,6 +78,7 @@ public final class WaterCompatibility {
                 canonical.velocityZ(),
                 canonical.imported(),
                 (canonical.flags() & WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED) != 0,
+                canonical.hostedWater(),
                 tagWater,
                 vanillaWaterBlock,
                 wildernessWaterBlock,
@@ -99,6 +100,7 @@ public final class WaterCompatibility {
             float velocityZ,
             boolean imported,
             boolean compatibilityProjected,
+            boolean hostedWater,
             boolean tagWater,
             boolean vanillaWaterBlock,
             boolean wildernessWaterBlock,
@@ -111,6 +113,31 @@ public final class WaterCompatibility {
         /** Returns whether any vanilla or replacement water exists here. */
         public boolean wet() {
             return canonicalVolumeUnits > 0 || tagWater || mobileWater;
+        }
+
+        /** Returns whether canonical storage currently owns visible water volume here. */
+        public boolean canonicalWater() {
+            return canonicalTracked && canonicalVolumeUnits > 0;
+        }
+
+        /** Returns whether a plain vanilla water block still needs migration to Wilderness water. */
+        public boolean pendingPlainVanillaConversion() {
+            return vanillaWaterBlock;
+        }
+
+        /** Returns whether tagged water has not yet been imported into canonical storage. */
+        public boolean pendingCanonicalImport() {
+            return tagWater && !canonicalTracked;
+        }
+
+        /** Returns whether a canonical cell lacks the compatibility fluid block/tag it should project. */
+        public boolean projectionGap() {
+            return canonicalWater() && !tagWater && !hostedWater;
+        }
+
+        /** Returns whether this is tagged water inside a non-plain host block, such as kelp or seagrass. */
+        public boolean nonPlainTaggedWater() {
+            return tagWater && !plainProjectionBlock;
         }
 
         /** Returns a compact velocity magnitude for debug output. */
