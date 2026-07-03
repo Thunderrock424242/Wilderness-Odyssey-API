@@ -30,8 +30,8 @@ import org.joml.Matrix4f;
  *
  * <p>Fog remains an ordinary NeoForge viewport customization, while the
  * optional overlay replaces vanilla's flat-water texture only when the mod's
- * linked shader owns the effect. Iris/Oculus keeps its normal overlay path;
- * canonical wave crests still receive a vanilla-compatible fallback overlay.</p>
+ * linked shader owns the effect. Iris/Oculus keeps its normal overlay path, and
+ * canonical wave crests remain compatible with vanilla water detection.</p>
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public final class UnderwaterEffectsRenderer {

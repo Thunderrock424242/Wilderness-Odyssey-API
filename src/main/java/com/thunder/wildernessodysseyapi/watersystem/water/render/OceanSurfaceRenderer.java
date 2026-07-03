@@ -60,6 +60,8 @@ public final class OceanSurfaceRenderer {
 
     private static final List<SurfacePatch> PATCHES = new ArrayList<>();
     private static volatile LongSet ownedVanillaTops = LongSets.EMPTY_SET;
+    private static volatile LongSet oceanOwnedVanillaTops = LongSets.EMPTY_SET;
+    private static volatile LongSet supplementalOwnedVanillaTops = LongSets.EMPTY_SET;
     private static ClientLevel cachedLevel;
     private static int cachedCenterX = Integer.MIN_VALUE;
     private static int cachedCenterZ = Integer.MIN_VALUE;
@@ -342,15 +344,18 @@ public final class OceanSurfaceRenderer {
         float distanceX = centerX - cameraX;
         float distanceZ = centerZ - cameraZ;
         float distance = (float) Math.sqrt(distanceX * distanceX + distanceZ * distanceZ);
-        float edgeFade = farRadius <= nearRadius
+        boolean replacingVanillaTop = WaterRenderingConfig.suppressVanillaWaterTopFaces();
+        float edgeFade = farRadius <= nearRadius || replacingVanillaTop
                 ? 1.0f
                 : 1.0f - smoothStep(Math.max(nearRadius, farRadius - 24.0f), farRadius, distance);
-        // Coarse cells are compatibility overlays above vanilla water. They
-        // should cover far-distance seams, not become opaque triangle sheets
-        // over dark seafloor or vegetation.
+        // In strict replacement mode, LOD patches are the visible ocean, not a
+        // faint overlay over Minecraft water. Keep them optically dense enough
+        // that the hidden vanilla top does not reveal cave-like seafloor shapes.
         float lodFade = patch.size <= 1
                 ? 1.0f
-                : patch.size <= 2 ? 0.58f : 0.42f;
+                : replacingVanillaTop
+                        ? patch.size <= 2 ? 0.92f : 0.84f
+                        : patch.size <= 2 ? 0.58f : 0.42f;
         return Math.max(0.0f, Math.min(1.0f, edgeFade * lodFade));
     }
 
@@ -573,20 +578,21 @@ public final class OceanSurfaceRenderer {
                 dominantType(first, second, third, fourth)
         ));
 
-        // Every validated footprint may replace the vanilla top faces below it.
-        // Coarse patches only reach this point after their full footprint and
-        // one-block border proved stable, deep, and replacement-safe, so hiding
-        // the baked surface removes double-water patchwork without exposing
-        // beach, ice, vegetation, or hosted water cells.
-        for (int offsetX = 0; offsetX < cellSize; offsetX++) {
-            for (int offsetZ = 0; offsetZ < cellSize; offsetZ++) {
-                SurfaceColumn covered = surfaceColumn(level, surfaces, x + offsetX, z + offsetZ);
-                if (covered.valid && covered.replacementSafe) {
-                    rebuiltOwnedTops.add(BlockPos.asLong(
-                            x + offsetX,
-                            covered.surfaceBlockY,
-                            z + offsetZ
-                    ));
+        // Strict visual replacement: validated open-water footprints own the
+        // visible top face across both block-detail and coarse LOD patches.
+        // Vanilla fluid blocks remain in-world for tags and compatibility, but
+        // their top surface should not be the thing the player sees.
+        if (WaterRenderingConfig.suppressVanillaWaterTopFaces()) {
+            for (int offsetX = 0; offsetX < cellSize; offsetX++) {
+                for (int offsetZ = 0; offsetZ < cellSize; offsetZ++) {
+                    SurfaceColumn covered = surfaceColumn(level, surfaces, x + offsetX, z + offsetZ);
+                    if (covered.valid && covered.replacementSafe) {
+                        rebuiltOwnedTops.add(BlockPos.asLong(
+                                x + offsetX,
+                                covered.surfaceBlockY,
+                                z + offsetZ
+                        ));
+                    }
                 }
             }
         }
@@ -780,6 +786,8 @@ public final class OceanSurfaceRenderer {
     private static void clearCache() {
         PATCHES.clear();
         ownedVanillaTops = LongSets.EMPTY_SET;
+        oceanOwnedVanillaTops = LongSets.EMPTY_SET;
+        supplementalOwnedVanillaTops = LongSets.EMPTY_SET;
         cachedLevel = null;
         cachedCenterX = Integer.MIN_VALUE;
         cachedCenterZ = Integer.MIN_VALUE;
@@ -803,10 +811,37 @@ public final class OceanSurfaceRenderer {
                 && ownedVanillaTops.contains(pos.asLong());
     }
 
-    // Rebuild only chunk sections whose top-face ownership changed. The set is
-    // immutable so chunk compilation workers can read it without locking.
+    /**
+     * Adds ownership from local shoreline/detail renderers into the same culling
+     * set used by the open-ocean mesh.
+     *
+     * <p>The mixin that hides vanilla top faces has one source of truth:
+     * {@link #ownedVanillaTops}. Shoreline rendering runs after the open-ocean
+     * pass, so it publishes a supplemental set here instead of owning another
+     * independent culling path.</p>
+     */
+    public static void setSupplementalBakedTopOwnership(ClientLevel level, LongSet supplementalOwnership) {
+        LongSet next = supplementalOwnership.isEmpty()
+                ? LongSets.EMPTY_SET
+                : LongSets.unmodifiable(new LongOpenHashSet(supplementalOwnership));
+        if (supplementalOwnedVanillaTops.equals(next)) {
+            return;
+        }
+        supplementalOwnedVanillaTops = next;
+        publishVanillaTopOwnership(level);
+    }
+
+    // Rebuild only chunk sections whose top-face ownership changed. The merged
+    // set is immutable so chunk compilation workers can read it without locking.
     private static void updateVanillaTopOwnership(ClientLevel level, LongSet rebuiltOwnership) {
-        LongSet next = LongSets.unmodifiable(rebuiltOwnership);
+        oceanOwnedVanillaTops = rebuiltOwnership.isEmpty()
+                ? LongSets.EMPTY_SET
+                : LongSets.unmodifiable(rebuiltOwnership);
+        publishVanillaTopOwnership(level);
+    }
+
+    private static void publishVanillaTopOwnership(ClientLevel level) {
+        LongSet next = mergeTopOwnership(oceanOwnedVanillaTops, supplementalOwnedVanillaTops);
         LongSet previous = ownedVanillaTops;
         if (previous.equals(next)) {
             return;
@@ -819,7 +854,21 @@ public final class OceanSurfaceRenderer {
                 changed.remove(packedPos);
             }
         }
-        markSectionsDirty(level, changed);
+        if (level != null && !changed.isEmpty()) {
+            markSectionsDirty(level, changed);
+        }
+    }
+
+    private static LongSet mergeTopOwnership(LongSet oceanOwnership, LongSet supplementalOwnership) {
+        if (oceanOwnership.isEmpty()) {
+            return supplementalOwnership;
+        }
+        if (supplementalOwnership.isEmpty()) {
+            return oceanOwnership;
+        }
+        LongOpenHashSet merged = new LongOpenHashSet(oceanOwnership);
+        merged.addAll(supplementalOwnership);
+        return LongSets.unmodifiable(merged);
     }
 
     private static void releaseVanillaTopOwnership(ClientLevel level) {
@@ -828,6 +877,8 @@ public final class OceanSurfaceRenderer {
             return;
         }
         ownedVanillaTops = LongSets.EMPTY_SET;
+        oceanOwnedVanillaTops = LongSets.EMPTY_SET;
+        supplementalOwnedVanillaTops = LongSets.EMPTY_SET;
         PATCHES.clear();
         if (level != null) {
             markSectionsDirty(level, previous);

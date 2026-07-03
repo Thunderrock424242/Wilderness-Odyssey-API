@@ -9,7 +9,7 @@ The Wilderness water system is split across several coordinated subsystems:
 - Finite fluid simulation: `WildernessFluidRegistry`, `CanonicalWaterFlowMixin`
 - Compatibility projection: `CanonicalWaterFlowMixin`, `CanonicalWaterBucketPickupMixin`
 - Client volume synchronization: `WaterVolumeChunkPayload`, `WaterVolumeSynchronizer`, `ClientWaterVolumeSnapshots`
-- Live diagnostics: `/wowater inspect`, `/wowater summary`, `/wowater migration`, `/wowater seed`, `/wowater repair`
+- Live diagnostics: `/wowater inspect`, `/wowater summary`, `/wowater authority`, `/wowater migration`, `/wowater seed`, `/wowater repair`
 - Release diagnostics: `/wowater shipcheck`
 - Ripple and splash particles: `RippleRenderer`, `WaterEntryEventHandler`
 - Gerstner waves per water body: `GerstnerWaveRenderMixin`, `WaveEntityPhysics`
@@ -24,9 +24,11 @@ amount, velocity, flags, and temperature in each chunk attachment. SPH owns
 mobile bucket volume; when a body settles, that exact volume is distributed
 into canonical cells. Vanilla water levels are projections for collision,
 swimming, waterlogging boundaries, and third-party compatibility rather than
-the simulation's source of truth. The client renderer keeps vanilla water tops
-visible by default as the stable fallback/base surface, then draws the animated
-replacement ocean and shoreline layers above that compatibility mask.
+the simulation's source of truth. `WildernessWaterAuthority` is the shared lens
+for deciding whether a cell is canonical, a namespaced Wilderness projection,
+hosted water, or a pending vanilla migration source. The client replacement
+surface samples that authority layer and treats plain `minecraft:water` as
+migration input instead of the visual base surface.
 
 The long-term replacement path is now namespaced ownership first and tag
 compatibility second. `wildernessodysseyapi:wilderness_water` and
@@ -55,13 +57,19 @@ because they can fire while Minecraft is preparing initial spawn chunks.
 `CanonicalWaterMigrationQueue` then processes loaded chunks after players
 exist, using configurable per-tick budgets for touched chunks, scanned columns,
 and converted blocks. A player-centered priority scan periodically promotes
-already-loaded chunks around each player, clamped to the server view distance,
-so visible water converges toward Wilderness ownership without force-loading
-the whole world. The seeder imports a bounded depth from oceans, rivers, lakes,
-and water under thin cover such as ice. Waterlogged host blocks, such as kelp,
-seagrass, and waterloggable modded blocks, can be imported as hosted canonical
-water for depth and optics, but the host block is not replaced and the
-open-ocean replacement mesh does not treat that cell as an exposed surface.
+already-loaded chunks around each player. By default it follows the player's
+requested view distance, adds a small padding radius, then clamps to the
+server's loaded view distance so visible water converges toward Wilderness
+ownership without force-loading the whole world. The seeder imports a bounded
+depth from oceans, rivers, lakes, and water under thin cover such as ice.
+Waterlogged host blocks, such as kelp, seagrass, and waterloggable modded
+blocks, can be imported directly from the motion-blocking surface scan as
+hosted canonical water for depth and optics, but the host block is not replaced
+and the open-ocean replacement mesh does not treat that cell as an exposed
+surface.
+Canonical authority import is allowed to continue after the per-tick block
+conversion budget is exhausted, so visible loaded water becomes
+Wilderness-owned before slower namespaced block rewrites finish catching up.
 Imported worldgen cells are flagged as stable reservoirs and do not tick until
 disturbed. When
 `convertSeededWorldWaterToWilderness` and automatic migration are enabled, the
@@ -95,7 +103,7 @@ Camera immersion samples that same rendered spectrum on the client. Biome tint,
 depth, local canonical velocity, daylight, and sea state feed a bounded optical
 model for fog distance/color and the optional built-in caustic overlay. External
 shader packs keep their normal water pipeline, while canonical crests above the
-flat compatibility plane receive a standard overlay fallback.
+flat compatibility plane receive the standard tagged-water overlay.
 
 ## Debug and manual validation
 
@@ -106,9 +114,13 @@ Use these commands in a dev world:
   one block.
 - `/wowater summary <radius>` counts nearby wet, tag-water, canonical, projected,
   and mobile-water blocks.
+- `/wowater authority <radius>` separates Wilderness-owned water from pending
+  vanilla migration sources, hosted/waterlogged cells, projection gaps, mobile
+  SPH water, and replacement-safe visible surface cells.
 - `/wowater migration` reports the automatic migration queue, totals, hosted
   waterlogged imports, player-priority scan counts, skipped unloaded chunks,
-  and the last tick's migration work.
+  effective view-distance priority radius, promoted chunks, and the last tick's
+  migration work.
 - `/wowater shipcheck <radius>` classifies nearby water as Wilderness-owned,
   vanilla-pending-conversion, hosted-safe, pending import, or projection gaps.
   Use it before visual bug hunting so screenshots can be tied to ownership

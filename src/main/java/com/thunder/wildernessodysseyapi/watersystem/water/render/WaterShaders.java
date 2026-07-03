@@ -46,10 +46,11 @@ public final class WaterShaders {
     }
 
     // A failed GLSL link can still produce a ShaderInstance. Reject it here so
-    // the per-frame ocean pass falls back instead of retrying an invalid program.
+    // the per-frame ocean pass can keep drawing the Wilderness mesh with the
+    // stock translucent program instead of retrying an invalid shader.
     private static void acceptOceanShader(ShaderInstance shader) {
         if (!isLinked(shader)) {
-            ModConstants.LOGGER.error("Ocean shader failed to link; using the vanilla translucent fallback");
+            ModConstants.LOGGER.error("Ocean shader failed to link; drawing the Wilderness ocean mesh with the stock translucent shader");
             oceanShader = null;
             return;
         }
@@ -60,14 +61,14 @@ public final class WaterShaders {
     // a bad resource reload must not prevent the client from reaching the menu.
     private static void acceptUnderwaterShader(ShaderInstance shader) {
         if (!isLinked(shader)) {
-            ModConstants.LOGGER.error("Underwater shader failed to link; using the vanilla water overlay");
+            ModConstants.LOGGER.error("Underwater shader failed to link; drawing the Wilderness underwater overlay with the stock texture shader");
             underwaterShader = null;
             return;
         }
         underwaterShader = shader;
     }
 
-    /** Returns the shader used by the custom ocean RenderType. */
+    /** Returns the program used by the custom Wilderness ocean RenderType. */
     public static ShaderInstance getOceanShader() {
         return oceanShader != null ? oceanShader : GameRenderer.getRendertypeTranslucentShader();
     }
@@ -87,7 +88,7 @@ public final class WaterShaders {
                 && !isExternalShaderPackModLoaded();
     }
 
-    /** Returns the linked underwater shader, falling back to vanilla position-texture rendering. */
+    /** Returns the program used by the Wilderness underwater overlay. */
     public static ShaderInstance getUnderwaterShader() {
         return underwaterShader != null ? underwaterShader : GameRenderer.getPositionTexShader();
     }

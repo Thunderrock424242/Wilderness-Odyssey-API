@@ -77,10 +77,10 @@ public final class WaterRenderingConfig {
                 .comment("Render the block-detail shoreline/local-water overlay for cells the open-ocean mesh does not own.")
                 .define("enableShorelineSurface", true);
         REPLACE_VANILLA_WATER_TOPS = builder
-                .comment("Hide vanilla top faces wherever the replacement water mesh owns the same safe surface cell. This removes the double-water patchwork look while preserving vanilla water states for compatibility.")
+                .comment("Hide vanilla top faces wherever the validated replacement mesh owns water. Vanilla fluid remains tagged compatibility data while Wilderness owns the visible surface.")
                 .define("replaceVanillaWaterTopFaces", true);
         SUPPRESS_VANILLA_WATER_TOPS = builder
-                .comment("Legacy/debug override: also hide vanilla top faces covered by the replacement mesh. Kept for older configs; replaceVanillaWaterTopFaces is the normal replacement-mode switch.")
+                .comment("Legacy/debug override: also enables vanilla top hiding. Kept for older configs; replaceVanillaWaterTopFaces is the normal replacement-mode switch.")
                 .define("suppressVanillaWaterTopFaces", false);
         ENABLE_WATER_CORE_SHADER = builder
                 .comment("Use the built-in Fresnel/absorption water shader when no external shader pack owns water rendering.")
@@ -115,10 +115,10 @@ public final class WaterRenderingConfig {
                 .defineInRange("underwaterTurbidityStrength", 1.0, 0.0, 2.0);
         SURFACE_ABSORPTION_STRENGTH = builder
                 .comment("Scales how quickly the replacement surface shifts toward deep-water color with depth. Higher values hide blocky seafloors sooner.")
-                .defineInRange("surfaceAbsorptionStrength", 1.35, 0.25, 3.0);
+                .defineInRange("surfaceAbsorptionStrength", 1.45, 0.25, 3.0);
         SURFACE_OPACITY_STRENGTH = builder
                 .comment("Scales replacement-surface alpha after depth, foam, and shoreline fades. Higher values make the water medium less see-through.")
-                .defineInRange("surfaceOpacityStrength", 1.16, 0.50, 2.0);
+                .defineInRange("surfaceOpacityStrength", 1.28, 0.50, 2.0);
         SHORELINE_OVERLAY_STRENGTH = builder
                 .comment("Scales shoreline overlay alpha, foam, and local vertical motion.")
                 .defineInRange("shorelineOverlayStrength", 1.0, 0.0, 2.0);
@@ -329,12 +329,14 @@ public final class WaterRenderingConfig {
 
     /** Returns the depth absorption multiplier used by surface renderers. */
     public static float surfaceAbsorptionStrength() {
-        return SURFACE_ABSORPTION_STRENGTH.get().floatValue();
+        float configured = SURFACE_ABSORPTION_STRENGTH.get().floatValue();
+        return suppressVanillaWaterTopFaces() ? Math.max(configured, 1.45f) : configured;
     }
 
     /** Returns the alpha multiplier used by surface renderers. */
     public static float surfaceOpacityStrength() {
-        return SURFACE_OPACITY_STRENGTH.get().floatValue();
+        float configured = SURFACE_OPACITY_STRENGTH.get().floatValue();
+        return suppressVanillaWaterTopFaces() ? Math.max(configured, 1.28f) : configured;
     }
 
     /**

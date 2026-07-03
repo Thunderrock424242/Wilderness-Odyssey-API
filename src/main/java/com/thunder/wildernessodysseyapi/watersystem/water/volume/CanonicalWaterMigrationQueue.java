@@ -35,10 +35,15 @@ public final class CanonicalWaterMigrationQueue {
     private static long convertedBlocks;
     private static long playerScanCheckedChunks;
     private static long playerScanQueuedChunks;
+    private static long playerScanPromotedChunks;
     private static long skippedUnloadedChunks;
     private static long droppedChunks;
     private static int lastPlayerScanCheckedChunks;
     private static int lastPlayerScanQueuedChunks;
+    private static int lastPlayerScanPromotedChunks;
+    private static int lastPlayerScanRadius;
+    private static int lastPlayerScanServerViewDistance;
+    private static int lastPlayerScanRequestedViewDistance;
     private static int nextPlayerScanTick;
     private static TickResult lastTick = TickResult.EMPTY;
 
@@ -59,7 +64,7 @@ public final class CanonicalWaterMigrationQueue {
         if (!WaterSimulationConfig.ENABLE_CANONICAL_WORLD_SEEDING.get()) {
             return false;
         }
-        MigrationTask task = new MigrationTask(level.dimension(), pos, 0);
+        MigrationTask task = new MigrationTask(level.dimension(), pos, 0, priority);
         if (QUEUED_KEYS.contains(task.key())) {
             if (priority) {
                 promoteQueuedTask(task.key());
@@ -123,8 +128,7 @@ public final class CanonicalWaterMigrationQueue {
         while (!QUEUE.isEmpty()
                 && attemptsRemaining > 0
                 && chunksRemaining > 0
-                && columnsRemaining > 0
-                && (!allowBlockConversion || conversionsRemaining > 0)) {
+                && columnsRemaining > 0) {
             attemptsRemaining--;
             MigrationTask task = QUEUE.pollFirst();
             if (task == null) {
@@ -162,7 +166,7 @@ public final class CanonicalWaterMigrationQueue {
             tickStats = tickStats.plus(sliceStats);
             columnsRemaining -= sliceStats.scannedColumns();
             if (allowBlockConversion) {
-                conversionsRemaining -= sliceStats.convertedBlocks();
+                conversionsRemaining = Math.max(0, conversionsRemaining - sliceStats.convertedBlocks());
             }
             chunksRemaining--;
             tickTouched++;
@@ -171,7 +175,7 @@ public final class CanonicalWaterMigrationQueue {
                 QUEUED_KEYS.remove(task.key());
                 tickCompleted++;
             } else {
-                QUEUE.offerLast(task.withNextColumnIndex(slice.nextColumnIndex()));
+                requeue(task.withNextColumnIndex(slice.nextColumnIndex()));
                 if (sliceStats.scannedColumns() <= 0) {
                     break;
                 }
@@ -219,10 +223,15 @@ public final class CanonicalWaterMigrationQueue {
         convertedBlocks = 0L;
         playerScanCheckedChunks = 0L;
         playerScanQueuedChunks = 0L;
+        playerScanPromotedChunks = 0L;
         skippedUnloadedChunks = 0L;
         droppedChunks = 0L;
         lastPlayerScanCheckedChunks = 0;
         lastPlayerScanQueuedChunks = 0;
+        lastPlayerScanPromotedChunks = 0;
+        lastPlayerScanRadius = 0;
+        lastPlayerScanServerViewDistance = 0;
+        lastPlayerScanRequestedViewDistance = 0;
         nextPlayerScanTick = 0;
         lastTick = TickResult.EMPTY;
     }
@@ -243,8 +252,13 @@ public final class CanonicalWaterMigrationQueue {
                 WaterSimulationConfig.automaticMigrationPlayerScanIntervalTicks(),
                 lastPlayerScanCheckedChunks,
                 lastPlayerScanQueuedChunks,
+                lastPlayerScanPromotedChunks,
+                lastPlayerScanRadius,
+                lastPlayerScanServerViewDistance,
+                lastPlayerScanRequestedViewDistance,
                 playerScanCheckedChunks,
                 playerScanQueuedChunks,
+                playerScanPromotedChunks,
                 skippedUnloadedChunks,
                 droppedChunks,
                 lastTick
@@ -256,6 +270,10 @@ public final class CanonicalWaterMigrationQueue {
         if (playerRadius <= 0) {
             lastPlayerScanCheckedChunks = 0;
             lastPlayerScanQueuedChunks = 0;
+            lastPlayerScanPromotedChunks = 0;
+            lastPlayerScanRadius = 0;
+            lastPlayerScanServerViewDistance = 0;
+            lastPlayerScanRequestedViewDistance = 0;
             return;
         }
 
@@ -265,13 +283,19 @@ public final class CanonicalWaterMigrationQueue {
         }
         nextPlayerScanTick = currentTick + WaterSimulationConfig.automaticMigrationPlayerScanIntervalTicks();
 
-        int serverViewDistance = Math.max(1, server.getPlayerList().getViewDistance());
-        int radius = Math.min(playerRadius, serverViewDistance);
         int checked = 0;
         int queued = 0;
+        int promoted = 0;
+        int maxRadius = 0;
+        int maxServerViewDistance = Math.max(1, server.getPlayerList().getViewDistance());
+        int maxRequestedViewDistance = 0;
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerLevel level = player.serverLevel();
             ChunkPos center = player.chunkPosition();
+            int requestedViewDistance = Math.max(1, player.requestedViewDistance());
+            int radius = effectivePlayerScanRadius(server, requestedViewDistance, playerRadius);
+            maxRadius = Math.max(maxRadius, radius);
+            maxRequestedViewDistance = Math.max(maxRequestedViewDistance, requestedViewDistance);
             for (int chunkX = center.x - radius; chunkX <= center.x + radius; chunkX++) {
                 for (int chunkZ = center.z - radius; chunkZ <= center.z + radius; chunkZ++) {
                     LevelChunk chunk = level.getChunkSource().getChunkNow(chunkX, chunkZ);
@@ -281,6 +305,8 @@ public final class CanonicalWaterMigrationQueue {
                     checked++;
                     if (enqueue(level, chunk.getPos(), true)) {
                         queued++;
+                    } else {
+                        promoted++;
                     }
                 }
             }
@@ -288,8 +314,25 @@ public final class CanonicalWaterMigrationQueue {
 
         lastPlayerScanCheckedChunks = checked;
         lastPlayerScanQueuedChunks = queued;
+        lastPlayerScanPromotedChunks = promoted;
+        lastPlayerScanRadius = maxRadius;
+        lastPlayerScanServerViewDistance = maxServerViewDistance;
+        lastPlayerScanRequestedViewDistance = maxRequestedViewDistance;
         playerScanCheckedChunks += checked;
         playerScanQueuedChunks += queued;
+        playerScanPromotedChunks += promoted;
+    }
+
+    private static int effectivePlayerScanRadius(
+            MinecraftServer server,
+            int requestedViewDistance,
+            int configuredRadius
+    ) {
+        int serverViewDistance = Math.max(1, server.getPlayerList().getViewDistance());
+        int visibleRadius = WaterSimulationConfig.automaticMigrationFollowsPlayerViewDistance()
+                ? requestedViewDistance + WaterSimulationConfig.automaticMigrationViewDistancePaddingChunks()
+                : configuredRadius;
+        return Math.max(1, Math.min(serverViewDistance, Math.max(configuredRadius, visibleRadius)));
     }
 
     private static void promoteQueuedTask(String key) {
@@ -298,19 +341,31 @@ public final class CanonicalWaterMigrationQueue {
             MigrationTask queued = iterator.next();
             if (queued.key().equals(key)) {
                 iterator.remove();
-                QUEUE.offerFirst(queued);
+                QUEUE.offerFirst(queued.asPriority());
                 return;
             }
         }
     }
 
-    private record MigrationTask(ResourceKey<Level> dimension, ChunkPos pos, int nextColumnIndex) {
+    private static void requeue(MigrationTask task) {
+        if (task.priority()) {
+            QUEUE.offerFirst(task);
+        } else {
+            QUEUE.offerLast(task);
+        }
+    }
+
+    private record MigrationTask(ResourceKey<Level> dimension, ChunkPos pos, int nextColumnIndex, boolean priority) {
         private String key() {
             return dimension.location() + ":" + pos.x + ":" + pos.z;
         }
 
         private MigrationTask withNextColumnIndex(int nextColumnIndex) {
-            return new MigrationTask(dimension, pos, nextColumnIndex);
+            return new MigrationTask(dimension, pos, nextColumnIndex, priority);
+        }
+
+        private MigrationTask asPriority() {
+            return priority ? this : new MigrationTask(dimension, pos, nextColumnIndex, true);
         }
     }
 
@@ -347,8 +402,13 @@ public final class CanonicalWaterMigrationQueue {
             int playerScanIntervalTicks,
             int lastPlayerScanCheckedChunks,
             int lastPlayerScanQueuedChunks,
+            int lastPlayerScanPromotedChunks,
+            int lastPlayerScanRadius,
+            int lastPlayerScanServerViewDistance,
+            int lastPlayerScanRequestedViewDistance,
             long playerScanCheckedChunks,
             long playerScanQueuedChunks,
+            long playerScanPromotedChunks,
             long skippedUnloadedChunks,
             long droppedChunks,
             TickResult lastTick

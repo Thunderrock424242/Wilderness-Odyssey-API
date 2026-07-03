@@ -1,28 +1,22 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.phys.Vec3;
 
 /**
- * Samples the client-visible water column from canonical volume first, then
- * from vanilla water as the compatibility projection.
+ * Samples client water through the Wilderness authority layer.
  *
  * <p>Keeping this logic in one place prevents shoreline overlays, open-ocean
  * replacement quads, and underwater fog from disagreeing about partial fills,
- * flow velocity, or the surface height of the same block.</p>
+ * flow velocity, or the surface height of the same block. Surface renderers
+ * reject vanilla-only migration candidates; immersion can still see tagged
+ * water while the server catches up.</p>
  */
 final class ClientWaterColumnSampler {
 
-    private static final int MIN_FULL_VOLUME_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK * 7 / 8;
-    private static final float FULL_WATER_SURFACE_HEIGHT = 0.8888889f;
     private static final float MIN_VISIBLE_DEPTH = 0.05f;
 
     private ClientWaterColumnSampler() {
@@ -46,7 +40,7 @@ final class ClientWaterColumnSampler {
         }
 
         CellSample cell = sampleCell(level, surfacePos);
-        if (!cell.valid || isCovered(level, surfacePos.above())) {
+        if (!cell.valid || !cell.authorityOwned || cell.hostedWater || isCovered(level, surfacePos.above())) {
             return ColumnSample.INVALID;
         }
 
@@ -62,6 +56,9 @@ final class ClientWaterColumnSampler {
                 cell.velocityY,
                 cell.velocityZ,
                 cell.canonical,
+                cell.authorityOwned,
+                cell.hostedWater,
+                cell.migrationCandidate,
                 cell.replacementSafe
         );
     }
@@ -72,57 +69,34 @@ final class ClientWaterColumnSampler {
             return CellSample.INVALID;
         }
 
-        var canonicalCell = CanonicalWater.getTracked(level, pos);
-        if (canonicalCell != null) {
-            if (canonicalCell.volumeUnits() <= 0) {
-                return CellSample.INVALID;
-            }
-            float fillFraction = clamp(canonicalCell.fillFraction(), 0.0f, 1.0f);
-            boolean fullWater = canonicalCell.volumeUnits() >= MIN_FULL_VOLUME_UNITS;
-            boolean replacementSafe = fullWater && !canonicalCell.hostedWater();
-            return new CellSample(
-                    true,
-                    fullWater,
-                    fillFraction,
-                    fullWater ? FULL_WATER_SURFACE_HEIGHT : fillFraction,
-                    canonicalCell.velocityX(),
-                    canonicalCell.velocityY(),
-                    canonicalCell.velocityZ(),
-                    true,
-                    replacementSafe
-            );
-        }
-
-        BlockState state = level.getBlockState(pos);
-        FluidState fluid = state.getFluidState();
-        if (!fluid.is(FluidTags.WATER)) {
+        WildernessWaterAuthority.CellAuthority authority = WildernessWaterAuthority.sample(level, pos);
+        if (!authority.water()) {
             return CellSample.INVALID;
         }
 
-        boolean fullWater = fluid.isSource();
-        float ownHeight = clamp(fluid.getOwnHeight(), 0.0f, 1.0f);
-        Vec3 flow = fluid.getFlow(level, pos);
-        boolean plainSourceWater = fullWater && WaterCompatibility.isPlainWaterProjection(state);
         return new CellSample(
                 true,
-                fullWater,
-                fullWater ? 1.0f : ownHeight,
-                fullWater ? FULL_WATER_SURFACE_HEIGHT : ownHeight,
-                (float) flow.x,
-                0.0f,
-                (float) flow.z,
-                false,
-                plainSourceWater
+                authority.fullSurfaceWater(),
+                clamp(authority.fillFraction(), 0.0f, 1.0f),
+                clamp(authority.surfaceFillHeight(), 0.0f, 1.0f),
+                authority.velocityX(),
+                authority.velocityY(),
+                authority.velocityZ(),
+                authority.canonicalTracked(),
+                authority.authorityOwned(),
+                authority.hostedWater(),
+                authority.migrationCandidate(),
+                authority.replacementSurfaceSafe()
         );
     }
 
-    /** Returns whether canonical or vanilla-compatible water occupies the block. */
+    /** Returns whether authoritative or pending compatibility water occupies the block. */
     static boolean hasWater(ClientLevel level, BlockPos pos) {
         return sampleCell(level, pos).valid;
     }
 
     /**
-     * Measures visible water depth by accumulating canonical/vanilla fill
+     * Measures visible water depth by accumulating authority-layer fill
      * fractions downward until terrain, an unloaded block, or air is reached.
      */
     static float scanDepthFromSurface(
@@ -182,10 +156,13 @@ final class ClientWaterColumnSampler {
             float velocityY,
             float velocityZ,
             boolean canonical,
+            boolean authorityOwned,
+            boolean hostedWater,
+            boolean migrationCandidate,
             boolean replacementSafe
     ) {
         static final ColumnSample INVALID = new ColumnSample(false, 0, 0.0f, 0.0f,
-                false, 0.0f, 0.0f, 0.0f, 0.0f, false, false);
+                false, 0.0f, 0.0f, 0.0f, 0.0f, false, false, false, false, false);
 
         /** Returns whether the open-ocean replacement mesh may hide vanilla top faces here. */
         public boolean replacementSafe() {
@@ -203,10 +180,13 @@ final class ClientWaterColumnSampler {
             float velocityY,
             float velocityZ,
             boolean canonical,
+            boolean authorityOwned,
+            boolean hostedWater,
+            boolean migrationCandidate,
             boolean replacementSafe
     ) {
         static final CellSample INVALID = new CellSample(false, false, 0.0f,
-                0.0f, 0.0f, 0.0f, 0.0f, false, false);
+                0.0f, 0.0f, 0.0f, 0.0f, false, false, false, false, false);
 
         /** Returns bounded three-dimensional water motion in blocks per second. */
         float speed() {

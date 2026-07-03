@@ -13,7 +13,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
  * compatibility vertices can move vertically when the dynamic replacement pass
  * is disabled, but remain laterally anchored. When the per-frame surface is
  * active, baked liquid geometry stays stable underneath it so ice shelves and
- * shoreline fallbacks cannot turn into large translucent triangles.</p>
+ * shoreline compatibility edges cannot turn into large translucent triangles.</p>
  */
 public final class GerstnerVertexConsumer implements VertexConsumer {
 
