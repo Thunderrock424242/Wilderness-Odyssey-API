@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterMigrationQueue;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterSeeder;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
@@ -45,6 +46,11 @@ public final class WaterDebugCommand {
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, 64))
                                 .executes(context -> summary(context,
                                         IntegerArgumentType.getInteger(context, "radius")))))
+                .then(Commands.literal("authority")
+                        .executes(context -> authority(context, 16))
+                        .then(Commands.argument("radius", IntegerArgumentType.integer(1, 64))
+                                .executes(context -> authority(context,
+                                        IntegerArgumentType.getInteger(context, "radius")))))
                 .then(Commands.literal("seed")
                         .requires(source -> source.hasPermission(2))
                         .executes(context -> seed(context, 0))
@@ -72,6 +78,12 @@ public final class WaterDebugCommand {
         WaterCompatibility.Snapshot snapshot = WaterCompatibility.describe(level, pos);
 
         source.sendSuccess(() -> Component.literal("WO water @ " + formatPos(pos)), false);
+        source.sendSuccess(() -> Component.literal("  authority source=" + snapshot.authoritySource()
+                + ", owned=" + snapshot.authorityOwned()
+                + ", migrationCandidate=" + snapshot.migrationCandidate()
+                + ", replacementSafe=" + snapshot.replacementSurfaceSafe()
+                + ", volume=" + snapshot.authorityVolumeUnits()
+                + ", fill=" + format(snapshot.authorityFillFraction())), false);
         source.sendSuccess(() -> Component.literal("  wet=" + snapshot.wet()
                 + ", tagWater=" + snapshot.tagWater()
                 + ", vanillaBlock=" + snapshot.vanillaWaterBlock()
@@ -100,6 +112,8 @@ public final class WaterDebugCommand {
         int wet = 0;
         int tagWater = 0;
         int canonical = 0;
+        int authorityOwned = 0;
+        int migrationCandidates = 0;
         int hosted = 0;
         int mobile = 0;
         int projected = 0;
@@ -112,6 +126,8 @@ public final class WaterDebugCommand {
             if (snapshot.wet()) wet++;
             if (snapshot.tagWater()) tagWater++;
             if (snapshot.canonicalTracked()) canonical++;
+            if (snapshot.authorityOwned()) authorityOwned++;
+            if (snapshot.migrationCandidate()) migrationCandidates++;
             if (snapshot.hostedWater()) hosted++;
             if (snapshot.mobileWater()) mobile++;
             if (snapshot.compatibilityProjected()) projected++;
@@ -122,6 +138,8 @@ public final class WaterDebugCommand {
         int finalWet = wet;
         int finalTagWater = tagWater;
         int finalCanonical = canonical;
+        int finalAuthorityOwned = authorityOwned;
+        int finalMigrationCandidates = migrationCandidates;
         int finalHosted = hosted;
         int finalMobile = mobile;
         int finalProjected = projected;
@@ -130,10 +148,100 @@ public final class WaterDebugCommand {
                 + " wet=" + finalWet
                 + " tagWater=" + finalTagWater
                 + " canonical=" + finalCanonical
+                + " authorityOwned=" + finalAuthorityOwned
+                + " pendingMigration=" + finalMigrationCandidates
                 + " hosted=" + finalHosted
                 + " projected=" + finalProjected
                 + " mobile=" + finalMobile), false);
         return 1;
+    }
+
+    private static int authority(CommandContext<CommandSourceStack> context, int requestedRadius) {
+        CommandSourceStack source = context.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos center = sourceBlockPos(source);
+        int radius = Math.min(requestedRadius, WaterSimulationConfig.debugCommandMaxRadius());
+        AuthorityStats stats = scanAuthority(level, center, radius);
+
+        source.sendSuccess(() -> Component.literal("WO water authority radius=" + radius
+                + " state=" + stats.stateLabel()), false);
+        source.sendSuccess(() -> Component.literal("  Coverage: sampled=" + stats.sampled()
+                + ", wet=" + stats.wet()
+                + ", owned=" + stats.authorityOwned()
+                + ", ownerCoverage=" + stats.ownerCoverageLabel()
+                + ", replacementSafe=" + stats.replacementSafe()), false);
+        source.sendSuccess(() -> Component.literal("  Sources: canonical=" + stats.canonical()
+                + ", canonicalHosted=" + stats.canonicalHosted()
+                + ", wildernessProjection=" + stats.wildernessProjection()
+                + ", vanillaPending=" + stats.vanillaPending()
+                + ", hostedPending=" + stats.hostedTagged()
+                + ", mobile=" + stats.mobile()), false);
+        source.sendSuccess(() -> Component.literal("  Action: pendingImport=" + stats.pendingImport()
+                + ", pendingHostedImport=" + stats.pendingHostedImport()
+                + ", projectionGaps=" + stats.projectionGaps()
+                + ", advice=" + stats.advice()), false);
+        return Math.max(1, stats.wet());
+    }
+
+    private static AuthorityStats scanAuthority(ServerLevel level, BlockPos center, int radius) {
+        int sampled = 0;
+        int wet = 0;
+        int authorityOwned = 0;
+        int replacementSafe = 0;
+        int canonical = 0;
+        int canonicalHosted = 0;
+        int wildernessProjection = 0;
+        int vanillaPending = 0;
+        int hostedTagged = 0;
+        int pendingImport = 0;
+        int pendingHostedImport = 0;
+        int projectionGaps = 0;
+        int mobile = 0;
+
+        for (BlockPos pos : BlockPos.betweenClosed(
+                center.offset(-radius, -radius, -radius),
+                center.offset(radius, radius, radius)
+        )) {
+            sampled++;
+            WaterCompatibility.Snapshot snapshot = WaterCompatibility.describe(level, pos);
+            if (snapshot.wet()) wet++;
+            if (snapshot.authorityOwned()) authorityOwned++;
+            if (snapshot.replacementSurfaceSafe()) replacementSafe++;
+            if (snapshot.canonicalWater()) canonical++;
+            if (snapshot.authoritySource() == WildernessWaterAuthority.WaterSource.CANONICAL_HOSTED) {
+                canonicalHosted++;
+            }
+            if (snapshot.authoritySource() == WildernessWaterAuthority.WaterSource.WILDERNESS_PROJECTION) {
+                wildernessProjection++;
+            }
+            if (snapshot.authoritySource() == WildernessWaterAuthority.WaterSource.VANILLA_MIGRATION_SOURCE) {
+                vanillaPending++;
+            }
+            if (snapshot.authoritySource() == WildernessWaterAuthority.WaterSource.HOSTED_TAGGED_WATER) {
+                hostedTagged++;
+            }
+            boolean pendingHosted = snapshot.nonPlainTaggedWater() && !snapshot.hostedWater();
+            if (snapshot.pendingCanonicalImport() && !pendingHosted) pendingImport++;
+            if (pendingHosted) pendingHostedImport++;
+            if (snapshot.projectionGap()) projectionGaps++;
+            if (snapshot.mobileWater()) mobile++;
+        }
+
+        return new AuthorityStats(
+                sampled,
+                wet,
+                authorityOwned,
+                replacementSafe,
+                canonical,
+                canonicalHosted,
+                wildernessProjection,
+                vanillaPending,
+                hostedTagged,
+                pendingImport,
+                pendingHostedImport,
+                projectionGaps,
+                mobile
+        );
     }
 
     private static int seed(CommandContext<CommandSourceStack> context, int chunkRadius) throws CommandSyntaxException {
@@ -184,10 +292,15 @@ public final class WaterDebugCommand {
                 + ", hosted=" + lastTick.hostedWaterCells()
                 + ", converted=" + lastTick.convertedBlocks()), false);
         source.sendSuccess(() -> Component.literal("  Player priority: radius=" + status.playerScanRadius()
+                + ", effective=" + status.lastPlayerScanRadius()
+                + ", requested=" + status.lastPlayerScanRequestedViewDistance()
+                + ", serverView=" + status.lastPlayerScanServerViewDistance()
                 + ", interval=" + status.playerScanIntervalTicks() + " ticks"
                 + ", last checked=" + status.lastPlayerScanCheckedChunks()
                 + ", last queued=" + status.lastPlayerScanQueuedChunks()
-                + ", total queued=" + status.playerScanQueuedChunks()), false);
+                + ", last promoted=" + status.lastPlayerScanPromotedChunks()
+                + ", total queued=" + status.playerScanQueuedChunks()
+                + ", total promoted=" + status.playerScanPromotedChunks()), false);
         source.sendSuccess(() -> Component.literal("  Queue health: skipped unloaded="
                 + status.skippedUnloadedChunks()
                 + ", dropped=" + status.droppedChunks()), false);
@@ -313,6 +426,59 @@ public final class WaterDebugCommand {
 
     private static String format(float value) {
         return String.format(Locale.ROOT, "%.3f", value);
+    }
+
+    /** Local authority report for deciding whether visible water is Wilderness-owned yet. */
+    private record AuthorityStats(
+            int sampled,
+            int wet,
+            int authorityOwned,
+            int replacementSafe,
+            int canonical,
+            int canonicalHosted,
+            int wildernessProjection,
+            int vanillaPending,
+            int hostedTagged,
+            int pendingImport,
+            int pendingHostedImport,
+            int projectionGaps,
+            int mobile
+    ) {
+        private String stateLabel() {
+            if (projectionGaps > 0) {
+                return "PROJECTION_GAPS";
+            }
+            if (vanillaPending > 0 || pendingImport > 0 || pendingHostedImport > 0) {
+                return "MIGRATING";
+            }
+            if (wet > 0 && authorityOwned == wet) {
+                return replacementSafe == wet ? "WILDERNESS_OWNED" : "WILDERNESS_OWNED_HOSTED";
+            }
+            return wet == 0 ? "DRY" : "MIXED";
+        }
+
+        private String ownerCoverageLabel() {
+            if (wet <= 0) {
+                return "n/a";
+            }
+            return Math.round(authorityOwned * 100.0f / wet) + "%";
+        }
+
+        private String advice() {
+            if (projectionGaps > 0) {
+                return "run /wowater repair nearby";
+            }
+            if (vanillaPending > 0 || pendingImport > 0 || pendingHostedImport > 0) {
+                return "wait for automatic migration or run /wowater seed 1";
+            }
+            if (wet == 0) {
+                return "no water sampled";
+            }
+            if (mobile > 0 && authorityOwned < wet) {
+                return "mobile SPH water is present; wait for it to settle into canonical cells";
+            }
+            return "local water is owned by Wilderness authority";
+        }
     }
 
     /** Compact local readiness summary for ship-track water validation. */

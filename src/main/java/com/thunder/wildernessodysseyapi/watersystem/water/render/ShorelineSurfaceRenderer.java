@@ -10,6 +10,9 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfi
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.longs.LongSets;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -36,9 +39,9 @@ import java.util.List;
  *
  * <p>The open-ocean renderer intentionally refuses shore, ice-adjacent,
  * flowing, partial, or otherwise discontinuous cells. This renderer fills that
- * visual gap with one-block, laterally anchored quads that never hide vanilla
- * water. Vanilla remains the compatibility mask while this layer adds local
- * color, small vertical motion, and foam-like edge brightness.</p>
+ * visual gap with one-block, laterally anchored quads. In strict replacement
+ * mode it also claims matching vanilla top faces so Minecraft water remains the
+ * compatibility mask, not the visible surface.</p>
  */
 @EventBusSubscriber(modid = "wildernessodysseyapi", value = Dist.CLIENT)
 public final class ShorelineSurfaceRenderer {
@@ -53,6 +56,7 @@ public final class ShorelineSurfaceRenderer {
     private static final float VISUAL_TIDE_SCALE = 0.18f;
 
     private static final List<ShorePatch> PATCHES = new ArrayList<>();
+    private static LongSet ownedVanillaTops = LongSets.EMPTY_SET;
     private static ClientLevel cachedLevel;
     private static int cachedCenterX = Integer.MIN_VALUE;
     private static int cachedCenterZ = Integer.MIN_VALUE;
@@ -63,7 +67,7 @@ public final class ShorelineSurfaceRenderer {
     private ShorelineSurfaceRenderer() {
     }
 
-    /** Renders local water detail after vanilla translucent terrain. */
+    /** Renders local water detail after the translucent terrain pass. */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
@@ -73,6 +77,10 @@ public final class ShorelineSurfaceRenderer {
                 || !WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()
                 || !WaterRenderingConfig.ENABLE_SHORELINE_SURFACE.get()) {
             clearCache();
+            OceanSurfaceRenderer.setSupplementalBakedTopOwnership(
+                    Minecraft.getInstance().level,
+                    LongSets.EMPTY_SET
+            );
             return;
         }
 
@@ -94,7 +102,11 @@ public final class ShorelineSurfaceRenderer {
         refreshCacheIfNeeded(level, (int) Math.floor(camera.x), (int) Math.floor(camera.z), radius,
                 WaterRenderingConfig.maxShorelineSurfacePatches());
         if (PATCHES.isEmpty()) {
+            OceanSurfaceRenderer.setSupplementalBakedTopOwnership(level, LongSets.EMPTY_SET);
             return;
+        }
+        if (WaterRenderingConfig.suppressVanillaWaterTopFaces()) {
+            OceanSurfaceRenderer.setSupplementalBakedTopOwnership(level, ownedVanillaTops);
         }
 
         float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
@@ -187,6 +199,7 @@ public final class ShorelineSurfaceRenderer {
                 }
             }
         }
+        updateVanillaTopOwnership(level);
     }
 
     private static void addPatchCandidate(
@@ -234,6 +247,7 @@ public final class ShorelineSurfaceRenderer {
         PATCHES.add(new ShorePatch(
                 x,
                 z,
+                surface.surfaceBlockY,
                 surface.surfaceY,
                 surface.depth,
                 WaterBodyClassifier.classify(level, new BlockPos(x, surface.surfaceBlockY, z)),
@@ -312,7 +326,9 @@ public final class ShorelineSurfaceRenderer {
         float dx = centerX - cameraX;
         float dz = centerZ - cameraZ;
         float distance = (float) Math.sqrt(dx * dx + dz * dz);
-        float distanceFade = 1.0f - smoothStep(renderRadius * 0.72f, renderRadius, distance);
+        float distanceFade = WaterRenderingConfig.suppressVanillaWaterTopFaces()
+                ? 1.0f
+                : 1.0f - smoothStep(renderRadius * 0.72f, renderRadius, distance);
         float visualStrength = Math.max(0.0f, shorelineStrength * distanceFade);
         if (visualStrength <= 0.0f) {
             return;
@@ -442,7 +458,11 @@ public final class ShorelineSurfaceRenderer {
         red = mix(red, 0.88f, foam);
         green = mix(green, 0.96f, foam);
         blue = mix(blue, 1.0f, foam);
-        float volumeAlpha = mix(0.28f, fullWater ? 0.52f : 0.44f, smoothStep(0.08f, 1.0f, fillFraction));
+        float alphaStart = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.50f : 0.28f;
+        float alphaEnd = WaterRenderingConfig.suppressVanillaWaterTopFaces()
+                ? fullWater ? 0.78f : 0.66f
+                : fullWater ? 0.52f : 0.44f;
+        float volumeAlpha = mix(alphaStart, alphaEnd, smoothStep(0.08f, 1.0f, fillFraction));
         float shorelineOpacity = mix(1.0f, WaterRenderingConfig.surfaceOpacityStrength(), 0.55f);
         float alpha = (volumeAlpha + edgeStrength * 0.10f + Math.min(0.06f, flowSpeed * 0.04f))
                 * shorelineOpacity
@@ -476,12 +496,35 @@ public final class ShorelineSurfaceRenderer {
 
     private static void clearCache() {
         PATCHES.clear();
+        ownedVanillaTops = LongSets.EMPTY_SET;
         cachedLevel = null;
         cachedCenterX = Integer.MIN_VALUE;
         cachedCenterZ = Integer.MIN_VALUE;
         cachedRadius = -1;
         cachedMaxPatches = -1;
         cachedGameTime = Long.MIN_VALUE;
+    }
+
+    /**
+     * Publishes local water ownership into the open-ocean culling set.
+     *
+     * <p>This keeps the replacement system strict: once a Wilderness shoreline
+     * patch is responsible for a cell, the baked vanilla top face is culled
+     * instead of staying visible as a backup layer.</p>
+     */
+    private static void updateVanillaTopOwnership(ClientLevel level) {
+        if (!WaterRenderingConfig.suppressVanillaWaterTopFaces() || PATCHES.isEmpty()) {
+            ownedVanillaTops = LongSets.EMPTY_SET;
+            OceanSurfaceRenderer.setSupplementalBakedTopOwnership(level, LongSets.EMPTY_SET);
+            return;
+        }
+
+        LongOpenHashSet rebuiltOwnedTops = new LongOpenHashSet(PATCHES.size());
+        for (ShorePatch patch : PATCHES) {
+            rebuiltOwnedTops.add(BlockPos.asLong(patch.x, patch.surfaceBlockY, patch.z));
+        }
+        ownedVanillaTops = LongSets.unmodifiable(rebuiltOwnedTops);
+        OceanSurfaceRenderer.setSupplementalBakedTopOwnership(level, ownedVanillaTops);
     }
 
     private static float smoothStep(float edge0, float edge1, float value) {
@@ -521,6 +564,7 @@ public final class ShorelineSurfaceRenderer {
     private record ShorePatch(
             int x,
             int z,
+            int surfaceBlockY,
             float surfaceY,
             float depth,
             WaterBodyClassifier.WaterType waterType,

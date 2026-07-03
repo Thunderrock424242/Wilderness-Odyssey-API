@@ -26,16 +26,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * GerstnerWaveRenderMixin
  * <p>
  * Wraps the consumer passed to {@code LiquidBlockRenderer#tesselate} when the
- * static compatibility mesh is allowed to receive fallback Gerstner motion.
+ * static compatibility mesh is allowed to receive bounded Gerstner motion.
  * <p>
  * A narrow mixin is necessary because NeoForge has no event for transforming
  * vertices while vanilla builds a liquid chunk mesh. Wave time is advanced by
  * the client tick handler; chunk compilation may run on worker threads and must
  * never mutate global animation state. When the dynamic ocean surface is
- * enabled, baked vanilla water stays stable and acts as the compatibility mask
- * beneath the per-frame replacement pass. Safe replacement cells can hide the
- * baked vanilla top so the player does not see two water surfaces blended over
- * each other.
+ * enabled, baked vanilla water stays stable only as tagged compatibility data.
+ * Validated replacement patches hide the baked vanilla top so Wilderness
+ * geometry owns the visible ocean surface.
  */
 @Mixin(LiquidBlockRenderer.class)
 public class GerstnerWaveRenderMixin {
@@ -102,8 +101,8 @@ public class GerstnerWaveRenderMixin {
 
     /**
      * Hides the vanilla top only when replacement ownership contains the same
-     * block. Vanilla side faces and all out-of-range water remain intact for
-     * compatibility and visual fallback.
+     * block. Vanilla side faces and out-of-range liquid state remain available
+     * for compatibility while Wilderness owns the visible top surface.
      */
     @Redirect(
             method = "tesselate",

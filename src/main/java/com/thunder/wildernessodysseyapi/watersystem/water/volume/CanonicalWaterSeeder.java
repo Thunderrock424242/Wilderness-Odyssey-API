@@ -117,10 +117,6 @@ public final class CanonicalWaterSeeder {
         int scannedColumns = 0;
 
         while (columnIndex < COLUMNS_PER_CHUNK && scannedColumns < boundedColumns) {
-            if (allowBlockConversion && conversionBudget.exhausted()) {
-                break;
-            }
-
             int localX = columnIndex / CHUNK_WIDTH;
             int localZ = columnIndex % CHUNK_WIDTH;
             int worldX = chunkPos.getMinBlockX() + localX;
@@ -138,13 +134,9 @@ public final class CanonicalWaterSeeder {
             );
             stats = stats.plus(columnResult.stats());
             scannedColumns++;
-            if (columnResult.conversionBudgetExhausted()) {
-                break;
-            }
             columnIndex++;
         }
-        return new SeedSlice(stats, columnIndex, columnIndex >= COLUMNS_PER_CHUNK,
-                allowBlockConversion && conversionBudget.exhausted());
+        return new SeedSlice(stats, columnIndex, columnIndex >= COLUMNS_PER_CHUNK);
     }
 
     private static SeedColumnResult seedColumn(
@@ -158,20 +150,25 @@ public final class CanonicalWaterSeeder {
             ConversionBudget conversionBudget
     ) {
         SeedStats stats = new SeedStats(1, 0, 0, 0, 0, 0, 0);
-        int waterSurfaceY = findWaterSurface(level, cursor, worldX, surfaceY, worldZ);
-        if (waterSurfaceY == Integer.MIN_VALUE) {
-            return new SeedColumnResult(stats, false);
-        }
+        int coverScanDepth = WaterSimulationConfig.coveredWaterSurfaceScanDepth();
+        int maxScanDepth = Math.max(1, maxColumnDepth + coverScanDepth);
+        boolean foundWater = false;
+        int waterCellsSeen = 0;
 
-        for (int depth = 0; depth < maxColumnDepth; depth++) {
-            cursor.set(worldX, waterSurfaceY - depth, worldZ);
+        for (int offset = 0; offset < maxScanDepth && waterCellsSeen < maxColumnDepth; offset++) {
+            cursor.set(worldX, surfaceY - offset, worldZ);
             if (level.isOutsideBuildHeight(cursor) || !level.hasChunkAt(cursor)) {
-                return new SeedColumnResult(stats, false);
+                return new SeedColumnResult(stats);
             }
             WaterCellCandidate candidate = waterCellCandidate(level, cursor);
             if (!candidate.water()) {
-                return new SeedColumnResult(stats, false);
+                if (foundWater || offset >= coverScanDepth) {
+                    return new SeedColumnResult(stats);
+                }
+                continue;
             }
+            foundWater = true;
+            waterCellsSeen++;
             if (!candidate.importable()) {
                 stats = stats.withSkippedWaterlogged(stats.skippedWaterlogged() + 1);
                 continue;
@@ -188,9 +185,6 @@ public final class CanonicalWaterSeeder {
                             conversionBudget
                     );
                     stats = conversion.stats();
-                    if (conversion.budgetExhausted()) {
-                        return new SeedColumnResult(stats, true);
-                    }
                 }
                 stats = stats.withSkippedTracked(stats.skippedTracked() + 1);
                 continue;
@@ -209,34 +203,10 @@ public final class CanonicalWaterSeeder {
                             conversionBudget
                     );
                     stats = conversion.stats();
-                    if (conversion.budgetExhausted()) {
-                        return new SeedColumnResult(stats, true);
-                    }
                 }
             }
         }
-        return new SeedColumnResult(stats, false);
-    }
-
-    private static int findWaterSurface(
-            ServerLevel level,
-            BlockPos.MutableBlockPos cursor,
-            int worldX,
-            int surfaceY,
-            int worldZ
-    ) {
-        int scanDepth = WaterSimulationConfig.coveredWaterSurfaceScanDepth();
-        for (int offset = 0; offset <= scanDepth; offset++) {
-            cursor.set(worldX, surfaceY - offset, worldZ);
-            if (level.isOutsideBuildHeight(cursor) || !level.hasChunkAt(cursor)) {
-                return Integer.MIN_VALUE;
-            }
-            WaterCellCandidate candidate = waterCellCandidate(level, cursor);
-            if (candidate.water() && !candidate.hostedWater()) {
-                return cursor.getY();
-            }
-        }
-        return Integer.MIN_VALUE;
+        return new SeedColumnResult(stats);
     }
 
     private static WaterCellCandidate waterCellCandidate(ServerLevel level, BlockPos pos) {
@@ -253,7 +223,7 @@ public final class CanonicalWaterSeeder {
     }
 
     private static boolean isPlainSeedWaterBlock(BlockState state) {
-        return state.is(Blocks.WATER) || state.is(WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get());
+        return WildernessWaterAuthority.isPlainWaterProjection(state);
     }
 
     private static ConversionResult convertSeededProjectionIfNeeded(
@@ -267,7 +237,7 @@ public final class CanonicalWaterSeeder {
             return new ConversionResult(stats, false);
         }
         if (conversionBudget.exhausted()) {
-            return new ConversionResult(stats, true);
+            return new ConversionResult(stats, false);
         }
         if (convertPlainVanillaWaterBlock(level, pos)) {
             conversionBudget.recordConversion();
@@ -312,7 +282,7 @@ public final class CanonicalWaterSeeder {
         private static final WaterCellCandidate DRY = new WaterCellCandidate(false, false, false);
     }
 
-    private record SeedColumnResult(SeedStats stats, boolean conversionBudgetExhausted) {
+    private record SeedColumnResult(SeedStats stats) {
     }
 
     private record ConversionResult(SeedStats stats, boolean budgetExhausted) {
@@ -340,8 +310,7 @@ public final class CanonicalWaterSeeder {
     public record SeedSlice(
             SeedStats stats,
             int nextColumnIndex,
-            boolean complete,
-            boolean conversionBudgetExhausted
+            boolean complete
     ) {
     }
 

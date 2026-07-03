@@ -60,12 +60,13 @@ and boat response therefore use one coherent wave field.
 The per-frame surface renderer follows the active client render distance through
 bounded near, medium, and far LODs instead of rebuilding every distant ocean
 block at full detail. Vanilla water remains the stable compatibility mask, but
-validated replacement footprints now hide the baked vanilla top faces beneath
-them by default. That prevents the player from seeing two water surfaces blended
-over each other while still preserving vanilla fluid state, tags, side faces,
-and out-of-range fallback geometry. Patch budgets keep extreme view distances
-from overwhelming the client, and vanilla side faces stay laterally anchored so
-shoreline triangles cannot stretch across land.
+validated replacement patches hide the baked vanilla top face beneath them by
+default. This makes the Wilderness surface the visible water layer while
+vanilla fluid state and tags remain in-world for compatibility. Coarse LOD
+patches are therefore optically denser in replacement mode rather than ghost
+overlays. Patch budgets keep extreme view distances from overwhelming the
+client, and vanilla side faces stay laterally anchored so shoreline triangles
+cannot stretch across land.
 Iris/Oculus keeps the standard translucent shader path; without an
 external shader pack, the optional core shader adds Fresnel, depth-colored
 absorption, foam, lighting, and animated micro-normal detail.
@@ -120,12 +121,15 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
 - `replaceVanillaWaterTopFaces` is enabled by default so validated replacement
   patches hide the matching baked vanilla top faces. The old
   `suppressVanillaWaterTopFaces` option remains as a legacy/debug override.
-  Both switches affect top faces only; vanilla side faces and any water outside
-  the replacement cache remain available as compatibility/fallback geometry.
+  Both switches affect top faces only; vanilla side faces and fluid/tag state
+  remain available for compatibility while Wilderness owns the visible surface.
+- When vanilla top replacement is active, `surfaceAbsorptionStrength` and
+  `surfaceOpacityStrength` enforce minimum effective values so coarse LOD water
+  is not a faint transparent sheet over hidden terrain.
 - When the per-frame dynamic ocean surface is enabled, baked vanilla liquid
-  vertices are no longer vertically waved. The chunk mesh remains a stable
-  compatibility/fallback layer while the replacement pass owns visible motion;
-  covered water under ice also stays flat.
+  vertices are no longer vertically waved. The chunk mesh remains stable
+  compatibility data while the replacement pass owns visible motion; covered
+  water under ice also stays flat.
 - Dynamic replacement vertices use Gerstner height and normals but remain
   laterally anchored. Full horizontal orbital displacement belongs to a future
   continuous offshore mesh; applying it to block-clipped shoreline topology can
@@ -133,8 +137,8 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
 - The replacement mesh treats vanilla/source water and full canonical cells as
   a compatibility mask, not as final face geometry. It renders only over stable
   full-water footprints with a one-block continuity border; flowing, partial,
-  covered, shore-adjacent, and ice-adjacent cells remain on the vanilla path
-  until a dedicated local-volume or shoreline mesh owns them.
+  covered, shore-adjacent, and ice-adjacent cells stay visible only after a
+  dedicated local-volume or shoreline mesh owns them.
 - Vanilla and Wilderness water are visually stitched in `LiquidBlockRenderer`
   by culling internal faces between any two fluids tagged as
   `#minecraft:water`. Without that client bridge, mixed migration boundaries
@@ -142,25 +146,31 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   logically water.
 - `ShorelineSurfaceRenderer` supplies that local edge layer. It draws one-block
   overlay quads for exposed shore, ice-adjacent, flowing, and partial cells
-  that the open-ocean mesh refuses to own. It never hides vanilla water, so the
-  compatibility projection remains visible while the overlay adds local color,
-  small vertical motion, and foam-brightened edges. It runs after the open-ocean
-  pass, respects a separate renderer-profile radius and patch budget, scans
-  nearest-first, and fades out near its range limit so shoreline detail does not
-  end abruptly.
+  that the open-ocean mesh refuses to own. In strict replacement mode it also
+  publishes matching top-face ownership so vanilla remains compatibility data
+  rather than the visible shoreline surface. It runs after the open-ocean pass,
+  respects a separate renderer-profile radius and patch budget, and scans
+  nearest-first.
 - `ClientWaterColumnSampler` is the shared client-side volume lens for
-  shoreline overlays, open-ocean depth checks, and camera immersion. Tracked
-  canonical cells provide fill height, local velocity, and accumulated water
-  depth before the renderers fall back to vanilla fluid state. That lets
-  partial finite-volume cells look thinner, makes shallow foam/fog follow
-  actual water amount, and scrolls local surface texture/wave phase in the
-  direction of flow.
+  shoreline overlays, open-ocean depth checks, and camera immersion. It samples
+  `WildernessWaterAuthority` so renderers only claim canonical or namespaced
+  Wilderness projection cells; plain `minecraft:water` is reported as pending
+  migration input instead of authoritative replacement water. That lets partial
+  finite-volume cells look thinner, makes shallow foam/fog follow actual water
+  amount, and scrolls local surface texture/wave phase in the direction of flow.
+- Automatic authority migration prioritizes loaded chunks around each player up
+  to the requested/server view-distance boundary. The renderers still never
+  force-load distant water, but every already-visible loaded chunk is pushed
+  toward canonical ownership before older background migration work.
+- Canonical ownership import is decoupled from the slower block-conversion
+  budget, so authority coverage can fill the visible ocean while namespaced
+  Wilderness block rewrites continue safely over later ticks.
 - Depth attenuation that fades deep-ocean waves into shallow water.
 - Foam generated from depth and crest slope rather than absolute world height.
 - `surfaceAbsorptionStrength` and `surfaceOpacityStrength` tune how quickly
   deep water hides the blocky seafloor and how strongly the replacement water
-  medium blends over vanilla terrain. The defaults favor a less see-through
-  ocean while keeping shoreline overlays partially readable.
+  medium blends over terrain. The defaults favor a less see-through ocean while
+  keeping shoreline overlays partially readable.
 - Patch-stable material tint avoids exposing the GPU's internal triangle split;
   view-dependent Fresnel remains a per-pixel shader responsibility.
 - The built-in dynamic-ocean pass writes color only, not depth, and keeps a

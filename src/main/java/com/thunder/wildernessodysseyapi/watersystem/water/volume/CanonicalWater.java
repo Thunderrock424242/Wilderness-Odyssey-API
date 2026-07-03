@@ -97,9 +97,8 @@ public final class CanonicalWater {
         int flags = hostedWater
                 ? WaterVolumeChunk.FLAG_IMPORTED | WaterVolumeChunk.FLAG_HOSTED_WATER
                 : WaterVolumeChunk.FLAG_IMPORTED | WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED;
-        int amount = Math.max(1, Math.min(VANILLA_LEVELS, fluidState.getAmount()));
         WaterVolumeChunk.WaterCell imported = WaterVolumeChunk.WaterCell.still(
-                amount * VOLUME_PER_VANILLA_LEVEL,
+                WildernessWaterAuthority.volumeUnitsFromFluid(fluidState),
                 flags
         );
         WaterVolumeChunk volume = chunk.getData(ModAttachments.WATER_VOLUME);
@@ -284,7 +283,7 @@ public final class CanonicalWater {
     }
 
     private static boolean isPlainWaterProjection(BlockState state) {
-        return state.is(Blocks.WATER) || state.is(WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get());
+        return WildernessWaterAuthority.isPlainWaterProjection(state);
     }
 
     private static ActiveQueue queue(ServerLevel level) {

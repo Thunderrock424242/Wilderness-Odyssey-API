@@ -22,6 +22,8 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_CONVERTED_BLOCKS_PER_TICK;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_MAX_QUEUED_CHUNKS;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_PLAYER_CHUNK_RADIUS;
+    public static final ModConfigSpec.BooleanValue AUTOMATIC_MIGRATION_FOLLOW_PLAYER_VIEW_DISTANCE;
+    public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_VIEW_DISTANCE_PADDING_CHUNKS;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS;
     public static final ModConfigSpec.BooleanValue SEED_ONLY_PLAIN_WATER_BLOCKS;
     public static final ModConfigSpec.BooleanValue IMPORT_WATERLOGGED_HOST_WATER;
@@ -47,23 +49,29 @@ public final class WaterSimulationConfig {
                 .comment("Maximum water depth imported per X/Z column during chunk-load seeding.")
                 .defineInRange("worldSeedMaxColumnDepth", 16, 1, 64);
         AUTOMATIC_MIGRATION_CHUNKS_PER_TICK = builder
-                .comment("Maximum queued chunks touched by automatic water migration per server tick.")
-                .defineInRange("automaticMigrationChunksPerTick", 1, 1, 16);
+                .comment("Maximum queued chunks touched by automatic water migration per server tick. Visible player chunks are prioritized before older background work.")
+                .defineInRange("automaticMigrationChunksPerTick", 4, 1, 16);
         AUTOMATIC_MIGRATION_COLUMNS_PER_TICK = builder
-                .comment("Maximum X/Z water columns scanned by automatic water migration per server tick.")
-                .defineInRange("automaticMigrationColumnsPerTick", 64, 1, 1024);
+                .comment("Maximum X/Z water columns scanned by automatic water migration per server tick. Canonical authority import uses this budget even when block conversion is exhausted.")
+                .defineInRange("automaticMigrationColumnsPerTick", 512, 1, 2048);
         AUTOMATIC_MIGRATION_CONVERTED_BLOCKS_PER_TICK = builder
                 .comment("Maximum vanilla water blocks converted to Wilderness water by automatic migration per server tick.")
-                .defineInRange("automaticMigrationConvertedBlocksPerTick", 256, 1, 4096);
+                .defineInRange("automaticMigrationConvertedBlocksPerTick", 1024, 1, 4096);
         AUTOMATIC_MIGRATION_MAX_QUEUED_CHUNKS = builder
-                .comment("Maximum loaded chunks waiting for automatic water migration.")
-                .defineInRange("automaticMigrationMaxQueuedChunks", 4096, 128, 65536);
+                .comment("Maximum loaded chunks waiting for automatic water migration. Kept above a large visible-radius square so player-priority work does not evict nearby ocean chunks.")
+                .defineInRange("automaticMigrationMaxQueuedChunks", 8192, 128, 65536);
         AUTOMATIC_MIGRATION_PLAYER_CHUNK_RADIUS = builder
-                .comment("Loaded chunk radius around each player that automatic water migration keeps prioritized. Clamped to server view distance; set 0 to disable player-centered priority scans.")
-                .defineInRange("automaticMigrationPlayerChunkRadius", 12, 0, 32);
+                .comment("Minimum loaded chunk radius around each player that automatic water migration keeps prioritized. Clamped to server view distance; set 0 to disable player-centered priority scans.")
+                .defineInRange("automaticMigrationPlayerChunkRadius", 16, 0, 32);
+        AUTOMATIC_MIGRATION_FOLLOW_PLAYER_VIEW_DISTANCE = builder
+                .comment("Expand player-priority water migration up to each player's requested render distance, clamped to chunks the server has already loaded.")
+                .define("automaticMigrationFollowPlayerViewDistance", true);
+        AUTOMATIC_MIGRATION_VIEW_DISTANCE_PADDING_CHUNKS = builder
+                .comment("Extra loaded chunk padding around the player render-distance migration radius. Helps authority arrive before the visible edge scrolls into view.")
+                .defineInRange("automaticMigrationViewDistancePaddingChunks", 1, 0, 4);
         AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS = builder
                 .comment("How often automatic water migration rescans already-loaded chunks around players.")
-                .defineInRange("automaticMigrationPlayerScanIntervalTicks", 40, 20, 600);
+                .defineInRange("automaticMigrationPlayerScanIntervalTicks", 20, 10, 600);
         SEED_ONLY_PLAIN_WATER_BLOCKS = builder
                 .comment("Restrict normal world seeding to plain water blocks. Non-plain tagged water can still import as hosted water when importWaterloggedHostWater is enabled.")
                 .define("seedOnlyPlainWaterBlocks", true);
@@ -101,32 +109,51 @@ public final class WaterSimulationConfig {
 
     /** Returns the number of queued chunks automatic migration may touch per server tick. */
     public static int automaticMigrationChunksPerTick() {
-        return AUTOMATIC_MIGRATION_CHUNKS_PER_TICK.get();
+        int configured = AUTOMATIC_MIGRATION_CHUNKS_PER_TICK.get();
+        return automaticMigrationFollowsPlayerViewDistance() ? Math.max(4, configured) : configured;
     }
 
     /** Returns the number of X/Z columns automatic migration may scan per server tick. */
     public static int automaticMigrationColumnsPerTick() {
-        return AUTOMATIC_MIGRATION_COLUMNS_PER_TICK.get();
+        int configured = AUTOMATIC_MIGRATION_COLUMNS_PER_TICK.get();
+        return automaticMigrationFollowsPlayerViewDistance() ? Math.max(512, configured) : configured;
     }
 
     /** Returns the number of water blocks automatic migration may convert per server tick. */
     public static int automaticMigrationConvertedBlocksPerTick() {
-        return AUTOMATIC_MIGRATION_CONVERTED_BLOCKS_PER_TICK.get();
+        int configured = AUTOMATIC_MIGRATION_CONVERTED_BLOCKS_PER_TICK.get();
+        return automaticMigrationFollowsPlayerViewDistance() ? Math.max(1024, configured) : configured;
     }
 
     /** Returns the maximum queued chunk positions retained by automatic migration. */
     public static int automaticMigrationMaxQueuedChunks() {
-        return AUTOMATIC_MIGRATION_MAX_QUEUED_CHUNKS.get();
+        int configured = AUTOMATIC_MIGRATION_MAX_QUEUED_CHUNKS.get();
+        return automaticMigrationFollowsPlayerViewDistance() ? Math.max(8192, configured) : configured;
     }
 
     /** Returns the loaded chunk radius that receives player-centered migration priority. */
     public static int automaticMigrationPlayerChunkRadius() {
-        return AUTOMATIC_MIGRATION_PLAYER_CHUNK_RADIUS.get();
+        int configured = AUTOMATIC_MIGRATION_PLAYER_CHUNK_RADIUS.get();
+        if (configured <= 0) {
+            return 0;
+        }
+        return automaticMigrationFollowsPlayerViewDistance() ? Math.max(16, configured) : configured;
+    }
+
+    /** Returns whether priority migration should follow each player's requested view distance. */
+    public static boolean automaticMigrationFollowsPlayerViewDistance() {
+        return AUTOMATIC_MIGRATION_FOLLOW_PLAYER_VIEW_DISTANCE.get();
+    }
+
+    /** Returns the small loaded-chunk padding added to the visible authority radius. */
+    public static int automaticMigrationViewDistancePaddingChunks() {
+        return AUTOMATIC_MIGRATION_VIEW_DISTANCE_PADDING_CHUNKS.get();
     }
 
     /** Returns how often loaded chunks around players are rescanned for automatic migration. */
     public static int automaticMigrationPlayerScanIntervalTicks() {
-        return AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS.get();
+        int configured = AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS.get();
+        return automaticMigrationFollowsPlayerViewDistance() ? Math.min(20, configured) : configured;
     }
 
     /** Returns whether waterlogged host blocks contribute hosted canonical water cells. */

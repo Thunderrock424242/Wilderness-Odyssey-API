@@ -45,7 +45,7 @@ public final class WaterCompatibility {
 
     /** Returns whether a block state is a plain water projection, not a waterlogged host. */
     public static boolean isPlainWaterProjection(BlockState state) {
-        return state.is(Blocks.WATER) || state.is(WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get());
+        return WildernessWaterAuthority.isPlainWaterProjection(state);
     }
 
     /** Returns whether the block's own fluid state participates in the water compatibility tag. */
@@ -55,13 +55,15 @@ public final class WaterCompatibility {
 
     /** Builds a bounded diagnostic snapshot for one block. */
     public static Snapshot describe(Level level, BlockPos pos) {
-        WaterVolumeChunk.WaterCell canonical = CanonicalWater.get(level, pos);
-        boolean tracked = CanonicalWater.isTracked(level, pos);
-        BlockState blockState = level.getBlockState(pos);
-        boolean tagWater = isTaggedWater(blockState.getFluidState());
+        WildernessWaterAuthority.CellAuthority authority = WildernessWaterAuthority.sample(level, pos);
+        WaterVolumeChunk.WaterCell canonical = authority.canonicalTracked()
+                ? CanonicalWater.get(level, pos)
+                : WaterVolumeChunk.WaterCell.EMPTY;
+        BlockState blockState = level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)
+                ? Blocks.AIR.defaultBlockState()
+                : level.getBlockState(pos);
         boolean vanillaWaterBlock = blockState.is(Blocks.WATER);
         boolean wildernessWaterBlock = blockState.is(WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get());
-        boolean plainProjectionBlock = isPlainWaterProjection(blockState);
         SPHSimulationManager.MobileWaterSample mobile = SPHSimulationManager.get().sampleAt(
                 level,
                 pos.getX() + 0.5,
@@ -70,7 +72,13 @@ public final class WaterCompatibility {
         );
 
         return new Snapshot(
-                tracked,
+                authority.source(),
+                authority.authorityOwned(),
+                authority.migrationCandidate(),
+                authority.replacementSurfaceSafe(),
+                authority.volumeUnits(),
+                authority.fillFraction(),
+                authority.canonicalTracked(),
                 canonical.volumeUnits(),
                 canonical.fillFraction(),
                 canonical.velocityX(),
@@ -79,10 +87,10 @@ public final class WaterCompatibility {
                 canonical.imported(),
                 (canonical.flags() & WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED) != 0,
                 canonical.hostedWater(),
-                tagWater,
+                authority.tagWater(),
                 vanillaWaterBlock,
                 wildernessWaterBlock,
-                plainProjectionBlock,
+                authority.plainProjection(),
                 mobile.wet(),
                 mobile.velocityX(),
                 mobile.velocityY(),
@@ -92,6 +100,12 @@ public final class WaterCompatibility {
 
     /** Immutable replacement/vanilla water state used by commands and diagnostics. */
     public record Snapshot(
+            WildernessWaterAuthority.WaterSource authoritySource,
+            boolean authorityOwned,
+            boolean migrationCandidate,
+            boolean replacementSurfaceSafe,
+            int authorityVolumeUnits,
+            float authorityFillFraction,
             boolean canonicalTracked,
             int canonicalVolumeUnits,
             float fillFraction,
@@ -112,7 +126,7 @@ public final class WaterCompatibility {
     ) {
         /** Returns whether any vanilla or replacement water exists here. */
         public boolean wet() {
-            return canonicalVolumeUnits > 0 || tagWater || mobileWater;
+            return authorityVolumeUnits > 0 || tagWater || mobileWater;
         }
 
         /** Returns whether canonical storage currently owns visible water volume here. */
@@ -122,12 +136,12 @@ public final class WaterCompatibility {
 
         /** Returns whether a plain vanilla water block still needs migration to Wilderness water. */
         public boolean pendingPlainVanillaConversion() {
-            return vanillaWaterBlock;
+            return authoritySource == WildernessWaterAuthority.WaterSource.VANILLA_MIGRATION_SOURCE;
         }
 
         /** Returns whether tagged water has not yet been imported into canonical storage. */
         public boolean pendingCanonicalImport() {
-            return tagWater && !canonicalTracked;
+            return migrationCandidate && tagWater && !canonicalTracked;
         }
 
         /** Returns whether a canonical cell lacks the compatibility fluid block/tag it should project. */
