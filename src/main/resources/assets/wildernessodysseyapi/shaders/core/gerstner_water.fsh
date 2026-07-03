@@ -50,8 +50,8 @@ void main() {
     color = max(color, vertexColor.rgb * 0.42);
     color *= ColorModulator.rgb;
 
-    float textureAlpha = mix(0.88, waterTexture.a, 0.35);
-    float alpha = clamp(max(vertexColor.a, 0.72) * textureAlpha * ColorModulator.a + fresnel * 0.08, 0.0, 0.96);
+    float textureAlpha = mix(0.90, waterTexture.a, 0.30);
+    float alpha = clamp(vertexColor.a * textureAlpha * ColorModulator.a + fresnel * 0.08, 0.0, 0.98);
     float fogRange = max(0.001, FogEnd - FogStart);
     float fogFactor = clamp((vertexDistance - FogStart) / fogRange, 0.0, 1.0);
     fragColor = mix(vec4(color, alpha), FogColor, fogFactor);

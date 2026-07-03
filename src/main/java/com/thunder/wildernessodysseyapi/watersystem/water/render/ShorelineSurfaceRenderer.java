@@ -427,7 +427,9 @@ public final class ShorelineSurfaceRenderer {
         float tintR = ((tint >> 16) & 0xFF) / 255.0f;
         float tintG = ((tint >> 8) & 0xFF) / 255.0f;
         float tintB = (tint & 0xFF) / 255.0f;
-        float absorption = 1.0f - (float) Math.exp(-Math.max(0.0f, depth) * 0.28f);
+        float absorption = 1.0f - (float) Math.exp(
+                -Math.max(0.0f, depth) * 0.28f * WaterRenderingConfig.surfaceAbsorptionStrength()
+        );
 
         float red = mix(0.16f + tintR * 0.36f, 0.06f + tintR * 0.20f, absorption);
         float green = mix(0.58f + tintG * 0.26f, 0.32f + tintG * 0.18f, absorption);
@@ -441,7 +443,9 @@ public final class ShorelineSurfaceRenderer {
         green = mix(green, 0.96f, foam);
         blue = mix(blue, 1.0f, foam);
         float volumeAlpha = mix(0.28f, fullWater ? 0.52f : 0.44f, smoothStep(0.08f, 1.0f, fillFraction));
+        float shorelineOpacity = mix(1.0f, WaterRenderingConfig.surfaceOpacityStrength(), 0.55f);
         float alpha = (volumeAlpha + edgeStrength * 0.10f + Math.min(0.06f, flowSpeed * 0.04f))
+                * shorelineOpacity
                 * Math.min(1.0f, visualStrength);
 
         return (channel(alpha) << 24)
