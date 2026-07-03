@@ -699,7 +699,7 @@ public class NBTStructurePlacer {
                     if (!BunkerTerrainClearer.shouldClear(existing)) {
                         continue;
                     }
-                    level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
+                    clearTerrainBlockWithoutDrops(level, cursor);
                 }
             }
         }
@@ -734,10 +734,31 @@ public class NBTStructurePlacer {
                     if (!BunkerTerrainClearer.shouldClear(existing) || existing.is(Blocks.BEDROCK)) {
                         continue;
                     }
-                    level.setBlock(cursor, Blocks.AIR.defaultBlockState(), 2);
+                    clearTerrainBlockWithoutDrops(level, cursor);
                 }
             }
         }
+    }
+
+    /**
+     * Clears terrain for starter-structure placement without running container
+     * drop paths from modded block entities.
+     *
+     * <p>The starter bunker can replace generated modded blocks while the
+     * integrated server is still creating spawn. Some blocks unpack loot or
+     * fire gameplay events from {@code onRemove}; removing the block entity
+     * first keeps structure carving from cascading into unrelated event-bus
+     * handlers before a player world is fully running.</p>
+     */
+    private void clearTerrainBlockWithoutDrops(ServerLevel level, BlockPos pos) {
+        if (level.getBlockEntity(pos) != null) {
+            level.removeBlockEntity(pos);
+        }
+        level.setBlock(
+                pos,
+                Blocks.AIR.defaultBlockState(),
+                Block.UPDATE_CLIENTS | Block.UPDATE_SUPPRESS_DROPS
+        );
     }
 
     private void replaceStarterBunkerSurfaceBlocks(ServerLevel level,
