@@ -18,10 +18,11 @@ import net.minecraft.world.level.material.FluidState;
  *
  * <p>World generation still creates normal {@code minecraft:water}, which is
  * important for compatibility and modded terrain. This seeder lazily mirrors
- * that stable water into canonical cells when chunks load. When configured, it
- * also migrates accepted plain water blocks to the namespaced Wilderness water
- * projection so the replacement system owns the block/fluid identity while
- * keeping {@code #minecraft:water} tag compatibility.</p>
+ * that stable water into canonical cells when chunks load. Waterlogged host
+ * blocks can contribute hosted canonical water without being replaced. When
+ * configured, accepted plain water blocks also migrate to the namespaced
+ * Wilderness water projection so the replacement system owns the block/fluid
+ * identity while keeping {@code #minecraft:water} tag compatibility.</p>
  */
 public final class CanonicalWaterSeeder {
 
@@ -156,7 +157,7 @@ public final class CanonicalWaterSeeder {
             boolean allowBlockConversion,
             ConversionBudget conversionBudget
     ) {
-        SeedStats stats = new SeedStats(1, 0, 0, 0, 0, 0);
+        SeedStats stats = new SeedStats(1, 0, 0, 0, 0, 0, 0);
         int waterSurfaceY = findWaterSurface(level, cursor, worldX, surfaceY, worldZ);
         if (waterSurfaceY == Integer.MIN_VALUE) {
             return new SeedColumnResult(stats, false);
@@ -171,38 +172,46 @@ public final class CanonicalWaterSeeder {
             if (!candidate.water()) {
                 return new SeedColumnResult(stats, false);
             }
-            if (candidate.waterloggedHost()) {
+            if (!candidate.importable()) {
                 stats = stats.withSkippedWaterlogged(stats.skippedWaterlogged() + 1);
-                return new SeedColumnResult(stats, false);
+                continue;
             }
             if (CanonicalWater.isTracked(level, cursor)) {
-                ConversionResult conversion = convertSeededProjectionIfNeeded(
-                        level,
-                        cursor,
-                        stats,
-                        allowBlockConversion,
-                        conversionBudget
-                );
-                stats = conversion.stats();
-                if (conversion.budgetExhausted()) {
-                    return new SeedColumnResult(stats, true);
+                if (candidate.hostedWater()) {
+                    CanonicalWater.getOrImport(level, cursor, true);
+                } else {
+                    ConversionResult conversion = convertSeededProjectionIfNeeded(
+                            level,
+                            cursor,
+                            stats,
+                            allowBlockConversion,
+                            conversionBudget
+                    );
+                    stats = conversion.stats();
+                    if (conversion.budgetExhausted()) {
+                        return new SeedColumnResult(stats, true);
+                    }
                 }
                 stats = stats.withSkippedTracked(stats.skippedTracked() + 1);
                 continue;
             }
-            WaterVolumeChunk.WaterCell imported = CanonicalWater.getOrImport(level, cursor);
+            WaterVolumeChunk.WaterCell imported = CanonicalWater.getOrImport(level, cursor, candidate.hostedWater());
             if (imported.volumeUnits() > 0) {
                 stats = stats.withImportedCells(stats.importedCells() + 1);
-                ConversionResult conversion = convertSeededProjectionIfNeeded(
-                        level,
-                        cursor,
-                        stats,
-                        allowBlockConversion,
-                        conversionBudget
-                );
-                stats = conversion.stats();
-                if (conversion.budgetExhausted()) {
-                    return new SeedColumnResult(stats, true);
+                if (candidate.hostedWater()) {
+                    stats = stats.withHostedWaterCells(stats.hostedWaterCells() + 1);
+                } else {
+                    ConversionResult conversion = convertSeededProjectionIfNeeded(
+                            level,
+                            cursor,
+                            stats,
+                            allowBlockConversion,
+                            conversionBudget
+                    );
+                    stats = conversion.stats();
+                    if (conversion.budgetExhausted()) {
+                        return new SeedColumnResult(stats, true);
+                    }
                 }
             }
         }
@@ -223,7 +232,7 @@ public final class CanonicalWaterSeeder {
                 return Integer.MIN_VALUE;
             }
             WaterCellCandidate candidate = waterCellCandidate(level, cursor);
-            if (candidate.water() && !candidate.waterloggedHost()) {
+            if (candidate.water() && !candidate.hostedWater()) {
                 return cursor.getY();
             }
         }
@@ -236,9 +245,11 @@ public final class CanonicalWaterSeeder {
         if (!fluid.is(FluidTags.WATER)) {
             return WaterCellCandidate.DRY;
         }
-        boolean waterloggedHost = WaterSimulationConfig.SEED_ONLY_PLAIN_WATER_BLOCKS.get()
-                && !isPlainSeedWaterBlock(state);
-        return new WaterCellCandidate(true, waterloggedHost);
+        boolean plainWater = isPlainSeedWaterBlock(state);
+        boolean hostedWater = !plainWater;
+        boolean importHosted = WaterSimulationConfig.importWaterloggedHostWater()
+                || !WaterSimulationConfig.SEED_ONLY_PLAIN_WATER_BLOCKS.get();
+        return new WaterCellCandidate(true, hostedWater, plainWater || importHosted);
     }
 
     private static boolean isPlainSeedWaterBlock(BlockState state) {
@@ -297,8 +308,8 @@ public final class CanonicalWaterSeeder {
         return true;
     }
 
-    private record WaterCellCandidate(boolean water, boolean waterloggedHost) {
-        private static final WaterCellCandidate DRY = new WaterCellCandidate(false, false);
+    private record WaterCellCandidate(boolean water, boolean hostedWater, boolean importable) {
+        private static final WaterCellCandidate DRY = new WaterCellCandidate(false, false, false);
     }
 
     private record SeedColumnResult(SeedStats stats, boolean conversionBudgetExhausted) {
@@ -338,18 +349,19 @@ public final class CanonicalWaterSeeder {
     public record SeedStats(
             int scannedColumns,
             int importedCells,
+            int hostedWaterCells,
             int convertedBlocks,
             int skippedTracked,
             int skippedWaterlogged,
             int loadedChunks
     ) {
         /** Shared zero-value stats object. */
-        public static final SeedStats EMPTY = new SeedStats(0, 0, 0, 0, 0, 0);
+        public static final SeedStats EMPTY = new SeedStats(0, 0, 0, 0, 0, 0, 0);
 
         /** Returns a copy with one more loaded chunk counted. */
         public SeedStats countedChunk() {
-            return new SeedStats(scannedColumns, importedCells, convertedBlocks, skippedTracked, skippedWaterlogged,
-                    loadedChunks + 1);
+            return new SeedStats(scannedColumns, importedCells, hostedWaterCells, convertedBlocks, skippedTracked,
+                    skippedWaterlogged, loadedChunks + 1);
         }
 
         /** Combines two independent seed results. */
@@ -357,6 +369,7 @@ public final class CanonicalWaterSeeder {
             return new SeedStats(
                     scannedColumns + other.scannedColumns,
                     importedCells + other.importedCells,
+                    hostedWaterCells + other.hostedWaterCells,
                     convertedBlocks + other.convertedBlocks,
                     skippedTracked + other.skippedTracked,
                     skippedWaterlogged + other.skippedWaterlogged,
@@ -365,23 +378,28 @@ public final class CanonicalWaterSeeder {
         }
 
         private SeedStats withImportedCells(int importedCells) {
-            return new SeedStats(scannedColumns, importedCells, convertedBlocks, skippedTracked, skippedWaterlogged,
-                    loadedChunks);
+            return new SeedStats(scannedColumns, importedCells, hostedWaterCells, convertedBlocks, skippedTracked,
+                    skippedWaterlogged, loadedChunks);
+        }
+
+        private SeedStats withHostedWaterCells(int hostedWaterCells) {
+            return new SeedStats(scannedColumns, importedCells, hostedWaterCells, convertedBlocks, skippedTracked,
+                    skippedWaterlogged, loadedChunks);
         }
 
         private SeedStats withConvertedBlocks(int convertedBlocks) {
-            return new SeedStats(scannedColumns, importedCells, convertedBlocks, skippedTracked, skippedWaterlogged,
-                    loadedChunks);
+            return new SeedStats(scannedColumns, importedCells, hostedWaterCells, convertedBlocks, skippedTracked,
+                    skippedWaterlogged, loadedChunks);
         }
 
         private SeedStats withSkippedTracked(int skippedTracked) {
-            return new SeedStats(scannedColumns, importedCells, convertedBlocks, skippedTracked, skippedWaterlogged,
-                    loadedChunks);
+            return new SeedStats(scannedColumns, importedCells, hostedWaterCells, convertedBlocks, skippedTracked,
+                    skippedWaterlogged, loadedChunks);
         }
 
         private SeedStats withSkippedWaterlogged(int skippedWaterlogged) {
-            return new SeedStats(scannedColumns, importedCells, convertedBlocks, skippedTracked, skippedWaterlogged,
-                    loadedChunks);
+            return new SeedStats(scannedColumns, importedCells, hostedWaterCells, convertedBlocks, skippedTracked,
+                    skippedWaterlogged, loadedChunks);
         }
     }
 }

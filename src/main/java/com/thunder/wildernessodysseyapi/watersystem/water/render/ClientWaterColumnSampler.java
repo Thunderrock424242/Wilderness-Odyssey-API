@@ -79,6 +79,7 @@ final class ClientWaterColumnSampler {
             }
             float fillFraction = clamp(canonicalCell.fillFraction(), 0.0f, 1.0f);
             boolean fullWater = canonicalCell.volumeUnits() >= MIN_FULL_VOLUME_UNITS;
+            boolean replacementSafe = fullWater && !canonicalCell.hostedWater();
             return new CellSample(
                     true,
                     fullWater,
@@ -88,7 +89,7 @@ final class ClientWaterColumnSampler {
                     canonicalCell.velocityY(),
                     canonicalCell.velocityZ(),
                     true,
-                    fullWater
+                    replacementSafe
             );
         }
 

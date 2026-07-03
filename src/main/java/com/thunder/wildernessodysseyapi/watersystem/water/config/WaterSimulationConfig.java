@@ -21,7 +21,10 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_COLUMNS_PER_TICK;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_CONVERTED_BLOCKS_PER_TICK;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_MAX_QUEUED_CHUNKS;
+    public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_PLAYER_CHUNK_RADIUS;
+    public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS;
     public static final ModConfigSpec.BooleanValue SEED_ONLY_PLAIN_WATER_BLOCKS;
+    public static final ModConfigSpec.BooleanValue IMPORT_WATERLOGGED_HOST_WATER;
     public static final ModConfigSpec.IntValue COVERED_WATER_SURFACE_SCAN_DEPTH;
     public static final ModConfigSpec.IntValue DEBUG_COMMAND_MAX_RADIUS;
 
@@ -55,9 +58,18 @@ public final class WaterSimulationConfig {
         AUTOMATIC_MIGRATION_MAX_QUEUED_CHUNKS = builder
                 .comment("Maximum loaded chunks waiting for automatic water migration.")
                 .defineInRange("automaticMigrationMaxQueuedChunks", 4096, 128, 65536);
+        AUTOMATIC_MIGRATION_PLAYER_CHUNK_RADIUS = builder
+                .comment("Loaded chunk radius around each player that automatic water migration keeps prioritized. Clamped to server view distance; set 0 to disable player-centered priority scans.")
+                .defineInRange("automaticMigrationPlayerChunkRadius", 12, 0, 32);
+        AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS = builder
+                .comment("How often automatic water migration rescans already-loaded chunks around players.")
+                .defineInRange("automaticMigrationPlayerScanIntervalTicks", 40, 20, 600);
         SEED_ONLY_PLAIN_WATER_BLOCKS = builder
-                .comment("Only seed plain water blocks. Keep waterlogged host blocks owned by vanilla/modded blocks.")
+                .comment("Restrict normal world seeding to plain water blocks. Non-plain tagged water can still import as hosted water when importWaterloggedHostWater is enabled.")
                 .define("seedOnlyPlainWaterBlocks", true);
+        IMPORT_WATERLOGGED_HOST_WATER = builder
+                .comment("Import water inside waterlogged host blocks into canonical volume without replacing the host block.")
+                .define("importWaterloggedHostWater", true);
         COVERED_WATER_SURFACE_SCAN_DEPTH = builder
                 .comment("How far below the motion-blocking surface to search for water under ice or thin cover.")
                 .defineInRange("coveredWaterSurfaceScanDepth", 5, 0, 16);
@@ -105,6 +117,21 @@ public final class WaterSimulationConfig {
     /** Returns the maximum queued chunk positions retained by automatic migration. */
     public static int automaticMigrationMaxQueuedChunks() {
         return AUTOMATIC_MIGRATION_MAX_QUEUED_CHUNKS.get();
+    }
+
+    /** Returns the loaded chunk radius that receives player-centered migration priority. */
+    public static int automaticMigrationPlayerChunkRadius() {
+        return AUTOMATIC_MIGRATION_PLAYER_CHUNK_RADIUS.get();
+    }
+
+    /** Returns how often loaded chunks around players are rescanned for automatic migration. */
+    public static int automaticMigrationPlayerScanIntervalTicks() {
+        return AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS.get();
+    }
+
+    /** Returns whether waterlogged host blocks contribute hosted canonical water cells. */
+    public static boolean importWaterloggedHostWater() {
+        return IMPORT_WATERLOGGED_HOST_WATER.get();
     }
 
     /** Returns the bounded covered-water surface scan depth. */

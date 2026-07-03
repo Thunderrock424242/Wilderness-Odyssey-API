@@ -110,10 +110,12 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   the same compatibility renderer without changing code.
 - Coarse optimized cells validate their complete footprint and edge grid before
   rendering, so they cannot bridge beach corners, islands, or unloaded gaps.
-- Surface ownership starts from exposed plain water or tracked canonical water,
-  not arbitrary waterlogged blocks. Ice-covered water, lily-pad-covered water,
-  and submerged vegetation keep vanilla rendering so the replacement mesh does
-  not draw dark floor-level patches in frozen or plant-heavy shorelines.
+- Surface ownership starts from exposed plain water or replacement-safe
+  canonical water, not arbitrary waterlogged blocks. Ice-covered water,
+  lily-pad-covered water, and submerged vegetation keep vanilla rendering so
+  the replacement mesh does not draw dark floor-level patches in frozen or
+  plant-heavy shorelines. Waterlogged hosts can still be imported as hosted
+  canonical water for depth/optics, but hosted cells are not replacement-safe.
 - Shallow or irregular LOD cells automatically subdivide to one-block patches;
   coarse non-planar quads are reserved for deep open water so their GPU
   triangle split cannot produce large angular shoreline artifacts.
@@ -135,6 +137,11 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   full-water footprints with a one-block continuity border; flowing, partial,
   covered, shore-adjacent, and ice-adjacent cells remain on the vanilla path
   until a dedicated local-volume or shoreline mesh owns them.
+- Vanilla and Wilderness water are visually stitched in `LiquidBlockRenderer`
+  by culling internal faces between any two fluids tagged as
+  `#minecraft:water`. Without that client bridge, mixed migration boundaries
+  render as tall translucent underwater curtains even though both sides are
+  logically water.
 - `ShorelineSurfaceRenderer` supplies that local edge layer. It draws one-block
   overlay quads for exposed shore, ice-adjacent, flowing, and partial cells
   that the open-ocean mesh refuses to own. It never hides vanilla water, so the
@@ -286,3 +293,26 @@ shader packs, avoiding an incompatible second post-processing pipeline.
   than the flat vanilla compatibility plane.
 - Frame budgets are measured separately for surface rendering, SPH mesh
   rebuilds, ripple geometry, and shader passes.
+- Player-centered automatic migration drains visible loaded chunks without
+  stalling world creation or forcing unloaded chunks.
+
+## Ship-track phases
+
+These phases are the practical path to a couple-week testable release:
+
+1. **Ownership convergence:** plain loaded water near players is automatically
+   imported, prioritized, and migrated to Wilderness water under tick budgets.
+   Waterlogged hosts import as hosted canonical cells instead of being
+   destroyed.
+2. **Renderer stitching:** vanilla and Wilderness water are visually continuous
+   while migration is in progress; the open-ocean mesh owns only
+   replacement-safe exposed water.
+3. **Compatibility hardening:** mod-owned checks use `WaterCompatibility` or
+   tags, while targeted mixins cover unavoidable vanilla-only water checks.
+   `/wowater shipcheck` is the local readiness command for separating normal
+   migration work from actual projection gaps.
+4. **Performance pass:** tune migration budgets, render-distance LODs, SPH
+   caps, and shoreline patch budgets against real FPS/frametime captures.
+5. **Release validation:** run new-world, old-world, frozen-ocean,
+   vegetation-heavy, bucket, boat, mob-spawn, shader/no-shader, and
+   multiplayer smoke tests before packaging.

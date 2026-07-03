@@ -65,10 +65,28 @@ public final class CanonicalWater {
      * Imported cells remain stable until explicitly disturbed by canonical flow.
      */
     public static WaterVolumeChunk.WaterCell getOrImport(ServerLevel level, BlockPos pos) {
+        return getOrImport(level, pos, false);
+    }
+
+    /**
+     * Imports a water cell while preserving whether Minecraft stores that
+     * fluid inside another block's waterlogged state.
+     *
+     * <p>Hosted water is useful for depth, optics, and diagnostics, but it must
+     * never be projected back as a standalone water block because that would
+     * destroy the block that owns the waterlogged state.</p>
+     */
+    public static WaterVolumeChunk.WaterCell getOrImport(ServerLevel level, BlockPos pos, boolean hostedWater) {
         LevelChunk chunk = level.getChunkAt(pos);
         var existing = chunk.getExistingData(ModAttachments.WATER_VOLUME);
         if (existing.isPresent() && existing.get().contains(pos)) {
-            return existing.get().get(pos);
+            WaterVolumeChunk.WaterCell cell = existing.get().get(pos);
+            if (hostedWater && cell.volumeUnits() > 0 && !cell.hostedWater()) {
+                WaterVolumeChunk.WaterCell hosted = cell.withAddedFlags(WaterVolumeChunk.FLAG_HOSTED_WATER);
+                existing.get().set(pos, hosted);
+                return hosted;
+            }
+            return cell;
         }
 
         FluidState fluidState = level.getFluidState(pos);
@@ -76,10 +94,13 @@ public final class CanonicalWater {
             return WaterVolumeChunk.WaterCell.EMPTY;
         }
 
+        int flags = hostedWater
+                ? WaterVolumeChunk.FLAG_IMPORTED | WaterVolumeChunk.FLAG_HOSTED_WATER
+                : WaterVolumeChunk.FLAG_IMPORTED | WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED;
         int amount = Math.max(1, Math.min(VANILLA_LEVELS, fluidState.getAmount()));
         WaterVolumeChunk.WaterCell imported = WaterVolumeChunk.WaterCell.still(
                 amount * VOLUME_PER_VANILLA_LEVEL,
-                WaterVolumeChunk.FLAG_IMPORTED | WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED
+                flags
         );
         WaterVolumeChunk volume = chunk.getData(ModAttachments.WATER_VOLUME);
         volume.set(pos, imported);

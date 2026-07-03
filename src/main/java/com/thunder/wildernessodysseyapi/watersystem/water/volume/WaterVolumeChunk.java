@@ -26,6 +26,8 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
     public static final int FLAG_IMPORTED = 1;
     /** Vanilla fluid state is being maintained as a compatibility projection. */
     public static final int FLAG_COMPATIBILITY_PROJECTED = 1 << 1;
+    /** Water lives inside another block's waterlogged fluid state; do not replace that host. */
+    public static final int FLAG_HOSTED_WATER = 1 << 2;
     /** Primitive integers encoded for each persisted or networked cell. */
     public static final int SERIALIZED_CELL_STRIDE = 7;
 
@@ -226,6 +228,20 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
         /** Returns whether this cell was lazily imported from vanilla state. */
         public boolean imported() {
             return (flags & FLAG_IMPORTED) != 0;
+        }
+
+        /** Returns whether this water is hosted by another block, such as kelp or a waterlogged fence. */
+        public boolean hostedWater() {
+            return (flags & FLAG_HOSTED_WATER) != 0;
+        }
+
+        /** Returns a copy with additional provenance flags preserved through synchronization. */
+        public WaterCell withAddedFlags(int addedFlags) {
+            if ((flags & addedFlags) == addedFlags) {
+                return this;
+            }
+            return new WaterCell(volumeUnits, velocityX, velocityY, velocityZ,
+                    flags | addedFlags, temperatureMilliKelvin).sanitized();
         }
 
         private static float finiteOrZero(float value) {

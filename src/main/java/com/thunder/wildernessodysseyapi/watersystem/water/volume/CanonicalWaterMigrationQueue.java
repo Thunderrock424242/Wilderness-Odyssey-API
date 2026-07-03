@@ -4,13 +4,15 @@ import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulation
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashSet;
-import java.util.Queue;
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -23,15 +25,21 @@ import java.util.Set;
  */
 public final class CanonicalWaterMigrationQueue {
 
-    private static final Queue<MigrationTask> QUEUE = new ArrayDeque<>();
+    private static final Deque<MigrationTask> QUEUE = new ArrayDeque<>();
     private static final Set<String> QUEUED_KEYS = new HashSet<>();
 
     private static long touchedChunks;
     private static long completedChunks;
     private static long importedCells;
+    private static long hostedWaterCells;
     private static long convertedBlocks;
+    private static long playerScanCheckedChunks;
+    private static long playerScanQueuedChunks;
     private static long skippedUnloadedChunks;
     private static long droppedChunks;
+    private static int lastPlayerScanCheckedChunks;
+    private static int lastPlayerScanQueuedChunks;
+    private static int nextPlayerScanTick;
     private static TickResult lastTick = TickResult.EMPTY;
 
     private CanonicalWaterMigrationQueue() {
@@ -44,20 +52,39 @@ public final class CanonicalWaterMigrationQueue {
      * events. It records only a dimension and chunk position.</p>
      */
     public static synchronized void enqueue(ServerLevel level, ChunkPos pos) {
+        enqueue(level, pos, false);
+    }
+
+    private static boolean enqueue(ServerLevel level, ChunkPos pos, boolean priority) {
         if (!WaterSimulationConfig.ENABLE_CANONICAL_WORLD_SEEDING.get()) {
-            return;
+            return false;
         }
         MigrationTask task = new MigrationTask(level.dimension(), pos, 0);
         if (QUEUED_KEYS.contains(task.key())) {
-            return;
+            if (priority) {
+                promoteQueuedTask(task.key());
+            }
+            return false;
         }
         if (QUEUE.size() >= WaterSimulationConfig.automaticMigrationMaxQueuedChunks()) {
-            droppedChunks++;
-            return;
+            if (!priority) {
+                droppedChunks++;
+                return false;
+            }
+            MigrationTask dropped = QUEUE.pollLast();
+            if (dropped != null) {
+                QUEUED_KEYS.remove(dropped.key());
+                droppedChunks++;
+            }
         }
 
         QUEUED_KEYS.add(task.key());
-        QUEUE.offer(task);
+        if (priority) {
+            QUEUE.offerFirst(task);
+        } else {
+            QUEUE.offerLast(task);
+        }
+        return true;
     }
 
     /**
@@ -69,9 +96,13 @@ public final class CanonicalWaterMigrationQueue {
      */
     public static synchronized TickResult runTick(MinecraftServer server) {
         if (!WaterSimulationConfig.ENABLE_CANONICAL_WORLD_SEEDING.get()
-                || QUEUE.isEmpty()
                 || server.getPlayerList().getPlayerCount() <= 0) {
             lastTick = TickResult.EMPTY.withQueuedChunks(QUEUE.size());
+            return lastTick;
+        }
+        enqueueLoadedPlayerChunks(server);
+        if (QUEUE.isEmpty()) {
+            lastTick = TickResult.EMPTY;
             return lastTick;
         }
 
@@ -95,7 +126,7 @@ public final class CanonicalWaterMigrationQueue {
                 && columnsRemaining > 0
                 && (!allowBlockConversion || conversionsRemaining > 0)) {
             attemptsRemaining--;
-            MigrationTask task = QUEUE.poll();
+            MigrationTask task = QUEUE.pollFirst();
             if (task == null) {
                 break;
             }
@@ -106,7 +137,7 @@ public final class CanonicalWaterMigrationQueue {
                 continue;
             }
             if (level.players().isEmpty()) {
-                QUEUE.offer(task);
+                QUEUE.offerLast(task);
                 continue;
             }
 
@@ -140,7 +171,7 @@ public final class CanonicalWaterMigrationQueue {
                 QUEUED_KEYS.remove(task.key());
                 tickCompleted++;
             } else {
-                QUEUE.offer(task.withNextColumnIndex(slice.nextColumnIndex()));
+                QUEUE.offerLast(task.withNextColumnIndex(slice.nextColumnIndex()));
                 if (sliceStats.scannedColumns() <= 0) {
                     break;
                 }
@@ -150,12 +181,14 @@ public final class CanonicalWaterMigrationQueue {
         touchedChunks += tickTouched;
         completedChunks += tickCompleted;
         importedCells += tickStats.importedCells();
+        hostedWaterCells += tickStats.hostedWaterCells();
         convertedBlocks += tickStats.convertedBlocks();
         lastTick = new TickResult(
                 tickTouched,
                 tickCompleted,
                 tickStats.scannedColumns(),
                 tickStats.importedCells(),
+                tickStats.hostedWaterCells(),
                 tickStats.convertedBlocks(),
                 tickSkippedUnloaded,
                 QUEUE.size()
@@ -182,9 +215,15 @@ public final class CanonicalWaterMigrationQueue {
         touchedChunks = 0L;
         completedChunks = 0L;
         importedCells = 0L;
+        hostedWaterCells = 0L;
         convertedBlocks = 0L;
+        playerScanCheckedChunks = 0L;
+        playerScanQueuedChunks = 0L;
         skippedUnloadedChunks = 0L;
         droppedChunks = 0L;
+        lastPlayerScanCheckedChunks = 0;
+        lastPlayerScanQueuedChunks = 0;
+        nextPlayerScanTick = 0;
         lastTick = TickResult.EMPTY;
     }
 
@@ -198,11 +237,71 @@ public final class CanonicalWaterMigrationQueue {
                 touchedChunks,
                 completedChunks,
                 importedCells,
+                hostedWaterCells,
                 convertedBlocks,
+                WaterSimulationConfig.automaticMigrationPlayerChunkRadius(),
+                WaterSimulationConfig.automaticMigrationPlayerScanIntervalTicks(),
+                lastPlayerScanCheckedChunks,
+                lastPlayerScanQueuedChunks,
+                playerScanCheckedChunks,
+                playerScanQueuedChunks,
                 skippedUnloadedChunks,
                 droppedChunks,
                 lastTick
         );
+    }
+
+    private static void enqueueLoadedPlayerChunks(MinecraftServer server) {
+        int playerRadius = WaterSimulationConfig.automaticMigrationPlayerChunkRadius();
+        if (playerRadius <= 0) {
+            lastPlayerScanCheckedChunks = 0;
+            lastPlayerScanQueuedChunks = 0;
+            return;
+        }
+
+        int currentTick = server.getTickCount();
+        if (currentTick < nextPlayerScanTick) {
+            return;
+        }
+        nextPlayerScanTick = currentTick + WaterSimulationConfig.automaticMigrationPlayerScanIntervalTicks();
+
+        int serverViewDistance = Math.max(1, server.getPlayerList().getViewDistance());
+        int radius = Math.min(playerRadius, serverViewDistance);
+        int checked = 0;
+        int queued = 0;
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            ServerLevel level = player.serverLevel();
+            ChunkPos center = player.chunkPosition();
+            for (int chunkX = center.x - radius; chunkX <= center.x + radius; chunkX++) {
+                for (int chunkZ = center.z - radius; chunkZ <= center.z + radius; chunkZ++) {
+                    LevelChunk chunk = level.getChunkSource().getChunkNow(chunkX, chunkZ);
+                    if (chunk == null) {
+                        continue;
+                    }
+                    checked++;
+                    if (enqueue(level, chunk.getPos(), true)) {
+                        queued++;
+                    }
+                }
+            }
+        }
+
+        lastPlayerScanCheckedChunks = checked;
+        lastPlayerScanQueuedChunks = queued;
+        playerScanCheckedChunks += checked;
+        playerScanQueuedChunks += queued;
+    }
+
+    private static void promoteQueuedTask(String key) {
+        Iterator<MigrationTask> iterator = QUEUE.iterator();
+        while (iterator.hasNext()) {
+            MigrationTask queued = iterator.next();
+            if (queued.key().equals(key)) {
+                iterator.remove();
+                QUEUE.offerFirst(queued);
+                return;
+            }
+        }
     }
 
     private record MigrationTask(ResourceKey<Level> dimension, ChunkPos pos, int nextColumnIndex) {
@@ -221,15 +320,16 @@ public final class CanonicalWaterMigrationQueue {
             int completedChunks,
             int scannedColumns,
             int importedCells,
+            int hostedWaterCells,
             int convertedBlocks,
             int skippedUnloadedChunks,
             int queuedChunks
     ) {
-        public static final TickResult EMPTY = new TickResult(0, 0, 0, 0, 0, 0, 0);
+        public static final TickResult EMPTY = new TickResult(0, 0, 0, 0, 0, 0, 0, 0);
 
         private TickResult withQueuedChunks(int queuedChunks) {
-            return new TickResult(touchedChunks, completedChunks, scannedColumns, importedCells, convertedBlocks,
-                    skippedUnloadedChunks, queuedChunks);
+            return new TickResult(touchedChunks, completedChunks, scannedColumns, importedCells, hostedWaterCells,
+                    convertedBlocks, skippedUnloadedChunks, queuedChunks);
         }
     }
 
@@ -241,7 +341,14 @@ public final class CanonicalWaterMigrationQueue {
             long touchedChunks,
             long completedChunks,
             long importedCells,
+            long hostedWaterCells,
             long convertedBlocks,
+            int playerScanRadius,
+            int playerScanIntervalTicks,
+            int lastPlayerScanCheckedChunks,
+            int lastPlayerScanQueuedChunks,
+            long playerScanCheckedChunks,
+            long playerScanQueuedChunks,
             long skippedUnloadedChunks,
             long droppedChunks,
             TickResult lastTick
