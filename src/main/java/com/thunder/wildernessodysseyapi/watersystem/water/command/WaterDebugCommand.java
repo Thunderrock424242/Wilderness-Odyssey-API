@@ -6,6 +6,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterMigrationQueue;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterSeeder;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import net.minecraft.commands.CommandSourceStack;
@@ -23,7 +24,7 @@ import java.util.Locale;
  * Server command for inspecting and repairing replacement water ownership.
  *
  * <p>The mutating subcommands are operator-only because they can import chunk
- * data or rewrite vanilla compatibility blocks. Read-only inspection remains
+ * data or rewrite compatibility projection blocks. Read-only inspection remains
  * available to any command source that can execute normal commands.</p>
  */
 public final class WaterDebugCommand {
@@ -50,6 +51,8 @@ public final class WaterDebugCommand {
                         .then(Commands.argument("chunkRadius", IntegerArgumentType.integer(0, 4))
                                 .executes(context -> seed(context,
                                         IntegerArgumentType.getInteger(context, "chunkRadius")))))
+                .then(Commands.literal("migration")
+                        .executes(WaterDebugCommand::migrationStatus))
                 .then(Commands.literal("repair")
                         .requires(source -> source.hasPermission(2))
                         .executes(context -> repair(context, 4))
@@ -65,8 +68,10 @@ public final class WaterDebugCommand {
 
         source.sendSuccess(() -> Component.literal("WO water @ " + formatPos(pos)), false);
         source.sendSuccess(() -> Component.literal("  wet=" + snapshot.wet()
-                + ", vanillaWater=" + snapshot.vanillaWater()
-                + ", plainWaterBlock=" + snapshot.plainWaterBlock()
+                + ", tagWater=" + snapshot.tagWater()
+                + ", vanillaBlock=" + snapshot.vanillaWaterBlock()
+                + ", wildernessBlock=" + snapshot.wildernessWaterBlock()
+                + ", plainProjection=" + snapshot.plainProjectionBlock()
                 + ", mobileWater=" + snapshot.mobileWater()), false);
         source.sendSuccess(() -> Component.literal("  canonical tracked=" + snapshot.canonicalTracked()
                 + ", volume=" + snapshot.canonicalVolumeUnits()
@@ -87,7 +92,7 @@ public final class WaterDebugCommand {
 
         int sampled = 0;
         int wet = 0;
-        int vanilla = 0;
+        int tagWater = 0;
         int canonical = 0;
         int mobile = 0;
         int projected = 0;
@@ -98,7 +103,7 @@ public final class WaterDebugCommand {
             sampled++;
             WaterCompatibility.Snapshot snapshot = WaterCompatibility.describe(level, pos);
             if (snapshot.wet()) wet++;
-            if (snapshot.vanillaWater()) vanilla++;
+            if (snapshot.tagWater()) tagWater++;
             if (snapshot.canonicalTracked()) canonical++;
             if (snapshot.mobileWater()) mobile++;
             if (snapshot.compatibilityProjected()) projected++;
@@ -107,14 +112,14 @@ public final class WaterDebugCommand {
         int finalRadius = radius;
         int finalSampled = sampled;
         int finalWet = wet;
-        int finalVanilla = vanilla;
+        int finalTagWater = tagWater;
         int finalCanonical = canonical;
         int finalMobile = mobile;
         int finalProjected = projected;
         source.sendSuccess(() -> Component.literal("WO water summary radius=" + finalRadius
                 + " sampled=" + finalSampled
                 + " wet=" + finalWet
-                + " vanilla=" + finalVanilla
+                + " tagWater=" + finalTagWater
                 + " canonical=" + finalCanonical
                 + " projected=" + finalProjected
                 + " mobile=" + finalMobile), false);
@@ -142,9 +147,30 @@ public final class WaterDebugCommand {
         source.sendSuccess(() -> Component.literal("WO water seeded chunks=" + finalTotal.loadedChunks()
                 + " columns=" + finalTotal.scannedColumns()
                 + " importedCells=" + finalTotal.importedCells()
+                + " convertedBlocks=" + finalTotal.convertedBlocks()
                 + " skippedTracked=" + finalTotal.skippedTracked()
                 + " skippedWaterlogged=" + finalTotal.skippedWaterlogged()), true);
-        return Math.max(1, total.importedCells());
+        return Math.max(1, total.importedCells() + total.convertedBlocks());
+    }
+
+    private static int migrationStatus(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        CanonicalWaterMigrationQueue.MigrationStatus status = CanonicalWaterMigrationQueue.status();
+        CanonicalWaterMigrationQueue.TickResult lastTick = status.lastTick();
+
+        source.sendSuccess(() -> Component.literal("WO water migration seeding=" + status.seedingEnabled()
+                + " blockConversion=" + status.blockConversionEnabled()
+                + " queuedChunks=" + status.queuedChunks()
+                + " touchedChunks=" + status.touchedChunks()
+                + " completedChunks=" + status.completedChunks()
+                + " importedCells=" + status.importedCells()
+                + " convertedBlocks=" + status.convertedBlocks()), false);
+        source.sendSuccess(() -> Component.literal("  skippedUnloaded=" + status.skippedUnloadedChunks()
+                + " droppedChunks=" + status.droppedChunks()
+                + " lastTickChunks=" + lastTick.touchedChunks()
+                + " lastTickColumns=" + lastTick.scannedColumns()
+                + " lastTickConverted=" + lastTick.convertedBlocks()), false);
+        return Math.max(1, status.queuedChunks());
     }
 
     private static int repair(CommandContext<CommandSourceStack> context, int requestedRadius) {

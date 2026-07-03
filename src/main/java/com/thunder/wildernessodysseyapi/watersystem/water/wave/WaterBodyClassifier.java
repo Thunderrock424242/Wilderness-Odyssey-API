@@ -1,11 +1,11 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.wave;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.material.Fluids;
 
 import java.util.Collections;
 import java.util.Map;
@@ -89,7 +89,7 @@ public class WaterBodyClassifier {
         for (int dx = -8; dx <= 8; dx += 2) {
             for (int dz = -8; dz <= 8; dz += 2) {
                 BlockPos check = pos.offset(dx, 0, dz);
-                if (level.getFluidState(check).is(Fluids.WATER)) {
+                if (WaterCompatibility.hasTaggedWater(level, check)) {
                     waterCount++;
                 }
             }

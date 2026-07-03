@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.worldgen.structure;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
@@ -9,7 +10,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
-import net.minecraft.world.level.material.Fluids;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -284,16 +284,14 @@ public final class TerrainReplacerEngine {
     }
 
     public static boolean isExcludedReplacement(BlockState state) {
-        return state.is(Blocks.WATER)
+        return WaterCompatibility.isPlainWaterProjection(state)
                 || state.is(Blocks.LAVA)
                 || state.is(Blocks.BUBBLE_COLUMN)
                 || state.is(BlockTags.GOLD_ORES)
                 || state.is(BlockTags.COAL_ORES)
                 || state.is(BlockTags.IRON_ORES)
                 || state.is(BlockTags.UNDERWATER_BONEMEALS)
-                || state.getFluidState().is(Fluids.WATER)
-                || state.getFluidState().is(Fluids.LAVA)
-                || state.getFluidState().is(FluidTags.WATER)
+                || WaterCompatibility.isTaggedWater(state.getFluidState())
                 || state.getFluidState().is(FluidTags.LAVA);
     }
 

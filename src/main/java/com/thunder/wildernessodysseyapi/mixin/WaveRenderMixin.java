@@ -1,12 +1,12 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaveAnimator;
 import net.minecraft.client.renderer.block.LiquidBlockRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -35,7 +35,7 @@ public class WaveRenderMixin {
                                   VertexConsumer consumer, BlockState blockState,
                                   FluidState fluidState, CallbackInfo ci) {
         // Only apply to water, not lava
-        if (!fluidState.is(Fluids.WATER) && !fluidState.is(Fluids.FLOWING_WATER)) return;
+        if (!WaterCompatibility.isTaggedWater(fluidState)) return;
 
         // Wave state is updated once per frame in WaveAnimator
         WaveAnimator.updateIfNeeded();

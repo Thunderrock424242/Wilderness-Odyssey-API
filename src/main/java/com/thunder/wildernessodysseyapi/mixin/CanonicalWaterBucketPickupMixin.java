@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -12,7 +13,6 @@ import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.material.Fluids;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -78,7 +78,6 @@ public abstract class CanonicalWaterBucketPickupMixin {
     }
 
     private static boolean isCanonicalPickupWater(LiquidBlock liquidBlock) {
-        return liquidBlock.fluid.isSame(Fluids.WATER)
-                || liquidBlock.fluid.isSame(WildernessFluidRegistry.WILDERNESS_WATER.get());
+        return WaterCompatibility.isCanonicalWaterFluid(liquidBlock.fluid);
     }
 }

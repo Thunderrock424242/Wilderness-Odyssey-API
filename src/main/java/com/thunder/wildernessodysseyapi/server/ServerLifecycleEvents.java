@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.modpack.structure.ModpackStructureRegist
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
 import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.entity.BoatTiltStore;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterMigrationQueue;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.server.level.ServerLevel;
@@ -34,6 +35,7 @@ public final class ServerLifecycleEvents {
     /** Initializes server-owned services and reloadable data before players join. */
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
+        CanonicalWaterMigrationQueue.clearAll();
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         ServerPropertiesTemplateManager.ensureManagedServerProperties(event.getServer());
         GameRulesListManager.ensureRulesFileExists(event.getServer());
@@ -56,6 +58,7 @@ public final class ServerLifecycleEvents {
         }
 
         AsyncTaskManager.drainMainThreadQueue(event.getServer());
+        CanonicalWaterMigrationQueue.runTick(event.getServer());
         for (ServerLevel level : event.getServer().getAllLevels()) {
             RiftfallSystem.tick(level);
         }
@@ -69,12 +72,16 @@ public final class ServerLifecycleEvents {
             waterManager.capturePersistentLevel(level);
         }
         waterManager.shutdown();
+        CanonicalWaterMigrationQueue.clearAll();
         AsyncTaskManager.shutdown();
     }
 
     /** Clears world-derived caches when a level is unloaded to avoid retaining stale state. */
     @SubscribeEvent
     public static void onLevelUnload(LevelEvent.Unload event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            CanonicalWaterMigrationQueue.clearLevel(level);
+        }
         WaterBodyClassifier.clearCache();
         BoatTiltStore.clear();
         // ServerTickHandler and ClientTickHandler release only the unloading

@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -11,7 +12,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.Fluids;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -137,7 +137,7 @@ public final class ShoreWaveSpawner {
         for (int y = seaLevel + 3; y >= seaLevel - 3; y--) {
             BlockPos pos = new BlockPos(x, y, z);
             if (!level.hasChunkAt(pos)) return null;
-            if (level.getFluidState(pos).is(Fluids.WATER)) {
+            if (WaterCompatibility.hasTaggedWater(level, pos)) {
                 return pos;
             }
         }
@@ -145,7 +145,7 @@ public final class ShoreWaveSpawner {
     }
 
     private static boolean isShoreBlock(ServerLevel level, BlockPos pos) {
-        if (level.getFluidState(pos).is(Fluids.WATER)) return false;
+        if (WaterCompatibility.hasTaggedWater(level, pos)) return false;
 
         BlockState state = level.getBlockState(pos);
         if (!state.getCollisionShape(level, pos).isEmpty()) {
@@ -153,7 +153,7 @@ public final class ShoreWaveSpawner {
         }
 
         BlockPos below = pos.below();
-        if (level.getFluidState(below).is(Fluids.WATER)) return false;
+        if (WaterCompatibility.hasTaggedWater(level, below)) return false;
         return !level.getBlockState(below).getCollisionShape(level, below).isEmpty();
     }
 

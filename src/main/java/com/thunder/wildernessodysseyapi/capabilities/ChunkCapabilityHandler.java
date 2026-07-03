@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.capabilities;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterSeeder;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterMigrationQueue;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -41,7 +41,10 @@ public final class ChunkCapabilityHandler {
                 }
             }
         });
-        CanonicalWaterSeeder.seedLoadedChunk(level, chunk);
+        // Chunk load may run while Minecraft is preparing initial spawn chunks.
+        // Queue water migration here, then let server ticks process it later
+        // under explicit budgets so world creation cannot freeze on ocean work.
+        CanonicalWaterMigrationQueue.enqueue(level, chunk.getPos());
     }
 
     @SubscribeEvent
