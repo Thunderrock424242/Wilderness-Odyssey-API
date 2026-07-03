@@ -25,6 +25,10 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.BooleanValue AUTOMATIC_MIGRATION_FOLLOW_PLAYER_VIEW_DISTANCE;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_VIEW_DISTANCE_PADDING_CHUNKS;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS;
+    public static final ModConfigSpec.BooleanValue ENABLE_VISIBLE_CHUNK_WATER_FINALIZATION;
+    public static final ModConfigSpec.IntValue VISIBLE_FINALIZATION_CHUNKS_PER_TICK;
+    public static final ModConfigSpec.IntValue VISIBLE_FINALIZATION_COLUMNS_PER_TICK;
+    public static final ModConfigSpec.IntValue VISIBLE_FINALIZATION_CONVERTED_BLOCKS_PER_TICK;
     public static final ModConfigSpec.BooleanValue SEED_ONLY_PLAIN_WATER_BLOCKS;
     public static final ModConfigSpec.BooleanValue IMPORT_WATERLOGGED_HOST_WATER;
     public static final ModConfigSpec.IntValue COVERED_WATER_SURFACE_SCAN_DEPTH;
@@ -72,6 +76,18 @@ public final class WaterSimulationConfig {
         AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS = builder
                 .comment("How often automatic water migration rescans already-loaded chunks around players.")
                 .defineInRange("automaticMigrationPlayerScanIntervalTicks", 20, 10, 600);
+        ENABLE_VISIBLE_CHUNK_WATER_FINALIZATION = builder
+                .comment("Finalize generated plain water into Wilderness water when a loaded chunk starts being watched by a player. Work remains bounded per tick so world creation and chunk sending do not stall.")
+                .define("enableVisibleChunkWaterFinalization", true);
+        VISIBLE_FINALIZATION_CHUNKS_PER_TICK = builder
+                .comment("Maximum player-visible chunks that may receive immediate water finalization in one server tick.")
+                .defineInRange("visibleFinalizationChunksPerTick", 2, 1, 16);
+        VISIBLE_FINALIZATION_COLUMNS_PER_TICK = builder
+                .comment("Maximum X/Z water columns finalized from player-visible chunks in one server tick.")
+                .defineInRange("visibleFinalizationColumnsPerTick", 512, 1, 2048);
+        VISIBLE_FINALIZATION_CONVERTED_BLOCKS_PER_TICK = builder
+                .comment("Maximum plain minecraft:water blocks rewritten to Wilderness water while finalizing player-visible chunks in one server tick.")
+                .defineInRange("visibleFinalizationConvertedBlocksPerTick", 1024, 1, 4096);
         SEED_ONLY_PLAIN_WATER_BLOCKS = builder
                 .comment("Restrict normal world seeding to plain water blocks. Non-plain tagged water can still import as hosted water when importWaterloggedHostWater is enabled.")
                 .define("seedOnlyPlainWaterBlocks", true);
@@ -154,6 +170,26 @@ public final class WaterSimulationConfig {
     public static int automaticMigrationPlayerScanIntervalTicks() {
         int configured = AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS.get();
         return automaticMigrationFollowsPlayerViewDistance() ? Math.min(20, configured) : configured;
+    }
+
+    /** Returns whether watched chunks should get a bounded pre-visibility water finalization pass. */
+    public static boolean visibleChunkWaterFinalizationEnabled() {
+        return ENABLE_VISIBLE_CHUNK_WATER_FINALIZATION.get();
+    }
+
+    /** Returns how many watched chunks can be finalized in one server tick. */
+    public static int visibleFinalizationChunksPerTick() {
+        return VISIBLE_FINALIZATION_CHUNKS_PER_TICK.get();
+    }
+
+    /** Returns how many watched-chunk columns can be finalized in one server tick. */
+    public static int visibleFinalizationColumnsPerTick() {
+        return VISIBLE_FINALIZATION_COLUMNS_PER_TICK.get();
+    }
+
+    /** Returns how many plain water blocks can be rewritten during watched-chunk finalization in one server tick. */
+    public static int visibleFinalizationConvertedBlocksPerTick() {
+        return VISIBLE_FINALIZATION_CONVERTED_BLOCKS_PER_TICK.get();
     }
 
     /** Returns whether waterlogged host blocks contribute hosted canonical water cells. */

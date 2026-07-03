@@ -14,9 +14,10 @@ be vanilla water internally. The mod owns namespaced water IDs such as
 biomes, structures, mob spawning, and other tag-aware checks still classify the
 fluid as water. Canonical projection writes the namespaced water block for
 owned/disturbed water, and deferred automatic seeding can migrate accepted
-plain vanilla world water into the same namespaced block after the world is
-running. Existing vanilla water therefore remains an import source, not the
-long-term ownership target. Exact
+plain vanilla world water into the same namespaced block as chunks become
+player-visible and during later background ticks. Existing vanilla water
+therefore remains a generation/import source, not the long-term ownership
+target. Exact
 `Blocks.WATER` / `Fluids.WATER` assumptions are handled with targeted mixins
 only when a system truly needs them.
 
@@ -164,7 +165,17 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   toward canonical ownership before older background migration work.
 - Canonical ownership import is decoupled from the slower block-conversion
   budget, so authority coverage can fill the visible ocean while namespaced
-  Wilderness block rewrites continue safely over later ticks.
+  Wilderness block rewrites continue safely over later ticks. If conversion
+  budget runs out, the chunk is requeued from the first skipped plain-water
+  column instead of being marked complete.
+- Loaded chunks receive a bounded watched-chunk finalization pass before normal
+  background migration. That is the handoff where generated plain
+  `minecraft:water` becomes namespaced Wilderness water without running large
+  rewrite scans on the raw worldgen path.
+- Exposed plain water that is still waiting for migration may draw a one-block
+  Wilderness visual preview so the water system does not disappear during
+  authority catch-up. It is not replacement-safe for coarse LODs or vanilla
+  top-face hiding until canonical or namespaced Wilderness authority owns it.
 - Depth attenuation that fades deep-ocean waves into shallow water.
 - Foam generated from depth and crest slope rather than absolute world height.
 - `surfaceAbsorptionStrength` and `surfaceOpacityStrength` tune how quickly
