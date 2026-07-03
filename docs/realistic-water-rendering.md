@@ -59,15 +59,13 @@ and boat response therefore use one coherent wave field.
 
 The per-frame surface renderer follows the active client render distance through
 bounded near, medium, and far LODs instead of rebuilding every distant ocean
-block at full detail. Vanilla water remains the stable compatibility/base
-surface by default, while the replacement pass renders animated optical detail
-above it. An experimental config can hide exact baked vanilla top faces covered
-by one-block replacement patches, but that path is off by default because it can
-turn any ownership mistake into visible holes. Coarser far LODs remain
-color-only overlays on top of vanilla-compatible water, and patch budgets keep
-extreme view distances from overwhelming the client. Vanilla side faces remain
-as failure-safe compatibility geometry and stay laterally anchored so shoreline
-triangles cannot stretch across land.
+block at full detail. Vanilla water remains the stable compatibility mask, but
+validated replacement footprints now hide the baked vanilla top faces beneath
+them by default. That prevents the player from seeing two water surfaces blended
+over each other while still preserving vanilla fluid state, tags, side faces,
+and out-of-range fallback geometry. Patch budgets keep extreme view distances
+from overwhelming the client, and vanilla side faces stay laterally anchored so
+shoreline triangles cannot stretch across land.
 Iris/Oculus keeps the standard translucent shader path; without an
 external shader pack, the optional core shader adds Fresnel, depth-colored
 absorption, foam, lighting, and animated micro-normal detail.
@@ -119,11 +117,11 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
 - Shallow or irregular LOD cells automatically subdivide to one-block patches;
   coarse non-planar quads are reserved for deep open water so their GPU
   triangle split cannot produce large angular shoreline artifacts.
-- Vanilla top faces remain visible by default. `suppressVanillaWaterTopFaces`
-  is an experimental opt-in for one-block replacement patches only; coarse
-  far-distance LOD patches always behave as water-colored overlays so the
-  vanilla/cached water surface remains a fallback under them instead of
-  revealing terrain through large transparent triangles.
+- `replaceVanillaWaterTopFaces` is enabled by default so validated replacement
+  patches hide the matching baked vanilla top faces. The old
+  `suppressVanillaWaterTopFaces` option remains as a legacy/debug override.
+  Both switches affect top faces only; vanilla side faces and any water outside
+  the replacement cache remain available as compatibility/fallback geometry.
 - When the per-frame dynamic ocean surface is enabled, baked vanilla liquid
   vertices are no longer vertically waved. The chunk mesh remains a stable
   compatibility/fallback layer while the replacement pass owns visible motion;
@@ -159,6 +157,10 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   direction of flow.
 - Depth attenuation that fades deep-ocean waves into shallow water.
 - Foam generated from depth and crest slope rather than absolute world height.
+- `surfaceAbsorptionStrength` and `surfaceOpacityStrength` tune how quickly
+  deep water hides the blocky seafloor and how strongly the replacement water
+  medium blends over vanilla terrain. The defaults favor a less see-through
+  ocean while keeping shoreline overlays partially readable.
 - Patch-stable material tint avoids exposing the GPU's internal triangle split;
   view-dependent Fresnel remains a per-pixel shader responsibility.
 - The built-in dynamic-ocean pass writes color only, not depth, and keeps a

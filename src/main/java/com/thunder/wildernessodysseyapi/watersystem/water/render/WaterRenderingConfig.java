@@ -18,6 +18,7 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_GERSTNER_WAVES;
     public static final ModConfigSpec.BooleanValue ENABLE_DYNAMIC_OCEAN_SURFACE;
     public static final ModConfigSpec.BooleanValue ENABLE_SHORELINE_SURFACE;
+    public static final ModConfigSpec.BooleanValue REPLACE_VANILLA_WATER_TOPS;
     public static final ModConfigSpec.BooleanValue SUPPRESS_VANILLA_WATER_TOPS;
     public static final ModConfigSpec.BooleanValue ENABLE_WATER_CORE_SHADER;
     public static final ModConfigSpec.BooleanValue ENABLE_UNDERWATER_OPTICS;
@@ -29,6 +30,8 @@ public final class WaterRenderingConfig {
 
     public static final ModConfigSpec.DoubleValue UNDERWATER_VISIBILITY_BLOCKS;
     public static final ModConfigSpec.DoubleValue UNDERWATER_TURBIDITY_STRENGTH;
+    public static final ModConfigSpec.DoubleValue SURFACE_ABSORPTION_STRENGTH;
+    public static final ModConfigSpec.DoubleValue SURFACE_OPACITY_STRENGTH;
     public static final ModConfigSpec.DoubleValue SHORELINE_OVERLAY_STRENGTH;
     public static final ModConfigSpec.IntValue MAX_OCEAN_SURFACE_DISTANCE_BLOCKS;
 
@@ -73,8 +76,11 @@ public final class WaterRenderingConfig {
         ENABLE_SHORELINE_SURFACE = builder
                 .comment("Render the block-detail shoreline/local-water overlay for cells the open-ocean mesh does not own.")
                 .define("enableShorelineSurface", true);
+        REPLACE_VANILLA_WATER_TOPS = builder
+                .comment("Hide vanilla top faces wherever the replacement water mesh owns the same safe surface cell. This removes the double-water patchwork look while preserving vanilla water states for compatibility.")
+                .define("replaceVanillaWaterTopFaces", true);
         SUPPRESS_VANILLA_WATER_TOPS = builder
-                .comment("Experimental: hide vanilla top faces covered by the replacement mesh. Disabled by default because the vanilla surface is the compatibility/fallback layer.")
+                .comment("Legacy/debug override: also hide vanilla top faces covered by the replacement mesh. Kept for older configs; replaceVanillaWaterTopFaces is the normal replacement-mode switch.")
                 .define("suppressVanillaWaterTopFaces", false);
         ENABLE_WATER_CORE_SHADER = builder
                 .comment("Use the built-in Fresnel/absorption water shader when no external shader pack owns water rendering.")
@@ -107,6 +113,12 @@ public final class WaterRenderingConfig {
         UNDERWATER_TURBIDITY_STRENGTH = builder
                 .comment("Scales storm, shallow-sediment, and moving-water turbidity. Zero keeps water maximally clear.")
                 .defineInRange("underwaterTurbidityStrength", 1.0, 0.0, 2.0);
+        SURFACE_ABSORPTION_STRENGTH = builder
+                .comment("Scales how quickly the replacement surface shifts toward deep-water color with depth. Higher values hide blocky seafloors sooner.")
+                .defineInRange("surfaceAbsorptionStrength", 1.35, 0.25, 3.0);
+        SURFACE_OPACITY_STRENGTH = builder
+                .comment("Scales replacement-surface alpha after depth, foam, and shoreline fades. Higher values make the water medium less see-through.")
+                .defineInRange("surfaceOpacityStrength", 1.16, 0.50, 2.0);
         SHORELINE_OVERLAY_STRENGTH = builder
                 .comment("Scales shoreline overlay alpha, foam, and local vertical motion.")
                 .defineInRange("shorelineOverlayStrength", 1.0, 0.0, 2.0);
@@ -284,9 +296,9 @@ public final class WaterRenderingConfig {
                 : NORMAL_OCEAN_CELL_SIZE.get();
     }
 
-    /** Returns whether the experimental renderer may hide baked vanilla water tops. */
+    /** Returns whether the replacement renderer may hide baked vanilla water tops. */
     public static boolean suppressVanillaWaterTopFaces() {
-        return SUPPRESS_VANILLA_WATER_TOPS.get();
+        return REPLACE_VANILLA_WATER_TOPS.get() || SUPPRESS_VANILLA_WATER_TOPS.get();
     }
 
     /** Returns the active cache budget for dynamic ocean surface patches. */
@@ -313,6 +325,16 @@ public final class WaterRenderingConfig {
     /** Returns the user-controlled shoreline overlay strength multiplier. */
     public static float shorelineOverlayStrength() {
         return SHORELINE_OVERLAY_STRENGTH.get().floatValue();
+    }
+
+    /** Returns the depth absorption multiplier used by surface renderers. */
+    public static float surfaceAbsorptionStrength() {
+        return SURFACE_ABSORPTION_STRENGTH.get().floatValue();
+    }
+
+    /** Returns the alpha multiplier used by surface renderers. */
+    public static float surfaceOpacityStrength() {
+        return SURFACE_OPACITY_STRENGTH.get().floatValue();
     }
 
     /**

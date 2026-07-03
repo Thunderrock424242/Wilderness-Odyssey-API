@@ -297,7 +297,9 @@ public final class OceanSurfaceRenderer {
         float tintG = ((tint >> 8) & 0xFF) / 255.0f;
         float tintB = (tint & 0xFF) / 255.0f;
 
-        float absorption = 1.0f - (float) Math.exp(-Math.max(0.0f, depth) * 0.32f);
+        float absorption = 1.0f - (float) Math.exp(
+                -Math.max(0.0f, depth) * 0.32f * WaterRenderingConfig.surfaceAbsorptionStrength()
+        );
 
         // Keep the replacement surface optically water-colored even over dark
         // ocean floors. The shader still applies depth, light, and Fresnel, but
@@ -319,6 +321,7 @@ public final class OceanSurfaceRenderer {
         float baseAlpha = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.72f : 0.46f;
         float depthAlpha = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.18f : 0.10f;
         float alpha = (baseAlpha + absorption * depthAlpha + foam * 0.05f)
+                * WaterRenderingConfig.surfaceOpacityStrength()
                 * Math.max(0.0f, Math.min(1.0f, alphaScale));
 
         return (channel(alpha) << 24)
@@ -570,20 +573,20 @@ public final class OceanSurfaceRenderer {
                 dominantType(first, second, third, fourth)
         ));
 
-        // Only one-block patches truly replace vanilla top faces. Coarser LOD
-        // patches are visual overlays; hiding the baked water beneath them
-        // exposes seafloor/ice intersections as large transparent triangles.
-        if (cellSize == 1) {
-            for (int offsetX = 0; offsetX < cellSize; offsetX++) {
-                for (int offsetZ = 0; offsetZ < cellSize; offsetZ++) {
-                    SurfaceColumn covered = surfaceColumn(level, surfaces, x + offsetX, z + offsetZ);
-                    if (covered.valid) {
-                        rebuiltOwnedTops.add(BlockPos.asLong(
-                                x + offsetX,
-                                covered.surfaceBlockY,
-                                z + offsetZ
-                        ));
-                    }
+        // Every validated footprint may replace the vanilla top faces below it.
+        // Coarse patches only reach this point after their full footprint and
+        // one-block border proved stable, deep, and replacement-safe, so hiding
+        // the baked surface removes double-water patchwork without exposing
+        // beach, ice, vegetation, or hosted water cells.
+        for (int offsetX = 0; offsetX < cellSize; offsetX++) {
+            for (int offsetZ = 0; offsetZ < cellSize; offsetZ++) {
+                SurfaceColumn covered = surfaceColumn(level, surfaces, x + offsetX, z + offsetZ);
+                if (covered.valid && covered.replacementSafe) {
+                    rebuiltOwnedTops.add(BlockPos.asLong(
+                            x + offsetX,
+                            covered.surfaceBlockY,
+                            z + offsetZ
+                    ));
                 }
             }
         }
