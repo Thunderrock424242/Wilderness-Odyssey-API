@@ -1,6 +1,5 @@
 {
   "itemGroup.wildernessodysseyapi": "Wilderness Odyssey API",
-  "message.wildernessodysseyapi.wake_up": "Waking from cryostasis...",
   "message.wildernessodysseyapi.cloak_enabled": "Cloak engaged.",
   "message.wildernessodysseyapi.cloak_disabled": "Cloak disengaged.",
   "message.wildernessodysseyapi.cloak_hold_breath_hint": "Use the cloak key to toggle cloak. Hold the breath key to quiet your breathing.",

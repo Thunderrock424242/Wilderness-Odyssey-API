@@ -1,17 +1,10 @@
 package com.thunder.wildernessodysseyapi.worldgen.spawn;
 
-import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
-import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -30,10 +23,6 @@ public class PlayerSpawnHandler {
 
     private static final String CRYO_ASSIGNED_TAG = "wo_cryo_assigned";
     private static final String CRYO_POS_TAG = "wo_cryo_pos";
-    private static final int INTRO_SLOWDOWN_TICKS = TickTokAPI.toTicksFromSeconds(3);
-    private static final int TITLE_FADE_IN_TICKS = TickTokAPI.toTicks(1);
-    private static final int TITLE_STAY_TICKS = TickTokAPI.toTicksFromSeconds(3);
-    private static final int TITLE_FADE_OUT_TICKS = TickTokAPI.toTicks(1);
 
     private static List<BlockPos> spawnBlocks = Collections.emptyList();
 
@@ -71,10 +60,8 @@ public class PlayerSpawnHandler {
         }
 
         teleportPlayer(player, spawnPos);
-        playIntroCinematic(player);
         tag.putBoolean(CRYO_ASSIGNED_TAG, true);
         tag.putLong(CRYO_POS_TAG, spawnPos.asLong());
-        player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, INTRO_SLOWDOWN_TICKS, 255, false, false));
     }
 
     private static BlockPos selectSpawn(ServerPlayer player, CompoundTag tag) {
@@ -101,14 +88,5 @@ public class PlayerSpawnHandler {
                 spawnPos.getZ() + 0.5,
                 player.getYRot(),
                 player.getXRot());
-    }
-
-    /**
-     * Play an intro cinematic when the player first awakens.
-     */
-    private static void playIntroCinematic(ServerPlayer player) {
-        ServerGamePacketListenerImpl connection = player.connection;
-        connection.send(new ClientboundSetTitlesAnimationPacket(TITLE_FADE_IN_TICKS, TITLE_STAY_TICKS, TITLE_FADE_OUT_TICKS));
-        connection.send(new ClientboundSetTitleTextPacket(Component.translatable("message.wildernessodysseyapi.wake_up")));
     }
 }
