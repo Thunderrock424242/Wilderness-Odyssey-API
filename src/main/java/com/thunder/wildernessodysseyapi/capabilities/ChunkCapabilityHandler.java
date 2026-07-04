@@ -43,21 +43,21 @@ public final class ChunkCapabilityHandler {
                 }
             }
         });
-        // Chunk load may run while Minecraft is preparing initial spawn chunks.
-        // Before players exist we only queue work. Once players are exploring,
-        // loaded chunks get an eager bounded finalization slice so Wilderness
-        // water is likely to own the chunk before the client renders it.
+        // Chunk load may run on Minecraft's streaming path, so never rewrite
+        // water blocks here. Loaded chunks are priority-queued once players
+        // exist, then the server tick queue performs bounded finalization.
         if (!chunkData.isWaterFinalized()) {
-            CanonicalWaterMigrationQueue.finalizeLoadedChunk(level, chunk);
+            CanonicalWaterMigrationQueue.queueLoadedChunkForFinalization(level, chunk);
         }
     }
 
     @SubscribeEvent
     public static void onChunkWatch(ChunkWatchEvent.Watch event) {
         // A watched chunk is the first safe player-visible boundary: worldgen is
-        // done, the chunk is loaded, and a player is about to see it. Finalize a
-        // bounded water slice here, then priority-queue any unfinished work.
-        CanonicalWaterMigrationQueue.finalizeVisibleChunk(event.getLevel(), event.getChunk());
+        // done, the chunk is loaded, and a player is about to see it. Promote
+        // it instead of rewriting in the watch callback so chunk sending stays
+        // responsive when many ocean chunks stream at once.
+        CanonicalWaterMigrationQueue.queueVisibleChunkForFinalization(event.getLevel(), event.getChunk());
     }
 
     @SubscribeEvent
