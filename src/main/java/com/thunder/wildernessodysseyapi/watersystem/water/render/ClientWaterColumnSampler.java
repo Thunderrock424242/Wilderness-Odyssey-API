@@ -12,11 +12,10 @@ import net.minecraft.world.level.levelgen.Heightmap;
  * <p>Keeping this logic in one place prevents shoreline overlays, open-ocean
  * replacement quads, and underwater fog from disagreeing about partial fills,
  * flow velocity, or the surface height of the same block. Surface renderers
- * render authoritative cells directly. Exposed plain water that is still
- * waiting for automatic migration may be sampled as a temporary one-block
- * visual preview, but it is not reported as replacement-safe until Wilderness
- * authority owns it. Immersion can still see tagged water while the server
- * catches up.</p>
+ * render authoritative cells directly. Plain Minecraft water that is still
+ * waiting for automatic migration remains a compatibility/migration source
+ * instead of becoming replacement geometry. Immersion can still see tagged
+ * water while the server catches up.</p>
  */
 final class ClientWaterColumnSampler {
 
@@ -199,13 +198,13 @@ final class ClientWaterColumnSampler {
         /**
          * Returns whether the client may draw a visible Wilderness surface here.
          *
-         * <p>Pending migration water is renderable so the replacement system
-         * does not visually disappear while the server imports nearby loaded
-         * chunks. It still remains non-replacement-safe until canonical or
-         * namespaced authority owns the cell.</p>
+         * <p>Only canonical volume or a namespaced Wilderness projection may
+         * render through the replacement mesh. Pending vanilla water remains on
+         * the Minecraft compatibility path until visible-chunk finalization
+         * hands that column to Wilderness authority.</p>
          */
         boolean renderableSurface() {
-            return authorityOwned || migrationCandidate;
+            return authorityOwned;
         }
     }
 }

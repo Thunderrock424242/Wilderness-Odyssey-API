@@ -110,12 +110,13 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   the same compatibility renderer without changing code.
 - Coarse optimized cells validate their complete footprint and edge grid before
   rendering, so they cannot bridge beach corners, islands, or unloaded gaps.
-- Surface ownership starts from exposed plain water or replacement-safe
-  canonical water, not arbitrary waterlogged blocks. Ice-covered water,
-  lily-pad-covered water, and submerged vegetation keep vanilla rendering so
-  the replacement mesh does not draw dark floor-level patches in frozen or
-  plant-heavy shorelines. Waterlogged hosts can still be imported as hosted
-  canonical water for depth/optics, but hosted cells are not replacement-safe.
+- Surface ownership starts from replacement-safe canonical water or a
+  namespaced Wilderness projection, not from pending plain Minecraft water or
+  arbitrary waterlogged blocks. Ice-covered water, lily-pad-covered water, and
+  submerged vegetation keep vanilla rendering so the replacement mesh does not
+  draw dark floor-level patches in frozen or plant-heavy shorelines.
+  Waterlogged hosts can still be imported as hosted canonical water for
+  depth/optics, but hosted cells are not replacement-safe.
 - Shallow or irregular LOD cells automatically subdivide to one-block patches;
   coarse non-planar quads are reserved for deep open water so their GPU
   triangle split cannot produce large angular shoreline artifacts.
@@ -135,23 +136,23 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   laterally anchored. Full horizontal orbital displacement belongs to a future
   continuous offshore mesh; applying it to block-clipped shoreline topology can
   pull boundary vertices across missing neighbors and reveal triangular gaps.
-- The replacement mesh treats vanilla/source water and full canonical cells as
-  a compatibility mask, not as final face geometry. It renders only over stable
-  full-water footprints with a one-block continuity border; flowing, partial,
-  covered, shore-adjacent, and ice-adjacent cells stay visible only after a
-  dedicated local-volume or shoreline mesh owns them.
+- The replacement mesh treats pending vanilla/source water as migration input,
+  not as final face geometry. It renders only over stable Wilderness-owned
+  footprints with a one-block continuity border; flowing, partial, covered,
+  shore-adjacent, and ice-adjacent cells stay visible only after canonical
+  volume or a dedicated local-volume/shoreline mesh owns them.
 - Vanilla and Wilderness water are visually stitched in `LiquidBlockRenderer`
   by culling internal faces between any two fluids tagged as
   `#minecraft:water`. Without that client bridge, mixed migration boundaries
   render as tall translucent underwater curtains even though both sides are
   logically water.
 - `ShorelineSurfaceRenderer` supplies that local edge layer. It draws one-block
-  overlay quads for exposed shore, ice-adjacent, flowing, and partial cells
-  that the open-ocean mesh refuses to own. In strict replacement mode it also
-  publishes matching top-face ownership so vanilla remains compatibility data
-  rather than the visible shoreline surface. It runs after the open-ocean pass,
-  respects a separate renderer-profile radius and patch budget, and scans
-  nearest-first.
+  overlay quads for Wilderness-owned exposed shore, ice-adjacent, flowing, and
+  partial cells that the open-ocean mesh refuses to own. In strict replacement
+  mode it publishes top-face ownership only for replacement-safe shoreline
+  cells, so unsafe pending/hosted cells cannot hide vanilla and reveal black
+  terrain gaps. It runs after the open-ocean pass, respects a separate
+  renderer-profile radius and patch budget, and scans nearest-first.
 - `ClientWaterColumnSampler` is the shared client-side volume lens for
   shoreline overlays, open-ocean depth checks, and camera immersion. It samples
   `WildernessWaterAuthority` so renderers only claim canonical or namespaced
@@ -172,10 +173,15 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   background migration. That is the handoff where generated plain
   `minecraft:water` becomes namespaced Wilderness water without running large
   rewrite scans on the raw worldgen path.
-- Exposed plain water that is still waiting for migration may draw a one-block
-  Wilderness visual preview so the water system does not disappear during
-  authority catch-up. It is not replacement-safe for coarse LODs or vanilla
-  top-face hiding until canonical or namespaced Wilderness authority owns it.
+- Completed chunk handoffs persist a water-finalized marker on the chunk data.
+  Render-distance and player-priority migration can therefore focus on newly
+  loaded/generated chunks instead of rescanning ocean that already belongs to
+  Wilderness authority.
+- Exposed plain Minecraft water that is still waiting for migration stays on
+  the vanilla compatibility renderer until visible-chunk finalization imports
+  and projects it as Wilderness water. This keeps the handoff single-authority:
+  a column is either vanilla-pending or Wilderness-owned, never a visual
+  half-preview that can disagree with top-face culling.
 - Depth attenuation that fades deep-ocean waves into shallow water.
 - Foam generated from depth and crest slope rather than absolute world height.
 - `surfaceAbsorptionStrength` and `surfaceOpacityStrength` tune how quickly

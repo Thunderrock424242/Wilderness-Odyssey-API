@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.volume;
 
+import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
+import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -42,6 +44,8 @@ public final class CanonicalWaterMigrationQueue {
     private static long visibleFinalizationHostedWaterCells;
     private static long visibleFinalizationConvertedBlocks;
     private static long visibleFinalizationBudgetMisses;
+    private static long visibleFinalizationSkippedFinalizedChunks;
+    private static long skippedFinalizedChunks;
     private static long skippedUnloadedChunks;
     private static long droppedChunks;
     private static int lastPlayerScanCheckedChunks;
@@ -75,6 +79,11 @@ public final class CanonicalWaterMigrationQueue {
         if (!WaterSimulationConfig.ENABLE_CANONICAL_WORLD_SEEDING.get()) {
             return false;
         }
+        LevelChunk loadedChunk = level.getChunkSource().getChunkNow(pos.x, pos.z);
+        if (loadedChunk != null && isChunkWaterFinalized(loadedChunk)) {
+            skippedFinalizedChunks++;
+            return false;
+        }
         MigrationTask task = new MigrationTask(level.dimension(), pos, 0, priority);
         if (QUEUED_KEYS.contains(task.key())) {
             if (priority) {
@@ -100,6 +109,11 @@ public final class CanonicalWaterMigrationQueue {
         }
 
         MigrationTask task = removeQueuedTask(new MigrationTask(level.dimension(), chunk.getPos(), 0, true).key());
+        if (isChunkWaterFinalized(chunk)) {
+            visibleFinalizationSkippedFinalizedChunks++;
+            lastVisibleFinalization = TickResult.EMPTY.withQueuedChunks(QUEUE.size());
+            return lastVisibleFinalization;
+        }
         if (task == null) {
             task = new MigrationTask(level.dimension(), chunk.getPos(), 0, true);
         } else {
@@ -150,6 +164,8 @@ public final class CanonicalWaterMigrationQueue {
         visibleFinalizationConvertedBlocks += stats.convertedBlocks();
         if (!slice.complete()) {
             queueTask(task.withNextColumnIndex(slice.nextColumnIndex()).asPriority());
+        } else {
+            markChunkWaterFinalized(chunk);
         }
 
         lastVisibleFinalization = new TickResult(
@@ -253,6 +269,11 @@ public final class CanonicalWaterMigrationQueue {
                 tickSkippedUnloaded++;
                 continue;
             }
+            if (isChunkWaterFinalized(chunk)) {
+                QUEUED_KEYS.remove(task.key());
+                skippedFinalizedChunks++;
+                continue;
+            }
 
             CanonicalWaterSeeder.SeedSlice slice = CanonicalWaterSeeder.seedChunkSlice(
                     level,
@@ -274,6 +295,7 @@ public final class CanonicalWaterMigrationQueue {
 
             if (slice.complete()) {
                 QUEUED_KEYS.remove(task.key());
+                markChunkWaterFinalized(chunk);
                 tickCompleted++;
             } else {
                 requeue(task.withNextColumnIndex(slice.nextColumnIndex()));
@@ -331,6 +353,8 @@ public final class CanonicalWaterMigrationQueue {
         visibleFinalizationHostedWaterCells = 0L;
         visibleFinalizationConvertedBlocks = 0L;
         visibleFinalizationBudgetMisses = 0L;
+        visibleFinalizationSkippedFinalizedChunks = 0L;
+        skippedFinalizedChunks = 0L;
         skippedUnloadedChunks = 0L;
         droppedChunks = 0L;
         lastPlayerScanCheckedChunks = 0;
@@ -378,11 +402,36 @@ public final class CanonicalWaterMigrationQueue {
                 visibleFinalizationHostedWaterCells,
                 visibleFinalizationConvertedBlocks,
                 visibleFinalizationBudgetMisses,
+                visibleFinalizationSkippedFinalizedChunks,
                 lastVisibleFinalization,
+                skippedFinalizedChunks,
                 skippedUnloadedChunks,
                 droppedChunks,
                 lastTick
         );
+    }
+
+    /**
+     * Returns whether a loaded chunk has already completed water finalization.
+     *
+     * <p>Diagnostics use this to explain why a chunk is no longer queued, and
+     * migration scheduling uses it to avoid rescanning chunks whose generated
+     * plain water has already been handed to Wilderness authority.</p>
+     */
+    public static boolean isChunkWaterFinalized(LevelChunk chunk) {
+        return chunk.getData(ModAttachments.CHUNK_DATA).isWaterFinalized();
+    }
+
+    /** Returns whether the migration queue currently contains this chunk. */
+    public static synchronized boolean isQueued(ServerLevel level, ChunkPos pos) {
+        return QUEUED_KEYS.contains(key(level.dimension(), pos));
+    }
+
+    private static void markChunkWaterFinalized(LevelChunk chunk) {
+        ChunkDataCapability chunkData = chunk.getData(ModAttachments.CHUNK_DATA);
+        if (!chunkData.isWaterFinalized()) {
+            chunkData.markWaterFinalized();
+        }
     }
 
     private static void enqueueLoadedPlayerChunks(MinecraftServer server) {
@@ -423,6 +472,9 @@ public final class CanonicalWaterMigrationQueue {
                         continue;
                     }
                     checked++;
+                    if (isChunkWaterFinalized(chunk)) {
+                        continue;
+                    }
                     if (enqueue(level, chunk.getPos(), true)) {
                         queued++;
                     } else {
@@ -500,9 +552,13 @@ public final class CanonicalWaterMigrationQueue {
         }
     }
 
+    private static String key(ResourceKey<Level> dimension, ChunkPos pos) {
+        return dimension.location() + ":" + pos.x + ":" + pos.z;
+    }
+
     private record MigrationTask(ResourceKey<Level> dimension, ChunkPos pos, int nextColumnIndex, boolean priority) {
         private String key() {
-            return dimension.location() + ":" + pos.x + ":" + pos.z;
+            return CanonicalWaterMigrationQueue.key(dimension, pos);
         }
 
         private MigrationTask withNextColumnIndex(int nextColumnIndex) {
@@ -561,7 +617,9 @@ public final class CanonicalWaterMigrationQueue {
             long visibleFinalizationHostedWaterCells,
             long visibleFinalizationConvertedBlocks,
             long visibleFinalizationBudgetMisses,
+            long visibleFinalizationSkippedFinalizedChunks,
             TickResult lastVisibleFinalization,
+            long skippedFinalizedChunks,
             long skippedUnloadedChunks,
             long droppedChunks,
             TickResult lastTick

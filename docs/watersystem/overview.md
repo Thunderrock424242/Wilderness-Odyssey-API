@@ -67,6 +67,10 @@ padding radius, then clamps to the server's loaded view distance so visible
 water converges toward Wilderness ownership without force-loading the whole
 world. The seeder imports a bounded depth from oceans, rivers, lakes, and
 water under thin cover such as ice.
+Chunks that complete this scan store a persistent water-finalized flag in
+their chunk data. Future chunk-load, chunk-watch, and player-priority scans
+skip those finalized chunks unless a repair/future migration clears the flag,
+so ordinary exploration does not keep paying for the same ocean columns.
 Waterlogged host blocks, such as kelp, seagrass, and waterloggable modded
 blocks, can be imported directly from the motion-blocking surface scan as
 hosted canonical water for depth and optics, but the host block is not replaced
@@ -76,11 +80,12 @@ Canonical authority import is allowed to continue after the per-tick block
 conversion budget is exhausted, but any skipped plain-water rewrites keep the
 chunk in the priority queue from the first skipped column. That prevents
 import-only passes from leaving permanent `minecraft:water` behind.
-While that catch-up is in progress, the client may render a one-block
-replacement-surface preview over exposed pending migration water. Coarse LOD
-patches and vanilla top-face hiding still require canonical or namespaced
-Wilderness ownership, which keeps unsafe shore, covered, and waterlogged cells
-from becoming large stretched replacement quads.
+While that catch-up is in progress, exposed pending Minecraft water remains on
+the vanilla compatibility renderer instead of becoming replacement geometry.
+Coarse LOD patches, shoreline top-face hiding, and Wilderness surface motion
+all require canonical or namespaced Wilderness ownership, which keeps unsafe
+shore, covered, and waterlogged cells from becoming large stretched replacement
+quads or black terrain gaps.
 Imported worldgen cells are flagged as stable reservoirs and do not tick until
 disturbed. When
 `convertSeededWorldWaterToWilderness` and automatic migration are enabled, the
@@ -131,7 +136,11 @@ Use these commands in a dev world:
 - `/wowater migration` reports the automatic migration queue, totals, hosted
   waterlogged imports, player-priority scan counts, skipped unloaded chunks,
   effective view-distance priority radius, promoted chunks, watched-chunk
-  visible finalization work, and the last tick's migration work.
+  visible finalization work, finalized chunk skips, and the last tick's
+  migration work.
+- `/wowater visible <chunkRadius>` scans loaded chunks around the player and
+  reports finalized chunks, queued chunks, unfinished chunks, and any leftover
+  plain `minecraft:water` blocks still waiting for Wilderness takeover.
 - `/wowater shipcheck <radius>` classifies nearby water as Wilderness-owned,
   vanilla-pending-conversion, hosted-safe, pending import, or projection gaps.
   Use it before visual bug hunting so screenshots can be tied to ownership
