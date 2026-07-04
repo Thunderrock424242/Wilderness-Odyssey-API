@@ -54,16 +54,15 @@ know whether a block is still `minecraft:water`.
 Generated world water is finalized into canonical volume from exposed plain
 `minecraft:water` columns automatically. Raw chunk-load events stay cheap and
 only enqueue work because they can fire while Minecraft is preparing initial
-spawn chunks. Once players exist, newly loaded chunks spend the same bounded
-visible-finalization budget immediately, before the watch/render edge catches
-up. When a loaded chunk starts being watched by a player, the watched-chunk
-finalizer performs the same bounded pass as a fallback. These passes import
-plain water, rewrite accepted `minecraft:water` blocks to
-`wildernessodysseyapi:wilderness_water_block`, and priority-queue any
-unfinished columns. `CanonicalWaterMigrationQueue` then processes remaining
-loaded chunks after players exist, using configurable per-tick budgets for
-touched chunks, scanned columns, and converted blocks. A player-centered
-priority scan periodically promotes already-loaded chunks around each player.
+spawn chunks or streaming terrain for an exploring player. Once players exist,
+newly loaded and newly watched chunks are promoted to the front of the
+migration queue instead of being rewritten inside the load/watch callback.
+`CanonicalWaterMigrationQueue` then imports plain water, rewrites accepted
+`minecraft:water` blocks to `wildernessodysseyapi:wilderness_water_block`, and
+requeues any unfinished columns from the server tick loop under configurable
+budgets for touched chunks, scanned columns, and converted blocks. A
+player-centered priority scan periodically promotes already-loaded chunks
+around each player.
 By default it follows the player's requested view distance, adds a small
 padding radius, then clamps to the server's loaded view distance so visible
 water converges toward Wilderness ownership without force-loading the whole
@@ -137,9 +136,8 @@ Use these commands in a dev world:
   SPH water, and replacement-safe visible surface cells.
 - `/wowater migration` reports the automatic migration queue, totals, hosted
   waterlogged imports, player-priority scan counts, skipped unloaded chunks,
-  effective view-distance priority radius, promoted chunks, watched-chunk
-  plus eager loaded-chunk finalization work, finalized chunk skips, and the
-  last tick's migration work.
+  effective view-distance priority radius, promoted chunks, visible priority
+  finalization work, finalized chunk skips, and the last tick's migration work.
 - `/wowater visible <chunkRadius>` scans loaded chunks around the player and
   reports finalized chunks, queued chunks, unfinished chunks, and any leftover
   plain `minecraft:water` blocks still waiting for Wilderness takeover.

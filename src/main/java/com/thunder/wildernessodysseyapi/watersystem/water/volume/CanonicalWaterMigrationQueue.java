@@ -20,12 +20,10 @@ import java.util.Set;
 /**
  * Defers vanilla-to-Wilderness water migration away from unsafe chunk-load callbacks.
  *
- * <p>Chunk load can happen while Minecraft is preparing initial spawn chunks.
- * Rewriting many ocean blocks before any player exists can stall world
- * creation, so those early chunks are only queued. Once players are present,
- * newly loaded chunks may spend the same bounded visible-finalization budget
- * immediately, making exploration look like the chunk generated with
- * Wilderness water instead of visibly migrating after render.</p>
+ * <p>Chunk load and chunk watch callbacks sit on Minecraft's streaming path.
+ * Rewriting ocean blocks there can make chunk loading hitch, so callbacks only
+ * enqueue or promote chunk positions. Server ticks later process small slices
+ * with explicit budgets and never force unloaded chunks back into memory.</p>
  */
 public final class CanonicalWaterMigrationQueue {
 
@@ -78,21 +76,38 @@ public final class CanonicalWaterMigrationQueue {
     }
 
     /**
-     * Finalizes a loaded chunk as early as safely possible.
+     * Queues a loaded chunk without mutating it from the load callback.
      *
-     * <p>Initial spawn preparation often loads many chunks before a player
-     * exists; that path still only queues the chunk. During normal exploration,
-     * however, the loaded chunk is already complete and can use the watched
-     * chunk budget immediately so the client is less likely to see vanilla
-     * water transitioning into Wilderness water.</p>
+     * <p>Chunks loaded during spawn preparation are queued normally. Chunks
+     * loaded while players are active are promoted to the front of the migration
+     * queue, preserving the "take over nearby water first" behavior without
+     * blocking the chunk loader.</p>
      */
-    public static synchronized TickResult finalizeLoadedChunk(ServerLevel level, LevelChunk chunk) {
-        if (level.getServer().getPlayerList().getPlayerCount() <= 0) {
-            enqueue(level, chunk.getPos());
-            lastVisibleFinalization = TickResult.EMPTY.withQueuedChunks(QUEUE.size());
-            return lastVisibleFinalization;
+    public static synchronized void queueLoadedChunkForFinalization(ServerLevel level, LevelChunk chunk) {
+        if (isChunkWaterFinalized(chunk)) {
+            skippedFinalizedChunks++;
+            return;
         }
-        return finalizeVisibleChunk(level, chunk);
+        boolean priority = level.getServer().getPlayerList().getPlayerCount() > 0;
+        enqueue(level, chunk.getPos(), priority);
+        lastVisibleFinalization = TickResult.EMPTY.withQueuedChunks(QUEUE.size());
+    }
+
+    /**
+     * Promotes a chunk that is about to be watched by a player.
+     *
+     * <p>The actual scan and block conversion still happen from the server tick
+     * migration queue. This avoids synchronous work during chunk tracking while
+     * keeping visible water ahead of older background tasks.</p>
+     */
+    public static synchronized void queueVisibleChunkForFinalization(ServerLevel level, LevelChunk chunk) {
+        if (isChunkWaterFinalized(chunk)) {
+            visibleFinalizationSkippedFinalizedChunks++;
+            lastVisibleFinalization = TickResult.EMPTY.withQueuedChunks(QUEUE.size());
+            return;
+        }
+        enqueue(level, chunk.getPos(), true);
+        lastVisibleFinalization = TickResult.EMPTY.withQueuedChunks(QUEUE.size());
     }
 
     private static boolean enqueue(ServerLevel level, ChunkPos pos, boolean priority) {
@@ -260,7 +275,10 @@ public final class CanonicalWaterMigrationQueue {
         int tickTouched = 0;
         int tickCompleted = 0;
         int tickSkippedUnloaded = 0;
+        int priorityTouched = 0;
+        int priorityCompleted = 0;
         CanonicalWaterSeeder.SeedStats tickStats = CanonicalWaterSeeder.SeedStats.EMPTY;
+        CanonicalWaterSeeder.SeedStats priorityStats = CanonicalWaterSeeder.SeedStats.EMPTY;
 
         while (!QUEUE.isEmpty()
                 && attemptsRemaining > 0
@@ -306,6 +324,10 @@ public final class CanonicalWaterMigrationQueue {
             );
             CanonicalWaterSeeder.SeedStats sliceStats = slice.stats();
             tickStats = tickStats.plus(sliceStats);
+            if (task.priority()) {
+                priorityTouched++;
+                priorityStats = priorityStats.plus(sliceStats);
+            }
             columnsRemaining -= sliceStats.scannedColumns();
             if (allowBlockConversion) {
                 conversionsRemaining = Math.max(0, conversionsRemaining - sliceStats.convertedBlocks());
@@ -317,6 +339,9 @@ public final class CanonicalWaterMigrationQueue {
                 QUEUED_KEYS.remove(task.key());
                 markChunkWaterFinalized(chunk);
                 tickCompleted++;
+                if (task.priority()) {
+                    priorityCompleted++;
+                }
             } else {
                 requeue(task.withNextColumnIndex(slice.nextColumnIndex()));
                 if (sliceStats.scannedColumns() <= 0) {
@@ -330,6 +355,25 @@ public final class CanonicalWaterMigrationQueue {
         importedCells += tickStats.importedCells();
         hostedWaterCells += tickStats.hostedWaterCells();
         convertedBlocks += tickStats.convertedBlocks();
+        if (priorityTouched > 0) {
+            visibleFinalizationTouchedChunks += priorityTouched;
+            visibleFinalizationCompletedChunks += priorityCompleted;
+            visibleFinalizationImportedCells += priorityStats.importedCells();
+            visibleFinalizationHostedWaterCells += priorityStats.hostedWaterCells();
+            visibleFinalizationConvertedBlocks += priorityStats.convertedBlocks();
+            lastVisibleFinalization = new TickResult(
+                    priorityTouched,
+                    priorityCompleted,
+                    priorityStats.scannedColumns(),
+                    priorityStats.importedCells(),
+                    priorityStats.hostedWaterCells(),
+                    priorityStats.convertedBlocks(),
+                    0,
+                    QUEUE.size()
+            );
+        } else {
+            lastVisibleFinalization = TickResult.EMPTY.withQueuedChunks(QUEUE.size());
+        }
         lastTick = new TickResult(
                 tickTouched,
                 tickCompleted,
