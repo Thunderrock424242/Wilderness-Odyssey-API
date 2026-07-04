@@ -252,6 +252,7 @@ public final class ShorelineSurfaceRenderer {
                 surface.depth,
                 WaterBodyClassifier.classify(level, new BlockPos(x, surface.surfaceBlockY, z)),
                 edge.edgeStrength,
+                surface.replacementSafe,
                 surface.fullWater,
                 surface.fillFraction,
                 surface.velocityX,
@@ -275,6 +276,7 @@ public final class ShorelineSurfaceRenderer {
                 sample.surfaceBlockY(),
                 sample.surfaceY(),
                 sample.depth(),
+                sample.replacementSafe(),
                 sample.fullWater(),
                 sample.fillFraction(),
                 sample.velocityX(),
@@ -521,7 +523,9 @@ public final class ShorelineSurfaceRenderer {
 
         LongOpenHashSet rebuiltOwnedTops = new LongOpenHashSet(PATCHES.size());
         for (ShorePatch patch : PATCHES) {
-            rebuiltOwnedTops.add(BlockPos.asLong(patch.x, patch.surfaceBlockY, patch.z));
+            if (patch.replacementSafe) {
+                rebuiltOwnedTops.add(BlockPos.asLong(patch.x, patch.surfaceBlockY, patch.z));
+            }
         }
         ownedVanillaTops = LongSets.unmodifiable(rebuiltOwnedTops);
         OceanSurfaceRenderer.setSupplementalBakedTopOwnership(level, ownedVanillaTops);
@@ -549,13 +553,14 @@ public final class ShorelineSurfaceRenderer {
             int surfaceBlockY,
             float surfaceY,
             float depth,
+            boolean replacementSafe,
             boolean fullWater,
             float fillFraction,
             float velocityX,
             float velocityZ
     ) {
         private static final SurfaceColumn INVALID = new SurfaceColumn(false, 0, 0.0f, 0.0f, false,
-                0.0f, 0.0f, 0.0f);
+                false, 0.0f, 0.0f, 0.0f);
     }
 
     private record EdgeSample(boolean localEdge, float edgeStrength) {
@@ -569,6 +574,7 @@ public final class ShorelineSurfaceRenderer {
             float depth,
             WaterBodyClassifier.WaterType waterType,
             float edgeStrength,
+            boolean replacementSafe,
             boolean fullWater,
             float fillFraction,
             float velocityX,

@@ -29,7 +29,8 @@ public final class ChunkCapabilityHandler {
         if (!(event.getChunk() instanceof LevelChunk chunk)) return;
 
         // Clear dirty on load to avoid unnecessary saves after hydration.
-        chunk.getExistingData(ModAttachments.CHUNK_DATA).ifPresent(ChunkDataCapability::clearDirty);
+        ChunkDataCapability chunkData = chunk.getData(ModAttachments.CHUNK_DATA);
+        chunkData.clearDirty();
         chunk.getExistingData(ModAttachments.WATER_VOLUME).ifPresent(volume -> {
             volume.clearDirty();
             for (WaterVolumeChunk.CellEntry entry : volume.snapshot()) {
@@ -45,7 +46,9 @@ public final class ChunkCapabilityHandler {
         // Chunk load may run while Minecraft is preparing initial spawn chunks.
         // Queue water migration here, then let server ticks process it later
         // under explicit budgets so world creation cannot freeze on ocean work.
-        CanonicalWaterMigrationQueue.enqueue(level, chunk.getPos());
+        if (!chunkData.isWaterFinalized()) {
+            CanonicalWaterMigrationQueue.enqueue(level, chunk.getPos());
+        }
     }
 
     @SubscribeEvent

@@ -13,6 +13,7 @@ public class ChunkDataCapability implements INBTSerializable<CompoundTag> {
     private static final String VISITS_TAG = "Visits";
     private static final String FLAGS_TAG = "Flags";
     private static final String UPGRADE_VERSION_TAG = "UpgradeVersion";
+    private static final short WATER_FINALIZED_FLAG = 1;
 
     private int visitCount;
     private short stateFlags;
@@ -56,6 +57,35 @@ public class ChunkDataCapability implements INBTSerializable<CompoundTag> {
         }
     }
 
+    /**
+     * Returns whether this chunk has completed the bounded worldgen-water
+     * finalization pass.
+     *
+     * <p>The water system uses this as its persistent handoff marker: once a
+     * chunk has been scanned through all X/Z columns and any accepted plain
+     * {@code minecraft:water} conversions have been completed, normal chunk
+     * load/watch hooks can skip it instead of rescanning forever.</p>
+     */
+    public boolean isWaterFinalized() {
+        return hasFlag(WATER_FINALIZED_FLAG);
+    }
+
+    /**
+     * Marks the chunk's generated plain water as finalized into Wilderness
+     * authority.
+     */
+    public void markWaterFinalized() {
+        setFlag(WATER_FINALIZED_FLAG, true);
+    }
+
+    /**
+     * Clears the water-finalized marker so repair or future migrations can
+     * force the chunk back through the bounded seeding queue.
+     */
+    public void clearWaterFinalized() {
+        setFlag(WATER_FINALIZED_FLAG, false);
+    }
+
     public int getUpgradeVersion() {
         return upgradeVersion;
     }
@@ -73,6 +103,17 @@ public class ChunkDataCapability implements INBTSerializable<CompoundTag> {
 
     public void clearDirty() {
         dirty = false;
+    }
+
+    private boolean hasFlag(short flag) {
+        return (stateFlags & flag) != 0;
+    }
+
+    private void setFlag(short flag, boolean enabled) {
+        short nextFlags = enabled
+                ? (short) (stateFlags | flag)
+                : (short) (stateFlags & ~flag);
+        setStateFlags(nextFlags);
     }
 
     @Override

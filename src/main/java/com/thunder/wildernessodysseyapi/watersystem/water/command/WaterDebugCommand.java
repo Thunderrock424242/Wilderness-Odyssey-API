@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterMigrationQueue;
@@ -59,6 +60,11 @@ public final class WaterDebugCommand {
                                         IntegerArgumentType.getInteger(context, "chunkRadius")))))
                 .then(Commands.literal("migration")
                         .executes(WaterDebugCommand::migrationStatus))
+                .then(Commands.literal("visible")
+                        .executes(context -> visibleReadiness(context, 2))
+                        .then(Commands.argument("chunkRadius", IntegerArgumentType.integer(0, 4))
+                                .executes(context -> visibleReadiness(context,
+                                        IntegerArgumentType.getInteger(context, "chunkRadius")))))
                 .then(Commands.literal("shipcheck")
                         .executes(context -> shipcheck(context, 16))
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, 64))
@@ -258,6 +264,7 @@ public final class WaterDebugCommand {
                         chunk,
                         WaterSimulationConfig.worldSeedMaxColumnDepth()
                 ).countedChunk());
+                chunk.getData(ModAttachments.CHUNK_DATA).markWaterFinalized();
             }
         }
 
@@ -312,11 +319,92 @@ public final class WaterDebugCommand {
                 + ", total chunks=" + status.visibleFinalizationTouchedChunks()
                 + ", total completed=" + status.visibleFinalizationCompletedChunks()
                 + ", total converted=" + status.visibleFinalizationConvertedBlocks()
-                + ", budget misses=" + status.visibleFinalizationBudgetMisses()), false);
+                + ", budget misses=" + status.visibleFinalizationBudgetMisses()
+                + ", skipped finalized=" + status.visibleFinalizationSkippedFinalizedChunks()), false);
         source.sendSuccess(() -> Component.literal("  Queue health: skipped unloaded="
                 + status.skippedUnloadedChunks()
+                + ", skipped finalized=" + status.skippedFinalizedChunks()
                 + ", dropped=" + status.droppedChunks()), false);
         return Math.max(1, status.queuedChunks());
+    }
+
+    private static int visibleReadiness(CommandContext<CommandSourceStack> context, int chunkRadius) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerLevel level = source.getLevel();
+        ChunkPos center = source.getPlayerOrException().chunkPosition();
+        VisibleWaterReadinessStats stats = scanVisibleReadiness(level, center, chunkRadius);
+
+        source.sendSuccess(() -> Component.literal("WO visible water readiness chunkRadius=" + chunkRadius
+                + " state=" + stats.stateLabel()), false);
+        source.sendSuccess(() -> Component.literal("  Chunks: loaded=" + stats.loadedChunks()
+                + ", finalized=" + stats.finalizedChunks()
+                + ", queued=" + stats.queuedChunks()
+                + ", unfinished=" + stats.unfinishedChunks()), false);
+        source.sendSuccess(() -> Component.literal("  Pending vanilla: chunks=" + stats.pendingPlainChunks()
+                + ", columns=" + stats.pendingPlainColumns()
+                + ", blocks=" + stats.pendingPlainBlocks()
+                + ", hosted tagged cells=" + stats.hostedTaggedCells()), false);
+        source.sendSuccess(() -> Component.literal("  Advice: " + stats.advice()), false);
+        return Math.max(1, stats.unfinishedChunks() + stats.pendingPlainBlocks());
+    }
+
+    private static VisibleWaterReadinessStats scanVisibleReadiness(
+            ServerLevel level,
+            ChunkPos center,
+            int chunkRadius
+    ) {
+        int loadedChunks = 0;
+        int finalizedChunks = 0;
+        int queuedChunks = 0;
+        int unfinishedChunks = 0;
+        int pendingPlainChunks = 0;
+        int pendingPlainColumns = 0;
+        int pendingPlainBlocks = 0;
+        int hostedTaggedCells = 0;
+
+        for (int chunkX = center.x - chunkRadius; chunkX <= center.x + chunkRadius; chunkX++) {
+            for (int chunkZ = center.z - chunkRadius; chunkZ <= center.z + chunkRadius; chunkZ++) {
+                LevelChunk chunk = level.getChunkSource().getChunkNow(chunkX, chunkZ);
+                if (chunk == null) {
+                    continue;
+                }
+                loadedChunks++;
+                boolean finalized = CanonicalWaterMigrationQueue.isChunkWaterFinalized(chunk);
+                boolean queued = CanonicalWaterMigrationQueue.isQueued(level, chunk.getPos());
+                CanonicalWaterSeeder.PendingPlainWaterStats pending =
+                        CanonicalWaterSeeder.scanPendingPlainWater(
+                                level,
+                                chunk,
+                                WaterSimulationConfig.worldSeedMaxColumnDepth()
+                        );
+                if (finalized) {
+                    finalizedChunks++;
+                }
+                if (queued) {
+                    queuedChunks++;
+                }
+                if (!finalized || pending.hasPendingPlainWater()) {
+                    unfinishedChunks++;
+                }
+                if (pending.hasPendingPlainWater()) {
+                    pendingPlainChunks++;
+                    pendingPlainColumns += pending.pendingColumns();
+                    pendingPlainBlocks += pending.pendingBlocks();
+                }
+                hostedTaggedCells += pending.hostedTaggedCells();
+            }
+        }
+
+        return new VisibleWaterReadinessStats(
+                loadedChunks,
+                finalizedChunks,
+                queuedChunks,
+                unfinishedChunks,
+                pendingPlainChunks,
+                pendingPlainColumns,
+                pendingPlainBlocks,
+                hostedTaggedCells
+        );
     }
 
     private static int shipcheck(CommandContext<CommandSourceStack> context, int requestedRadius) {
@@ -530,6 +618,44 @@ public final class WaterDebugCommand {
                 return "no local water sampled";
             }
             return "local water ownership looks ready for visual testing";
+        }
+    }
+
+    /** Chunk-level readiness report for visible generated-water takeover. */
+    private record VisibleWaterReadinessStats(
+            int loadedChunks,
+            int finalizedChunks,
+            int queuedChunks,
+            int unfinishedChunks,
+            int pendingPlainChunks,
+            int pendingPlainColumns,
+            int pendingPlainBlocks,
+            int hostedTaggedCells
+    ) {
+        private String stateLabel() {
+            if (loadedChunks <= 0) {
+                return "NO_LOADED_CHUNKS";
+            }
+            if (pendingPlainBlocks > 0) {
+                return "VANILLA_WATER_PENDING";
+            }
+            if (unfinishedChunks > 0 || queuedChunks > 0) {
+                return "FINALIZING";
+            }
+            return "WILDERNESS_READY";
+        }
+
+        private String advice() {
+            if (loadedChunks <= 0) {
+                return "no loaded chunks were sampled";
+            }
+            if (pendingPlainBlocks > 0) {
+                return "wait for visible finalization or run /wowater seed 1 nearby";
+            }
+            if (unfinishedChunks > 0 || queuedChunks > 0) {
+                return "loaded chunks are queued/finalizing but no plain vanilla water leak was found";
+            }
+            return "visible loaded water has completed Wilderness takeover";
         }
     }
 }

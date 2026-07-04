@@ -146,6 +146,71 @@ public final class CanonicalWaterSeeder {
         );
     }
 
+    /**
+     * Counts pending plain Minecraft water in a loaded chunk without importing
+     * or converting anything.
+     *
+     * <p>This is intentionally paired with the same motion-blocking surface and
+     * depth limits as the migration pass so {@code /wowater} diagnostics report
+     * the exact kind of visible/generated water that the automatic finalizer is
+     * expected to take over.</p>
+     */
+    public static PendingPlainWaterStats scanPendingPlainWater(
+            ServerLevel level,
+            LevelChunk chunk,
+            int maxColumnDepth
+    ) {
+        int boundedDepth = Math.max(1, Math.min(64, maxColumnDepth));
+        int coverScanDepth = WaterSimulationConfig.coveredWaterSurfaceScanDepth();
+        int maxScanDepth = Math.max(1, boundedDepth + coverScanDepth);
+        ChunkPos chunkPos = chunk.getPos();
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        int pendingColumns = 0;
+        int pendingBlocks = 0;
+        int hostedTaggedCells = 0;
+
+        for (int columnIndex = 0; columnIndex < COLUMNS_PER_CHUNK; columnIndex++) {
+            int localX = columnIndex / CHUNK_WIDTH;
+            int localZ = columnIndex % CHUNK_WIDTH;
+            int worldX = chunkPos.getMinBlockX() + localX;
+            int worldZ = chunkPos.getMinBlockZ() + localZ;
+            int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING, worldX, worldZ) - 1;
+            boolean foundWater = false;
+            boolean columnPending = false;
+            int waterCellsSeen = 0;
+
+            for (int offset = 0; offset < maxScanDepth && waterCellsSeen < boundedDepth; offset++) {
+                cursor.set(worldX, surfaceY - offset, worldZ);
+                if (level.isOutsideBuildHeight(cursor) || !level.hasChunkAt(cursor)) {
+                    break;
+                }
+                WaterCellCandidate candidate = waterCellCandidate(level, cursor);
+                if (!candidate.water()) {
+                    if (foundWater || offset >= coverScanDepth) {
+                        break;
+                    }
+                    continue;
+                }
+
+                foundWater = true;
+                waterCellsSeen++;
+                if (candidate.hostedWater()) {
+                    hostedTaggedCells++;
+                }
+                if (isPendingPlainVanillaWaterBlock(level, cursor)) {
+                    pendingBlocks++;
+                    columnPending = true;
+                }
+            }
+
+            if (columnPending) {
+                pendingColumns++;
+            }
+        }
+
+        return new PendingPlainWaterStats(COLUMNS_PER_CHUNK, pendingColumns, pendingBlocks, hostedTaggedCells);
+    }
+
     private static SeedColumnResult seedColumn(
             ServerLevel level,
             BlockPos.MutableBlockPos cursor,
@@ -385,6 +450,19 @@ public final class CanonicalWaterSeeder {
         private SeedStats withSkippedWaterlogged(int skippedWaterlogged) {
             return new SeedStats(scannedColumns, importedCells, hostedWaterCells, convertedBlocks, skippedTracked,
                     skippedWaterlogged, loadedChunks);
+        }
+    }
+
+    /** Read-only leak counters for visible water finalization diagnostics. */
+    public record PendingPlainWaterStats(
+            int scannedColumns,
+            int pendingColumns,
+            int pendingBlocks,
+            int hostedTaggedCells
+    ) {
+        /** Returns true when generated plain Minecraft water still needs takeover. */
+        public boolean hasPendingPlainWater() {
+            return pendingBlocks > 0;
         }
     }
 }
