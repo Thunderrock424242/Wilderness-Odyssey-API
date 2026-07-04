@@ -18,12 +18,14 @@ import java.util.Iterator;
 import java.util.Set;
 
 /**
- * Defers vanilla-to-Wilderness water migration away from chunk-load callbacks.
+ * Defers vanilla-to-Wilderness water migration away from unsafe chunk-load callbacks.
  *
  * <p>Chunk load can happen while Minecraft is preparing initial spawn chunks.
- * Rewriting many ocean blocks from that callback can stall world creation, so
- * loaded chunks are only queued there. Server ticks later process small slices
- * with explicit budgets and never force unloaded chunks back into memory.</p>
+ * Rewriting many ocean blocks before any player exists can stall world
+ * creation, so those early chunks are only queued. Once players are present,
+ * newly loaded chunks may spend the same bounded visible-finalization budget
+ * immediately, making exploration look like the chunk generated with
+ * Wilderness water instead of visibly migrating after render.</p>
  */
 public final class CanonicalWaterMigrationQueue {
 
@@ -73,6 +75,24 @@ public final class CanonicalWaterMigrationQueue {
      */
     public static synchronized void enqueue(ServerLevel level, ChunkPos pos) {
         enqueue(level, pos, false);
+    }
+
+    /**
+     * Finalizes a loaded chunk as early as safely possible.
+     *
+     * <p>Initial spawn preparation often loads many chunks before a player
+     * exists; that path still only queues the chunk. During normal exploration,
+     * however, the loaded chunk is already complete and can use the watched
+     * chunk budget immediately so the client is less likely to see vanilla
+     * water transitioning into Wilderness water.</p>
+     */
+    public static synchronized TickResult finalizeLoadedChunk(ServerLevel level, LevelChunk chunk) {
+        if (level.getServer().getPlayerList().getPlayerCount() <= 0) {
+            enqueue(level, chunk.getPos());
+            lastVisibleFinalization = TickResult.EMPTY.withQueuedChunks(QUEUE.size());
+            return lastVisibleFinalization;
+        }
+        return finalizeVisibleChunk(level, chunk);
     }
 
     private static boolean enqueue(ServerLevel level, ChunkPos pos, boolean priority) {

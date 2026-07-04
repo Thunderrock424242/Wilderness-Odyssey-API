@@ -169,10 +169,11 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
   Wilderness block rewrites continue safely over later ticks. If conversion
   budget runs out, the chunk is requeued from the first skipped plain-water
   column instead of being marked complete.
-- Loaded chunks receive a bounded watched-chunk finalization pass before normal
-  background migration. That is the handoff where generated plain
-  `minecraft:water` becomes namespaced Wilderness water without running large
-  rewrite scans on the raw worldgen path.
+- Loaded chunks receive a bounded eager finalization pass once players exist,
+  with watched-chunk finalization as a fallback before normal background
+  migration. That is the handoff where generated plain `minecraft:water`
+  becomes namespaced Wilderness water without running large rewrite scans
+  during raw spawn-preparation worldgen.
 - Completed chunk handoffs persist a water-finalized marker on the chunk data.
   Render-distance and player-priority migration can therefore focus on newly
   loaded/generated chunks instead of rescanning ocean that already belongs to

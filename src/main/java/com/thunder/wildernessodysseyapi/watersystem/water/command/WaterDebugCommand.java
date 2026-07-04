@@ -309,7 +309,7 @@ public final class WaterDebugCommand {
                 + ", total queued=" + status.playerScanQueuedChunks()
                 + ", total promoted=" + status.playerScanPromotedChunks()), false);
         CanonicalWaterMigrationQueue.TickResult visible = status.lastVisibleFinalization();
-        source.sendSuccess(() -> Component.literal("  Visible finalization: enabled="
+        source.sendSuccess(() -> Component.literal("  Visible/eager finalization: enabled="
                 + onOff(status.visibleFinalizationEnabled())
                 + ", last chunks=" + visible.touchedChunks()
                 + ", columns=" + visible.scannedColumns()

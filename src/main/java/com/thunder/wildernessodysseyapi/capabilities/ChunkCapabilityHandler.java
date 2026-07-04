@@ -44,10 +44,11 @@ public final class ChunkCapabilityHandler {
             }
         });
         // Chunk load may run while Minecraft is preparing initial spawn chunks.
-        // Queue water migration here, then let server ticks process it later
-        // under explicit budgets so world creation cannot freeze on ocean work.
+        // Before players exist we only queue work. Once players are exploring,
+        // loaded chunks get an eager bounded finalization slice so Wilderness
+        // water is likely to own the chunk before the client renders it.
         if (!chunkData.isWaterFinalized()) {
-            CanonicalWaterMigrationQueue.enqueue(level, chunk.getPos());
+            CanonicalWaterMigrationQueue.finalizeLoadedChunk(level, chunk);
         }
     }
 
