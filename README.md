@@ -101,7 +101,6 @@ It analyzes both Java sources under `src/main/java` and the repository's GitHub 
 Spawn Behavior:
 ----------
 Players spawn inside a cryo tube when joining the world for the first time. Leaving the tube prevents re-entry.
-An introductory title sequence plays as they wake, which can be replaced with a custom cinematic in the future.
 On first join, each player is assigned a random cryo tube and teleported directly into it.
 
 Custom Assets
