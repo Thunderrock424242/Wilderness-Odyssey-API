@@ -179,20 +179,26 @@ public final class WaterSimulationConfig {
 
     /** Returns how many watched chunks can be finalized in one server tick. */
     public static int visibleFinalizationChunksPerTick() {
-        int configured = VISIBLE_FINALIZATION_CHUNKS_PER_TICK.get();
-        return automaticMigrationFollowsPlayerViewDistance() ? Math.max(4, configured) : configured;
+        return effectiveVisibleFinalizationChunksPerTick();
     }
 
     /** Returns how many watched-chunk columns can be finalized in one server tick. */
     public static int visibleFinalizationColumnsPerTick() {
         int configured = VISIBLE_FINALIZATION_COLUMNS_PER_TICK.get();
-        return automaticMigrationFollowsPlayerViewDistance() ? Math.max(1024, configured) : configured;
+        int fullChunkColumns = effectiveVisibleFinalizationChunksPerTick() * 16 * 16;
+        return automaticMigrationFollowsPlayerViewDistance() ? Math.max(fullChunkColumns, configured) : configured;
     }
 
     /** Returns how many plain water blocks can be rewritten during watched-chunk finalization in one server tick. */
     public static int visibleFinalizationConvertedBlocksPerTick() {
         int configured = VISIBLE_FINALIZATION_CONVERTED_BLOCKS_PER_TICK.get();
-        return automaticMigrationFollowsPlayerViewDistance() ? Math.max(2048, configured) : configured;
+        int fullChunkWaterBlocks = effectiveVisibleFinalizationChunksPerTick() * 16 * 16 * worldSeedMaxColumnDepth();
+        return automaticMigrationFollowsPlayerViewDistance() ? Math.max(fullChunkWaterBlocks, configured) : configured;
+    }
+
+    private static int effectiveVisibleFinalizationChunksPerTick() {
+        int configured = VISIBLE_FINALIZATION_CHUNKS_PER_TICK.get();
+        return automaticMigrationFollowsPlayerViewDistance() ? Math.max(2, configured) : configured;
     }
 
     /** Returns whether waterlogged host blocks contribute hosted canonical water cells. */
