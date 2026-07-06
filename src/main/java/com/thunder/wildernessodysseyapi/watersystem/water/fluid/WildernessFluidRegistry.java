@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.fluid;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
@@ -123,7 +124,6 @@ public final class WildernessFluidRegistry {
                     new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1))
     );
 
-    private static final int MAX_CELLS_PER_TICK = 192;
     private static final int MIN_FLOW_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK / 64;
     private static final int MIN_LATERAL_DIFFERENCE_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK / 16;
     private static final int MAX_VERTICAL_TRANSFER_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK * 3 / 4;
@@ -133,7 +133,6 @@ public final class WildernessFluidRegistry {
     private static final float FALL_SPEED = -4.8f;
     private static final float SIDE_FLOW_SPEED = 0.85f;
     private static final float SOURCE_VELOCITY_DAMPING = 0.62f;
-    private static final float REST_SPEED = 0.03f;
 
     private WildernessFluidRegistry() {
     }
@@ -173,7 +172,8 @@ public final class WildernessFluidRegistry {
             return;
         }
 
-        for (int processed = 0; processed < MAX_CELLS_PER_TICK; processed++) {
+        int maxCells = WaterSimulationConfig.localFlowCellsPerTick();
+        for (int processed = 0; processed < maxCells; processed++) {
             BlockPos pos = CanonicalWater.pollActive(level);
             if (pos == null) {
                 break;
@@ -184,7 +184,7 @@ public final class WildernessFluidRegistry {
 
     private static void tickCell(ServerLevel level, BlockPos pos) {
         WaterVolumeChunk.WaterCell current = CanonicalWater.getOrImport(level, pos);
-        if (current.volumeUnits() <= 0 || current.imported()) {
+        if (current.volumeUnits() <= 0 || current.imported() || current.sleeping()) {
             return;
         }
 
@@ -227,7 +227,7 @@ public final class WildernessFluidRegistry {
 
         if (moved) {
             commitSource(level, pos, current, remaining);
-        } else if (speedSquared(current) > REST_SPEED * REST_SPEED) {
+        } else if (!shouldSleep(current)) {
             // A disturbed cell that cannot currently move should calm down
             // instead of carrying stale velocity forever.
             CanonicalWater.set(level, pos, new WaterVolumeChunk.WaterCell(
@@ -238,6 +238,15 @@ public final class WildernessFluidRegistry {
                     WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED,
                     current.temperatureMilliKelvin()
             ), true);
+        } else {
+            CanonicalWater.set(level, pos, new WaterVolumeChunk.WaterCell(
+                    current.volumeUnits(),
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED | WaterVolumeChunk.FLAG_SLEEPING,
+                    current.temperatureMilliKelvin()
+            ), true, false);
         }
     }
 
@@ -367,6 +376,11 @@ public final class WildernessFluidRegistry {
         return cell.velocityX() * cell.velocityX()
                 + cell.velocityY() * cell.velocityY()
                 + cell.velocityZ() * cell.velocityZ();
+    }
+
+    private static boolean shouldSleep(WaterVolumeChunk.WaterCell cell) {
+        float sleepSpeed = WaterSimulationConfig.localFlowSleepSpeed();
+        return speedSquared(cell) <= sleepSpeed * sleepSpeed;
     }
 
     private static boolean canOccupy(ServerLevel level, BlockPos pos) {

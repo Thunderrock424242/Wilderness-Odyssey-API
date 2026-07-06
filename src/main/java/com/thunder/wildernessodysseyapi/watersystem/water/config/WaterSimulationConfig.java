@@ -21,6 +21,7 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_COLUMNS_PER_TICK;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_CONVERTED_BLOCKS_PER_TICK;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_MAX_QUEUED_CHUNKS;
+    public static final ModConfigSpec.BooleanValue ENABLE_PLAYER_CENTERED_WATER_MIGRATION_SCAN;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_PLAYER_CHUNK_RADIUS;
     public static final ModConfigSpec.BooleanValue AUTOMATIC_MIGRATION_FOLLOW_PLAYER_VIEW_DISTANCE;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_VIEW_DISTANCE_PADDING_CHUNKS;
@@ -32,6 +33,13 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.BooleanValue SEED_ONLY_PLAIN_WATER_BLOCKS;
     public static final ModConfigSpec.BooleanValue IMPORT_WATERLOGGED_HOST_WATER;
     public static final ModConfigSpec.IntValue COVERED_WATER_SURFACE_SCAN_DEPTH;
+    public static final ModConfigSpec.IntValue LOCAL_FLOW_CELLS_PER_TICK;
+    public static final ModConfigSpec.DoubleValue LOCAL_FLOW_SLEEP_SPEED;
+    public static final ModConfigSpec.IntValue LARGE_BODY_CACHE_MAX_COLUMNS;
+    public static final ModConfigSpec.BooleanValue ENABLE_SERVER_SPH_LOCAL_SIMULATION;
+    public static final ModConfigSpec.IntValue SERVER_SPH_MAX_ACTIVE_BODIES;
+    public static final ModConfigSpec.IntValue SERVER_SPH_MAX_PARTICLES_PER_BODY;
+    public static final ModConfigSpec.IntValue SERVER_SPH_PARTICLE_TICK_BUDGET;
     public static final ModConfigSpec.IntValue DEBUG_COMMAND_MAX_RADIUS;
 
     static {
@@ -64,6 +72,9 @@ public final class WaterSimulationConfig {
         AUTOMATIC_MIGRATION_MAX_QUEUED_CHUNKS = builder
                 .comment("Maximum loaded chunks waiting for automatic water migration. Kept above a large visible-radius square so player-priority work does not evict nearby ocean chunks.")
                 .defineInRange("automaticMigrationMaxQueuedChunks", 8192, 128, 65536);
+        ENABLE_PLAYER_CENTERED_WATER_MIGRATION_SCAN = builder
+                .comment("Legacy safety net that periodically scans loaded chunks around moving players. Disabled by default so player movement does not trigger mass water conversion work.")
+                .define("enablePlayerCenteredWaterMigrationScan", false);
         AUTOMATIC_MIGRATION_PLAYER_CHUNK_RADIUS = builder
                 .comment("Minimum loaded chunk radius around each player that automatic water migration keeps prioritized. Clamped to server view distance; set 0 to disable player-centered priority scans.")
                 .defineInRange("automaticMigrationPlayerChunkRadius", 16, 0, 32);
@@ -97,6 +108,27 @@ public final class WaterSimulationConfig {
         COVERED_WATER_SURFACE_SCAN_DEPTH = builder
                 .comment("How far below the motion-blocking surface to search for water under ice or thin cover.")
                 .defineInRange("coveredWaterSurfaceScanDepth", 5, 0, 16);
+        LOCAL_FLOW_CELLS_PER_TICK = builder
+                .comment("Maximum active detailed water cells processed per server tick. Sleeping cells are skipped until nearby water changes.")
+                .defineInRange("localFlowCellsPerTick", 128, 16, 1024);
+        LOCAL_FLOW_SLEEP_SPEED = builder
+                .comment("Velocity below this value lets a detailed local water cell sleep when it cannot flow.")
+                .defineInRange("localFlowSleepSpeed", 0.025, 0.001, 0.20);
+        LARGE_BODY_CACHE_MAX_COLUMNS = builder
+                .comment("Maximum derived large-water-body columns persisted per dimension. This is a safe per-world cache, not a second authority.")
+                .defineInRange("largeBodyCacheMaxColumns", 16384, 1024, 262144);
+        ENABLE_SERVER_SPH_LOCAL_SIMULATION = builder
+                .comment("Allow tiny gameplay-critical SPH bodies for active local water such as waterfalls. Oceans, lakes, rivers, and stored world water never use SPH.")
+                .define("enableServerSphLocalSimulation", true);
+        SERVER_SPH_MAX_ACTIVE_BODIES = builder
+                .comment("Maximum server-owned gameplay SPH bodies per dimension. Keep this small; visual-only splashes are client events.")
+                .defineInRange("serverSphMaxActiveBodies", 8, 0, 24);
+        SERVER_SPH_MAX_PARTICLES_PER_BODY = builder
+                .comment("Maximum particles in one server-owned gameplay SPH body. Larger values are more expensive and should not be used for permanent water.")
+                .defineInRange("serverSphMaxParticlesPerBody", 192, 16, 720);
+        SERVER_SPH_PARTICLE_TICK_BUDGET = builder
+                .comment("Maximum server-owned SPH particles advanced per dimension tick. Bodies past the budget wait for a later tick.")
+                .defineInRange("serverSphParticleTickBudget", 900, 0, 4096);
         DEBUG_COMMAND_MAX_RADIUS = builder
                 .comment("Maximum block radius accepted by /wowater summary and /wowater repair.")
                 .defineInRange("debugCommandMaxRadius", 16, 1, 64);
@@ -149,11 +181,19 @@ public final class WaterSimulationConfig {
 
     /** Returns the loaded chunk radius that receives player-centered migration priority. */
     public static int automaticMigrationPlayerChunkRadius() {
+        if (!playerCenteredWaterMigrationScanEnabled()) {
+            return 0;
+        }
         int configured = AUTOMATIC_MIGRATION_PLAYER_CHUNK_RADIUS.get();
         if (configured <= 0) {
             return 0;
         }
         return automaticMigrationFollowsPlayerViewDistance() ? Math.max(16, configured) : configured;
+    }
+
+    /** Returns whether movement-centered loaded-chunk scans are enabled. */
+    public static boolean playerCenteredWaterMigrationScanEnabled() {
+        return ENABLE_PLAYER_CENTERED_WATER_MIGRATION_SCAN.get();
     }
 
     /** Returns whether priority migration should follow each player's requested view distance. */
@@ -209,6 +249,43 @@ public final class WaterSimulationConfig {
     /** Returns the bounded covered-water surface scan depth. */
     public static int coveredWaterSurfaceScanDepth() {
         return COVERED_WATER_SURFACE_SCAN_DEPTH.get();
+    }
+
+    /** Returns the active local-cell flow budget for one server tick. */
+    public static int localFlowCellsPerTick() {
+        return LOCAL_FLOW_CELLS_PER_TICK.get();
+    }
+
+    /** Returns the speed threshold under which immobile local cells can sleep. */
+    public static float localFlowSleepSpeed() {
+        return LOCAL_FLOW_SLEEP_SPEED.get().floatValue();
+    }
+
+    /** Returns the maximum persisted large-body column cache entries per dimension. */
+    public static int largeBodyCacheMaxColumns() {
+        return LARGE_BODY_CACHE_MAX_COLUMNS.get();
+    }
+
+    /** Returns whether server-owned local SPH is allowed for gameplay-critical active water. */
+    public static boolean serverSphLocalSimulationEnabled() {
+        return ENABLE_SERVER_SPH_LOCAL_SIMULATION.get()
+                && SERVER_SPH_MAX_ACTIVE_BODIES.get() > 0
+                && SERVER_SPH_PARTICLE_TICK_BUDGET.get() > 0;
+    }
+
+    /** Returns the maximum number of server gameplay SPH bodies per dimension. */
+    public static int serverSphMaxActiveBodies() {
+        return serverSphLocalSimulationEnabled() ? SERVER_SPH_MAX_ACTIVE_BODIES.get() : 0;
+    }
+
+    /** Returns the maximum particles allowed in one server gameplay SPH body. */
+    public static int serverSphMaxParticlesPerBody() {
+        return serverSphLocalSimulationEnabled() ? SERVER_SPH_MAX_PARTICLES_PER_BODY.get() : 0;
+    }
+
+    /** Returns the per-dimension server SPH particle simulation budget. */
+    public static int serverSphParticleTickBudget() {
+        return serverSphLocalSimulationEnabled() ? SERVER_SPH_PARTICLE_TICK_BUDGET.get() : 0;
     }
 
     /** Returns the maximum debug radius allowed by server config. */

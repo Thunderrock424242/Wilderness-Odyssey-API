@@ -4,7 +4,7 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
@@ -199,16 +199,16 @@ public final class ShorelineWaterManager {
                 BlockPos.MutableBlockPos pos,
                 BlockPos.MutableBlockPos neighbour
         ) {
-            if (CanonicalWater.isWater(level, pos)) {
+            if (WildernessWaterAuthority.isWaterAt(level, pos)) {
                 return true;
             }
             int x = pos.getX();
             int y = pos.getY();
             int z = pos.getZ();
-            return CanonicalWater.isWater(level, neighbour.set(x + 1, y, z))
-                    || CanonicalWater.isWater(level, neighbour.set(x - 1, y, z))
-                    || CanonicalWater.isWater(level, neighbour.set(x, y, z + 1))
-                    || CanonicalWater.isWater(level, neighbour.set(x, y, z - 1));
+            return WildernessWaterAuthority.isWaterAt(level, neighbour.set(x + 1, y, z))
+                    || WildernessWaterAuthority.isWaterAt(level, neighbour.set(x - 1, y, z))
+                    || WildernessWaterAuthority.isWaterAt(level, neighbour.set(x, y, z + 1))
+                    || WildernessWaterAuthority.isWaterAt(level, neighbour.set(x, y, z - 1));
         }
     }
 

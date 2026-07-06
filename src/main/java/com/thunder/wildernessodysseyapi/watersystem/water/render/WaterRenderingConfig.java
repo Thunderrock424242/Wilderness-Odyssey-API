@@ -27,6 +27,7 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_RIPPLES;
     public static final ModConfigSpec.BooleanValue AUTO_OPTIMIZE_WITH_RENDERER_MODS;
     public static final ModConfigSpec.BooleanValue MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE;
+    public static final ModConfigSpec.EnumValue<SphLocalEffectQuality> SPH_LOCAL_EFFECT_QUALITY;
 
     public static final ModConfigSpec.DoubleValue UNDERWATER_VISIBILITY_BLOCKS;
     public static final ModConfigSpec.DoubleValue UNDERWATER_TURBIDITY_STRENGTH;
@@ -34,6 +35,8 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.DoubleValue SURFACE_OPACITY_STRENGTH;
     public static final ModConfigSpec.DoubleValue SHORELINE_OVERLAY_STRENGTH;
     public static final ModConfigSpec.IntValue MAX_OCEAN_SURFACE_DISTANCE_BLOCKS;
+    public static final ModConfigSpec.IntValue DYNAMIC_OCEAN_CACHE_LIFETIME_TICKS;
+    public static final ModConfigSpec.IntValue DYNAMIC_OCEAN_MAX_CELL_SIZE;
 
     public static final ModConfigSpec.IntValue NORMAL_SPH_RENDER_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue NORMAL_MAX_RENDERED_SPH_SIMULATIONS;
@@ -103,10 +106,19 @@ public final class WaterRenderingConfig {
         MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE = builder
                 .comment("Extend the replacement surface toward the client view distance using coarser distant LODs.")
                 .define("matchOceanSurfaceToViewDistance", true);
+        SPH_LOCAL_EFFECT_QUALITY = builder
+                .comment("Quality for local SPH-only water effects. OFF disables client-side SPH splashes; LOW/MEDIUM/HIGH scale temporary particles and lifetimes without changing authoritative water storage.")
+                .defineEnum("sphLocalEffectQuality", SphLocalEffectQuality.MEDIUM);
         MAX_OCEAN_SURFACE_DISTANCE_BLOCKS = builder
                 .comment("Safety cap for view-distance-matched ocean rendering. Higher values cover more distant vanilla water but cost more CPU and vertices.")
                 .defineInRange("maxOceanSurfaceDistanceBlocks", 160, 64,
                         ABSOLUTE_OCEAN_SURFACE_DISTANCE_CAP_BLOCKS);
+        DYNAMIC_OCEAN_CACHE_LIFETIME_TICKS = builder
+                .comment("How long the client may reuse the dynamic ocean patch cache before rescanning nearby water. Higher values improve FPS while still rebuilding on movement and config changes.")
+                .defineInRange("dynamicOceanCacheLifetimeTicks", 60, 10, 200);
+        DYNAMIC_OCEAN_MAX_CELL_SIZE = builder
+                .comment("Largest distant ocean LOD cell size in blocks. Higher values reduce far-ocean patch count while keeping nearby shorelines detailed.")
+                .defineInRange("dynamicOceanMaxCellSize", 8, 4, 16);
         UNDERWATER_VISIBILITY_BLOCKS = builder
                 .comment("Maximum clear-water visibility used by the underwater optical model.")
                 .defineInRange("underwaterVisibilityBlocks", 44.0, 8.0, 128.0);
@@ -226,6 +238,46 @@ public final class WaterRenderingConfig {
         return usesOptimizedProfile() ? "optimized" : "normal";
     }
 
+    /** Returns whether local visual SPH effects may be spawned on this client. */
+    public static boolean localSphEffectsEnabled() {
+        return ENABLE_SPH_WATER_RENDERING.get() && SPH_LOCAL_EFFECT_QUALITY.get() != SphLocalEffectQuality.OFF;
+    }
+
+    /** Returns the active local SPH quality level. */
+    public static SphLocalEffectQuality sphLocalEffectQuality() {
+        return SPH_LOCAL_EFFECT_QUALITY.get();
+    }
+
+    /** Scales an event-requested particle count to the active local SPH quality. */
+    public static int localSphParticleCount(int requestedParticles) {
+        if (!localSphEffectsEnabled() || requestedParticles <= 0) {
+            return 0;
+        }
+        SphLocalEffectQuality quality = sphLocalEffectQuality();
+        int scaled = Math.round(requestedParticles * quality.particleScale());
+        return Math.max(quality.minimumParticles(), Math.min(quality.maximumParticles(), scaled));
+    }
+
+    /** Scales an event-requested lifetime to the active local SPH quality. */
+    public static int localSphLifetimeTicks(int requestedLifetimeTicks) {
+        if (!localSphEffectsEnabled() || requestedLifetimeTicks <= 0) {
+            return 0;
+        }
+        SphLocalEffectQuality quality = sphLocalEffectQuality();
+        int scaled = Math.round(requestedLifetimeTicks * quality.lifetimeScale());
+        return Math.max(8, Math.min(quality.maximumLifetimeTicks(), scaled));
+    }
+
+    /** Returns the maximum number of client-owned visual SPH bodies. */
+    public static int maxLocalSphEffects() {
+        return localSphEffectsEnabled() ? sphLocalEffectQuality().maxEffects() : 0;
+    }
+
+    /** Returns the per-frame client SPH physics particle budget. */
+    public static int localSphParticleTickBudget() {
+        return localSphEffectsEnabled() ? sphLocalEffectQuality().particleTickBudget() : 0;
+    }
+
     /** Returns the active SPH mesh render distance in blocks. */
     public static int sphRenderDistanceBlocks() {
         return usesOptimizedProfile()
@@ -308,6 +360,16 @@ public final class WaterRenderingConfig {
                 : NORMAL_MAX_OCEAN_SURFACE_PATCHES.get();
     }
 
+    /** Returns how long a matching dynamic-ocean patch cache can be reused. */
+    public static int dynamicOceanCacheLifetimeTicks() {
+        return DYNAMIC_OCEAN_CACHE_LIFETIME_TICKS.get();
+    }
+
+    /** Returns the largest cell size used by far-distance dynamic ocean LOD. */
+    public static int dynamicOceanMaxCellSize() {
+        return DYNAMIC_OCEAN_MAX_CELL_SIZE.get();
+    }
+
     /** Returns the active shoreline/local-water overlay radius in blocks. */
     public static int shorelineRenderDistanceBlocks() {
         return usesOptimizedProfile()
@@ -355,5 +417,73 @@ public final class WaterRenderingConfig {
         );
         return Math.max(highDetailRadius,
                 Math.min(configuredCap, viewDistanceBlocks));
+    }
+
+    /**
+     * Client-side quality levels for optional SPH detail.
+     *
+     * <p>These settings intentionally affect only temporary local effects.
+     * Oceans, lakes, rivers, and canonical storage remain controlled by the
+     * Water Authority and large-body renderers.</p>
+     */
+    public enum SphLocalEffectQuality {
+        OFF(0.0f, 0.0f, 0, 0, 0, 0, 0),
+        LOW(0.35f, 0.55f, 8, 48, 28, 4, 320),
+        MEDIUM(0.65f, 0.80f, 12, 96, 48, 8, 760),
+        HIGH(1.0f, 1.0f, 16, 160, 80, 12, 1400);
+
+        private final float particleScale;
+        private final float lifetimeScale;
+        private final int minimumParticles;
+        private final int maximumParticles;
+        private final int maximumLifetimeTicks;
+        private final int maxEffects;
+        private final int particleTickBudget;
+
+        SphLocalEffectQuality(
+                float particleScale,
+                float lifetimeScale,
+                int minimumParticles,
+                int maximumParticles,
+                int maximumLifetimeTicks,
+                int maxEffects,
+                int particleTickBudget
+        ) {
+            this.particleScale = particleScale;
+            this.lifetimeScale = lifetimeScale;
+            this.minimumParticles = minimumParticles;
+            this.maximumParticles = maximumParticles;
+            this.maximumLifetimeTicks = maximumLifetimeTicks;
+            this.maxEffects = maxEffects;
+            this.particleTickBudget = particleTickBudget;
+        }
+
+        private float particleScale() {
+            return particleScale;
+        }
+
+        private float lifetimeScale() {
+            return lifetimeScale;
+        }
+
+        private int minimumParticles() {
+            return minimumParticles;
+        }
+
+        private int maximumParticles() {
+            return maximumParticles;
+        }
+
+        private int maximumLifetimeTicks() {
+            return maximumLifetimeTicks;
+        }
+
+        private int maxEffects() {
+            return maxEffects;
+        }
+
+        private int particleTickBudget() {
+            return particleTickBudget;
+        }
     }
 }

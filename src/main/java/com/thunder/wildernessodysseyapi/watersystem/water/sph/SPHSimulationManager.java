@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.sph;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.core.BlockPos;
@@ -14,9 +16,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * A Singleton manager that oversees all active SPH fluid simulations in the world.
  * <p>
- * When a player places a water bucket, this manager creates an isolated {@link SPHSimulator}.
- * Simulations tick on the logical server thread because the collision pass queries
- * Minecraft block states and voxel shapes, which are not safe to read from worker threads.
+ * Server-owned SPH is reserved for tiny gameplay-critical active water such as
+ * falling canonical volume. Visual splashes are normally spawned from compact
+ * client events and do not own persistent water volume. Authoritative
+ * simulations tick on the logical server thread because their collision pass
+ * queries Minecraft block states and voxel shapes, which are not safe to read
+ * from worker threads.
  */
 public class SPHSimulationManager {
 
@@ -138,14 +143,45 @@ public class SPHSimulationManager {
     public SPHSimulator createTransientSimulation(float x, float y, float z, BlockGetter level,
                                                   int requestedCount, float impulseX, float impulseY, float impulseZ,
                                                   int lifetimeTicks) {
+        return createTransientSimulation(
+                x,
+                y,
+                z,
+                level,
+                requestedCount,
+                impulseX,
+                impulseY,
+                impulseZ,
+                lifetimeTicks,
+                SPHConstants.MAX_TRANSIENT_SHORE_SIMULATIONS
+        );
+    }
+
+    private SPHSimulator createTransientSimulation(
+            float x,
+            float y,
+            float z,
+            BlockGetter level,
+            int requestedCount,
+            float impulseX,
+            float impulseY,
+            float impulseZ,
+            int lifetimeTicks,
+            int maxTransientSimulations
+    ) {
         runPendingSettleCallbacks();
         removeEmptySimulations();
 
-        if (countTransientSimulations(level) >= SPHConstants.MAX_TRANSIENT_SHORE_SIMULATIONS) {
+        int maxSimulations = Math.max(0, maxTransientSimulations);
+        if (maxSimulations <= 0) {
+            return null;
+        }
+
+        if (countTransientSimulations(level) >= maxSimulations) {
             removeFirstTransientSimulation(level);
         }
 
-        if (countTransientSimulations(level) >= SPHConstants.MAX_TRANSIENT_SHORE_SIMULATIONS) {
+        if (countTransientSimulations(level) >= maxSimulations) {
             return null;
         }
 
@@ -154,6 +190,69 @@ public class SPHSimulationManager {
         sim.spawnPulse(x, y, z, requestedCount, impulseX, impulseY, impulseZ);
         active.add(sim);
         return sim;
+    }
+
+    /**
+     * Creates a client-owned visual SPH effect from a compact network event.
+     *
+     * <p>The active client quality profile clamps particle count, lifetime, and
+     * active effect count. This path intentionally does not own canonical
+     * volume and should not be used for gameplay-critical water.</p>
+     */
+    public SPHSimulator createLocalVisualEffect(
+            float x,
+            float y,
+            float z,
+            BlockGetter level,
+            int requestedCount,
+            float impulseX,
+            float impulseY,
+            float impulseZ,
+            int requestedLifetimeTicks
+    ) {
+        if (level instanceof ServerLevel || !WaterRenderingConfig.localSphEffectsEnabled()) {
+            return null;
+        }
+        int particleCount = WaterRenderingConfig.localSphParticleCount(requestedCount);
+        int lifetimeTicks = WaterRenderingConfig.localSphLifetimeTicks(requestedLifetimeTicks);
+        if (particleCount <= 0 || lifetimeTicks <= 0) {
+            return null;
+        }
+        return createTransientSimulation(
+                x,
+                y,
+                z,
+                level,
+                particleCount,
+                impulseX,
+                impulseY,
+                impulseZ,
+                lifetimeTicks,
+                WaterRenderingConfig.maxLocalSphEffects()
+        );
+    }
+
+    /**
+     * Spawns a visual splash for bucket placement after canonical Wilderness
+     * water already owns the real volume at the placed block.
+     *
+     * <p>Bucket water must persist as canonical chunk volume immediately so a
+     * failed or culled SPH body cannot make the player's placed water vanish.
+     * This transient body is intentionally cosmetic and is never saved as
+     * persistent volume.</p>
+     */
+    public SPHSimulator createBucketSplash(float x, float y, float z, BlockGetter level) {
+        return createTransientSimulation(
+                x,
+                y,
+                z,
+                level,
+                SPHConstants.BUCKET_SPLASH_PARTICLES,
+                0.0f,
+                0.0f,
+                0.0f,
+                SPHConstants.BUCKET_SPLASH_LIFETIME_TICKS
+        );
     }
 
     /**
@@ -180,29 +279,44 @@ public class SPHSimulationManager {
         if (conservedVolume <= 0) {
             return false;
         }
+        if (!WaterSimulationConfig.serverSphLocalSimulationEnabled()) {
+            return false;
+        }
 
         runPendingSettleCallbacks();
         removeEmptySimulations();
 
-        int particleCount = particleCountForVolume(conservedVolume);
+        int maxParticlesPerBody = Math.max(1, WaterSimulationConfig.serverSphMaxParticlesPerBody());
+        int particleCount = Math.min(particleCountForVolume(conservedVolume), maxParticlesPerBody);
         SPHSimulator existing = findMergeTarget(x, y, z, level, SPHConstants.MERGE_RADIUS);
         if (existing != null) {
-            existing.spawnPulse(x, y, z, particleCount, impulseX, impulseY, impulseZ);
+            int availableParticles = Math.max(0, maxParticlesPerBody - existing.particleCount());
+            if (availableParticles <= 0) {
+                return false;
+            }
+            existing.spawnPulse(x, y, z, Math.min(particleCount, availableParticles),
+                    impulseX, impulseY, impulseZ);
             existing.addCanonicalVolumeUnits(conservedVolume);
             return true;
         }
 
-        if (countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
+        int maxActiveBodies = WaterSimulationConfig.serverSphMaxActiveBodies();
+        if (countSimulations(level) >= maxActiveBodies) {
             SPHSimulator overloaded = findMergeTarget(x, y, z, level, SPHConstants.OVERLOAD_MERGE_RADIUS);
             if (overloaded == null && removeFirstSettledSimulation(level)) {
                 overloaded = findMergeTarget(x, y, z, level, SPHConstants.OVERLOAD_MERGE_RADIUS);
             }
             if (overloaded != null) {
-                overloaded.spawnPulse(x, y, z, Math.max(8, particleCount / 2), impulseX, impulseY, impulseZ);
+                int availableParticles = Math.max(0, maxParticlesPerBody - overloaded.particleCount());
+                if (availableParticles <= 0) {
+                    return false;
+                }
+                overloaded.spawnPulse(x, y, z, Math.min(Math.max(8, particleCount / 2), availableParticles),
+                        impulseX, impulseY, impulseZ);
                 overloaded.addCanonicalVolumeUnits(conservedVolume);
                 return true;
             }
-            if (countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
+            if (countSimulations(level) >= maxActiveBodies) {
                 return false;
             }
         }
@@ -360,20 +474,40 @@ public class SPHSimulationManager {
 
     public void tickLevel(BlockGetter level, float deltaTime) {
         runPendingSettleCallbacks();
+        if (!(level instanceof ServerLevel) && !WaterRenderingConfig.localSphEffectsEnabled()) {
+            active.removeIf(sim -> sim.getLevel() == level
+                    && sim.isTransientSimulation()
+                    && !sim.isRemoteMirror());
+        }
+        int remainingParticleBudget = particleTickBudget(level);
 
         for (SPHSimulator sim : active) {
             if (sim.getLevel() != level) {
                 continue;
             }
 
-            sim.tick(deltaTime);
             retrySettlementIfNeeded(level, sim);
+            if (!sim.isRemoteMirror()) {
+                int particleCost = Math.max(1, sim.particleCount());
+                if (remainingParticleBudget <= 0 || particleCost > remainingParticleBudget) {
+                    continue;
+                }
+                remainingParticleBudget -= particleCost;
+            }
+            sim.tick(deltaTime);
             if ((sim.particleCount() == 0 && sim.getCanonicalVolumeUnits() <= 0)
                     || sim.isRemoteExpired()) {
                 active.remove(sim);
                 settlementRetries.remove(sim);
             }
         }
+    }
+
+    private static int particleTickBudget(BlockGetter level) {
+        if (level instanceof ServerLevel) {
+            return WaterSimulationConfig.serverSphParticleTickBudget();
+        }
+        return WaterRenderingConfig.localSphParticleTickBudget();
     }
 
     /**

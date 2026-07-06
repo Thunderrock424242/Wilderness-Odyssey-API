@@ -106,10 +106,16 @@ public final class CanonicalWater {
         return imported;
     }
 
-    /** Returns true when canonical or compatibility water occupies the position. */
+    /**
+     * Returns true when Wilderness authority owns water at the position.
+     *
+     * @deprecated Ask {@link WildernessWaterAuthority} directly for gameplay and
+     * visual ownership checks. This bridge remains only to keep older callers
+     * from treating unconverted tagged water as authoritative.
+     */
+    @Deprecated
     public static boolean isWater(Level level, BlockPos pos) {
-        WaterVolumeChunk.WaterCell cell = get(level, pos);
-        return cell.volumeUnits() > 0 || level.getFluidState(pos).is(FluidTags.WATER);
+        return WildernessWaterAuthority.isWaterAt(level, pos);
     }
 
     /** Records one player-placed bucket as a full active canonical cell. */
@@ -219,6 +225,22 @@ public final class CanonicalWater {
             WaterVolumeChunk.WaterCell cell,
             boolean projectCompatibility
     ) {
+        set(level, pos, cell, projectCompatibility, true);
+    }
+
+    /**
+     * Replaces one cell and optionally schedules neighboring active-flow work.
+     *
+     * <p>Sleeping cells use this with scheduling disabled so the act of going
+     * dormant does not immediately put them back into the active queue.</p>
+     */
+    public static void set(
+            ServerLevel level,
+            BlockPos pos,
+            WaterVolumeChunk.WaterCell cell,
+            boolean projectCompatibility,
+            boolean scheduleUpdates
+    ) {
         if (level.isOutsideBuildHeight(pos)) {
             return;
         }
@@ -226,11 +248,20 @@ public final class CanonicalWater {
         if (projectCompatibility) {
             projectCompatibility(level, pos, cell == null ? 0 : cell.volumeUnits());
         }
-        scheduleAround(level, pos);
+        if (scheduleUpdates) {
+            scheduleAround(level, pos);
+        }
     }
 
     /** Schedules a persisted dynamic cell to resume finite-volume processing. */
     public static void schedule(ServerLevel level, BlockPos pos) {
+        if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
+            return;
+        }
+        WaterVolumeChunk.WaterCell tracked = getTracked(level, pos);
+        if (tracked != null && tracked.sleeping()) {
+            volume(level, pos).set(pos, tracked.withoutFlags(WaterVolumeChunk.FLAG_SLEEPING));
+        }
         queue(level).offer(pos.immutable());
     }
 

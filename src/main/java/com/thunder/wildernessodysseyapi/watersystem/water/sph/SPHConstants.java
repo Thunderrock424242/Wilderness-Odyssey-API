@@ -145,6 +145,12 @@ public final class SPHConstants {
     /** Number of particles spawned per bucket placement. */
     public static final int   PARTICLES_PER_BUCKET = 140;
 
+    /** Visual-only splash particles spawned after bucket water becomes canonical Wilderness water. */
+    public static final int   BUCKET_SPLASH_PARTICLES = 96;
+
+    /** Lifetime for bucket splash particles; canonical volume remains after this visual expires. */
+    public static final int   BUCKET_SPLASH_LIFETIME_TICKS = 45;
+
     /** Smaller pour size when a bucket has to merge into an overloaded sim. */
     public static final int   OVERLOAD_PARTICLES_PER_BUCKET = 72;
 

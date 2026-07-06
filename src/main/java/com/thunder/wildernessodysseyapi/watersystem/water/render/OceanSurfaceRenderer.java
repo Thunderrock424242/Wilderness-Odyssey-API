@@ -49,10 +49,8 @@ import java.util.Map;
 public final class OceanSurfaceRenderer {
 
     private static final FluidState WATER_STATE = Fluids.WATER.defaultFluidState();
-    private static final int CACHE_LIFETIME_TICKS = 40;
     private static final int MAX_DEPTH_SAMPLE = 16;
     private static final int SHORE_DETAIL_DEPTH = 12;
-    private static final int MAX_DYNAMIC_CELL_SIZE = 4;
     private static final int CONTINUITY_BORDER = 1;
     private static final float MAX_SURFACE_STEP = 0.05f;
     private static final float UV_SCALE = 0.28f;
@@ -369,7 +367,9 @@ public final class OceanSurfaceRenderer {
             int maxPatches
     ) {
         long gameTime = level.getGameTime();
-        int movementThreshold = Math.max(8, nearCellSize * 8);
+        int maxDynamicCellSize = Math.max(4, WaterRenderingConfig.dynamicOceanMaxCellSize());
+        int movementThreshold = Math.max(8, maxDynamicCellSize * 2);
+        int cacheLifetimeTicks = Math.max(1, WaterRenderingConfig.dynamicOceanCacheLifetimeTicks());
         boolean stale = cachedLevel != level
                 || nearRadius != cachedNearRadius
                 || farRadius != cachedFarRadius
@@ -377,7 +377,7 @@ public final class OceanSurfaceRenderer {
                 || maxPatches != cachedMaxPatches
                 || Math.abs(cameraX - cachedCenterX) >= movementThreshold
                 || Math.abs(cameraZ - cachedCenterZ) >= movementThreshold
-                || gameTime - cachedGameTime >= CACHE_LIFETIME_TICKS;
+                || gameTime - cachedGameTime >= cacheLifetimeTicks;
         if (!stale) {
             return;
         }
@@ -397,12 +397,13 @@ public final class OceanSurfaceRenderer {
         LongOpenHashSet rebuiltOwnedTops = new LongOpenHashSet();
         int mediumRadius = Math.min(farRadius, Math.max(nearRadius, nearRadius * 2));
         int boundedPatchBudget = Math.max(1, maxPatches);
-        // The high-detail ring stays at one-block detail. Medium and far rings
-        // are coarsened aggressively so render-distance coverage follows the
-        // player's settings without rebuilding huge block-resolution oceans.
-        int detailCellSize = 1;
-        int mediumCellSize = Math.min(MAX_DYNAMIC_CELL_SIZE, Math.max(2, nearCellSize));
-        int farCellSize = Math.min(MAX_DYNAMIC_CELL_SIZE, Math.max(4, nearCellSize * 2));
+        // The high-detail ring respects the active quality profile. Medium and
+        // far rings are coarsened aggressively so render-distance coverage
+        // follows the player's settings without rebuilding block-resolution
+        // oceans across the whole visible radius.
+        int detailCellSize = Math.max(1, nearCellSize);
+        int mediumCellSize = Math.min(maxDynamicCellSize, Math.max(2, nearCellSize * 2));
+        int farCellSize = Math.min(maxDynamicCellSize, Math.max(4, nearCellSize * 4));
         int paddedFarRadius = farRadius + farCellSize;
         int paddedFarRadiusSquared = paddedFarRadius * paddedFarRadius;
         int centerCoarseX = Math.floorDiv(cameraX, farCellSize) * farCellSize;

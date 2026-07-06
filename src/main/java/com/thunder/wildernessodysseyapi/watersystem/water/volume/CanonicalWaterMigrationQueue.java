@@ -483,7 +483,8 @@ public final class CanonicalWaterMigrationQueue {
      * plain water has already been handed to Wilderness authority.</p>
      */
     public static boolean isChunkWaterFinalized(LevelChunk chunk) {
-        return chunk.getData(ModAttachments.CHUNK_DATA).isWaterFinalized();
+        return chunk.getData(ModAttachments.CHUNK_DATA)
+                .isWaterFinalized(WildernessWaterAuthority.CURRENT_WATER_SYSTEM_VERSION);
     }
 
     /** Returns whether the migration queue currently contains this chunk. */
@@ -493,8 +494,8 @@ public final class CanonicalWaterMigrationQueue {
 
     private static void markChunkWaterFinalized(LevelChunk chunk) {
         ChunkDataCapability chunkData = chunk.getData(ModAttachments.CHUNK_DATA);
-        if (!chunkData.isWaterFinalized()) {
-            chunkData.markWaterFinalized();
+        if (!chunkData.isWaterFinalized(WildernessWaterAuthority.CURRENT_WATER_SYSTEM_VERSION)) {
+            chunkData.markWaterFinalized(WildernessWaterAuthority.CURRENT_WATER_SYSTEM_VERSION);
         }
     }
 
