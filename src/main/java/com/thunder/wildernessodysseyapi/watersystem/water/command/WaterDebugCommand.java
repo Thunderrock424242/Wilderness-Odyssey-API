@@ -103,7 +103,8 @@ public final class WaterDebugCommand {
                 + ", fill=" + format(snapshot.fillFraction())
                 + ", imported=" + snapshot.imported()
                 + ", projected=" + snapshot.compatibilityProjected()
-                + ", hosted=" + snapshot.hostedWater()), false);
+                + ", hosted=" + snapshot.hostedWater()
+                + ", sleeping=" + snapshot.sleeping()), false);
         source.sendSuccess(() -> Component.literal("  canonicalSpeed=" + format(snapshot.canonicalSpeed())
                 + ", mobileSpeed=" + format(snapshot.mobileSpeed())), false);
         return 1;
