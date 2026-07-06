@@ -118,12 +118,53 @@ public final class CanonicalWater {
         return WildernessWaterAuthority.isWaterAt(level, pos);
     }
 
-    /** Records one player-placed bucket as a full active canonical cell. */
+    /**
+     * Records one player-placed bucket as a full canonical Wilderness cell.
+     *
+     * <p>A bucket on flat ground should behave like a stable local reservoir,
+     * not spread itself into an invisible one-pixel film. We only wake the
+     * finite-volume ticker immediately when the placement has an obvious
+     * downhill outlet or touches already-active local water.</p>
+     */
     public static void placeBucket(ServerLevel level, BlockPos pos) {
+        boolean activePlacement = shouldActivateBucketPlacement(level, pos);
+        int flags = WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED;
+        if (!activePlacement) {
+            flags |= WaterVolumeChunk.FLAG_SLEEPING;
+        }
         set(level, pos, WaterVolumeChunk.WaterCell.still(
                 WaterVolumeChunk.UNITS_PER_BLOCK,
-                WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED
-        ), true);
+                flags
+        ), true, activePlacement);
+    }
+
+    /**
+     * Returns whether a freshly placed bucket should start finite-volume flow.
+     *
+     * <p>This keeps ordinary flat-ground placement stable while still allowing
+     * buckets on ledges, waterfalls, drains, leaks, or disturbed neighboring
+     * water to move right away.</p>
+     */
+    private static boolean shouldActivateBucketPlacement(ServerLevel level, BlockPos pos) {
+        if (canAcceptVolume(level, pos.below())) {
+            return true;
+        }
+
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            BlockPos side = pos.relative(direction);
+            if (canAcceptVolume(level, side) && canAcceptVolume(level, side.below())) {
+                return true;
+            }
+
+            WaterVolumeChunk.WaterCell neighbour = getTracked(level, side);
+            if (neighbour != null
+                    && neighbour.volumeUnits() > 0
+                    && !neighbour.imported()
+                    && !neighbour.sleeping()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

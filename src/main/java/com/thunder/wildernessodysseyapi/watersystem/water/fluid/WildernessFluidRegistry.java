@@ -29,6 +29,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.SoundActions;
+import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.fluids.BaseFlowingFluid;
 import net.neoforged.neoforge.fluids.FluidType;
@@ -179,6 +180,34 @@ public final class WildernessFluidRegistry {
                 break;
             }
             tickCell(level, pos);
+        }
+    }
+
+    /**
+     * Wakes nearby canonical water after terrain changes.
+     *
+     * <p>Flat bucket water is allowed to sleep so it does not smear itself into
+     * invisible film, but a later block break or placement can create a real
+     * outlet. Only already-tracked cells are queued, which avoids turning normal
+     * block edits into chunk-wide water imports.</p>
+     */
+    @SubscribeEvent
+    public static void onBlockBroken(BlockEvent.BreakEvent event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            wakeTrackedWaterAround(level, event.getPos());
+        }
+    }
+
+    /**
+     * Wakes nearby canonical water after player or automation block placement.
+     *
+     * <p>This lets the authority re-check local pressure when a new block
+     * dams, redirects, or exposes a small water feature.</p>
+     */
+    @SubscribeEvent
+    public static void onBlockPlaced(BlockEvent.EntityPlaceEvent event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            wakeTrackedWaterAround(level, event.getPos());
         }
     }
 
@@ -385,6 +414,23 @@ public final class WildernessFluidRegistry {
 
     private static boolean canOccupy(ServerLevel level, BlockPos pos) {
         return CanonicalWater.canAcceptVolume(level, pos);
+    }
+
+    private static void wakeTrackedWaterAround(ServerLevel level, BlockPos pos) {
+        scheduleIfTracked(level, pos);
+        scheduleIfTracked(level, pos.below());
+        scheduleIfTracked(level, pos.above());
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            scheduleIfTracked(level, pos.relative(direction));
+        }
+    }
+
+    private static void scheduleIfTracked(ServerLevel level, BlockPos pos) {
+        if (!level.isOutsideBuildHeight(pos)
+                && level.hasChunkAt(pos)
+                && CanonicalWater.isTracked(level, pos)) {
+            CanonicalWater.schedule(level, pos);
+        }
     }
 
     private record LateralCandidate(Direction direction, BlockPos pos, int capacity, int difference) {
