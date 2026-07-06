@@ -3,6 +3,7 @@
 The Wilderness water system is split across several coordinated subsystems:
 
 - Canonical chunk volume: `WaterVolumeChunk`, `CanonicalWater`, `ModAttachments.WATER_VOLUME`
+- Hybrid large-body authority: `HybridWaterBodyModel`, `WildernessWaterAuthority`
 - Canonical world seeding and migration: `CanonicalWaterSeeder`, `CanonicalWaterMigrationQueue`, `WaterSimulationConfig`
 - Namespaced water registry: `WildernessFluidRegistry`
 - SPH bucket pours: `BucketPlaceMixin`, `SPHSimulator`, `FluidRenderer`
@@ -22,13 +23,50 @@ The Wilderness water system is split across several coordinated subsystems:
 Canonical water uses 4,096 fixed-point units per full block and stores sparse
 amount, velocity, flags, and temperature in each chunk attachment. SPH owns
 mobile bucket volume; when a body settles, that exact volume is distributed
-into canonical cells. Vanilla water levels are projections for collision,
-swimming, waterlogging boundaries, and third-party compatibility rather than
-the simulation's source of truth. `WildernessWaterAuthority` is the shared lens
-for deciding whether a cell is canonical, a namespaced Wilderness projection,
-hosted water, or a pending vanilla migration source. The client replacement
-surface samples that authority layer and treats plain `minecraft:water` as
-migration input instead of the visual base surface.
+into canonical cells. Large oceans, lakes, rivers, and ponds are handled as
+hybrid large bodies instead of full 3D pressure grids: the authority derives a
+loaded body column with bounds, base surface height, depth, estimated volume,
+shoreline status, flow, tide/wave profile, water type, and optional local sparse
+cell overrides. Local detailed cells still handle buckets, cave flooding,
+player-dug channels, structure pools, broken dams/pipes, and dirty active
+regions. Vanilla water levels are projections for collision, swimming,
+waterlogging boundaries, and third-party compatibility rather than the
+simulation's source of truth. `WildernessWaterAuthority` is the shared lens for
+deciding whether a cell is canonical, a cheap large body, a namespaced
+Wilderness projection, hosted water, or a pending vanilla migration source. The
+client replacement surface samples that authority layer and treats plain
+`minecraft:water` as migration input instead of the visual base surface.
+
+Large-body column metadata is cached per dimension through Minecraft
+`SavedData` in `LargeWaterBodySavedData`. That is the preferred "file cache per
+world" shape for this system: it follows world saves, dimensions, backups,
+server shutdown, and Minecraft's normal dirty-save lifecycle instead of writing
+loose cache files beside the world. The cache stores derived surface/floor/depth
+metadata keyed by block column plus a terrain hash and the water-system version,
+so it is a performance hint, not a second source of water authority.
+
+Local active water cells now sleep when they cannot move and their velocity has
+damped below `localFlowSleepSpeed`. Sleeping cells stay persisted in canonical
+volume but are skipped by the finite-volume ticker until `CanonicalWater`
+schedules that position or a neighbor again. This keeps buckets, drains, and
+freshly disturbed water responsive while preventing calm ponds and settled
+local cells from consuming the `localFlowCellsPerTick` budget forever.
+
+SPH is now an optional local high-detail layer rather than the water system
+itself. The Water Authority, chunk volume, large-body columns, depth maps,
+tides, and wave profiles remain the source of truth for oceans, lakes, rivers,
+and persistent water storage. Client-side SPH effects are preferred for
+splashes, bucket impact visuals, shore wash, storm/anomaly hits, and other
+short-lived detail. Those effects are synchronized as compact
+`SphLocalEffectPayload` events, not particle-by-particle snapshots; each client
+applies its `sphLocalEffectQuality` setting (`OFF`, `LOW`, `MEDIUM`, or `HIGH`)
+to clamp particle count, lifetime, active effect count, and tick budget.
+Server-owned SPH remains available only for tiny gameplay-critical active water
+such as falling canonical volume from small waterfalls or leaks. It is bounded
+by `enableServerSphLocalSimulation`, `serverSphMaxActiveBodies`,
+`serverSphMaxParticlesPerBody`, and `serverSphParticleTickBudget`, and settled
+server SPH merges conserved volume back into canonical cells instead of
+becoming permanent world storage.
 
 The long-term replacement path is now namespaced ownership first and tag
 compatibility second. `wildernessodysseyapi:wilderness_water` and
@@ -42,14 +80,22 @@ inside the `minecraft` namespace. Hardcoded `Blocks.WATER` or `Fluids.WATER`
 checks remain deliberate follow-up mixin points instead of pretending tag
 compatibility covers every vanilla contract.
 
-Mod-owned gameplay checks should route through `WaterCompatibility` when they
-are asking "is this water?" rather than "is this specifically vanilla water?".
-That helper distinguishes tag-water, vanilla water blocks, Wilderness water
-blocks, and plain projection blocks for commands, buckets, canonical flow
-suppression, shoreline wash, water-body classification, terrain replacement,
-and client water-column sampling. Direct vanilla constants are still allowed for
-vanilla tint sampling, cauldron/dripstone targets, and migration code that must
-know whether a block is still `minecraft:water`.
+Mod-owned gameplay checks should route through `WildernessWaterAuthority` when
+they are asking "is this water?" rather than "is this specifically vanilla
+water?". Its API owns checks such as `isWaterAt`, `isWOWaterAt`,
+`getSurfaceHeight`, `getWaterDepth`, `getWaterSurfaceHeight`,
+`getWaterAmount`, `isFullWaterCell`, `isPartialWaterCell`,
+`isEntitySubmerged`, `canBucketPickup`, `canBucketPlace`, `canBoatFloatAt`,
+`canFishAt`, `canHydrateFarmland`, `canFlowInto`, `addWaterVolume`, and
+`removeWaterVolume`. `getSurfaceHeight` combines the body base level, tide,
+wave profile, and local disturbance. `WaterCompatibility` remains the
+diagnostic and conversion-boundary helper that distinguishes tag-water, vanilla
+water blocks, Wilderness water blocks, and plain projection blocks for commands,
+buckets, canonical flow suppression, terrain replacement, and client
+water-column sampling. Direct vanilla constants are still allowed for vanilla
+tint sampling, cauldron/dripstone targets, face-culling between tagged water
+projections, and migration code that must know whether a block is still
+`minecraft:water`.
 
 Generated world water is finalized into canonical volume from exposed plain
 `minecraft:water` columns automatically. Raw chunk-load events stay cheap and
@@ -61,22 +107,28 @@ migration queue instead of being rewritten inside the load/watch callback.
 `minecraft:water` blocks to `wildernessodysseyapi:wilderness_water_block`, and
 requeues any unfinished columns from the server tick loop under configurable
 budgets for touched chunks, scanned columns, and converted blocks. A
-player-centered priority scan periodically promotes already-loaded chunks
-around each player.
-By default it follows the player's requested view distance, adds a small
-padding radius, then clamps to the server's loaded view distance so visible
-water converges toward Wilderness ownership without force-loading the whole
-world. The seeder imports a bounded depth from oceans, rivers, lakes, and
-water under thin cover such as ice.
-Chunks that complete this scan store a persistent water-finalized flag in
-their chunk data. Future chunk-load, chunk-watch, and player-priority scans
-skip those finalized chunks unless a repair/future migration clears the flag,
-so ordinary exploration does not keep paying for the same ocean columns.
+optional player-centered priority scan can periodically promote already-loaded
+chunks around each player, but it is disabled by default because player movement
+should not cause mass water scanning. If enabled, it follows the player's
+requested view distance, adds a small padding radius, then clamps to the
+server's loaded view distance so visible water converges toward Wilderness
+ownership without force-loading the whole world. The seeder imports a bounded
+depth from oceans, rivers, lakes, and water under thin cover such as ice.
+Chunks that complete this scan store both a persistent water-finalized flag and
+the current Wilderness water-system version in their chunk data. Future
+chunk-load, chunk-watch, and optional player-priority scans skip chunks whose
+stored version is current unless a repair/future migration clears the flag, so
+ordinary exploration does not keep paying for the same ocean columns.
 Waterlogged host blocks, such as kelp, seagrass, and waterloggable modded
 blocks, can be imported directly from the motion-blocking surface scan as
 hosted canonical water for depth and optics, but the host block is not replaced
 and the open-ocean replacement mesh does not treat that cell as an exposed
 surface.
+Chunk water preprocessing remains async-safe by design: chunk-load/watch hooks
+may enqueue or promote immutable chunk positions, and read/apply work happens
+later under server-tick budgets against already-loaded chunks. Future worker
+threads may prepare purely immutable metadata, but block-state reads and all
+canonical/projection writes must remain on Minecraft's logical server thread.
 Canonical authority import is allowed to continue after the per-tick block
 conversion budget is exhausted, but any skipped plain-water rewrites keep the
 chunk in the priority queue from the first skipped column. That prevents
@@ -132,8 +184,8 @@ Use these commands in a dev world:
 - `/wowater summary <radius>` counts nearby wet, tag-water, canonical, projected,
   and mobile-water blocks.
 - `/wowater authority <radius>` separates Wilderness-owned water from pending
-  vanilla migration sources, hosted/waterlogged cells, projection gaps, mobile
-  SPH water, and replacement-safe visible surface cells.
+  vanilla migration sources, hosted/waterlogged cells, cheap large-body cells,
+  projection gaps, mobile SPH water, and replacement-safe visible surface cells.
 - `/wowater migration` reports the automatic migration queue, totals, hosted
   waterlogged imports, player-priority scan counts, skipped unloaded chunks,
   effective view-distance priority radius, promoted chunks, visible priority
@@ -172,3 +224,11 @@ Manual test matrix before calling a water build stable:
    beach, an open ocean, and a frozen ocean. The replacement surface should
    follow render distance through LODs without drawing block-detail water across
    the entire view.
+8. Run `/wowater migration` after flying over a large ocean and confirm the
+   performance line reports the expected local-flow budget, sleep speed, and
+   large-body cache count/budget.
+9. Place buckets, stand near shore wash, and trigger splash-heavy events at
+   `sphLocalEffectQuality=OFF`, `LOW`, `MEDIUM`, and `HIGH`. OFF should keep
+   the durable Wilderness water while suppressing client SPH visuals; higher
+   settings should add richer local splashes without changing `/wowater`
+   authority ownership.

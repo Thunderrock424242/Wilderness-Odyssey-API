@@ -2,9 +2,9 @@ package com.thunder.wildernessodysseyapi.watersystem.ocean.shore;
 
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.SphLocalEffectPayload;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHConstants;
-import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * Adds small, capped SPH pulses at ocean shorelines while tides are moving.
+ * Adds small, capped client SPH effect events at shorelines while tides move.
  * The canonical ocean surface remains the large-scale model; this creates local shore wash.
  */
 @EventBusSubscriber(modid = "wildernessodysseyapi")
@@ -137,7 +137,7 @@ public final class ShoreWaveSpawner {
         for (int y = seaLevel + 3; y >= seaLevel - 3; y--) {
             BlockPos pos = new BlockPos(x, y, z);
             if (!level.hasChunkAt(pos)) return null;
-            if (WaterCompatibility.hasTaggedWater(level, pos)) {
+            if (WildernessWaterAuthority.isWaterAt(level, pos)) {
                 return pos;
             }
         }
@@ -145,7 +145,8 @@ public final class ShoreWaveSpawner {
     }
 
     private static boolean isShoreBlock(ServerLevel level, BlockPos pos) {
-        if (WaterCompatibility.hasTaggedWater(level, pos)) return false;
+        if (!level.hasChunkAt(pos)) return false;
+        if (WildernessWaterAuthority.isWaterAt(level, pos)) return false;
 
         BlockState state = level.getBlockState(pos);
         if (!state.getCollisionShape(level, pos).isEmpty()) {
@@ -153,7 +154,8 @@ public final class ShoreWaveSpawner {
         }
 
         BlockPos below = pos.below();
-        if (WaterCompatibility.hasTaggedWater(level, below)) return false;
+        if (!level.hasChunkAt(below)) return false;
+        if (WildernessWaterAuthority.isWaterAt(level, below)) return false;
         return !level.getBlockState(below).getCollisionShape(level, below).isEmpty();
     }
 
@@ -195,12 +197,21 @@ public final class ShoreWaveSpawner {
             impulseZ += shallowFlow.velocityZ() * 0.12f;
         }
 
-        SPHSimulationManager.get().createTransientSimulation(
-                spawnX, spawnY, spawnZ,
+        SphLocalEffectPayload.sendToNearby(
                 level,
-                particleCount,
-                impulseX, -0.35f, impulseZ,
-                SPHConstants.SHORE_WAVE_LIFETIME_TICKS
+                spawnX,
+                spawnY,
+                spawnZ,
+                SphLocalEffectPayload.shoreWash(
+                        spawnX,
+                        spawnY,
+                        spawnZ,
+                        particleCount,
+                        impulseX,
+                        -0.35f,
+                        impulseZ,
+                        SPHConstants.SHORE_WAVE_LIFETIME_TICKS
+                )
         );
     }
 

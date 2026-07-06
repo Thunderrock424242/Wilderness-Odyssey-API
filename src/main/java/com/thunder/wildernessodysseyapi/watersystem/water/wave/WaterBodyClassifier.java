@@ -1,9 +1,11 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.wave;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.tags.BiomeTags;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.biome.Biome;
 
@@ -89,7 +91,7 @@ public class WaterBodyClassifier {
         for (int dx = -8; dx <= 8; dx += 2) {
             for (int dz = -8; dz <= 8; dz += 2) {
                 BlockPos check = pos.offset(dx, 0, dz);
-                if (WaterCompatibility.hasTaggedWater(level, check)) {
+                if (hasAuthoritativeWater(level, check)) {
                     waterCount++;
                 }
             }
@@ -106,5 +108,12 @@ public class WaterBodyClassifier {
 
     private static long cellKey(int cellX, int cellZ) {
         return ((long) cellX & 0xFFFFFFFFL) | (((long) cellZ & 0xFFFFFFFFL) << 32);
+    }
+
+    private static boolean hasAuthoritativeWater(LevelReader level, BlockPos pos) {
+        if (level instanceof Level concreteLevel) {
+            return WildernessWaterAuthority.isWaterAt(concreteLevel, pos);
+        }
+        return WaterCompatibility.hasTaggedWater(level, pos);
     }
 }

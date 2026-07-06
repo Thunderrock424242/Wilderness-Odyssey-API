@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulation
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterMigrationQueue;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterSeeder;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.LargeWaterBodySavedData;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import net.minecraft.commands.CommandSourceStack;
@@ -178,6 +179,7 @@ public final class WaterDebugCommand {
                 + ", replacementSafe=" + stats.replacementSafe()), false);
         source.sendSuccess(() -> Component.literal("  Sources: canonical=" + stats.canonical()
                 + ", canonicalHosted=" + stats.canonicalHosted()
+                + ", largeBody=" + stats.largeBody()
                 + ", wildernessProjection=" + stats.wildernessProjection()
                 + ", vanillaPending=" + stats.vanillaPending()
                 + ", hostedPending=" + stats.hostedTagged()
@@ -196,6 +198,7 @@ public final class WaterDebugCommand {
         int replacementSafe = 0;
         int canonical = 0;
         int canonicalHosted = 0;
+        int largeBody = 0;
         int wildernessProjection = 0;
         int vanillaPending = 0;
         int hostedTagged = 0;
@@ -216,6 +219,9 @@ public final class WaterDebugCommand {
             if (snapshot.canonicalWater()) canonical++;
             if (snapshot.authoritySource() == WildernessWaterAuthority.WaterSource.CANONICAL_HOSTED) {
                 canonicalHosted++;
+            }
+            if (snapshot.authoritySource() == WildernessWaterAuthority.WaterSource.LARGE_BODY) {
+                largeBody++;
             }
             if (snapshot.authoritySource() == WildernessWaterAuthority.WaterSource.WILDERNESS_PROJECTION) {
                 wildernessProjection++;
@@ -240,6 +246,7 @@ public final class WaterDebugCommand {
                 replacementSafe,
                 canonical,
                 canonicalHosted,
+                largeBody,
                 wildernessProjection,
                 vanillaPending,
                 hostedTagged,
@@ -264,7 +271,8 @@ public final class WaterDebugCommand {
                         chunk,
                         WaterSimulationConfig.worldSeedMaxColumnDepth()
                 ).countedChunk());
-                chunk.getData(ModAttachments.CHUNK_DATA).markWaterFinalized();
+                chunk.getData(ModAttachments.CHUNK_DATA)
+                        .markWaterFinalized(WildernessWaterAuthority.CURRENT_WATER_SYSTEM_VERSION);
             }
         }
 
@@ -283,10 +291,12 @@ public final class WaterDebugCommand {
         CommandSourceStack source = context.getSource();
         CanonicalWaterMigrationQueue.MigrationStatus status = CanonicalWaterMigrationQueue.status();
         CanonicalWaterMigrationQueue.TickResult lastTick = status.lastTick();
+        int largeBodyCacheSize = LargeWaterBodySavedData.get(source.getLevel()).cachedColumnCount();
 
         source.sendSuccess(() -> Component.literal("WO water migration"), false);
         source.sendSuccess(() -> Component.literal("  Status: seeding=" + onOff(status.seedingEnabled())
                 + ", block conversion=" + onOff(status.blockConversionEnabled())
+                + ", authority version=" + WildernessWaterAuthority.CURRENT_WATER_SYSTEM_VERSION
                 + ", queued chunks=" + status.queuedChunks()), false);
         source.sendSuccess(() -> Component.literal("  Totals: touched=" + status.touchedChunks()
                 + ", completed=" + status.completedChunks()
@@ -325,6 +335,17 @@ public final class WaterDebugCommand {
                 + status.skippedUnloadedChunks()
                 + ", skipped finalized=" + status.skippedFinalizedChunks()
                 + ", dropped=" + status.droppedChunks()), false);
+        source.sendSuccess(() -> Component.literal("  Performance: localFlowCells/tick="
+                + WaterSimulationConfig.localFlowCellsPerTick()
+                + ", sleepSpeed=" + format(WaterSimulationConfig.localFlowSleepSpeed())
+                + ", largeBodyCache=" + largeBodyCacheSize
+                + "/" + WaterSimulationConfig.largeBodyCacheMaxColumns()), false);
+        source.sendSuccess(() -> Component.literal("  SPH local layer: serverCritical="
+                + onOff(WaterSimulationConfig.serverSphLocalSimulationEnabled())
+                + ", maxBodies=" + WaterSimulationConfig.serverSphMaxActiveBodies()
+                + ", maxParticles/body=" + WaterSimulationConfig.serverSphMaxParticlesPerBody()
+                + ", tickBudget=" + WaterSimulationConfig.serverSphParticleTickBudget()
+                + ", visual splashes are client event effects"), false);
         return Math.max(1, status.queuedChunks());
     }
 
@@ -338,6 +359,8 @@ public final class WaterDebugCommand {
                 + " state=" + stats.stateLabel()), false);
         source.sendSuccess(() -> Component.literal("  Chunks: loaded=" + stats.loadedChunks()
                 + ", finalized=" + stats.finalizedChunks()
+                + ", outdatedVersion=" + stats.outdatedVersionChunks()
+                + ", currentVersion=" + WildernessWaterAuthority.CURRENT_WATER_SYSTEM_VERSION
                 + ", queued=" + stats.queuedChunks()
                 + ", unfinished=" + stats.unfinishedChunks()), false);
         source.sendSuccess(() -> Component.literal("  Pending vanilla: chunks=" + stats.pendingPlainChunks()
@@ -355,6 +378,7 @@ public final class WaterDebugCommand {
     ) {
         int loadedChunks = 0;
         int finalizedChunks = 0;
+        int outdatedVersionChunks = 0;
         int queuedChunks = 0;
         int unfinishedChunks = 0;
         int pendingPlainChunks = 0;
@@ -369,7 +393,9 @@ public final class WaterDebugCommand {
                     continue;
                 }
                 loadedChunks++;
-                boolean finalized = CanonicalWaterMigrationQueue.isChunkWaterFinalized(chunk);
+                var chunkData = chunk.getData(ModAttachments.CHUNK_DATA);
+                boolean finalized = chunkData.isWaterFinalized(WildernessWaterAuthority.CURRENT_WATER_SYSTEM_VERSION);
+                boolean outdatedVersion = chunkData.isWaterFinalized() && !finalized;
                 boolean queued = CanonicalWaterMigrationQueue.isQueued(level, chunk.getPos());
                 CanonicalWaterSeeder.PendingPlainWaterStats pending =
                         CanonicalWaterSeeder.scanPendingPlainWater(
@@ -379,6 +405,9 @@ public final class WaterDebugCommand {
                         );
                 if (finalized) {
                     finalizedChunks++;
+                }
+                if (outdatedVersion) {
+                    outdatedVersionChunks++;
                 }
                 if (queued) {
                     queuedChunks++;
@@ -398,6 +427,7 @@ public final class WaterDebugCommand {
         return new VisibleWaterReadinessStats(
                 loadedChunks,
                 finalizedChunks,
+                outdatedVersionChunks,
                 queuedChunks,
                 unfinishedChunks,
                 pendingPlainChunks,
@@ -536,6 +566,7 @@ public final class WaterDebugCommand {
             int replacementSafe,
             int canonical,
             int canonicalHosted,
+            int largeBody,
             int wildernessProjection,
             int vanillaPending,
             int hostedTagged,
@@ -625,6 +656,7 @@ public final class WaterDebugCommand {
     private record VisibleWaterReadinessStats(
             int loadedChunks,
             int finalizedChunks,
+            int outdatedVersionChunks,
             int queuedChunks,
             int unfinishedChunks,
             int pendingPlainChunks,

@@ -13,21 +13,22 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 
 /**
- * Read-only compatibility view of replacement water at a block position.
+ * Read-only compatibility and diagnostics view of replacement water at a block position.
  *
  * <p>The replacement system now owns a namespaced water fluid and relies on
- * {@code #minecraft:water} for broad compatibility. This helper keeps that
- * rule in one place so gameplay hooks, render sampling, and diagnostics do not
- * drift back toward hardcoded {@code Blocks.WATER} checks.</p>
+ * {@code #minecraft:water} only for import boundaries and broad mod
+ * compatibility. Gameplay-facing code should ask {@link WildernessWaterAuthority}
+ * for authoritative answers; this helper explains what vanilla/tagged state is
+ * still present for commands, repair, migration, and visual diagnostics.</p>
  */
 public final class WaterCompatibility {
 
     private WaterCompatibility() {
     }
 
-    /** Returns whether vanilla or replacement-owned water occupies this block. */
+    /** Returns whether Wilderness authority owns water at this block. */
     public static boolean isWater(Level level, BlockPos pos) {
-        return describe(level, pos).wet();
+        return WildernessWaterAuthority.isWaterAt(level, pos);
     }
 
     /** Returns whether this fluid state is considered water by the compatibility tag. */

@@ -31,7 +31,9 @@ public final class SphSnapshotSynchronizer {
                 * SPHConstants.NETWORK_TRACKING_DISTANCE;
 
         for (SPHSimulator simulator : SPHSimulationManager.get().getActive(level)) {
-            if (simulator.isRemoteMirror() || simulator.particleCount() == 0) {
+            if (simulator.isRemoteMirror()
+                    || simulator.isTransientSimulation()
+                    || simulator.particleCount() == 0) {
                 continue;
             }
             // Settled meshes are static. A one-second refresh still catches

@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifi
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -59,7 +60,7 @@ public final class WaveEntityPhysics {
             return;
         }
         if (!entity.isInWater()
-                && !CanonicalWater.isWater(level, entity.blockPosition())
+                && !WildernessWaterAuthority.isWaterAt(level, entity.blockPosition())
                 && !mobileWater.wet()
                 && !(entity instanceof Boat)) {
             return;
@@ -232,8 +233,8 @@ public final class WaveEntityPhysics {
     private static boolean isBoatTouchingWater(Boat boat) {
         // A floating boat's block position can sit just above the surface, so
         // check both its feet and the block immediately beneath the hull.
-        return CanonicalWater.isWater(boat.level(), boat.blockPosition())
-                || CanonicalWater.isWater(boat.level(), boat.blockPosition().below());
+        return WildernessWaterAuthority.canBoatFloatAt(boat.level(), boat.blockPosition())
+                || WildernessWaterAuthority.canBoatFloatAt(boat.level(), boat.blockPosition().below());
     }
 
     private static GerstnerWaveProfile profileFor(WaterBodyClassifier.WaterType type) {

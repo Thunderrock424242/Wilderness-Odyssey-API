@@ -16,8 +16,9 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifi
 /**
  * ClientTickHandler
  *
- * Advances lightweight client-only water animation state. SPH simulation is
- * driven by the logical server tick because it queries world collision data.
+ * Advances lightweight client-only water animation state. Remote authoritative
+ * SPH mirrors interpolate server snapshots, while local visual SPH effects
+ * tick only on the client from compact event payloads.
  */
 @EventBusSubscriber(modid = "wildernessodysseyapi", value = Dist.CLIENT)
 public class ClientTickHandler {

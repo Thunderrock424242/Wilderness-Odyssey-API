@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.lorebook.network.SyncCodexMapPayload;
 import com.thunder.wildernessodysseyapi.lorebook.network.SyncLoreBookPayload;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.OceanSeaStatePayload;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.SphLocalEffectPayload;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.SphSimulationSnapshotPayload;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.WaterVolumeChunkPayload;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
@@ -24,7 +25,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModPayloads {
 
-    private static final String NETWORK_VERSION = "5";
+    private static final String NETWORK_VERSION = "6";
 
     private ModPayloads() {
     }
@@ -69,6 +70,12 @@ public final class ModPayloads {
                                 context.player().level(),
                                 payload.toParticles()
                         ))
+        );
+        registrar.playToClient(
+                SphLocalEffectPayload.TYPE,
+                SphLocalEffectPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        payload.spawnClientEffect(context.player().level()))
         );
         registrar.playToClient(
                 WaterVolumeChunkPayload.TYPE,

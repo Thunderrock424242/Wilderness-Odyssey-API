@@ -28,6 +28,8 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
     public static final int FLAG_COMPATIBILITY_PROJECTED = 1 << 1;
     /** Water lives inside another block's waterlogged fluid state; do not replace that host. */
     public static final int FLAG_HOSTED_WATER = 1 << 2;
+    /** Local detailed cell is stable and should not consume active-flow ticks until disturbed nearby. */
+    public static final int FLAG_SLEEPING = 1 << 3;
     /** Primitive integers encoded for each persisted or networked cell. */
     public static final int SERIALIZED_CELL_STRIDE = 7;
 
@@ -235,6 +237,11 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
             return (flags & FLAG_HOSTED_WATER) != 0;
         }
 
+        /** Returns whether this detailed local cell is asleep until neighboring water changes. */
+        public boolean sleeping() {
+            return (flags & FLAG_SLEEPING) != 0;
+        }
+
         /** Returns a copy with additional provenance flags preserved through synchronization. */
         public WaterCell withAddedFlags(int addedFlags) {
             if ((flags & addedFlags) == addedFlags) {
@@ -242,6 +249,15 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
             }
             return new WaterCell(volumeUnits, velocityX, velocityY, velocityZ,
                     flags | addedFlags, temperatureMilliKelvin).sanitized();
+        }
+
+        /** Returns a copy with selected runtime flags cleared. */
+        public WaterCell withoutFlags(int removedFlags) {
+            if ((flags & removedFlags) == 0) {
+                return this;
+            }
+            return new WaterCell(volumeUnits, velocityX, velocityY, velocityZ,
+                    flags & ~removedFlags, temperatureMilliKelvin).sanitized();
         }
 
         private static float finiteOrZero(float value) {
