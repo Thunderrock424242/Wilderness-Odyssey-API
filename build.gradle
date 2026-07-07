@@ -152,10 +152,6 @@ repositories {
     maven {
         url "https://repo.bluecolored.de/releases"
     }
-    maven {
-        name "CaffeineMC"
-        url "https://maven.caffeinemc.net/releases" // or /snapshots
-    }
 }
 
 dependencies {
@@ -179,8 +175,7 @@ dependencies {
     implementation "curse.maven:supplementaries-412082:8244187"
     implementation "curse.maven:multipart-machines-cooking-885587:5686941"
     implementation "curse.maven:bluemap-406463:6239407"
-    //implementation "curse.maven:sodium-394468:8382328"
-    //implementation "curse.maven:irisshaders-455508:8242804"
+    implementation "curse.maven:embeddium-908741:6118392"
     jarJar(implementation("org.yaml:snakeyaml:2.2")) {
         version {
             strictly '[2.2,3.0)'
