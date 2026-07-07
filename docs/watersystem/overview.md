@@ -160,6 +160,21 @@ queued pass gradually migrates accepted plain vanilla cells to
 `wildernessodysseyapi:wilderness_water_block` or its flowing Wilderness state.
 Manual `/wowater seed` remains available as an operator force/repair tool.
 
+Starter-bunker worlds can also run a bounded blocking pre-finalization pass
+during initial spawn creation. When `enableSpawnWaterPreFinalization` is true,
+the closest generated chunks around the bunker are synchronously imported and
+rewritten before the first player sees spawn, up to the configured chunk cap and
+soft timeout. This intentionally spends a small amount of loading-screen time to
+avoid obvious live water takeover in the spawn area, while unfinished chunks are
+still handed back to the normal priority migration queue.
+
+Fallback note: if spawn pre-finalization, visible-chunk finalization, and
+budgeted migration still cannot make new worlds feel clean after the mod and
+modpack reach a stable baseline, the next escalation should be targeted mixins
+into Minecraft's water/worldgen paths. That should be a stable-version step,
+not a broad unstable-development rewrite, because those hooks are more fragile
+and can affect other terrain, structure, and aquifer generation behavior.
+
 Canonical persistence is complete rather than capped. Network snapshots split
 large sparse chunks into bounded pages and clients reassemble the newest
 revision even when its packets arrive before the destination chunk. Settled SPH

@@ -109,13 +109,13 @@ public final class WaterRenderingConfig {
                 .define("matchOceanSurfaceToViewDistance", true);
         WATER_QUALITY = builder
                 .comment("Overall water quality target. LOW is cheap waves/no SPH, MEDIUM adds basic foam/ripples, HIGH enables capped local SPH, and CINEMATIC raises client visuals while still keeping hard safety caps.")
-                .defineEnum("waterQuality", WaterQuality.HIGH);
+                .defineEnum("waterQuality", WaterQuality.CINEMATIC);
         SPH_LOCAL_EFFECT_QUALITY = builder
                 .comment("Quality for local SPH-only water effects. The overall waterQuality can still clamp this down; SPH never owns oceans, lakes, rivers, or permanent storage.")
                 .defineEnum("sphLocalEffectQuality", SphLocalEffectQuality.HIGH);
         MAX_OCEAN_SURFACE_DISTANCE_BLOCKS = builder
                 .comment("Safety cap for view-distance-matched ocean rendering. Higher values cover more distant vanilla water but cost more CPU and vertices.")
-                .defineInRange("maxOceanSurfaceDistanceBlocks", 160, 64,
+                .defineInRange("maxOceanSurfaceDistanceBlocks", 192, 64,
                         ABSOLUTE_OCEAN_SURFACE_DISTANCE_CAP_BLOCKS);
         DYNAMIC_OCEAN_CACHE_LIFETIME_TICKS = builder
                 .comment("How long the client may reuse the dynamic ocean patch cache before rescanning nearby water. Higher values improve FPS while still rebuilding on movement and config changes.")
@@ -131,10 +131,10 @@ public final class WaterRenderingConfig {
                 .defineInRange("underwaterTurbidityStrength", 1.0, 0.0, 2.0);
         SURFACE_ABSORPTION_STRENGTH = builder
                 .comment("Scales how quickly the replacement surface shifts toward deep-water color with depth. Higher values hide blocky seafloors sooner.")
-                .defineInRange("surfaceAbsorptionStrength", 1.45, 0.25, 3.0);
+                .defineInRange("surfaceAbsorptionStrength", 1.70, 0.25, 3.0);
         SURFACE_OPACITY_STRENGTH = builder
                 .comment("Scales replacement-surface alpha after depth, foam, and shoreline fades. Higher values make the water medium less see-through.")
-                .defineInRange("surfaceOpacityStrength", 1.28, 0.50, 2.0);
+                .defineInRange("surfaceOpacityStrength", 1.38, 0.50, 2.0);
         SHORELINE_OVERLAY_STRENGTH = builder
                 .comment("Scales shoreline overlay alpha, foam, and local vertical motion.")
                 .defineInRange("shorelineOverlayStrength", 1.0, 0.0, 2.0);
@@ -164,19 +164,19 @@ public final class WaterRenderingConfig {
                 .defineInRange("waveTrains", 4, 1, 4);
         NORMAL_OCEAN_RENDER_DISTANCE_BLOCKS = builder
                 .comment("Radius of the per-frame ocean surface around the camera.")
-                .defineInRange("oceanRenderDistanceBlocks", 32, 12, 80);
+                .defineInRange("oceanRenderDistanceBlocks", 40, 12, 80);
         NORMAL_OCEAN_CELL_SIZE = builder
                 .comment("Horizontal ocean mesh spacing. One gives block-resolution shore edges.")
                 .defineInRange("oceanCellSize", 1, 1, 4);
         NORMAL_MAX_OCEAN_SURFACE_PATCHES = builder
                 .comment("Maximum dynamic ocean patches kept in the client cache. This prevents view-distance water from tanking FPS.")
-                .defineInRange("maxOceanSurfacePatches", 12000, 512, 24000);
+                .defineInRange("maxOceanSurfacePatches", 16000, 512, 24000);
         NORMAL_SHORELINE_RENDER_DISTANCE_BLOCKS = builder
                 .comment("Radius for block-detail shoreline/local-water overlays.")
-                .defineInRange("shorelineRenderDistanceBlocks", 24, 8, 48);
+                .defineInRange("shorelineRenderDistanceBlocks", 32, 8, 48);
         NORMAL_MAX_SHORELINE_SURFACE_PATCHES = builder
                 .comment("Maximum shoreline overlay patches kept near the camera. The nearest cells are prioritized first.")
-                .defineInRange("maxShorelineSurfacePatches", 900, 128, 4096);
+                .defineInRange("maxShorelineSurfacePatches", 1200, 128, 4096);
         builder.pop();
 
         builder.comment("Optimized profile used when Sodium or Embeddium is loaded.")

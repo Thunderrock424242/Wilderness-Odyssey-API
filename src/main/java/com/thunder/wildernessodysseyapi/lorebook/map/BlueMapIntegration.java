@@ -119,12 +119,19 @@ public final class BlueMapIntegration {
     }
 
     private static Collection<BlueMapMap> findMaps(BlueMapAPI api, ServerLevel level, String configuredMapId) {
-        return api.getWorld(level)
+        List<BlueMapMap> maps = api.getWorld(level)
                 .map(BlueMapWorld::getMaps)
                 .stream()
                 .flatMap(Collection::stream)
-                .filter(map -> configuredMapId.isBlank() || map.getId().equals(configuredMapId))
                 .toList();
+        if (configuredMapId.isBlank()) {
+            return maps;
+        }
+
+        List<BlueMapMap> matchingMaps = maps.stream()
+                .filter(map -> map.getId().equals(configuredMapId))
+                .toList();
+        return matchingMaps.isEmpty() ? maps : matchingMaps;
     }
 
     private static void publishToMap(BlueMapMap map, List<CodexMapPoi> pois) {

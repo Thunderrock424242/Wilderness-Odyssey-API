@@ -178,7 +178,7 @@ public final class BlueMapTileClient {
 
     /** Mutable request state for one tile address. */
     public static final class TileEntry {
-        private static final long ERROR_RETRY_DELAY_MS = 10_000L;
+        private static final long ERROR_RETRY_DELAY_MS = 60_000L;
 
         private final BlueMapTileAddress address;
         private volatile TileState state = TileState.EMPTY;

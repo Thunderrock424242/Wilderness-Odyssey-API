@@ -41,8 +41,11 @@ public final class CodexMapServerConfig {
                 .comment("BlueMap map id used by both the Codex tile URL and optional BlueMap marker publishing.")
                 .define("mapId", "world");
         TILE_URL_TEMPLATE = builder
-                .comment("Tile URL template. Supported placeholders: {base}, {map}, {zoom}, {x}, {z}.")
-                .define("tileUrlTemplate", "{base}/maps/{map}/tiles/{zoom}/{x}_{z}.png");
+                .comment(
+                        "Optional PNG tile URL template. Supported placeholders: {base}, {map}, {zoom}, {x}, {z}.",
+                        "BlueMap 5 stores native web tiles as .prbm.gz data, not PNGs, so leave this empty unless you expose a PNG tile proxy."
+                )
+                .define("tileUrlTemplate", "");
         TILE_ZOOM = builder
                 .comment("Tile zoom/detail value inserted into {zoom}.")
                 .defineInRange("tileZoom", 0, 0, 16);
