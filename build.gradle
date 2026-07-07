@@ -152,6 +152,10 @@ repositories {
     maven {
         url "https://repo.bluecolored.de/releases"
     }
+    maven {
+        name "CaffeineMC"
+        url "https://maven.caffeinemc.net/releases" // or /snapshots
+    }
 }
 
 dependencies {
