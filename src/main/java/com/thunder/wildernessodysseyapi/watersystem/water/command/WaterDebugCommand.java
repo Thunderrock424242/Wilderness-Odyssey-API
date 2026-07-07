@@ -339,6 +339,8 @@ public final class WaterDebugCommand {
         source.sendSuccess(() -> Component.literal("  Performance: localFlowCells/tick="
                 + WaterSimulationConfig.localFlowCellsPerTick()
                 + ", sleepSpeed=" + format(WaterSimulationConfig.localFlowSleepSpeed())
+                + ", waterBodyUpdates/tick=" + WaterSimulationConfig.waterBodyUpdatesPerTick()
+                + ", localWaterEvents/tick=" + WaterSimulationConfig.localWaterNetworkEventsPerTick()
                 + ", largeBodyCache=" + largeBodyCacheSize
                 + "/" + WaterSimulationConfig.largeBodyCacheMaxColumns()), false);
         source.sendSuccess(() -> Component.literal("  SPH local layer: serverCritical="

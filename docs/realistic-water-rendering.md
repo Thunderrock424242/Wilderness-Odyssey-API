@@ -33,8 +33,8 @@ technically appropriate model for a large Minecraft world:
 
 - Gerstner gravity waves model the continuous far-field ocean, river, and pond
   surfaces.
-- The existing SPH solver handles local volumes such as pours, droplets,
-  splashes, and shore wash.
+- The existing SPH solver handles temporary local detail such as falling slices,
+  droplets, splashes, leaks, and shore wash.
 - Tide and shoreline systems provide the slower boundary conditions that move
   water toward and away from land.
 - Canonical finite-volume cells own conserved block-scale water amount and the
@@ -78,8 +78,9 @@ touches it; disturbed water prefers bounded downward transfer, then distributes
 sideways across every lower neighbor instead of picking one arbitrary direction.
 When a falling cell has enough volume and no canonical water below it, the
 solver can transfer a conserved slice into `SPHSimulationManager` as a mobile
-body. That SPH body is ticked, synchronized, persisted, and later settles back
-into canonical cells with averaged particle velocity preserved.
+local body. That SPH body is ticked under strict budgets, synchronized only
+when gameplay-critical, and later settles back into canonical cells with
+averaged particle velocity preserved.
 
 ## Rendering phases
 
@@ -222,25 +223,28 @@ players, couples open boundaries to tide plus ocean swell, and supplies flow to
 boats, items, wading entities, and breaking-wave SPH pulses. The old four-block
 tide edit grid was removed; tides no longer place or delete water blocks.
 
-### Phase 5: persistent local volumes
+### Phase 5: local volumetric detail and optional SPH
 
-- Bucket pours are simulated on the logical server and identified by UUID.
-- Nearby clients receive quantized, bounded position and velocity snapshots
-  every four ticks and interpolate rather than re-running divergent SPH physics.
-- Static bodies refresh less often and remote mirrors expire when tracking ends.
-- Non-transient bodies persist per dimension in compact `SavedData` arrays and
-  restore their identity, position, velocity, and droplet state.
-- Dimension unload captures mobile bodies before releasing runtime references;
-  unloading one dimension no longer clears simulations in every dimension.
-- Pending settlement callbacks retain their owning level and are flushed before
-  persistence, preventing unload-time duplication or loss.
+- Bucket placement becomes canonical Wilderness volume immediately. SPH can add
+  a visual splash, but it does not own the bucket's durable water.
+- Local cells are sparse, store compact fill/velocity/provenance, and sleep
+  when they cannot move. The finite-volume ticker processes only the configured
+  `localFlowCellsPerTick` budget.
+- Server-owned SPH is reserved for tiny gameplay-critical cases such as falling
+  canonical slices, small leaks, and short waterfalls. It is capped by active
+  body count, particles per body, and particle tick budget.
+- Client SPH is preferred for splashes, shore wash, bucket impact visuals, and
+  storm/anomaly spray. The server sends compact events, not individual
+  particles, and `localWaterNetworkEventsPerTick` limits how many local water
+  events one dimension can emit per tick.
+- The top-level client `waterQuality` setting clamps waves, ripples, SPH,
+  render distance, patch counts, and mesh rebuild cadence. `LOW` and `MEDIUM`
+  disable SPH; `HIGH` and `CINEMATIC` allow bounded local SPH.
+- Historical non-transient SPH save data remains loadable for compatibility,
+  but the target architecture is temporary local SPH that settles conserved
+  volume back into canonical cells rather than permanent SPH world storage.
 - Settled SPH conversion is transactional: if nearby canonical cells cannot
   hold the complete body, partial writes roll back and the body retries later.
-- Vanilla performs the bucket interaction first for permissions, inventory,
-  sounds, and game events; persistent SPH then owns that exact mobile volume
-  until it settles into the chunk-persistent canonical state.
-- If the SPH body budget is completely full, the placed bucket stays as visible
-  canonical projected water instead of being removed into a ghost allocation.
 - Vanilla fluid levels remain a deliberately lossy compatibility projection
   for swimming, waterlogging boundaries, redstone, and unintegrated mods.
 
@@ -266,8 +270,9 @@ Implemented foundation:
 
 - Water volume, velocity, provenance, temperature, and revision are stored in
   sparse chunk-persistent cells using 4,096 units per full block.
-- Buckets become conserved persistent SPH volume, then materialize into exact
-  canonical cell volume after settling instead of leaving a duplicate source.
+- Buckets become exact canonical cell volume immediately. Flat-ground bucket
+  water sleeps as a stable local reservoir; ledges, drains, leaks, and nearby
+  active water wake it into finite-volume flow.
 - Disturbed cells use a bounded finite-volume queue; vanilla ticks are
   suppressed only for tracked canonical cells so a second solver cannot mutate
   owned state while untracked mod or vanilla water keeps normal behavior.

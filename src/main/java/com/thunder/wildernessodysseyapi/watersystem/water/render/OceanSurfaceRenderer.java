@@ -169,7 +169,7 @@ public final class OceanSurfaceRenderer {
             int nearRadius,
             int farRadius
     ) {
-        float waveBlend = smoothStep(0.35f, 4.0f, patch.depth);
+        float waveBlend = 0.25f + smoothStep(0.35f, 4.0f, patch.depth) * 0.75f;
         int waveLimit = WaterRenderingConfig.waveTrainLimit(patch.waterType);
         GerstnerWaveProfile waveProfile = profileFor(patch.waterType);
         float localTideOffset = patch.waterType == WaterBodyClassifier.WaterType.OCEAN
@@ -254,7 +254,13 @@ public final class OceanSurfaceRenderer {
         // this render mesh height-only; entity physics still uses orbital
         // velocity from the same wave sample.
         float x = baseX;
-        float y = baseY + sample.height() + 0.002f;
+        float transientDisplacement = WaterSurfaceDisplacement.sampleHeight(
+                level,
+                baseX,
+                baseZ,
+                timeSeconds * 20.0f
+        );
+        float y = baseY + sample.height() + transientDisplacement + 0.002f;
         float z = baseZ;
         int light = waterLight(level, x, y, z);
         return new VertexData(x, y, z, sample.normalX(), sample.normalY(), sample.normalZ(), color, light);

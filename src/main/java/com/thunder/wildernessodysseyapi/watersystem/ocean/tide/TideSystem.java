@@ -3,133 +3,139 @@ package com.thunder.wildernessodysseyapi.watersystem.ocean.tide;
 import net.minecraft.world.level.Level;
 
 /**
- * TideSystem
- * <p>
- * Calculates the current tide height offset based on the Minecraft
- * moon phase (0–7) and time-of-day, producing a smooth tidal cycle.
- * <p>
- * Minecraft moon phases:
- *   0 = Full moon     → highest tide (spring tide)
- *   1 = Waning gibbous
- *   2 = Last quarter
- *   3 = Waning crescent
- *   4 = New moon      → second highest (spring tide)
- *   5 = Waxing crescent
- *   6 = First quarter → lowest tide (neap tide)
- *   7 = Waxing gibbous
- * <p>
- * Tidal model:
- *   - Spring tides at full + new moon (phases 0, 4) → ±MAX_SPRING blocks
- *   - Neap tides at quarter moons (phases 2, 6) → ±MAX_NEAP blocks
- *   - Two tidal cycles per Minecraft day (semidiurnal tide)
- *   - Tide height = lunar_amplitude(phase) * sin(2 * dayFraction * 2π)
+ * Computes moon-phase-driven ocean tides for Wilderness water.
+ *
+ * <p>The model keeps the gameplay cost tiny: it samples synchronized Minecraft
+ * world time and moon phase, then returns a deterministic semidiurnal tide.
+ * Full and new moons create spring tides, quarter moons create neap tides, and
+ * the tide timing drifts through the lunar cycle so each moon phase has a
+ * distinct ocean feel.</p>
  */
-public class TideSystem {
+public final class TideSystem {
 
-    // Maximum tide rise/fall during spring tides (blocks)
+    /** Maximum tide rise/fall during spring tides, in blocks. */
     public static final float MAX_SPRING_AMPLITUDE = 1.8f;
+    /** Maximum tide rise/fall during neap tides, in blocks. */
+    public static final float MAX_NEAP_AMPLITUDE = 0.6f;
 
-    // Maximum tide rise/fall during neap tides (blocks)
-    public static final float MAX_NEAP_AMPLITUDE   = 0.6f;
+    private static final float TICKS_PER_DAY = 24_000.0f;
+    private static final float LUNAR_PHASES = 8.0f;
+    private static final float TIDAL_CYCLES_PER_DAY = 2.0f;
+    private static final float TWO_PI = (float) (Math.PI * 2.0);
 
-    // One Minecraft day = 24000 ticks
-    private static final float TICKS_PER_DAY = 24000f;
-
-    // Two high tides per day (semidiurnal)
-    private static final float TIDAL_CYCLES_PER_DAY = 2f;
+    private TideSystem() {
+    }
 
     /**
-     * Get the current tide height offset in blocks.
-     * Positive = high tide (water higher), negative = low tide.
+     * Returns the current tide height offset in blocks.
      *
-     * @param level  the world (used for day time + moon phase)
-     * @return       Y offset in blocks
+     * <p>Positive values are high tide; negative values are low tide.</p>
      */
     public static float getTideOffset(Level level) {
-        int moonPhase = level.getMoonPhase();           // 0–7
-        long dayTime  = level.getDayTime() % (long)TICKS_PER_DAY;
-
-        float lunarAmplitude = getLunarAmplitude(moonPhase);
-        float dayFraction    = dayTime / TICKS_PER_DAY; // 0 → 1
-
-        // Semidiurnal: two complete cycles per day
-        float tideAngle = dayFraction * TIDAL_CYCLES_PER_DAY * 2f * (float)Math.PI;
-        return lunarAmplitude * (float)Math.sin(tideAngle);
+        return sample(level).offset();
     }
 
     /**
-     * Get the rate of tide change (blocks/second) — used for current strength.
-     * Derivative of getTideOffset with respect to time.
+     * Returns the current tide velocity in blocks per second.
+     *
+     * <p>This is the main signal used for tidal current strength. It ignores
+     * the tiny derivative of the slowly changing spring/neap amplitude because
+     * gameplay currents should follow flood/ebb motion, not the week-scale
+     * amplitude envelope.</p>
      */
     public static float getTideRate(Level level) {
-        int moonPhase = level.getMoonPhase();
-        long dayTime  = level.getDayTime() % (long)TICKS_PER_DAY;
-
-        float lunarAmplitude = getLunarAmplitude(moonPhase);
-        float dayFraction    = dayTime / TICKS_PER_DAY;
-
-        float tideAngle = dayFraction * TIDAL_CYCLES_PER_DAY * 2f * (float)Math.PI;
-        float dAngleDt  = TIDAL_CYCLES_PER_DAY * 2f * (float)Math.PI / TICKS_PER_DAY * 20f; // per second
-        return lunarAmplitude * dAngleDt * (float)Math.cos(tideAngle);
+        return sample(level).rate();
     }
 
-    /**
-     * Get a [0, 1] visual indicator of current tide level.
-     * 1.0 = highest possible tide, 0.0 = lowest possible tide.
-     */
+    /** Returns a normalized 0..1 display value for the current tide height. */
     public static float getTideNormalised(Level level) {
-        return (getTideOffset(level) / MAX_SPRING_AMPLITUDE) * 0.5f + 0.5f;
+        return sample(level).normalised();
     }
 
-    /**
-     * Get descriptive tide name for display (e.g. HUD or debug).
-     */
+    /** Returns a short descriptive tide name for HUD/debug display. */
     public static String getTideName(Level level) {
-        float offset = getTideOffset(level);
-        float rate   = getTideRate(level);
-        int phase    = level.getMoonPhase();
+        TideSample sample = sample(level);
+        String typeName = sample.springFactor() > 0.72f
+                ? "Spring"
+                : sample.springFactor() < 0.28f
+                        ? "Neap"
+                        : "Mixed";
 
-        String typeName = (phase == 0 || phase == 4) ? "Spring" : 
-                          (phase == 2 || phase == 6) ? "Neap" : "Mixed";
-
-        if (Math.abs(rate) < 0.001f) {
-            return typeName + (offset > 0 ? " High Tide" : " Low Tide");
+        if (Math.abs(sample.rate()) < 0.001f) {
+            return typeName + (sample.offset() > 0.0f ? " High Tide" : " Low Tide");
         }
-        return typeName + (rate > 0 ? " Flooding" : " Ebbing");
+        return typeName + (sample.rate() > 0.0f ? " Flooding" : " Ebbing");
     }
 
     /**
-     * Returns the tidal direction vector (normalised XZ) for ocean current.
-     * During flooding tide the current flows inland (positive Z axis by convention).
-     * During ebbing tide it flows seaward.
+     * Returns the simplified tidal current direction in X/Z.
+     *
+     * <p>The current reverses during ebb and flood. Shore systems can blend
+     * this with their local coastline normal later; this global vector is a
+     * cheap deterministic fallback.</p>
      */
     public static float[] getTidalCurrentDirection(Level level) {
-        float rate = getTideRate(level);
-        // Simplified: tidal current runs along Z axis, reversed by ebb/flood
-        float sign = rate > 0 ? 1f : -1f;
-        return new float[]{ 0f, sign };
+        float sign = getTideRate(level) > 0.0f ? 1.0f : -1.0f;
+        return new float[]{0.0f, sign};
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
+    /** Returns a complete tide sample for renderers, physics, HUDs, and tests. */
+    public static TideSample sample(Level level) {
+        long dayTime = Math.max(0L, level.getDayTime());
+        float dayFraction = (dayTime % (long) TICKS_PER_DAY) / TICKS_PER_DAY;
+        float lunarPhase = fractionalMoonPhase(level, dayFraction);
+        float springFactor = lunarSpringFactor(lunarPhase);
+        float amplitude = MAX_NEAP_AMPLITUDE
+                + springFactor * (MAX_SPRING_AMPLITUDE - MAX_NEAP_AMPLITUDE);
 
-    /**
-     * Map moon phase (0–7) to a tidal amplitude.
-     * Uses a cosine interpolation between spring and neap.
-     * <p>
-     * Phase 0 (full) and phase 4 (new) → spring tide (max amplitude)
-     * Phase 2 and phase 6 (quarters)    → neap tide (min amplitude)
-     */
-    private static float getLunarAmplitude(int moonPhase) {
-        // Normalise phase to 0–2π (one full lunar cycle)
-        float angle = moonPhase / 8f * 2f * (float)Math.PI;
+        // Real tides lag the moon. This phase offset makes each Minecraft moon
+        // phase shift high/low tide timing instead of only changing amplitude.
+        float lunarTimingOffset = lunarPhase / LUNAR_PHASES * TWO_PI;
+        float tideAngle = dayFraction * TIDAL_CYCLES_PER_DAY * TWO_PI + lunarTimingOffset;
+        float offset = amplitude * (float) Math.sin(tideAngle);
+        float anglePerSecond = TIDAL_CYCLES_PER_DAY * TWO_PI / TICKS_PER_DAY * 20.0f;
+        float rate = amplitude * anglePerSecond * (float) Math.cos(tideAngle);
+        float normalised = clamp01((offset / MAX_SPRING_AMPLITUDE) * 0.5f + 0.5f);
 
-        // cos²(angle/2) maps: 0→1, π/2→0.5, π→0, ...  then re-map to [neap, spring]
-        // Absolute alignment is maximal at both full and new moon and minimal
-        // at both quarter moons, matching the real spring-neap tide cycle.
-        float normalised = Math.abs((float) Math.cos(angle));
+        return new TideSample(
+                offset,
+                rate,
+                amplitude,
+                normalised,
+                level.getMoonPhase(),
+                springFactor,
+                tideAngle
+        );
+    }
 
-        return MAX_NEAP_AMPLITUDE + normalised * (MAX_SPRING_AMPLITUDE - MAX_NEAP_AMPLITUDE);
+    /** Returns the spring/neap amplitude for a discrete Minecraft moon phase. */
+    public static float getLunarAmplitude(int moonPhase) {
+        float springFactor = lunarSpringFactor(Math.floorMod(moonPhase, (int) LUNAR_PHASES));
+        return MAX_NEAP_AMPLITUDE + springFactor * (MAX_SPRING_AMPLITUDE - MAX_NEAP_AMPLITUDE);
+    }
+
+    private static float fractionalMoonPhase(Level level, float dayFraction) {
+        return Math.floorMod(level.getMoonPhase(), (int) LUNAR_PHASES) + dayFraction;
+    }
+
+    private static float lunarSpringFactor(float moonPhase) {
+        float angle = moonPhase / LUNAR_PHASES * TWO_PI;
+        return Math.abs((float) Math.cos(angle));
+    }
+
+    private static float clamp01(float value) {
+        return Math.max(0.0f, Math.min(1.0f, value));
+    }
+
+    /** Immutable tide sample for one world tick. */
+    public record TideSample(
+            float offset,
+            float rate,
+            float amplitude,
+            float normalised,
+            int moonPhase,
+            float springFactor,
+            float tideAngle
+    ) {
     }
 }

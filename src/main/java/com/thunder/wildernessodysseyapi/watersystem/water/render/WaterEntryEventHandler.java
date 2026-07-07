@@ -49,6 +49,7 @@ public class WaterEntryEventHandler {
 
             spawnSplashParticles(entity, x, y, z);
             RippleRenderer.spawnRipple(x, y, z);
+            WaterSurfaceDisplacement.spawnImpact(entity, x, z);
         }
 
         wasInWater.put(entity, inWaterNow);

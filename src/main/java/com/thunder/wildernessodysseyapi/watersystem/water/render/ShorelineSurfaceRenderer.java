@@ -346,7 +346,7 @@ public final class ShorelineSurfaceRenderer {
         float fillWave = smoothStep(0.12f, 1.0f, patch.fillFraction);
         float flowChop = smoothStep(0.05f, 0.65f, flowSpeed) * 0.16f;
         float waveBlend = smoothStep(0.25f, 3.5f, patch.depth)
-                * (0.12f + fillWave * 0.33f + flowChop)
+                * (0.18f + fillWave * 0.42f + flowChop)
                 * Math.min(1.0f, visualStrength);
         int color = opticalColor(level, patch.x + 0.5f, patch.surfaceY, patch.z + 0.5f,
                 patch.depth, patch.edgeStrength, patch.fullWater, patch.fillFraction, flowSpeed, visualStrength);
@@ -388,7 +388,13 @@ public final class ShorelineSurfaceRenderer {
                 .sampleAt(advectedX, advectedZ, timeSeconds, waveLimit, spectrum)
                 .withHeightOffset(tideOffset)
                 .attenuated(waveBlend);
-        float surfaceY = y + sample.height();
+        float transientDisplacement = WaterSurfaceDisplacement.sampleHeight(
+                level,
+                x,
+                z,
+                timeSeconds * 20.0f
+        );
+        float surfaceY = y + sample.height() + transientDisplacement;
         float textureU = x * UV_SCALE - clampedFlowX * timeSeconds * 0.08f;
         float textureV = z * UV_SCALE - clampedFlowZ * timeSeconds * 0.08f;
         return new VertexData(
