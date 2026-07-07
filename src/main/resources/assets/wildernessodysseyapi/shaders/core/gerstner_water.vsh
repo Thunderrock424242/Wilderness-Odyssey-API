@@ -22,6 +22,8 @@ out vec2 texCoord0;
 out vec3 lightColor;
 out vec3 viewPosition;
 out vec3 viewNormal;
+out vec3 worldPosition;
+out vec3 worldNormal;
 out vec3 celestialDirection;
 out float celestialDaylight;
 
@@ -29,6 +31,8 @@ void main() {
     vec4 view = ModelViewMat * vec4(Position, 1.0);
     viewPosition = view.xyz;
     viewNormal = normalize(mat3(ModelViewMat) * Normal);
+    worldPosition = Position;
+    worldNormal = normalize(Normal);
     float celestialAngle = DayTime * 6.28318530718;
     vec3 sunDirection = normalize(vec3(cos(celestialAngle), sin(celestialAngle), 0.20));
     celestialDaylight = step(0.0, sunDirection.y);

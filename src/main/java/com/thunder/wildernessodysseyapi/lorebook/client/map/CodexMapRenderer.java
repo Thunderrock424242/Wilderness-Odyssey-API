@@ -58,12 +58,6 @@ public final class CodexMapRenderer {
             renderControls(graphics, font, x + width - 47, y + height - 18, mouseX, mouseY);
             return;
         }
-        if (config.normalizedBaseUrl().isBlank() || config.normalizedTemplate().isBlank()) {
-            renderCenteredStatus(graphics, font, mapX, mapY, mapW, mapH, "BlueMap URL not configured", WARNING_INK);
-            renderFooter(graphics, font, player, config, x, y + height - 16, width);
-            renderControls(graphics, font, x + width - 47, y + height - 18, mouseX, mouseY);
-            return;
-        }
 
         renderTiles(graphics, font, player, config, mapX + 4, mapY + 4, mapW - 8, mapH - 8);
         renderFooter(graphics, font, player, config, x, y + height - 16, width);
@@ -121,39 +115,48 @@ public final class CodexMapRenderer {
         double scale = displayScale();
         int centerScreenX = x + width / 2;
         int centerScreenY = y + height / 2;
+        boolean tileSourceConfigured = !config.normalizedBaseUrl().isBlank()
+                && !config.normalizedMapId().isBlank()
+                && !config.normalizedTemplate().isBlank();
         boolean sawReadyTile = false;
-        String lastStatus = "Waiting for BlueMap";
+        boolean sawError = false;
+        boolean sawRequesting = false;
+        String lastStatus = "";
 
         graphics.enableScissor(x, y, x + width, y + height);
         renderMapBackground(graphics, x, y, width, height);
 
-        for (int dz = -config.tileRadius(); dz <= config.tileRadius(); dz++) {
-            for (int dx = -config.tileRadius(); dx <= config.tileRadius(); dx++) {
-                BlueMapTileAddress address = center.offset(dx, dz);
-                BlueMapTileClient.TileEntry entry = BlueMapTileClient.get().request(address, config);
-                int drawSize = Math.max(1, (int) Math.round(tilePixelSize * scale));
-                int drawX = (int) Math.round(centerScreenX + ((dx * tilePixelSize) - playerPixelX) * scale);
-                int drawY = (int) Math.round(centerScreenY + ((dz * tilePixelSize) - playerPixelZ) * scale);
+        if (tileSourceConfigured) {
+            for (int dz = -config.tileRadius(); dz <= config.tileRadius(); dz++) {
+                for (int dx = -config.tileRadius(); dx <= config.tileRadius(); dx++) {
+                    BlueMapTileAddress address = center.offset(dx, dz);
+                    BlueMapTileClient.TileEntry entry = BlueMapTileClient.get().request(address, config);
+                    int drawSize = Math.max(1, (int) Math.round(tilePixelSize * scale));
+                    int drawX = (int) Math.round(centerScreenX + ((dx * tilePixelSize) - playerPixelX) * scale);
+                    int drawY = (int) Math.round(centerScreenY + ((dz * tilePixelSize) - playerPixelZ) * scale);
 
-                var texture = BlueMapTileClient.get().textureFor(entry);
-                if (texture != null) {
-                    graphics.blit(
-                            texture,
-                            drawX,
-                            drawY,
-                            0.0F,
-                            0.0F,
-                            drawSize,
-                            drawSize,
-                            drawSize,
-                            drawSize
-                    );
-                    sawReadyTile = true;
-                } else if (entry.state() == BlueMapTileClient.TileState.ERROR) {
-                    lastStatus = entry.status();
-                    graphics.fill(drawX, drawY, drawX + drawSize, drawY + drawSize, 0x331F0D0D);
-                } else {
-                    graphics.fill(drawX, drawY, drawX + drawSize, drawY + drawSize, 0x221E3238);
+                    var texture = BlueMapTileClient.get().textureFor(entry);
+                    if (texture != null) {
+                        graphics.blit(
+                                texture,
+                                drawX,
+                                drawY,
+                                0.0F,
+                                0.0F,
+                                drawSize,
+                                drawSize,
+                                drawSize,
+                                drawSize
+                        );
+                        sawReadyTile = true;
+                    } else if (entry.state() == BlueMapTileClient.TileState.ERROR) {
+                        sawError = true;
+                        lastStatus = entry.status();
+                        graphics.fill(drawX, drawY, drawX + drawSize, drawY + drawSize, 0x331F0D0D);
+                    } else {
+                        sawRequesting = true;
+                        graphics.fill(drawX, drawY, drawX + drawSize, drawY + drawSize, 0x221E3238);
+                    }
                 }
             }
         }
@@ -165,7 +168,7 @@ public final class CodexMapRenderer {
 
         BlueMapTileClient.get().trimTo(config.cacheTiles());
         if (!sawReadyTile) {
-            renderCenteredStatus(graphics, font, x, y, width, height, lastStatus, FADED_INK);
+            renderTileHint(graphics, font, x, y, tileSourceConfigured, sawRequesting, sawError, lastStatus);
         }
     }
 
@@ -280,6 +283,38 @@ public final class CodexMapRenderer {
             int color
     ) {
         graphics.drawCenteredString(font, Component.literal(status), x + width / 2, y + height / 2 - 4, color);
+    }
+
+    private void renderTileHint(
+            GuiGraphics graphics,
+            Font font,
+            int x,
+            int y,
+            boolean tileSourceConfigured,
+            boolean sawRequesting,
+            boolean sawError,
+            String lastStatus
+    ) {
+        String line1;
+        String line2;
+        if (!tileSourceConfigured) {
+            line1 = "Field grid active";
+            line2 = "BlueMap markers synced";
+        } else if (sawError) {
+            line1 = "Field grid active";
+            line2 = "Tiles: " + (lastStatus == null || lastStatus.isBlank() ? "not ready" : lastStatus);
+        } else if (sawRequesting) {
+            line1 = "Loading BlueMap tiles";
+            line2 = "Field grid active";
+        } else {
+            line1 = "Field grid active";
+            line2 = "Waiting for map data";
+        }
+
+        int width = Math.max(font.width(line1), font.width(line2)) + 10;
+        graphics.fill(x + 5, y + 5, x + 5 + width, y + 28, 0xAA081015);
+        graphics.drawString(font, Component.literal(line1), x + 10, y + 9, 0xFFEAD7AE, false);
+        graphics.drawString(font, Component.literal(line2), x + 10, y + 19, FADED_INK, false);
     }
 
     private double displayScale() {

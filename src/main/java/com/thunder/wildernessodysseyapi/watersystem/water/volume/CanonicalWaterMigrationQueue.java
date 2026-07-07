@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.volume;
 import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -12,9 +13,12 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -214,6 +218,113 @@ public final class CanonicalWaterMigrationQueue {
                 QUEUE.size()
         );
         return lastVisibleFinalization;
+    }
+
+    /**
+     * Finalizes starter-bunker water before the first player sees the world.
+     *
+     * <p>This is the one deliberately blocking water takeover path. It runs
+     * only during initial spawn/bunker creation, may synchronously load a
+     * bounded chunk radius, and then uses the same seeder/finalized markers as
+     * normal migration. Any chunks not completed before the soft timeout are
+     * priority-queued for the regular budgeted tick path.</p>
+     *
+     * @param level overworld being prepared
+     * @param center block center of the starter bunker area
+     * @return summary for startup logs and diagnostics
+     */
+    public static synchronized SpawnPreFinalizationResult preFinalizeSpawnArea(
+            ServerLevel level,
+            BlockPos center
+    ) {
+        if (!WaterSimulationConfig.spawnWaterPreFinalizationEnabled()) {
+            return SpawnPreFinalizationResult.disabled(QUEUE.size());
+        }
+
+        int radius = WaterSimulationConfig.spawnWaterPreFinalizationRadiusChunks();
+        int maxChunks = WaterSimulationConfig.spawnWaterPreFinalizationMaxChunks();
+        int timeoutMs = WaterSimulationConfig.spawnWaterPreFinalizationTimeoutMs();
+        boolean allowBlockConversion = WaterSimulationConfig.convertSeededWorldWaterToWilderness();
+        List<ChunkPos> candidates = spawnAreaChunkCandidates(new ChunkPos(center), radius, maxChunks);
+        long startNanos = System.nanoTime();
+        long timeoutNanos = timeoutMs <= 0 ? Long.MAX_VALUE : timeoutMs * 1_000_000L;
+
+        int touched = 0;
+        int completed = 0;
+        int skippedFinalized = 0;
+        int queuedUnfinished = 0;
+        boolean timedOut = false;
+        CanonicalWaterSeeder.SeedStats totalStats = CanonicalWaterSeeder.SeedStats.EMPTY;
+
+        for (int index = 0; index < candidates.size(); index++) {
+            if (timedOut(startNanos, timeoutNanos, touched)) {
+                timedOut = true;
+                queuedUnfinished += queueRemainingSpawnChunks(level, candidates, index);
+                break;
+            }
+
+            ChunkPos chunkPos = candidates.get(index);
+            removeQueuedTask(key(level.dimension(), chunkPos));
+            LevelChunk chunk = level.getChunk(chunkPos.x, chunkPos.z);
+            if (isChunkWaterFinalized(chunk)) {
+                skippedFinalized++;
+                skippedFinalizedChunks++;
+                continue;
+            }
+
+            CanonicalWaterSeeder.SeedSlice slice = CanonicalWaterSeeder.seedChunkSlice(
+                    level,
+                    chunk,
+                    WaterSimulationConfig.worldSeedMaxColumnDepth(),
+                    0,
+                    16 * 16,
+                    allowBlockConversion ? Integer.MAX_VALUE : 0,
+                    allowBlockConversion
+            );
+            CanonicalWaterSeeder.SeedStats sliceStats = slice.stats().countedChunk();
+            totalStats = totalStats.plus(sliceStats);
+            touched++;
+            if (slice.complete()) {
+                markChunkWaterFinalized(chunk);
+                completed++;
+            } else if (queueTask(new MigrationTask(level.dimension(), chunkPos, slice.nextColumnIndex(), true))) {
+                queuedUnfinished++;
+            }
+        }
+
+        touchedChunks += touched;
+        completedChunks += completed;
+        importedCells += totalStats.importedCells();
+        hostedWaterCells += totalStats.hostedWaterCells();
+        convertedBlocks += totalStats.convertedBlocks();
+        lastTick = new TickResult(
+                touched,
+                completed,
+                totalStats.scannedColumns(),
+                totalStats.importedCells(),
+                totalStats.hostedWaterCells(),
+                totalStats.convertedBlocks(),
+                0,
+                QUEUE.size()
+        );
+
+        long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+        return new SpawnPreFinalizationResult(
+                true,
+                radius,
+                candidates.size(),
+                touched,
+                completed,
+                skippedFinalized,
+                queuedUnfinished,
+                totalStats.scannedColumns(),
+                totalStats.importedCells(),
+                totalStats.hostedWaterCells(),
+                totalStats.convertedBlocks(),
+                elapsedMs,
+                timedOut,
+                QUEUE.size()
+        );
     }
 
     private static boolean queueTask(MigrationTask task) {
@@ -617,6 +728,46 @@ public final class CanonicalWaterMigrationQueue {
         }
     }
 
+    private static List<ChunkPos> spawnAreaChunkCandidates(ChunkPos center, int radius, int maxChunks) {
+        int boundedRadius = Math.max(0, radius);
+        int boundedMaxChunks = Math.max(1, maxChunks);
+        List<ChunkPos> candidates = new ArrayList<>((boundedRadius * 2 + 1) * (boundedRadius * 2 + 1));
+        for (int chunkX = center.x - boundedRadius; chunkX <= center.x + boundedRadius; chunkX++) {
+            for (int chunkZ = center.z - boundedRadius; chunkZ <= center.z + boundedRadius; chunkZ++) {
+                candidates.add(new ChunkPos(chunkX, chunkZ));
+            }
+        }
+        candidates.sort(Comparator
+                .comparingInt((ChunkPos pos) -> distanceSquared(center, pos))
+                .thenComparingInt(pos -> Math.abs(pos.x - center.x) + Math.abs(pos.z - center.z))
+                .thenComparingInt(pos -> pos.x)
+                .thenComparingInt(pos -> pos.z));
+        if (candidates.size() <= boundedMaxChunks) {
+            return candidates;
+        }
+        return new ArrayList<>(candidates.subList(0, boundedMaxChunks));
+    }
+
+    private static int distanceSquared(ChunkPos center, ChunkPos pos) {
+        int deltaX = pos.x - center.x;
+        int deltaZ = pos.z - center.z;
+        return deltaX * deltaX + deltaZ * deltaZ;
+    }
+
+    private static boolean timedOut(long startNanos, long timeoutNanos, int touchedChunks) {
+        return touchedChunks > 0 && System.nanoTime() - startNanos >= timeoutNanos;
+    }
+
+    private static int queueRemainingSpawnChunks(ServerLevel level, List<ChunkPos> candidates, int startIndex) {
+        int queued = 0;
+        for (int index = startIndex; index < candidates.size(); index++) {
+            if (enqueue(level, candidates.get(index), true)) {
+                queued++;
+            }
+        }
+        return queued;
+    }
+
     private static String key(ResourceKey<Level> dimension, ChunkPos pos) {
         return dimension.location() + ":" + pos.x + ":" + pos.z;
     }
@@ -689,5 +840,42 @@ public final class CanonicalWaterMigrationQueue {
             long droppedChunks,
             TickResult lastTick
     ) {
+    }
+
+    /** Summary returned by the blocking starter-bunker water takeover pass. */
+    public record SpawnPreFinalizationResult(
+            boolean enabled,
+            int radiusChunks,
+            int candidateChunks,
+            int touchedChunks,
+            int completedChunks,
+            int skippedFinalizedChunks,
+            int queuedUnfinishedChunks,
+            int scannedColumns,
+            int importedCells,
+            int hostedWaterCells,
+            int convertedBlocks,
+            long elapsedMs,
+            boolean timedOut,
+            int queuedChunks
+    ) {
+        private static SpawnPreFinalizationResult disabled(int queuedChunks) {
+            return new SpawnPreFinalizationResult(
+                    false,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0L,
+                    false,
+                    queuedChunks
+            );
+        }
     }
 }

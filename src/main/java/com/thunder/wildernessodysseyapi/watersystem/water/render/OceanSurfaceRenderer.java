@@ -310,12 +310,12 @@ public final class OceanSurfaceRenderer {
         // Keep the replacement surface optically water-colored even over dark
         // ocean floors. The shader still applies depth, light, and Fresnel, but
         // the base medium should not become black transparent terrain cutouts.
-        float shallowR = 0.10f + tintR * 0.40f;
-        float shallowG = 0.52f + tintG * 0.30f;
-        float shallowB = 0.70f + tintB * 0.28f;
-        float deepR = 0.04f + tintR * 0.18f;
-        float deepG = 0.25f + tintG * 0.18f;
-        float deepB = 0.52f + tintB * 0.24f;
+        float shallowR = 0.06f + tintR * 0.32f;
+        float shallowG = 0.56f + tintG * 0.24f;
+        float shallowB = 0.82f + tintB * 0.16f;
+        float deepR = 0.015f + tintR * 0.12f;
+        float deepG = 0.20f + tintG * 0.18f;
+        float deepB = 0.44f + tintB * 0.32f;
         float red = mix(shallowR, deepR, absorption);
         float green = mix(shallowG, deepG, absorption);
         float blue = mix(shallowB, deepB, absorption);
@@ -324,8 +324,8 @@ public final class OceanSurfaceRenderer {
         red = mix(red, 0.86f, foam);
         green = mix(green, 0.94f, foam);
         blue = mix(blue, 1.0f, foam);
-        float baseAlpha = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.72f : 0.46f;
-        float depthAlpha = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.18f : 0.10f;
+        float baseAlpha = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.76f : 0.50f;
+        float depthAlpha = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.22f : 0.12f;
         float alpha = (baseAlpha + absorption * depthAlpha + foam * 0.05f)
                 * WaterRenderingConfig.surfaceOpacityStrength()
                 * Math.max(0.0f, Math.min(1.0f, alphaScale));

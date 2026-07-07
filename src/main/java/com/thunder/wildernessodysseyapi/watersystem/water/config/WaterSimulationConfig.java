@@ -26,6 +26,10 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.BooleanValue AUTOMATIC_MIGRATION_FOLLOW_PLAYER_VIEW_DISTANCE;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_VIEW_DISTANCE_PADDING_CHUNKS;
     public static final ModConfigSpec.IntValue AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS;
+    public static final ModConfigSpec.BooleanValue ENABLE_SPAWN_WATER_PRE_FINALIZATION;
+    public static final ModConfigSpec.IntValue SPAWN_WATER_PRE_FINALIZATION_RADIUS_CHUNKS;
+    public static final ModConfigSpec.IntValue SPAWN_WATER_PRE_FINALIZATION_MAX_CHUNKS;
+    public static final ModConfigSpec.IntValue SPAWN_WATER_PRE_FINALIZATION_TIMEOUT_MS;
     public static final ModConfigSpec.BooleanValue ENABLE_VISIBLE_CHUNK_WATER_FINALIZATION;
     public static final ModConfigSpec.IntValue VISIBLE_FINALIZATION_CHUNKS_PER_TICK;
     public static final ModConfigSpec.IntValue VISIBLE_FINALIZATION_COLUMNS_PER_TICK;
@@ -89,6 +93,18 @@ public final class WaterSimulationConfig {
         AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS = builder
                 .comment("How often automatic water migration rescans already-loaded chunks around players.")
                 .defineInRange("automaticMigrationPlayerScanIntervalTicks", 20, 10, 600);
+        ENABLE_SPAWN_WATER_PRE_FINALIZATION = builder
+                .comment("During initial starter-bunker world creation, synchronously finalize nearby generated water into Wilderness water before the player sees spawn. This can make Create World / Joining World slower, but prevents visible live migration around the bunker.")
+                .define("enableSpawnWaterPreFinalization", true);
+        SPAWN_WATER_PRE_FINALIZATION_RADIUS_CHUNKS = builder
+                .comment("Chunk radius around the starter bunker that may be synchronously water-finalized during world creation.")
+                .defineInRange("spawnWaterPreFinalizationRadiusChunks", 5, 1, 12);
+        SPAWN_WATER_PRE_FINALIZATION_MAX_CHUNKS = builder
+                .comment("Hard cap for starter-bunker water pre-finalization chunks. Closest chunks are processed first so this safely bounds first-load cost.")
+                .defineInRange("spawnWaterPreFinalizationMaxChunks", 121, 1, 625);
+        SPAWN_WATER_PRE_FINALIZATION_TIMEOUT_MS = builder
+                .comment("Soft timeout for starter-bunker water pre-finalization. Zero disables the timeout; unfinished chunks remain in the normal priority migration queue.")
+                .defineInRange("spawnWaterPreFinalizationTimeoutMs", 10_000, 0, 120_000);
         ENABLE_VISIBLE_CHUNK_WATER_FINALIZATION = builder
                 .comment("Finalize generated plain water into Wilderness water when a loaded chunk starts being watched by a player. Work remains bounded per tick so world creation and chunk sending do not stall.")
                 .define("enableVisibleChunkWaterFinalization", true);
@@ -218,6 +234,28 @@ public final class WaterSimulationConfig {
     public static int automaticMigrationPlayerScanIntervalTicks() {
         int configured = AUTOMATIC_MIGRATION_PLAYER_SCAN_INTERVAL_TICKS.get();
         return automaticMigrationFollowsPlayerViewDistance() ? Math.min(20, configured) : configured;
+    }
+
+    /** Returns whether the starter-bunker area should be finalized while the world is still loading. */
+    public static boolean spawnWaterPreFinalizationEnabled() {
+        return ENABLE_SPAWN_WATER_PRE_FINALIZATION.get()
+                && ENABLE_CANONICAL_WORLD_SEEDING.get()
+                && convertSeededWorldWaterToWilderness();
+    }
+
+    /** Returns the configured starter-bunker pre-finalization chunk radius. */
+    public static int spawnWaterPreFinalizationRadiusChunks() {
+        return SPAWN_WATER_PRE_FINALIZATION_RADIUS_CHUNKS.get();
+    }
+
+    /** Returns the maximum starter-bunker chunks that may be finalized in one blocking load pass. */
+    public static int spawnWaterPreFinalizationMaxChunks() {
+        return SPAWN_WATER_PRE_FINALIZATION_MAX_CHUNKS.get();
+    }
+
+    /** Returns the soft timeout for starter-bunker pre-finalization. Zero means no timeout. */
+    public static int spawnWaterPreFinalizationTimeoutMs() {
+        return SPAWN_WATER_PRE_FINALIZATION_TIMEOUT_MS.get();
     }
 
     /** Returns whether watched chunks should get a bounded pre-visibility water finalization pass. */

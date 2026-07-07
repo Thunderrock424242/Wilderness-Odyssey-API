@@ -204,6 +204,11 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
 - Fresnel reflection based on view angle.
 - Beer-Lambert absorption using estimated water depth.
 - Normal-driven sun and moon specular highlights.
+- The built-in surface shader treats the vanilla atlas as only a subtle material
+  hint. Procedural wind-aligned micro-ripples, denser depth color, brighter
+  glancing Fresnel, and sharper celestial highlights carry the default look so
+  Wilderness water reads as a smooth cinematic surface instead of re-skinned
+  vanilla water.
 - CPU optical color remains active in the shader-pack compatibility path.
 - The built-in shader adds angle-dependent Fresnel, animated shimmer, lightmap
   response, and fog without becoming mandatory for startup.

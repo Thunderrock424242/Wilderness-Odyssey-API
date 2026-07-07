@@ -455,9 +455,9 @@ public final class ShorelineSurfaceRenderer {
                 -Math.max(0.0f, depth) * 0.28f * WaterRenderingConfig.surfaceAbsorptionStrength()
         );
 
-        float red = mix(0.16f + tintR * 0.36f, 0.06f + tintR * 0.20f, absorption);
-        float green = mix(0.58f + tintG * 0.26f, 0.32f + tintG * 0.18f, absorption);
-        float blue = mix(0.76f + tintB * 0.22f, 0.60f + tintB * 0.20f, absorption);
+        float red = mix(0.08f + tintR * 0.30f, 0.02f + tintR * 0.12f, absorption);
+        float green = mix(0.58f + tintG * 0.22f, 0.24f + tintG * 0.18f, absorption);
+        float blue = mix(0.84f + tintB * 0.14f, 0.52f + tintB * 0.28f, absorption);
         float fillFoam = smoothStep(0.0f, 0.85f, 1.0f - fillFraction) * 0.20f;
         float flowFoam = smoothStep(0.08f, 0.70f, flowSpeed) * (0.10f + edgeStrength * 0.18f);
         float foam = Math.max(Math.max(edgeStrength * 0.35f, smoothStep(0.0f, 0.9f, 1.05f - depth)),
@@ -466,10 +466,10 @@ public final class ShorelineSurfaceRenderer {
         red = mix(red, 0.88f, foam);
         green = mix(green, 0.96f, foam);
         blue = mix(blue, 1.0f, foam);
-        float alphaStart = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.50f : 0.28f;
+        float alphaStart = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.54f : 0.32f;
         float alphaEnd = WaterRenderingConfig.suppressVanillaWaterTopFaces()
-                ? fullWater ? 0.78f : 0.66f
-                : fullWater ? 0.52f : 0.44f;
+                ? fullWater ? 0.82f : 0.70f
+                : fullWater ? 0.56f : 0.46f;
         float volumeAlpha = mix(alphaStart, alphaEnd, smoothStep(0.08f, 1.0f, fillFraction));
         float shorelineOpacity = mix(1.0f, WaterRenderingConfig.surfaceOpacityStrength(), 0.55f);
         float alpha = (volumeAlpha + edgeStrength * 0.10f + Math.min(0.06f, flowSpeed * 0.04f))

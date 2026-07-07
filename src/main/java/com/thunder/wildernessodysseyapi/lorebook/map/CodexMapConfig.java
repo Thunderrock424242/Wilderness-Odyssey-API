@@ -40,10 +40,10 @@ public final class CodexMapConfig {
                 .define("mapId", "world");
         TILE_URL_TEMPLATE = builder
                 .comment(
-                        "Tile URL template. Supported placeholders: {base}, {map}, {zoom}, {x}, {z}.",
-                        "Adjust this if your BlueMap web-root stores tiles under a different path."
+                        "Optional PNG tile URL template. Supported placeholders: {base}, {map}, {zoom}, {x}, {z}.",
+                        "BlueMap 5 stores native web tiles as .prbm.gz data, not PNGs, so leave this empty unless you expose a PNG tile proxy."
                 )
-                .define("tileUrlTemplate", "{base}/maps/{map}/tiles/{zoom}/{x}_{z}.png");
+                .define("tileUrlTemplate", "");
         TILE_ZOOM = builder
                 .comment("Tile zoom/detail value inserted into {zoom}. The on-screen +/- controls only scale the loaded tiles.")
                 .defineInRange("tileZoom", 0, 0, 16);
