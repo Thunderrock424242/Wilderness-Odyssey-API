@@ -36,6 +36,8 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.IntValue LOCAL_FLOW_CELLS_PER_TICK;
     public static final ModConfigSpec.DoubleValue LOCAL_FLOW_SLEEP_SPEED;
     public static final ModConfigSpec.IntValue LARGE_BODY_CACHE_MAX_COLUMNS;
+    public static final ModConfigSpec.IntValue WATER_BODY_UPDATES_PER_TICK;
+    public static final ModConfigSpec.IntValue LOCAL_WATER_NETWORK_EVENTS_PER_TICK;
     public static final ModConfigSpec.BooleanValue ENABLE_SERVER_SPH_LOCAL_SIMULATION;
     public static final ModConfigSpec.IntValue SERVER_SPH_MAX_ACTIVE_BODIES;
     public static final ModConfigSpec.IntValue SERVER_SPH_MAX_PARTICLES_PER_BODY;
@@ -117,6 +119,12 @@ public final class WaterSimulationConfig {
         LARGE_BODY_CACHE_MAX_COLUMNS = builder
                 .comment("Maximum derived large-water-body columns persisted per dimension. This is a safe per-world cache, not a second authority.")
                 .defineInRange("largeBodyCacheMaxColumns", 16384, 1024, 262144);
+        WATER_BODY_UPDATES_PER_TICK = builder
+                .comment("Maximum high-level water-body or shoreline-grid regions updated per dimension tick. Large bodies stay as cached metadata; this cap prevents player oceans from becoming full-cell simulation work.")
+                .defineInRange("waterBodyUpdatesPerTick", 6, 1, 64);
+        LOCAL_WATER_NETWORK_EVENTS_PER_TICK = builder
+                .comment("Maximum compact local water visual events, such as SPH splash or shore-wash events, sent per dimension tick. Events are synced instead of individual particles.")
+                .defineInRange("localWaterNetworkEventsPerTick", 32, 0, 512);
         ENABLE_SERVER_SPH_LOCAL_SIMULATION = builder
                 .comment("Allow tiny gameplay-critical SPH bodies for active local water such as waterfalls. Oceans, lakes, rivers, and stored world water never use SPH.")
                 .define("enableServerSphLocalSimulation", true);
@@ -264,6 +272,16 @@ public final class WaterSimulationConfig {
     /** Returns the maximum persisted large-body column cache entries per dimension. */
     public static int largeBodyCacheMaxColumns() {
         return LARGE_BODY_CACHE_MAX_COLUMNS.get();
+    }
+
+    /** Returns how many high-level water-body regions may update in one dimension tick. */
+    public static int waterBodyUpdatesPerTick() {
+        return WATER_BODY_UPDATES_PER_TICK.get();
+    }
+
+    /** Returns how many compact local water network events may be sent in one dimension tick. */
+    public static int localWaterNetworkEventsPerTick() {
+        return LOCAL_WATER_NETWORK_EVENTS_PER_TICK.get();
     }
 
     /** Returns whether server-owned local SPH is allowed for gameplay-critical active water. */

@@ -175,6 +175,8 @@ dependencies {
     implementation "curse.maven:supplementaries-412082:8244187"
     implementation "curse.maven:multipart-machines-cooking-885587:5686941"
     implementation "curse.maven:bluemap-406463:6239407"
+    implementation "curse.maven:sodium-394468:8382328"
+    implementation "curse.maven:irisshaders-455508:8242804"
     jarJar(implementation("org.yaml:snakeyaml:2.2")) {
         version {
             strictly '[2.2,3.0)'

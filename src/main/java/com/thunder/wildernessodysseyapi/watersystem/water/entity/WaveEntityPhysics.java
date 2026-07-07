@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.entity;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.shore.ShorelineWaterManager;
+import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterSurfaceDisplacement;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
@@ -73,6 +74,9 @@ public final class WaveEntityPhysics {
         if (level.isClientSide()) {
             if (entity instanceof Boat boat) {
                 updateBoatVisuals(boat, type);
+                WaterSurfaceDisplacement.spawnEntityWake(boat);
+            } else if (entity instanceof LivingEntity) {
+                WaterSurfaceDisplacement.spawnEntityWake(entity);
             }
             return;
         }
@@ -100,23 +104,66 @@ public final class WaveEntityPhysics {
         float worldX = (float) boat.getX();
         float worldZ = (float) boat.getZ();
         GerstnerWaveProfile profile = profileFor(type);
-        WaveSurfaceSample surface = GerstnerWaveAnimator.getSurfaceSampleAt(worldX, worldZ, type);
-
-        float inverseNormalY = 1.0f / Math.max(0.01f, surface.normalY());
-        float slopeX = -surface.normalX() * inverseNormalY;
-        float slopeZ = -surface.normalZ() * inverseNormalY;
+        Level level = boat.level();
         float yawRadians = (float) Math.toRadians(boat.getYRot());
         float forwardX = -(float) Math.sin(yawRadians);
         float forwardZ = (float) Math.cos(yawRadians);
         float rightX = (float) Math.cos(yawRadians);
         float rightZ = (float) Math.sin(yawRadians);
-        float forwardSlope = slopeX * forwardX + slopeZ * forwardZ;
-        float rightSlope = slopeX * rightX + slopeZ * rightZ;
+        float hullLength = Math.max(1.4f, boat.getBbWidth() * 1.45f);
+        float hullWidth = Math.max(0.9f, boat.getBbWidth() * 0.90f);
 
+        // Match the renderer's height field by sampling the hull footprint
+        // instead of tilting from a single center normal. This keeps boats
+        // aligned with the visible crest/trough under their bow and sides.
+        float centerHeight = renderedSurfaceHeight(level, type, worldX, worldZ);
+        float frontHeight = renderedSurfaceHeight(
+                level,
+                type,
+                worldX + forwardX * hullLength * 0.5f,
+                worldZ + forwardZ * hullLength * 0.5f
+        );
+        float backHeight = renderedSurfaceHeight(
+                level,
+                type,
+                worldX - forwardX * hullLength * 0.5f,
+                worldZ - forwardZ * hullLength * 0.5f
+        );
+        float rightHeight = renderedSurfaceHeight(
+                level,
+                type,
+                worldX + rightX * hullWidth * 0.5f,
+                worldZ + rightZ * hullWidth * 0.5f
+        );
+        float leftHeight = renderedSurfaceHeight(
+                level,
+                type,
+                worldX - rightX * hullWidth * 0.5f,
+                worldZ - rightZ * hullWidth * 0.5f
+        );
+
+        float forwardSlope = (frontHeight - backHeight) / hullLength;
+        float rightSlope = (rightHeight - leftHeight) / hullWidth;
         float pitch = clamp((float) Math.toDegrees(Math.atan(forwardSlope)), -25.0f, 25.0f);
         float roll = clamp((float) Math.toDegrees(Math.atan(rightSlope)), -20.0f, 20.0f);
-        float bob = surface.height() * profile.boatBobStrength;
+        float bob = clamp(centerHeight * profile.boatBobStrength, -0.55f, 0.55f);
         BoatTiltStore.set(boat.getId(), pitch, roll, bob);
+    }
+
+    private static float renderedSurfaceHeight(
+            Level level,
+            WaterBodyClassifier.WaterType type,
+            float worldX,
+            float worldZ
+    ) {
+        WaveSurfaceSample surface = GerstnerWaveAnimator.getSurfaceSampleAt(worldX, worldZ, type);
+        float sampleTick = GerstnerWaveAnimator.getTime() * TICKS_PER_SECOND;
+        return surface.height() + WaterSurfaceDisplacement.sampleHeight(
+                level,
+                worldX,
+                worldZ,
+                sampleTick
+        );
     }
 
     // Server movement uses the same spectrum evaluated from authoritative time.

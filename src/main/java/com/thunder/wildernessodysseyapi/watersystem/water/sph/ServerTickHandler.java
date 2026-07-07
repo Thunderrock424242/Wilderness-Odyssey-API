@@ -14,8 +14,9 @@ import net.minecraft.server.level.ServerLevel;
 /**
  * ServerTickHandler
  *
- * Advances, synchronizes, and persists server-owned SPH water each tick.
- * Mobile bucket volume remains SPH until it settles into canonical chunk cells.
+ * Advances, synchronizes, and persists server-owned local SPH water each tick.
+ * Buckets become canonical immediately; SPH is reserved for tiny active effects
+ * such as falling canonical slices that later settle back into chunk cells.
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public class ServerTickHandler {

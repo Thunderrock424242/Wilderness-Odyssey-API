@@ -14,8 +14,10 @@ import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -31,6 +33,8 @@ public final class CanonicalWater {
 
     private static final int VANILLA_LEVELS = 8;
     private static final int VOLUME_PER_VANILLA_LEVEL = WaterVolumeChunk.UNITS_PER_BLOCK / VANILLA_LEVELS;
+    private static final int DISPLACEMENT_VERTICAL_SEARCH = 4;
+    private static final int DISPLACEMENT_HORIZONTAL_RADIUS = 2;
 
     private static final Map<ServerLevel, ActiveQueue> ACTIVE_QUEUES =
             Collections.synchronizedMap(new IdentityHashMap<>());
@@ -47,6 +51,9 @@ public final class CanonicalWater {
     /** Returns tracked state, or {@code null} when vanilla has not been imported. */
     @Nullable
     public static WaterVolumeChunk.WaterCell getTracked(Level level, BlockPos pos) {
+        if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
+            return null;
+        }
         LevelChunk chunk = level.getChunkAt(pos);
         var existing = chunk.getExistingData(ModAttachments.WATER_VOLUME);
         if (existing.isEmpty() || !existing.get().contains(pos)) {
@@ -176,11 +183,78 @@ public final class CanonicalWater {
      * excluded because replacing them would destroy unrelated block state.</p>
      */
     public static boolean canAcceptVolume(ServerLevel level, BlockPos pos) {
-        if (level.isOutsideBuildHeight(pos)) {
+        if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
             return false;
         }
         BlockState state = level.getBlockState(pos);
         return state.isAir() || isPlainWaterProjection(state) || state.canBeReplaced();
+    }
+
+    /**
+     * Conserves local water when a solid block replaces a water cell.
+     *
+     * <p>Block placement has already written the solid into the world by the
+     * time NeoForge notifies us, so the displaced cell is removed from
+     * canonical storage without projecting air over the newly placed block. The
+     * volume is then pushed into loaded side cells first. If those cannot accept
+     * water, nearby upward cells receive it, which visually reads as the local
+     * surface level rising around the obstruction.</p>
+     *
+     * @return the number of fixed-point water units successfully moved
+     */
+    public static int displaceForSolidPlacement(
+            ServerLevel level,
+            BlockPos pos,
+            BlockState replacedState,
+            BlockState placedState
+    ) {
+        if (!isDisplacingSolid(level, pos, placedState)) {
+            return 0;
+        }
+
+        WaterVolumeChunk.WaterCell source = displacementSource(level, pos, replacedState);
+        if (source.volumeUnits() <= 0 || source.hostedWater()) {
+            return 0;
+        }
+
+        if (getTracked(level, pos) != null) {
+            set(level, pos, WaterVolumeChunk.WaterCell.EMPTY, false, false);
+        }
+
+        int remaining = source.volumeUnits();
+        int moved = 0;
+        int sideMoved = distributeDisplacedVolume(
+                level,
+                pos,
+                source,
+                remaining,
+                sideCandidates(pos)
+        );
+        remaining -= sideMoved;
+        moved += sideMoved;
+
+        if (remaining > 0) {
+            int raised = distributeDisplacedVolume(
+                    level,
+                    pos,
+                    source,
+                    remaining,
+                    raisedSurfaceCandidates(pos, sideMoved == 0)
+            );
+            remaining -= raised;
+            moved += raised;
+        }
+
+        if (remaining > 0) {
+            moved += distributeDisplacedVolume(
+                    level,
+                    pos,
+                    source,
+                    remaining,
+                    fallbackDisplacementCandidates(pos)
+            );
+        }
+        return moved;
     }
 
     /** Adds bounded volume and returns the amount accepted by the target cell. */
@@ -318,6 +392,146 @@ public final class CanonicalWater {
 
     private static WaterVolumeChunk volume(Level level, BlockPos pos) {
         return level.getChunkAt(pos).getData(ModAttachments.WATER_VOLUME);
+    }
+
+    private static WaterVolumeChunk.WaterCell displacementSource(
+            ServerLevel level,
+            BlockPos pos,
+            BlockState replacedState
+    ) {
+        WaterVolumeChunk.WaterCell tracked = getTracked(level, pos);
+        if (tracked != null && tracked.volumeUnits() > 0) {
+            return tracked.withoutFlags(WaterVolumeChunk.FLAG_SLEEPING);
+        }
+
+        if (!isPlainWaterProjection(replacedState)) {
+            return WaterVolumeChunk.WaterCell.EMPTY;
+        }
+        int volumeUnits = WildernessWaterAuthority.volumeUnitsFromFluid(replacedState.getFluidState());
+        return WaterVolumeChunk.WaterCell.still(
+                volumeUnits,
+                WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED
+        );
+    }
+
+    private static boolean isDisplacingSolid(ServerLevel level, BlockPos pos, BlockState placedState) {
+        if (placedState.isAir()
+                || placedState.canBeReplaced()
+                || isPlainWaterProjection(placedState)
+                || placedState.getFluidState().is(FluidTags.WATER)) {
+            return false;
+        }
+        return !placedState.getCollisionShape(level, pos).isEmpty();
+    }
+
+    private static int distributeDisplacedVolume(
+            ServerLevel level,
+            BlockPos sourcePos,
+            WaterVolumeChunk.WaterCell source,
+            int requestedUnits,
+            List<BlockPos> candidates
+    ) {
+        int remaining = requestedUnits;
+        int moved = 0;
+        for (int index = 0; index < candidates.size() && remaining > 0; index++) {
+            BlockPos target = candidates.get(index);
+            int candidatesLeft = candidates.size() - index;
+            int requestedForTarget = Math.max(1, (remaining + candidatesLeft - 1) / candidatesLeft);
+            int accepted = addVolume(
+                    level,
+                    target,
+                    requestedForTarget,
+                    displacementVelocityX(sourcePos, target, source),
+                    displacementVelocityY(sourcePos, target, source),
+                    displacementVelocityZ(sourcePos, target, source)
+            );
+            remaining -= accepted;
+            moved += accepted;
+        }
+        return moved;
+    }
+
+    private static float displacementVelocityX(
+            BlockPos sourcePos,
+            BlockPos targetPos,
+            WaterVolumeChunk.WaterCell source
+    ) {
+        int deltaX = Integer.compare(targetPos.getX(), sourcePos.getX());
+        return source.velocityX() * 0.35f + deltaX * 0.22f;
+    }
+
+    private static float displacementVelocityY(
+            BlockPos sourcePos,
+            BlockPos targetPos,
+            WaterVolumeChunk.WaterCell source
+    ) {
+        int deltaY = Math.max(0, targetPos.getY() - sourcePos.getY());
+        return source.velocityY() * 0.25f + deltaY * 0.18f;
+    }
+
+    private static float displacementVelocityZ(
+            BlockPos sourcePos,
+            BlockPos targetPos,
+            WaterVolumeChunk.WaterCell source
+    ) {
+        int deltaZ = Integer.compare(targetPos.getZ(), sourcePos.getZ());
+        return source.velocityZ() * 0.35f + deltaZ * 0.22f;
+    }
+
+    private static List<BlockPos> sideCandidates(BlockPos pos) {
+        List<BlockPos> candidates = new ArrayList<>(4);
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            candidates.add(pos.relative(direction));
+        }
+        return candidates;
+    }
+
+    private static List<BlockPos> raisedSurfaceCandidates(BlockPos pos, boolean prioritizeColumn) {
+        List<BlockPos> candidates = new ArrayList<>(6);
+        if (prioritizeColumn) {
+            candidates.add(pos.above());
+        }
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            candidates.add(pos.above().relative(direction));
+        }
+        if (!prioritizeColumn) {
+            candidates.add(pos.above());
+        }
+        candidates.add(pos.above(2));
+        return candidates;
+    }
+
+    private static List<BlockPos> fallbackDisplacementCandidates(BlockPos pos) {
+        List<BlockPos> candidates = new ArrayList<>();
+        for (int yOffset = 0; yOffset <= DISPLACEMENT_VERTICAL_SEARCH; yOffset++) {
+            for (int radius = 1; radius <= DISPLACEMENT_HORIZONTAL_RADIUS; radius++) {
+                for (int xOffset = -radius; xOffset <= radius; xOffset++) {
+                    addFallbackCandidate(candidates, pos, xOffset, yOffset, -radius);
+                    addFallbackCandidate(candidates, pos, xOffset, yOffset, radius);
+                }
+                for (int zOffset = -radius + 1; zOffset <= radius - 1; zOffset++) {
+                    addFallbackCandidate(candidates, pos, -radius, yOffset, zOffset);
+                    addFallbackCandidate(candidates, pos, radius, yOffset, zOffset);
+                }
+            }
+        }
+        for (int yOffset = 3; yOffset <= DISPLACEMENT_VERTICAL_SEARCH; yOffset++) {
+            candidates.add(pos.above(yOffset));
+        }
+        return candidates;
+    }
+
+    private static void addFallbackCandidate(
+            List<BlockPos> candidates,
+            BlockPos pos,
+            int xOffset,
+            int yOffset,
+            int zOffset
+    ) {
+        if (xOffset == 0 && yOffset == 0 && zOffset == 0) {
+            return;
+        }
+        candidates.add(pos.offset(xOffset, yOffset, zOffset));
     }
 
     private static void scheduleAround(ServerLevel level, BlockPos pos) {

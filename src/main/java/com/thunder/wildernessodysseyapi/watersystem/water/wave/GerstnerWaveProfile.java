@@ -247,29 +247,29 @@ public final class GerstnerWaveProfile {
 
     /** Moderate ocean swell with wind-aligned secondary chop. */
     public static final GerstnerWaveProfile OCEAN = new Builder(4, 20.0f)
-            .wave(0, 0.110f, 18.0f, 0.85f, 0.53f, 0.65f, 0.00f)
-            .wave(1, 0.060f, 9.5f, 0.72f, 0.69f, 0.55f, 1.31f)
-            .wave(2, 0.025f, 4.0f, 0.35f, -0.94f, 0.42f, 2.17f)
-            .wave(3, 0.012f, 1.8f, -0.60f, -0.80f, 0.25f, 0.73f)
-            .entityPush(0.010f)
-            .boatBob(0.65f)
+            .wave(0, 0.185f, 22.0f, 0.85f, 0.53f, 0.68f, 0.00f)
+            .wave(1, 0.095f, 11.5f, 0.72f, 0.69f, 0.58f, 1.31f)
+            .wave(2, 0.038f, 4.8f, 0.35f, -0.94f, 0.44f, 2.17f)
+            .wave(3, 0.016f, 2.0f, -0.60f, -0.80f, 0.28f, 0.73f)
+            .entityPush(0.012f)
+            .boatBob(1.00f)
             .build();
 
     /** Directional river motion with small, depth-limited ripples. */
     public static final GerstnerWaveProfile RIVER = new Builder(3, 2.0f)
-            .wave(0, 0.025f, 5.5f, 1.00f, 0.00f, 0.24f, 0.00f)
-            .wave(1, 0.012f, 2.4f, 0.95f, 0.31f, 0.18f, 1.57f)
-            .wave(2, 0.006f, 1.1f, 0.98f, -0.20f, 0.10f, 2.64f)
+            .wave(0, 0.038f, 6.0f, 1.00f, 0.00f, 0.26f, 0.00f)
+            .wave(1, 0.018f, 2.6f, 0.95f, 0.31f, 0.20f, 1.57f)
+            .wave(2, 0.009f, 1.2f, 0.98f, -0.20f, 0.12f, 2.64f)
             .entityPush(0.004f)
-            .boatBob(0.35f)
+            .boatBob(0.65f)
             .build();
 
     /** Subtle wind ripples for enclosed ponds. */
     public static final GerstnerWaveProfile POND = new Builder(2, 1.0f)
-            .wave(0, 0.008f, 3.5f, 0.71f, 0.71f, 0.10f, 0.00f)
-            .wave(1, 0.004f, 1.7f, -0.71f, 0.71f, 0.06f, 1.91f)
+            .wave(0, 0.014f, 3.8f, 0.71f, 0.71f, 0.12f, 0.00f)
+            .wave(1, 0.007f, 1.9f, -0.71f, 0.71f, 0.08f, 1.91f)
             .entityPush(0.0005f)
-            .boatBob(0.12f)
+            .boatBob(0.35f)
             .build();
 
     /**

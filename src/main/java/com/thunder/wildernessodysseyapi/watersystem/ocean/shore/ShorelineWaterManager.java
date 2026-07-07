@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.ocean.shore;
 
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
@@ -71,6 +72,7 @@ public final class ShorelineWaterManager {
             }
         }
 
+        int updatesRemaining = Math.max(0, WaterSimulationConfig.waterBodyUpdatesPerTick());
         Iterator<Region> iterator = regions.values().iterator();
         while (iterator.hasNext()) {
             Region region = iterator.next();
@@ -78,7 +80,11 @@ public final class ShorelineWaterManager {
                 iterator.remove();
                 continue;
             }
+            if (updatesRemaining <= 0) {
+                continue;
+            }
             region.tick(level, gameTime);
+            updatesRemaining--;
         }
     }
 

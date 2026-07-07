@@ -28,6 +28,7 @@ import net.minecraft.world.level.material.PushReaction;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.util.BlockSnapshot;
 import net.neoforged.neoforge.common.SoundActions;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
@@ -207,6 +208,7 @@ public final class WildernessFluidRegistry {
     @SubscribeEvent
     public static void onBlockPlaced(BlockEvent.EntityPlaceEvent event) {
         if (event.getLevel() instanceof ServerLevel level) {
+            displaceWaterForPlacedBlocks(level, event);
             wakeTrackedWaterAround(level, event.getPos());
         }
     }
@@ -414,6 +416,36 @@ public final class WildernessFluidRegistry {
 
     private static boolean canOccupy(ServerLevel level, BlockPos pos) {
         return CanonicalWater.canAcceptVolume(level, pos);
+    }
+
+    private static void displaceWaterForPlacedBlocks(ServerLevel level, BlockEvent.EntityPlaceEvent event) {
+        if (event instanceof BlockEvent.EntityMultiPlaceEvent multiPlaceEvent) {
+            for (BlockSnapshot snapshot : multiPlaceEvent.getReplacedBlockSnapshots()) {
+                displaceWaterForPlacedSnapshot(level, snapshot);
+            }
+            return;
+        }
+        displaceWaterForPlacedSnapshot(level, event.getBlockSnapshot());
+    }
+
+    private static void displaceWaterForPlacedSnapshot(ServerLevel level, BlockSnapshot snapshot) {
+        BlockPos pos = snapshot.getPos();
+        if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
+            return;
+        }
+
+        // NeoForge snapshots preserve the replaced state. The live state is the
+        // placed block, so the authority can conserve water without overwriting
+        // the player's newly placed solid.
+        int moved = CanonicalWater.displaceForSolidPlacement(
+                level,
+                pos,
+                snapshot.getState(),
+                level.getBlockState(pos)
+        );
+        if (moved > 0) {
+            wakeTrackedWaterAround(level, pos);
+        }
     }
 
     private static void wakeTrackedWaterAround(ServerLevel level, BlockPos pos) {

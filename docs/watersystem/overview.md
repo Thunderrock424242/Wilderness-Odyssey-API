@@ -6,7 +6,7 @@ The Wilderness water system is split across several coordinated subsystems:
 - Hybrid large-body authority: `HybridWaterBodyModel`, `WildernessWaterAuthority`
 - Canonical world seeding and migration: `CanonicalWaterSeeder`, `CanonicalWaterMigrationQueue`, `WaterSimulationConfig`
 - Namespaced water registry: `WildernessFluidRegistry`
-- SPH bucket pours: `BucketPlaceMixin`, `SPHSimulator`, `FluidRenderer`
+- Local SPH effects: `SphLocalEffectPayload`, `SPHSimulationManager`, `SPHSimulator`, `FluidRenderer`
 - Finite fluid simulation: `WildernessFluidRegistry`, `CanonicalWaterFlowMixin`
 - Compatibility projection: `CanonicalWaterFlowMixin`, `CanonicalWaterBucketPickupMixin`
 - Client volume synchronization: `WaterVolumeChunkPayload`, `WaterVolumeSynchronizer`, `ClientWaterVolumeSnapshots`
@@ -21,9 +21,11 @@ The Wilderness water system is split across several coordinated subsystems:
 - Boat rocking: `BoatRenderMixin`, `BoatTiltStore`
 
 Canonical water uses 4,096 fixed-point units per full block and stores sparse
-amount, velocity, flags, and temperature in each chunk attachment. SPH owns
-mobile bucket volume; when a body settles, that exact volume is distributed
-into canonical cells. Large oceans, lakes, rivers, and ponds are handled as
+amount, velocity, flags, and temperature in each chunk attachment. Buckets
+become canonical Wilderness water immediately; SPH is only a temporary local
+detail layer for splashes, falling slices, shore wash, leaks, and similar
+small active events. When a server-owned SPH body settles, its conserved volume
+is distributed back into canonical cells. Large oceans, lakes, rivers, and ponds are handled as
 hybrid large bodies instead of full 3D pressure grids: the authority derives a
 loaded body column with bounds, base surface height, depth, estimated volume,
 shoreline status, flow, tide/wave profile, water type, and optional local sparse
@@ -58,15 +60,27 @@ tides, and wave profiles remain the source of truth for oceans, lakes, rivers,
 and persistent water storage. Client-side SPH effects are preferred for
 splashes, bucket impact visuals, shore wash, storm/anomaly hits, and other
 short-lived detail. Those effects are synchronized as compact
-`SphLocalEffectPayload` events, not particle-by-particle snapshots; each client
-applies its `sphLocalEffectQuality` setting (`OFF`, `LOW`, `MEDIUM`, or `HIGH`)
-to clamp particle count, lifetime, active effect count, and tick budget.
+`SphLocalEffectPayload` events, not particle-by-particle snapshots. The
+top-level client `waterQuality` setting (`LOW`, `MEDIUM`, `HIGH`, or
+`CINEMATIC`) clamps wave trains, ripple counts, ocean/shoreline patch budgets,
+SPH render distance, SPH bodies, and mesh rebuild cadence. `LOW` and `MEDIUM`
+disable local SPH entirely; `HIGH` and `CINEMATIC` allow bounded local SPH.
+The lower-level `sphLocalEffectQuality` setting (`OFF`, `LOW`, `MEDIUM`,
+`HIGH`, or `CINEMATIC`) then clamps particle count, lifetime, active effect
+count, and tick budget inside the overall water-quality ceiling.
 Server-owned SPH remains available only for tiny gameplay-critical active water
 such as falling canonical volume from small waterfalls or leaks. It is bounded
 by `enableServerSphLocalSimulation`, `serverSphMaxActiveBodies`,
 `serverSphMaxParticlesPerBody`, and `serverSphParticleTickBudget`, and settled
 server SPH merges conserved volume back into canonical cells instead of
 becoming permanent world storage.
+
+Server-side performance caps also include `localFlowCellsPerTick`,
+`waterBodyUpdatesPerTick`, and `localWaterNetworkEventsPerTick`. Large-body and
+shoreline regions are updated under the water-body cap, while SPH splash and
+shore-wash packets are capped as compact events per dimension tick. No water
+path should force-load chunks, simulate whole oceans as local cell grids, or
+sync individual client SPH particles.
 
 The long-term replacement path is now namespaced ownership first and tag
 compatibility second. `wildernessodysseyapi:wilderness_water` and
