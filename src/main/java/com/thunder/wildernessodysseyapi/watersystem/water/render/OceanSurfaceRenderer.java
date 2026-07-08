@@ -325,12 +325,12 @@ public final class OceanSurfaceRenderer {
         // Keep the replacement surface optically water-colored even over dark
         // ocean floors. The shader still applies depth, light, and Fresnel, but
         // the base medium should not become black transparent terrain cutouts.
-        float shallowR = 0.06f + tintR * 0.32f;
-        float shallowG = 0.56f + tintG * 0.24f;
-        float shallowB = 0.82f + tintB * 0.16f;
-        float deepR = 0.015f + tintR * 0.12f;
-        float deepG = 0.20f + tintG * 0.18f;
-        float deepB = 0.44f + tintB * 0.32f;
+        float shallowR = 0.025f + tintR * 0.18f;
+        float shallowG = 0.34f + tintG * 0.16f;
+        float shallowB = 0.62f + tintB * 0.18f;
+        float deepR = 0.006f + tintR * 0.08f;
+        float deepG = 0.13f + tintG * 0.13f;
+        float deepB = 0.34f + tintB * 0.26f;
         float red = mix(shallowR, deepR, absorption);
         float green = mix(shallowG, deepG, absorption);
         float blue = mix(shallowB, deepB, absorption);
