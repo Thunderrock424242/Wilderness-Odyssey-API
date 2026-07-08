@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.volume;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -134,6 +135,9 @@ public final class CanonicalWater {
      * downhill outlet or touches already-active local water.</p>
      */
     public static void placeBucket(ServerLevel level, BlockPos pos) {
+        if (!WildernessWaterRules.isEnabled(level)) {
+            return;
+        }
         boolean activePlacement = shouldActivateBucketPlacement(level, pos);
         int flags = WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED;
         if (!activePlacement) {

@@ -53,7 +53,6 @@ public final class OceanSurfaceRenderer {
     private static final int SHORE_DETAIL_DEPTH = 12;
     private static final int CONTINUITY_BORDER = 1;
     private static final float MAX_SURFACE_STEP = 0.05f;
-    private static final float UV_SCALE = 0.28f;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
 
     private static final List<SurfacePatch> PATCHES = new ArrayList<>();
@@ -79,9 +78,9 @@ public final class OceanSurfaceRenderer {
             return;
         }
 
-        if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()
-                || !WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()) {
-            releaseVanillaTopOwnership(Minecraft.getInstance().level);
+        ClientLevel level = Minecraft.getInstance().level;
+        if (!WaterRenderingConfig.replacementWaterRenderingEnabled(level)) {
+            releaseVanillaTopOwnership(level);
             return;
         }
 
@@ -181,10 +180,16 @@ public final class OceanSurfaceRenderer {
         float z1 = patch.z + patch.size;
         float centerX = (x0 + x1) * 0.5f;
         float centerZ = (z0 + z1) * 0.5f;
-        float alphaScale = patchAlphaScale(patch, centerX, centerZ, cameraX, cameraZ, nearRadius, farRadius);
+        float alphaScale = patchAlphaScale(level, patch, centerX, centerZ, cameraX, cameraZ, nearRadius, farRadius);
         if (alphaScale <= 0.01f) {
             return;
         }
+        float textureScale = WaterRenderingConfig.dynamicOceanTextureScale(patch.size);
+        float textureSpan = Math.min(0.92f, Math.max(0.02f, patch.size * textureScale));
+        float textureU0 = atlasSafeTile(x0 * textureScale, textureSpan);
+        float textureV0 = atlasSafeTile(z0 * textureScale, textureSpan);
+        float textureU1 = textureU0 + textureSpan;
+        float textureV1 = textureV0 + textureSpan;
 
         WaveSpectrumState spectrum = patch.waterType == WaterBodyClassifier.WaterType.OCEAN
                 ? seaState.spectrum()
@@ -199,16 +204,16 @@ public final class OceanSurfaceRenderer {
         );
         VertexData first = vertex(level, x0, patch.firstY, z0, waveBlend,
                 waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
-                cameraX, cameraZ, nearRadius, farRadius);
+                cameraX, cameraZ, nearRadius, farRadius, textureU0, textureV0);
         VertexData second = vertex(level, x0, patch.secondY, z1, waveBlend,
                 waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
-                cameraX, cameraZ, nearRadius, farRadius);
+                cameraX, cameraZ, nearRadius, farRadius, textureU0, textureV1);
         VertexData third = vertex(level, x1, patch.thirdY, z1, waveBlend,
                 waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
-                cameraX, cameraZ, nearRadius, farRadius);
+                cameraX, cameraZ, nearRadius, farRadius, textureU1, textureV1);
         VertexData fourth = vertex(level, x1, patch.fourthY, z0, waveBlend,
                 waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
-                cameraX, cameraZ, nearRadius, farRadius);
+                cameraX, cameraZ, nearRadius, farRadius, textureU1, textureV0);
 
         emitVertex(buffer, pose, sprite, first);
         emitVertex(buffer, pose, sprite, second);
@@ -231,7 +236,9 @@ public final class OceanSurfaceRenderer {
             float cameraX,
             float cameraZ,
             int nearRadius,
-            int farRadius
+            int farRadius,
+            float textureU,
+            float textureV
     ) {
         float distanceX = baseX - cameraX;
         float distanceZ = baseZ - cameraZ;
@@ -263,7 +270,8 @@ public final class OceanSurfaceRenderer {
         float y = baseY + sample.height() + transientDisplacement + 0.002f;
         float z = baseZ;
         int light = waterLight(level, x, y, z);
-        return new VertexData(x, y, z, sample.normalX(), sample.normalY(), sample.normalZ(), color, light);
+        return new VertexData(x, y, z, sample.normalX(), sample.normalY(), sample.normalZ(),
+                color, light, textureU, textureV);
     }
 
     private static void emitVertex(
@@ -272,8 +280,8 @@ public final class OceanSurfaceRenderer {
             TextureAtlasSprite sprite,
             VertexData vertex
     ) {
-        float u = sprite.getU(tile(vertex.x * UV_SCALE));
-        float v = sprite.getV(tile(vertex.z * UV_SCALE));
+        float u = sprite.getU(vertex.textureU);
+        float v = sprite.getV(vertex.textureV);
         buffer.addVertex(pose, vertex.x, vertex.y, vertex.z)
                 .setColor(
                         (vertex.color >> 16) & 0xFF,
@@ -324,8 +332,9 @@ public final class OceanSurfaceRenderer {
         red = mix(red, 0.86f, foam);
         green = mix(green, 0.94f, foam);
         blue = mix(blue, 1.0f, foam);
-        float baseAlpha = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.76f : 0.50f;
-        float depthAlpha = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.22f : 0.12f;
+        boolean replacingVanillaTop = WaterRenderingConfig.suppressVanillaWaterTopFaces(level);
+        float baseAlpha = replacingVanillaTop ? 0.76f : 0.50f;
+        float depthAlpha = replacingVanillaTop ? 0.22f : 0.12f;
         float alpha = (baseAlpha + absorption * depthAlpha + foam * 0.05f)
                 * WaterRenderingConfig.surfaceOpacityStrength()
                 * Math.max(0.0f, Math.min(1.0f, alphaScale));
@@ -337,6 +346,7 @@ public final class OceanSurfaceRenderer {
     }
 
     private static float patchAlphaScale(
+            ClientLevel level,
             SurfacePatch patch,
             float centerX,
             float centerZ,
@@ -348,7 +358,7 @@ public final class OceanSurfaceRenderer {
         float distanceX = centerX - cameraX;
         float distanceZ = centerZ - cameraZ;
         float distance = (float) Math.sqrt(distanceX * distanceX + distanceZ * distanceZ);
-        boolean replacingVanillaTop = WaterRenderingConfig.suppressVanillaWaterTopFaces();
+        boolean replacingVanillaTop = WaterRenderingConfig.suppressVanillaWaterTopFaces(level);
         float edgeFade = farRadius <= nearRadius || replacingVanillaTop
                 ? 1.0f
                 : 1.0f - smoothStep(Math.max(nearRadius, farRadius - 24.0f), farRadius, distance);
@@ -358,7 +368,7 @@ public final class OceanSurfaceRenderer {
         float lodFade = patch.size <= 1
                 ? 1.0f
                 : replacingVanillaTop
-                        ? patch.size <= 2 ? 0.92f : 0.84f
+                        ? patch.size <= 2 ? 0.98f : 0.94f
                         : patch.size <= 2 ? 0.58f : 0.42f;
         return Math.max(0.0f, Math.min(1.0f, edgeFade * lodFade));
     }
@@ -464,7 +474,7 @@ public final class OceanSurfaceRenderer {
                 }
             }
         }
-        if (WaterRenderingConfig.suppressVanillaWaterTopFaces()) {
+        if (WaterRenderingConfig.suppressVanillaWaterTopFaces(level)) {
             updateVanillaTopOwnership(level, rebuiltOwnedTops);
         } else {
             releaseVanillaTopOwnership(level);
@@ -587,7 +597,7 @@ public final class OceanSurfaceRenderer {
         // visible top face across both block-detail and coarse LOD patches.
         // Vanilla fluid blocks remain in-world for tags and compatibility, but
         // their top surface should not be the thing the player sees.
-        if (WaterRenderingConfig.suppressVanillaWaterTopFaces()) {
+        if (WaterRenderingConfig.suppressVanillaWaterTopFaces(level)) {
             for (int offsetX = 0; offsetX < cellSize; offsetX++) {
                 for (int offsetZ = 0; offsetZ < cellSize; offsetZ++) {
                     SurfaceColumn covered = surfaceColumn(level, surfaces, x + offsetX, z + offsetZ);
@@ -812,7 +822,7 @@ public final class OceanSurfaceRenderer {
 
     /** Returns whether the per-frame mesh currently replaces this baked top face. */
     public static boolean ownsBakedTop(BlockPos pos) {
-        return WaterRenderingConfig.suppressVanillaWaterTopFaces()
+        return WaterRenderingConfig.suppressVanillaWaterTopFaces(Minecraft.getInstance().level)
                 && ownedVanillaTops.contains(pos.asLong());
     }
 
@@ -923,6 +933,15 @@ public final class OceanSurfaceRenderer {
         return value - (float) Math.floor(value);
     }
 
+    private static float atlasSafeTile(float value, float span) {
+        float boundedSpan = Math.max(0.001f, Math.min(0.92f, span));
+        float start = tile(value);
+        if (start + boundedSpan > 0.98f) {
+            return Math.max(0.02f, 0.98f - boundedSpan);
+        }
+        return Math.max(0.02f, start);
+    }
+
     private record SurfacePatch(
             int x,
             int z,
@@ -974,7 +993,9 @@ public final class OceanSurfaceRenderer {
             float normalY,
             float normalZ,
             int color,
-            int light
+            int light,
+            float textureU,
+            float textureV
     ) {
     }
 }

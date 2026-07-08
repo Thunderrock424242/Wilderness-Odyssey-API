@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.volume;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.FluidTags;
@@ -44,6 +45,9 @@ public final class WildernessWaterAuthority {
      * waiting for vanilla-to-Wilderness migration.</p>
      */
     public static CellAuthority sample(Level level, BlockPos pos) {
+        if (!WildernessWaterRules.isEnabled(level)) {
+            return CellAuthority.DRY;
+        }
         CellAuthority cell = sampleCellOnly(level, pos);
         if (cell.water()) {
             return cell;
@@ -63,6 +67,9 @@ public final class WildernessWaterAuthority {
      * without recursively asking the full authority.</p>
      */
     static CellAuthority sampleCellOnly(Level level, BlockPos pos) {
+        if (!WildernessWaterRules.isEnabled(level)) {
+            return CellAuthority.DRY;
+        }
         if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
             return CellAuthority.DRY;
         }
@@ -256,7 +263,9 @@ public final class WildernessWaterAuthority {
      * updates a local sparse cell near the interaction.</p>
      */
     public static boolean addWaterVolume(Level level, BlockPos pos, int amountUnits) {
-        if (!(level instanceof ServerLevel serverLevel) || amountUnits <= 0) {
+        if (!WildernessWaterRules.isEnabled(level)
+                || !(level instanceof ServerLevel serverLevel)
+                || amountUnits <= 0) {
             return false;
         }
         return CanonicalWater.addVolume(serverLevel, pos, amountUnits, 0.0f, 0.0f, 0.0f) > 0;
@@ -270,7 +279,9 @@ public final class WildernessWaterAuthority {
      * disturb only the interaction area instead of editing the whole body.</p>
      */
     public static boolean removeWaterVolume(Level level, BlockPos pos, int amountUnits) {
-        if (!(level instanceof ServerLevel serverLevel) || amountUnits <= 0) {
+        if (!WildernessWaterRules.isEnabled(level)
+                || !(level instanceof ServerLevel serverLevel)
+                || amountUnits <= 0) {
             return false;
         }
         if (CanonicalWater.getTracked(serverLevel, pos) == null && isWaterAt(serverLevel, pos)) {
@@ -293,6 +304,9 @@ public final class WildernessWaterAuthority {
 
     /** Returns whether a water bucket may place Wilderness water at the position. */
     public static boolean canBucketPlace(Level level, BlockPos pos) {
+        if (!WildernessWaterRules.isEnabled(level)) {
+            return false;
+        }
         BlockState state = level.getBlockState(pos);
         return state.isAir() || state.canBeReplaced() || sample(level, pos).migrationCandidate();
     }

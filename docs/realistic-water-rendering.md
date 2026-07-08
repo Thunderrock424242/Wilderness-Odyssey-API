@@ -109,6 +109,10 @@ them. `OceanSurfaceRenderer` provides a bounded camera-local replacement pass wi
 - `WaterRenderingConfig` exposes profile-specific patch budgets and distance
   caps so normal clients and Sodium/Embeddium-style renderer stacks can tune
   the same compatibility renderer without changing code.
+- Coarse LOD patches use atlas-safe local texture spans controlled by
+  `dynamicOceanTextureScale` and `dynamicOceanLodTextureSoftening`. This keeps
+  far water from wrapping the atlas across each large quad and reduces the
+  patch-pane look when render-distance water is enabled.
 - Coarse optimized cells validate their complete footprint and edge grid before
   rendering, so they cannot bridge beach corners, islands, or unloaded gaps.
 - Surface ownership starts from replacement-safe canonical water or a

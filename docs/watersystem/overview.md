@@ -20,6 +20,15 @@ The Wilderness water system is split across several coordinated subsystems:
 - Underwater optics: `ClientWaterImmersion`, `UnderwaterOpticsModel`, `UnderwaterEffectsRenderer`
 - Boat rocking: `BoatRenderMixin`, `BoatTiltStore`
 
+The system has two master enable controls. The server config
+`enableWildernessOdysseyWater` in
+`wildernessodysseyapi-water-simulation-server.toml` is the pack-wide default,
+while the per-world gamerule `/gamerule enableWildernessOdysseyWater true|false`
+can toggle Wilderness water at runtime. When either one is disabled, migration,
+canonical authority, local flow, SPH gameplay water, replacement rendering,
+ripples, and custom immersion stop running; the registered fluids/tags remain
+available so worlds and registries still load safely.
+
 Canonical water uses 4,096 fixed-point units per full block and stores sparse
 amount, velocity, flags, and temperature in each chunk attachment. Buckets
 become canonical Wilderness water immediately; SPH is only a temporary local

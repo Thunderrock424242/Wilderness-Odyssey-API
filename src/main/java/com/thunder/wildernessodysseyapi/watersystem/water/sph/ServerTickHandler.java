@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.SphSnapshotSynchronizer;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.OceanSeaStateSynchronizer;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.WaterVolumeSynchronizer;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -48,8 +49,12 @@ public class ServerTickHandler {
             ticksUntilSeaStateSnapshot = 20;
         }
 
+        SPHSimulationManager manager = SPHSimulationManager.get();
         for (var level : event.getServer().getAllLevels()) {
-            SPHSimulationManager manager = SPHSimulationManager.get();
+            if (!WildernessWaterRules.isEnabled(level)) {
+                manager.clearLevel(level);
+                continue;
+            }
             manager.ensurePersistentLevelLoaded(level);
             manager.tickLevel(level, SERVER_TICK_DELTA);
             if (publishSnapshot) {

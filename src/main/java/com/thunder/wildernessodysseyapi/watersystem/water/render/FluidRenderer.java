@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
 import com.thunder.wildernessodysseyapi.watersystem.water.mesh.FluidMesh;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulator;
@@ -68,6 +69,10 @@ public class FluidRenderer {
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
         if (level == null) return;
+        if (!WildernessWaterRules.isEnabled(level)) {
+            meshMap.clear();
+            return;
+        }
 
         SPHSimulationManager manager = SPHSimulationManager.get();
         ACTIVE_SIMULATIONS.clear();

@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.capabilities;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterMigrationQueue;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
@@ -31,8 +32,12 @@ public final class ChunkCapabilityHandler {
         // Clear dirty on load to avoid unnecessary saves after hydration.
         ChunkDataCapability chunkData = chunk.getData(ModAttachments.CHUNK_DATA);
         chunkData.clearDirty();
+        boolean waterEnabled = WildernessWaterRules.isEnabled(level);
         chunk.getExistingData(ModAttachments.WATER_VOLUME).ifPresent(volume -> {
             volume.clearDirty();
+            if (!waterEnabled) {
+                return;
+            }
             for (WaterVolumeChunk.CellEntry entry : volume.snapshot()) {
                 if (!entry.cell().imported()) {
                     CanonicalWater.schedule(level, WaterVolumeChunk.unpack(
@@ -43,6 +48,9 @@ public final class ChunkCapabilityHandler {
                 }
             }
         });
+        if (!waterEnabled) {
+            return;
+        }
         // Chunk load may run on Minecraft's streaming path, so never rewrite
         // water blocks here. Loaded chunks are priority-queued once players
         // exist, then the server tick queue performs bounded finalization.
@@ -53,6 +61,9 @@ public final class ChunkCapabilityHandler {
 
     @SubscribeEvent
     public static void onChunkWatch(ChunkWatchEvent.Watch event) {
+        if (!WildernessWaterRules.isEnabled(event.getLevel())) {
+            return;
+        }
         // A watched chunk is the first safe player-visible boundary: worldgen is
         // done, the chunk is loaded, and a player is about to see it. Promote
         // it instead of rewriting in the watch callback so chunk sending stays

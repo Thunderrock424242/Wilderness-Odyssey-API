@@ -13,6 +13,7 @@ public final class WaterSimulationConfig {
 
     public static final ModConfigSpec CONFIG_SPEC;
 
+    public static final ModConfigSpec.BooleanValue ENABLE_WILDERNESS_ODYSSEY_WATER;
     public static final ModConfigSpec.BooleanValue ENABLE_CANONICAL_WORLD_SEEDING;
     public static final ModConfigSpec.BooleanValue CONVERT_SEEDED_WORLD_WATER_TO_WILDERNESS;
     public static final ModConfigSpec.BooleanValue ENABLE_AUTOMATIC_WATER_MIGRATION;
@@ -54,6 +55,9 @@ public final class WaterSimulationConfig {
         builder.comment("Server-side water simulation and compatibility options.")
                 .push("water_simulation");
 
+        ENABLE_WILDERNESS_ODYSSEY_WATER = builder
+                .comment("Master server-config switch for Wilderness Odyssey water authority, migration, local flow, SPH gameplay water, and replacement rendering. The per-world gamerule enableWildernessOdysseyWater can still disable it at runtime.")
+                .define("enableWildernessOdysseyWater", true);
         ENABLE_CANONICAL_WORLD_SEEDING = builder
                 .comment("Import exposed vanilla ocean, river, and lake columns into canonical water when chunks load.")
                 .define("enableCanonicalWorldSeeding", true);
@@ -164,6 +168,11 @@ public final class WaterSimulationConfig {
     private WaterSimulationConfig() {
     }
 
+    /** Returns whether the pack-level Wilderness water master switch is enabled. */
+    public static boolean wildernessWaterEnabled() {
+        return ENABLE_WILDERNESS_ODYSSEY_WATER.get();
+    }
+
     /** Returns the bounded import depth used by automatic and command seeding. */
     public static int worldSeedMaxColumnDepth() {
         return WORLD_SEED_MAX_COLUMN_DEPTH.get();
@@ -171,12 +180,12 @@ public final class WaterSimulationConfig {
 
     /** Returns whether manual and budgeted automatic seeding may migrate plain vanilla water to Wilderness blocks. */
     public static boolean convertSeededWorldWaterToWilderness() {
-        return CONVERT_SEEDED_WORLD_WATER_TO_WILDERNESS.get();
+        return wildernessWaterEnabled() && CONVERT_SEEDED_WORLD_WATER_TO_WILDERNESS.get();
     }
 
     /** Returns whether loaded chunks should be queued for budgeted automatic water migration. */
     public static boolean automaticWaterMigrationEnabled() {
-        return ENABLE_AUTOMATIC_WATER_MIGRATION.get();
+        return wildernessWaterEnabled() && ENABLE_AUTOMATIC_WATER_MIGRATION.get();
     }
 
     /** Returns the number of queued chunks automatic migration may touch per server tick. */
@@ -217,7 +226,7 @@ public final class WaterSimulationConfig {
 
     /** Returns whether movement-centered loaded-chunk scans are enabled. */
     public static boolean playerCenteredWaterMigrationScanEnabled() {
-        return ENABLE_PLAYER_CENTERED_WATER_MIGRATION_SCAN.get();
+        return wildernessWaterEnabled() && ENABLE_PLAYER_CENTERED_WATER_MIGRATION_SCAN.get();
     }
 
     /** Returns whether priority migration should follow each player's requested view distance. */
@@ -238,7 +247,8 @@ public final class WaterSimulationConfig {
 
     /** Returns whether the starter-bunker area should be finalized while the world is still loading. */
     public static boolean spawnWaterPreFinalizationEnabled() {
-        return ENABLE_SPAWN_WATER_PRE_FINALIZATION.get()
+        return wildernessWaterEnabled()
+                && ENABLE_SPAWN_WATER_PRE_FINALIZATION.get()
                 && ENABLE_CANONICAL_WORLD_SEEDING.get()
                 && convertSeededWorldWaterToWilderness();
     }
@@ -260,7 +270,7 @@ public final class WaterSimulationConfig {
 
     /** Returns whether watched chunks should get a bounded pre-visibility water finalization pass. */
     public static boolean visibleChunkWaterFinalizationEnabled() {
-        return ENABLE_VISIBLE_CHUNK_WATER_FINALIZATION.get();
+        return wildernessWaterEnabled() && ENABLE_VISIBLE_CHUNK_WATER_FINALIZATION.get();
     }
 
     /** Returns how many watched chunks can be finalized in one server tick. */
@@ -289,7 +299,7 @@ public final class WaterSimulationConfig {
 
     /** Returns whether waterlogged host blocks contribute hosted canonical water cells. */
     public static boolean importWaterloggedHostWater() {
-        return IMPORT_WATERLOGGED_HOST_WATER.get();
+        return wildernessWaterEnabled() && IMPORT_WATERLOGGED_HOST_WATER.get();
     }
 
     /** Returns the bounded covered-water surface scan depth. */
@@ -299,7 +309,7 @@ public final class WaterSimulationConfig {
 
     /** Returns the active local-cell flow budget for one server tick. */
     public static int localFlowCellsPerTick() {
-        return LOCAL_FLOW_CELLS_PER_TICK.get();
+        return wildernessWaterEnabled() ? LOCAL_FLOW_CELLS_PER_TICK.get() : 0;
     }
 
     /** Returns the speed threshold under which immobile local cells can sleep. */
@@ -314,17 +324,18 @@ public final class WaterSimulationConfig {
 
     /** Returns how many high-level water-body regions may update in one dimension tick. */
     public static int waterBodyUpdatesPerTick() {
-        return WATER_BODY_UPDATES_PER_TICK.get();
+        return wildernessWaterEnabled() ? WATER_BODY_UPDATES_PER_TICK.get() : 0;
     }
 
     /** Returns how many compact local water network events may be sent in one dimension tick. */
     public static int localWaterNetworkEventsPerTick() {
-        return LOCAL_WATER_NETWORK_EVENTS_PER_TICK.get();
+        return wildernessWaterEnabled() ? LOCAL_WATER_NETWORK_EVENTS_PER_TICK.get() : 0;
     }
 
     /** Returns whether server-owned local SPH is allowed for gameplay-critical active water. */
     public static boolean serverSphLocalSimulationEnabled() {
-        return ENABLE_SERVER_SPH_LOCAL_SIMULATION.get()
+        return wildernessWaterEnabled()
+                && ENABLE_SERVER_SPH_LOCAL_SIMULATION.get()
                 && SERVER_SPH_MAX_ACTIVE_BODIES.get() > 0
                 && SERVER_SPH_PARTICLE_TICK_BUDGET.get() > 0;
     }

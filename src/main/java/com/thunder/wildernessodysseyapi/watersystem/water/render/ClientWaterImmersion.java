@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
@@ -37,6 +38,10 @@ public final class ClientWaterImmersion {
     /** Returns the camera's current bounded water-immersion state. */
     public static ImmersionState sample(Camera camera, float partialTick) {
         if (!(camera.getEntity().level() instanceof ClientLevel level)) {
+            return ImmersionState.DRY;
+        }
+        if (!WildernessWaterRules.isEnabled(level)) {
+            clear(level);
             return ImmersionState.DRY;
         }
 
@@ -114,8 +119,7 @@ public final class ClientWaterImmersion {
         WaterBodyClassifier.WaterType waterType = WaterBodyClassifier.classify(level, surfacePos);
 
         float animatedHeight = 0.0f;
-        if (WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()
-                && WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()) {
+        if (WaterRenderingConfig.replacementWaterRenderingEnabled(level)) {
             float waveBlend = smoothStep(0.35f, 4.0f, columnDepth);
             animatedHeight = GerstnerWaveAnimator.getSurfaceSampleAt(
                     (float) cameraPosition.x,
@@ -156,6 +160,9 @@ public final class ClientWaterImmersion {
     }
 
     private static ImmersionState resolveMobileWater(ClientLevel level, Vec3 cameraPosition) {
+        if (!WildernessWaterRules.isEnabled(level)) {
+            return ImmersionState.DRY;
+        }
         SPHSimulationManager.MobileWaterSample mobile = SPHSimulationManager.get().sampleAt(
                 level,
                 cameraPosition.x,
