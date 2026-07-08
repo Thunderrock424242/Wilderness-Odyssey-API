@@ -6,6 +6,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterMigrationQueue;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterSeeder;
@@ -261,6 +262,12 @@ public final class WaterDebugCommand {
     private static int seed(CommandContext<CommandSourceStack> context, int chunkRadius) throws CommandSyntaxException {
         CommandSourceStack source = context.getSource();
         ServerLevel level = source.getLevel();
+        if (!WildernessWaterRules.isEnabled(level)) {
+            source.sendSuccess(() -> Component.literal(
+                    "WO water seed skipped: Wilderness Odyssey water is disabled by config or gamerule."
+            ), false);
+            return 0;
+        }
         ChunkPos center = source.getPlayerOrException().chunkPosition();
         CanonicalWaterSeeder.SeedStats total = CanonicalWaterSeeder.SeedStats.EMPTY;
 
@@ -295,7 +302,12 @@ public final class WaterDebugCommand {
         int largeBodyCacheSize = LargeWaterBodySavedData.get(source.getLevel()).cachedColumnCount();
 
         source.sendSuccess(() -> Component.literal("WO water migration"), false);
-        source.sendSuccess(() -> Component.literal("  Status: seeding=" + onOff(status.seedingEnabled())
+        source.sendSuccess(() -> Component.literal("  Status: enabled="
+                + onOff(WildernessWaterRules.isEnabled(source.getLevel()))
+                + " (config=" + onOff(WaterSimulationConfig.wildernessWaterEnabled())
+                + ", gamerule=" + onOff(source.getLevel().getGameRules()
+                        .getBoolean(WildernessWaterRules.ENABLE_WILDERNESS_ODYSSEY_WATER)) + ")"
+                + ", seeding=" + onOff(status.seedingEnabled())
                 + ", block conversion=" + onOff(status.blockConversionEnabled())
                 + ", authority version=" + WildernessWaterAuthority.CURRENT_WATER_SYSTEM_VERSION
                 + ", queued chunks=" + status.queuedChunks()), false);
@@ -443,6 +455,12 @@ public final class WaterDebugCommand {
     private static int shipcheck(CommandContext<CommandSourceStack> context, int requestedRadius) {
         CommandSourceStack source = context.getSource();
         ServerLevel level = source.getLevel();
+        if (!WildernessWaterRules.isEnabled(level)) {
+            source.sendSuccess(() -> Component.literal(
+                    "WO water repair skipped: Wilderness Odyssey water is disabled by config or gamerule."
+            ), false);
+            return 0;
+        }
         BlockPos center = sourceBlockPos(source);
         int radius = Math.min(requestedRadius, WaterSimulationConfig.debugCommandMaxRadius());
         ShipCheckStats stats = scanShipCheck(level, center, radius);

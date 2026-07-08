@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.render.OceanSurfaceRenderer;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerVertexConsumer;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
@@ -53,11 +54,11 @@ public class GerstnerWaveRenderMixin {
             FluidState fluidState,
             CallbackInfo callbackInfo
     ) {
+        Level concreteLevel = resolveConcreteLevel(level);
         HIDE_VANILLA_TOP.set(
                 WaterCompatibility.isTaggedWater(fluidState)
-                        && WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()
-                        && WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()
-                        && WaterRenderingConfig.suppressVanillaWaterTopFaces()
+                        && WaterRenderingConfig.replacementWaterRenderingEnabled(concreteLevel)
+                        && WaterRenderingConfig.suppressVanillaWaterTopFaces(concreteLevel)
                         && OceanSurfaceRenderer.ownsBakedTop(pos)
         );
     }
@@ -78,15 +79,19 @@ public class GerstnerWaveRenderMixin {
         if (!WaterCompatibility.isTaggedWater(fluidState)) {
             return originalConsumer;
         }
-        if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()) {
+        Level concreteLevel = resolveConcreteLevel(level);
+        if (!WildernessWaterRules.isEnabled(concreteLevel)
+                || !WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()) {
             return originalConsumer;
         }
 
-        LevelReader waterLevel = resolveLevelReader(level);
+        LevelReader waterLevel = concreteLevel != null ? concreteLevel : resolveLevelReader(level);
         WaterBodyClassifier.WaterType waterType = waterLevel == null
                 ? WaterBodyClassifier.WaterType.POND
                 : WaterBodyClassifier.classify(waterLevel, pos);
-        boolean dynamicSurfaceEnabled = WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get();
+        boolean dynamicSurfaceEnabled = concreteLevel == null
+                ? WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()
+                : WaterRenderingConfig.replacementWaterRenderingEnabled(concreteLevel);
         boolean suppressSurfaceDisplacement = dynamicSurfaceEnabled
                 || !isExposedWaterTop(level, pos, fluidState);
         return new GerstnerVertexConsumer(
@@ -147,6 +152,18 @@ public class GerstnerWaveRenderMixin {
         if (level instanceof RenderChunkRegion renderChunkRegion) {
             Level clientLevel = ((RenderChunkRegionAccessor) renderChunkRegion).wildernessodysseyapi$getLevel();
             return clientLevel;
+        }
+
+        return null;
+    }
+
+    private static Level resolveConcreteLevel(BlockAndTintGetter level) {
+        if (level instanceof Level concreteLevel) {
+            return concreteLevel;
+        }
+
+        if (level instanceof RenderChunkRegion renderChunkRegion) {
+            return ((RenderChunkRegionAccessor) renderChunkRegion).wildernessodysseyapi$getLevel();
         }
 
         return null;

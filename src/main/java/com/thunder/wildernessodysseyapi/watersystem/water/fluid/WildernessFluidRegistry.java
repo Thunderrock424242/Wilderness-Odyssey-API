@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.fluid;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
@@ -173,6 +174,9 @@ public final class WildernessFluidRegistry {
         if (!(event.getLevel() instanceof ServerLevel level)) {
             return;
         }
+        if (!WildernessWaterRules.isEnabled(level)) {
+            return;
+        }
 
         int maxCells = WaterSimulationConfig.localFlowCellsPerTick();
         for (int processed = 0; processed < maxCells; processed++) {
@@ -194,7 +198,7 @@ public final class WildernessFluidRegistry {
      */
     @SubscribeEvent
     public static void onBlockBroken(BlockEvent.BreakEvent event) {
-        if (event.getLevel() instanceof ServerLevel level) {
+        if (event.getLevel() instanceof ServerLevel level && WildernessWaterRules.isEnabled(level)) {
             wakeTrackedWaterAround(level, event.getPos());
         }
     }
@@ -207,7 +211,7 @@ public final class WildernessFluidRegistry {
      */
     @SubscribeEvent
     public static void onBlockPlaced(BlockEvent.EntityPlaceEvent event) {
-        if (event.getLevel() instanceof ServerLevel level) {
+        if (event.getLevel() instanceof ServerLevel level && WildernessWaterRules.isEnabled(level)) {
             displaceWaterForPlacedBlocks(level, event);
             wakeTrackedWaterAround(level, event.getPos());
         }

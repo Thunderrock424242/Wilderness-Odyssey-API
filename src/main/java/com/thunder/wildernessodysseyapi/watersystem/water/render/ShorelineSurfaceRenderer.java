@@ -73,12 +73,11 @@ public final class ShorelineSurfaceRenderer {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
             return;
         }
-        if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()
-                || !WaterRenderingConfig.ENABLE_DYNAMIC_OCEAN_SURFACE.get()
-                || !WaterRenderingConfig.ENABLE_SHORELINE_SURFACE.get()) {
+        ClientLevel level = Minecraft.getInstance().level;
+        if (!WaterRenderingConfig.shorelineWaterRenderingEnabled(level)) {
             clearCache();
             OceanSurfaceRenderer.setSupplementalBakedTopOwnership(
-                    Minecraft.getInstance().level,
+                    level,
                     LongSets.EMPTY_SET
             );
             return;
@@ -105,7 +104,7 @@ public final class ShorelineSurfaceRenderer {
             OceanSurfaceRenderer.setSupplementalBakedTopOwnership(level, LongSets.EMPTY_SET);
             return;
         }
-        if (WaterRenderingConfig.suppressVanillaWaterTopFaces()) {
+        if (WaterRenderingConfig.suppressVanillaWaterTopFaces(level)) {
             OceanSurfaceRenderer.setSupplementalBakedTopOwnership(level, ownedVanillaTops);
         }
 
@@ -328,7 +327,7 @@ public final class ShorelineSurfaceRenderer {
         float dx = centerX - cameraX;
         float dz = centerZ - cameraZ;
         float distance = (float) Math.sqrt(dx * dx + dz * dz);
-        float distanceFade = WaterRenderingConfig.suppressVanillaWaterTopFaces()
+        float distanceFade = WaterRenderingConfig.suppressVanillaWaterTopFaces(level)
                 ? 1.0f
                 : 1.0f - smoothStep(renderRadius * 0.72f, renderRadius, distance);
         float visualStrength = Math.max(0.0f, shorelineStrength * distanceFade);
@@ -466,8 +465,9 @@ public final class ShorelineSurfaceRenderer {
         red = mix(red, 0.88f, foam);
         green = mix(green, 0.96f, foam);
         blue = mix(blue, 1.0f, foam);
-        float alphaStart = WaterRenderingConfig.suppressVanillaWaterTopFaces() ? 0.54f : 0.32f;
-        float alphaEnd = WaterRenderingConfig.suppressVanillaWaterTopFaces()
+        boolean replacingVanillaTop = WaterRenderingConfig.suppressVanillaWaterTopFaces(level);
+        float alphaStart = replacingVanillaTop ? 0.54f : 0.32f;
+        float alphaEnd = replacingVanillaTop
                 ? fullWater ? 0.82f : 0.70f
                 : fullWater ? 0.56f : 0.46f;
         float volumeAlpha = mix(alphaStart, alphaEnd, smoothStep(0.08f, 1.0f, fillFraction));
@@ -521,7 +521,7 @@ public final class ShorelineSurfaceRenderer {
      * instead of staying visible as a backup layer.</p>
      */
     private static void updateVanillaTopOwnership(ClientLevel level) {
-        if (!WaterRenderingConfig.suppressVanillaWaterTopFaces() || PATCHES.isEmpty()) {
+        if (!WaterRenderingConfig.suppressVanillaWaterTopFaces(level) || PATCHES.isEmpty()) {
             ownedVanillaTops = LongSets.EMPTY_SET;
             OceanSurfaceRenderer.setSupplementalBakedTopOwnership(level, LongSets.EMPTY_SET);
             return;

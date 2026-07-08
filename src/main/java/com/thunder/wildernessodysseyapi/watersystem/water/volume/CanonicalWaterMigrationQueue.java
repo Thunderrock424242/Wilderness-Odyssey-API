@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.volume;
 import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -88,6 +89,9 @@ public final class CanonicalWaterMigrationQueue {
      * blocking the chunk loader.</p>
      */
     public static synchronized void queueLoadedChunkForFinalization(ServerLevel level, LevelChunk chunk) {
+        if (!WildernessWaterRules.isEnabled(level)) {
+            return;
+        }
         if (isChunkWaterFinalized(chunk)) {
             skippedFinalizedChunks++;
             return;
@@ -105,6 +109,10 @@ public final class CanonicalWaterMigrationQueue {
      * keeping visible water ahead of older background tasks.</p>
      */
     public static synchronized void queueVisibleChunkForFinalization(ServerLevel level, LevelChunk chunk) {
+        if (!WildernessWaterRules.isEnabled(level)) {
+            lastVisibleFinalization = TickResult.EMPTY.withQueuedChunks(QUEUE.size());
+            return;
+        }
         if (isChunkWaterFinalized(chunk)) {
             visibleFinalizationSkippedFinalizedChunks++;
             lastVisibleFinalization = TickResult.EMPTY.withQueuedChunks(QUEUE.size());
@@ -115,7 +123,7 @@ public final class CanonicalWaterMigrationQueue {
     }
 
     private static boolean enqueue(ServerLevel level, ChunkPos pos, boolean priority) {
-        if (!WaterSimulationConfig.ENABLE_CANONICAL_WORLD_SEEDING.get()) {
+        if (!WildernessWaterRules.isEnabled(level) || !WaterSimulationConfig.ENABLE_CANONICAL_WORLD_SEEDING.get()) {
             return false;
         }
         LevelChunk loadedChunk = level.getChunkSource().getChunkNow(pos.x, pos.z);
@@ -142,7 +150,7 @@ public final class CanonicalWaterMigrationQueue {
      * per-tick budgets and priority-queues any unfinished columns.</p>
      */
     public static synchronized TickResult finalizeVisibleChunk(ServerLevel level, LevelChunk chunk) {
-        if (!WaterSimulationConfig.ENABLE_CANONICAL_WORLD_SEEDING.get()) {
+        if (!WildernessWaterRules.isEnabled(level) || !WaterSimulationConfig.ENABLE_CANONICAL_WORLD_SEEDING.get()) {
             lastVisibleFinalization = TickResult.EMPTY.withQueuedChunks(QUEUE.size());
             return lastVisibleFinalization;
         }
@@ -237,7 +245,7 @@ public final class CanonicalWaterMigrationQueue {
             ServerLevel level,
             BlockPos center
     ) {
-        if (!WaterSimulationConfig.spawnWaterPreFinalizationEnabled()) {
+        if (!WildernessWaterRules.isEnabled(level) || !WaterSimulationConfig.spawnWaterPreFinalizationEnabled()) {
             return SpawnPreFinalizationResult.disabled(QUEUE.size());
         }
 
@@ -363,7 +371,8 @@ public final class CanonicalWaterMigrationQueue {
      * screen preparing spawn chunks.</p>
      */
     public static synchronized TickResult runTick(MinecraftServer server) {
-        if (!WaterSimulationConfig.ENABLE_CANONICAL_WORLD_SEEDING.get()
+        if (!WaterSimulationConfig.wildernessWaterEnabled()
+                || !WaterSimulationConfig.ENABLE_CANONICAL_WORLD_SEEDING.get()
                 || server.getPlayerList().getPlayerCount() <= 0) {
             lastTick = TickResult.EMPTY.withQueuedChunks(QUEUE.size());
             return lastTick;
@@ -403,6 +412,10 @@ public final class CanonicalWaterMigrationQueue {
 
             ServerLevel level = server.getLevel(task.dimension());
             if (level == null) {
+                QUEUED_KEYS.remove(task.key());
+                continue;
+            }
+            if (!WildernessWaterRules.isEnabled(level)) {
                 QUEUED_KEYS.remove(task.key());
                 continue;
             }
@@ -636,6 +649,9 @@ public final class CanonicalWaterMigrationQueue {
         int maxRequestedViewDistance = 0;
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerLevel level = player.serverLevel();
+            if (!WildernessWaterRules.isEnabled(level)) {
+                continue;
+            }
             ChunkPos center = player.chunkPosition();
             int requestedViewDistance = Math.max(1, player.requestedViewDistance());
             int radius = effectivePlayerScanRadius(server, requestedViewDistance, playerRadius);

@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
+import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -38,6 +40,8 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.IntValue MAX_OCEAN_SURFACE_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue DYNAMIC_OCEAN_CACHE_LIFETIME_TICKS;
     public static final ModConfigSpec.IntValue DYNAMIC_OCEAN_MAX_CELL_SIZE;
+    public static final ModConfigSpec.DoubleValue DYNAMIC_OCEAN_TEXTURE_SCALE;
+    public static final ModConfigSpec.DoubleValue DYNAMIC_OCEAN_LOD_TEXTURE_SOFTENING;
 
     public static final ModConfigSpec.IntValue NORMAL_SPH_RENDER_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue NORMAL_MAX_RENDERED_SPH_SIMULATIONS;
@@ -122,7 +126,13 @@ public final class WaterRenderingConfig {
                 .defineInRange("dynamicOceanCacheLifetimeTicks", 60, 10, 200);
         DYNAMIC_OCEAN_MAX_CELL_SIZE = builder
                 .comment("Largest distant ocean LOD cell size in blocks. Higher values reduce far-ocean patch count while keeping nearby shorelines detailed.")
-                .defineInRange("dynamicOceanMaxCellSize", 8, 4, 16);
+                .defineInRange("dynamicOceanMaxCellSize", 4, 4, 16);
+        DYNAMIC_OCEAN_TEXTURE_SCALE = builder
+                .comment("World-space water texture repeat scale for the replacement ocean mesh. Smaller values reduce obvious tiling on large surfaces.")
+                .defineInRange("dynamicOceanTextureScale", 0.24, 0.05, 0.50);
+        DYNAMIC_OCEAN_LOD_TEXTURE_SOFTENING = builder
+                .comment("Reduces texture repetition on medium/far LOD quads so coarse water cells do not look like separate patch panes.")
+                .defineInRange("dynamicOceanLodTextureSoftening", 0.75, 0.0, 2.0);
         UNDERWATER_VISIBILITY_BLOCKS = builder
                 .comment("Maximum clear-water visibility used by the underwater optical model.")
                 .defineInRange("underwaterVisibilityBlocks", 44.0, 8.0, 128.0);
@@ -134,7 +144,7 @@ public final class WaterRenderingConfig {
                 .defineInRange("surfaceAbsorptionStrength", 1.70, 0.25, 3.0);
         SURFACE_OPACITY_STRENGTH = builder
                 .comment("Scales replacement-surface alpha after depth, foam, and shoreline fades. Higher values make the water medium less see-through.")
-                .defineInRange("surfaceOpacityStrength", 1.38, 0.50, 2.0);
+                .defineInRange("surfaceOpacityStrength", 1.50, 0.50, 2.0);
         SHORELINE_OVERLAY_STRENGTH = builder
                 .comment("Scales shoreline overlay alpha, foam, and local vertical motion.")
                 .defineInRange("shorelineOverlayStrength", 1.0, 0.0, 2.0);
@@ -245,6 +255,18 @@ public final class WaterRenderingConfig {
     /** Returns the active top-level water quality target. */
     public static WaterQuality waterQuality() {
         return WATER_QUALITY.get();
+    }
+
+    /** Returns whether the replacement water renderer should draw in this world. */
+    public static boolean replacementWaterRenderingEnabled(Level level) {
+        return WildernessWaterRules.isEnabled(level)
+                && ENABLE_GERSTNER_WAVES.get()
+                && ENABLE_DYNAMIC_OCEAN_SURFACE.get();
+    }
+
+    /** Returns whether the shoreline/local overlay should draw in this world. */
+    public static boolean shorelineWaterRenderingEnabled(Level level) {
+        return replacementWaterRenderingEnabled(level) && ENABLE_SHORELINE_SURFACE.get();
     }
 
     /** Returns whether local visual SPH effects may be spawned on this client. */
@@ -373,6 +395,11 @@ public final class WaterRenderingConfig {
         return REPLACE_VANILLA_WATER_TOPS.get() || SUPPRESS_VANILLA_WATER_TOPS.get();
     }
 
+    /** Returns whether the replacement renderer may hide baked vanilla water tops in this world. */
+    public static boolean suppressVanillaWaterTopFaces(Level level) {
+        return WildernessWaterRules.isEnabled(level) && suppressVanillaWaterTopFaces();
+    }
+
     /** Returns the active cache budget for dynamic ocean surface patches. */
     public static int maxOceanSurfacePatches() {
         int configured = usesOptimizedProfile()
@@ -389,6 +416,14 @@ public final class WaterRenderingConfig {
     /** Returns the largest cell size used by far-distance dynamic ocean LOD. */
     public static int dynamicOceanMaxCellSize() {
         return DYNAMIC_OCEAN_MAX_CELL_SIZE.get();
+    }
+
+    /** Returns an atlas-safe water texture scale for a replacement ocean patch. */
+    public static float dynamicOceanTextureScale(int patchSize) {
+        float configured = DYNAMIC_OCEAN_TEXTURE_SCALE.get().floatValue();
+        float softening = DYNAMIC_OCEAN_LOD_TEXTURE_SOFTENING.get().floatValue();
+        int boundedPatchSize = Math.max(1, patchSize);
+        return configured / (1.0f + Math.max(0, boundedPatchSize - 1) * Math.max(0.0f, softening));
     }
 
     /** Returns the active shoreline/local-water overlay radius in blocks. */

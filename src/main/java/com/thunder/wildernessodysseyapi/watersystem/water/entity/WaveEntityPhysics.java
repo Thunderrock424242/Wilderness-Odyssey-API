@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.entity;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.shore.ShorelineWaterManager;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterSurfaceDisplacement;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
@@ -47,6 +48,14 @@ public final class WaveEntityPhysics {
     public static void onEntityTick(EntityTickEvent.Post event) {
         Entity entity = event.getEntity();
         Level level = entity.level();
+
+        if (!WildernessWaterRules.isEnabled(level)) {
+            if (level.isClientSide() && entity instanceof Boat boat) {
+                BoatTiltStore.remove(boat.getId());
+            }
+            return;
+        }
+
         var mobileWater = SPHSimulationManager.get().sampleAt(
                 level,
                 entity.getX(),

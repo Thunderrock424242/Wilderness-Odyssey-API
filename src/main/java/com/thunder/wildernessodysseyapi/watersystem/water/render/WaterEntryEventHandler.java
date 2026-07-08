@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.api.distmarker.Dist;
@@ -41,7 +42,7 @@ public class WaterEntryEventHandler {
         boolean inWaterNow = entity.isInWater();
         boolean wasInWaterBefore = wasInWater.getOrDefault(entity, false);
 
-        if (inWaterNow && !wasInWaterBefore) {
+        if (inWaterNow && !wasInWaterBefore && WildernessWaterRules.isEnabled(entity.level())) {
             // Entity just entered water this tick — spawn effects at feet
             double x = entity.getX();
             double y = entity.getY() + 0.1;
@@ -56,7 +57,7 @@ public class WaterEntryEventHandler {
     }
 
     private static void spawnSplashParticles(Entity entity, double x, double y, double z) {
-        if (!WaterRenderingConfig.ENABLE_RIPPLES.get()) return;
+        if (!WaterRenderingConfig.ENABLE_RIPPLES.get() || !WildernessWaterRules.isEnabled(entity.level())) return;
 
         var level = entity.level();
         if (!level.isClientSide()) return;

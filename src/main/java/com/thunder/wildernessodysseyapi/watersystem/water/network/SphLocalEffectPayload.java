@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.network;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import net.minecraft.network.FriendlyByteBuf;
@@ -10,6 +11,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.Collections;
@@ -103,6 +105,9 @@ public record SphLocalEffectPayload(
 
     /** Sends one local SPH event to players close enough to see it. */
     public static void sendToNearby(ServerLevel level, double x, double y, double z, SphLocalEffectPayload payload) {
+        if (!WildernessWaterRules.isEnabled(level)) {
+            return;
+        }
         if (!tryConsumeNetworkEvent(level)) {
             return;
         }
@@ -119,6 +124,9 @@ public record SphLocalEffectPayload(
 
     /** Spawns the short-lived client-owned SPH body for this effect. */
     public void spawnClientEffect(net.minecraft.world.level.BlockGetter level) {
+        if (level instanceof Level concreteLevel && !WildernessWaterRules.isEnabled(concreteLevel)) {
+            return;
+        }
         SPHSimulationManager.get().createLocalVisualEffect(
                 x,
                 y,

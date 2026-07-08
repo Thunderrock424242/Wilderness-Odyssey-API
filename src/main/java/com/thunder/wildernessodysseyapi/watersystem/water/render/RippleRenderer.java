@@ -2,6 +2,8 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
@@ -33,7 +35,8 @@ public class RippleRenderer {
     private static final List<Ripple> activeRipples = new ArrayList<>();
 
     public static void spawnRipple(double x, double y, double z) {
-        if (!WaterRenderingConfig.ENABLE_RIPPLES.get()) {
+        if (!WaterRenderingConfig.ENABLE_RIPPLES.get()
+                || !WildernessWaterRules.isEnabled(Minecraft.getInstance().level)) {
             return;
         }
 
@@ -58,7 +61,8 @@ public class RippleRenderer {
     }
 
     private static void renderScoped(RenderLevelStageEvent event) {
-        if (!WaterRenderingConfig.ENABLE_RIPPLES.get()) {
+        if (!WaterRenderingConfig.ENABLE_RIPPLES.get()
+                || !WildernessWaterRules.isEnabled(Minecraft.getInstance().level)) {
             activeRipples.clear();
             return;
         }

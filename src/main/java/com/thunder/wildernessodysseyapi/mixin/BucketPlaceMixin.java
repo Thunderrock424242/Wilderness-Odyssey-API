@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.network.SphLocalEffectPayload;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import net.minecraft.core.BlockPos;
@@ -46,6 +47,7 @@ public abstract class BucketPlaceMixin {
         Fluid content = ((BucketItem) (Object) this).content;
         if (!isCanonicalBucketWater(content)
                 || level.isClientSide
+                || !WildernessWaterRules.isEnabled(level)
                 || !Boolean.TRUE.equals(callbackInfo.getReturnValue())) {
             return;
         }

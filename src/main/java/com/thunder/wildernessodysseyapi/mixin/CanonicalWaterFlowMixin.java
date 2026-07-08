@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -34,7 +35,9 @@ public abstract class CanonicalWaterFlowMixin {
         if (!WaterCompatibility.isTaggedWater(state)) {
             return;
         }
-        if (level instanceof ServerLevel serverLevel && CanonicalWater.isTracked(serverLevel, pos)) {
+        if (level instanceof ServerLevel serverLevel
+                && WildernessWaterRules.isEnabled(serverLevel)
+                && CanonicalWater.isTracked(serverLevel, pos)) {
             callbackInfo.cancel();
         }
     }
