@@ -125,8 +125,8 @@ public final class WaterRenderingConfig {
                 .comment("How long the client may reuse the dynamic ocean patch cache before rescanning nearby water. Higher values improve FPS while still rebuilding on movement and config changes.")
                 .defineInRange("dynamicOceanCacheLifetimeTicks", 60, 10, 200);
         DYNAMIC_OCEAN_MAX_CELL_SIZE = builder
-                .comment("Largest distant ocean LOD cell size in blocks. Higher values reduce far-ocean patch count while keeping nearby shorelines detailed.")
-                .defineInRange("dynamicOceanMaxCellSize", 4, 4, 16);
+                .comment("Largest distant ocean LOD cell size in blocks. Values above four are clamped by the renderer because large translucent quads create visible water-pane artifacts.")
+                .defineInRange("dynamicOceanMaxCellSize", 4, 1, 16);
         DYNAMIC_OCEAN_TEXTURE_SCALE = builder
                 .comment("World-space water texture repeat scale for the replacement ocean mesh. Smaller values reduce obvious tiling on large surfaces.")
                 .defineInRange("dynamicOceanTextureScale", 0.24, 0.05, 0.50);
@@ -415,7 +415,10 @@ public final class WaterRenderingConfig {
 
     /** Returns the largest cell size used by far-distance dynamic ocean LOD. */
     public static int dynamicOceanMaxCellSize() {
-        return DYNAMIC_OCEAN_MAX_CELL_SIZE.get();
+        // Existing dev configs may still contain old 8/16-block LOD values.
+        // Those huge translucent quads are the main source of the cyan polygon
+        // islands seen across oceans, so strict replacement mode caps them.
+        return Math.max(1, Math.min(4, DYNAMIC_OCEAN_MAX_CELL_SIZE.get()));
     }
 
     /** Returns an atlas-safe water texture scale for a replacement ocean patch. */
@@ -456,7 +459,7 @@ public final class WaterRenderingConfig {
     /** Returns the alpha multiplier used by surface renderers. */
     public static float surfaceOpacityStrength() {
         float configured = SURFACE_OPACITY_STRENGTH.get().floatValue();
-        return suppressVanillaWaterTopFaces() ? Math.max(configured, 1.28f) : configured;
+        return suppressVanillaWaterTopFaces() ? Math.max(configured, 1.55f) : configured;
     }
 
     /**

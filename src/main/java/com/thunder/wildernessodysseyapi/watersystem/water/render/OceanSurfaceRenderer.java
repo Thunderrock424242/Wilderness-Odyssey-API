@@ -194,25 +194,28 @@ public final class OceanSurfaceRenderer {
         WaveSpectrumState spectrum = patch.waterType == WaterBodyClassifier.WaterType.OCEAN
                 ? seaState.spectrum()
                 : WaveSpectrumState.NEUTRAL;
-        int patchColor = opticalColor(
+        int firstColor = opticalColor(
                 level,
-                centerX,
-                (patch.firstY + patch.secondY + patch.thirdY + patch.fourthY) * 0.25f,
-                centerZ,
-                patch.depth,
+                x0,
+                patch.firstY,
+                z0,
+                patch.firstDepth,
                 alphaScale
         );
+        int secondColor = opticalColor(level, x0, patch.secondY, z1, patch.secondDepth, alphaScale);
+        int thirdColor = opticalColor(level, x1, patch.thirdY, z1, patch.thirdDepth, alphaScale);
+        int fourthColor = opticalColor(level, x1, patch.fourthY, z0, patch.fourthDepth, alphaScale);
         VertexData first = vertex(level, x0, patch.firstY, z0, waveBlend,
-                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, firstColor,
                 cameraX, cameraZ, nearRadius, farRadius, textureU0, textureV0);
         VertexData second = vertex(level, x0, patch.secondY, z1, waveBlend,
-                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, secondColor,
                 cameraX, cameraZ, nearRadius, farRadius, textureU0, textureV1);
         VertexData third = vertex(level, x1, patch.thirdY, z1, waveBlend,
-                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, thirdColor,
                 cameraX, cameraZ, nearRadius, farRadius, textureU1, textureV1);
         VertexData fourth = vertex(level, x1, patch.fourthY, z0, waveBlend,
-                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, patchColor,
+                waveProfile, spectrum, timeSeconds, localTideOffset, waveLimit, fourthColor,
                 cameraX, cameraZ, nearRadius, farRadius, textureU1, textureV0);
 
         emitVertex(buffer, pose, sprite, first);
@@ -314,6 +317,10 @@ public final class OceanSurfaceRenderer {
         float absorption = 1.0f - (float) Math.exp(
                 -Math.max(0.0f, depth) * 0.32f * WaterRenderingConfig.surfaceAbsorptionStrength()
         );
+        boolean replacingVanillaTop = WaterRenderingConfig.suppressVanillaWaterTopFaces(level);
+        if (replacingVanillaTop) {
+            absorption = Math.max(absorption, 0.42f);
+        }
 
         // Keep the replacement surface optically water-colored even over dark
         // ocean floors. The shader still applies depth, light, and Fresnel, but
@@ -328,11 +335,13 @@ public final class OceanSurfaceRenderer {
         float green = mix(shallowG, deepG, absorption);
         float blue = mix(shallowB, deepB, absorption);
 
-        float foam = smoothStep(0.0f, 0.8f, 1.15f - depth);
+        // Do not turn every shallow or partially migrated open-ocean column
+        // into bright cyan "foam." ShorelineSurfaceRenderer owns true local
+        // edge foam; this pass should stay optically continuous across water.
+        float foam = replacingVanillaTop ? 0.0f : smoothStep(0.0f, 0.8f, 1.15f - depth);
         red = mix(red, 0.86f, foam);
         green = mix(green, 0.94f, foam);
         blue = mix(blue, 1.0f, foam);
-        boolean replacingVanillaTop = WaterRenderingConfig.suppressVanillaWaterTopFaces(level);
         float baseAlpha = replacingVanillaTop ? 0.76f : 0.50f;
         float depthAlpha = replacingVanillaTop ? 0.22f : 0.12f;
         float alpha = (baseAlpha + absorption * depthAlpha + foam * 0.05f)
@@ -365,11 +374,12 @@ public final class OceanSurfaceRenderer {
         // In strict replacement mode, LOD patches are the visible ocean, not a
         // faint overlay over Minecraft water. Keep them optically dense enough
         // that the hidden vanilla top does not reveal cave-like seafloor shapes.
+        if (replacingVanillaTop) {
+            return edgeFade;
+        }
         float lodFade = patch.size <= 1
                 ? 1.0f
-                : replacingVanillaTop
-                        ? patch.size <= 2 ? 0.98f : 0.94f
-                        : patch.size <= 2 ? 0.58f : 0.42f;
+                : patch.size <= 2 ? 0.58f : 0.42f;
         return Math.max(0.0f, Math.min(1.0f, edgeFade * lodFade));
     }
 
@@ -383,7 +393,7 @@ public final class OceanSurfaceRenderer {
             int maxPatches
     ) {
         long gameTime = level.getGameTime();
-        int maxDynamicCellSize = Math.max(4, WaterRenderingConfig.dynamicOceanMaxCellSize());
+        int maxDynamicCellSize = Math.max(1, WaterRenderingConfig.dynamicOceanMaxCellSize());
         int movementThreshold = Math.max(8, maxDynamicCellSize * 2);
         int cacheLifetimeTicks = Math.max(1, WaterRenderingConfig.dynamicOceanCacheLifetimeTicks());
         boolean stale = cachedLevel != level
@@ -546,27 +556,12 @@ public final class OceanSurfaceRenderer {
             return;
         }
 
-        WaterColumn center = column(
-                level,
-                columns,
-                surfaces,
-                x + cellSize / 2,
-                z + cellSize / 2
-        );
-        float sampledMinimumDepth = center.valid
-                ? Math.min(
-                        center.depth,
-                        Math.min(Math.min(first.depth, second.depth), Math.min(third.depth, fourth.depth))
-                )
-                : 0.0f;
-
         PatchFootprint footprint = validatePatchFootprint(
                 level,
                 surfaces,
                 x,
                 z,
-                cellSize,
-                sampledMinimumDepth
+                cellSize
         );
         if (!footprint.valid) {
             subdivideShorePatch(level, columns, surfaces, rebuiltOwnedTops, x, z, cellSize, maxPatches);
@@ -590,7 +585,11 @@ public final class OceanSurfaceRenderer {
                 footprint.surfaceY,
                 cellSize,
                 footprint.minimumDepth,
-                dominantType(first, second, third, fourth)
+                dominantType(first, second, third, fourth),
+                first.depth,
+                second.depth,
+                third.depth,
+                fourth.depth
         ));
 
         // Strict visual replacement: validated open-water footprints own the
@@ -650,11 +649,11 @@ public final class OceanSurfaceRenderer {
             Map<Long, SurfaceColumn> surfaces,
             int startX,
             int startZ,
-            int cellSize,
-            float sampledMinimumDepth
+            int cellSize
     ) {
         float minimumSurface = Float.POSITIVE_INFINITY;
         float maximumSurface = Float.NEGATIVE_INFINITY;
+        float minimumDepth = Float.POSITIVE_INFINITY;
         boolean replacementSafe = true;
         for (int offsetX = -CONTINUITY_BORDER; offsetX <= cellSize + CONTINUITY_BORDER; offsetX++) {
             for (int offsetZ = -CONTINUITY_BORDER; offsetZ <= cellSize + CONTINUITY_BORDER; offsetZ++) {
@@ -672,12 +671,18 @@ public final class OceanSurfaceRenderer {
                     minimumSurface = Math.min(minimumSurface, covered.surfaceY);
                     maximumSurface = Math.max(maximumSurface, covered.surfaceY);
                 }
+                if (offsetX >= 0 && offsetX < cellSize && offsetZ >= 0 && offsetZ < cellSize) {
+                    minimumDepth = Math.min(minimumDepth, covered.depth);
+                }
             }
         }
         if (maximumSurface - minimumSurface > MAX_SURFACE_STEP) {
             return PatchFootprint.INVALID;
         }
-        return new PatchFootprint(true, replacementSafe, sampledMinimumDepth, (minimumSurface + maximumSurface) * 0.5f);
+        if (!Float.isFinite(minimumDepth)) {
+            return PatchFootprint.INVALID;
+        }
+        return new PatchFootprint(true, replacementSafe, minimumDepth, (minimumSurface + maximumSurface) * 0.5f);
     }
 
     private static WaterColumn column(
@@ -951,7 +956,11 @@ public final class OceanSurfaceRenderer {
             float fourthY,
             int size,
             float depth,
-            WaterBodyClassifier.WaterType waterType
+            WaterBodyClassifier.WaterType waterType,
+            float firstDepth,
+            float secondDepth,
+            float thirdDepth,
+            float fourthDepth
     ) {
     }
 
