@@ -11,11 +11,11 @@ import net.minecraft.world.level.levelgen.Heightmap;
  *
  * <p>Keeping this logic in one place prevents shoreline overlays, open-ocean
  * replacement quads, and underwater fog from disagreeing about partial fills,
- * flow velocity, or the surface height of the same block. Surface renderers
- * render authoritative cells directly. Plain Minecraft water that is still
- * waiting for automatic migration remains a compatibility/migration source
- * instead of becoming replacement geometry. Immersion can still see tagged
- * water while the server catches up.</p>
+ * flow velocity, or the surface height of the same block. Gameplay authority
+ * still comes from Wilderness-owned cells, but the client may draw a visual
+ * replacement preview over exposed plain water while migration catches up.
+ * That prevents the ocean from becoming a mix of Wilderness waves and vanilla
+ * tiled water tops.</p>
  */
 final class ClientWaterColumnSampler {
 
@@ -88,7 +88,7 @@ final class ClientWaterColumnSampler {
                 authority.authorityOwned(),
                 authority.hostedWater(),
                 authority.migrationCandidate(),
-                authority.replacementSurfaceSafe()
+                replacementSurfaceSafeForRendering(authority)
         );
     }
 
@@ -204,7 +204,18 @@ final class ClientWaterColumnSampler {
          * hands that column to Wilderness authority.</p>
          */
         boolean renderableSurface() {
-            return authorityOwned;
+            return authorityOwned || (migrationCandidate && replacementSafe);
         }
+    }
+
+    // Rendering may temporarily cover exposed plain water before server-side
+    // migration has finalized it. This is visual-only: gameplay and storage
+    // still read authorityOwned/canonical state from WildernessWaterAuthority.
+    private static boolean replacementSurfaceSafeForRendering(WildernessWaterAuthority.CellAuthority authority) {
+        return authority.replacementSurfaceSafe()
+                || (authority.migrationCandidate()
+                && authority.plainProjection()
+                && authority.fullSurfaceWater()
+                && !authority.hostedWater());
     }
 }

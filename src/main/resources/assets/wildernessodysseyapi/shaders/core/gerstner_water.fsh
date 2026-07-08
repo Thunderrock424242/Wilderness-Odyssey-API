@@ -70,8 +70,10 @@ void main() {
         celestialDaylight
     );
 
-    vec3 atlasHint = mix(vec3(1.0), waterTexture.rgb, 0.045);
-    vec3 bodyColor = vertexColor.rgb * atlasHint;
+    // The Minecraft water atlas is only a transparency guard here. Letting its
+    // pixels tint the custom surface makes the replacement ocean look like
+    // vanilla tiled water instead of one continuous optical medium.
+    vec3 bodyColor = vertexColor.rgb;
     vec3 deepOpticalBlue = mix(vec3(0.015, 0.155, 0.285), vec3(0.035, 0.235, 0.405), celestialDaylight);
     vec3 skyReflection = mix(vec3(0.12, 0.18, 0.29), vec3(0.60, 0.78, 0.93), celestialDaylight);
     vec3 color = mix(bodyColor, deepOpticalBlue, 0.22);
@@ -83,9 +85,8 @@ void main() {
     color = max(color, bodyColor * 0.52);
     color *= ColorModulator.rgb;
 
-    float textureAlpha = mix(0.94, waterTexture.a, 0.12);
     float alpha = clamp(
-        vertexColor.a * textureAlpha * ColorModulator.a
+        vertexColor.a * ColorModulator.a
             + fresnel * 0.13
             + slopeFoam * 0.045,
         0.0,
