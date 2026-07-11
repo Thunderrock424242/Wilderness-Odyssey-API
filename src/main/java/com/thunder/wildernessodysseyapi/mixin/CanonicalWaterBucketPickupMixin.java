@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
@@ -44,6 +45,7 @@ public abstract class CanonicalWaterBucketPickupMixin {
         LiquidBlock liquidBlock = (LiquidBlock) (Object) this;
         if (!(level instanceof ServerLevel serverLevel)
                 || !WildernessWaterRules.isEnabled(serverLevel)
+                || !WaterSimulationConfig.vanillaBucketCompatEnabled()
                 || !isCanonicalPickupWater(liquidBlock)
                 || state.getValue(BlockStateProperties.LEVEL) != 0) {
             return;

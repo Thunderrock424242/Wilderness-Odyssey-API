@@ -4,6 +4,8 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.shore.ShorelineWaterManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla.EntityWaterCompat;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterSurfaceDisplacement;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
@@ -11,7 +13,6 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifi
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -63,14 +64,15 @@ public final class WaveEntityPhysics {
                 entity.getZ()
         );
 
-        if (entity instanceof Boat boat && !isBoatTouchingWater(boat) && !mobileWater.wet()) {
+        if (entity instanceof Boat boat
+                && (!WaterSimulationConfig.vanillaBoatCompatEnabled()
+                || (!EntityWaterCompat.stateFor(boat).touchingWater() && !mobileWater.wet()))) {
             if (level.isClientSide()) {
                 BoatTiltStore.remove(boat.getId());
             }
             return;
         }
-        if (!entity.isInWater()
-                && !WildernessWaterAuthority.isWaterAt(level, entity.blockPosition())
+        if (!EntityWaterCompat.stateFor(entity).touchingWater()
                 && !mobileWater.wet()
                 && !(entity instanceof Boat)) {
             return;
@@ -284,13 +286,6 @@ public final class WaveEntityPhysics {
         }
         push[0] += flow.velocityX() * strength;
         push[1] += flow.velocityZ() * strength;
-    }
-
-    private static boolean isBoatTouchingWater(Boat boat) {
-        // A floating boat's block position can sit just above the surface, so
-        // check both its feet and the block immediately beneath the hull.
-        return WildernessWaterAuthority.canBoatFloatAt(boat.level(), boat.blockPosition())
-                || WildernessWaterAuthority.canBoatFloatAt(boat.level(), boat.blockPosition().below());
     }
 
     private static GerstnerWaveProfile profileFor(WaterBodyClassifier.WaterType type) {

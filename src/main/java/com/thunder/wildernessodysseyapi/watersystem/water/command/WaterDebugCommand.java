@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
+import com.thunder.wildernessodysseyapi.watersystem.water.compat.WaterCompatibilityRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
@@ -62,6 +63,8 @@ public final class WaterDebugCommand {
                                         IntegerArgumentType.getInteger(context, "chunkRadius")))))
                 .then(Commands.literal("migration")
                         .executes(WaterDebugCommand::migrationStatus))
+                .then(Commands.literal("compat")
+                        .executes(WaterDebugCommand::compatibilityStatus))
                 .then(Commands.literal("visible")
                         .executes(context -> visibleReadiness(context, 2))
                         .then(Commands.argument("chunkRadius", IntegerArgumentType.integer(0, 4))
@@ -362,6 +365,25 @@ public final class WaterDebugCommand {
                 + ", tickBudget=" + WaterSimulationConfig.serverSphParticleTickBudget()
                 + ", visual splashes are client event effects"), false);
         return Math.max(1, status.queuedChunks());
+    }
+
+    private static int compatibilityStatus(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        source.sendSuccess(() -> Component.literal("WO water compatibility"), false);
+        source.sendSuccess(() -> Component.literal("  flags: entity="
+                + onOff(WaterSimulationConfig.entityWaterCompatEnabled())
+                + ", bucket=" + onOff(WaterSimulationConfig.vanillaBucketCompatEnabled())
+                + ", boat=" + onOff(WaterSimulationConfig.vanillaBoatCompatEnabled())
+                + ", fishing=" + onOff(WaterSimulationConfig.fishingCompatEnabled())
+                + ", structures=" + onOff(WaterSimulationConfig.structureWaterMarkersEnabled())
+                + ", fluidHandlers=" + onOff(WaterSimulationConfig.fluidHandlerCompatEnabled())), false);
+        for (WaterCompatibilityRegistry.AdapterStatus status : WaterCompatibilityRegistry.statuses()) {
+            source.sendSuccess(() -> Component.literal("  " + status.id()
+                    + ": level=" + status.compatibilityLevel()
+                    + ", available=" + status.available()
+                    + ", initialized=" + status.initialized()), false);
+        }
+        return Math.max(1, WaterCompatibilityRegistry.statuses().size());
     }
 
     private static int visibleReadiness(CommandContext<CommandSourceStack> context, int chunkRadius) throws CommandSyntaxException {
