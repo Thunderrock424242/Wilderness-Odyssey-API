@@ -220,6 +220,39 @@ public final class WildernessWaterAuthority {
         return sample.valid() ? sample.surfaceHeight() : Float.NaN;
     }
 
+    /**
+     * Returns the complete primitive surface sample used by the public query API.
+     *
+     * <p>Keeping this conversion inside the authority prevents API and
+     * compatibility packages from depending on the package-private hybrid body
+     * implementation. The record contains no Minecraft object references and is
+     * safe to reuse as a short-lived query result.</p>
+     */
+    public static SurfaceAuthority sampleSurface(Level level, double x, double z, float partialTick) {
+        HybridWaterBodyModel.SurfaceSample sample = HybridWaterBodyModel.sampleSurface(level, x, z, partialTick);
+        if (!sample.valid()) {
+            return SurfaceAuthority.INVALID;
+        }
+        HybridWaterBodyModel.SurfaceColumn column = sample.column();
+        return new SurfaceAuthority(
+                true,
+                sample.surfaceHeight(),
+                sample.flowX(),
+                sample.wave().velocityY(),
+                sample.flowZ(),
+                sample.wave().normalX(),
+                sample.wave().normalY(),
+                sample.wave().normalZ(),
+                column.chunkX(),
+                column.chunkZ(),
+                column.surfaceBlockY(),
+                column.floorY(),
+                column.depth(),
+                column.estimatedVolumeUnits(),
+                column.waterType().name()
+        );
+    }
+
     /** Returns whether the entity's eye is inside Wilderness-owned water. */
     public static boolean isEntitySubmerged(Entity entity) {
         Level level = entity.level();
@@ -263,12 +296,28 @@ public final class WildernessWaterAuthority {
      * updates a local sparse cell near the interaction.</p>
      */
     public static boolean addWaterVolume(Level level, BlockPos pos, int amountUnits) {
+        return addWaterVolume(level, pos, amountUnits, false) > 0;
+    }
+
+    /**
+     * Adds or simulates detailed local volume and returns the accepted amount.
+     *
+     * <p>Simulation never imports legacy blocks or creates chunk attachments.
+     * It only inspects loaded state, which makes it safe for fluid handlers to
+     * negotiate a transfer before executing it.</p>
+     */
+    public static int addWaterVolume(Level level, BlockPos pos, int amountUnits, boolean simulate) {
         if (!WildernessWaterRules.isEnabled(level)
                 || !(level instanceof ServerLevel serverLevel)
-                || amountUnits <= 0) {
-            return false;
+                || amountUnits <= 0
+                || !CanonicalWater.canAcceptVolume(serverLevel, pos)) {
+            return 0;
         }
-        return CanonicalWater.addVolume(serverLevel, pos, amountUnits, 0.0f, 0.0f, 0.0f) > 0;
+        if (simulate) {
+            CellAuthority existing = sample(serverLevel, pos);
+            return Math.min(amountUnits, Math.max(0, WaterVolumeChunk.UNITS_PER_BLOCK - existing.volumeUnits()));
+        }
+        return CanonicalWater.addVolume(serverLevel, pos, amountUnits, 0.0f, 0.0f, 0.0f);
     }
 
     /**
@@ -279,18 +328,31 @@ public final class WildernessWaterAuthority {
      * disturb only the interaction area instead of editing the whole body.</p>
      */
     public static boolean removeWaterVolume(Level level, BlockPos pos, int amountUnits) {
+        return removeWaterVolume(level, pos, amountUnits, false) > 0;
+    }
+
+    /** Removes or simulates local volume and returns the drained amount. */
+    public static int removeWaterVolume(Level level, BlockPos pos, int amountUnits, boolean simulate) {
         if (!WildernessWaterRules.isEnabled(level)
                 || !(level instanceof ServerLevel serverLevel)
                 || amountUnits <= 0) {
-            return false;
+            return 0;
         }
-        if (CanonicalWater.getTracked(serverLevel, pos) == null && isWaterAt(serverLevel, pos)) {
+        CellAuthority existing = sample(serverLevel, pos);
+        if (!existing.water() || !existing.authorityOwned() || existing.hostedWater()) {
+            return 0;
+        }
+        int transferable = Math.min(amountUnits, existing.volumeUnits());
+        if (simulate || transferable <= 0) {
+            return transferable;
+        }
+        if (CanonicalWater.getTracked(serverLevel, pos) == null) {
             CanonicalWater.set(serverLevel, pos, WaterVolumeChunk.WaterCell.still(
                     WaterVolumeChunk.UNITS_PER_BLOCK,
                     WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED
             ), true);
         }
-        return CanonicalWater.drainVolume(serverLevel, pos, amountUnits) > 0;
+        return CanonicalWater.drainVolume(serverLevel, pos, transferable);
     }
 
     /** Returns whether a bucket may pick up one full non-hosted Wilderness water cell. */
@@ -477,5 +539,43 @@ public final class WildernessWaterAuthority {
         public float speed() {
             return (float) Math.sqrt(velocityX * velocityX + velocityY * velocityY + velocityZ * velocityZ);
         }
+    }
+
+    /** Primitive large-body surface data exposed to the public authority facade. */
+    public record SurfaceAuthority(
+            boolean valid,
+            float surfaceHeight,
+            float currentX,
+            float currentY,
+            float currentZ,
+            float normalX,
+            float normalY,
+            float normalZ,
+            int chunkX,
+            int chunkZ,
+            int surfaceBlockY,
+            int floorY,
+            float depth,
+            long estimatedVolumeUnits,
+            String waterType
+    ) {
+        /** Shared invalid result for dry or unloaded columns. */
+        public static final SurfaceAuthority INVALID = new SurfaceAuthority(
+                false,
+                Float.NaN,
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                1.0f,
+                0.0f,
+                0,
+                0,
+                0,
+                0,
+                0.0f,
+                0L,
+                "POND"
+        );
     }
 }

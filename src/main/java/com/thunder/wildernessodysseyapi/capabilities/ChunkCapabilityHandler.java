@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.capabilities;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.WaterVolumeSynchronizer;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterMigrationQueue;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
@@ -69,6 +70,12 @@ public final class ChunkCapabilityHandler {
         // it instead of rewriting in the watch callback so chunk sending stays
         // responsive when many ocean chunks stream at once.
         CanonicalWaterMigrationQueue.queueVisibleChunkForFinalization(event.getLevel(), event.getChunk());
+    }
+
+    /** Clears per-player revision state when Minecraft removes a tracked chunk. */
+    @SubscribeEvent
+    public static void onChunkUnwatch(ChunkWatchEvent.UnWatch event) {
+        WaterVolumeSynchronizer.forgetChunk(event.getPlayer(), event.getPos());
     }
 
     @SubscribeEvent

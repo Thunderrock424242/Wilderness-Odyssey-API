@@ -85,6 +85,12 @@ public final class CanonicalWater {
      * destroy the block that owns the waterlogged state.</p>
      */
     public static WaterVolumeChunk.WaterCell getOrImport(ServerLevel level, BlockPos pos, boolean hostedWater) {
+        // Canonical reads must never turn a local simulation or settlement near
+        // a chunk edge into a synchronous chunk load. Callers can retry once the
+        // destination is naturally loaded by Minecraft's normal tracking path.
+        if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
+            return WaterVolumeChunk.WaterCell.EMPTY;
+        }
         LevelChunk chunk = level.getChunkAt(pos);
         var existing = chunk.getExistingData(ModAttachments.WATER_VOLUME);
         if (existing.isPresent() && existing.get().contains(pos)) {
@@ -360,7 +366,10 @@ public final class CanonicalWater {
             boolean projectCompatibility,
             boolean scheduleUpdates
     ) {
-        if (level.isOutsideBuildHeight(pos)) {
+        // Runtime water writes are restricted to already-loaded chunks. This is
+        // especially important for SPH settlement, whose bounded search can
+        // cross a chunk edge while the neighboring chunk is absent.
+        if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
             return;
         }
         volume(level, pos).set(pos, cell);

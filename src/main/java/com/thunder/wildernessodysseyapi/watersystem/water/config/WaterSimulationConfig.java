@@ -14,6 +14,12 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec CONFIG_SPEC;
 
     public static final ModConfigSpec.BooleanValue ENABLE_WILDERNESS_ODYSSEY_WATER;
+    public static final ModConfigSpec.BooleanValue ENABLE_VANILLA_BUCKET_COMPAT;
+    public static final ModConfigSpec.BooleanValue ENABLE_VANILLA_BOAT_COMPAT;
+    public static final ModConfigSpec.BooleanValue ENABLE_ENTITY_WATER_COMPAT;
+    public static final ModConfigSpec.BooleanValue ENABLE_FISHING_COMPAT;
+    public static final ModConfigSpec.BooleanValue ENABLE_STRUCTURE_WATER_MARKERS;
+    public static final ModConfigSpec.BooleanValue ENABLE_FLUID_HANDLER_COMPAT;
     public static final ModConfigSpec.BooleanValue ENABLE_CANONICAL_WORLD_SEEDING;
     public static final ModConfigSpec.BooleanValue CONVERT_SEEDED_WORLD_WATER_TO_WILDERNESS;
     public static final ModConfigSpec.BooleanValue ENABLE_AUTOMATIC_WATER_MIGRATION;
@@ -58,6 +64,24 @@ public final class WaterSimulationConfig {
         ENABLE_WILDERNESS_ODYSSEY_WATER = builder
                 .comment("Master server-config switch for Wilderness Odyssey water authority, migration, local flow, SPH gameplay water, and replacement rendering. The per-world gamerule enableWildernessOdysseyWater can still disable it at runtime.")
                 .define("enableWildernessOdysseyWater", true);
+        ENABLE_VANILLA_BUCKET_COMPAT = builder
+                .comment("Allow vanilla and Wilderness water buckets to translate successful placement and pickup through canonical authority. Disable independently while experimental bucket behavior is being tested.")
+                .define("enableVanillaBucketCompat", true);
+        ENABLE_VANILLA_BOAT_COMPAT = builder
+                .comment("Allow vanilla boats to consume custom surface and current data. This does not change core water simulation when disabled.")
+                .define("enableVanillaBoatCompat", true);
+        ENABLE_ENTITY_WATER_COMPAT = builder
+                .comment("Maintain centralized custom-water contact, submersion, eye, depth, current, and transition state for entities.")
+                .define("enableEntityWaterCompat", true);
+        ENABLE_FISHING_COMPAT = builder
+                .comment("Enable future fishing-bobber integration. No fishing adapter is registered yet.")
+                .define("enableFishingCompat", false);
+        ENABLE_STRUCTURE_WATER_MARKERS = builder
+                .comment("Enable future one-time structure water-marker conversion. No marker adapter is registered yet.")
+                .define("enableStructureWaterMarkers", false);
+        ENABLE_FLUID_HANDLER_COMPAT = builder
+                .comment("Enable future NeoForge fluid-handler translation. No machine bridge is registered yet.")
+                .define("enableFluidHandlerCompat", false);
         ENABLE_CANONICAL_WORLD_SEEDING = builder
                 .comment("Import exposed vanilla ocean, river, and lake columns into canonical water when chunks load.")
                 .define("enableCanonicalWorldSeeding", true);
@@ -171,6 +195,36 @@ public final class WaterSimulationConfig {
     /** Returns whether the pack-level Wilderness water master switch is enabled. */
     public static boolean wildernessWaterEnabled() {
         return ENABLE_WILDERNESS_ODYSSEY_WATER.get();
+    }
+
+    /** Returns whether successful bucket interactions may update custom authority. */
+    public static boolean vanillaBucketCompatEnabled() {
+        return wildernessWaterEnabled() && ENABLE_VANILLA_BUCKET_COMPAT.get();
+    }
+
+    /** Returns whether vanilla boats may consume custom buoyancy/current state. */
+    public static boolean vanillaBoatCompatEnabled() {
+        return wildernessWaterEnabled() && ENABLE_VANILLA_BOAT_COMPAT.get();
+    }
+
+    /** Returns whether centralized entity water-state sampling is active. */
+    public static boolean entityWaterCompatEnabled() {
+        return wildernessWaterEnabled() && ENABLE_ENTITY_WATER_COMPAT.get();
+    }
+
+    /** Returns whether the future fishing adapter is enabled. */
+    public static boolean fishingCompatEnabled() {
+        return wildernessWaterEnabled() && ENABLE_FISHING_COMPAT.get();
+    }
+
+    /** Returns whether the future structure marker adapter is enabled. */
+    public static boolean structureWaterMarkersEnabled() {
+        return wildernessWaterEnabled() && ENABLE_STRUCTURE_WATER_MARKERS.get();
+    }
+
+    /** Returns whether the future NeoForge fluid-handler bridge is enabled. */
+    public static boolean fluidHandlerCompatEnabled() {
+        return wildernessWaterEnabled() && ENABLE_FLUID_HANDLER_COMPAT.get();
     }
 
     /** Returns the bounded import depth used by automatic and command seeding. */

@@ -17,6 +17,7 @@ import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryReporter;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueProcessor;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideWorldUpdater;
+import com.thunder.wildernessodysseyapi.watersystem.water.compat.WaterCompatibilityRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.worldgen.biome.BiomeCompatibilityBootstrap;
 import net.minecraft.world.item.CreativeModeTabs;
@@ -52,6 +53,7 @@ public final class WildernessOdysseyAPIMainModClass {
         LOGGER.info("Initializing Wilderness Odyssey API and mod-conflict tracking");
 
         WildernessWaterRules.bootstrap();
+        WaterCompatibilityRegistry.bootstrap();
 
         // Mod-bus listeners handle lifecycle work that NeoForge runs during startup.
         modEventBus.addListener(this::commonSetup);

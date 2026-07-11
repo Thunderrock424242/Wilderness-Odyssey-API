@@ -43,6 +43,10 @@ public class SPHSimulationManager {
     /** Settled authoritative bodies waiting for nearby canonical capacity. */
     private final Map<SPHSimulator, Long> settlementRetries = new IdentityHashMap<>();
 
+    /** Per-level round-robin cursor that prevents particle-budget starvation. */
+    private final Map<BlockGetter, Integer> tickCursors =
+            Collections.synchronizedMap(new IdentityHashMap<>());
+
     private SPHSimulationManager() {}
 
     /**
@@ -479,20 +483,49 @@ public class SPHSimulationManager {
                     && sim.isTransientSimulation()
                     && !sim.isRemoteMirror());
         }
-        int remainingParticleBudget = particleTickBudget(level);
+        int totalParticleBudget = particleTickBudget(level);
+        int remainingParticleBudget = totalParticleBudget;
+        List<SPHSimulator> levelSimulations = new ArrayList<>();
+        for (SPHSimulator simulator : active) {
+            if (simulator.getLevel() == level) {
+                levelSimulations.add(simulator);
+            }
+        }
+        if (levelSimulations.isEmpty()) {
+            tickCursors.remove(level);
+            return;
+        }
 
-        for (SPHSimulator sim : active) {
-            if (sim.getLevel() != level) {
+        int startIndex = Math.floorMod(tickCursors.getOrDefault(level, 0), levelSimulations.size());
+        tickCursors.put(level, (startIndex + 1) % levelSimulations.size());
+        boolean advancedBudgetedSimulation = false;
+
+        // Rotate the first candidate every level tick. Without this cursor, the
+        // stable active-list order lets early bodies consume the whole budget
+        // forever while later bodies never advance or settle.
+        for (int offset = 0; offset < levelSimulations.size(); offset++) {
+            SPHSimulator sim = levelSimulations.get((startIndex + offset) % levelSimulations.size());
+
+            // Server-owned collision queries must sleep with their naturally
+            // unloaded chunks instead of pulling terrain back into memory.
+            if (level instanceof ServerLevel serverLevel && !simulationAreaLoaded(serverLevel, sim)) {
                 continue;
             }
-
             retrySettlementIfNeeded(level, sim);
             if (!sim.isRemoteMirror()) {
                 int particleCost = Math.max(1, sim.particleCount());
-                if (remainingParticleBudget <= 0 || particleCost > remainingParticleBudget) {
+                if (remainingParticleBudget <= 0) {
                     continue;
                 }
-                remainingParticleBudget -= particleCost;
+                if (particleCost > remainingParticleBudget && advancedBudgetedSimulation) {
+                    continue;
+                }
+
+                // Treat the configured budget as a soft per-level ceiling for
+                // one oversized body. Otherwise lowering the budget below an
+                // existing body's particle count freezes that body permanently.
+                remainingParticleBudget = Math.max(0, remainingParticleBudget - particleCost);
+                advancedBudgetedSimulation = true;
             }
             sim.tick(deltaTime);
             if ((sim.particleCount() == 0 && sim.getCanonicalVolumeUnits() <= 0)
@@ -501,6 +534,23 @@ public class SPHSimulationManager {
                 settlementRetries.remove(sim);
             }
         }
+    }
+
+    private static boolean simulationAreaLoaded(ServerLevel level, SPHSimulator simulator) {
+        List<SPHParticle> particles = simulator.getRenderParticles();
+        if (particles.isEmpty()) {
+            return level.hasChunkAt(BlockPos.containing(
+                    simulator.getCenterX(),
+                    simulator.getCenterY(),
+                    simulator.getCenterZ()
+            ));
+        }
+        for (SPHParticle particle : particles) {
+            if (!level.hasChunkAt(BlockPos.containing(particle.position.x, particle.position.y, particle.position.z))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int particleTickBudget(BlockGetter level) {
@@ -813,6 +863,7 @@ public class SPHSimulationManager {
         settlementRetries.keySet().removeIf(sim -> sim.getLevel() == level);
         active.removeIf(sim -> sim.getLevel() == level);
         restoredPersistentLevels.remove(level);
+        tickCursors.remove(level);
     }
 
     /**
@@ -941,6 +992,7 @@ public class SPHSimulationManager {
         pendingSettlements.clear();
         settlementRetries.clear();
         restoredPersistentLevels.clear();
+        tickCursors.clear();
     }
 
     /**

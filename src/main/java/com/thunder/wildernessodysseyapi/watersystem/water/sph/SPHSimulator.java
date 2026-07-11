@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.sph;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -541,6 +542,14 @@ public class SPHSimulator {
                     previousY + deltaY * progress,
                     previousZ + deltaZ * progress
             );
+            if (level instanceof Level concreteLevel
+                    && !concreteLevel.hasChunkAt(BlockPos.containing(p.position.x, p.position.y, p.position.z))) {
+                // Stop at the last loaded position. The manager will leave this
+                // body asleep until normal player/chunk tracking loads its area.
+                p.position.set(previousX, previousY, previousZ);
+                p.velocity.zero();
+                return;
+            }
             if (resolveCollisionAtCurrentPosition(p)) {
                 return;
             }
