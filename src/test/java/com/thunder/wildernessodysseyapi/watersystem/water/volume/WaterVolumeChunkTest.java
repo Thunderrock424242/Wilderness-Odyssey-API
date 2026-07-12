@@ -49,6 +49,23 @@ class WaterVolumeChunkTest {
     }
 
     @Test
+    void dryGeneratedOverrideSurvivesPersistence() {
+        BlockPos pos = new BlockPos(15, 62, 0);
+        WaterVolumeChunk original = new WaterVolumeChunk();
+        WaterVolumeChunk.WaterCell dryOverride = WaterVolumeChunk.WaterCell.still(
+                0,
+                WaterVolumeChunk.FLAG_GENERATED_OVERRIDE | WaterVolumeChunk.FLAG_DRY_OVERRIDE
+        );
+        original.set(pos, dryOverride);
+
+        WaterVolumeChunk decoded = new WaterVolumeChunk();
+        decoded.deserializeNBT(null, original.serializeNBT(null));
+
+        assertTrue(decoded.contains(pos));
+        assertEquals(dryOverride, decoded.get(pos));
+    }
+
+    @Test
     void packedPositionPreservesNegativeWorldHeight() {
         BlockPos source = new BlockPos(-33, -64, 48);
         int packed = WaterVolumeChunk.pack(source);

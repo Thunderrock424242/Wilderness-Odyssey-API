@@ -35,7 +35,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * terrain render type. That keeps the geometry friendly to Sodium/Iris and
  * avoids custom shader state fighting with shader packs.
  */
-@EventBusSubscriber(modid = "wildernessodysseyapi", value = Dist.CLIENT)
 public class FluidRenderer {
 
     private static final Map<SPHSimulator, FluidMesh> meshMap = new ConcurrentHashMap<>();
@@ -52,7 +51,6 @@ public class FluidRenderer {
     private static final float BASE_G = 0.76f;
     private static final float BASE_B = 1.00f;
 
-    @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
         try (GpuDiagnostics.Scope ignored = GpuDiagnostics.scope("water.sph")) {
@@ -123,7 +121,7 @@ public class FluidRenderer {
         poseStack.popPose();
 
         if (drew) {
-            bufferSource.endBatch(RenderType.translucent());
+            // WaterRenderCoordinator flushes the shared translucent detail batch.
         }
     }
 

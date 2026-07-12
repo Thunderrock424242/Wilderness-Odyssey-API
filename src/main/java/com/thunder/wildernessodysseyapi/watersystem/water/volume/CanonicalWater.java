@@ -25,10 +25,9 @@ import java.util.Set;
 /**
  * Public access point for the server-authoritative Wilderness water volume.
  *
- * <p>Canonical cells own water amount and velocity once a position has been
- * imported or changed. Namespaced Wilderness water is projected from that state
- * so tag-aware Minecraft and third-party systems can continue to detect water
- * without requiring the simulation to write vanilla water blocks forever.</p>
+ * <p>Canonical cells own sparse runtime disturbances. Untouched world water
+ * remains in {@link GeneratedWaterChunk}; a bounded loaded neighborhood is
+ * materialized only when runtime logic changes that generated baseline.</p>
  */
 public final class CanonicalWater {
 
@@ -36,6 +35,7 @@ public final class CanonicalWater {
     private static final int VOLUME_PER_VANILLA_LEVEL = WaterVolumeChunk.UNITS_PER_BLOCK / VANILLA_LEVELS;
     private static final int DISPLACEMENT_VERTICAL_SEARCH = 4;
     private static final int DISPLACEMENT_HORIZONTAL_RADIUS = 2;
+    private static final int GENERATED_MATERIALIZATION_RADIUS = 1;
 
     private static final Map<ServerLevel, ActiveQueue> ACTIVE_QUEUES =
             Collections.synchronizedMap(new IdentityHashMap<>());
@@ -43,13 +43,13 @@ public final class CanonicalWater {
     private CanonicalWater() {
     }
 
-    /** Returns tracked canonical state without importing vanilla water. */
+    /** Returns tracked sparse state without materializing generated water. */
     public static WaterVolumeChunk.WaterCell get(Level level, BlockPos pos) {
         WaterVolumeChunk.WaterCell tracked = getTracked(level, pos);
         return tracked == null ? WaterVolumeChunk.WaterCell.EMPTY : tracked;
     }
 
-    /** Returns tracked state, or {@code null} when vanilla has not been imported. */
+    /** Returns tracked sparse state, including explicit generated-water dry overrides. */
     @Nullable
     public static WaterVolumeChunk.WaterCell getTracked(Level level, BlockPos pos) {
         if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
@@ -68,21 +68,15 @@ public final class CanonicalWater {
         return getTracked(level, pos) != null;
     }
 
-    /**
-     * Imports an existing vanilla water level the first time server logic needs it.
-     * Imported cells remain stable until explicitly disturbed by canonical flow.
-     */
+    /** Materializes generated or provisional Wilderness water for a runtime interaction. */
     public static WaterVolumeChunk.WaterCell getOrImport(ServerLevel level, BlockPos pos) {
         return getOrImport(level, pos, false);
     }
 
     /**
-     * Imports a water cell while preserving whether Minecraft stores that
-     * fluid inside another block's waterlogged state.
-     *
-     * <p>Hosted water is useful for depth, optics, and diagnostics, but it must
-     * never be projected back as a standalone water block because that would
-     * destroy the block that owns the waterlogged state.</p>
+     * Retains the historical hosted-water parameter for source compatibility.
+     * External tagged and waterlogged fluids are not imported by the generated
+     * architecture.
      */
     public static WaterVolumeChunk.WaterCell getOrImport(ServerLevel level, BlockPos pos, boolean hostedWater) {
         // Canonical reads must never turn a local simulation or settlement near
@@ -94,30 +88,28 @@ public final class CanonicalWater {
         LevelChunk chunk = level.getChunkAt(pos);
         var existing = chunk.getExistingData(ModAttachments.WATER_VOLUME);
         if (existing.isPresent() && existing.get().contains(pos)) {
-            WaterVolumeChunk.WaterCell cell = existing.get().get(pos);
-            if (hostedWater && cell.volumeUnits() > 0 && !cell.hostedWater()) {
-                WaterVolumeChunk.WaterCell hosted = cell.withAddedFlags(WaterVolumeChunk.FLAG_HOSTED_WATER);
-                existing.get().set(pos, hosted);
-                return hosted;
-            }
-            return cell;
+            return existing.get().get(pos);
         }
 
-        FluidState fluidState = level.getFluidState(pos);
-        if (!fluidState.is(FluidTags.WATER)) {
+        GeneratedWaterChunk.WaterSpan generated = WildernessWaterAuthority.generatedSpanAt(level, pos);
+        if (WildernessWaterAuthority.matchesGeneratedProjection(level, pos, generated)) {
+            materializeGeneratedNeighborhood(level, pos);
+            WaterVolumeChunk.WaterCell materialized = getTracked(level, pos);
+            return materialized == null ? WaterVolumeChunk.WaterCell.EMPTY : materialized;
+        }
+
+        BlockState state = level.getBlockState(pos);
+        FluidState fluidState = state.getFluidState();
+        if (!WildernessWaterAuthority.isWildernessProjection(state, fluidState)) {
             return WaterVolumeChunk.WaterCell.EMPTY;
         }
 
-        int flags = hostedWater
-                ? WaterVolumeChunk.FLAG_IMPORTED | WaterVolumeChunk.FLAG_HOSTED_WATER
-                : WaterVolumeChunk.FLAG_IMPORTED | WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED;
-        WaterVolumeChunk.WaterCell imported = WaterVolumeChunk.WaterCell.still(
+        WaterVolumeChunk.WaterCell provisional = WaterVolumeChunk.WaterCell.still(
                 WildernessWaterAuthority.volumeUnitsFromFluid(fluidState),
-                flags
+                WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED
         );
-        WaterVolumeChunk volume = chunk.getData(ModAttachments.WATER_VOLUME);
-        volume.set(pos, imported);
-        return imported;
+        chunk.getData(ModAttachments.WATER_VOLUME).set(pos, provisional);
+        return provisional;
     }
 
     /**
@@ -332,11 +324,11 @@ public final class CanonicalWater {
     }
 
     /**
-     * Re-applies the vanilla water compatibility projection for one tracked cell.
+     * Re-applies the namespaced physical projection for one tracked cell.
      *
-     * <p>This is primarily used by debug/repair tooling and chunk migration. It
-     * does not change canonical volume; it only makes the vanilla block state
-     * match the canonical cell so other mods can continue detecting water.</p>
+     * <p>This is primarily used by debug/repair tooling. It
+     * does not change sparse volume; it only makes the physical Wilderness
+     * block state match the tracked cell.</p>
      */
     public static void reprojectCompatibility(ServerLevel level, BlockPos pos) {
         WaterVolumeChunk.WaterCell cell = get(level, pos);
@@ -372,12 +364,53 @@ public final class CanonicalWater {
         if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
             return;
         }
-        volume(level, pos).set(pos, cell);
+        GeneratedWaterChunk.WaterSpan generated = WildernessWaterAuthority.generatedSpanAt(level, pos);
+        if (generated != null) {
+            materializeGeneratedNeighborhood(level, pos);
+        }
+        WaterVolumeChunk.WaterCell effectiveCell = generatedOverrideCell(cell, generated != null);
+        volume(level, pos).set(pos, effectiveCell);
         if (projectCompatibility) {
-            projectCompatibility(level, pos, cell == null ? 0 : cell.volumeUnits());
+            projectCompatibility(level, pos, effectiveCell.volumeUnits());
         }
         if (scheduleUpdates) {
             scheduleAround(level, pos);
+        }
+    }
+
+    /**
+     * Materializes a bounded loaded neighborhood around disturbed generated water.
+     *
+     * <p>The copied cells begin asleep and consume no finite-volume tick budget
+     * until the normal mutation path wakes the affected positions. No chunk is
+     * force-loaded and untouched generated interiors remain span-backed.</p>
+     */
+    public static void materializeGeneratedNeighborhood(ServerLevel level, BlockPos center) {
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int offsetX = -GENERATED_MATERIALIZATION_RADIUS;
+             offsetX <= GENERATED_MATERIALIZATION_RADIUS; offsetX++) {
+            for (int offsetY = -GENERATED_MATERIALIZATION_RADIUS;
+                 offsetY <= GENERATED_MATERIALIZATION_RADIUS; offsetY++) {
+                for (int offsetZ = -GENERATED_MATERIALIZATION_RADIUS;
+                     offsetZ <= GENERATED_MATERIALIZATION_RADIUS; offsetZ++) {
+                    cursor.set(center.getX() + offsetX, center.getY() + offsetY, center.getZ() + offsetZ);
+                    if (level.isOutsideBuildHeight(cursor) || !level.hasChunkAt(cursor)
+                            || getTracked(level, cursor) != null) {
+                        continue;
+                    }
+                    GeneratedWaterChunk.WaterSpan span = WildernessWaterAuthority.generatedSpanAt(level, cursor);
+                    if (!WildernessWaterAuthority.matchesGeneratedProjection(level, cursor, span)) {
+                        continue;
+                    }
+                    WaterVolumeChunk.WaterCell generatedCell = WaterVolumeChunk.WaterCell.still(
+                            span.amountUnits(),
+                            WaterVolumeChunk.FLAG_GENERATED_OVERRIDE
+                                    | WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED
+                                    | WaterVolumeChunk.FLAG_SLEEPING
+                    );
+                    volume(level, cursor).set(cursor, generatedCell);
+                }
+            }
         }
     }
 
@@ -405,6 +438,30 @@ public final class CanonicalWater {
 
     private static WaterVolumeChunk volume(Level level, BlockPos pos) {
         return level.getChunkAt(pos).getData(ModAttachments.WATER_VOLUME);
+    }
+
+    private static WaterVolumeChunk.WaterCell generatedOverrideCell(
+            WaterVolumeChunk.WaterCell cell,
+            boolean generatedBaseline
+    ) {
+        WaterVolumeChunk.WaterCell sanitized = cell == null ? WaterVolumeChunk.WaterCell.EMPTY : cell.sanitized();
+        if (!generatedBaseline) {
+            return sanitized;
+        }
+        int flags = sanitized.flags() | WaterVolumeChunk.FLAG_GENERATED_OVERRIDE;
+        if (sanitized.volumeUnits() <= 0) {
+            flags |= WaterVolumeChunk.FLAG_DRY_OVERRIDE;
+        } else {
+            flags &= ~WaterVolumeChunk.FLAG_DRY_OVERRIDE;
+        }
+        return new WaterVolumeChunk.WaterCell(
+                sanitized.volumeUnits(),
+                sanitized.velocityX(),
+                sanitized.velocityY(),
+                sanitized.velocityZ(),
+                flags,
+                sanitized.temperatureMilliKelvin()
+        ).sanitized();
     }
 
     private static WaterVolumeChunk.WaterCell displacementSource(
@@ -556,9 +613,8 @@ public final class CanonicalWater {
         }
     }
 
-    // Projects fixed-point volume back to Minecraft's eight fluid levels. New
-    // writes use the namespaced Wilderness water block; vanilla water remains
-    // accepted here only as a migration/import source for existing worlds.
+    // Projects fixed-point volume back to the namespaced Wilderness fluid's
+    // eight physical levels.
     private static void projectCompatibility(ServerLevel level, BlockPos pos, int volumeUnits) {
         BlockState current = level.getBlockState(pos);
         if (volumeUnits <= 0) {

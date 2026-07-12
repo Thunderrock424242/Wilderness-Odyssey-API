@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.volume;
 
+import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import net.minecraft.core.BlockPos;
@@ -8,7 +9,9 @@ import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
 
@@ -17,10 +20,10 @@ import net.minecraft.world.phys.Vec3;
  *
  * <p>Future water features should ask this class "what owns this water cell?"
  * instead of checking {@code Blocks.WATER} or {@code Fluids.WATER} directly.
- * Canonical chunk volume is authoritative. Namespaced Wilderness fluid blocks
- * are compatibility projections of that authority. Plain vanilla water is only
- * an import/migration source, so renderers can avoid treating Minecraft water
- * as their fallback simulation.</p>
+ * Sparse runtime overrides are authoritative over the compact generated-water
+ * baseline. Namespaced Wilderness fluid blocks are the physical projection of
+ * those two layers. Vanilla and externally tagged water are observable but do
+ * not become Wilderness-owned state.</p>
  */
 public final class WildernessWaterAuthority {
 
@@ -40,31 +43,19 @@ public final class WildernessWaterAuthority {
     /**
      * Samples one block without mutating world state.
      *
-     * <p>The returned source explains whether the position is truly owned by
-     * Wilderness water, merely projected for tag compatibility, or still
-     * waiting for vanilla-to-Wilderness migration.</p>
+     * <p>The returned source explains whether the position is a sparse runtime
+     * override, an untouched generated cell, a provisional custom projection,
+     * or non-authoritative tagged water.</p>
      */
     public static CellAuthority sample(Level level, BlockPos pos) {
         if (!WildernessWaterRules.isEnabled(level)) {
             return CellAuthority.DRY;
         }
-        CellAuthority cell = sampleCellOnly(level, pos);
-        if (cell.water()) {
-            return cell;
-        }
-
-        HybridWaterBodyModel.LargeBodyCell body = HybridWaterBodyModel.sampleCell(level, pos);
-        if (body.valid()) {
-            return fromLargeBody(body);
-        }
-        return CellAuthority.DRY;
+        return sampleCellOnly(level, pos);
     }
 
     /**
-     * Samples only explicit local cell/projection state.
-     *
-     * <p>Large-body sampling calls this method to find safe surface anchors
-     * without recursively asking the full authority.</p>
+     * Samples explicit sparse, generated, and physical projection state.
      */
     static CellAuthority sampleCellOnly(Level level, BlockPos pos) {
         if (!WildernessWaterRules.isEnabled(level)) {
@@ -82,29 +73,34 @@ public final class WildernessWaterAuthority {
         if (canonical != null) {
             return fromCanonical(canonical, tagWater, plainProjection);
         }
+
+        GeneratedWaterChunk.WaterSpan generated = generatedSpanAt(level, pos);
+        boolean wildernessProjection = isWildernessProjection(blockState, fluidState);
+        if (generated != null && wildernessProjection
+                && volumeUnitsFromFluid(fluidState) == generated.amountUnits()) {
+            return fromGenerated(generated, tagWater, plainProjection);
+        }
+        if (wildernessProjection) {
+            return fromProjection(level, pos, fluidState, tagWater, plainProjection);
+        }
+
         if (!tagWater) {
             return CellAuthority.DRY;
         }
-
         int volumeUnits = volumeUnitsFromFluid(fluidState);
         float fillFraction = volumeUnits / (float) WaterVolumeChunk.UNITS_PER_BLOCK;
         Vec3 flow = fluidState.getFlow(level, pos);
-        boolean wildernessProjection = isWildernessProjection(blockState, fluidState);
         boolean vanillaPlain = blockState.is(Blocks.WATER);
-        WaterSource source = wildernessProjection
-                ? WaterSource.WILDERNESS_PROJECTION
-                : vanillaPlain
-                        ? WaterSource.VANILLA_MIGRATION_SOURCE
-                        : WaterSource.HOSTED_TAGGED_WATER;
-        boolean hosted = !plainProjection;
-        boolean authorityOwned = wildernessProjection;
+        boolean hosted = !(blockState.getBlock() instanceof LiquidBlock);
+        WaterSource source = vanillaPlain
+                ? WaterSource.VANILLA_TAGGED_WATER
+                : hosted ? WaterSource.HOSTED_TAGGED_WATER : WaterSource.EXTERNAL_TAGGED_WATER;
         return new CellAuthority(
                 source,
                 true,
                 false,
-                authorityOwned,
-                authorityOwned,
-                !authorityOwned,
+                false,
+                false,
                 volumeUnits,
                 fillFraction,
                 fluidState.isSource() ? FULL_WATER_SURFACE_HEIGHT : fillFraction,
@@ -115,14 +111,17 @@ public final class WildernessWaterAuthority {
                 plainProjection,
                 hosted,
                 false,
-                wildernessProjection
+                false
         );
     }
 
     /**
-     * Imports tagged water into canonical storage, then returns the authoritative
-     * sample. Use this from server-side migration and interaction paths only.
+     * Materializes generated or provisional Wilderness water for a runtime interaction.
+     *
+     * @deprecated External tagged water is intentionally non-authoritative. New
+     * callers should use explicit volume mutation methods instead.
      */
+    @Deprecated
     public static CellAuthority importIfPresent(ServerLevel level, BlockPos pos, boolean hostedWater) {
         CanonicalWater.getOrImport(level, pos, hostedWater);
         return sample(level, pos);
@@ -131,10 +130,9 @@ public final class WildernessWaterAuthority {
     /**
      * Returns whether authoritative Wilderness water exists at the position.
      *
-     * <p>Temporary vanilla or modded tagged water that has not been imported is
-     * deliberately not treated as gameplay water here. It remains conversion
-     * input for chunk finalization, while canonical volume and namespaced
-     * Wilderness projections are the source of truth.</p>
+     * <p>Vanilla and external tagged water are deliberately not treated as
+     * gameplay water. Sparse runtime state, generated metadata, and namespaced
+     * Wilderness projections are the only owned sources.</p>
      */
     public static boolean isWaterAt(Level level, BlockPos pos) {
         return isWOWaterAt(level, pos);
@@ -151,11 +149,6 @@ public final class WildernessWaterAuthority {
         return sample(level, pos).authorityOwned();
     }
 
-    /** Returns true when a plain vanilla water block still needs migration. */
-    public static boolean isPendingMigration(Level level, BlockPos pos) {
-        return sample(level, pos).migrationCandidate();
-    }
-
     /** Returns the approximate contiguous water depth starting at this block. */
     public static float getWaterDepth(Level level, BlockPos surfacePos) {
         return getWaterDepth(level, surfacePos, 64);
@@ -164,9 +157,8 @@ public final class WildernessWaterAuthority {
     /**
      * Returns the approximate contiguous water depth starting at this block.
      *
-     * <p>The depth is measured in block units by walking downward through
-     * Wilderness-owned cells only. Pending vanilla/tagged water is ignored so
-     * gameplay does not quietly depend on unconverted vanilla water.</p>
+     * <p>The depth is measured in block units through Wilderness-owned cells.
+     * Vanilla and external tagged water remain non-authoritative.</p>
      */
     public static float getWaterDepth(Level level, BlockPos surfacePos, int maxDepth) {
         HybridWaterBodyModel.LargeBodyCell largeBody = HybridWaterBodyModel.sampleCell(level, surfacePos);
@@ -211,7 +203,7 @@ public final class WildernessWaterAuthority {
     /**
      * Returns the animated authoritative surface height for the column.
      *
-     * <p>The height combines the large body's base level, tide, wave profile,
+     * <p>The height combines the generated column baseline, tide, wave profile,
      * and local disturbance. {@link Float#NaN} means the loaded column is not
      * currently owned by Wilderness water.</p>
      */
@@ -323,9 +315,8 @@ public final class WildernessWaterAuthority {
     /**
      * Removes detailed local volume from the Wilderness system.
      *
-     * <p>If a large body owns the position but no detailed override exists yet,
-     * this seeds a local full cell first so buckets and future drainage can
-     * disturb only the interaction area instead of editing the whole body.</p>
+     * <p>If generated water owns the position, the mutation materializes only
+     * a bounded loaded neighborhood into sparse runtime overrides.</p>
      */
     public static boolean removeWaterVolume(Level level, BlockPos pos, int amountUnits) {
         return removeWaterVolume(level, pos, amountUnits, false) > 0;
@@ -346,12 +337,6 @@ public final class WildernessWaterAuthority {
         if (simulate || transferable <= 0) {
             return transferable;
         }
-        if (CanonicalWater.getTracked(serverLevel, pos) == null) {
-            CanonicalWater.set(serverLevel, pos, WaterVolumeChunk.WaterCell.still(
-                    WaterVolumeChunk.UNITS_PER_BLOCK,
-                    WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED
-            ), true);
-        }
         return CanonicalWater.drainVolume(serverLevel, pos, transferable);
     }
 
@@ -370,7 +355,8 @@ public final class WildernessWaterAuthority {
             return false;
         }
         BlockState state = level.getBlockState(pos);
-        return state.isAir() || state.canBeReplaced() || sample(level, pos).migrationCandidate();
+        return state.isAir() || state.canBeReplaced()
+                || isWildernessProjection(state, state.getFluidState());
     }
 
     /** Returns whether a boat should treat this position as floatable water. */
@@ -404,7 +390,11 @@ public final class WildernessWaterAuthority {
     /** Converts Minecraft's eight fluid levels into fixed-point canonical units. */
     public static int volumeUnitsFromFluid(FluidState fluidState) {
         if (!fluidState.is(FluidTags.WATER)) {
-            return 0;
+            boolean wildernessFluid = fluidState.getType().isSame(WildernessFluidRegistry.WILDERNESS_WATER.get())
+                    || fluidState.getType().isSame(WildernessFluidRegistry.FLOWING_WILDERNESS_WATER.get());
+            if (!wildernessFluid) {
+                return 0;
+            }
         }
         int amount = Math.max(1, Math.min(VANILLA_LEVELS, fluidState.getAmount()));
         return amount * VOLUME_PER_VANILLA_LEVEL;
@@ -417,7 +407,24 @@ public final class WildernessWaterAuthority {
     ) {
         int volumeUnits = Math.max(0, canonical.volumeUnits());
         if (volumeUnits <= 0) {
-            return CellAuthority.DRY;
+            return new CellAuthority(
+                    WaterSource.SPARSE_DRY_OVERRIDE,
+                    false,
+                    true,
+                    false,
+                    false,
+                    0,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    tagWater,
+                    plainProjection,
+                    false,
+                    false,
+                    false
+            );
         }
         boolean hosted = canonical.hostedWater();
         float fillFraction = Math.max(0.0f, Math.min(1.0f, canonical.fillFraction()));
@@ -428,7 +435,6 @@ public final class WildernessWaterAuthority {
                 true,
                 true,
                 replacementSafe,
-                false,
                 volumeUnits,
                 fillFraction,
                 volumeUnits >= MIN_FULL_VOLUME_UNITS ? FULL_WATER_SURFACE_HEIGHT : fillFraction,
@@ -443,29 +449,86 @@ public final class WildernessWaterAuthority {
         );
     }
 
-    private static CellAuthority fromLargeBody(HybridWaterBodyModel.LargeBodyCell body) {
+    private static CellAuthority fromGenerated(
+            GeneratedWaterChunk.WaterSpan span,
+            boolean tagWater,
+            boolean plainProjection
+    ) {
+        int volumeUnits = span.amountUnits();
+        float fillFraction = volumeUnits / (float) WaterVolumeChunk.UNITS_PER_BLOCK;
         return new CellAuthority(
-                WaterSource.LARGE_BODY,
+                WaterSource.GENERATED,
                 true,
                 false,
                 true,
-                body.amountUnits() >= MIN_FULL_VOLUME_UNITS,
-                false,
-                body.amountUnits(),
-                body.fillFraction(),
-                body.surfaceFillHeight(),
+                volumeUnits >= MIN_FULL_VOLUME_UNITS,
+                volumeUnits,
+                fillFraction,
+                volumeUnits >= MIN_FULL_VOLUME_UNITS ? FULL_WATER_SURFACE_HEIGHT : fillFraction,
                 0.0f,
                 0.0f,
                 0.0f,
+                tagWater,
+                plainProjection,
                 false,
                 false,
-                false,
-                false,
-                false
+                true
         );
     }
 
-    private static boolean isWildernessProjection(BlockState state, FluidState fluidState) {
+    private static CellAuthority fromProjection(
+            Level level,
+            BlockPos pos,
+            FluidState fluidState,
+            boolean tagWater,
+            boolean plainProjection
+    ) {
+        int volumeUnits = volumeUnitsFromFluid(fluidState);
+        float fillFraction = volumeUnits / (float) WaterVolumeChunk.UNITS_PER_BLOCK;
+        Vec3 flow = fluidState.getFlow(level, pos);
+        return new CellAuthority(
+                WaterSource.WILDERNESS_PROJECTION,
+                true,
+                false,
+                true,
+                volumeUnits >= MIN_FULL_VOLUME_UNITS && plainProjection,
+                volumeUnits,
+                fillFraction,
+                fluidState.isSource() ? FULL_WATER_SURFACE_HEIGHT : fillFraction,
+                (float) flow.x,
+                0.0f,
+                (float) flow.z,
+                tagWater,
+                plainProjection,
+                !plainProjection,
+                false,
+                true
+        );
+    }
+
+    /** Returns the compact generated span at a loaded position, or {@code null}. */
+    static GeneratedWaterChunk.WaterSpan generatedSpanAt(Level level, BlockPos pos) {
+        if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
+            return null;
+        }
+        LevelChunk chunk = level.getChunkAt(pos);
+        return chunk.getExistingData(ModAttachments.GENERATED_WATER)
+                .map(generated -> generated.spanAt(pos))
+                .orElse(null);
+    }
+
+    /** Returns whether the physical Wilderness fluid still matches its immutable generated baseline. */
+    static boolean matchesGeneratedProjection(Level level, BlockPos pos, GeneratedWaterChunk.WaterSpan span) {
+        if (span == null || level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(pos);
+        FluidState fluidState = state.getFluidState();
+        return isWildernessProjection(state, fluidState)
+                && volumeUnitsFromFluid(fluidState) == span.amountUnits();
+    }
+
+    static boolean isWildernessProjection(BlockState state, FluidState fluidState) {
         return state.is(WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get())
                 || fluidState.getType().isSame(WildernessFluidRegistry.WILDERNESS_WATER.get())
                 || fluidState.getType().isSame(WildernessFluidRegistry.FLOWING_WILDERNESS_WATER.get());
@@ -479,12 +542,19 @@ public final class WildernessWaterAuthority {
         CANONICAL,
         /** Canonical chunk volume tracks hosted water inside another block. */
         CANONICAL_HOSTED,
-        /** Cheap high-level body volume represents this interior water cell. */
+        /** Sparse runtime state intentionally suppresses a generated baseline cell. */
+        SPARSE_DRY_OVERRIDE,
+        /** Compact world-generation metadata owns this matching physical fluid cell. */
+        GENERATED,
+        /** Legacy large-body source retained for compatibility with older diagnostics. */
+        @Deprecated
         LARGE_BODY,
-        /** Namespaced Wilderness fluid exists before/without a client snapshot. */
+        /** Namespaced Wilderness fluid exists without matching generated metadata. */
         WILDERNESS_PROJECTION,
-        /** Plain vanilla water remains only as a migration source. */
-        VANILLA_MIGRATION_SOURCE,
+        /** Plain vanilla water exists but is not Wilderness-owned. */
+        VANILLA_TAGGED_WATER,
+        /** A standalone externally registered tagged water fluid is non-authoritative. */
+        EXTERNAL_TAGGED_WATER,
         /** Tagged water exists in a non-plain host block, such as waterlogged vegetation. */
         HOSTED_TAGGED_WATER
     }
@@ -496,7 +566,6 @@ public final class WildernessWaterAuthority {
             boolean canonicalTracked,
             boolean authorityOwned,
             boolean replacementSurfaceSafe,
-            boolean migrationCandidate,
             int volumeUnits,
             float fillFraction,
             float surfaceFillHeight,
@@ -512,7 +581,6 @@ public final class WildernessWaterAuthority {
         /** Shared dry result to avoid allocating for common empty cells. */
         public static final CellAuthority DRY = new CellAuthority(
                 WaterSource.DRY,
-                false,
                 false,
                 false,
                 false,

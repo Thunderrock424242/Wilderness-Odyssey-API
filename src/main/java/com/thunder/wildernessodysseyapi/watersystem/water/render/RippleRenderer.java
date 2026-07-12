@@ -25,7 +25,6 @@ import java.util.*;
  * They are drawn during RenderLevelStageEvent AFTER_TRANSLUCENT_BLOCKS so they
  * composite correctly with the translucent water geometry.
  */
-@EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public class RippleRenderer {
 
     private static final float MAX_RADIUS = 1.8f;
@@ -52,7 +51,6 @@ public class RippleRenderer {
         activeRipples.add(new Ripple(x, y, z));
     }
 
-    @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
         try (GpuDiagnostics.Scope ignored = GpuDiagnostics.scope("water.ripples")) {
@@ -104,7 +102,7 @@ public class RippleRenderer {
         }
 
         poseStack.popPose();
-        bufferSource.endBatch(RenderType.translucent());
+        // WaterRenderCoordinator flushes the shared translucent detail batch.
     }
 
     private static void drawRing(VertexConsumer buffer, PoseStack poseStack,

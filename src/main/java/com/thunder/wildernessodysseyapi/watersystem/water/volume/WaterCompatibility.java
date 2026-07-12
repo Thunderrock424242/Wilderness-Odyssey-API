@@ -16,10 +16,10 @@ import net.minecraft.world.level.material.Fluids;
  * Read-only compatibility and diagnostics view of replacement water at a block position.
  *
  * <p>The replacement system now owns a namespaced water fluid and relies on
- * {@code #minecraft:water} only for import boundaries and broad mod
+ * {@code #minecraft:water} only for broad mod
  * compatibility. Gameplay-facing code should ask {@link WildernessWaterAuthority}
- * for authoritative answers; this helper explains what vanilla/tagged state is
- * still present for commands, repair, migration, and visual diagnostics.</p>
+ * for authoritative answers; this helper reports vanilla/tagged state only as
+ * non-authoritative diagnostic context.</p>
  */
 public final class WaterCompatibility {
 
@@ -75,7 +75,6 @@ public final class WaterCompatibility {
         return new Snapshot(
                 authority.source(),
                 authority.authorityOwned(),
-                authority.migrationCandidate(),
                 authority.replacementSurfaceSafe(),
                 authority.volumeUnits(),
                 authority.fillFraction(),
@@ -104,7 +103,6 @@ public final class WaterCompatibility {
     public record Snapshot(
             WildernessWaterAuthority.WaterSource authoritySource,
             boolean authorityOwned,
-            boolean migrationCandidate,
             boolean replacementSurfaceSafe,
             int authorityVolumeUnits,
             float authorityFillFraction,
@@ -137,14 +135,9 @@ public final class WaterCompatibility {
             return canonicalTracked && canonicalVolumeUnits > 0;
         }
 
-        /** Returns whether a plain vanilla water block still needs migration to Wilderness water. */
-        public boolean pendingPlainVanillaConversion() {
-            return authoritySource == WildernessWaterAuthority.WaterSource.VANILLA_MIGRATION_SOURCE;
-        }
-
-        /** Returns whether tagged water has not yet been imported into canonical storage. */
-        public boolean pendingCanonicalImport() {
-            return migrationCandidate && tagWater && !canonicalTracked;
+        /** Returns whether compact generated metadata owns the physical water cell. */
+        public boolean generatedWater() {
+            return authoritySource == WildernessWaterAuthority.WaterSource.GENERATED;
         }
 
         /** Returns whether a canonical cell lacks the compatibility fluid block/tag it should project. */
@@ -154,7 +147,7 @@ public final class WaterCompatibility {
 
         /** Returns whether this is tagged water inside a non-plain host block, such as kelp or seagrass. */
         public boolean nonPlainTaggedWater() {
-            return tagWater && !plainProjectionBlock;
+            return authoritySource == WildernessWaterAuthority.WaterSource.HOSTED_TAGGED_WATER;
         }
 
         /** Returns a compact velocity magnitude for debug output. */

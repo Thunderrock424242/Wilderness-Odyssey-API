@@ -1,5 +1,10 @@
 # Custom Water System Technical Audit
 
+> Historical baseline (2026-07-10): this audit describes the former
+> migration-based implementation. The direct-generation architecture documented
+> in `overview.md` supersedes its current-state descriptions; keep the findings
+> below as design history and regression context.
+
 Date: 2026-07-10  
 Target: Wilderness Odyssey API, NeoForge 1.21.1  
 Verdict: **major restructuring required before normal-player release; suitable only for controlled experimental testing with backups**

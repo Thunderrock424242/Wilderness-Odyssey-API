@@ -45,7 +45,6 @@ import java.util.Map;
  * same mesh works with a standard translucent RenderType under external shader
  * packs and with the mod's optional optical core shader otherwise.</p>
  */
-@EventBusSubscriber(modid = "wildernessodysseyapi", value = Dist.CLIENT)
 public final class OceanSurfaceRenderer {
 
     private static final FluidState WATER_STATE = Fluids.WATER.defaultFluidState();
@@ -72,7 +71,6 @@ public final class OceanSurfaceRenderer {
     }
 
     /** Renders replacement open-water tops after translucent terrain. */
-    @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
             return;

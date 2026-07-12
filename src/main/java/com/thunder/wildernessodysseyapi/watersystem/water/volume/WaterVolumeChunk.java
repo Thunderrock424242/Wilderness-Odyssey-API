@@ -30,6 +30,10 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
     public static final int FLAG_HOSTED_WATER = 1 << 2;
     /** Local detailed cell is stable and should not consume active-flow ticks until disturbed nearby. */
     public static final int FLAG_SLEEPING = 1 << 3;
+    /** Sparse state intentionally replaces an immutable generated-water baseline cell. */
+    public static final int FLAG_GENERATED_OVERRIDE = 1 << 4;
+    /** Zero-volume override that keeps drained generated water from reappearing through metadata. */
+    public static final int FLAG_DRY_OVERRIDE = 1 << 5;
     /** Primitive integers encoded for each persisted or networked cell. */
     public static final int SERIALIZED_CELL_STRIDE = 7;
 
@@ -57,7 +61,8 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
 
     /**
      * Replaces one canonical cell and increments the synchronization revision.
-     * A zero-volume value removes the sparse entry.
+     * A zero-volume value removes the sparse entry unless it is an explicit dry
+     * override for generated water.
      */
     public void set(BlockPos pos, WaterCell cell) {
         setPacked(pack(pos), cell, true);
@@ -119,7 +124,9 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
     private void setPacked(int packedPosition, WaterCell cell, boolean notify) {
         WaterCell sanitized = cell == null ? WaterCell.EMPTY : cell.sanitized();
         WaterCell previous;
-        if (sanitized.volumeUnits == 0) {
+        boolean retainDryOverride = sanitized.volumeUnits == 0
+                && (sanitized.flags & FLAG_DRY_OVERRIDE) != 0;
+        if (sanitized.volumeUnits == 0 && !retainDryOverride) {
             previous = cells.remove(packedPosition);
             if (previous == null) {
                 return;

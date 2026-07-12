@@ -10,6 +10,8 @@ import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockE
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterShaders;
 import net.minecraft.client.renderer.BiomeColors;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.BlockAndTintGetter;
@@ -17,6 +19,7 @@ import net.minecraft.world.level.material.FluidState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterShadersEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
@@ -34,6 +37,27 @@ public class ClientSetup {
             ResourceLocation.withDefaultNamespace("block/water_overlay");
     private static final ResourceLocation UNDERWATER_OVERLAY =
             ResourceLocation.withDefaultNamespace("textures/misc/underwater.png");
+
+    /**
+     * Assigns both Wilderness fluid states to Minecraft's translucent chunk pass.
+     *
+     * <p>The assignment must happen while client loading is active. Keeping the
+     * source and flowing variants on the same layer also makes the vanilla fluid
+     * mesh a safe fallback until a coordinated custom surface is ready.</p>
+     */
+    @SubscribeEvent
+    public static void onClientSetup(FMLClientSetupEvent event) {
+        event.enqueueWork(() -> {
+            ItemBlockRenderTypes.setRenderLayer(
+                    WildernessFluidRegistry.WILDERNESS_WATER.get(),
+                    RenderType.translucent()
+            );
+            ItemBlockRenderTypes.setRenderLayer(
+                    WildernessFluidRegistry.FLOWING_WILDERNESS_WATER.get(),
+                    RenderType.translucent()
+            );
+        });
+    }
 
     @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
