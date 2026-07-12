@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.volume;
 
+import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
@@ -8,20 +9,17 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifi
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
-import net.minecraft.tags.BiomeTags;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.chunk.LevelChunk;
+
+import java.util.List;
 
 /**
- * Derives cheap large-body water samples for the central water authority.
+ * Derives cheap surface samples from compact generated-water metadata.
  *
  * <p>This is the bridge between Unreal-style surface water and real volumetric
- * gameplay. Large oceans, lakes, rivers, and ponds are represented as bounded
- * columns with a base surface, sampled depth, estimated volume, flow direction,
+ * gameplay. Oceans, lakes, rivers, aquifers, and springs are represented as
+ * generated spans with a base surface, exact baseline depth, flow direction,
  * tide/wave profile, and optional local sparse-cell overrides. It deliberately
  * does not tick every internal water block. Detailed cell simulation remains in
  * {@link WaterVolumeChunk} and is used for buckets, flooding, channels, and
@@ -31,32 +29,25 @@ final class HybridWaterBodyModel {
 
     private static final float TICKS_PER_SECOND = 20.0f;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
-    private static final int SURFACE_SCAN_ABOVE = 6;
-    private static final int SURFACE_SCAN_BELOW_SEA_LEVEL = 48;
-    private static final int MAX_DEPTH_SCAN = 96;
-
     private HybridWaterBodyModel() {
     }
 
     /**
-     * Samples large-body volume occupying one block position.
-     *
-     * <p>The method only trusts water already owned by Wilderness authority as a
-     * surface anchor. Pending vanilla water remains conversion input and never
-     * becomes a fallback body.</p>
+     * Samples generated-body volume occupying one block position.
      */
     static LargeBodyCell sampleCell(Level level, BlockPos pos) {
-        SurfaceColumn column = findSurfaceColumn(level, pos.getX(), pos.getZ(), pos.getY());
+        WildernessWaterAuthority.CellAuthority authority = WildernessWaterAuthority.sampleCellOnly(level, pos);
+        if (!authority.water() || !authority.authorityOwned()) {
+            return LargeBodyCell.INVALID;
+        }
+        SurfaceColumn column = findSurfaceColumn(level, pos.getX(), pos.getZ());
         if (!column.valid()
                 || pos.getY() > column.surfaceBlockY()
                 || pos.getY() <= column.floorY()) {
             return LargeBodyCell.INVALID;
         }
 
-        int amount = pos.getY() == column.surfaceBlockY()
-                ? Math.max(1, Math.min(WaterVolumeChunk.UNITS_PER_BLOCK,
-                Math.round(column.baseSurfaceFill() * WaterVolumeChunk.UNITS_PER_BLOCK)))
-                : WaterVolumeChunk.UNITS_PER_BLOCK;
+        int amount = authority.volumeUnits();
         float fillFraction = amount / (float) WaterVolumeChunk.UNITS_PER_BLOCK;
         return new LargeBodyCell(
                 true,
@@ -78,7 +69,7 @@ final class HybridWaterBodyModel {
      */
     static SurfaceSample sampleSurface(Level level, double x, double z, float partialTick) {
         BlockPos columnPos = BlockPos.containing(x, level.getSeaLevel(), z);
-        SurfaceColumn column = findSurfaceColumn(level, columnPos.getX(), columnPos.getZ(), level.getSeaLevel());
+        SurfaceColumn column = findSurfaceColumn(level, columnPos.getX(), columnPos.getZ());
         if (!column.valid()) {
             return SurfaceSample.INVALID;
         }
@@ -107,116 +98,54 @@ final class HybridWaterBodyModel {
         );
     }
 
-    private static SurfaceColumn findSurfaceColumn(Level level, int x, int z, int referenceY) {
+    private static SurfaceColumn findSurfaceColumn(Level level, int x, int z) {
         BlockPos chunkProbe = new BlockPos(x, level.getSeaLevel(), z);
         if (level.isOutsideBuildHeight(chunkProbe) || !level.hasChunkAt(chunkProbe)) {
             return SurfaceColumn.INVALID;
         }
-
-        int heightY = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1;
-        int terrainHash = terrainHash(level, x, z, heightY);
-        long cacheKey = columnKey(x, z);
-        if (level instanceof ServerLevel serverLevel) {
-            HybridWaterBodyModel.SurfaceColumn cached =
-                    LargeWaterBodySavedData.get(serverLevel).getColumn(cacheKey, terrainHash);
-            if (cached != null) {
-                return cached;
-            }
+        LevelChunk chunk = level.getChunkAt(chunkProbe);
+        GeneratedWaterChunk generated = chunk.getExistingData(ModAttachments.GENERATED_WATER).orElse(null);
+        if (generated == null) {
+            return SurfaceColumn.INVALID;
+        }
+        int column = (x & 15) | ((z & 15) << 4);
+        List<GeneratedWaterChunk.WaterSpan> spans = generated.snapshot().spansForColumn(column);
+        if (spans.isEmpty()) {
+            return SurfaceColumn.INVALID;
+        }
+        GeneratedWaterChunk.WaterSpan topSpan = spans.get(spans.size() - 1);
+        int surfaceY = topSpan.topY();
+        BlockPos surfacePos = new BlockPos(x, surfaceY, z);
+        WildernessWaterAuthority.CellAuthority cell = WildernessWaterAuthority.sampleCellOnly(level, surfacePos);
+        if (!cell.water() || !cell.authorityOwned() || cell.hostedWater()) {
+            return SurfaceColumn.INVALID;
         }
 
-        int startY = Math.min(
-                level.getMaxBuildHeight() - 1,
-                Math.max(Math.max(referenceY, heightY), level.getSeaLevel()) + SURFACE_SCAN_ABOVE
+        int floorY = generated.snapshot().floorY(x & 15, z & 15);
+        float baseSurfaceFill = Math.max(0.05f, Math.min(1.0f, cell.surfaceFillHeight()));
+        float baseSurfaceHeight = surfaceY + baseSurfaceFill;
+        float depth = Math.max(0.0f, baseSurfaceHeight - (floorY + 1.0f));
+        long estimatedVolume = spans.stream()
+                .mapToLong(span -> (long) (span.topY() - span.bottomY() + 1) * span.amountUnits())
+                .sum();
+        WaterBodyClassifier.WaterType type = classifyWaterType(topSpan.cell().bodyType());
+        return new SurfaceColumn(
+                true,
+                x >> 4,
+                z >> 4,
+                x & ~15,
+                (x & ~15) + 15,
+                z & ~15,
+                (z & ~15) + 15,
+                surfaceY,
+                baseSurfaceFill,
+                baseSurfaceHeight,
+                floorY,
+                depth,
+                estimatedVolume,
+                isShorelineColumn(level, x, surfaceY, z),
+                type
         );
-        int stopY = Math.max(
-                level.getMinBuildHeight(),
-                Math.min(referenceY, level.getSeaLevel() - SURFACE_SCAN_BELOW_SEA_LEVEL)
-        );
-
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        for (int y = startY; y >= stopY; y--) {
-            cursor.set(x, y, z);
-            if (!level.hasChunkAt(cursor)) {
-                return SurfaceColumn.INVALID;
-            }
-            WildernessWaterAuthority.CellAuthority cell = WildernessWaterAuthority.sampleCellOnly(level, cursor);
-            if (isLargeBodySurfaceAnchor(cell)) {
-                int floorY = findFloorY(level, x, y, z);
-                if (floorY >= y) {
-                    return SurfaceColumn.INVALID;
-                }
-                WaterBodyClassifier.WaterType type = classifyWaterType(level, cursor);
-                float baseSurfaceFill = Math.max(0.05f, Math.min(1.0f, cell.surfaceFillHeight()));
-                float baseSurfaceHeight = y + baseSurfaceFill;
-                float depth = Math.max(0.0f, baseSurfaceHeight - (floorY + 1.0f));
-                boolean shoreline = isShorelineColumn(level, x, y, z);
-                long estimatedVolume = Math.max(0L, Math.round(depth * 16.0f * 16.0f
-                        * WaterVolumeChunk.UNITS_PER_BLOCK));
-                SurfaceColumn sampled = new SurfaceColumn(
-                        true,
-                        x >> 4,
-                        z >> 4,
-                        x & ~15,
-                        (x & ~15) + 15,
-                        z & ~15,
-                        (z & ~15) + 15,
-                        y,
-                        baseSurfaceFill,
-                        baseSurfaceHeight,
-                        floorY,
-                        depth,
-                        estimatedVolume,
-                        shoreline,
-                        type
-                );
-                if (level instanceof ServerLevel serverLevel) {
-                    LargeWaterBodySavedData.get(serverLevel).putColumn(cacheKey, terrainHash, sampled);
-                }
-                return sampled;
-            }
-        }
-        return SurfaceColumn.INVALID;
-    }
-
-    private static long columnKey(int x, int z) {
-        return ((long) x & 0xFFFFFFFFL) | (((long) z & 0xFFFFFFFFL) << 32);
-    }
-
-    private static int terrainHash(Level level, int x, int z, int heightY) {
-        int hash = 17;
-        hash = 31 * hash + heightY;
-        hash = 31 * hash + level.getSeaLevel();
-        hash = 31 * hash + level.dimension().location().hashCode();
-        BlockPos probe = new BlockPos(x, heightY, z);
-        if (!level.isOutsideBuildHeight(probe) && level.hasChunkAt(probe)) {
-            hash = 31 * hash + level.getBlockState(probe).hashCode();
-        }
-        return hash;
-    }
-
-    private static boolean isLargeBodySurfaceAnchor(WildernessWaterAuthority.CellAuthority cell) {
-        return cell.water()
-                && cell.authorityOwned()
-                && !cell.hostedWater()
-                && cell.fillFraction() >= 0.75f
-                && (cell.imported()
-                || cell.source() == WildernessWaterAuthority.WaterSource.WILDERNESS_PROJECTION);
-    }
-
-    private static int findFloorY(Level level, int x, int surfaceY, int z) {
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        int minY = Math.max(level.getMinBuildHeight(), surfaceY - MAX_DEPTH_SCAN);
-        for (int y = surfaceY - 1; y >= minY; y--) {
-            cursor.set(x, y, z);
-            if (!level.hasChunkAt(cursor)) {
-                break;
-            }
-            BlockState state = level.getBlockState(cursor);
-            if (!state.getCollisionShape(level, cursor).isEmpty()) {
-                return y;
-            }
-        }
-        return minY;
     }
 
     private static boolean isShorelineColumn(Level level, int x, int y, int z) {
@@ -240,17 +169,12 @@ final class HybridWaterBodyModel {
         return false;
     }
 
-    private static WaterBodyClassifier.WaterType classifyWaterType(Level level, BlockPos pos) {
-        Holder<Biome> biomeHolder = level.getBiome(pos);
-        if (biomeHolder.is(BiomeTags.IS_OCEAN)
-                || biomeHolder.is(BiomeTags.IS_DEEP_OCEAN)
-                || biomeHolder.is(BiomeTags.IS_BEACH)) {
-            return WaterBodyClassifier.WaterType.OCEAN;
-        }
-        if (biomeHolder.is(BiomeTags.IS_RIVER)) {
-            return WaterBodyClassifier.WaterType.RIVER;
-        }
-        return WaterBodyClassifier.WaterType.POND;
+    private static WaterBodyClassifier.WaterType classifyWaterType(GeneratedWaterChunk.BodyType bodyType) {
+        return switch (bodyType) {
+            case OCEAN -> WaterBodyClassifier.WaterType.OCEAN;
+            case RIVER -> WaterBodyClassifier.WaterType.RIVER;
+            case LAKE, AQUIFER, SPRING -> WaterBodyClassifier.WaterType.POND;
+        };
     }
 
     private static WaveSurfaceSample sampleWave(

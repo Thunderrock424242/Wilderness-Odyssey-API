@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.core;
 
 import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -35,6 +36,18 @@ public final class ModAttachments {
                 }
                 return volume;
             }).build()
+    );
+
+    /** Persistent compact baseline recorded while a {@link net.minecraft.world.level.chunk.ProtoChunk} is generated. */
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<GeneratedWaterChunk>> GENERATED_WATER = ATTACHMENTS.register(
+            "generated_water",
+            () -> AttachmentType.serializable(holder -> {
+                GeneratedWaterChunk generated = new GeneratedWaterChunk();
+                if (holder instanceof ChunkAccess chunk) {
+                    generated.setDirtyListener(() -> chunk.setUnsaved(true));
+                }
+                return generated;
+            }).sync(GeneratedWaterChunk.STREAM_CODEC).build()
     );
 
     private ModAttachments() {

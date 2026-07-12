@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.watersystem.water.render.OceanSurfaceRenderer;
+import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderCoordinator;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
@@ -59,7 +59,7 @@ public class GerstnerWaveRenderMixin {
                 WaterCompatibility.isTaggedWater(fluidState)
                         && WaterRenderingConfig.replacementWaterRenderingEnabled(concreteLevel)
                         && WaterRenderingConfig.suppressVanillaWaterTopFaces(concreteLevel)
-                        && OceanSurfaceRenderer.ownsBakedTop(pos)
+                        && WaterRenderCoordinator.ownsBakedTop(pos)
         );
     }
 

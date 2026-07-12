@@ -4,7 +4,6 @@ import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.WaterVolumeSynchronizer;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterMigrationQueue;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -52,24 +51,6 @@ public final class ChunkCapabilityHandler {
         if (!waterEnabled) {
             return;
         }
-        // Chunk load may run on Minecraft's streaming path, so never rewrite
-        // water blocks here. Loaded chunks are priority-queued once players
-        // exist, then the server tick queue performs bounded finalization.
-        if (!chunkData.isWaterFinalized()) {
-            CanonicalWaterMigrationQueue.queueLoadedChunkForFinalization(level, chunk);
-        }
-    }
-
-    @SubscribeEvent
-    public static void onChunkWatch(ChunkWatchEvent.Watch event) {
-        if (!WildernessWaterRules.isEnabled(event.getLevel())) {
-            return;
-        }
-        // A watched chunk is the first safe player-visible boundary: worldgen is
-        // done, the chunk is loaded, and a player is about to see it. Promote
-        // it instead of rewriting in the watch callback so chunk sending stays
-        // responsive when many ocean chunks stream at once.
-        CanonicalWaterMigrationQueue.queueVisibleChunkForFinalization(event.getLevel(), event.getChunk());
     }
 
     /** Clears per-player revision state when Minecraft removes a tracked chunk. */

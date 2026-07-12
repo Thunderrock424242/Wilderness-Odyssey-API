@@ -43,7 +43,6 @@ import java.util.List;
  * mode it also claims matching vanilla top faces so Minecraft water remains the
  * compatibility mask, not the visible surface.</p>
  */
-@EventBusSubscriber(modid = "wildernessodysseyapi", value = Dist.CLIENT)
 public final class ShorelineSurfaceRenderer {
 
     private static final FluidState WATER_STATE = Fluids.WATER.defaultFluidState();
@@ -68,7 +67,6 @@ public final class ShorelineSurfaceRenderer {
     }
 
     /** Renders local water detail after the translucent terrain pass. */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
             return;

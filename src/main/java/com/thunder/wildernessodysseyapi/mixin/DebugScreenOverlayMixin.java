@@ -4,6 +4,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.thunder.wildernessodysseyapi.debugoverlay.client.DebugOverlayAnimator;
 import com.thunder.wildernessodysseyapi.debugoverlay.client.DebugOverlayLineFilter;
 import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuProfiler;
+import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderDiagnostics;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.DebugScreenOverlay;
 import org.spongepowered.asm.mixin.Mixin;
@@ -37,6 +38,9 @@ public abstract class DebugScreenOverlayMixin {
     private void wildernessOdysseyApi$filterSystemInformation(CallbackInfoReturnable<List<String>> cir) {
         List<String> lines = new ArrayList<>(DebugOverlayLineFilter.filterSystemLines(cir.getReturnValue()));
         lines.addAll(GpuProfiler.debugLines());
+        // Water diagnostics live beside the existing GPU counters so render
+        // regressions can be inspected without opening a separate HUD.
+        lines.addAll(WaterRenderDiagnostics.debugLines());
         cir.setReturnValue(lines);
     }
 }

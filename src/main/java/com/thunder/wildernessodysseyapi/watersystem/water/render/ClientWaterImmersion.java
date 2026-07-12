@@ -1,30 +1,29 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
-import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
-import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 
 /**
- * Resolves camera immersion against canonical fill and the animated surface.
+ * Resolves camera immersion from immutable snapshots and the GPU surface equation.
  *
- * <p>Vanilla tests only the flat fluid height stored in a block. This resolver
- * retains that fluid as the compatibility source, then applies the same
- * Gerstner/tide surface used by the replacement renderer so fog and overlays
- * cross the visible wave rather than an invisible horizontal plane.</p>
+ * <p>No block, heightmap, or mutable authority scan occurs here. The same base
+ * surface, body blend, tide, synchronized sea state, and shader-compatible
+ * Gerstner calculation drive both visible geometry and underwater transitions.</p>
  */
 public final class ClientWaterImmersion {
 
-    private static final int MAX_SURFACE_SCAN = 64;
-    private static final int MAX_DEPTH_SAMPLE = 32;
+    private static final float VISUAL_TIDE_SCALE = 0.18f;
+    private static final float EXIT_HYSTERESIS = 0.08f;
 
     private static ClientLevel cachedLevel;
     private static long cachedGameTime = Long.MIN_VALUE;
@@ -37,24 +36,21 @@ public final class ClientWaterImmersion {
 
     /** Returns the camera's current bounded water-immersion state. */
     public static ImmersionState sample(Camera camera, float partialTick) {
-        if (!(camera.getEntity().level() instanceof ClientLevel level)) {
+        if (!(camera.getEntity().level() instanceof ClientLevel level)
+                || !WildernessWaterRules.isEnabled(level)) {
             return ImmersionState.DRY;
         }
-        if (!WildernessWaterRules.isEnabled(level)) {
-            clear(level);
-            return ImmersionState.DRY;
-        }
-
         Vec3 cameraPosition = camera.getPosition();
         if (isCached(level, cameraPosition, partialTick)) {
             return cachedState;
         }
 
+        ImmersionState previous = cachedLevel == level ? cachedState : ImmersionState.DRY;
         cachedLevel = level;
         cachedGameTime = level.getGameTime();
         cachedPartialTick = partialTick;
         cachedCameraPosition = cameraPosition;
-        cachedState = resolve(level, cameraPosition);
+        cachedState = resolve(level, cameraPosition, partialTick, previous);
         return cachedState;
     }
 
@@ -69,144 +65,99 @@ public final class ClientWaterImmersion {
         }
     }
 
-    private static ImmersionState resolve(ClientLevel level, Vec3 cameraPosition) {
-        int x = (int) Math.floor(cameraPosition.x);
-        int z = (int) Math.floor(cameraPosition.z);
-        int cameraY = (int) Math.floor(cameraPosition.y);
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos(x, cameraY, z);
-        if (!level.hasChunkAt(cursor)) {
-            return ImmersionState.DRY;
+    private static ImmersionState resolve(
+            ClientLevel level,
+            Vec3 cameraPosition,
+            float partialTick,
+            ImmersionState previous
+    ) {
+        int blockX = (int) Math.floor(cameraPosition.x);
+        int blockZ = (int) Math.floor(cameraPosition.z);
+        ClientWaterChunkSnapshot snapshot = ClientWaterSnapshotStore.getAtBlock(level, blockX, blockZ);
+        if (snapshot == null) {
+            return resolveMobileWater(level, cameraPosition);
         }
-
-        // The two-block downward allowance captures a wave crest that rises
-        // above vanilla's otherwise flat top fluid block.
-        int waterY = Integer.MIN_VALUE;
-        for (int offset = 0; offset <= 2; offset++) {
-            cursor.set(x, cameraY - offset, z);
-            if (ClientWaterColumnSampler.hasWater(level, cursor)) {
-                waterY = cursor.getY();
-                break;
-            }
-        }
-        if (waterY == Integer.MIN_VALUE) {
+        ClientWaterChunkSnapshot.Column column = snapshot.column(blockX & 15, blockZ & 15);
+        if (!column.wet()) {
             return resolveMobileWater(level, cameraPosition);
         }
 
-        int topY = waterY;
-        int scanned = 0;
-        while (topY + 1 < level.getMaxBuildHeight() && scanned++ < MAX_SURFACE_SCAN) {
-            cursor.set(x, topY + 1, z);
-            if (!ClientWaterColumnSampler.hasWater(level, cursor)) {
-                break;
-            }
-            topY++;
-        }
-
-        BlockPos surfacePos = new BlockPos(x, topY, z);
-        ClientWaterColumnSampler.CellSample surfaceCell =
-                ClientWaterColumnSampler.sampleCell(level, surfacePos);
-        if (!surfaceCell.valid()) {
-            return ImmersionState.DRY;
-        }
-
-        float baseSurfaceY = topY + surfaceCell.surfaceFillHeight();
-        float columnDepth = ClientWaterColumnSampler.scanDepthFromSurface(
-                level,
-                surfacePos,
-                surfaceCell.fillFraction(),
-                MAX_DEPTH_SAMPLE
+        OceanSeaState.Sample sea = ClientOceanSeaState.current(level);
+        float oceanWeight = column.oceanWeight() / 255.0f;
+        float riverWeight = column.riverWeight() / 255.0f;
+        float lakeWeight = column.lakeWeight() / 255.0f;
+        float timeSeconds = (level.getGameTime() + partialTick) / 20.0f;
+        float surfaceY = WaterSurfaceEquation.snapshotSurfaceHeight(
+                column.baseSurfaceY(),
+                (float) cameraPosition.x,
+                (float) cameraPosition.z,
+                timeSeconds,
+                sea.strength(),
+                sea.windDirectionX(),
+                sea.windDirectionZ(),
+                oceanWeight,
+                riverWeight,
+                lakeWeight,
+                TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE
         );
-        WaterBodyClassifier.WaterType waterType = WaterBodyClassifier.classify(level, surfacePos);
-
-        float animatedHeight = 0.0f;
-        if (WaterRenderingConfig.replacementWaterRenderingEnabled(level)) {
-            float waveBlend = smoothStep(0.35f, 4.0f, columnDepth);
-            animatedHeight = GerstnerWaveAnimator.getSurfaceSampleAt(
-                    (float) cameraPosition.x,
-                    (float) cameraPosition.z,
-                    waterType
-            ).height() * waveBlend;
+        float depthBelowSurface = surfaceY - (float) cameraPosition.y;
+        boolean withinColumn = cameraPosition.y >= column.floorY() + 0.92f
+                && cameraPosition.y <= surfaceY + (previous.waterColumnPresent() ? EXIT_HYSTERESIS : 0.0f);
+        if (!withinColumn) {
+            return resolveMobileWater(level, cameraPosition);
         }
 
-        float surfaceY = baseSurfaceY + animatedHeight;
-        float depthBelowSurface = surfaceY - (float) cameraPosition.y;
-        float disturbance = clamp(surfaceCell.speed() / 1.5f, 0.0f, 1.0f);
+        float columnDepth = Math.max(0.05f, surfaceY - (column.floorY() + 1.0f));
         float daylight = LightTexture.getBrightness(
                 level.dimensionType(),
-                level.getMaxLocalRawBrightness(surfacePos)
+                level.getMaxLocalRawBrightness(new BlockPos(blockX, column.surfaceBlockY(), blockZ))
         );
-        float seaState = waterType == WaterBodyClassifier.WaterType.OCEAN
-                ? ClientOceanSeaState.current(level).strength()
-                : 0.0f;
-
-        int tint = IClientFluidTypeExtensions.of(Fluids.WATER).getTintColor(
-                Fluids.WATER.defaultFluidState(),
-                level,
-                surfacePos
-        );
+        float[] tint = bodyTint(oceanWeight, riverWeight, lakeWeight);
         UnderwaterOpticsModel.OpticalProperties optics = UnderwaterOpticsModel.evaluate(
                 depthBelowSurface,
                 columnDepth,
-                disturbance,
+                0.0f,
                 daylight,
-                ((tint >> 16) & 0xFF) / 255.0f,
-                ((tint >> 8) & 0xFF) / 255.0f,
-                (tint & 0xFF) / 255.0f,
-                seaState,
+                tint[0],
+                tint[1],
+                tint[2],
+                sea.strength() * oceanWeight,
                 WaterRenderingConfig.UNDERWATER_VISIBILITY_BLOCKS.get().floatValue(),
                 WaterRenderingConfig.UNDERWATER_TURBIDITY_STRENGTH.get().floatValue()
         );
-        return new ImmersionState(true, surfaceY, depthBelowSurface, seaState, optics);
+        return new ImmersionState(true, surfaceY, depthBelowSurface,
+                sea.strength() * oceanWeight, optics);
     }
 
     private static ImmersionState resolveMobileWater(ClientLevel level, Vec3 cameraPosition) {
-        if (!WildernessWaterRules.isEnabled(level)) {
-            return ImmersionState.DRY;
-        }
         SPHSimulationManager.MobileWaterSample mobile = SPHSimulationManager.get().sampleAt(
-                level,
-                cameraPosition.x,
-                cameraPosition.y,
-                cameraPosition.z
-        );
+                level, cameraPosition.x, cameraPosition.y, cameraPosition.z);
         if (!mobile.wet()) {
             return ImmersionState.DRY;
         }
-
-        BlockPos cameraPos = BlockPos.containing(cameraPosition);
-        int tint = IClientFluidTypeExtensions.of(Fluids.WATER).getTintColor(
-                Fluids.WATER.defaultFluidState(),
-                level,
-                cameraPos
-        );
         float disturbance = clamp((float) Math.sqrt(
                 mobile.velocityX() * mobile.velocityX()
                         + mobile.velocityY() * mobile.velocityY()
-                        + mobile.velocityZ() * mobile.velocityZ()
-        ) / 1.5f, 0.0f, 1.0f);
+                        + mobile.velocityZ() * mobile.velocityZ()) / 1.5f, 0.0f, 1.0f);
+        BlockPos cameraPos = BlockPos.containing(cameraPosition);
         float daylight = LightTexture.getBrightness(
-                level.dimensionType(),
-                level.getMaxLocalRawBrightness(cameraPos)
-        );
+                level.dimensionType(), level.getMaxLocalRawBrightness(cameraPos));
         UnderwaterOpticsModel.OpticalProperties optics = UnderwaterOpticsModel.evaluate(
-                0.35f,
-                1.0f,
-                disturbance,
-                daylight,
-                ((tint >> 16) & 0xFF) / 255.0f,
-                ((tint >> 8) & 0xFF) / 255.0f,
-                (tint & 0xFF) / 255.0f,
-                0.0f,
+                0.35f, 1.0f, disturbance, daylight,
+                0.03f, 0.34f, 0.62f, 0.0f,
                 WaterRenderingConfig.UNDERWATER_VISIBILITY_BLOCKS.get().floatValue(),
                 WaterRenderingConfig.UNDERWATER_TURBIDITY_STRENGTH.get().floatValue()
         );
-        return new ImmersionState(
-                true,
-                (float) cameraPosition.y + 0.35f,
-                0.35f,
-                0.0f,
-                optics
-        );
+        return new ImmersionState(true, (float) cameraPosition.y + 0.35f,
+                0.35f, 0.0f, optics);
+    }
+
+    private static float[] bodyTint(float ocean, float river, float lake) {
+        return new float[]{
+                0.018f * ocean + 0.035f * river + 0.045f * lake,
+                0.25f * ocean + 0.35f * river + 0.38f * lake,
+                0.62f * ocean + 0.58f * river + 0.52f * lake
+        };
     }
 
     private static boolean isCached(ClientLevel level, Vec3 cameraPosition, float partialTick) {
@@ -214,11 +165,6 @@ public final class ClientWaterImmersion {
                 && cachedGameTime == level.getGameTime()
                 && Math.abs(cachedPartialTick - partialTick) < 1.0e-4f
                 && cachedCameraPosition.distanceToSqr(cameraPosition) < 1.0e-8;
-    }
-
-    private static float smoothStep(float edge0, float edge1, float value) {
-        float t = clamp((value - edge0) / (edge1 - edge0), 0.0f, 1.0f);
-        return t * t * (3.0f - 2.0f * t);
     }
 
     private static float clamp(float value, float minimum, float maximum) {
@@ -233,7 +179,6 @@ public final class ClientWaterImmersion {
             float seaState,
             UnderwaterOpticsModel.OpticalProperties optics
     ) {
-        /** Shared dry value for unloaded or water-free camera positions. */
         public static final ImmersionState DRY = new ImmersionState(
                 false,
                 Float.NEGATIVE_INFINITY,
@@ -243,7 +188,7 @@ public final class ClientWaterImmersion {
                         1.0f, 128.0f, 0.0f, 0.0f, 0.0f)
         );
 
-        /** Returns whether any visible underwater transition should be active. */
+        /** Returns whether any smooth underwater transition should be active. */
         public boolean isVisuallySubmerged() {
             return waterColumnPresent && optics.immersionBlend() > 0.001f;
         }

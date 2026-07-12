@@ -1,14 +1,24 @@
 #version 150
 
 uniform sampler2D Sampler0;
+uniform sampler2D SceneColor;
+uniform sampler2D SceneDepth;
 uniform vec4 ColorModulator;
 uniform float FogStart;
 uniform float FogEnd;
 uniform vec4 FogColor;
 uniform mat4 ModelViewMat;
+uniform mat4 ProjMat;
+uniform mat4 InverseProjMat;
 uniform float GameTime;
 uniform float SeaState;
 uniform vec2 WindDirection;
+uniform vec2 ScreenSize;
+uniform vec4 Weather;
+uniform vec4 EnvironmentColor;
+uniform vec4 OpticalQuality;
+uniform vec3 AbsorptionCoefficients;
+uniform float SceneCaptureValid;
 
 in float vertexDistance;
 in vec4 vertexColor;
@@ -20,6 +30,7 @@ in vec3 worldPosition;
 in vec3 worldNormal;
 in vec3 celestialDirection;
 in float celestialDaylight;
+in vec3 waterBodyBlend;
 
 out vec4 fragColor;
 
@@ -31,16 +42,71 @@ vec3 proceduralWorldNormal(vec2 position, float sea) {
     vec2 wind = normalize(WindDirection + vec2(0.0001, 0.0));
     vec2 crossWind = vec2(-wind.y, wind.x);
     vec2 diagonal = normalize(wind + crossWind * 0.45);
-
     float longRipple = waveLayer(position, wind, 1.65, 0.55 + sea * 1.15);
     float crossRipple = waveLayer(position, crossWind, 3.35, -0.42 - sea * 0.90);
     float capillary = waveLayer(position, diagonal, 9.25, 1.80 + sea * 3.20);
-    float glassRipple = waveLayer(position + wind * GameTime * 0.12, normalize(wind - crossWind * 0.60), 15.0, 2.60 + sea * 4.40);
-
+    float glassRipple = waveLayer(position + wind * GameTime * 0.12,
+        normalize(wind - crossWind * 0.60), 15.0, 2.60 + sea * 4.40);
     vec2 gradient = wind * (longRipple * 0.018 + capillary * 0.010)
         + crossWind * (crossRipple * 0.014)
         + diagonal * (glassRipple * 0.006);
     return normalize(vec3(gradient.x, 1.0, gradient.y));
+}
+
+vec3 reconstructViewPosition(vec2 uv, float depth) {
+    vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 view = InverseProjMat * clip;
+    return view.xyz / max(abs(view.w), 0.00001);
+}
+
+float depthDiscontinuity(vec2 uv, float centerDepth) {
+    vec2 texel = 1.0 / max(ScreenSize, vec2(1.0));
+    float dx = abs(texture(SceneDepth, clamp(uv + vec2(texel.x, 0.0), 0.0, 1.0)).r - centerDepth);
+    float dy = abs(texture(SceneDepth, clamp(uv + vec2(0.0, texel.y), 0.0, 1.0)).r - centerDepth);
+    return max(dx, dy);
+}
+
+vec3 environmentReflection(float fresnel, float sea) {
+    float rain = clamp(Weather.x, 0.0, 1.0);
+    float thunder = clamp(Weather.y, 0.0, 1.0);
+    vec3 nightSky = vec3(0.045, 0.075, 0.145);
+    vec3 sky = mix(nightSky, EnvironmentColor.rgb, celestialDaylight);
+    sky *= mix(1.0, 0.62, rain) * mix(1.0, 0.70, thunder);
+    vec3 horizon = mix(vec3(0.16, 0.23, 0.34), sky, 0.70);
+    return mix(horizon, sky, clamp(fresnel + sea * 0.10, 0.0, 1.0));
+}
+
+vec4 traceScreenReflection(vec3 origin, vec3 direction, int stepCount, float maxDistance) {
+    if (stepCount <= 0 || maxDistance <= 0.0 || SceneCaptureValid < 0.5) {
+        return vec4(0.0);
+    }
+    float stride = maxDistance / float(stepCount);
+    vec3 ray = origin + direction * 0.12;
+    for (int stepIndex = 0; stepIndex < 24; stepIndex++) {
+        if (stepIndex >= stepCount) {
+            break;
+        }
+        ray += direction * stride;
+        vec4 projected = ProjMat * vec4(ray, 1.0);
+        if (projected.w <= 0.0001) {
+            break;
+        }
+        vec2 uv = projected.xy / projected.w * 0.5 + 0.5;
+        if (any(lessThan(uv, vec2(0.002))) || any(greaterThan(uv, vec2(0.998)))) {
+            break;
+        }
+        float sampledDepth = texture(SceneDepth, uv).r;
+        if (sampledDepth >= 0.99998) {
+            continue;
+        }
+        vec3 sampledView = reconstructViewPosition(uv, sampledDepth);
+        float separation = (-ray.z) - (-sampledView.z);
+        float tolerance = 0.16 + stride * 0.65;
+        if (separation >= -0.06 && separation <= tolerance) {
+            return vec4(texture(SceneColor, uv).rgb, 1.0);
+        }
+    }
+    return vec4(0.0);
 }
 
 void main() {
@@ -56,43 +122,78 @@ void main() {
     vec3 normal = normalize(mat3(ModelViewMat) * combinedWorldNormal);
     vec3 viewDirection = normalize(-viewPosition);
     float facing = clamp(dot(normal, viewDirection), 0.0, 1.0);
-    float fresnel = 0.02 + 0.98 * pow(1.0 - facing, 5.0);
+    float fresnel = 0.0204 + (1.0 - 0.0204) * pow(1.0 - facing, 5.0);
+
+    vec2 screenUv = gl_FragCoord.xy / max(ScreenSize, vec2(1.0));
+    float sceneDepth = SceneCaptureValid > 0.5 ? texture(SceneDepth, screenUv).r : 1.0;
+    bool validDepth = SceneCaptureValid > 0.5 && sceneDepth < 0.99998 && sceneDepth > gl_FragCoord.z + 0.00001;
+    vec3 sceneView = validDepth ? reconstructViewPosition(screenUv, sceneDepth) : viewPosition;
+    float thickness = validDepth
+        ? clamp(length(sceneView) - length(viewPosition), 0.0, 64.0)
+        : clamp(vertexColor.a * 3.0, 0.35, 3.0);
+
+    float edgeDistance = min(min(screenUv.x, 1.0 - screenUv.x), min(screenUv.y, 1.0 - screenUv.y));
+    float screenEdgeFade = smoothstep(0.004, 0.045, edgeDistance);
+    float silhouetteFade = validDepth
+        ? 1.0 - smoothstep(0.0015, 0.012, depthDiscontinuity(screenUv, sceneDepth))
+        : 0.0;
+    float depthFade = smoothstep(0.05, 1.75, thickness);
+    float distortionScale = OpticalQuality.y * (0.004 + sea * 0.006)
+        * screenEdgeFade * silhouetteFade * depthFade;
+    vec2 refractedUv = clamp(screenUv + normal.xy * distortionScale, vec2(0.002), vec2(0.998));
+    float refractedDepth = SceneCaptureValid > 0.5 ? texture(SceneDepth, refractedUv).r : 1.0;
+    if (refractedDepth <= gl_FragCoord.z + 0.00001) {
+        refractedUv = screenUv;
+    }
+
+    vec3 sceneColor = SceneCaptureValid > 0.5
+        ? texture(SceneColor, refractedUv).rgb
+        : vertexColor.rgb;
+    vec3 oceanAbsorption = vec3(1.0, 0.92, 0.86);
+    vec3 riverAbsorption = vec3(0.82, 1.10, 1.34);
+    vec3 lakeAbsorption = vec3(0.91, 1.02, 1.18);
+    vec3 bodyAbsorption = oceanAbsorption * waterBodyBlend.x
+        + riverAbsorption * waterBodyBlend.y
+        + lakeAbsorption * waterBodyBlend.z;
+    vec3 biomeAbsorption = mix(vec3(1.0),
+        clamp(vec3(1.35) - vertexColor.rgb, vec3(0.65), vec3(1.55)), 0.32);
+    vec3 effectiveAbsorption = max(AbsorptionCoefficients * bodyAbsorption * biomeAbsorption,
+        vec3(0.0001));
+    vec3 transmission = exp(-effectiveAbsorption * thickness);
+    vec3 deepBodyColor = vec3(0.006, 0.105, 0.245) * waterBodyBlend.x
+        + vec3(0.018, 0.155, 0.185) * waterBodyBlend.y
+        + vec3(0.012, 0.128, 0.205) * waterBodyBlend.z;
+    vec3 absorbedColor = mix(vertexColor.rgb, deepBodyColor, smoothstep(2.0, 24.0, thickness));
+    vec3 transmittedColor = sceneColor * transmission + absorbedColor * (vec3(1.0) - transmission);
+
+    vec3 reflectedColor = environmentReflection(fresnel, sea);
+    int ssrSteps = int(clamp(OpticalQuality.z, 0.0, 24.0));
+    vec3 incident = normalize(viewPosition);
+    vec3 reflectedRay = normalize(reflect(incident, normal));
+    vec4 ssr = traceScreenReflection(viewPosition, reflectedRay, ssrSteps, OpticalQuality.w);
+    reflectedColor = mix(reflectedColor, ssr.rgb, ssr.a * (0.58 + fresnel * 0.32));
+
     float slope = clamp(1.0 - combinedWorldNormal.y, 0.0, 1.0);
-    float slopeFoam = smoothstep(0.018, 0.115 + sea * 0.035, slope);
-    float microShimmer = pow(max(0.0,
-        sin(worldPosition.x * 7.5 + worldPosition.z * 3.2 + GameTime * (2.0 + sea * 3.4))
-        * cos(worldPosition.z * 8.3 - worldPosition.x * 2.7 + GameTime * (1.4 + sea * 2.6))), 10.0);
+    float slopeFoam = smoothstep(0.025, 0.14 + sea * 0.04, slope);
     vec3 halfDirection = normalize(celestialDirection + viewDirection);
-    float celestialSpecular = pow(max(dot(normal, halfDirection), 0.0), mix(112.0, 58.0, sea));
-    vec3 celestialColor = mix(
-        vec3(0.38, 0.50, 0.72),
-        vec3(1.00, 0.88, 0.68),
-        celestialDaylight
-    );
+    float celestialSpecular = pow(max(dot(normal, halfDirection), 0.0), mix(120.0, 54.0, sea));
+    vec3 celestialColor = mix(vec3(0.42, 0.52, 0.75), vec3(1.00, 0.88, 0.67), celestialDaylight);
 
-    // The Minecraft water atlas is only a transparency guard here. Letting its
-    // pixels tint the custom surface makes the replacement ocean look like
-    // vanilla tiled water instead of one continuous optical medium.
-    vec3 bodyColor = vertexColor.rgb;
-    vec3 deepOpticalBlue = mix(vec3(0.015, 0.155, 0.285), vec3(0.035, 0.235, 0.405), celestialDaylight);
-    vec3 skyReflection = mix(vec3(0.12, 0.18, 0.29), vec3(0.60, 0.78, 0.93), celestialDaylight);
-    vec3 color = mix(bodyColor, deepOpticalBlue, 0.22);
-    color = mix(color, skyReflection, fresnel * (0.44 + sea * 0.16));
-    color = mix(color, vec3(0.88, 0.96, 1.0), slopeFoam * (0.14 + sea * 0.26));
-    color += vec3(0.44, 0.57, 0.72) * microShimmer * (0.24 + sea * 0.62);
-    color += celestialColor * celestialSpecular * (0.34 + sea * 0.24);
-    color *= max(lightColor, vec3(0.56));
-    color = max(color, bodyColor * 0.52);
-    color *= ColorModulator.rgb;
+    vec3 color = mix(transmittedColor, reflectedColor, fresnel);
+    color = mix(color, vec3(0.84, 0.94, 1.0), slopeFoam * (0.08 + sea * 0.18));
+    color += celestialColor * celestialSpecular * (0.24 + sea * 0.25);
+    color *= max(lightColor, vec3(0.48)) * ColorModulator.rgb;
 
+    float mediumOpacity = 1.0 - dot(transmission, vec3(0.2126, 0.7152, 0.0722));
     float alpha = clamp(
-        vertexColor.a * ColorModulator.a
-            + fresnel * 0.13
-            + slopeFoam * 0.045,
-        0.0,
-        0.985
-    );
+        fresnel + (1.0 - fresnel) * (0.10 + mediumOpacity * 0.82),
+        0.10,
+        0.96
+    ) * ColorModulator.a;
+    float loadedFrontier = smoothstep(0.14, 0.22, vertexColor.a);
+    color = mix(environmentReflection(fresnel, sea), color, loadedFrontier);
+    alpha *= mix(0.18, 1.0, loadedFrontier);
     float fogRange = max(0.001, FogEnd - FogStart);
     float fogFactor = clamp((vertexDistance - FogStart) / fogRange, 0.0, 1.0);
-    fragColor = mix(vec4(color, alpha), FogColor, fogFactor);
+    fragColor = vec4(mix(color, FogColor.rgb, fogFactor), alpha);
 }

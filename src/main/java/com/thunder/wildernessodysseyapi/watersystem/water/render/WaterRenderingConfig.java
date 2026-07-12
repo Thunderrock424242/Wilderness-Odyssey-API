@@ -23,6 +23,7 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.BooleanValue REPLACE_VANILLA_WATER_TOPS;
     public static final ModConfigSpec.BooleanValue SUPPRESS_VANILLA_WATER_TOPS;
     public static final ModConfigSpec.BooleanValue ENABLE_WATER_CORE_SHADER;
+    public static final ModConfigSpec.BooleanValue ENABLE_SCREEN_SPACE_REFLECTIONS;
     public static final ModConfigSpec.BooleanValue ENABLE_UNDERWATER_OPTICS;
     public static final ModConfigSpec.BooleanValue ENABLE_UNDERWATER_CAUSTICS;
     public static final ModConfigSpec.BooleanValue ENABLE_SPH_WATER_RENDERING;
@@ -37,6 +38,7 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.DoubleValue SURFACE_ABSORPTION_STRENGTH;
     public static final ModConfigSpec.DoubleValue SURFACE_OPACITY_STRENGTH;
     public static final ModConfigSpec.DoubleValue SHORELINE_OVERLAY_STRENGTH;
+    public static final ModConfigSpec.DoubleValue REFRACTION_STRENGTH;
     public static final ModConfigSpec.IntValue MAX_OCEAN_SURFACE_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue DYNAMIC_OCEAN_CACHE_LIFETIME_TICKS;
     public static final ModConfigSpec.IntValue DYNAMIC_OCEAN_MAX_CELL_SIZE;
@@ -93,6 +95,9 @@ public final class WaterRenderingConfig {
         ENABLE_WATER_CORE_SHADER = builder
                 .comment("Use the built-in Fresnel/absorption water shader when no external shader pack owns water rendering.")
                 .define("enableWaterCoreShader", true);
+        ENABLE_SCREEN_SPACE_REFLECTIONS = builder
+                .comment("Allow bounded screen-space reflections on HIGH and CINEMATIC water quality. Missing screen data always falls back to environment reflection.")
+                .define("enableScreenSpaceReflections", true);
         ENABLE_UNDERWATER_OPTICS = builder
                 .comment("Use canonical volume and the animated surface for underwater fog and camera immersion.")
                 .define("enableUnderwaterOptics", true);
@@ -148,6 +153,9 @@ public final class WaterRenderingConfig {
         SHORELINE_OVERLAY_STRENGTH = builder
                 .comment("Scales shoreline overlay alpha, foam, and local vertical motion.")
                 .defineInRange("shorelineOverlayStrength", 1.0, 0.0, 2.0);
+        REFRACTION_STRENGTH = builder
+                .comment("Scales depth-aware screen-space refraction. Distortion is reduced automatically near silhouettes and invalid depth.")
+                .defineInRange("refractionStrength", 1.0, 0.0, 2.0);
 
         builder.comment("Normal quality profile.")
                 .push("normal_profile");
@@ -257,6 +265,38 @@ public final class WaterRenderingConfig {
         return WATER_QUALITY.get();
     }
 
+    /** Returns the bounded SSR march count for the active quality tier. */
+    public static int screenSpaceReflectionSteps() {
+        if (!ENABLE_SCREEN_SPACE_REFLECTIONS.get()) {
+            return 0;
+        }
+        return switch (waterQuality()) {
+            case LOW, MEDIUM -> 0;
+            case HIGH -> 10;
+            case CINEMATIC -> 18;
+        };
+    }
+
+    /** Returns the maximum view-space distance covered by SSR rays. */
+    public static float screenSpaceReflectionDistance() {
+        return switch (waterQuality()) {
+            case LOW, MEDIUM -> 0.0f;
+            case HIGH -> 28.0f;
+            case CINEMATIC -> 52.0f;
+        };
+    }
+
+    /** Returns the quality-scaled refraction distortion multiplier. */
+    public static float refractionStrength() {
+        float qualityScale = switch (waterQuality()) {
+            case LOW -> 0.35f;
+            case MEDIUM -> 0.60f;
+            case HIGH -> 0.85f;
+            case CINEMATIC -> 1.0f;
+        };
+        return REFRACTION_STRENGTH.get().floatValue() * qualityScale;
+    }
+
     /** Returns whether the replacement water renderer should draw in this world. */
     public static boolean replacementWaterRenderingEnabled(Level level) {
         return WildernessWaterRules.isEnabled(level)
@@ -271,14 +311,25 @@ public final class WaterRenderingConfig {
 
     /** Returns whether local visual SPH effects may be spawned on this client. */
     public static boolean localSphEffectsEnabled() {
-        return ENABLE_SPH_WATER_RENDERING.get()
-                && waterQuality().allowsLocalSph()
-                && sphLocalEffectQuality() != SphLocalEffectQuality.OFF;
+        try {
+            return ENABLE_SPH_WATER_RENDERING.get()
+                    && waterQuality().allowsLocalSph()
+                    && sphLocalEffectQuality() != SphLocalEffectQuality.OFF;
+        } catch (IllegalStateException configNotLoaded) {
+            // Unit/GameTest bootstrap can exercise visual-only SPH before the
+            // client config is installed. Preserve the authored default rather
+            // than making simulation construction depend on config lifecycle.
+            return true;
+        }
     }
 
     /** Returns the active local SPH quality level. */
     public static SphLocalEffectQuality sphLocalEffectQuality() {
-        return waterQuality().clampSphQuality(SPH_LOCAL_EFFECT_QUALITY.get());
+        try {
+            return waterQuality().clampSphQuality(SPH_LOCAL_EFFECT_QUALITY.get());
+        } catch (IllegalStateException configNotLoaded) {
+            return SphLocalEffectQuality.HIGH;
+        }
     }
 
     /** Scales an event-requested particle count to the active local SPH quality. */

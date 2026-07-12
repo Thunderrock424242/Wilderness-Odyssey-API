@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.network;
 
-import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.network.FriendlyByteBuf;
@@ -123,10 +122,7 @@ public record WaterVolumeChunkPayload(
         if (chunk == null) {
             return false;
         }
-        WaterVolumeChunk volume = chunk.getData(ModAttachments.WATER_VOLUME);
-        if (revision >= volume.revision()) {
-            volume.applyNetworkSnapshot(revision, completeData);
-        }
+        ClientWaterSnapshotStore.publishSparse(level, chunkX, chunkZ, revision, completeData);
         return true;
     }
 

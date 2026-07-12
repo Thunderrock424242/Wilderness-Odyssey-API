@@ -11,11 +11,9 @@ import net.minecraft.world.level.levelgen.Heightmap;
  *
  * <p>Keeping this logic in one place prevents shoreline overlays, open-ocean
  * replacement quads, and underwater fog from disagreeing about partial fills,
- * flow velocity, or the surface height of the same block. Gameplay authority
- * still comes from Wilderness-owned cells, but the client may draw a visual
- * replacement preview over exposed plain water while migration catches up.
- * That prevents the ocean from becoming a mix of Wilderness waves and vanilla
- * tiled water tops.</p>
+ * flow velocity, or the surface height of the same block. Replacement geometry
+ * is restricted to Wilderness-owned cells so vanilla or externally tagged
+ * water can never be claimed by the custom renderer.</p>
  */
 final class ClientWaterColumnSampler {
 
@@ -60,7 +58,6 @@ final class ClientWaterColumnSampler {
                 cell.canonical,
                 cell.authorityOwned,
                 cell.hostedWater,
-                cell.migrationCandidate,
                 cell.replacementSafe
         );
     }
@@ -87,8 +84,7 @@ final class ClientWaterColumnSampler {
                 authority.canonicalTracked(),
                 authority.authorityOwned(),
                 authority.hostedWater(),
-                authority.migrationCandidate(),
-                replacementSurfaceSafeForRendering(authority)
+                authority.replacementSurfaceSafe()
         );
     }
 
@@ -160,11 +156,10 @@ final class ClientWaterColumnSampler {
             boolean canonical,
             boolean authorityOwned,
             boolean hostedWater,
-            boolean migrationCandidate,
             boolean replacementSafe
     ) {
         static final ColumnSample INVALID = new ColumnSample(false, 0, 0.0f, 0.0f,
-                false, 0.0f, 0.0f, 0.0f, 0.0f, false, false, false, false, false);
+                false, 0.0f, 0.0f, 0.0f, 0.0f, false, false, false, false);
 
         /** Returns whether the open-ocean replacement mesh may hide vanilla top faces here. */
         public boolean replacementSafe() {
@@ -184,11 +179,10 @@ final class ClientWaterColumnSampler {
             boolean canonical,
             boolean authorityOwned,
             boolean hostedWater,
-            boolean migrationCandidate,
             boolean replacementSafe
     ) {
         static final CellSample INVALID = new CellSample(false, false, 0.0f,
-                0.0f, 0.0f, 0.0f, 0.0f, false, false, false, false, false);
+                0.0f, 0.0f, 0.0f, 0.0f, false, false, false, false);
 
         /** Returns bounded three-dimensional water motion in blocks per second. */
         float speed() {
@@ -198,24 +192,11 @@ final class ClientWaterColumnSampler {
         /**
          * Returns whether the client may draw a visible Wilderness surface here.
          *
-         * <p>Only canonical volume or a namespaced Wilderness projection may
-         * render through the replacement mesh. Pending vanilla water remains on
-         * the Minecraft compatibility path until visible-chunk finalization
-         * hands that column to Wilderness authority.</p>
+         * <p>Only generated metadata, sparse runtime volume, or a namespaced
+         * Wilderness projection may render through the replacement mesh.</p>
          */
         boolean renderableSurface() {
-            return authorityOwned || (migrationCandidate && replacementSafe);
+            return authorityOwned;
         }
-    }
-
-    // Rendering may temporarily cover exposed plain water before server-side
-    // migration has finalized it. This is visual-only: gameplay and storage
-    // still read authorityOwned/canonical state from WildernessWaterAuthority.
-    private static boolean replacementSurfaceSafeForRendering(WildernessWaterAuthority.CellAuthority authority) {
-        return authority.replacementSurfaceSafe()
-                || (authority.migrationCandidate()
-                && authority.plainProjection()
-                && authority.fullSurfaceWater()
-                && !authority.hostedWater());
     }
 }

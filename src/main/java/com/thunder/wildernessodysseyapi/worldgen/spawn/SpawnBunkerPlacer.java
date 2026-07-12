@@ -7,7 +7,6 @@ import com.thunder.wildernessodysseyapi.worldgen.processor.BunkerPlacementProces
 import com.thunder.wildernessodysseyapi.worldgen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.worldgen.structure.StarterStructureSpawnGuard;
 import com.thunder.wildernessodysseyapi.worldgen.structure.TerrainReplacerEngine;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWaterMigrationQueue;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
@@ -79,7 +78,6 @@ public final class SpawnBunkerPlacer {
             return;
         }
         applySpawnData(level, result);
-        preFinalizeSpawnWater(level, result);
         event.setCanceled(true);
     }
 
@@ -203,32 +201,6 @@ public final class SpawnBunkerPlacer {
         StarterStructureSpawnGuard.registerSpawnDenyZone(level, result.bounds());
 
         ModConstants.LOGGER.info("Placed spawn bunker {} at {} with {} cryo tubes.", BUNKER_ID, result.origin(), cryoPositions.size());
-    }
-
-    private static void preFinalizeSpawnWater(ServerLevel level, NBTStructurePlacer.PlacementResult result) {
-        // New-world spawn preparation is the only blocking water takeover path; it trades a bounded
-        // loading-screen cost for avoiding visible live migration around the starter bunker.
-        CanonicalWaterMigrationQueue.SpawnPreFinalizationResult waterResult =
-                CanonicalWaterMigrationQueue.preFinalizeSpawnArea(
-                        level,
-                        BlockPos.containing(result.bounds().getCenter()));
-        if (!waterResult.enabled()) {
-            return;
-        }
-
-        ModConstants.LOGGER.info(
-                "Pre-finalized Wilderness water around spawn bunker: {}/{} chunks complete, {} touched, {} skipped, {} queued, {} columns, {} imported cells, {} hosted cells, {} converted blocks in {} ms{}.",
-                waterResult.completedChunks(),
-                waterResult.candidateChunks(),
-                waterResult.touchedChunks(),
-                waterResult.skippedFinalizedChunks(),
-                waterResult.queuedUnfinishedChunks(),
-                waterResult.scannedColumns(),
-                waterResult.importedCells(),
-                waterResult.hostedWaterCells(),
-                waterResult.convertedBlocks(),
-                waterResult.elapsedMs(),
-                waterResult.timedOut() ? " (timed out; remaining chunks queued)" : "");
     }
 
     private static BlockPos pickSpawnTarget(NBTStructurePlacer.PlacementResult result) {
