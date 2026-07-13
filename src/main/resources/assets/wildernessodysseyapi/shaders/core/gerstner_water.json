@@ -29,7 +29,7 @@
     ,{ "name": "Weather", "type": "float", "count": 4, "values": [0, 0, 1, 0] }
     ,{ "name": "EnvironmentColor", "type": "float", "count": 4, "values": [0.35, 0.55, 0.75, 1] }
     ,{ "name": "OpticalQuality", "type": "float", "count": 4, "values": [2, 1, 10, 28] }
-    ,{ "name": "AbsorptionCoefficients", "type": "float", "count": 3, "values": [0.145, 0.052, 0.024] }
+    ,{ "name": "AbsorptionCoefficients", "type": "float", "count": 3, "values": [0.082, 0.030, 0.014] }
     ,{ "name": "SceneCaptureValid", "type": "float", "count": 1, "values": [0] }
     ,{ "name": "TideOffset", "type": "float", "count": 1, "values": [0] }
     ,{ "name": "GpuWaveStrength", "type": "float", "count": 1, "values": [0.12] }

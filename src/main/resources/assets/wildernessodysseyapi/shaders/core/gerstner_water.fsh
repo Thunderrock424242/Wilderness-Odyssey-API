@@ -31,6 +31,7 @@ in vec3 worldNormal;
 in vec3 celestialDirection;
 in float celestialDaylight;
 in vec3 waterBodyBlend;
+in float surfaceContinuity;
 
 out vec4 fragColor;
 
@@ -41,15 +42,22 @@ float waveLayer(vec2 position, vec2 direction, float frequency, float speed) {
 vec3 proceduralWorldNormal(vec2 position, float sea) {
     vec2 wind = normalize(WindDirection + vec2(0.0001, 0.0));
     vec2 crossWind = vec2(-wind.y, wind.x);
-    vec2 diagonal = normalize(wind + crossWind * 0.45);
-    float longRipple = waveLayer(position, wind, 1.65, 0.55 + sea * 1.15);
-    float crossRipple = waveLayer(position, crossWind, 3.35, -0.42 - sea * 0.90);
-    float capillary = waveLayer(position, diagonal, 9.25, 1.80 + sea * 3.20);
-    float glassRipple = waveLayer(position + wind * GameTime * 0.12,
-        normalize(wind - crossWind * 0.60), 15.0, 2.60 + sea * 4.40);
-    vec2 gradient = wind * (longRipple * 0.018 + capillary * 0.010)
-        + crossWind * (crossRipple * 0.014)
-        + diagonal * (glassRipple * 0.006);
+    vec2 diagonal = normalize(wind * 0.73 + crossWind * 0.61);
+    // Low-frequency domain warping prevents the small normal layers from
+    // resolving into a repeating checkerboard when viewed across many chunks.
+    vec2 warp = vec2(
+        sin(dot(position, vec2(0.071, 0.113)) + GameTime * 0.19),
+        cos(dot(position, vec2(-0.097, 0.059)) - GameTime * 0.16)
+    ) * (0.42 + sea * 0.48);
+    vec2 warped = position + warp;
+    float longRipple = waveLayer(warped, wind, 1.37, 0.51 + sea * 1.07);
+    float crossRipple = waveLayer(warped, crossWind, 2.73, -0.39 - sea * 0.83);
+    float capillary = waveLayer(warped, diagonal, 6.91, 1.63 + sea * 2.91);
+    float glassRipple = waveLayer(warped + wind * GameTime * 0.11,
+        normalize(wind * 0.58 - crossWind * 0.81), 13.73, 2.31 + sea * 4.07);
+    vec2 gradient = wind * (longRipple * 0.016 + capillary * 0.008)
+        + crossWind * (crossRipple * 0.012)
+        + diagonal * (capillary * 0.007 + glassRipple * 0.005);
     return normalize(vec3(gradient.x, 1.0, gradient.y));
 }
 
@@ -118,7 +126,9 @@ void main() {
     float sea = clamp(SeaState, 0.0, 1.0);
     vec3 baseWorldNormal = normalize(worldNormal);
     vec3 microWorldNormal = proceduralWorldNormal(worldPosition.xz, sea);
-    vec3 combinedWorldNormal = normalize(mix(baseWorldNormal, microWorldNormal, 0.30 + sea * 0.18));
+    float continuousSurface = smoothstep(0.10, 0.70, surfaceContinuity);
+    vec3 combinedWorldNormal = normalize(mix(baseWorldNormal, microWorldNormal,
+        (0.30 + sea * 0.18) * continuousSurface));
     vec3 normal = normalize(mat3(ModelViewMat) * combinedWorldNormal);
     vec3 viewDirection = normalize(-viewPosition);
     float facing = clamp(dot(normal, viewDirection), 0.0, 1.0);
@@ -160,9 +170,9 @@ void main() {
     vec3 effectiveAbsorption = max(AbsorptionCoefficients * bodyAbsorption * biomeAbsorption,
         vec3(0.0001));
     vec3 transmission = exp(-effectiveAbsorption * thickness);
-    vec3 deepBodyColor = vec3(0.006, 0.105, 0.245) * waterBodyBlend.x
-        + vec3(0.018, 0.155, 0.185) * waterBodyBlend.y
-        + vec3(0.012, 0.128, 0.205) * waterBodyBlend.z;
+    vec3 deepBodyColor = vec3(0.010, 0.145, 0.310) * waterBodyBlend.x
+        + vec3(0.025, 0.205, 0.235) * waterBodyBlend.y
+        + vec3(0.020, 0.175, 0.260) * waterBodyBlend.z;
     vec3 absorbedColor = mix(vertexColor.rgb, deepBodyColor, smoothstep(2.0, 24.0, thickness));
     vec3 transmittedColor = sceneColor * transmission + absorbedColor * (vec3(1.0) - transmission);
 
@@ -182,7 +192,12 @@ void main() {
     vec3 color = mix(transmittedColor, reflectedColor, fresnel);
     color = mix(color, vec3(0.84, 0.94, 1.0), slopeFoam * (0.08 + sea * 0.18));
     color += celestialColor * celestialSpecular * (0.24 + sea * 0.25);
-    color *= max(lightColor, vec3(0.48)) * ColorModulator.rgb;
+    // Captured terrain is already lightmapped. Applying the water lightmap to
+    // the completed scene-color composite a second time made the seafloor much
+    // darker than the surrounding world, especially under overhangs.
+    vec3 waterLighting = max(lightColor, vec3(0.62));
+    waterLighting = mix(waterLighting, vec3(1.0), SceneCaptureValid * 0.82);
+    color *= waterLighting * ColorModulator.rgb;
 
     float mediumOpacity = 1.0 - dot(transmission, vec3(0.2126, 0.7152, 0.0722));
     float alpha = clamp(
@@ -190,7 +205,7 @@ void main() {
         0.10,
         0.96
     ) * ColorModulator.a;
-    float loadedFrontier = smoothstep(0.14, 0.22, vertexColor.a);
+    float loadedFrontier = smoothstep(0.08, 0.55, surfaceContinuity);
     color = mix(environmentReflection(fresnel, sea), color, loadedFrontier);
     alpha *= mix(0.18, 1.0, loadedFrontier);
     float fogRange = max(0.001, FogEnd - FogStart);

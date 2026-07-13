@@ -79,6 +79,11 @@ public final class WaterChunkMeshCache {
         return groups.size();
     }
 
+    /** Returns whether a published GPU group can remain visible during an atomic rebuild. */
+    public boolean hasGroup(long chunkKey) {
+        return groups.containsKey(chunkKey);
+    }
+
     /** Releases all GPU objects during dimension/resource teardown. */
     public void clear() {
         for (MeshGroup group : groups.values()) {
@@ -112,7 +117,9 @@ public final class WaterChunkMeshCache {
                 WildernessFluidRegistry.WILDERNESS_WATER.get().defaultFluidState()
         )[0];
 
-        int vertexCount = wetColumns * 4;
+        int subdivisions = surfaceSubdivisions();
+        int quadsPerColumn = subdivisions * subdivisions;
+        int vertexCount = wetColumns * quadsPerColumn * 4;
         int minimumY = Integer.MAX_VALUE;
         int maximumY = Integer.MIN_VALUE;
         try (ByteBufferBuilder bytes = new ByteBufferBuilder(Math.max(256, vertexCount * BYTES_PER_VERTEX))) {
@@ -125,7 +132,8 @@ public final class WaterChunkMeshCache {
                     }
                     minimumY = Math.min(minimumY, column.floorY());
                     maximumY = Math.max(maximumY, column.surfaceBlockY());
-                    emitColumn(level, snapshot, builder, sprite, chunkMinX + localX, chunkMinZ + localZ, column);
+                    emitColumn(level, snapshot, builder, sprite, chunkMinX + localX,
+                            chunkMinZ + localZ, column, subdivisions);
                 }
             }
             MeshData mesh = builder.buildOrThrow();
@@ -148,7 +156,7 @@ public final class WaterChunkMeshCache {
                     buffer,
                     bounds,
                     vertexCount,
-                    wetColumns * 2
+                    wetColumns * quadsPerColumn * 2
             );
         }
     }
@@ -160,7 +168,8 @@ public final class WaterChunkMeshCache {
             TextureAtlasSprite sprite,
             int worldX,
             int worldZ,
-            ClientWaterChunkSnapshot.Column column
+            ClientWaterChunkSnapshot.Column column,
+            int subdivisions
     ) {
         VertexSample northWest = sampleVertex(level, worldX, worldZ, column);
         VertexSample southWest = sampleVertex(level, worldX, worldZ + 1, column);
@@ -170,10 +179,31 @@ public final class WaterChunkMeshCache {
         float u1 = sprite.getU1();
         float v0 = sprite.getV0();
         float v1 = sprite.getV1();
-        emit(builder, worldX, northWest, worldZ, u0, v0);
-        emit(builder, worldX, southWest, worldZ + 1, u0, v1);
-        emit(builder, worldX + 1, southEast, worldZ + 1, u1, v1);
-        emit(builder, worldX + 1, northEast, worldZ, u1, v0);
+        float step = 1.0f / subdivisions;
+        for (int subZ = 0; subZ < subdivisions; subZ++) {
+            float z0 = subZ * step;
+            float z1 = (subZ + 1) * step;
+            for (int subX = 0; subX < subdivisions; subX++) {
+                float x0 = subX * step;
+                float x1 = (subX + 1) * step;
+                VertexSample subNorthWest = interpolate(
+                        northWest, southWest, southEast, northEast, x0, z0);
+                VertexSample subSouthWest = interpolate(
+                        northWest, southWest, southEast, northEast, x0, z1);
+                VertexSample subSouthEast = interpolate(
+                        northWest, southWest, southEast, northEast, x1, z1);
+                VertexSample subNorthEast = interpolate(
+                        northWest, southWest, southEast, northEast, x1, z0);
+                float subU0 = mix(u0, u1, x0);
+                float subU1 = mix(u0, u1, x1);
+                float subV0 = mix(v0, v1, z0);
+                float subV1 = mix(v0, v1, z1);
+                emit(builder, worldX + x0, subNorthWest, worldZ + z0, subU0, subV0);
+                emit(builder, worldX + x0, subSouthWest, worldZ + z1, subU0, subV1);
+                emit(builder, worldX + x1, subSouthEast, worldZ + z1, subU1, subV1);
+                emit(builder, worldX + x1, subNorthEast, worldZ + z0, subU1, subV0);
+            }
+        }
     }
 
     // Every surface vertex samples the four touching columns. Adjacent chunks
@@ -238,7 +268,8 @@ public final class WaterChunkMeshCache {
         int color = opticalColor(ocean, river, lake,
                 tintRed * inverse, tintGreen * inverse, tintBlue * inverse,
                 depth * inverse, count < 4);
-        return new VertexSample(height * inverse, ocean, river, lake, color);
+        return new VertexSample(height * inverse, ocean, river, lake,
+                Math.max(0.18f, count * 0.25f), color);
     }
 
     /** Returns whether the coordinator mesh, rather than the fluid fallback, owns this column. */
@@ -268,11 +299,65 @@ public final class WaterChunkMeshCache {
         return (alpha << 24) | (channel(red) << 16) | (channel(green) << 8) | channel(blue);
     }
 
+    // High quality uses a half-block topology so GPU-displaced silhouettes and
+    // specular gradients no longer reveal Minecraft's one-block quad grid.
+    // Lower tiers retain one quad per column to bound distant-ocean cost.
+    private static int surfaceSubdivisions() {
+        return switch (WaterRenderingConfig.waterQuality()) {
+            case LOW, MEDIUM -> 1;
+            case HIGH, CINEMATIC -> 2;
+        };
+    }
+
+    private static VertexSample interpolate(
+            VertexSample northWest,
+            VertexSample southWest,
+            VertexSample southEast,
+            VertexSample northEast,
+            float x,
+            float z
+    ) {
+        return new VertexSample(
+                bilinear(northWest.height, southWest.height, southEast.height, northEast.height, x, z),
+                bilinear(northWest.oceanWeight, southWest.oceanWeight,
+                        southEast.oceanWeight, northEast.oceanWeight, x, z),
+                bilinear(northWest.riverWeight, southWest.riverWeight,
+                        southEast.riverWeight, northEast.riverWeight, x, z),
+                bilinear(northWest.lakeWeight, southWest.lakeWeight,
+                        southEast.lakeWeight, northEast.lakeWeight, x, z),
+                bilinear(northWest.continuity, southWest.continuity,
+                        southEast.continuity, northEast.continuity, x, z),
+                bilinearColor(northWest.color, southWest.color, southEast.color, northEast.color, x, z)
+        );
+    }
+
+    private static float bilinear(float northWest, float southWest, float southEast,
+                                  float northEast, float x, float z) {
+        return mix(mix(northWest, northEast, x), mix(southWest, southEast, x), z);
+    }
+
+    private static int bilinearColor(int northWest, int southWest, int southEast,
+                                     int northEast, float x, float z) {
+        int alpha = Math.round(bilinear((northWest >>> 24) & 0xFF, (southWest >>> 24) & 0xFF,
+                (southEast >>> 24) & 0xFF, (northEast >>> 24) & 0xFF, x, z));
+        int red = Math.round(bilinear((northWest >>> 16) & 0xFF, (southWest >>> 16) & 0xFF,
+                (southEast >>> 16) & 0xFF, (northEast >>> 16) & 0xFF, x, z));
+        int green = Math.round(bilinear((northWest >>> 8) & 0xFF, (southWest >>> 8) & 0xFF,
+                (southEast >>> 8) & 0xFF, (northEast >>> 8) & 0xFF, x, z));
+        int blue = Math.round(bilinear(northWest & 0xFF, southWest & 0xFF,
+                southEast & 0xFF, northEast & 0xFF, x, z));
+        return (alpha << 24) | (red << 16) | (green << 8) | blue;
+    }
+
+    private static float mix(float from, float to, float amount) {
+        return from + (to - from) * amount;
+    }
+
     private static void emit(
             BufferBuilder builder,
-            int worldX,
+            float worldX,
             VertexSample sample,
-            int worldZ,
+            float worldZ,
             float u,
             float v
     ) {
@@ -280,7 +365,11 @@ public final class WaterChunkMeshCache {
                 .setColor(sample.color)
                 .setUv(u, v)
                 .setLight(FULL_BRIGHT)
-                .setNormal(sample.oceanWeight, sample.riverWeight, sample.lakeWeight);
+                // Normal magnitude carries loaded-surface continuity; the
+                // shader renormalizes the body blend before optical use.
+                .setNormal(sample.oceanWeight * sample.continuity,
+                        sample.riverWeight * sample.continuity,
+                        sample.lakeWeight * sample.continuity);
     }
 
     private static int channel(float value) {
@@ -296,6 +385,7 @@ public final class WaterChunkMeshCache {
             float oceanWeight,
             float riverWeight,
             float lakeWeight,
+            float continuity,
             int color
     ) {
     }

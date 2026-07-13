@@ -39,6 +39,7 @@ public final class WaterRenderCoordinator {
 
     private static final WaterChunkMeshCache MESHES = new WaterChunkMeshCache();
     private static final Map<Long, Ownership> OWNERSHIP = new ConcurrentHashMap<>();
+    private static boolean externalPackOwnedLastFrame;
 
     private WaterRenderCoordinator() {
     }
@@ -53,7 +54,28 @@ public final class WaterRenderCoordinator {
         ClientLevel level = minecraft.level;
         if (level == null || !WaterRenderingConfig.replacementWaterRenderingEnabled(level)) {
             clear();
+            externalPackOwnedLastFrame = false;
             return;
+        }
+
+        // Shader packs need the tagged Wilderness fluid geometry. The stable
+        // snapshot mesh depends on our vertex shader for its displacement, so
+        // drawing it through stock translucent here would create the flat ring
+        // seen around the GPU-wave surface and would hide pack-owned fluid tops.
+        if (WaterShaders.externalShaderPackOwnsWater()) {
+            if (!externalPackOwnedLastFrame) {
+                clear();
+                event.getLevelRenderer().allChanged();
+                externalPackOwnedLastFrame = true;
+            }
+            renderDetailSubpasses(minecraft, event);
+            WaterRenderDiagnostics.publishFrame(0, 0, 0, 0, 0L, 0L);
+            return;
+        }
+        if (externalPackOwnedLastFrame) {
+            externalPackOwnedLastFrame = false;
+            ClientWaterSnapshotStore.markAllDirtyMeshes(level);
+            event.getLevelRenderer().allChanged();
         }
 
         long started = System.nanoTime();
@@ -96,9 +118,7 @@ public final class WaterRenderCoordinator {
 
         // Local SPH and ripple effects emit into the same stock translucent
         // buffer and are flushed once after both coordinated detail subpasses.
-        FluidRenderer.onRenderLevel(event);
-        RippleRenderer.onRenderLevel(event);
-        minecraft.renderBuffers().bufferSource().endBatch(RenderType.translucent());
+        renderDetailSubpasses(minecraft, event);
 
         WaterRenderDiagnostics.setSnapshotBytes(ClientWaterSnapshotStore.estimatedBytes(level));
         WaterRenderDiagnostics.setGeneratedMetadataBytes(
@@ -115,6 +135,9 @@ public final class WaterRenderCoordinator {
 
     /** Returns true only after a replacement mesh is uploaded and published. */
     public static boolean ownsBakedTop(BlockPos pos) {
+        if (WaterShaders.externalShaderPackOwnsWater()) {
+            return false;
+        }
         Minecraft minecraft = Minecraft.getInstance();
         ClientLevel level = minecraft.level;
         if (level == null) {
@@ -140,24 +163,37 @@ public final class WaterRenderCoordinator {
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel().isClientSide()) {
             clear();
+            externalPackOwnedLastFrame = false;
             WaterSceneCapture.release();
             WaterGpuTimer.release();
         }
     }
 
     private static void rebuildDirtyGroups(ClientLevel level, RenderLevelStageEvent event) {
-        int budget = switch (WaterRenderingConfig.waterQuality()) {
-            case LOW -> 2;
-            case MEDIUM -> 4;
-            case HIGH -> 8;
-            case CINEMATIC -> 16;
+        int baseBudget = switch (WaterRenderingConfig.waterQuality()) {
+            case LOW -> 4;
+            case MEDIUM -> 8;
+            case HIGH -> 16;
+            case CINEMATIC -> 24;
         };
+        // Chunk streaming can publish generated and sparse snapshots together.
+        // A bounded burst drains that unique-key backlog before it becomes a
+        // visible flat fallback ring, while normal incremental updates retain
+        // the smaller per-quality rebuild budget.
+        int pending = ClientWaterSnapshotStore.pendingDirtyMeshCount();
+        int budget = pending > baseBudget * 3
+                ? Math.min(48, baseBudget * 2)
+                : baseBudget;
         for (int rebuilt = 0; rebuilt < budget; rebuilt++) {
             Long key = ClientWaterSnapshotStore.pollDirtyMesh();
             if (key == null) {
                 return;
             }
-            OWNERSHIP.put(key, Ownership.FALLBACK);
+            boolean replacingPublishedMesh = MESHES.hasGroup(key)
+                    && OWNERSHIP.get(key) == Ownership.CUSTOM_OWNED;
+            if (!replacingPublishedMesh) {
+                OWNERSHIP.put(key, Ownership.FALLBACK);
+            }
             int chunkX = (int) (long) key;
             int chunkZ = (int) ((long) key >>> 32);
             ClientWaterChunkSnapshot snapshot = ClientWaterSnapshotStore.get(level, chunkX, chunkZ);
@@ -170,9 +206,11 @@ public final class WaterRenderCoordinator {
             WaterRenderDiagnostics.recordMeshRebuild();
             if (group.empty()) {
                 OWNERSHIP.remove(key);
+                // A previously owned surface may have become dry or covered;
+                // request the baked fallback immediately so no hole remains.
+                markSurfaceSectionsDirty(event, snapshot);
                 continue;
             }
-            OWNERSHIP.put(key, Ownership.MESH_UPLOADED);
             markSurfaceSectionsDirty(event, snapshot);
             // Public chunk compilation hooks cannot acknowledge exactly when
             // every fallback top has disappeared. Publishing custom ownership
@@ -243,9 +281,17 @@ public final class WaterRenderCoordinator {
         OWNERSHIP.clear();
     }
 
+    private static void renderDetailSubpasses(
+            Minecraft minecraft,
+            RenderLevelStageEvent event
+    ) {
+        FluidRenderer.onRenderLevel(event);
+        RippleRenderer.onRenderLevel(event);
+        minecraft.renderBuffers().bufferSource().endBatch(RenderType.translucent());
+    }
+
     private enum Ownership {
         FALLBACK,
-        MESH_UPLOADED,
         CUSTOM_OWNED
     }
 }

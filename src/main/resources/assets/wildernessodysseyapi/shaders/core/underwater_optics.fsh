@@ -34,12 +34,16 @@ void main() {
 
     float shaft = pow(clamp(1.0 - abs(fract(distortedUv.x * 0.42 + GameTime * 0.015) - 0.5) * 2.0,
         0.0, 1.0), 5.0) * CausticStrength;
-    vec3 color = mix(WaterFogColor, overlay.rgb, 0.12 + clarity * 0.16);
-    color += vec3(0.20, 0.34, 0.40) * caustic * 0.34;
-    color += vec3(0.10, 0.18, 0.22) * shaft * 0.12;
+    // Preserve the scene carried by the vanilla overlay instead of replacing
+    // most of it with a dark fog swatch. Fog distance remains responsible for
+    // large-scale attenuation while this pass supplies tint and caustics.
+    vec3 color = mix(overlay.rgb, WaterFogColor, 0.24 + (1.0 - clarity) * 0.14);
+    color = max(color, WaterFogColor * 0.72 + vec3(0.018, 0.032, 0.042));
+    color += vec3(0.22, 0.37, 0.44) * caustic * 0.38;
+    color += vec3(0.12, 0.21, 0.26) * shaft * 0.14;
     color *= ColorModulator.rgb;
 
-    float alpha = (0.035 + (1.0 - clarity) * 0.055 + caustic * 0.018 + shaft * 0.010)
+    float alpha = (0.024 + (1.0 - clarity) * 0.042 + caustic * 0.014 + shaft * 0.008)
         * submersion * ColorModulator.a;
-    fragColor = vec4(color, clamp(alpha, 0.0, 0.14));
+    fragColor = vec4(color, clamp(alpha, 0.0, 0.10));
 }

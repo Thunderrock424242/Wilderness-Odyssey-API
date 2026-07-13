@@ -15,18 +15,24 @@ import org.lwjgl.opengl.GL20;
 import org.joml.Matrix4f;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 
 /**
  * Owns the optional built-in ocean shader and its frame uniforms.
  *
- * <p>Iris/Oculus installations stay on the normal translucent RenderType so
- * the active shader pack remains the final authority over water shading.</p>
+ * <p>An active Iris/Oculus shader pack stays on the tagged-fluid path so the
+ * pack remains the final authority over water shading. Installing either mod
+ * without enabling a pack still permits the built-in GPU-wave renderer.</p>
  */
 public final class WaterShaders {
 
     private static ShaderInstance oceanShader;
     private static ShaderInstance underwaterShader;
     private static boolean sceneCaptureFailureLogged;
+    private static volatile boolean externalShaderApiResolved;
+    private static Method externalShaderApiGetInstance;
+    private static Method externalShaderApiIsPackInUse;
+    private static boolean externalShaderApiFailureLogged;
 
     private WaterShaders() {
     }
@@ -85,14 +91,14 @@ public final class WaterShaders {
         if (!WaterRenderingConfig.ENABLE_WATER_CORE_SHADER.get() || oceanShader == null) {
             return false;
         }
-        return !isExternalShaderPackModLoaded();
+        return !externalShaderPackOwnsWater();
     }
 
     /** Returns whether the built-in underwater overlay should own this frame. */
     public static boolean shouldUseUnderwaterShader() {
         return WaterRenderingConfig.ENABLE_UNDERWATER_CAUSTICS.get()
                 && underwaterShader != null
-                && !isExternalShaderPackModLoaded();
+                && !externalShaderPackOwnsWater();
     }
 
     /** Returns the program used by the Wilderness underwater overlay. */
@@ -168,10 +174,14 @@ public final class WaterShaders {
                 WaterRenderingConfig.screenSpaceReflectionDistance()
         );
         float absorption = WaterRenderingConfig.surfaceAbsorptionStrength();
+        // Keep enough spectral separation for blue-water depth while allowing
+        // sunlit terrain to remain readable through several blocks of water.
+        // The previous coefficients compounded with the cinematic config and
+        // effectively attenuated the already-lit scene twice.
         oceanShader.safeGetUniform("AbsorptionCoefficients").set(
-                0.145f * absorption,
-                0.052f * absorption,
-                0.024f * absorption
+                0.082f * absorption,
+                0.030f * absorption,
+                0.014f * absorption
         );
         oceanShader.safeGetUniform("TideOffset").set(
                 TideSystem.getTideOffset(minecraft.level) * 0.18f
@@ -238,9 +248,65 @@ public final class WaterShaders {
         );
     }
 
-    private static boolean isExternalShaderPackModLoaded() {
+    /**
+     * Returns whether an active Iris/Oculus pack should retain the ordinary tagged-fluid path.
+     *
+     * <p>The snapshot mesh relies on the built-in vertex program for continuous
+     * wave displacement. Drawing it through stock translucent under a shader
+     * pack would produce a flat duplicate surface and hide the fluid geometry
+     * the pack expects to shade.</p>
+     */
+    public static boolean externalShaderPackOwnsWater() {
         ModList mods = ModList.get();
-        return mods.isLoaded("iris") || mods.isLoaded("oculus");
+        if (!mods.isLoaded("iris") && !mods.isLoaded("oculus")) {
+            return false;
+        }
+        resolveExternalShaderApi();
+        if (externalShaderApiGetInstance == null || externalShaderApiIsPackInUse == null) {
+            // An installed renderer with an unknown API is safer on its tagged
+            // fluid path than behind an un-displaced duplicate snapshot mesh.
+            return true;
+        }
+        try {
+            Object api = externalShaderApiGetInstance.invoke(null);
+            return Boolean.TRUE.equals(externalShaderApiIsPackInUse.invoke(api));
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            if (!externalShaderApiFailureLogged) {
+                ModConstants.LOGGER.warn(
+                        "Unable to query the active Iris/Oculus shader pack; preserving tagged-fluid water fallback",
+                        exception
+                );
+                externalShaderApiFailureLogged = true;
+            }
+            return true;
+        }
+    }
+
+    private static void resolveExternalShaderApi() {
+        if (externalShaderApiResolved) {
+            return;
+        }
+        synchronized (WaterShaders.class) {
+            if (externalShaderApiResolved) {
+                return;
+            }
+            for (String className : new String[] {
+                    "net.irisshaders.iris.api.v0.IrisApi",
+                    "net.coderbot.iris.api.v0.IrisApi"
+            }) {
+                try {
+                    Class<?> apiClass = Class.forName(className, false, WaterShaders.class.getClassLoader());
+                    Method getInstance = apiClass.getMethod("getInstance");
+                    Method isPackInUse = apiClass.getMethod("isShaderPackInUse");
+                    externalShaderApiGetInstance = getInstance;
+                    externalShaderApiIsPackInUse = isPackInUse;
+                    break;
+                } catch (ClassNotFoundException | NoSuchMethodException ignored) {
+                    // Try the next API package used by modern/legacy Iris and Oculus.
+                }
+            }
+            externalShaderApiResolved = true;
+        }
     }
 
     private static boolean isLinked(ShaderInstance shader) {

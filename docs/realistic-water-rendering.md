@@ -116,10 +116,12 @@ geometry. It runs after translucent terrain and coordinates:
 `WaterChunkMeshCache` builds stable, world-aligned chunk groups only when a
 snapshot changes. Corners average the neighboring snapshot columns and their
 body blend weights, so both sides of a loaded chunk boundary select identical
-surface topology. Continuous Gerstner and tide displacement happens in the
-vertex shader rather than rebuilding vertices every frame. Rebuild work is
-incrementally budgeted by quality level, replacing the old global ocean-patch
-limit.
+surface topology. High and Cinematic groups subdivide each block top into a
+stable half-block grid so GPU-displaced silhouettes remain smooth without a
+per-frame CPU rebuild. Continuous Gerstner and tide displacement happens in
+the vertex shader, with displacement tapered at dry or unloaded boundaries.
+Rebuild work uses a deduplicated chunk-key queue and a bounded streaming burst,
+preventing repeated neighbor entries from leaving a distant flat fallback ring.
 
 Fallback fluid tops remain visible while a group is absent or rebuilding. Once
 the custom vertex buffer is uploaded, the coordinator requests the affected
@@ -127,6 +129,20 @@ terrain sections to rebuild and publishes custom ownership. The baked-fluid
 mixin suppresses only a top that has both custom ownership and a matching wet
 snapshot column. Internal fluid faces, unloaded chunks, and unsupported buried
 surfaces keep the standard translucent fluid path.
+
+When an Iris or Oculus shader pack is active, the external shader path owns Wilderness
+water through the ordinary tagged custom-fluid geometry. A narrow optional
+material bridge aliases unmapped Wilderness fluid states to the numeric material
+ID that the active pack assigned to vanilla water, so Complementary-style packs
+apply their own water waves and optics without modifying the shader-pack archive.
+Explicit pack mappings remain authoritative. In that mode the
+coordinator neither draws the snapshot mesh through the stock translucent
+shader nor suppresses fallback tops: without the built-in vertex program that
+mesh would be flat and would hide the geometry the shader pack expects. A mode
+switch clears custom ownership, refreshes terrain sections, and requeues all
+loaded snapshots if control later returns to the built-in renderer. The active
+pack state is queried through the modern or legacy Iris API; installing the
+renderer without enabling a pack keeps the built-in GPU-wave path available.
 
 The coordinator flushes ripples and local SPH once as one translucent detail
 batch. Legacy ocean and shoreline event handlers no longer independently draw
@@ -217,10 +233,15 @@ crossings, unloaded frontiers, and every quality tier. Watch the F3 water lines
 for rebuild storms, unexpectedly large snapshot memory, or unbounded render
 cost while testing.
 
-## Deferred compatibility
+## Compatibility boundary
 
-Buckets, boats, mobs, vanilla structures, waterlogging replacement, external
-fluid APIs, other mods, and existing-world conversion are intentionally not
-part of this generation/rendering architecture. Compatibility work must adapt
-to the authority boundary later rather than reintroducing completed-chunk
+Natural aquatic decoration (kelp, seagrass, sea pickles, and coral) and vanilla
+water-animal spawn predicates recognize physically present Wilderness water.
+This is intentionally narrow: it supports the flora and fauna that belong in a
+newly generated water body without making externally tagged water authoritative.
+
+Buckets, boats, unrelated mob mechanics, vanilla structures, waterlogging
+replacement, external fluid APIs, other mods, and existing-world conversion are
+not part of this generation/rendering architecture. Later compatibility work
+must adapt to the authority boundary rather than reintroducing completed-chunk
 scanning or migration into the core system.
