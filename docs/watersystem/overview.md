@@ -134,12 +134,17 @@ Server-side ownership can be inspected with:
 
 These commands do not import or convert vanilla water.
 
-## Deferred compatibility
+## Compatibility boundary
 
-Buckets, boats, mobs, structures, waterlogging replacement, other mods,
-external fluid APIs, and existing-world conversion are deliberately outside the
-current core architecture. Vanilla or externally tagged water can be reported
-by diagnostics, but it does not become Wilderness-owned automatically.
+Natural kelp, seagrass, sea pickles, coral, and vanilla water-animal spawn
+predicates recognize generated Wilderness water. The Minecraft 1.21.1 singular
+`tags/fluid/water.json` resource also keeps generic in-water checks working for
+the custom source and flowing fluids without converting waterlogged hosts.
+
+Buckets, boats, unrelated mob mechanics, structures, waterlogging replacement,
+other mods, external fluid APIs, and existing-world conversion remain outside
+the current core architecture. Vanilla or externally tagged water can be
+reported by diagnostics, but it does not become Wilderness-owned automatically.
 
 ## Validation
 

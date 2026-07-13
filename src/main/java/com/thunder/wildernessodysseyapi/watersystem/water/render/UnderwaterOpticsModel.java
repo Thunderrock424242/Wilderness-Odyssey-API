@@ -50,17 +50,20 @@ public final class UnderwaterOpticsModel {
         float tintR = clamp(finiteOrZero(tintRed), 0.0f, 1.0f);
         float tintG = clamp(finiteOrZero(tintGreen), 0.0f, 1.0f);
         float tintB = clamp(finiteOrZero(tintBlue), 0.0f, 1.0f);
-        float lightScale = 0.28f + light * 0.72f;
+        // Preserve a readable ambient floor underwater. Direct daylight still
+        // drives caustics, but terrain no longer collapses toward black when
+        // vanilla sky light is briefly low under a wave or overhang.
+        float lightScale = 0.42f + light * 0.58f;
 
         // Red wavelengths attenuate first, followed by green and then blue.
         // The biome tint remains recognizable while depth approaches a cool,
         // low-luminance ocean color rather than an opaque blue wall.
-        float red = (0.012f + tintR * 0.30f)
-                * exponentialAttenuation(0.085f, attenuationDepth) * lightScale;
-        float green = (0.045f + tintG * 0.42f)
-                * exponentialAttenuation(0.036f, attenuationDepth) * lightScale;
-        float blue = (0.105f + tintB * 0.50f)
-                * exponentialAttenuation(0.018f, attenuationDepth) * lightScale;
+        float red = (0.025f + tintR * 0.36f)
+                * exponentialAttenuation(0.070f, attenuationDepth) * lightScale;
+        float green = (0.080f + tintG * 0.48f)
+                * exponentialAttenuation(0.029f, attenuationDepth) * lightScale;
+        float blue = (0.155f + tintB * 0.56f)
+                * exponentialAttenuation(0.014f, attenuationDepth) * lightScale;
 
         float visibility = visibilityLimit * clarity
                 * exponentialAttenuation(0.018f, positiveDepth)

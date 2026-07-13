@@ -13,6 +13,7 @@ import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -28,6 +29,7 @@ public final class ClientWaterSnapshotStore {
 
     private static final Map<Long, ClientWaterChunkSnapshot> SNAPSHOTS = new ConcurrentHashMap<>();
     private static final ConcurrentLinkedQueue<Long> DIRTY_MESHES = new ConcurrentLinkedQueue<>();
+    private static final Set<Long> DIRTY_MESH_KEYS = ConcurrentHashMap.newKeySet();
     private static volatile Level activeLevel;
 
     private ClientWaterSnapshotStore() {
@@ -82,7 +84,28 @@ public final class ClientWaterSnapshotStore {
 
     /** Returns and removes one chunk key whose cached mesh must be rebuilt. */
     public static Long pollDirtyMesh() {
-        return DIRTY_MESHES.poll();
+        Long key;
+        while ((key = DIRTY_MESHES.poll()) != null) {
+            if (DIRTY_MESH_KEYS.remove(key)) {
+                return key;
+            }
+        }
+        return null;
+    }
+
+    /** Number of unique chunk groups still waiting for an incremental rebuild. */
+    public static int pendingDirtyMeshCount() {
+        return DIRTY_MESH_KEYS.size();
+    }
+
+    /** Queues every loaded snapshot after a renderer ownership-mode switch. */
+    public static void markAllDirtyMeshes(Level level) {
+        if (activeLevel != level) {
+            return;
+        }
+        for (long key : SNAPSHOTS.keySet()) {
+            offerDirty(key);
+        }
     }
 
     /** Approximate primitive snapshot memory for diagnostics. */
@@ -140,6 +163,7 @@ public final class ClientWaterSnapshotStore {
         if (event.getLevel() == activeLevel) {
             SNAPSHOTS.clear();
             DIRTY_MESHES.clear();
+            DIRTY_MESH_KEYS.clear();
             activeLevel = null;
         }
     }
@@ -148,17 +172,32 @@ public final class ClientWaterSnapshotStore {
         if (activeLevel != level) {
             SNAPSHOTS.clear();
             DIRTY_MESHES.clear();
+            DIRTY_MESH_KEYS.clear();
             activeLevel = level;
         }
     }
 
     private static void markDirty(long key) {
-        DIRTY_MESHES.offer(key);
+        offerDirty(key);
         int chunkX = (int) key;
         int chunkZ = (int) (key >>> 32);
-        DIRTY_MESHES.offer(ChunkPos.asLong(chunkX - 1, chunkZ));
-        DIRTY_MESHES.offer(ChunkPos.asLong(chunkX + 1, chunkZ));
-        DIRTY_MESHES.offer(ChunkPos.asLong(chunkX, chunkZ - 1));
-        DIRTY_MESHES.offer(ChunkPos.asLong(chunkX, chunkZ + 1));
+        offerLoadedNeighbor(ChunkPos.asLong(chunkX - 1, chunkZ));
+        offerLoadedNeighbor(ChunkPos.asLong(chunkX + 1, chunkZ));
+        offerLoadedNeighbor(ChunkPos.asLong(chunkX, chunkZ - 1));
+        offerLoadedNeighbor(ChunkPos.asLong(chunkX, chunkZ + 1));
+    }
+
+    private static void offerLoadedNeighbor(long key) {
+        // Missing chunks have no mesh to rebuild. Skipping them prevents a
+        // streaming wave of no-op neighbor entries from delaying visible water.
+        if (SNAPSHOTS.containsKey(key)) {
+            offerDirty(key);
+        }
+    }
+
+    private static void offerDirty(long key) {
+        if (DIRTY_MESH_KEYS.add(key)) {
+            DIRTY_MESHES.offer(key);
+        }
     }
 }

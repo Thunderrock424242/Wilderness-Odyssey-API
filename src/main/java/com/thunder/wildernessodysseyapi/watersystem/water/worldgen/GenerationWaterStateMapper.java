@@ -70,6 +70,13 @@ public final class GenerationWaterStateMapper {
      */
     public static void recordStoredState(ChunkAccess chunk, BlockPos pos, BlockState storedState) {
         if (!isWildernessWater(storedState)) {
+            // Natural aquatic flora replaces a standalone fluid block with a
+            // vanilla hosted-water state. Keep the already-recorded generated
+            // span so snapshots retain the compact water body beneath plants.
+            if (storedState != null
+                    && NaturalAquaticWaterCompatibility.isNaturalAquaticFloraHost(storedState)) {
+                return;
+            }
             chunk.getExistingData(ModAttachments.GENERATED_WATER)
                     .ifPresent(generated -> {
                         generated.recordCell(pos, null);

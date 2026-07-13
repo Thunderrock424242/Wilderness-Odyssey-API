@@ -51,6 +51,7 @@ out vec3 viewNormal;
 out vec3 worldPosition;
 out vec3 worldNormal;
 out vec3 waterBodyBlend;
+out float surfaceContinuity;
 out vec3 celestialDirection;
 out float celestialDaylight;
 
@@ -77,7 +78,8 @@ void main() {
     float sea = clamp(SeaState, 0.0, 1.0);
     vec2 worldXZ = Position.xz;
     vec3 bodyBlend = max(Normal, vec3(0.0));
-    bodyBlend /= max(bodyBlend.x + bodyBlend.y + bodyBlend.z, 0.0001);
+    surfaceContinuity = clamp(bodyBlend.x + bodyBlend.y + bodyBlend.z, 0.0, 1.0);
+    bodyBlend /= max(surfaceContinuity, 0.0001);
     waterBodyBlend = bodyBlend;
     float oceanHeight = 0.0;
     vec2 oceanGradient = vec2(0.0);
@@ -106,12 +108,16 @@ void main() {
         + pondGradient * bodyBlend.z;
 
     vec3 displacedPosition = Position;
-    displacedPosition.y += gpuHeight * GpuWaveStrength
-        + TideOffset * bodyBlend.x;
+    // Flatten displacement continuously at dry or unloaded boundaries. This
+    // makes the stable custom mesh meet the safe fluid fallback without a
+    // raised, visibly flat perimeter ring or cracks between ownership modes.
+    float continuityWave = smoothstep(0.18, 0.92, surfaceContinuity);
+    displacedPosition.y += gpuHeight * GpuWaveStrength * continuityWave
+        + TideOffset * bodyBlend.x * continuityWave;
     vec3 gpuNormal = normalize(vec3(
-        -gpuGradient.x * GpuWaveStrength,
+        -gpuGradient.x * GpuWaveStrength * continuityWave,
         1.0,
-        -gpuGradient.y * GpuWaveStrength
+        -gpuGradient.y * GpuWaveStrength * continuityWave
     ));
     vec3 combinedNormal = gpuNormal;
 
