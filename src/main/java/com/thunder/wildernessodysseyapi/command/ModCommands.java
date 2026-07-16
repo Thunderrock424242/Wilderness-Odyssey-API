@@ -15,6 +15,7 @@ import com.thunder.wildernessodysseyapi.modpack.structure.command.ModpackStructu
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationCommands;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueStatsCommand;
 import com.thunder.wildernessodysseyapi.watersystem.water.command.WaterDebugCommand;
+import com.thunder.wildernessodysseyapi.weather.debug.WeatherDebugCommand;
 import com.thunder.wildernessodysseyapi.worldgen.command.StructureInfoCommand;
 import com.thunder.wildernessodysseyapi.worldgen.command.StructurePlacementDebugCommand;
 import com.thunder.wildernessodysseyapi.worldgen.command.WorldGenScanCommand;
@@ -58,5 +59,6 @@ public final class ModCommands {
         UnstuckCommand.register(dispatcher);
         MinecraftVerificationCommands.register(dispatcher);
         WaterDebugCommand.register(dispatcher);
+        WeatherDebugCommand.register(dispatcher);
     }
 }

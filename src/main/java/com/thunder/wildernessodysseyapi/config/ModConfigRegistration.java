@@ -19,6 +19,8 @@ import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
 import com.thunder.wildernessodysseyapi.truedarkness.config.TrueDarknessConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
+import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
+import com.thunder.wildernessodysseyapi.weather.simulation.WeatherAuthority;
 import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.config.ModConfig;
@@ -81,6 +83,8 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-codex-map-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, WaterSimulationConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-water-simulation-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, WeatherConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-weather-server.toml");
     }
 
     /** Applies runtime-backed settings after NeoForge loads a config file. */
@@ -98,6 +102,8 @@ public final class ModConfigRegistration {
             AsyncTaskManager.initialize(AsyncThreadingConfig.values());
         } else if (config.getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
+        } else if (config.getSpec() == WeatherConfig.CONFIG_SPEC) {
+            WeatherAuthority.get().onConfigurationReload();
         }
     }
 }
