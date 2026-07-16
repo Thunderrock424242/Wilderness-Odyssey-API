@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.weather.client;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindVector;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
 
@@ -86,6 +87,48 @@ class WeatherSnapshotTest {
         assertEquals(PrecipitationType.RAIN, snapshot.precipitationType(128.0, 128.0));
     }
 
+    @Test
+    void cloudFieldInterpolatesAllFourAtmosphericCells() {
+        WeatherSnapshot snapshot = snapshot(Map.of(
+                WeatherSnapshot.packCell(0, 0), cell(0, 0, cloudSample(0.0, 0.1, 0.2, 0.3, -0.8, 0.2)),
+                WeatherSnapshot.packCell(1, 0), cell(1, 0, cloudSample(0.2, 0.3, 0.4, 0.5, -0.4, 0.4)),
+                WeatherSnapshot.packCell(0, 1), cell(0, 1, cloudSample(0.6, 0.5, 0.6, 0.7, 0.4, 0.6)),
+                WeatherSnapshot.packCell(1, 1), cell(1, 1, cloudSample(1.0, 0.7, 0.8, 0.9, 0.8, 0.8))
+        ));
+
+        CloudFieldSample field = snapshot.cloudField(256.0, 256.0);
+
+        assertEquals(1.0, field.support(), 1.0E-12);
+        assertEquals(0.45, field.cloudWater(), 1.0E-12);
+        assertEquals(0.40, field.precipitationIntensity(), 1.0E-12);
+        assertEquals(0.50, field.stormEnergy(), 1.0E-12);
+        assertEquals(0.60, field.instability(), 1.0E-12);
+        assertEquals(0.0, field.windX(), 1.0E-12);
+        assertEquals(0.50, field.windZ(), 1.0E-12);
+    }
+
+    @Test
+    void cloudFieldFadesSupportAtSynchronizedRegionEdge() {
+        WeatherSnapshot snapshot = snapshot(Map.of(
+                WeatherSnapshot.packCell(0, 0), cell(
+                        0,
+                        0,
+                        cloudSample(0.80, 0.60, 0.50, 0.40, 0.30, -0.20)
+                ))
+        );
+
+        CloudFieldSample centered = snapshot.cloudField(128.0, 128.0);
+        CloudFieldSample nearEdge = snapshot.cloudField(192.0, 128.0);
+        CloudFieldSample outside = snapshot.cloudField(384.0, 128.0);
+
+        assertEquals(1.0, centered.support(), 1.0E-12);
+        assertEquals(0.75, nearEdge.support(), 1.0E-12);
+        assertEquals(0.80, nearEdge.cloudWater(), 1.0E-12);
+        assertEquals(0.60, nearEdge.precipitationIntensity(), 1.0E-12);
+        assertEquals(0.0, outside.support(), 1.0E-12);
+        assertEquals(0.0, outside.cloudWater(), 1.0E-12);
+    }
+
     private static WeatherSnapshot snapshot(Map<Long, WeatherSnapshot.SnapshotCell> cells) {
         return new WeatherSnapshot(OVERWORLD, 1, 1L, 256, new HashMap<>(cells));
     }
@@ -109,6 +152,27 @@ class WeatherSnapshotTest {
                 0.5,
                 precipitationIntensity,
                 precipitationType
+        );
+    }
+
+    private static WeatherSample cloudSample(
+            double cloudWater,
+            double precipitationIntensity,
+            double stormEnergy,
+            double instability,
+            double windX,
+            double windZ
+    ) {
+        return new WeatherSample(
+                12.0,
+                0.8,
+                1.0,
+                new WindVector(windX, windZ),
+                cloudWater,
+                instability,
+                stormEnergy,
+                precipitationIntensity,
+                PrecipitationType.RAIN
         );
     }
 }

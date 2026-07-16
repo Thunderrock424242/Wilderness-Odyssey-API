@@ -261,6 +261,61 @@ public final class WaterShaders {
                 optics.fogGreen(),
                 optics.fogBlue()
         );
+
+        // The underwater pass runs after the level has been drawn. Capture it
+        // once at this stage so every underwater optical operation samples an
+        // isolated scene instead of feeding the framebuffer back into itself.
+        Minecraft minecraft = Minecraft.getInstance();
+        WaterSceneCapture.Capture capture = null;
+        if (minecraft.level != null) {
+            long frameKey = ((minecraft.level.getGameTime() << 32)
+                    ^ (Float.floatToRawIntBits(timeSeconds) & 0xFFFFFFFFL))
+                    ^ 0x4000_0000_0000_0000L;
+            try {
+                capture = WaterSceneCapture.capture(frameKey);
+            } catch (RuntimeException exception) {
+                if (!sceneCaptureFailureLogged) {
+                    ModConstants.LOGGER.warn(
+                            "Unable to capture the completed scene for underwater optics; using texture fallback",
+                            exception
+                    );
+                    sceneCaptureFailureLogged = true;
+                }
+            }
+        }
+
+        if (capture != null && capture.available()) {
+            underwaterShader.setSampler("SceneColor", capture.colorTextureId());
+            underwaterShader.setSampler("SceneDepth", capture.depthTextureId());
+            underwaterShader.safeGetUniform("ScreenSize").set(
+                    (float) capture.width(),
+                    (float) capture.height()
+            );
+            underwaterShader.safeGetUniform("SceneCaptureValid").set(1.0f);
+        } else {
+            underwaterShader.safeGetUniform("ScreenSize").set(1.0f, 1.0f);
+            underwaterShader.safeGetUniform("SceneCaptureValid").set(0.0f);
+        }
+
+        float turbidity = 1.0f - optics.clarity();
+        underwaterShader.safeGetUniform("CameraDepth").set(
+                Math.max(0.0f, state.depthBelowSurface())
+        );
+        underwaterShader.safeGetUniform("VisibilityBlocks").set(
+                Math.max(6.0f, optics.visibilityBlocks())
+        );
+        underwaterShader.safeGetUniform("DepthRange").set(
+                0.05f,
+                Math.max(16.0f, minecraft.gameRenderer.getDepthFar())
+        );
+        // The world fog pass already handles long-distance extinction. These
+        // bounded coefficients grade the captured scene once and supply local
+        // Beer-Lambert color separation without darkening its lightmap twice.
+        underwaterShader.safeGetUniform("AbsorptionCoefficients").set(
+                0.018f + turbidity * 0.018f,
+                0.007f + turbidity * 0.010f,
+                0.0035f + turbidity * 0.006f
+        );
     }
 
     /**

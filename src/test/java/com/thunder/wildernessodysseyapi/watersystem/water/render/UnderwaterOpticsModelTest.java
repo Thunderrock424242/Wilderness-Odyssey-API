@@ -35,6 +35,52 @@ class UnderwaterOpticsModelTest {
         assertTrue(redTransmission < blueTransmission);
     }
 
+    @Test
+    void moderateDaylightOceanDepthKeepsAReadableScatteringColor() {
+        var optics = UnderwaterOpticsModel.evaluate(
+                8.0f,
+                8.0f,
+                0.0f,
+                1.0f,
+                0.018f,
+                0.25f,
+                0.62f,
+                0.0f,
+                44.0f,
+                1.0f
+        );
+
+        float luminance = optics.fogRed() * 0.2126f
+                + optics.fogGreen() * 0.7152f
+                + optics.fogBlue() * 0.0722f;
+        assertTrue(luminance > 0.12f,
+                "daylight water at the screenshot depth must not collapse toward black");
+        assertTrue(optics.fogBlue() > optics.fogGreen());
+        assertTrue(optics.fogGreen() > optics.fogRed());
+    }
+
+    @Test
+    void ambientFloorRemainsNonBlackWithoutDirectDaylight() {
+        var optics = UnderwaterOpticsModel.evaluate(
+                8.0f,
+                8.0f,
+                0.0f,
+                0.0f,
+                0.018f,
+                0.25f,
+                0.62f,
+                0.0f,
+                44.0f,
+                1.0f
+        );
+
+        float luminance = optics.fogRed() * 0.2126f
+                + optics.fogGreen() * 0.7152f
+                + optics.fogBlue() * 0.0722f;
+        assertTrue(luminance > 0.05f,
+                "night and overhangs may be dark but retain bounded ambient water color");
+    }
+
     private static UnderwaterOpticsModel.OpticalProperties sample(
             float depth,
             float columnDepth,

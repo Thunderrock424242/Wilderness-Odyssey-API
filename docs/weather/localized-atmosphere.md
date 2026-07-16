@@ -7,11 +7,14 @@ foundation. It replaces the vanilla global rain flag as the source of truth for
 Wilderness-controlled weather while preserving vanilla global state by default
 for compatibility. The first phase provides evolving atmospheric cells,
 persistence, regional client synchronization, smooth local rain and snow,
-localized sky/fog inputs, diagnostics, and read-only Wilderness water coupling.
+localized sky/fog inputs, Minecraft-style localized cloud masses, diagnostics,
+and read-only Wilderness water coupling.
 
-This phase does not provide destructive storms, full volumetric clouds, local
+This phase does not provide destructive storms, volumetric clouds, local
 lightning spawning, or a complete replacement for every vanilla gameplay rain
-check. Those boundaries are intentional and are listed under
+check. The cloud layer deliberately remains blocky and uses Minecraft's cloud
+pipeline rather than becoming a realistic particle volume. Those boundaries
+are intentional and are listed under
 [Known limitations](#known-limitations-and-compatibility).
 
 ## Architecture
@@ -32,6 +35,7 @@ flowchart LR
     L --> M["Immutable WeatherSnapshot"]
     M --> N["ClientWeatherCoordinator"]
     N --> O["Rain/snow, sound, sky, fog, F3, and water shader inputs"]
+    N --> P["CloudFieldSample and LocalizedCloudRenderer"]
 ```
 
 The principal ownership boundaries are:
@@ -86,6 +90,12 @@ Both server and client sample at cell centers and bilinearly interpolate the
 four surrounding values. A missing edge neighbor reuses the nearest available
 sample. This avoids square visible boundaries without creating cells merely to
 answer a query. A region with no sample returns the immutable clear fallback.
+
+Cloud geometry uses a separate support-aware interpolation path. It blends the
+same four synchronized cells but also records how much of the bilinear sample
+is backed by received data. Missing cells therefore reduce support and fade the
+cloud field at the edge of the synchronized region instead of stretching the
+last cloud cell indefinitely.
 
 Derived rendering/gameplay inputs are also centralized on `WeatherSample`:
 
@@ -464,11 +474,69 @@ storm-neutral color and shortens the far plane, never below 24 blocks. The
 Wilderness built-in ocean shader also receives local rain/thunder uniforms at
 the camera when snapshots are active.
 
-The F3 overlay adds four `WO Atmosphere` lines with cell, sequence, synchronized
+### Localized cloud rendering
+
+`LevelRendererLocalizedWeatherMixin` wraps only vanilla's dimension-cloud
+fallback. A dimension's own custom cloud renderer is allowed to run first. If
+it declines and a synchronized Wilderness weather snapshot controls the level,
+`LocalizedCloudRenderer` draws the localized field and suppresses vanilla's
+global cloud sheet. With no controlling snapshot, disabled localized clouds,
+or a dimension without a cloud height, rendering falls back safely.
+
+The renderer keeps Minecraft's recognizable cloud language:
+
+- the horizontal grid is made from `12 x 12` block cloud voxels, matching
+  vanilla's cloud scale;
+- **Fancy** clouds are solid block masses with exposed top, bottom, and side
+  faces and discrete heights of 4, 8, or 12 blocks as precipitation and
+  convection strengthen;
+- **Fast** clouds use one flat quad for each occupied voxel; and
+- both modes use vanilla `RenderType.clouds`, the active cloud texture,
+  Minecraft fog/color state, and the normal Fancy depth-only pass.
+
+Cloud placement is functional rather than decorative. Every voxel samples the
+server-authored cloud water, precipitation, storm energy, instability, and wind
+at that voxel's real world position. Cloud water produces deterministic broken
+coverage, while precipitation adds a continuous coverage floor. Any supported
+tile with effective precipitation of at least `1.0E-4` bypasses morphology noise,
+so meaningful rain or snow always has cloud directly overhead. Stronger rain
+and convection also increase voxel thickness, darkness, and opacity.
+
+The broad cloud envelope remains anchored to its authoritative world-space
+weather field. Local wind advances only the deterministic small-scale
+morphology, so cloud edges visibly evolve and travel without allowing the
+whole cloud mass to drift away from the rainy area that owns it. Geometry is
+cached in one client VBO and rebuilt only for a new weather sequence, camera
+cloud-tile movement, quality/config changes, temporal blending, or sufficient
+wind-detail movement.
+
+The F3 overlay adds five `WO Atmosphere` lines with cell, sequence, synchronized
 cell count, blend progress, temperature, humidity, pressure, wind, cloud water,
-instability, storm energy, precipitation, thunder, and fog. Server activity
-state remains available through `/wilderness weather cell` and `dump` rather
-than adding activity metadata to every client cell.
+instability, storm energy, precipitation, thunder, fog, cloud-mesh state,
+visible tile count, vertex count, and average coverage. Server activity state
+remains available through `/wilderness weather cell` and `dump` rather than
+adding activity metadata to every client cell.
+
+## Client cloud configuration
+
+Localized cloud quality settings are client-only and are registered as
+`wildernessodysseyapi/wildernessodysseyapi-weather-rendering-client.toml`.
+They do not change server weather authority, precipitation decisions, or the
+synchronized atmospheric footprint.
+
+| Config path under `localized_clouds` | Default | Allowed range or behavior |
+| --- | ---: | --- |
+| `enabled` | `true` | Replaces the vanilla global sheet only while a localized snapshot controls the dimension. |
+| `renderDistanceBlocks` | `384` | `96..512`; horizontal radius sampled for cloud geometry. |
+| `rebuildIntervalTicks` | `5` | `2..40`; minimum interval while blending or wind detail is moving. |
+| `windDetailSpeedBlocksPerSecond` | `6.0` | `0..24`; visual morphology speed at full normalized wind. It does not move the authoritative envelope. |
+| `maximumCloudTiles` | `4096` | `256..8192`; hard cap on sampled `12 x 12` tiles per rebuild. |
+| `opacityMultiplier` | `1.0` | `0.25..1.25`; visual alpha only, without changing cloud occupancy or precipitation. |
+
+Minecraft's normal Clouds option still selects Off, Fast, or Fancy. Off skips
+the cloud render call entirely; the client config does not force clouds back
+on. Config load/reload publishes one immutable settings snapshot for the
+render thread and invalidates the cached mesh when values change.
 
 ## Server configuration
 
@@ -543,8 +611,13 @@ a block-scale weather system:
 - retained cells are bounded and least-valuable dormant cells are evicted;
 - persistence uses primitive arrays and fixed-point weather words;
 - each client receives only a bounded nearby region and changed revisions;
-- client state copies occur on payload receipt rather than every frame; and
+- client state copies occur on payload receipt rather than every frame;
 - per-column precipitation type queries use allocation-light scalar interpolation;
+- clouds reuse one VBO and a bounded circular tile field instead of rebuilding
+  or drawing one object per tile every frame;
+- cloud mesh rebuilds are rate-limited during temporal blending and wind-detail
+  movement, while sequence, camera-tile, quality, and config changes invalidate
+  the cache immediately; and
 - all world reads are server-thread confined.
 
 Remaining first-phase risks are bounded but worth profiling. Each simulation
@@ -555,7 +628,10 @@ neighbor/environment window, which is safe and cheap but only an approximation
 of the missed timeline. The two 2,048-entry environment caches can churn on a
 server that rotates rapidly through many distant cells. Simulation is still on
 the server thread, so aggressive radius, interval, or speed settings should be
-profiled before production use.
+profiled before production use. On the client, high cloud render distance and
+tile-cap settings combined with a very short rebuild interval increase CPU mesh
+construction and GPU upload frequency; the defaults should remain the baseline
+until representative Fancy-cloud scenes are profiled.
 
 ## Known limitations and compatibility
 
@@ -590,9 +666,19 @@ Additional first-phase limits:
   fields; there is no explicit front object, storm merge identity, or distant
   storm metadata;
 - the client uses vanilla precipitation geometry and sound logic, not rain
-  shafts, custom cloud layers, or volumetric clouds;
-- a custom renderer that entirely replaces vanilla `LevelRenderer` weather
-  methods may need its own adapter to consume `ClientWeatherCoordinator`;
+  shafts or volumetric clouds; localized clouds are intentionally discrete
+  Minecraft-style voxels rather than physically simulated vapor;
+- cloud coverage is bounded by the synchronized weather region and configured
+  render radius. Support fades at a missing snapshot edge, so this renderer
+  does not provide horizon-scale distant storm silhouettes;
+- Minecraft's Clouds Off option intentionally hides all cloud geometry even
+  while localized precipitation remains authoritative;
+- custom dimension cloud renderers take priority. Shader packs or render mods
+  that bypass or entirely replace vanilla `LevelRenderer.renderClouds` may need
+  an adapter to consume `ClientWeatherCoordinator`;
+- the renderer samples a known opaque texel in the active cloud texture so a
+  rainy voxel cannot contain vanilla texture holes. A resource pack that makes
+  that texel transparent can weaken the visible coverage guarantee;
 - seasons, anomaly moisture, contaminated rain, drought, lake-effect snow,
   external weather mods, radar, destructive wind, tornadoes, cyclones,
   hurricanes, and block damage are not implemented; and
@@ -612,64 +698,85 @@ For multiplayer validation, run a dedicated development server and connect two
 clients with permission level 2. Keep the default 256-block cells unless a test
 explicitly changes them; changing size resets atmospheric state.
 
-1. **Inspect the baseline.** Join, open F3, and confirm the four
+1. **Inspect the baseline.** Join, open F3, and confirm the five
    `WO Atmosphere` lines appear after the first sync. Run
    `/wilderness weather sample`, `/wilderness weather cell`, and
    `/wilderness weather dump`. Confirm the command values match the local F3
    sample within network quantization and the two-second client blend.
 2. **Verify rain and snow rendering.** Run
    `/wilderness weather force rain`; confirm local rain quads, particles,
-   precipitation sounds, sky darkening, and air fog. Run
+   precipitation sounds, sky darkening, air fog, and cloud cover. Run
    `/wilderness weather force snow`; confirm snow replaces rain. Run
    `/wilderness weather clear` and confirm both stop after synchronization and
    blending.
-3. **Verify two local conditions.** Place player A inside a forced `3 x 3`
+3. **Verify functional cloud coverage and quality modes.** In Video Settings,
+   set Clouds to **Fancy**, then run `/wilderness weather force rain`. Confirm
+   the F3 `Cloud mesh active` line reports nonzero tiles and vertices. Look up
+   throughout the raining area and confirm every raining column is under cloud,
+   then use spectator flight to view the solid `12 x 12` voxel masses and their
+   exposed sides. Stand near the forced `3 x 3` storm boundary and look across
+   it: the cloud mass should follow and blend out with the rain footprint rather
+   than continuing as a global sheet. Switch Clouds to **Fast** and confirm the
+   same footprint becomes flat quads. Switch Clouds **Off** and confirm clouds
+   disappear while localized rain remains; restore Fancy before continuing.
+4. **Verify client config fallback.** Stop the client and set
+   `localized_clouds.enabled=false` in
+   `config/wildernessodysseyapi/wildernessodysseyapi-weather-rendering-client.toml`.
+   Restart, force rain, and confirm the F3 cloud-mesh line is inactive while
+   vanilla cloud fallback is used. Re-enable it and restart; confirm the local
+   mesh returns. Optionally set `renderDistanceBlocks=96` and
+   `opacityMultiplier=0.25`, restart, and confirm the visual radius/opacity and
+   F3 tile count change without changing precipitation. Restore defaults after
+   the check.
+5. **Verify two local conditions.** Place player A inside a forced `3 x 3`
    region and player B at least three cells away (roughly 768 blocks at the
    default size), but in the same dimension. Force rain at A and clear at B.
-   Confirm A sees rain while B remains clear. Move both clients to the same
-   block and confirm their F3 weather fields agree.
-4. **Verify continuous evolution and transport.** Force rain, then use
+   Confirm A sees rain and its local cloud mass while B remains clear. Move both
+   clients to the same block and confirm their F3 weather and cloud-mesh fields
+   agree.
+6. **Verify continuous evolution and transport.** Force rain, then use
    `/execute positioned <x> <y> <z> run wilderness weather set pressure 0.7`
    in one cell and pressure `1.3` in an adjacent cell. Set humidity near `1.0`
    where needed. Wait several 60-tick simulation intervals and sample both
    cells repeatedly. Confirm wind develops from the pressure gradient and
    temperature, humidity, cloud water, and precipitation change smoothly rather
-   than switching presets. Walk across the boundary and confirm interpolation
-   has no hard square edge.
-5. **Verify restart persistence.** Force weather, record `sample` and `cell`,
+   than switching presets. Confirm cloud-edge detail moves with wind while the
+   rainy cloud envelope stays over its authoritative rain area. Walk across the
+   boundary and confirm interpolation has no hard square edge.
+7. **Verify restart persistence.** Force weather, record `sample` and `cell`,
    run `/save-all flush`, stop cleanly, restart, and return to the same
    coordinates. Confirm the cell revision/state and weather continuity survive;
    allow for fixed-point save precision and elapsed simulation.
-6. **Verify chunk-load safety.** With players stationary, record the server's
+8. **Verify chunk-load safety.** With players stationary, record the server's
    loaded-chunk count using the development server/F3 or the pack's normal chunk
    profiler. Wait through multiple environment refreshes (more than 400 ticks).
    Confirm the loaded region does not expand in an atmospheric-cell pattern.
    Move into a new region and confirm sampling skips unavailable probes rather
    than creating distant chunk tickets.
-7. **Verify dimension synchronization.** Enter another dimension and confirm
+9. **Verify dimension synchronization.** Enter another dimension and confirm
    F3 changes to that dimension's new regional sequence/state. Return and
    confirm the original dimension state is resynchronized. Repeat with a
    same-dimension teleport across at least one atmospheric-cell boundary.
-8. **Verify reconnect behavior.** Disconnect during forced weather, reconnect,
-   and confirm the first full snapshot restores the correct local visuals and
-   F3 sample. Confirm stale state from the previous connection or dimension is
-   not briefly used.
-9. **Verify water is read-only.** At an ocean/river/lake, record
-   `/wowater inspect` and `/wowater authority 16`, then record nearby weather
-   humidity. Wait through an environment refresh and repeat. Confirm wet
-   regions contribute moisture over time while the water ownership/coverage
-   diagnostics and blocks are unchanged by weather.
-10. **Verify every debug edit.** Exercise all scalar setters, `force rain`,
+10. **Verify reconnect behavior.** Disconnect during forced weather, reconnect,
+    and confirm the first full snapshot restores the correct local visuals and
+    F3 sample. Confirm stale state from the previous connection or dimension is
+    not briefly used.
+11. **Verify water is read-only.** At an ocean/river/lake, record
+    `/wowater inspect` and `/wowater authority 16`, then record nearby weather
+    humidity. Wait through an environment refresh and repeat. Confirm wet
+    regions contribute moisture over time while the water ownership/coverage
+    diagnostics and blocks are unchanged by weather.
+12. **Verify every debug edit.** Exercise all scalar setters, `force rain`,
     `force snow`, `clear`, and `dump` as an operator. Confirm a non-operator is
     denied. Confirm edits increment the cell revision and appear on connected
     clients at the next synchronization pass.
-11. **Verify disable/reset behavior.** Set `weather.enabled=false` in the
+13. **Verify disable/reset behavior.** Set `weather.enabled=false` in the
     server config and reload/restart. Confirm clients receive an empty reset,
     the F3 atmosphere lines disappear, rendering falls back safely to vanilla,
     and server weather queries return clear. Re-enable it and confirm a complete
     regional snapshot resumes. Test both compatibility modes separately if the
     pack intends to use `SUPPRESS_GLOBAL`.
-12. **Verify multiplayer authority.** Put both clients at the same coordinates,
+14. **Verify multiplayer authority.** Put both clients at the same coordinates,
     issue edits from the server/operator, and compare F3/sample values. Confirm
     both converge on the same server-authored fields, clients cannot create
     weather locally, and rapid movement/reconnect does not make an older payload
@@ -691,10 +798,11 @@ The next phase should deepen the same boundaries rather than replace them:
    `LocalizedPrecipitationController`, starting with Riftfall, fire/wetness,
    cauldrons, farmland, snow/freezing, and fishing. Once global consumers are
    removed, reassess making suppression the default.
-4. Build layered/distant clouds, rain shafts, fog banks, and storm-front visuals
-   as client consumers of `ClientWeatherCoordinator`. Start with instanced
-   layers and quality settings; treat volumetric/compute rendering as an
-   optional later tier, not part of server authority.
+4. Extend the current localized voxel renderer with a distant low-detail cloud
+   tier, rain shafts, fog banks, and storm-front visuals as client consumers of
+   `ClientWeatherCoordinator`. Preserve the authoritative footprint and treat
+   volumetric/compute rendering as an optional later quality tier, not part of
+   server authority.
 5. Extend the existing `WeatherWaterInfluence` and
    `SeasonalWeatherInfluence` boundaries for lake-effect snow, ocean-fed storm
    development, seasons, drought, contamination, and anomaly weather without

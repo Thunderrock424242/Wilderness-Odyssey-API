@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.weather.client;
 
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherRegionSyncPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -123,6 +124,34 @@ public final class ClientWeatherCoordinator {
     /** Returns the temporally and spatially interpolated sample at a vector position. */
     public static WeatherSample sampleAt(ClientLevel level, Vec3 pos) {
         return pos == null ? WeatherSample.CLEAR : sampleAt(level, pos.x, pos.z);
+    }
+
+    /** Returns the support-aware cloud field at a vector position. */
+    public static CloudFieldSample cloudFieldAt(ClientLevel level, Vec3 pos) {
+        return pos == null ? CloudFieldSample.CLEAR : cloudFieldAt(level, pos.x, pos.z);
+    }
+
+    /**
+     * Returns the spatially and temporally interpolated cloud field at world coordinates.
+     *
+     * <p>This query deliberately exposes synchronized-region support so cloud
+     * geometry can fade at its data boundary. General weather queries retain
+     * their nearest-cell edge behavior for precipitation stability.</p>
+     */
+    public static CloudFieldSample cloudFieldAt(ClientLevel level, double blockX, double blockZ) {
+        State state = matchingState(level);
+        if (state == null) {
+            return CloudFieldSample.CLEAR;
+        }
+        double amount = state.progress(System.nanoTime());
+        if (amount >= 1.0D) {
+            return state.current().cloudField(blockX, blockZ);
+        }
+        return CloudFieldSample.interpolate(
+                state.previous().cloudField(blockX, blockZ),
+                state.current().cloudField(blockX, blockZ),
+                amount
+        );
     }
 
     /** Returns the local precipitation intensity in the canonical {@code [0, 1]} range. */

@@ -129,6 +129,14 @@ public class GerstnerWaveRenderMixin {
         if (HIDE_VANILLA_TOP.get()) {
             return true;
         }
+        // Aquatic flora keeps vanilla's hosted water fluid while generated
+        // oceans use the namespaced Wilderness fluid. Treat that shared tagged
+        // volume as continuous so vanilla never bakes horizontal panes inside
+        // kelp, seagrass, or coral columns.
+        if (WaterCompatibility.isTaggedWater(selfState)
+                && WaterCompatibility.isTaggedWater(aboveState.getFluidState())) {
+            return true;
+        }
         return aboveState.shouldHideAdjacentFluidFace(neighborFace, selfState);
     }
 
