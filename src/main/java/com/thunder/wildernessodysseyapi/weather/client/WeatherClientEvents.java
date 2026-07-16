@@ -2,6 +2,9 @@ package com.thunder.wildernessodysseyapi.weather.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.LocalizedCloudRenderer;
+import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
+import net.minecraft.client.CloudStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -10,6 +13,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
@@ -32,15 +36,28 @@ public final class WeatherClientEvents {
     private WeatherClientEvents() {
     }
 
+    /** Releases dormant cloud geometry when the normal cloud render call is skipped. */
+    @SubscribeEvent
+    public static void onClientTick(ClientTickEvent.Post event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.options.getCloudsType() == CloudStatus.OFF
+                || !WeatherRenderingConfig.settings().enabled()
+                || !ClientWeatherCoordinator.controls(minecraft.level)) {
+            LocalizedCloudRenderer.clear();
+        }
+    }
+
     /** Clears stale sequence watermarks before the next server starts syncing weather. */
     @SubscribeEvent
     public static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
+        LocalizedCloudRenderer.clear();
         ClientWeatherCoordinator.clearAll();
     }
 
     /** Releases all immutable atmosphere state when the client disconnects. */
     @SubscribeEvent
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        LocalizedCloudRenderer.clear();
         ClientWeatherCoordinator.clearAll();
     }
 
@@ -48,6 +65,7 @@ public final class WeatherClientEvents {
     @SubscribeEvent
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel() instanceof ClientLevel clientLevel) {
+            LocalizedCloudRenderer.clear();
             ClientWeatherCoordinator.clearLevel(clientLevel);
         }
     }
@@ -128,6 +146,7 @@ public final class WeatherClientEvents {
         WeatherSample sample = ClientWeatherCoordinator.sampleAt(level, pos);
         float thunder = ClientWeatherCoordinator.thunderContribution(sample);
         float fog = ClientWeatherCoordinator.fogContribution(sample);
+        LocalizedCloudRenderer.Diagnostics clouds = LocalizedCloudRenderer.diagnostics();
 
         return List.of(
                 String.format(
@@ -162,6 +181,14 @@ public final class WeatherClientEvents {
                         sample.precipitationIntensity(),
                         thunder,
                         fog
+                ),
+                String.format(
+                        Locale.ROOT,
+                        "Cloud mesh %s | %d tiles | %d vertices | coverage %.3f",
+                        clouds.active() ? "active" : "inactive",
+                        clouds.visibleTiles(),
+                        clouds.vertices(),
+                        clouds.averageCoverage()
                 )
         );
     }

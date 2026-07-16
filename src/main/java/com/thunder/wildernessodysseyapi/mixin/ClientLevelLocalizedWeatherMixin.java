@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.LocalizedCloudRenderer;
 import net.minecraft.client.multiplayer.ClientLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -27,6 +28,9 @@ public abstract class ClientLevelLocalizedWeatherMixin {
             ClientLevel level,
             float partialTick
     ) {
+        if (LocalizedCloudRenderer.isSamplingBaseCloudColor()) {
+            return 0.0F;
+        }
         if (ClientWeatherCoordinator.controls(level)) {
             return ClientWeatherCoordinator.localSkyDarkening(level);
         }
@@ -44,6 +48,9 @@ public abstract class ClientLevelLocalizedWeatherMixin {
             ClientLevel level,
             float partialTick
     ) {
+        if (LocalizedCloudRenderer.isSamplingBaseCloudColor()) {
+            return 0.0F;
+        }
         if (ClientWeatherCoordinator.controls(level)) {
             return ClientWeatherCoordinator.localThunderLevel(level);
         }

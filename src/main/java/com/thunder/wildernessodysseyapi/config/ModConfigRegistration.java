@@ -20,6 +20,7 @@ import com.thunder.wildernessodysseyapi.truedarkness.config.TrueDarknessConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
+import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import com.thunder.wildernessodysseyapi.weather.simulation.WeatherAuthority;
 import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import net.neoforged.fml.ModContainer;
@@ -59,6 +60,8 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-true-darkness-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, WaterRenderingConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-water-rendering-client.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, WeatherRenderingConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-weather-rendering-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, CodexMapConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-codex-map-client.toml");
 
@@ -104,6 +107,8 @@ public final class ModConfigRegistration {
             StructureBlockSettings.reloadFromConfig();
         } else if (config.getSpec() == WeatherConfig.CONFIG_SPEC) {
             WeatherAuthority.get().onConfigurationReload();
+        } else if (config.getSpec() == WeatherRenderingConfig.CONFIG_SPEC) {
+            WeatherRenderingConfig.reload();
         }
     }
 }

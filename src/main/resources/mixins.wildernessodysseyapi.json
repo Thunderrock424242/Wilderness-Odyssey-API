@@ -39,6 +39,7 @@
     "ClientLevelTrueDarknessMixin",
     "ClientLevelWeatherColorMixin",
     "DebugScreenOverlayMixin",
+    "EmbeddiumWaterRenderMixin",
     "GlStateManagerGpuProfilerMixin",
     "GerstnerWaveRenderMixin",
     "IrisWaterMaterialBridgeMixin",

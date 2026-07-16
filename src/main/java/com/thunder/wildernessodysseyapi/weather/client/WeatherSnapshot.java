@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.weather.client;
 
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -94,6 +95,32 @@ public final class WeatherSnapshot {
         WeatherSample south = interpolateAvailable(southWest, southEast, xAmount);
         WeatherSample result = interpolateAvailable(north, south, zAmount);
         return result == null ? WeatherSample.CLEAR : result;
+    }
+
+    /**
+     * Samples only the atmospheric fields needed to construct cloud geometry.
+     *
+     * <p>Unlike general gameplay sampling, this path retains the fraction of
+     * the bilinear footprint backed by synchronized cells. The renderer can
+     * therefore end a bounded cloud field cleanly instead of repeating its
+     * nearest edge cell across the horizon.</p>
+     */
+    public CloudFieldSample cloudField(double blockX, double blockZ) {
+        double gridX = blockX / cellSize - 0.5D;
+        double gridZ = blockZ / cellSize - 0.5D;
+        int minimumCellX = floorToInt(gridX);
+        int minimumCellZ = floorToInt(gridZ);
+        double xAmount = gridX - minimumCellX;
+        double zAmount = gridZ - minimumCellZ;
+
+        return CloudFieldSample.spatial(
+                sampleInCell(minimumCellX, minimumCellZ),
+                sampleInCell(minimumCellX + 1, minimumCellZ),
+                sampleInCell(minimumCellX, minimumCellZ + 1),
+                sampleInCell(minimumCellX + 1, minimumCellZ + 1),
+                xAmount,
+                zAmount
+        );
     }
 
     /**
