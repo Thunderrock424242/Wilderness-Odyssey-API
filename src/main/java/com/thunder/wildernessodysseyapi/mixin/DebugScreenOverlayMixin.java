@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.debugoverlay.client.DebugOverlayAnimator
 import com.thunder.wildernessodysseyapi.debugoverlay.client.DebugOverlayLineFilter;
 import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuProfiler;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderDiagnostics;
+import com.thunder.wildernessodysseyapi.weather.client.WeatherClientEvents;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.DebugScreenOverlay;
 import org.spongepowered.asm.mixin.Mixin;
@@ -41,6 +42,7 @@ public abstract class DebugScreenOverlayMixin {
         // Water diagnostics live beside the existing GPU counters so render
         // regressions can be inspected without opening a separate HUD.
         lines.addAll(WaterRenderDiagnostics.debugLines());
+        lines.addAll(WeatherClientEvents.debugLines());
         cir.setReturnValue(lines);
     }
 }

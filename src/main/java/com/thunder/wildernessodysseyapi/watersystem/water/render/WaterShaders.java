@@ -5,6 +5,8 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
+import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.ShaderInstance;
@@ -155,8 +157,21 @@ public final class WaterShaders {
         oceanShader.safeGetUniform("InverseProjMat").set(inverseProjection);
         var cameraPosition = minecraft.gameRenderer.getMainCamera().getPosition();
 
-        float rain = minecraft.level.getRainLevel(partialTick);
-        float thunder = minecraft.level.getThunderLevel(partialTick);
+        float rain;
+        float thunder;
+        if (ClientWeatherCoordinator.controls(minecraft.level)) {
+            // Water remains read-only from weather's perspective; only these
+            // client shader uniforms consume the local immutable snapshot.
+            WeatherSample localWeather = ClientWeatherCoordinator.sampleAt(
+                    minecraft.level,
+                    cameraPosition
+            );
+            rain = (float) localWeather.precipitationIntensity();
+            thunder = ClientWeatherCoordinator.thunderContribution(localWeather);
+        } else {
+            rain = minecraft.level.getRainLevel(partialTick);
+            thunder = minecraft.level.getThunderLevel(partialTick);
+        }
         float skyBrightness = Math.max(0.12f, 1.0f - rain * 0.32f - thunder * 0.38f);
         oceanShader.safeGetUniform("Weather").set(rain, thunder, skyBrightness, 0.0f);
         var sky = minecraft.level.getSkyColor(cameraPosition, partialTick);
