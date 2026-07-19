@@ -106,14 +106,28 @@ public record CloudFieldSample(
         CloudFieldSample safeFrom = from == null ? CLEAR : from;
         CloudFieldSample safeTo = to == null ? CLEAR : to;
         double alpha = unit(amount);
+        double support = lerp(safeFrom.support, safeTo.support, alpha);
+        if (support <= 1.0E-9) {
+            return CLEAR;
+        }
+
+        // Interpolate support-weighted fields first, then normalize once. This
+        // keeps effective coverage linear while a synchronized region appears
+        // or disappears instead of multiplying two independent transitions.
         return new CloudFieldSample(
-                lerp(safeFrom.cloudWater, safeTo.cloudWater, alpha),
-                lerp(safeFrom.precipitationIntensity, safeTo.precipitationIntensity, alpha),
-                lerp(safeFrom.stormEnergy, safeTo.stormEnergy, alpha),
-                lerp(safeFrom.instability, safeTo.instability, alpha),
-                lerp(safeFrom.windX, safeTo.windX, alpha),
-                lerp(safeFrom.windZ, safeTo.windZ, alpha),
-                lerp(safeFrom.support, safeTo.support, alpha)
+                interpolateEffective(safeFrom.cloudWater, safeFrom.support,
+                        safeTo.cloudWater, safeTo.support, alpha, support),
+                interpolateEffective(safeFrom.precipitationIntensity, safeFrom.support,
+                        safeTo.precipitationIntensity, safeTo.support, alpha, support),
+                interpolateEffective(safeFrom.stormEnergy, safeFrom.support,
+                        safeTo.stormEnergy, safeTo.support, alpha, support),
+                interpolateEffective(safeFrom.instability, safeFrom.support,
+                        safeTo.instability, safeTo.support, alpha, support),
+                interpolateEffective(safeFrom.windX, safeFrom.support,
+                        safeTo.windX, safeTo.support, alpha, support),
+                interpolateEffective(safeFrom.windZ, safeFrom.support,
+                        safeTo.windZ, safeTo.support, alpha, support),
+                support
         );
     }
 
@@ -129,6 +143,17 @@ public record CloudFieldSample(
 
     private static double lerp(double from, double to, double amount) {
         return from + (to - from) * amount;
+    }
+
+    private static double interpolateEffective(
+            double from,
+            double fromSupport,
+            double to,
+            double toSupport,
+            double amount,
+            double blendedSupport
+    ) {
+        return lerp(from * fromSupport, to * toSupport, amount) / blendedSupport;
     }
 
     private static double unit(double value) {

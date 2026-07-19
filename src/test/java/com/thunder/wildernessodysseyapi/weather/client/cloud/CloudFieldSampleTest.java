@@ -47,13 +47,26 @@ class CloudFieldSampleTest {
 
         CloudFieldSample field = CloudFieldSample.interpolate(from, to, 0.25);
 
-        assertEquals(0.35, field.cloudWater(), 1.0E-12);
-        assertEquals(0.25, field.precipitationIntensity(), 1.0E-12);
-        assertEquals(0.45, field.stormEnergy(), 1.0E-12);
-        assertEquals(0.45, field.instability(), 1.0E-12);
-        assertEquals(-0.25, field.windX(), 1.0E-12);
-        assertEquals(0.0, field.windZ(), 1.0E-12);
+        assertEquals(0.25 / 0.875, field.cloudWater(), 1.0E-12);
+        assertEquals(0.1625 / 0.875, field.precipitationIntensity(), 1.0E-12);
+        assertEquals(0.3375 / 0.875, field.stormEnergy(), 1.0E-12);
+        assertEquals(0.375 / 0.875, field.instability(), 1.0E-12);
+        assertEquals(-0.3125 / 0.875, field.windX(), 1.0E-12);
+        assertEquals(0.09375 / 0.875, field.windZ(), 1.0E-12);
         assertEquals(0.875, field.support(), 1.0E-12);
+        assertEquals(0.25, field.effectiveCloudWater(), 1.0E-12);
+        assertEquals(0.1625, field.effectivePrecipitation(), 1.0E-12);
+    }
+
+    @Test
+    void temporalInterpolationPreservesEffectivePrecipitationAtSupportEdge() {
+        CloudFieldSample edge = new CloudFieldSample(0.8, 0.8, 0.6, 0.5, 0.2, -0.1, 0.5);
+
+        CloudFieldSample halfway = CloudFieldSample.interpolate(CloudFieldSample.CLEAR, edge, 0.5);
+
+        assertEquals(0.25, halfway.support(), 1.0E-12);
+        assertEquals(0.8, halfway.precipitationIntensity(), 1.0E-12);
+        assertEquals(0.20, halfway.effectivePrecipitation(), 1.0E-12);
     }
 
     private static WeatherSample sample(

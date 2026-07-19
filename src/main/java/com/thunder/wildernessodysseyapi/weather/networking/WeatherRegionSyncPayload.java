@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereView;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
+import com.thunder.wildernessodysseyapi.weather.api.PrecipitationIntensity;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindVector;
 import net.minecraft.network.FriendlyByteBuf;
@@ -69,7 +70,6 @@ public record WeatherRegionSyncPayload(
     private static final int UNSIGNED_SHORT_MAX = 65_535;
     private static final int UNSIGNED_BYTE_MAX = 255;
     private static final int SIGNED_UNIT_MAX = 32_767;
-    private static final int PRECIPITATION_INTENSITY_MAX = 63;
 
     /** Payload identifier used by NeoForge's client-bound play protocol. */
     public static final Type<WeatherRegionSyncPayload> TYPE = new Type<>(
@@ -162,7 +162,7 @@ public record WeatherRegionSyncPayload(
             // Precipitation type needs only two bits, leaving the remaining six
             // for intensity without another byte per cell.
             int precipitation = precipitationTypeId(cell.precipitationType) << 6;
-            precipitation |= quantizeUnit(cell.precipitationIntensity, PRECIPITATION_INTENSITY_MAX);
+            precipitation |= PrecipitationIntensity.quantize(cell.precipitationIntensity);
             buffer.writeByte(precipitation);
         }
     }
@@ -225,9 +225,8 @@ public record WeatherRegionSyncPayload(
             float stormEnergy = dequantizeUnit(buffer.readUnsignedByte(), UNSIGNED_BYTE_MAX);
             int precipitation = buffer.readUnsignedByte();
             PrecipitationType precipitationType = precipitationTypeFromId(precipitation >>> 6);
-            float precipitationIntensity = dequantizeUnit(
-                    precipitation & PRECIPITATION_INTENSITY_MAX,
-                    PRECIPITATION_INTENSITY_MAX
+            float precipitationIntensity = PrecipitationIntensity.dequantize(
+                    precipitation & PrecipitationIntensity.QUANTIZED_MAX
             );
             cells.add(new CellSnapshot(
                     cellX,

@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.weather.client;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudLightingModel;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherRegionSyncPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -160,6 +161,75 @@ public final class ClientWeatherCoordinator {
     }
 
     /**
+     * Returns allocation-free interpolated precipitation at arbitrary world coordinates.
+     *
+     * <p>The cloud renderer uses this continuous scalar path to prove whether
+     * any part of a 12-block cloud tile overlaps a rainy atmospheric region.</p>
+     */
+    public static double precipitationIntensityAt(ClientLevel level, double blockX, double blockZ) {
+        State state = matchingState(level);
+        if (state == null) {
+            return 0.0D;
+        }
+        double amount = state.progress(System.nanoTime());
+        return lerp(
+                state.previous().precipitationIntensity(blockX, blockZ),
+                state.current().precipitationIntensity(blockX, blockZ),
+                amount
+        );
+    }
+
+    /**
+     * Returns temporally blended precipitation attenuated at synchronized-region edges.
+     *
+     * <p>Clouds and precipitation visuals share this primitive scalar so neither
+     * system can continue beyond the authoritative client footprint alone.</p>
+     */
+    public static double visualPrecipitationIntensityAt(
+            ClientLevel level,
+            double blockX,
+            double blockZ
+    ) {
+        State state = matchingState(level);
+        if (state == null) {
+            return 0.0D;
+        }
+        double amount = state.progress(System.nanoTime());
+        return lerp(
+                state.previous().supportedPrecipitationIntensity(blockX, blockZ),
+                state.current().supportedPrecipitationIntensity(blockX, blockZ),
+                amount
+        );
+    }
+
+    /**
+     * Returns precipitation from the newest accepted snapshot without visual blending.
+     *
+     * <p>Client gameplay prediction uses this path so rain-sensitive actions do
+     * not trail server authority by the two-second rendering transition.</p>
+     */
+    public static float currentPrecipitationIntensityAt(ClientLevel level, BlockPos pos) {
+        if (pos == null) {
+            return 0.0F;
+        }
+        State state = matchingState(level);
+        return state == null
+                ? 0.0F
+                : (float) state.current().precipitationIntensity(pos.getX(), pos.getZ());
+    }
+
+    /** Returns the newest accepted precipitation type for client gameplay prediction. */
+    public static PrecipitationType currentPrecipitationTypeAt(ClientLevel level, BlockPos pos) {
+        if (pos == null) {
+            return PrecipitationType.NONE;
+        }
+        State state = matchingState(level);
+        return state == null
+                ? PrecipitationType.NONE
+                : state.current().precipitationType(pos.getX(), pos.getZ());
+    }
+
+    /**
      * Returns the interpolated local rain/snow classification at a block.
      *
      * <p>This is the allocation-light path used for each precipitation render
@@ -213,7 +283,14 @@ public final class ClientWeatherCoordinator {
 
     /** Returns overcast, precipitation, and storm darkening for sky calculations. */
     public static float localSkyDarkening(ClientLevel level) {
-        return (float) localSample(level).skyDarkening();
+        Vec3 position = localVisualPosition(level);
+        if (position == null) {
+            return 0.0F;
+        }
+        return (float) CloudLightingModel.skyDarkening(
+                sampleAt(level, position),
+                cloudFieldAt(level, position)
+        );
     }
 
     /**
@@ -228,7 +305,14 @@ public final class ClientWeatherCoordinator {
 
     /** Returns a smooth air-fog contribution derived from local humidity and precipitation. */
     public static float localFogContribution(ClientLevel level) {
-        return fogContribution(localSample(level));
+        Vec3 position = localVisualPosition(level);
+        if (position == null) {
+            return 0.0F;
+        }
+        return (float) CloudLightingModel.fogContribution(
+                sampleAt(level, position),
+                cloudFieldAt(level, position)
+        );
     }
 
     /** Calculates the renderer-facing thunder contribution for any immutable sample. */
@@ -298,19 +382,6 @@ public final class ClientWeatherCoordinator {
         );
     }
 
-    private static double precipitationIntensityAt(ClientLevel level, double blockX, double blockZ) {
-        State state = matchingState(level);
-        if (state == null) {
-            return 0.0D;
-        }
-        double amount = state.progress(System.nanoTime());
-        return lerp(
-                state.previous().precipitationIntensity(blockX, blockZ),
-                state.current().precipitationIntensity(blockX, blockZ),
-                amount
-        );
-    }
-
     private static State matchingState(ClientLevel level) {
         State state = activeState;
         return level != null
@@ -329,6 +400,23 @@ public final class ClientWeatherCoordinator {
             return minecraft.player.blockPosition();
         }
         return BlockPos.containing(minecraft.gameRenderer.getMainCamera().getPosition());
+    }
+
+    private static Vec3 localVisualPosition(ClientLevel level) {
+        if (level == null) {
+            return null;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.gameRenderer.getMainCamera().getEntity() != null
+                && minecraft.gameRenderer.getMainCamera().getEntity().level() == level) {
+            Vec3 camera = minecraft.gameRenderer.getMainCamera().getPosition();
+            if (Double.isFinite(camera.x) && Double.isFinite(camera.y) && Double.isFinite(camera.z)) {
+                return camera;
+            }
+        }
+        return minecraft.player != null && minecraft.player.level() == level
+                ? minecraft.player.position()
+                : null;
     }
 
     private static boolean isValidEnabledPayload(WeatherRegionSyncPayload payload) {

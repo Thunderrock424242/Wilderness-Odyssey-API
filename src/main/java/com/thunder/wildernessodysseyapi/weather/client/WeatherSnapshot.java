@@ -133,6 +133,38 @@ public final class WeatherSnapshot {
         return sampleScalar(blockX, blockZ, PRECIPITATION_FIELD, 0.0);
     }
 
+    /**
+     * Returns visual precipitation with missing synchronized cells treated as clear.
+     *
+     * <p>The general scalar path repeats the nearest edge value to keep gameplay
+     * queries stable. Renderers instead use this weighted path so rain, cloud
+     * cover, and distant shafts fade together at the bounded payload edge.</p>
+     */
+    double supportedPrecipitationIntensity(double blockX, double blockZ) {
+        double gridX = blockX / cellSize - 0.5D;
+        double gridZ = blockZ / cellSize - 0.5D;
+        int minimumCellX = floorToInt(gridX);
+        int minimumCellZ = floorToInt(gridZ);
+        double xAmount = gridX - minimumCellX;
+        double zAmount = gridZ - minimumCellZ;
+
+        double northWest = clearIfMissing(
+                scalarInCell(minimumCellX, minimumCellZ, PRECIPITATION_FIELD)
+        );
+        double northEast = clearIfMissing(
+                scalarInCell(minimumCellX + 1, minimumCellZ, PRECIPITATION_FIELD)
+        );
+        double southWest = clearIfMissing(
+                scalarInCell(minimumCellX, minimumCellZ + 1, PRECIPITATION_FIELD)
+        );
+        double southEast = clearIfMissing(
+                scalarInCell(minimumCellX + 1, minimumCellZ + 1, PRECIPITATION_FIELD)
+        );
+        double north = northWest + (northEast - northWest) * xAmount;
+        double south = southWest + (southEast - southWest) * xAmount;
+        return north + (south - north) * zAmount;
+    }
+
     /** Returns interpolated temperature through the renderer's scalar query path. */
     double temperature(double blockX, double blockZ) {
         return sampleScalar(blockX, blockZ, TEMPERATURE_FIELD, WeatherSample.CLEAR.temperature());
@@ -316,6 +348,10 @@ public final class WeatherSnapshot {
             return from;
         }
         return from + (to - from) * clamp01(amount);
+    }
+
+    private static double clearIfMissing(double value) {
+        return Double.isNaN(value) ? 0.0 : value;
     }
 
     private static double scalar(WeatherSample sample, int field) {

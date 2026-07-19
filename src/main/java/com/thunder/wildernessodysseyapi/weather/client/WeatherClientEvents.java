@@ -2,7 +2,10 @@ package com.thunder.wildernessodysseyapi.weather.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudLightingModel;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.LocalizedCloudRenderer;
+import com.thunder.wildernessodysseyapi.weather.client.precipitation.LocalizedPrecipitationRenderer;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import net.minecraft.client.CloudStatus;
 import net.minecraft.client.Minecraft;
@@ -45,12 +48,16 @@ public final class WeatherClientEvents {
                 || !ClientWeatherCoordinator.controls(minecraft.level)) {
             LocalizedCloudRenderer.clear();
         }
+        if (!ClientWeatherCoordinator.controls(minecraft.level)) {
+            LocalizedPrecipitationRenderer.clear();
+        }
     }
 
     /** Clears stale sequence watermarks before the next server starts syncing weather. */
     @SubscribeEvent
     public static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
         LocalizedCloudRenderer.clear();
+        LocalizedPrecipitationRenderer.clear();
         ClientWeatherCoordinator.clearAll();
     }
 
@@ -58,6 +65,7 @@ public final class WeatherClientEvents {
     @SubscribeEvent
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         LocalizedCloudRenderer.clear();
+        LocalizedPrecipitationRenderer.clear();
         ClientWeatherCoordinator.clearAll();
     }
 
@@ -66,6 +74,7 @@ public final class WeatherClientEvents {
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel() instanceof ClientLevel clientLevel) {
             LocalizedCloudRenderer.clear();
+            LocalizedPrecipitationRenderer.clear();
             ClientWeatherCoordinator.clearLevel(clientLevel);
         }
     }
@@ -85,7 +94,11 @@ public final class WeatherClientEvents {
                 level,
                 event.getCamera().getPosition()
         );
-        float fog = ClientWeatherCoordinator.fogContribution(sample);
+        CloudFieldSample cloudField = ClientWeatherCoordinator.cloudFieldAt(
+                level,
+                event.getCamera().getPosition()
+        );
+        float fog = (float) CloudLightingModel.fogContribution(sample, cloudField);
         if (fog <= 0.001F) {
             return;
         }
@@ -113,14 +126,18 @@ public final class WeatherClientEvents {
                 level,
                 event.getCamera().getPosition()
         );
-        float fog = ClientWeatherCoordinator.fogContribution(sample);
+        CloudFieldSample cloudField = ClientWeatherCoordinator.cloudFieldAt(
+                level,
+                event.getCamera().getPosition()
+        );
+        float fog = (float) CloudLightingModel.fogContribution(sample, cloudField);
         if (fog <= 0.001F) {
             return;
         }
 
         float sourceNear = event.getNearPlaneDistance();
         float sourceFar = event.getFarPlaneDistance();
-        float targetFar = Math.max(24.0F, sourceFar * (1.0F - fog * 0.8F));
+        float targetFar = (float) CloudLightingModel.attenuatedFogFarPlane(sourceFar, fog);
         float denseNear = Math.min(sourceNear, targetFar * 0.25F);
         float targetNear = mix(sourceNear, denseNear, fog);
         event.setNearPlaneDistance(Math.min(targetNear, targetFar - 1.0F));
@@ -146,7 +163,16 @@ public final class WeatherClientEvents {
         WeatherSample sample = ClientWeatherCoordinator.sampleAt(level, pos);
         float thunder = ClientWeatherCoordinator.thunderContribution(sample);
         float fog = ClientWeatherCoordinator.fogContribution(sample);
+        CloudFieldSample cloudField = ClientWeatherCoordinator.cloudFieldAt(
+                level,
+                pos.getX() + 0.5,
+                pos.getZ() + 0.5
+        );
+        CloudLightingModel.OpticalState optics = CloudLightingModel.evaluate(cloudField);
+        fog = (float) CloudLightingModel.fogContribution(sample, cloudField);
         LocalizedCloudRenderer.Diagnostics clouds = LocalizedCloudRenderer.diagnostics();
+        LocalizedPrecipitationRenderer.Diagnostics precipitation =
+                LocalizedPrecipitationRenderer.diagnostics();
 
         return List.of(
                 String.format(
@@ -189,6 +215,21 @@ public final class WeatherClientEvents {
                         clouds.visibleTiles(),
                         clouds.vertices(),
                         clouds.averageCoverage()
+                ),
+                String.format(
+                        Locale.ROOT,
+                        "Overhead coverage %.3f | optical %.3f | shadow %.3f",
+                        optics.coverage(),
+                        optics.opticalDensity(),
+                        optics.shadow()
+                ),
+                String.format(
+                        Locale.ROOT,
+                        "Precip mesh %s | %d near | %d shafts | %d vertices",
+                        precipitation.active() ? "active" : "inactive",
+                        precipitation.nearColumns(),
+                        precipitation.distantShafts(),
+                        precipitation.vertices()
                 )
         );
     }

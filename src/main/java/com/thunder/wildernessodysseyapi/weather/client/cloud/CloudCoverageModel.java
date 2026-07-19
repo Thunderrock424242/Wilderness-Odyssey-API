@@ -107,8 +107,8 @@ public final class CloudCoverageModel {
     }
 
     private static double valueNoise(double x, double z, long seed) {
-        int x0 = floorToInt(x);
-        int z0 = floorToInt(z);
+        long x0 = floorToLong(x);
+        long z0 = floorToLong(z);
         double xAmount = smoothFraction(x - x0);
         double zAmount = smoothFraction(z - z0);
         double north = lerp(hashUnit(x0, z0, seed), hashUnit(x0 + 1, z0, seed), xAmount);
@@ -116,10 +116,10 @@ public final class CloudCoverageModel {
         return lerp(north, south, zAmount);
     }
 
-    private static double hashUnit(int x, int z, long seed) {
+    private static double hashUnit(long x, long z, long seed) {
         long value = seed;
-        value ^= (long) x * 0x9E3779B97F4A7C15L;
-        value ^= (long) z * 0xC2B2AE3D27D4EB4FL;
+        value ^= x * 0x9E3779B97F4A7C15L;
+        value ^= z * 0xC2B2AE3D27D4EB4FL;
         value ^= value >>> 30;
         value *= 0xBF58476D1CE4E5B9L;
         value ^= value >>> 27;
@@ -145,6 +145,11 @@ public final class CloudCoverageModel {
     private static int floorToInt(double value) {
         int truncated = (int) value;
         return value < truncated ? truncated - 1 : truncated;
+    }
+
+    private static long floorToLong(double value) {
+        long truncated = (long) value;
+        return value < truncated ? truncated - 1L : truncated;
     }
 
     private static double unit(double value) {

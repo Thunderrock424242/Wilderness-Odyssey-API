@@ -11,6 +11,7 @@ import com.thunder.wildernessodysseyapi.weather.config.VanillaWeatherCompatibili
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.integration.SeasonalWeatherInfluence;
 import com.thunder.wildernessodysseyapi.weather.integration.WildernessWeatherWaterInfluence;
+import com.thunder.wildernessodysseyapi.weather.lightning.LocalizedLightningScheduler;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherRegionSyncPayload;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherSnapshotManager;
 import com.thunder.wildernessodysseyapi.weather.storage.AtmosphereSavedData;
@@ -27,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Singular server authority for dimension-local atmospheric weather.
@@ -45,7 +46,7 @@ public final class WeatherAuthority implements WeatherQuery {
     private static final WeatherAuthority INSTANCE = new WeatherAuthority();
 
     private final AtmosphereSimulationEngine engine = new AtmosphereSimulationEngine();
-    private final Map<ServerLevel, LevelRuntime> runtimes = new WeakHashMap<>();
+    private final Map<ServerLevel, LevelRuntime> runtimes = new ConcurrentHashMap<>();
 
     private WeatherAuthority() {
     }
@@ -75,7 +76,7 @@ public final class WeatherAuthority implements WeatherQuery {
         }
 
         LevelRuntime runtime = runtime(level);
-        AtmosphereSavedData data = AtmosphereSavedData.get(level, scheduling);
+        AtmosphereSavedData data = data(level, scheduling, runtime);
         AtmosphereGrid grid = data.grid();
         if (grid.ensureCellSize(scheduling.cellSize())) {
             data.markChanged();
@@ -84,14 +85,20 @@ public final class WeatherAuthority implements WeatherQuery {
 
         if (scheduling.compatibilityMode() == VanillaWeatherCompatibilityMode.SUPPRESS_GLOBAL
                 && (level.isRaining() || level.isThundering())) {
-            // This opt-in mode removes vanilla's global gameplay rain. The
-            // default preserves it for current Riftfall and vanilla adapters.
+            // This opt-in mode removes the global fallback. Position-aware
+            // adapters are already local; current Riftfall consumers are not.
             level.setWeatherParameters(6_000, 0, false, false);
         }
 
         if (isDue(gameTime, scheduling.simulationIntervalTicks())) {
             simulate(level, runtime, data, scheduling, WeatherConfig.settings(), gameTime);
         }
+        runtime.lightningScheduler.tick(
+                level,
+                gameTime,
+                scheduling.cellSize(),
+                WeatherConfig.lightning()
+        );
         if (isDue(gameTime, scheduling.snapshotSyncIntervalTicks())) {
             WeatherSnapshotManager.syncLevel(
                     level,
@@ -108,8 +115,37 @@ public final class WeatherAuthority implements WeatherQuery {
         if (level == null || position == null || !WeatherConfig.dimensionEnabled(level.dimension())) {
             return WeatherSample.CLEAR;
         }
-        AtmosphereSavedData data = AtmosphereSavedData.get(level, WeatherConfig.scheduling());
-        return data.grid().sample(position);
+        return queryGrid(level).sample(position);
+    }
+
+    /** Uses the cached primitive grid path for vanilla's frequent rain checks. */
+    @Override
+    public boolean isRainingAt(ServerLevel level, BlockPos position) {
+        return precipitationTypeAt(level, position) == PrecipitationType.RAIN;
+    }
+
+    /** Uses the cached primitive grid path for localized snow checks. */
+    @Override
+    public boolean isSnowingAt(ServerLevel level, BlockPos position) {
+        return precipitationTypeAt(level, position) == PrecipitationType.SNOW;
+    }
+
+    /** Returns allocation-free primitive precipitation from the attached level grid. */
+    @Override
+    public double precipitationIntensityAt(ServerLevel level, BlockPos position) {
+        if (level == null || position == null || !WeatherConfig.dimensionEnabled(level.dimension())) {
+            return 0.0;
+        }
+        return queryGrid(level).precipitationIntensity(position.getX(), position.getZ());
+    }
+
+    /** Returns allocation-free functional rain/snow classification from the attached grid. */
+    @Override
+    public PrecipitationType precipitationTypeAt(ServerLevel level, BlockPos position) {
+        if (level == null || position == null || !WeatherConfig.dimensionEnabled(level.dimension())) {
+            return PrecipitationType.NONE;
+        }
+        return queryGrid(level).functionalPrecipitationType(position.getX(), position.getZ());
     }
 
     /** Returns the immutable cell containing a position, or {@code null}. */
@@ -118,7 +154,7 @@ public final class WeatherAuthority implements WeatherQuery {
             return null;
         }
         WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
-        AtmosphereGrid grid = AtmosphereSavedData.get(level, scheduling).grid();
+        AtmosphereGrid grid = data(level, scheduling).grid();
         return grid.view(AtmosphereCellKey.fromBlock(
                 position.getX(),
                 position.getZ(),
@@ -131,7 +167,7 @@ public final class WeatherAuthority implements WeatherQuery {
         if (level == null || !WeatherConfig.dimensionEnabled(level.dimension())) {
             return List.of();
         }
-        return AtmosphereSavedData.get(level, WeatherConfig.scheduling()).grid().views();
+        return data(level, WeatherConfig.scheduling()).grid().views();
     }
 
     /** Applies one operator-controlled scalar to the containing cell. */
@@ -161,7 +197,7 @@ public final class WeatherAuthority implements WeatherQuery {
             return 0;
         }
         WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
-        AtmosphereSavedData data = AtmosphereSavedData.get(level, scheduling);
+        AtmosphereSavedData data = data(level, scheduling);
         AtmosphereCellKey center = AtmosphereCellKey.fromBlock(position.getX(), position.getZ(), scheduling.cellSize());
         int changed = 0;
         for (int offsetX = -1; offsetX <= 1; offsetX++) {
@@ -200,7 +236,7 @@ public final class WeatherAuthority implements WeatherQuery {
             return 0;
         }
         WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
-        AtmosphereSavedData data = AtmosphereSavedData.get(level, scheduling);
+        AtmosphereSavedData data = data(level, scheduling);
         AtmosphereCellKey center = AtmosphereCellKey.fromBlock(position.getX(), position.getZ(), scheduling.cellSize());
         int changed = 0;
         for (int offsetX = -1; offsetX <= 1; offsetX++) {
@@ -248,8 +284,11 @@ public final class WeatherAuthority implements WeatherQuery {
 
     /** Invalidates cached inputs and forces full snapshots after config reload. */
     public synchronized void onConfigurationReload() {
+        WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
         for (Map.Entry<ServerLevel, LevelRuntime> entry : runtimes.entrySet()) {
+            data(entry.getKey(), scheduling, entry.getValue());
             entry.getValue().inputSampler.clear();
+            entry.getValue().lightningScheduler.reset();
             WeatherSnapshotManager.markLevelDirty(entry.getKey().dimension());
         }
     }
@@ -259,6 +298,7 @@ public final class WeatherAuthority implements WeatherQuery {
         LevelRuntime runtime = runtimes.remove(level);
         if (runtime != null) {
             runtime.inputSampler.clear();
+            runtime.lightningScheduler.reset();
         }
         WeatherSnapshotManager.clearLevel(level.dimension());
     }
@@ -267,6 +307,7 @@ public final class WeatherAuthority implements WeatherQuery {
     public synchronized void shutdown() {
         for (LevelRuntime runtime : runtimes.values()) {
             runtime.inputSampler.clear();
+            runtime.lightningScheduler.reset();
         }
         runtimes.clear();
         WeatherSnapshotManager.clear();
@@ -450,7 +491,7 @@ public final class WeatherAuthority implements WeatherQuery {
             return null;
         }
         WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
-        AtmosphereSavedData data = AtmosphereSavedData.get(level, scheduling);
+        AtmosphereSavedData data = data(level, scheduling);
         AtmosphereCellKey key = AtmosphereCellKey.fromBlock(
                 position.getX(),
                 position.getZ(),
@@ -541,13 +582,45 @@ public final class WeatherAuthority implements WeatherQuery {
         );
     }
 
-    private synchronized LevelRuntime runtime(ServerLevel level) {
+    private LevelRuntime runtime(ServerLevel level) {
         return runtimes.computeIfAbsent(level, ignored -> new LevelRuntime(
                 new AtmosphereInputSampler(
                         new WildernessWeatherWaterInfluence(),
                         SeasonalWeatherInfluence.NONE
-                )
+                ),
+                new LocalizedLightningScheduler(this)
         ));
+    }
+
+    private AtmosphereSavedData data(
+            ServerLevel level,
+            WeatherConfig.SchedulingSettings scheduling
+    ) {
+        return data(level, scheduling, runtime(level));
+    }
+
+    private AtmosphereSavedData data(
+            ServerLevel level,
+            WeatherConfig.SchedulingSettings scheduling,
+            LevelRuntime runtime
+    ) {
+        AtmosphereSavedData data = AtmosphereSavedData.get(level, scheduling);
+        runtime.atmosphereGrid = data.grid();
+        return data;
+    }
+
+    private AtmosphereGrid queryGrid(ServerLevel level) {
+        LevelRuntime runtime = runtimes.get(level);
+        AtmosphereGrid cached = runtime == null ? null : runtime.atmosphereGrid;
+        if (cached != null) {
+            return cached;
+        }
+
+        // Persisted weather must be visible before the first post-server tick.
+        // This storage lookup occurs once per level; steady-state position
+        // queries remain allocation-free through the attached runtime grid.
+        LevelRuntime attachedRuntime = runtime == null ? runtime(level) : runtime;
+        return data(level, WeatherConfig.scheduling(), attachedRuntime).grid();
     }
 
     private static int synchronizationRadius(WeatherConfig.SchedulingSettings scheduling) {
@@ -577,7 +650,18 @@ public final class WeatherAuthority implements WeatherQuery {
         DORMANT
     }
 
-    private record LevelRuntime(AtmosphereInputSampler inputSampler) {
+    private static final class LevelRuntime {
+        private final AtmosphereInputSampler inputSampler;
+        private final LocalizedLightningScheduler lightningScheduler;
+        private volatile AtmosphereGrid atmosphereGrid;
+
+        private LevelRuntime(
+                AtmosphereInputSampler inputSampler,
+                LocalizedLightningScheduler lightningScheduler
+        ) {
+            this.inputSampler = inputSampler;
+            this.lightningScheduler = lightningScheduler;
+        }
     }
 
     private record CalculatedCell(

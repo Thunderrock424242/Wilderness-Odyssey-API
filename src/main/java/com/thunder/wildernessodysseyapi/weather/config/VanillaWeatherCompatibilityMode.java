@@ -4,9 +4,9 @@ package com.thunder.wildernessodysseyapi.weather.config;
  * Defines how localized weather coexists with Minecraft's global rain state.
  */
 public enum VanillaWeatherCompatibilityMode {
-    /** Keep global state for vanilla/Riftfall gameplay while clients render localized weather. */
+    /** Keep global state for unmigrated/Riftfall consumers alongside localized adapters. */
     PRESERVE_GLOBAL,
 
-    /** Suppress global precipitation so only the localized authority drives weather. */
+    /** Suppress global precipitation for consumers not yet using the local authority. */
     SUPPRESS_GLOBAL
 }

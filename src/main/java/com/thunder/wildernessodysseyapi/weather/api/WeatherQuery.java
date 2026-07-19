@@ -17,12 +17,25 @@ public interface WeatherQuery {
 
     /** Returns whether localized rain is active at the position. */
     default boolean isRainingAt(ServerLevel level, BlockPos position) {
-        return sample(level, position).isRaining();
+        WeatherSample sample = sample(level, position);
+        return sample.precipitationType() == PrecipitationType.RAIN
+                && PrecipitationIntensity.isFunctional(sample.precipitationIntensity());
     }
 
     /** Returns whether localized snow is active at the position. */
     default boolean isSnowingAt(ServerLevel level, BlockPos position) {
-        return sample(level, position).isSnowing();
+        WeatherSample sample = sample(level, position);
+        return sample.precipitationType() == PrecipitationType.SNOW
+                && PrecipitationIntensity.isFunctional(sample.precipitationIntensity());
+    }
+
+    /** Returns the physical type after applying the canonical intensity bucket. */
+    default PrecipitationType precipitationTypeAt(ServerLevel level, BlockPos position) {
+        WeatherSample sample = sample(level, position);
+        return sample.precipitationType() != PrecipitationType.NONE
+                && PrecipitationIntensity.isFunctional(sample.precipitationIntensity())
+                ? sample.precipitationType()
+                : PrecipitationType.NONE;
     }
 
     /** Returns normalized localized precipitation intensity. */

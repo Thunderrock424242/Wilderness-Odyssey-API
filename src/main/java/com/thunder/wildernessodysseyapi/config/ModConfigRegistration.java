@@ -106,6 +106,7 @@ public final class ModConfigRegistration {
         } else if (config.getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
         } else if (config.getSpec() == WeatherConfig.CONFIG_SPEC) {
+            WeatherConfig.reload();
             WeatherAuthority.get().onConfigurationReload();
         } else if (config.getSpec() == WeatherRenderingConfig.CONFIG_SPEC) {
             WeatherRenderingConfig.reload();

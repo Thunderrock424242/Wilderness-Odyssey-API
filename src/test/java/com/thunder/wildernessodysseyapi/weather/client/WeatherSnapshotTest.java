@@ -129,6 +129,21 @@ class WeatherSnapshotTest {
         assertEquals(0.0, outside.cloudWater(), 1.0E-12);
     }
 
+    @Test
+    void visualPrecipitationFadesInsteadOfRepeatingAtRegionEdge() {
+        WeatherSnapshot snapshot = snapshot(Map.of(
+                WeatherSnapshot.packCell(0, 0), cell(
+                        0,
+                        0,
+                        cloudSample(0.80, 0.60, 0.50, 0.40, 0.30, -0.20)
+                ))
+        );
+
+        assertEquals(0.60, snapshot.supportedPrecipitationIntensity(128.0, 128.0), 1.0E-12);
+        assertEquals(0.45, snapshot.supportedPrecipitationIntensity(192.0, 128.0), 1.0E-12);
+        assertEquals(0.0, snapshot.supportedPrecipitationIntensity(384.0, 128.0), 1.0E-12);
+    }
+
     private static WeatherSnapshot snapshot(Map<Long, WeatherSnapshot.SnapshotCell> cells) {
         return new WeatherSnapshot(OVERWORLD, 1, 1L, 256, new HashMap<>(cells));
     }

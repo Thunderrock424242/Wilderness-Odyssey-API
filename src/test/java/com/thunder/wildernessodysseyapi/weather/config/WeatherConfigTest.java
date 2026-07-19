@@ -70,6 +70,37 @@ class WeatherConfigTest {
     }
 
     @Test
+    void lightningSettingsClampCadenceBudgetAndProbability() {
+        WeatherConfig.LightningSettings unsafe = new WeatherConfig.LightningSettings(
+                true,
+                -1,
+                Integer.MAX_VALUE,
+                0,
+                Integer.MAX_VALUE,
+                0,
+                Double.NaN
+        );
+        WeatherConfig.LightningSettings cellBelowDimension = new WeatherConfig.LightningSettings(
+                true,
+                20,
+                120,
+                20,
+                96,
+                4,
+                2.0
+        );
+
+        assertEquals(5, unsafe.checkIntervalTicks());
+        assertEquals(72_000, unsafe.dimensionCooldownTicks());
+        assertEquals(72_000, unsafe.cellCooldownTicks());
+        assertEquals(256, unsafe.candidateRadiusBlocks());
+        assertEquals(1, unsafe.maxCandidateAttempts());
+        assertEquals(0.20, unsafe.maximumChancePerCheck());
+        assertEquals(120, cellBelowDimension.cellCooldownTicks());
+        assertEquals(1.0, cellBelowDimension.maximumChancePerCheck());
+    }
+
+    @Test
     void denylistOverridesAllowlistAndEmptyAllowlistPermitsNormalDimensions() {
         WeatherConfig.SchedulingSettings selected = new WeatherConfig.SchedulingSettings(
                 true, 256, 60, 2, 2_400, 400, 60, 4_096,
