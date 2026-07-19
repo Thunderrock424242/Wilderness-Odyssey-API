@@ -2,15 +2,16 @@ package com.thunder.wildernessodysseyapi.weather.simulation;
 
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereView;
+import com.thunder.wildernessodysseyapi.weather.api.PrecipitationIntensity;
+import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.core.BlockPos;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -23,7 +24,7 @@ import java.util.Set;
  */
 public final class AtmosphereGrid {
 
-    private final Map<Long, AtmosphereCell> cells = new HashMap<>();
+    private final Long2ObjectOpenHashMap<AtmosphereCell> cells = new Long2ObjectOpenHashMap<>();
     private int cellSize;
 
     /** Creates an empty grid with the supplied horizontal cell width. */
@@ -226,9 +227,105 @@ public final class AtmosphereGrid {
         return result == null ? WeatherSample.CLEAR : result;
     }
 
+    /**
+     * Returns interpolated precipitation intensity without allocating samples.
+     *
+     * <p>This primitive path is used by vanilla's frequent rain-position checks.
+     * Missing edge cells retain the nearest available value, matching
+     * {@link #sample(double, double)}.</p>
+     */
+    public double precipitationIntensity(double blockX, double blockZ) {
+        double gridX = blockX / cellSize - 0.5;
+        double gridZ = blockZ / cellSize - 0.5;
+        int minimumX = floorToInt(gridX);
+        int minimumZ = floorToInt(gridZ);
+        double xAmount = gridX - minimumX;
+        double zAmount = gridZ - minimumZ;
+
+        double north = interpolateAvailableScalar(
+                precipitation(sampleAtCell(minimumX, minimumZ)),
+                precipitation(sampleAtCell(minimumX + 1, minimumZ)),
+                xAmount
+        );
+        double south = interpolateAvailableScalar(
+                precipitation(sampleAtCell(minimumX, minimumZ + 1)),
+                precipitation(sampleAtCell(minimumX + 1, minimumZ + 1)),
+                xAmount
+        );
+        double result = interpolateAvailableScalar(north, south, zAmount);
+        return Double.isNaN(result) ? 0.0 : result;
+    }
+
+    /**
+     * Returns the canonical gameplay precipitation type without temporary records.
+     */
+    public PrecipitationType functionalPrecipitationType(double blockX, double blockZ) {
+        double gridX = blockX / cellSize - 0.5;
+        double gridZ = blockZ / cellSize - 0.5;
+        int minimumX = floorToInt(gridX);
+        int minimumZ = floorToInt(gridZ);
+        double xAmount = gridX - minimumX;
+        double zAmount = gridZ - minimumZ;
+
+        WeatherSample northWest = sampleAtCell(minimumX, minimumZ);
+        WeatherSample northEast = sampleAtCell(minimumX + 1, minimumZ);
+        WeatherSample southWest = sampleAtCell(minimumX, minimumZ + 1);
+        WeatherSample southEast = sampleAtCell(minimumX + 1, minimumZ + 1);
+        double northTemperature = interpolateAvailableScalar(
+                temperature(northWest),
+                temperature(northEast),
+                xAmount
+        );
+        double southTemperature = interpolateAvailableScalar(
+                temperature(southWest),
+                temperature(southEast),
+                xAmount
+        );
+        // The network quantizes cell endpoints before the client interpolates
+        // them. Canonicalizing each endpoint here keeps physical rain/snow
+        // classification identical between server and client prediction.
+        double northIntensity = interpolateAvailableScalar(
+                canonicalPrecipitation(northWest),
+                canonicalPrecipitation(northEast),
+                xAmount
+        );
+        double southIntensity = interpolateAvailableScalar(
+                canonicalPrecipitation(southWest),
+                canonicalPrecipitation(southEast),
+                xAmount
+        );
+        double intensity = interpolateAvailableScalar(northIntensity, southIntensity, zAmount);
+        if (Double.isNaN(intensity) || !PrecipitationIntensity.isFunctional(intensity)) {
+            return PrecipitationType.NONE;
+        }
+
+        PrecipitationType northType = interpolateAvailableType(
+                canonicalType(northWest),
+                canonicalType(northEast),
+                northTemperature,
+                northIntensity,
+                xAmount
+        );
+        PrecipitationType southType = interpolateAvailableType(
+                canonicalType(southWest),
+                canonicalType(southEast),
+                southTemperature,
+                southIntensity,
+                xAmount
+        );
+        PrecipitationType result = interpolateAvailableType(
+                northType,
+                southType,
+                interpolateAvailableScalar(northTemperature, southTemperature, zAmount),
+                intensity,
+                zAmount
+        );
+        return result == null ? PrecipitationType.NONE : result;
+    }
+
     private WeatherSample sampleAtCell(int cellX, int cellZ) {
-        AtmosphereView view = view(new AtmosphereCellKey(cellX, cellZ));
-        return view == null ? null : view.sample();
+        AtmosphereCell cell = cells.get(packCell(cellX, cellZ));
+        return cell == null ? null : cell.sample();
     }
 
     private static WeatherSample interpolateAvailable(WeatherSample first, WeatherSample second, double amount) {
@@ -239,6 +336,79 @@ public final class AtmosphereGrid {
             return first;
         }
         return WeatherSample.interpolate(first, second, amount);
+    }
+
+    private static double interpolateAvailableScalar(double first, double second, double amount) {
+        if (Double.isNaN(first)) {
+            return second;
+        }
+        if (Double.isNaN(second)) {
+            return first;
+        }
+        return first + (second - first) * amount;
+    }
+
+    private static PrecipitationType interpolateAvailableType(
+            PrecipitationType first,
+            PrecipitationType second,
+            double temperature,
+            double intensity,
+            double amount
+    ) {
+        if (first == null && second == null) {
+            return null;
+        }
+        if (!Double.isFinite(intensity) || intensity <= 0.0) {
+            return PrecipitationType.NONE;
+        }
+        if (first == null) {
+            return second;
+        }
+        if (second == null || first == second) {
+            return first;
+        }
+        if (first == PrecipitationType.NONE) {
+            return second;
+        }
+        if (second == PrecipitationType.NONE) {
+            return first;
+        }
+        if ((first == PrecipitationType.SNOW && second == PrecipitationType.RAIN)
+                || (first == PrecipitationType.RAIN && second == PrecipitationType.SNOW)) {
+            return temperature <= WeatherSample.SNOW_MAX_TEMPERATURE
+                    ? PrecipitationType.SNOW
+                    : PrecipitationType.RAIN;
+        }
+        return amount < 0.5 ? first : second;
+    }
+
+    private static double precipitation(WeatherSample sample) {
+        return sample == null ? Double.NaN : sample.precipitationIntensity();
+    }
+
+    private static double canonicalPrecipitation(WeatherSample sample) {
+        return sample == null
+                ? Double.NaN
+                : PrecipitationIntensity.dequantize(
+                        PrecipitationIntensity.quantize(sample.precipitationIntensity())
+                );
+    }
+
+    private static double temperature(WeatherSample sample) {
+        return sample == null ? Double.NaN : sample.temperature();
+    }
+
+    private static PrecipitationType canonicalType(WeatherSample sample) {
+        if (sample == null) {
+            return null;
+        }
+        return PrecipitationIntensity.quantize(sample.precipitationIntensity()) == 0
+                ? PrecipitationType.NONE
+                : sample.precipitationType();
+    }
+
+    private static long packCell(int cellX, int cellZ) {
+        return ((long) cellX << 32) | (cellZ & 0xFFFFFFFFL);
     }
 
     private static int floorToInt(double value) {

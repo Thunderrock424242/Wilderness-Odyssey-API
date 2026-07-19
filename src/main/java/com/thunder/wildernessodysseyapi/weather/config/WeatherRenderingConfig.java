@@ -3,7 +3,7 @@ package com.thunder.wildernessodysseyapi.weather.config;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
- * Defines client-only quality and motion limits for localized cloud rendering.
+ * Defines client-only quality and motion limits for localized weather rendering.
  *
  * <p>The server remains authoritative for atmospheric state. These options
  * change only how much of that synchronized field the client visualizes.</p>
@@ -17,13 +17,28 @@ public final class WeatherRenderingConfig {
     public static final ModConfigSpec.DoubleValue WIND_DETAIL_SPEED_BLOCKS_PER_SECOND;
     public static final ModConfigSpec.IntValue MAXIMUM_CLOUD_TILES;
     public static final ModConfigSpec.DoubleValue OPACITY_MULTIPLIER;
+    public static final ModConfigSpec.BooleanValue ENABLE_DISTANT_RAIN_SHAFTS;
+    public static final ModConfigSpec.IntValue DISTANT_RAIN_DISTANCE_BLOCKS;
+    public static final ModConfigSpec.IntValue DISTANT_RAIN_SPACING_BLOCKS;
+    public static final ModConfigSpec.IntValue MAXIMUM_DISTANT_RAIN_SHAFTS;
 
-    private static final Settings DEFAULTS = new Settings(true, 384, 5, 6.0, 4096, 1.0);
+    private static final Settings DEFAULTS = new Settings(
+            true,
+            384,
+            5,
+            6.0,
+            4096,
+            1.0,
+            true,
+            96,
+            6,
+            768
+    );
     private static volatile Settings activeSettings = DEFAULTS;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
-        builder.comment("Client-side rendering options for server-authored localized clouds.")
+        builder.comment("Client-side rendering options for server-authored localized weather.")
                 .push("localized_clouds");
         ENABLE_LOCALIZED_CLOUDS = builder
                 .comment("Replace vanilla's global cloud sheet with weather-cell cloud masses.")
@@ -44,6 +59,22 @@ public final class WeatherRenderingConfig {
                 .comment("Scales localized cloud opacity without changing authoritative coverage.")
                 .defineInRange("opacityMultiplier", 1.0, 0.25, 1.25);
         builder.pop();
+
+        builder.comment("Client-side presentation of localized precipitation.")
+                .push("localized_precipitation");
+        ENABLE_DISTANT_RAIN_SHAFTS = builder
+                .comment("Render sparse vanilla-style rain curtains beyond Minecraft's near weather radius.")
+                .define("distantRainShafts", true);
+        DISTANT_RAIN_DISTANCE_BLOCKS = builder
+                .comment("Maximum horizontal distance of distant rain curtains.")
+                .defineInRange("distantRainDistanceBlocks", 96, 32, 192);
+        DISTANT_RAIN_SPACING_BLOCKS = builder
+                .comment("World-space spacing between distant rain curtains. Larger values improve performance.")
+                .defineInRange("distantRainSpacingBlocks", 6, 4, 16);
+        MAXIMUM_DISTANT_RAIN_SHAFTS = builder
+                .comment("Hard cap on loaded distant rain columns sampled during one cache rebuild.")
+                .defineInRange("maximumDistantRainShafts", 768, 64, 2_048);
+        builder.pop();
         CONFIG_SPEC = builder.build();
     }
 
@@ -63,7 +94,11 @@ public final class WeatherRenderingConfig {
                 REBUILD_INTERVAL_TICKS.get(),
                 WIND_DETAIL_SPEED_BLOCKS_PER_SECOND.get(),
                 MAXIMUM_CLOUD_TILES.get(),
-                OPACITY_MULTIPLIER.get()
+                OPACITY_MULTIPLIER.get(),
+                ENABLE_DISTANT_RAIN_SHAFTS.get(),
+                DISTANT_RAIN_DISTANCE_BLOCKS.get(),
+                DISTANT_RAIN_SPACING_BLOCKS.get(),
+                MAXIMUM_DISTANT_RAIN_SHAFTS.get()
         );
     }
 
@@ -74,7 +109,11 @@ public final class WeatherRenderingConfig {
             int rebuildIntervalTicks,
             double windDetailSpeedBlocksPerSecond,
             int maximumCloudTiles,
-            double opacityMultiplier
+            double opacityMultiplier,
+            boolean distantRainShafts,
+            int distantRainDistanceBlocks,
+            int distantRainSpacingBlocks,
+            int maximumDistantRainShafts
     ) {
         public Settings {
             renderDistanceBlocks = clamp(renderDistanceBlocks, 96, 512);
@@ -82,6 +121,9 @@ public final class WeatherRenderingConfig {
             windDetailSpeedBlocksPerSecond = clamp(windDetailSpeedBlocksPerSecond, 0.0, 24.0);
             maximumCloudTiles = clamp(maximumCloudTiles, 256, 8192);
             opacityMultiplier = clamp(opacityMultiplier, 0.25, 1.25);
+            distantRainDistanceBlocks = clamp(distantRainDistanceBlocks, 32, 192);
+            distantRainSpacingBlocks = clamp(distantRainSpacingBlocks, 4, 16);
+            maximumDistantRainShafts = clamp(maximumDistantRainShafts, 64, 2_048);
         }
 
         private static int clamp(int value, int minimum, int maximum) {

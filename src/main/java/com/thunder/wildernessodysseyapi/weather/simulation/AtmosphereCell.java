@@ -39,6 +39,11 @@ final class AtmosphereCell {
         return new AtmosphereView(key, sample, revision, lastSimulatedTick, lastActiveTick);
     }
 
+    /** Returns the immutable sample without allocating a public cell view. */
+    WeatherSample sample() {
+        return sample;
+    }
+
     long revision() {
         return revision;
     }

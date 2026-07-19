@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.weather.networking;
 
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
+import com.thunder.wildernessodysseyapi.weather.api.PrecipitationIntensity;
+import com.thunder.wildernessodysseyapi.weather.integration.LocalizedPrecipitationPolicy;
 import io.netty.buffer.Unpooled;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
@@ -10,7 +12,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies the bounded and quantized regional weather wire format. */
 class WeatherRegionSyncPayloadTest {
@@ -76,6 +80,110 @@ class WeatherRegionSyncPayloadTest {
             assertEquals(0.89f, decodedCell.stormEnergy(), 1.0f / 255.0f);
             assertEquals(0.77f, decodedCell.precipitationIntensity(), 1.0f / 63.0f);
             assertEquals(PrecipitationType.SNOW, decodedCell.precipitationType());
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
+    void functionalRainBoundaryMatchesSixBitWireRounding() {
+        var wet = precipitationCell(0, 0.025F);
+        var dry = precipitationCell(1, 0.020F);
+        var payload = new WeatherRegionSyncPayload(
+                OVERWORLD,
+                WeatherRegionSyncPayload.DATA_VERSION,
+                20L,
+                true,
+                true,
+                256,
+                0,
+                0,
+                List.of(wet, dry)
+        );
+
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            assertTrue(LocalizedPrecipitationPolicy.hasPrecipitation(wet.sample()));
+            assertFalse(LocalizedPrecipitationPolicy.hasPrecipitation(dry.sample()));
+
+            WeatherRegionSyncPayload.STREAM_CODEC.encode(buffer, payload);
+            WeatherRegionSyncPayload decoded = WeatherRegionSyncPayload.STREAM_CODEC.decode(buffer);
+
+            assertTrue(LocalizedPrecipitationPolicy.hasPrecipitation(decoded.cells().get(0).sample()));
+            assertFalse(LocalizedPrecipitationPolicy.hasPrecipitation(decoded.cells().get(1).sample()));
+            assertEquals(2.0F / 63.0F, decoded.cells().get(0).precipitationIntensity(), 1.0E-7F);
+            assertEquals(1.0F / 63.0F, decoded.cells().get(1).precipitationIntensity(), 1.0E-7F);
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
+    void endpointQuantizationPrecedesClientSpatialInterpolation() {
+        var payload = new WeatherRegionSyncPayload(
+                OVERWORLD,
+                WeatherRegionSyncPayload.DATA_VERSION,
+                21L,
+                true,
+                true,
+                256,
+                0,
+                0,
+                List.of(precipitationCell(0, 0.0F), precipitationCell(1, 0.047F))
+        );
+
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            WeatherRegionSyncPayload.STREAM_CODEC.encode(buffer, payload);
+            WeatherRegionSyncPayload decoded = WeatherRegionSyncPayload.STREAM_CODEC.decode(buffer);
+            double decodedMidpoint = (
+                    decoded.cells().get(0).precipitationIntensity()
+                            + decoded.cells().get(1).precipitationIntensity()
+            ) * 0.5;
+
+            assertFalse(PrecipitationIntensity.isFunctional(0.047 * 0.5));
+            assertTrue(PrecipitationIntensity.isFunctional(decodedMidpoint));
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
+    void zeroIntensityWireBucketClearsItsPrecipitationType() {
+        var traceSnow = new WeatherRegionSyncPayload.CellSnapshot(
+                0,
+                0,
+                0L,
+                -5.0F,
+                0.9F,
+                1.0F,
+                0.0F,
+                0.0F,
+                0.8F,
+                0.5F,
+                0.5F,
+                0.001F,
+                PrecipitationType.SNOW
+        );
+        var payload = new WeatherRegionSyncPayload(
+                OVERWORLD,
+                WeatherRegionSyncPayload.DATA_VERSION,
+                22L,
+                true,
+                true,
+                256,
+                0,
+                0,
+                List.of(traceSnow)
+        );
+
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            WeatherRegionSyncPayload.STREAM_CODEC.encode(buffer, payload);
+            WeatherRegionSyncPayload decoded = WeatherRegionSyncPayload.STREAM_CODEC.decode(buffer);
+
+            assertEquals(0.0F, decoded.cells().getFirst().precipitationIntensity());
+            assertEquals(PrecipitationType.NONE, decoded.cells().getFirst().precipitationType());
         } finally {
             buffer.release();
         }
@@ -193,6 +301,27 @@ class WeatherRegionSyncPayloadTest {
                 0.0f,
                 0.0f,
                 PrecipitationType.NONE
+        );
+    }
+
+    private static WeatherRegionSyncPayload.CellSnapshot precipitationCell(
+            int cellX,
+            float intensity
+    ) {
+        return new WeatherRegionSyncPayload.CellSnapshot(
+                cellX,
+                0,
+                0L,
+                15.0F,
+                0.9F,
+                1.0F,
+                0.0F,
+                0.0F,
+                0.8F,
+                0.5F,
+                0.5F,
+                intensity,
+                PrecipitationType.RAIN
         );
     }
 }

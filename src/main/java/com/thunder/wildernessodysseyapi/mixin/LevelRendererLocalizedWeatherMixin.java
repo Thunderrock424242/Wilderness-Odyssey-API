@@ -3,28 +3,25 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.LocalizedCloudRenderer;
+import com.thunder.wildernessodysseyapi.weather.client.precipitation.LocalizedPrecipitationRenderer;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.DimensionSpecialEffects;
 import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.biome.Biome;
+import net.minecraft.client.renderer.LightTexture;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * Routes vanilla precipitation quads, particles, and sounds through localized weather.
+ * Routes vanilla cloud and precipitation fallbacks through localized weather.
  *
- * <p>NeoForge does not expose an event for replacing the rain value and biome
- * precipitation classification inside {@code renderSnowAndRain}/{@code tickRain}.
- * These redirects are therefore limited to those two methods; global
- * {@link ClientLevel} weather getters remain untouched for compatibility.</p>
+ * <p>The wrappers preserve dimension-owned renderers first, then replace only
+ * vanilla's fallback. Global {@link ClientLevel} weather getters remain
+ * untouched for compatibility with unrelated gameplay and mods.</p>
  */
 @Mixin(LevelRenderer.class)
 public abstract class LevelRendererLocalizedWeatherMixin {
@@ -96,92 +93,80 @@ public abstract class LevelRendererLocalizedWeatherMixin {
         return false;
     }
 
-    @Redirect(
-            method = "renderSnowAndRain",
+    /** Replaces vanilla fallback weather quads with per-column local intensity. */
+    @WrapOperation(
+            method = "renderSnowAndRain(Lnet/minecraft/client/renderer/LightTexture;FDDD)V",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/multiplayer/ClientLevel;getRainLevel(F)F"
-            )
+                    target = "Lnet/minecraft/client/renderer/DimensionSpecialEffects;renderSnowAndRain(Lnet/minecraft/client/multiplayer/ClientLevel;IFLnet/minecraft/client/renderer/LightTexture;DDD)Z"
+            ),
+            require = 1
     )
-    private float wildernessodysseyapi$localizedRenderedIntensity(
+    private boolean wildernessodysseyapi$renderLocalizedPrecipitation(
+            DimensionSpecialEffects effects,
             ClientLevel level,
-            float partialTick
+            int ticks,
+            float partialTick,
+            LightTexture lightTexture,
+            double camX,
+            double camY,
+            double camZ,
+            Operation<Boolean> original
     ) {
-        return localizedIntensityOrVanilla(level, partialTick);
-    }
-
-    @Redirect(
-            method = "tickRain",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/client/multiplayer/ClientLevel;getRainLevel(F)F"
-            )
-    )
-    private float wildernessodysseyapi$localizedParticleAndSoundIntensity(
-            ClientLevel level,
-            float partialTick
-    ) {
-        return localizedIntensityOrVanilla(level, partialTick);
-    }
-
-    @Redirect(
-            method = "renderSnowAndRain",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/world/level/biome/Biome;hasPrecipitation()Z"
-            )
-    )
-    private boolean wildernessodysseyapi$allowLocalizedPrecipitationBiome(Biome biome) {
-        ClientLevel level = Minecraft.getInstance().level;
-        return ClientWeatherCoordinator.controls(level) || biome.hasPrecipitation();
-    }
-
-    @Redirect(
-            method = "renderSnowAndRain",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/world/level/biome/Biome;getPrecipitationAt(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/biome/Biome$Precipitation;"
-            )
-    )
-    private Biome.Precipitation wildernessodysseyapi$localizedRenderedType(
-            Biome biome,
-            BlockPos pos
-    ) {
-        return localizedTypeOrBiome(biome, pos);
-    }
-
-    @Redirect(
-            method = "tickRain",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/world/level/biome/Biome;getPrecipitationAt(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/biome/Biome$Precipitation;"
-            )
-    )
-    private Biome.Precipitation wildernessodysseyapi$localizedParticleAndSoundType(
-            Biome biome,
-            BlockPos pos
-    ) {
-        return localizedTypeOrBiome(biome, pos);
-    }
-
-    private static float localizedIntensityOrVanilla(ClientLevel level, float partialTick) {
-        if (ClientWeatherCoordinator.controls(level)) {
-            return ClientWeatherCoordinator.localPrecipitationIntensity(level);
+        if (original.call(effects, level, ticks, partialTick, lightTexture, camX, camY, camZ)) {
+            if (ClientWeatherCoordinator.controls(level)) {
+                LocalizedPrecipitationRenderer.clearRenderState();
+            } else {
+                LocalizedPrecipitationRenderer.clear();
+            }
+            return true;
         }
-        return level.getRainLevel(partialTick);
-    }
-
-    private static Biome.Precipitation localizedTypeOrBiome(Biome biome, BlockPos pos) {
-        ClientLevel level = Minecraft.getInstance().level;
         if (!ClientWeatherCoordinator.controls(level)) {
-            return biome.getPrecipitationAt(pos);
+            LocalizedPrecipitationRenderer.clear();
+            return false;
         }
+        LocalizedPrecipitationRenderer.render(
+                level,
+                ticks,
+                partialTick,
+                lightTexture,
+                camX,
+                camY,
+                camZ,
+                effects.getCloudHeight()
+        );
+        return true;
+    }
 
-        PrecipitationType type = ClientWeatherCoordinator.precipitationTypeAt(level, pos);
-        return switch (type) {
-            case NONE -> Biome.Precipitation.NONE;
-            case RAIN -> Biome.Precipitation.RAIN;
-            case SNOW -> Biome.Precipitation.SNOW;
-        };
+    /** Replaces vanilla fallback splash particles and sounds with local samples. */
+    @WrapOperation(
+            method = "tickRain(Lnet/minecraft/client/Camera;)V",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/renderer/DimensionSpecialEffects;tickRain(Lnet/minecraft/client/multiplayer/ClientLevel;ILnet/minecraft/client/Camera;)Z"
+            ),
+            require = 1
+    )
+    private boolean wildernessodysseyapi$tickLocalizedPrecipitation(
+            DimensionSpecialEffects effects,
+            ClientLevel level,
+            int ticks,
+            Camera camera,
+            Operation<Boolean> original
+    ) {
+        if (original.call(effects, level, ticks, camera)) {
+            if (ClientWeatherCoordinator.controls(level)) {
+                LocalizedPrecipitationRenderer.clearTickState();
+            } else {
+                LocalizedPrecipitationRenderer.clear();
+            }
+            return true;
+        }
+        if (!ClientWeatherCoordinator.controls(level)) {
+            LocalizedPrecipitationRenderer.clear();
+            return false;
+        }
+        LocalizedPrecipitationRenderer.tick(level, ticks, camera);
+        return true;
     }
 }

@@ -5,16 +5,17 @@
 The localized atmosphere is a server-authoritative, dimension-scoped weather
 foundation. It replaces the vanilla global rain flag as the source of truth for
 Wilderness-controlled weather while preserving vanilla global state by default
-for compatibility. The first phase provides evolving atmospheric cells,
-persistence, regional client synchronization, smooth local rain and snow,
-localized sky/fog inputs, Minecraft-style localized cloud masses, diagnostics,
-and read-only Wilderness water coupling.
+for compatibility. The implemented phases provide evolving atmospheric cells,
+persistence, regional client synchronization, per-column rain and snow,
+Minecraft-style functional cloud masses and distant rain curtains, overhead
+cloud optics, localized natural lightning, position-aware gameplay rain,
+diagnostics, and read-only Wilderness water coupling.
 
-This phase does not provide destructive storms, volumetric clouds, local
-lightning spawning, or a complete replacement for every vanilla gameplay rain
-check. The cloud layer deliberately remains blocky and uses Minecraft's cloud
-pipeline rather than becoming a realistic particle volume. Those boundaries
-are intentional and are listed under
+The system does not provide destructive storms, volumetric clouds, projected
+per-block cloud shadows, or a complete replacement for every global vanilla
+weather consumer. The cloud layer deliberately remains blocky and uses
+Minecraft's cloud pipeline rather than becoming a realistic particle volume.
+Those boundaries are intentional and are listed under
 [Known limitations](#known-limitations-and-compatibility).
 
 ## Architecture
@@ -29,13 +30,13 @@ flowchart LR
     F --> G["Dimension AtmosphereGrid"]
     G --> H["AtmosphereSavedData"]
     G --> I["WeatherServices / WeatherQuery"]
-    I --> J["LocalizedPrecipitationController and future gameplay adapters"]
+    I --> J["LocalizedPrecipitationController, gameplay adapters, and lightning scheduler"]
     G --> K["WeatherSnapshotManager"]
     K --> L["WeatherRegionSyncPayload"]
     L --> M["Immutable WeatherSnapshot"]
     M --> N["ClientWeatherCoordinator"]
-    N --> O["Rain/snow, sound, sky, fog, F3, and water shader inputs"]
-    N --> P["CloudFieldSample and LocalizedCloudRenderer"]
+    N --> O["Per-column rain/snow, distant shafts, sound, F3, and water shader inputs"]
+    N --> P["CloudFieldSample, LocalizedCloudRenderer, and CloudLightingModel"]
 ```
 
 The principal ownership boundaries are:
@@ -53,6 +54,8 @@ The principal ownership boundaries are:
   rendering never reads live server state or mutable network DTOs.
 - `WeatherServices.query()` is the stable server-side API. Consumers do not
   need to know cell coordinates, storage, scheduling, or payload details.
+- Each level runtime owns one bounded `LocalizedLightningScheduler`; clients
+  receive the resulting vanilla lightning entity and never request a strike.
 
 The first implementation is synchronous and throttled. World, chunk, biome,
 registry, and water reads stay on the server thread. The engine accepts only
@@ -114,8 +117,9 @@ thunderIntensity = precipitationIntensity
 
 Thunder is zero without precipitation. Lightning eligibility currently means
 precipitation intensity at least `0.25`, storm energy at least `0.55`, and
-derived thunder at least `0.35`; it is an API decision only and does not spawn
-lightning in this phase.
+derived thunder at least `0.35`. The localized lightning scheduler combines
+that eligibility with loaded-chunk, exposure, probability, and cooldown checks
+before creating a vanilla bolt.
 
 ## Environmental sampling
 
@@ -433,6 +437,12 @@ values:
 | Cloud water, instability, storm energy | unsigned 8-bit fixed point each |
 | Precipitation | one byte: two-bit type plus six-bit intensity |
 
+Gameplay precipitation uses the same six-bit rounding as this payload. Server
+physical queries quantize each cell endpoint before spatial interpolation,
+matching the client's decode-then-interpolate order. Bucket `2` (`2 / 63`) is
+the first functional rain/snow value, so a raw server field cannot become wet
+on only one side of the connection.
+
 The client rejects a payload with the wrong version, wrong active dimension,
 invalid bounds, duplicate/out-of-region cells, or a sequence at or below its
 per-dimension watermark. Network state is copied into a new complete immutable
@@ -454,11 +464,12 @@ precipitation render loop.
 Two narrow client mixins integrate with vanilla rendering without globally
 overriding `ClientLevel` weather getters:
 
-- `LevelRendererLocalizedWeatherMixin` redirects the rain intensity and biome
-  precipitation decisions only inside `renderSnowAndRain` and `tickRain`.
-  Vanilla rain/snow quads, particles, and precipitation sounds therefore use
-  local intensity. Type is sampled at each rendered block, while the overall
-  intensity comes from the local player/camera sample.
+- `LevelRendererLocalizedWeatherMixin` wraps the dimension weather ownership
+  hooks inside `renderSnowAndRain` and `tickRain`. Dimension-specific renderers
+  run first; `LocalizedPrecipitationRenderer` replaces only vanilla's fallback.
+  Every near rain/snow column receives its own intensity and type, so a dry
+  camera no longer hides a neighboring rain edge. Splash particles and sounds
+  use the same per-column field.
 - `ClientLevelLocalizedWeatherMixin` redirects rain/thunder reads only inside
   sky darkness, sky color, and cloud color calculations. It uses localized
   sky-darkening and thunder contributions.
@@ -470,9 +481,11 @@ are intentionally not changed.
 
 `WeatherClientEvents` blends only air-camera fog. It leaves water, lava, and
 powder-snow fog to their existing owners. Weather haze shifts fog toward a
-storm-neutral color and shortens the far plane, never below 24 blocks. The
-Wilderness built-in ocean shader also receives local rain/thunder uniforms at
-the camera when snapshots are active.
+storm-neutral color and normally uses a 32-block weather floor. If Blindness,
+Darkness, or another renderer already supplies a shorter far plane, local
+weather preserves that denser fog instead of lengthening it. The Wilderness
+built-in ocean shader also receives local rain/thunder uniforms at the camera
+when snapshots are active.
 
 ### Localized cloud rendering
 
@@ -496,21 +509,38 @@ The renderer keeps Minecraft's recognizable cloud language:
 
 Cloud placement is functional rather than decorative. Every voxel samples the
 server-authored cloud water, precipitation, storm energy, instability, and wind
-at that voxel's real world position. Cloud water produces deterministic broken
-coverage, while precipitation adds a continuous coverage floor. Any supported
-tile with effective precipitation of at least `1.0E-4` bypasses morphology noise,
-so meaningful rain or snow always has cloud directly overhead. Stronger rain
-and convection also increase voxel thickness, darkness, and opacity.
+at its real world position. It also checks the tile endpoints and every
+atmospheric interpolation knot inside the `12 x 12` footprint; because each
+subregion is bilinear, these at-most-nine probes prove whether even a thin rainy
+edge crosses the tile. Cloud water produces deterministic broken coverage,
+while any supported tile with effective precipitation of at least `1.0E-4`
+bypasses morphology noise, so meaningful rain or snow remains under cloud.
+Stronger rain and convection also increase voxel thickness, darkness, and
+opacity.
 
 The broad cloud envelope remains anchored to its authoritative world-space
-weather field. Local wind advances only the deterministic small-scale
-morphology, so cloud edges visibly evolve and travel without allowing the
-whole cloud mass to drift away from the rainy area that owns it. Geometry is
-cached in one client VBO and rebuilt only for a new weather sequence, camera
-cloud-tile movement, quality/config changes, temporal blending, or sufficient
-wind-detail movement.
+weather field. Local wind advances only deterministic small-scale morphology,
+using continuous unwrapped motion and long lattice coordinates so a long client
+session cannot snap at a periodic wrap boundary. Cloud edges visibly evolve
+without allowing the whole mass to drift away from the rainy area that owns it.
+Geometry is cached in one client VBO and rebuilt only for a new weather
+sequence, camera cloud-tile movement, quality/config changes, temporal blending,
+or sufficient wind-detail movement.
 
-The F3 overlay adds five `WO Atmosphere` lines with cell, sequence, synchronized
+Rain also remains visible beyond vanilla's ten-block near-weather radius.
+Loaded columns on a world-snapped six-block lattice produce sparse vertical
+curtains with the active vanilla rain texture. The default 96-block request is
+reduced symmetrically when necessary to remain under the 768-shaft hard cap;
+unloaded columns are skipped and are never requested from the chunk source.
+
+`CloudLightingModel` converts the cloud field directly overhead into bounded
+optical density, shadow, and storm-fog values. Those values feed Minecraft's
+existing camera-local sky/lightmap and viewport fog paths, so dense dry clouds
+reduce daylight and rain deepens the effect without a custom terrain shader or
+server light-engine rewrite. This is a broad local cloud shadow, not a projected
+per-block shadow map.
+
+The F3 overlay adds atmosphere, cloud-optics, and precipitation-mesh lines with cell, sequence, synchronized
 cell count, blend progress, temperature, humidity, pressure, wind, cloud water,
 instability, storm energy, precipitation, thunder, fog, cloud-mesh state,
 visible tile count, vertex count, and average coverage. Server activity state
@@ -532,6 +562,13 @@ synchronized atmospheric footprint.
 | `windDetailSpeedBlocksPerSecond` | `6.0` | `0..24`; visual morphology speed at full normalized wind. It does not move the authoritative envelope. |
 | `maximumCloudTiles` | `4096` | `256..8192`; hard cap on sampled `12 x 12` tiles per rebuild. |
 | `opacityMultiplier` | `1.0` | `0.25..1.25`; visual alpha only, without changing cloud occupancy or precipitation. |
+
+| Config path under `localized_precipitation` | Default | Allowed range or behavior |
+| --- | ---: | --- |
+| `distantRainShafts` | `true` | Enables loaded-only rain curtains outside the vanilla near radius. |
+| `distantRainDistanceBlocks` | `96` | `32..192`; requested horizontal curtain radius. |
+| `distantRainSpacingBlocks` | `6` | `4..16`; world-lattice spacing, where larger values reduce work. |
+| `maximumDistantRainShafts` | `768` | `64..2048`; hard cap that also bounds the effective symmetric radius. |
 
 Minecraft's normal Clouds option still selects Off, Fast, or Fancy. Off skips
 the cloud render call entirely; the client config does not force clouds back
@@ -564,14 +601,48 @@ validated by NeoForge and copied into immutable scheduling/simulation records.
 | `simulation.stormFormationThreshold` | `0.42` | `0..1`. |
 | `simulation.maximumPrecipitationIntensity` | `1.0` | `0..1`. |
 | `simulation.randomVariation` | `0.04` | `0..0.25`, deterministic by cell. |
+| `lightning.enabled` | `true` | Lets eligible localized storms create natural lightning. Disabling it also leaves vanilla natural strikes suppressed in controlled dimensions. |
+| `lightning.checkIntervalTicks` | `20` | `5..1200`; one bounded candidate pass per dimension. |
+| `lightning.dimensionCooldownTicks` | `120` | `20..72000`; minimum delay between successful strikes in one dimension. |
+| `lightning.cellCooldownTicks` | `600` | `20..72000`, and never below the dimension cooldown. |
+| `lightning.candidateRadiusBlocks` | `96` | `16..256`; player-centered horizontal candidate radius. |
+| `lightning.maxCandidateAttempts` | `4` | `1..16`; hard per-check sampling cap, with at most one successful bolt. |
+| `lightning.maximumChancePerCheck` | `0.20` | `0..1`; strongest eligible storms approach this probability. |
 | `compatibility.dimensionAllowlist` | empty | Empty permits all dimensions not denied. |
 | `compatibility.dimensionDenylist` | empty | Deny entries override allow entries. |
 | `compatibility.vanillaWeatherCompatibilityMode` | `PRESERVE_GLOBAL` | `PRESERVE_GLOBAL` or `SUPPRESS_GLOBAL`. |
 | `debugLogging` | `false` | Logs concise counts on simulation passes that meet the 1,200-tick diagnostics boundary. |
 
-Dimension identifiers are normalized, deduplicated, and validated resource
-locations. A config reload clears environment caches and marks tracked players
-for complete regional snapshots.
+Dimension identifiers are normalized, deduplicated, validated resource
+locations, and cached on config load/reload for the chunk-tick lightning gate.
+A config reload also clears environment/lightning runtime caches and marks
+tracked players for complete regional snapshots.
+
+## Localized natural lightning
+
+`WeatherAuthority` owns one ephemeral `LocalizedLightningScheduler` per loaded
+server dimension. Once per configured check interval it inspects at most the
+configured number of random columns around non-spectator players. Candidates
+must remain inside the world border and have a loaded, entity-ticking chunk
+before heightmaps, blocks, entities, or exposure are read. Dry samples, weak
+storms, covered terrain, dimension cooldowns, and atmospheric-cell cooldowns
+are rejected. Only the strongest candidate receives the single probability
+roll, so adding players does not multiply the dimension's strike rate.
+
+After that roll, the scheduler calls Minecraft's own lightning-target resolver
+to preserve lightning rods and exposed-entity attraction, then repeats the
+loaded/ticking, local-storm, exposure, and cooldown checks at the final target.
+It creates a real vanilla `LightningBolt`, including the vanilla skeleton-trap
+roll. Minecraft therefore continues to own sound, sky flash, rods, fire,
+copper, entity effects, NeoForge struck-entity events, and entity networking;
+there is no custom strike payload.
+
+The common `ServerLevelLocalizedLightningMixin` wraps only the
+`isThundering()` query inside `ServerLevel.tickChunk`. It reports false while
+localized weather controls that dimension, preventing the preserved global
+weather state from producing duplicate or clear-region natural strikes. Other
+global rain/thunder consumers, channeled lightning, commands, and mod-created
+bolts are untouched.
 
 ## Commands and diagnostics
 
@@ -612,15 +683,19 @@ a block-scale weather system:
 - persistence uses primitive arrays and fixed-point weather words;
 - each client receives only a bounded nearby region and changed revisions;
 - client state copies occur on payload receipt rather than every frame;
-- per-column precipitation type queries use allocation-light scalar interpolation;
+- high-frequency server rain checks read the level runtime's cached primitive
+  grid, and client precipitation type queries use primitive scalar
+  interpolation rather than temporary sample records;
 - clouds reuse one VBO and a bounded circular tile field instead of rebuilding
   or drawing one object per tile every frame;
 - cloud mesh rebuilds are rate-limited during temporal blending and wind-detail
   movement, while sequence, camera-tile, quality, and config changes invalidate
-  the cache immediately; and
+  the cache immediately;
+- localized lightning checks a fixed candidate budget, uses only loaded and
+  entity-ticking chunks, and can add at most one bolt per dimension check; and
 - all world reads are server-thread confined.
 
-Remaining first-phase risks are bounded but worth profiling. Each simulation
+Remaining risks are bounded but worth profiling. Each simulation
 pass currently copies retained immutable views into temporary maps/lists, so a
 very high `maxPersistedCells` combined with many active dimensions can create
 allocation pressure. Catch-up repeats at most 12 pure steps using one captured
@@ -639,15 +714,21 @@ until representative Fancy-cloud scenes are profiled.
 snow, precipitation sound, sky, fog, and built-in water-shader inputs, while
 the vanilla global rain/thunder state continues to exist for compatibility.
 This is currently necessary because Riftfall systems, Riftfall client effects,
-several Rift entities, vanilla gameplay, and other mods still query global
-`isRaining`/`isThundering` state.
+several Rift entities, and other consumers still query global
+`isRaining`/`isThundering` state directly.
 
-The consequence is deliberate but visible: localized weather can disagree
-with global gameplay. Vanilla fire extinguishing, cauldron filling, farmland,
-crops, snow/freezing, fishing, mob spawning/behavior, lightning, and other
-weather-aware logic have not yet migrated to `LocalizedPrecipitationController`.
-A vanilla global storm can affect those systems even where the localized view
-is clear, and a localized storm does not yet trigger all of them.
+Position-aware vanilla rain has migrated in both compatibility modes.
+`Level.isRainingAt` now reads authoritative local rain and exposure, which
+automatically covers open-sky fire behavior, entity wetness/extinguishing,
+farmland and normal crop fertility, fishing speed, Riptide, conduits, and other
+vanilla callers. Vanilla's loaded-column precipitation tick keeps its original
+cadence and block hooks but uses the local rain/snow type for snow layers,
+cauldrons, and modded precipitation-aware blocks. Natural lightning is also
+localized, while Minecraft remains responsible for every resulting bolt effect.
+The rain gate, snow decision, and block precipitation type use narrow
+MixinExtras operation wrappers to avoid direct redirect conflicts. A mod that
+replaces those exact invocations may still require explicit ordering or a
+compatibility adapter because localized authority must replace the result.
 
 `SUPPRESS_GLOBAL` clears active vanilla rain/thunder through server weather
 parameters while keeping localized rendering. This removes the compatibility
@@ -655,19 +736,23 @@ fallback; current Riftfall and other global-weather consumers will stop seeing
 rain. It should be enabled only after those consumers are migrated or when that
 behavior is desired.
 
-Additional first-phase limits:
+Additional limits and compatibility boundaries:
 
-- local thunder is a derived render/API contribution; no localized lightning
-  scheduler, strike synchronization, or thunder event metadata exists yet;
-- `LocalizedPrecipitationController` exposes safe decisions for wetting,
-  hydration, lightning eligibility, visibility, and temperature, but it is not
-  wired into every vanilla interaction;
+- lightning cooldowns are intentionally ephemeral per loaded dimension rather
+  than persisted; a clean restart can therefore allow one earlier first strike;
+- global-only `isRaining`/`isThundering` consumers, including current Riftfall
+  paths, can still disagree with local conditions in `PRESERVE_GLOBAL`;
+- ambient water freezing remains biome-owned. A localized thermal replacement
+  is deferred until sustained-cold hysteresis, light, thawing, and canonical or
+  custom-water behavior can be implemented together;
 - fronts move only through the current cardinal transport of continuous cell
   fields; there is no explicit front object, storm merge identity, or distant
   storm metadata;
-- the client uses vanilla precipitation geometry and sound logic, not rain
-  shafts or volumetric clouds; localized clouds are intentionally discrete
-  Minecraft-style voxels rather than physically simulated vapor;
+- distant precipitation is a sparse vanilla-texture rain lattice; there are no
+  distant snow curtains or volumetric clouds, and localized clouds remain
+  discrete Minecraft-style voxels rather than physically simulated vapor;
+- overhead optical cover feeds Minecraft's camera-local sky/lightmap and fog.
+  It is not a projected terrain shadow map and does not mutate server lighting;
 - cloud coverage is bounded by the synchronized weather region and configured
   render radius. Support fades at a missing snapshot edge, so this renderer
   does not provide horizon-scale distant storm silhouettes;
@@ -676,6 +761,9 @@ Additional first-phase limits:
 - custom dimension cloud renderers take priority. Shader packs or render mods
   that bypass or entirely replace vanilla `LevelRenderer.renderClouds` may need
   an adapter to consume `ClientWeatherCoordinator`;
+- the central `Level.isRainingAt` mixins intentionally affect vanilla semantics
+  and mods that use that vanilla position-aware query. Mods that separately
+  redirect the same call site may require an explicit compatibility adapter;
 - the renderer samples a known opaque texel in the active cloud texture so a
   rainy voxel cannot contain vanilla texture holes. A resource pack that makes
   that texel transparent can weaken the visible coverage guarantee;
@@ -698,7 +786,7 @@ For multiplayer validation, run a dedicated development server and connect two
 clients with permission level 2. Keep the default 256-block cells unless a test
 explicitly changes them; changing size resets atmospheric state.
 
-1. **Inspect the baseline.** Join, open F3, and confirm the five
+1. **Inspect the baseline.** Join, open F3, and confirm the
    `WO Atmosphere` lines appear after the first sync. Run
    `/wilderness weather sample`, `/wilderness weather cell`, and
    `/wilderness weather dump`. Confirm the command values match the local F3
@@ -708,7 +796,10 @@ explicitly changes them; changing size resets atmospheric state.
    precipitation sounds, sky darkening, air fog, and cloud cover. Run
    `/wilderness weather force snow`; confirm snow replaces rain. Run
    `/wilderness weather clear` and confirm both stop after synchronization and
-   blending.
+   blending. Walk across the forced-cell edge and confirm nearby rainy columns
+   remain visible while the camera itself is still dry. From a hill, confirm
+   sparse rain curtains connect the distant cloud footprint to loaded terrain
+   and fade into storm fog rather than ending at ten blocks.
 3. **Verify functional cloud coverage and quality modes.** In Video Settings,
    set Clouds to **Fancy**, then run `/wilderness weather force rain`. Confirm
    the F3 `Cloud mesh active` line reports nonzero tiles and vertices. Look up
@@ -753,30 +844,48 @@ explicitly changes them; changing size resets atmospheric state.
    Confirm the loaded region does not expand in an atmospheric-cell pattern.
    Move into a new region and confirm sampling skips unavailable probes rather
    than creating distant chunk tickets.
-9. **Verify dimension synchronization.** Enter another dimension and confirm
-   F3 changes to that dimension's new regional sequence/state. Return and
-   confirm the original dimension state is resynchronized. Repeat with a
-   same-dimension teleport across at least one atmospheric-cell boundary.
-10. **Verify reconnect behavior.** Disconnect during forced weather, reconnect,
+9. **Verify localized lightning.** Stand near the center of a forced rain area,
+   run `/wilderness weather set storm_energy 1`, temporarily set
+   `lightning.maximumChancePerCheck=1.0`, and restart for a deterministic
+   development check.
+   Confirm a real bolt appears only beneath the local storm, a lightning rod
+   attracts it, copper and entities receive vanilla effects, and no new chunk
+   tickets appear. Clear the local weather, run `/weather thunder`, and confirm
+   preserved global thunder no longer creates natural strikes in the locally
+   clear region. Restore the default chance afterward.
+10. **Verify localized gameplay rain.** Run `/weather clear`, force local rain,
+    and compare an open-sky test area with a roofed area and a neighboring clear
+    cell. Verify exposed entity/block fire extinguishes while covered or clear
+    fire does not, dry farmland reaches moisture 7 and feeds normal crop
+    fertility, and the fishing rain bonus applies only under exposed local rain.
+    Place empty and layered cauldrons, temporarily raise `randomTickSpeed` if
+    needed, and verify vanilla/modded precipitation hooks fill them. Force snow
+    and verify snow layers plus powder-snow cauldrons, then restore
+    `randomTickSpeed` to 3.
+11. **Verify dimension synchronization.** Enter another dimension and confirm
+    F3 changes to that dimension's new regional sequence/state. Return and
+    confirm the original dimension state is resynchronized. Repeat with a
+    same-dimension teleport across at least one atmospheric-cell boundary.
+12. **Verify reconnect behavior.** Disconnect during forced weather, reconnect,
     and confirm the first full snapshot restores the correct local visuals and
     F3 sample. Confirm stale state from the previous connection or dimension is
     not briefly used.
-11. **Verify water is read-only.** At an ocean/river/lake, record
+13. **Verify water is read-only.** At an ocean/river/lake, record
     `/wowater inspect` and `/wowater authority 16`, then record nearby weather
     humidity. Wait through an environment refresh and repeat. Confirm wet
     regions contribute moisture over time while the water ownership/coverage
     diagnostics and blocks are unchanged by weather.
-12. **Verify every debug edit.** Exercise all scalar setters, `force rain`,
+14. **Verify every debug edit.** Exercise all scalar setters, `force rain`,
     `force snow`, `clear`, and `dump` as an operator. Confirm a non-operator is
     denied. Confirm edits increment the cell revision and appear on connected
     clients at the next synchronization pass.
-13. **Verify disable/reset behavior.** Set `weather.enabled=false` in the
+15. **Verify disable/reset behavior.** Set `weather.enabled=false` in the
     server config and reload/restart. Confirm clients receive an empty reset,
     the F3 atmosphere lines disappear, rendering falls back safely to vanilla,
     and server weather queries return clear. Re-enable it and confirm a complete
     regional snapshot resumes. Test both compatibility modes separately if the
     pack intends to use `SUPPRESS_GLOBAL`.
-14. **Verify multiplayer authority.** Put both clients at the same coordinates,
+16. **Verify multiplayer authority.** Put both clients at the same coordinates,
     issue edits from the server/operator, and compare F3/sample values. Confirm
     both converge on the same server-authored fields, clients cannot create
     weather locally, and rapid movement/reconnect does not make an older payload
@@ -790,19 +899,18 @@ The next phase should deepen the same boundaries rather than replace them:
    semi-Lagrangian transport pass, an advection-aware expansion of the existing
    retained-cell cardinal storm halo, and tests for translation, strengthening,
    merging, and dissipation. Keep calculation pure and apply by revision.
-2. Add server-owned thunderstorm metadata and a localized lightning scheduler
-   using `lightningEligible`, exposure, cooldowns, and bounded strike regions.
-   Synchronize only nearby strike/event metadata; never let clients request
-   authoritative strikes.
-3. Migrate gameplay one adapter at a time through
-   `LocalizedPrecipitationController`, starting with Riftfall, fire/wetness,
-   cauldrons, farmland, snow/freezing, and fishing. Once global consumers are
-   removed, reassess making suppression the default.
+2. Extend localized lightning only where gameplay needs additional metadata,
+   such as strike diagnostics or storm-cell identity. Keep vanilla bolt entity
+   synchronization as the normal path and never let clients request strikes.
+3. Migrate remaining global-only consumers one adapter at a time, beginning
+   with Riftfall and explicitly weather-sensitive mob logic. Design localized
+   freezing only together with sustained-cold hysteresis, thawing, light, and
+   canonical/custom-water rules. Reassess making global suppression the default
+   only after those consumers are gone.
 4. Extend the current localized voxel renderer with a distant low-detail cloud
-   tier, rain shafts, fog banks, and storm-front visuals as client consumers of
-   `ClientWeatherCoordinator`. Preserve the authoritative footprint and treat
-   volumetric/compute rendering as an optional later quality tier, not part of
-   server authority.
+   tier, fog banks, and storm-front silhouettes. Preserve the authoritative
+   footprint and treat volumetric/compute rendering as an optional later
+   quality tier, not part of server authority.
 5. Extend the existing `WeatherWaterInfluence` and
    `SeasonalWeatherInfluence` boundaries for lake-effect snow, ocean-fed storm
    development, seasons, drought, contamination, and anomaly weather without

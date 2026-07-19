@@ -19,6 +19,10 @@ class WeatherRenderingConfigTest {
         assertEquals(6.0, defaults.windDetailSpeedBlocksPerSecond(), 1.0E-12);
         assertEquals(4_096, defaults.maximumCloudTiles());
         assertEquals(1.0, defaults.opacityMultiplier(), 1.0E-12);
+        assertTrue(defaults.distantRainShafts());
+        assertEquals(96, defaults.distantRainDistanceBlocks());
+        assertEquals(6, defaults.distantRainSpacingBlocks());
+        assertEquals(768, defaults.maximumDistantRainShafts());
     }
 
     @Test
@@ -29,7 +33,11 @@ class WeatherRenderingConfigTest {
                 Integer.MIN_VALUE,
                 Double.NaN,
                 Integer.MIN_VALUE,
-                Double.NEGATIVE_INFINITY
+                Double.NEGATIVE_INFINITY,
+                true,
+                Integer.MIN_VALUE,
+                Integer.MIN_VALUE,
+                Integer.MIN_VALUE
         );
 
         assertTrue(settings.enabled());
@@ -38,6 +46,9 @@ class WeatherRenderingConfigTest {
         assertEquals(0.0, settings.windDetailSpeedBlocksPerSecond(), 1.0E-12);
         assertEquals(256, settings.maximumCloudTiles());
         assertEquals(0.25, settings.opacityMultiplier(), 1.0E-12);
+        assertEquals(32, settings.distantRainDistanceBlocks());
+        assertEquals(4, settings.distantRainSpacingBlocks());
+        assertEquals(64, settings.maximumDistantRainShafts());
     }
 
     @Test
@@ -48,7 +59,11 @@ class WeatherRenderingConfigTest {
                 Integer.MAX_VALUE,
                 1_000.0,
                 Integer.MAX_VALUE,
-                100.0
+                100.0,
+                false,
+                Integer.MAX_VALUE,
+                Integer.MAX_VALUE,
+                Integer.MAX_VALUE
         );
 
         assertFalse(settings.enabled());
@@ -57,5 +72,9 @@ class WeatherRenderingConfigTest {
         assertEquals(24.0, settings.windDetailSpeedBlocksPerSecond(), 1.0E-12);
         assertEquals(8_192, settings.maximumCloudTiles());
         assertEquals(1.25, settings.opacityMultiplier(), 1.0E-12);
+        assertFalse(settings.distantRainShafts());
+        assertEquals(192, settings.distantRainDistanceBlocks());
+        assertEquals(16, settings.distantRainSpacingBlocks());
+        assertEquals(2_048, settings.maximumDistantRainShafts());
     }
 }

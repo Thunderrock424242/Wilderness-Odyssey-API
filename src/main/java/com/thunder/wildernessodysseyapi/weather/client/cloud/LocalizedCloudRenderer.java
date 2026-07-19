@@ -32,7 +32,6 @@ public final class LocalizedCloudRenderer {
     private static final double CLOUD_BASE_OFFSET = 0.33;
     private static final float CLOUD_U = 17.5F / 256.0F;
     private static final float CLOUD_V = 0.5F / 256.0F;
-    private static final double MOTION_WRAP_BLOCKS = CloudCoverageModel.CLOUD_TILE_SIZE * 1024.0;
 
     private static VertexBuffer cloudBuffer;
     private static boolean meshCacheValid;
@@ -213,10 +212,10 @@ public final class LocalizedCloudRenderer {
         }
 
         CloudFieldSample field = ClientWeatherCoordinator.cloudFieldAt(level, camX, camZ);
-        windDetailOffsetX = wrapMotion(
+        windDetailOffsetX = finiteMotion(
                 windDetailOffsetX + field.windX() * field.support() * speedBlocksPerSecond * elapsedSeconds
         );
-        windDetailOffsetZ = wrapMotion(
+        windDetailOffsetZ = finiteMotion(
                 windDetailOffsetZ + field.windZ() * field.support() * speedBlocksPerSecond * elapsedSeconds
         );
     }
@@ -264,9 +263,15 @@ public final class LocalizedCloudRenderer {
         double coverageSum = 0.0;
         int visibleTiles = 0;
         boolean morphologyPotential = false;
+        CloudTileCoverageModel.PrecipitationSampler precipitationSampler =
+                (blockX, blockZ) -> ClientWeatherCoordinator.visualPrecipitationIntensityAt(
+                        level,
+                        blockX,
+                        blockZ
+                );
 
-        // Sample at each voxel center. Precipitation bypasses morphology noise,
-        // guaranteeing that every meaningful rainy tile has cloud overhead.
+        // Sample each voxel's center for its shape, then prove precipitation
+        // overlap across bilinear sub-rectangles so thin rainy edges stay covered.
         for (int localZ = -radius; localZ <= radius; localZ++) {
             for (int localX = -radius; localX <= radius; localX++) {
                 if (localX * localX + localZ * localZ > radius * radius) {
@@ -282,10 +287,17 @@ public final class LocalizedCloudRenderer {
                                 + CloudCoverageModel.CLOUD_TILE_SIZE * 0.5
                 );
                 double coverage = CloudCoverageModel.coverage(field);
+                boolean overlapsPrecipitation = field.effectivePrecipitation()
+                        >= CloudCoverageModel.PRECIPITATION_COVERAGE_THRESHOLD
+                        || CloudTileCoverageModel.overlapsPrecipitation(
+                                worldTileX,
+                                worldTileZ,
+                                state.cellSize(),
+                                precipitationSampler
+                        );
                 morphologyPotential |= coverage > 0.015
-                        || field.effectivePrecipitation()
-                        >= CloudCoverageModel.PRECIPITATION_COVERAGE_THRESHOLD;
-                if (!CloudCoverageModel.isPresent(
+                        || overlapsPrecipitation;
+                if (!overlapsPrecipitation && !CloudCoverageModel.isPresent(
                         field,
                         worldTileX,
                         worldTileZ,
@@ -654,14 +666,8 @@ public final class LocalizedCloudRenderer {
         }
     }
 
-    private static double wrapMotion(double value) {
-        if (!Double.isFinite(value)) {
-            return 0.0;
-        }
-        if (Math.abs(value) <= MOTION_WRAP_BLOCKS) {
-            return value;
-        }
-        return Math.IEEEremainder(value, MOTION_WRAP_BLOCKS * 2.0);
+    private static double finiteMotion(double value) {
+        return Double.isFinite(value) ? value : 0.0;
     }
 
     private static boolean detailMovedSinceBuild() {

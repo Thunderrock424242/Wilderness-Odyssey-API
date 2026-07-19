@@ -61,6 +61,16 @@ class CloudCoverageModelTest {
         assertTrue(Math.abs(first - shifted) > 1.0E-12);
     }
 
+    @Test
+    void morphologyRetainsPrecisionBeyondIntegerLatticeCoordinates() {
+        double largeOffset = (double) Integer.MAX_VALUE * CloudCoverageModel.CLOUD_TILE_SIZE * 8.0;
+        double first = CloudCoverageModel.morphologyNoise(27, -14, largeOffset, -largeOffset);
+        double repeated = CloudCoverageModel.morphologyNoise(27, -14, largeOffset, -largeOffset);
+
+        assertEquals(first, repeated, 0.0);
+        assertTrue(first >= 0.0 && first <= 1.0);
+    }
+
     private static CloudFieldSample field(
             double cloudWater,
             double precipitation,

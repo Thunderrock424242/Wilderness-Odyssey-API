@@ -7,8 +7,10 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Server configuration for localized atmospheric weather.
@@ -38,6 +40,13 @@ public final class WeatherConfig {
     public static final ModConfigSpec.DoubleValue STORM_FORMATION_THRESHOLD;
     public static final ModConfigSpec.DoubleValue MAXIMUM_PRECIPITATION_INTENSITY;
     public static final ModConfigSpec.DoubleValue RANDOM_VARIATION;
+    public static final ModConfigSpec.BooleanValue LOCALIZED_LIGHTNING_ENABLED;
+    public static final ModConfigSpec.IntValue LIGHTNING_CHECK_INTERVAL_TICKS;
+    public static final ModConfigSpec.IntValue LIGHTNING_DIMENSION_COOLDOWN_TICKS;
+    public static final ModConfigSpec.IntValue LIGHTNING_CELL_COOLDOWN_TICKS;
+    public static final ModConfigSpec.IntValue LIGHTNING_CANDIDATE_RADIUS_BLOCKS;
+    public static final ModConfigSpec.IntValue LIGHTNING_MAX_CANDIDATE_ATTEMPTS;
+    public static final ModConfigSpec.DoubleValue LIGHTNING_MAXIMUM_CHANCE_PER_CHECK;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> DIMENSION_ALLOWLIST;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> DIMENSION_DENYLIST;
     public static final ModConfigSpec.EnumValue<VanillaWeatherCompatibilityMode> VANILLA_WEATHER_COMPATIBILITY_MODE;
@@ -50,6 +59,13 @@ public final class WeatherConfig {
     private static final int DEFAULT_ENVIRONMENT_RESAMPLE_INTERVAL = 400;
     private static final int DEFAULT_SNAPSHOT_SYNC_INTERVAL = 60;
     private static final int DEFAULT_MAX_PERSISTED_CELLS = 4_096;
+    private static final int DEFAULT_LIGHTNING_CHECK_INTERVAL = 20;
+    private static final int DEFAULT_LIGHTNING_DIMENSION_COOLDOWN = 120;
+    private static final int DEFAULT_LIGHTNING_CELL_COOLDOWN = 600;
+    private static final int DEFAULT_LIGHTNING_CANDIDATE_RADIUS = 96;
+    private static final int DEFAULT_LIGHTNING_MAX_CANDIDATES = 4;
+    private static final double DEFAULT_LIGHTNING_MAXIMUM_CHANCE = 0.20;
+    private static volatile DimensionSelection cachedDimensionSelection = DimensionSelection.DEFAULT;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -115,6 +131,31 @@ public final class WeatherConfig {
                 .defineInRange("randomVariation", 0.04, 0.0, 0.25);
         builder.pop();
 
+        builder.comment("Server-owned localized lightning scheduling.")
+                .push("lightning");
+        LOCALIZED_LIGHTNING_ENABLED = builder
+                .comment("Allow authoritative atmospheric storms to create natural lightning. Vanilla global natural strikes remain suppressed in controlled dimensions when false.")
+                .define("enabled", true);
+        LIGHTNING_CHECK_INTERVAL_TICKS = builder
+                .comment("Server ticks between bounded localized-lightning candidate checks.")
+                .defineInRange("checkIntervalTicks", DEFAULT_LIGHTNING_CHECK_INTERVAL, 5, 1_200);
+        LIGHTNING_DIMENSION_COOLDOWN_TICKS = builder
+                .comment("Minimum ticks between successful localized strikes in one dimension.")
+                .defineInRange("dimensionCooldownTicks", DEFAULT_LIGHTNING_DIMENSION_COOLDOWN, 20, 72_000);
+        LIGHTNING_CELL_COOLDOWN_TICKS = builder
+                .comment("Minimum ticks before the same atmospheric cell may receive another strike.")
+                .defineInRange("cellCooldownTicks", DEFAULT_LIGHTNING_CELL_COOLDOWN, 20, 72_000);
+        LIGHTNING_CANDIDATE_RADIUS_BLOCKS = builder
+                .comment("Horizontal radius around active players used for loaded strike candidates.")
+                .defineInRange("candidateRadiusBlocks", DEFAULT_LIGHTNING_CANDIDATE_RADIUS, 16, 256);
+        LIGHTNING_MAX_CANDIDATE_ATTEMPTS = builder
+                .comment("Maximum loaded candidate columns sampled per dimension check. At most one bolt can spawn per check.")
+                .defineInRange("maxCandidateAttempts", DEFAULT_LIGHTNING_MAX_CANDIDATES, 1, 16);
+        LIGHTNING_MAXIMUM_CHANCE_PER_CHECK = builder
+                .comment("Maximum probability that one eligible candidate produces a strike during a check.")
+                .defineInRange("maximumChancePerCheck", DEFAULT_LIGHTNING_MAXIMUM_CHANCE, 0.0, 1.0);
+        builder.pop();
+
         builder.comment("Dimension and vanilla-weather compatibility controls.")
                 .push("compatibility");
         DIMENSION_ALLOWLIST = builder
@@ -124,7 +165,7 @@ public final class WeatherConfig {
                 .comment("Dimension ids that must not run localized weather. Deny entries override the allowlist.")
                 .defineListAllowEmpty("dimensionDenylist", List.of(), WeatherConfig::isDimensionIdentifier);
         VANILLA_WEATHER_COMPATIBILITY_MODE = builder
-                .comment("PRESERVE_GLOBAL keeps vanilla/Riftfall gameplay state while clients use local visuals. SUPPRESS_GLOBAL disables global precipitation.")
+                .comment("PRESERVE_GLOBAL retains rain/thunder for unmigrated and Riftfall consumers while localized adapters use atmospheric cells. SUPPRESS_GLOBAL disables that global fallback.")
                 .defineEnum("vanillaWeatherCompatibilityMode", VanillaWeatherCompatibilityMode.PRESERVE_GLOBAL);
         builder.pop();
 
@@ -181,9 +222,37 @@ public final class WeatherConfig {
         }
     }
 
-    /** Returns whether localized weather is enabled for a dimension. */
+    /** Returns captured localized-lightning cadence and safety controls. */
+    public static LightningSettings lightning() {
+        try {
+            return new LightningSettings(
+                    LOCALIZED_LIGHTNING_ENABLED.get(),
+                    LIGHTNING_CHECK_INTERVAL_TICKS.get(),
+                    LIGHTNING_DIMENSION_COOLDOWN_TICKS.get(),
+                    LIGHTNING_CELL_COOLDOWN_TICKS.get(),
+                    LIGHTNING_CANDIDATE_RADIUS_BLOCKS.get(),
+                    LIGHTNING_MAX_CANDIDATE_ATTEMPTS.get(),
+                    LIGHTNING_MAXIMUM_CHANCE_PER_CHECK.get()
+            );
+        } catch (IllegalStateException exception) {
+            return LightningSettings.DEFAULT;
+        }
+    }
+
+    /**
+     * Refreshes allocation-free dimension selection used from chunk tick hooks.
+     *
+     * <p>NeoForge invokes this after the server config loads or reloads. Other
+     * scheduling and simulation values remain captured at their normal
+     * throttled call sites.</p>
+     */
+    public static void reload() {
+        cachedDimensionSelection = DimensionSelection.capture(scheduling());
+    }
+
+    /** Returns whether localized weather is enabled using the cached dimension selection. */
     public static boolean dimensionEnabled(ResourceKey<Level> dimension) {
-        return dimension != null && scheduling().dimensionEnabled(dimension.location());
+        return dimension != null && cachedDimensionSelection.dimensionEnabled(dimension.location());
     }
 
     /** Returns the configured vanilla global-weather compatibility behavior. */
@@ -202,6 +271,49 @@ public final class WeatherConfig {
 
     private static List<String> copyStrings(List<? extends String> source) {
         return source == null ? List.of() : List.copyOf(source);
+    }
+
+    /** Parsed immutable dimension ids used by the per-ticking-chunk hook. */
+    private record DimensionSelection(
+            boolean enabled,
+            Set<ResourceLocation> allowlist,
+            Set<ResourceLocation> denylist
+    ) {
+        private static final DimensionSelection DEFAULT = new DimensionSelection(
+                true,
+                Set.of(),
+                Set.of()
+        );
+
+        private static DimensionSelection capture(SchedulingSettings settings) {
+            SchedulingSettings safe = settings == null ? SchedulingSettings.DEFAULT : settings;
+            return new DimensionSelection(
+                    safe.enabled(),
+                    parseLocations(safe.dimensionAllowlist()),
+                    parseLocations(safe.dimensionDenylist())
+            );
+        }
+
+        private boolean dimensionEnabled(ResourceLocation dimension) {
+            return enabled
+                    && dimension != null
+                    && (allowlist.isEmpty() || allowlist.contains(dimension))
+                    && !denylist.contains(dimension);
+        }
+
+        private static Set<ResourceLocation> parseLocations(List<String> identifiers) {
+            if (identifiers == null || identifiers.isEmpty()) {
+                return Set.of();
+            }
+            Set<ResourceLocation> parsed = new HashSet<>(identifiers.size());
+            for (String identifier : identifiers) {
+                ResourceLocation location = ResourceLocation.tryParse(identifier);
+                if (location != null) {
+                    parsed.add(location);
+                }
+            }
+            return Set.copyOf(parsed);
+        }
     }
 
     /**
@@ -279,6 +391,58 @@ public final class WeatherConfig {
         }
 
         private static int clamp(int value, int minimum, int maximum) {
+            return Math.max(minimum, Math.min(maximum, value));
+        }
+    }
+
+    /**
+     * Immutable, clamp-safe localized-lightning controls.
+     *
+     * <p>The cell cooldown is never allowed below the dimension cooldown, so
+     * a single atmospheric cell cannot bypass the global anti-spam bound.</p>
+     */
+    public record LightningSettings(
+            boolean enabled,
+            int checkIntervalTicks,
+            int dimensionCooldownTicks,
+            int cellCooldownTicks,
+            int candidateRadiusBlocks,
+            int maxCandidateAttempts,
+            double maximumChancePerCheck
+    ) {
+        public static final LightningSettings DEFAULT = new LightningSettings(
+                true,
+                DEFAULT_LIGHTNING_CHECK_INTERVAL,
+                DEFAULT_LIGHTNING_DIMENSION_COOLDOWN,
+                DEFAULT_LIGHTNING_CELL_COOLDOWN,
+                DEFAULT_LIGHTNING_CANDIDATE_RADIUS,
+                DEFAULT_LIGHTNING_MAX_CANDIDATES,
+                DEFAULT_LIGHTNING_MAXIMUM_CHANCE
+        );
+
+        public LightningSettings {
+            checkIntervalTicks = clamp(checkIntervalTicks, 5, 1_200);
+            dimensionCooldownTicks = clamp(dimensionCooldownTicks, 20, 72_000);
+            cellCooldownTicks = Math.max(
+                    dimensionCooldownTicks,
+                    clamp(cellCooldownTicks, 20, 72_000)
+            );
+            candidateRadiusBlocks = clamp(candidateRadiusBlocks, 16, 256);
+            maxCandidateAttempts = clamp(maxCandidateAttempts, 1, 16);
+            maximumChancePerCheck = clamp(
+                    Double.isFinite(maximumChancePerCheck)
+                            ? maximumChancePerCheck
+                            : DEFAULT_LIGHTNING_MAXIMUM_CHANCE,
+                    0.0,
+                    1.0
+            );
+        }
+
+        private static int clamp(int value, int minimum, int maximum) {
+            return Math.max(minimum, Math.min(maximum, value));
+        }
+
+        private static double clamp(double value, double minimum, double maximum) {
             return Math.max(minimum, Math.min(maximum, value));
         }
     }
