@@ -37,6 +37,18 @@ public final class AuthorityWaterAccess implements WaterAccess {
     }
 
     @Override
+    public long getWaterUnits(Level level, BlockPos position) {
+        if (level == null || position == null) {
+            return 0L;
+        }
+        WildernessWaterAuthority.CellAuthority authority =
+                WildernessWaterAuthority.sample(level, position);
+        return authority.water() && authority.authorityOwned()
+                ? authority.volumeUnits()
+                : 0L;
+    }
+
+    @Override
     public boolean isSubmerged(Level level, AABB bounds) {
         WaterSample sample = SCRATCH.get();
         double x = (bounds.minX + bounds.maxX) * 0.5;

@@ -39,6 +39,37 @@ class ChangelogGeneratorTest {
     }
 
     @Test
+    void readsTopLevelBuildGradleVersionByDefault(@TempDir Path repository) throws IOException {
+        Files.writeString(repository.resolve("build.gradle"), """
+                plugins {
+                    id 'java'
+                }
+
+                version = "4.2.0"
+
+                publishing {
+                    version = 'stale-publication-version'
+                }
+                """);
+
+        GeneratorOptions options = GeneratorOptions.parse(new String[]{"--repo", repository.toString()});
+
+        assertEquals("4.2.0", options.version());
+    }
+
+    @Test
+    void explicitVersionStillOverridesBuildGradle(@TempDir Path repository) throws IOException {
+        Files.writeString(repository.resolve("build.gradle"), "version = \"4.2.0\"\n");
+
+        GeneratorOptions options = GeneratorOptions.parse(new String[]{
+                "--repo", repository.toString(),
+                "--version", "4.2.1-rc.1"
+        });
+
+        assertEquals("4.2.1-rc.1", options.version());
+    }
+
+    @Test
     void firstAutomaticRunUsesThePreviousThirtyDays(@TempDir Path repository) throws IOException {
         Path output = createChangelog(repository, """
                 # Wilderness Odyssey Changelog

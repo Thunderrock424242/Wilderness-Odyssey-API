@@ -3,8 +3,12 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.meteor.event.MeteorImpactEvent;
+import com.thunder.wildernessodysseyapi.weather.integration.VanillaWeatherCommandAdapter;
+import com.thunder.wildernessodysseyapi.weather.simulation.WeatherAuthority;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -17,11 +21,17 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Injects into vanilla WeatherCommand.register() to add:
- * <p>
+ * Bridges vanilla clear, rain, and thunder into the localized weather authority.
+ *
+ * <p>Vanilla keeps ownership of permissions, global state, duration selection,
+ * and command feedback. This mixin mirrors its final weather parameters into
+ * Wilderness atmospheric cells for that same duration.</p>
+ *
+ * <p>It also injects into vanilla WeatherCommand.register() to add:</p>
+ *
  *   /weather meteor              — shower using config min/max count
  *   /weather meteor <count>      — shower with exact count (1–20)
- * <p>
+ *
  * The inject point is TAIL (end of the method), so all vanilla literals
  * (clear, rain, thunder) are already registered. We then pull the /weather
  * node directly from the dispatcher tree and add "meteor" as a proper child —
@@ -29,6 +39,32 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(WeatherCommand.class)
 public class MixinWeatherCommand {
+
+    @WrapOperation(
+            method = {"setClear", "setRain", "setThunder"},
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/server/level/ServerLevel;setWeatherParameters(IIZZ)V"
+            )
+    )
+    private static void wilderness$bridgeVanillaWeather(
+            ServerLevel level,
+            int clearDuration,
+            int weatherDuration,
+            boolean raining,
+            boolean thundering,
+            Operation<Void> original
+    ) {
+        // Vanilla commits its global state first; the localized authority then
+        // mirrors exactly the state and duration selected by the command.
+        original.call(level, clearDuration, weatherDuration, raining, thundering);
+        int duration = raining ? weatherDuration : clearDuration;
+        WeatherAuthority.get().applyVanillaCommandWeather(
+                level,
+                VanillaWeatherCommandAdapter.fromParameters(raining, thundering),
+                duration
+        );
+    }
 
     @Inject(method = "register", at = @At("TAIL"))
     private static void wilderness$addMeteorSubcommand(

@@ -13,6 +13,7 @@ uniform mat4 InverseProjMat;
 uniform float GameTime;
 uniform float SeaState;
 uniform vec2 WindDirection;
+uniform vec4 SpectrumState;
 uniform vec2 ScreenSize;
 uniform vec4 Weather;
 uniform vec4 EnvironmentColor;
@@ -32,6 +33,10 @@ in vec3 celestialDirection;
 in float celestialDaylight;
 in vec3 waterBodyBlend;
 in float surfaceContinuity;
+in vec2 localCurrent;
+in float shoreFactor;
+in float depthFactor;
+in float disturbanceStrength;
 
 out vec4 fragColor;
 
@@ -39,17 +44,25 @@ float waveLayer(vec2 position, vec2 direction, float frequency, float speed) {
     return sin(dot(position, direction) * frequency + GameTime * speed);
 }
 
-vec3 proceduralWorldNormal(vec2 position, float sea) {
+vec2 normalizedOr(vec2 direction, vec2 fallbackDirection) {
+    float directionLength = length(direction);
+    return directionLength > 0.000001 ? direction / directionLength : fallbackDirection;
+}
+
+vec3 proceduralWorldNormal(vec2 position, vec2 current, float sea) {
     vec2 wind = normalize(WindDirection + vec2(0.0001, 0.0));
     vec2 crossWind = vec2(-wind.y, wind.x);
     vec2 diagonal = normalize(wind * 0.73 + crossWind * 0.61);
+    // Sparse canonical velocity is snapshot data. Advecting this procedural
+    // domain makes actual local flow visible without rebuilding chunk geometry.
+    vec2 advectedPosition = position - current * GameTime * 1.35;
     // Low-frequency domain warping prevents the small normal layers from
     // resolving into a repeating checkerboard when viewed across many chunks.
     vec2 warp = vec2(
-        sin(dot(position, vec2(0.071, 0.113)) + GameTime * 0.19),
-        cos(dot(position, vec2(-0.097, 0.059)) - GameTime * 0.16)
+        sin(dot(advectedPosition, vec2(0.071, 0.113)) + GameTime * 0.19),
+        cos(dot(advectedPosition, vec2(-0.097, 0.059)) - GameTime * 0.16)
     ) * (0.42 + sea * 0.48);
-    vec2 warped = position + warp;
+    vec2 warped = advectedPosition + warp;
     float longRipple = waveLayer(warped, wind, 1.37, 0.51 + sea * 1.07);
     float crossRipple = waveLayer(warped, crossWind, 2.73, -0.39 - sea * 0.83);
     float capillary = waveLayer(warped, diagonal, 6.91, 1.63 + sea * 2.91);
@@ -125,7 +138,7 @@ void main() {
 
     float sea = clamp(SeaState, 0.0, 1.0);
     vec3 baseWorldNormal = normalize(worldNormal);
-    vec3 microWorldNormal = proceduralWorldNormal(worldPosition.xz, sea);
+    vec3 microWorldNormal = proceduralWorldNormal(worldPosition.xz, localCurrent, sea);
     float continuousSurface = smoothstep(0.10, 0.70, surfaceContinuity);
     vec3 combinedWorldNormal = normalize(mix(baseWorldNormal, microWorldNormal,
         (0.30 + sea * 0.18) * continuousSurface));
@@ -185,12 +198,34 @@ void main() {
 
     float slope = clamp(1.0 - combinedWorldNormal.y, 0.0, 1.0);
     float slopeFoam = smoothstep(0.025, 0.14 + sea * 0.04, slope);
+    float currentSpeed = length(localCurrent);
+    vec2 foamDirection = normalizedOr(localCurrent,
+        normalizedOr(WindDirection, vec2(1.0, 0.0)));
+    float shallowWater = 1.0 - clamp(depthFactor, 0.0, 1.0);
+    float breakerPhase = 0.5 + 0.5 * sin(
+        dot(worldPosition.xz, foamDirection) * (1.65 + currentSpeed * 0.35)
+        - GameTime * (1.15 + currentSpeed * 2.4)
+    );
+    // Shore proximity is a deterministic client snapshot-boundary/depth
+    // approximation. SpectrumState.w is the synchronized server breaking cue;
+    // this does not claim to synchronize the separate shallow-water grid.
+    float shoreBreaker = shoreFactor
+        * (0.22 + SpectrumState.w * 0.78)
+        * smoothstep(0.34, 0.82, breakerPhase + shallowWater * 0.28);
+    float currentShear = shoreFactor
+        * clamp(currentSpeed / 1.6, 0.0, 1.0)
+        * smoothstep(0.48, 0.92, 0.5 + 0.5 * sin(
+            dot(worldPosition.xz, vec2(-foamDirection.y, foamDirection.x)) * 3.4
+            + GameTime * 0.55
+        ));
+    float impulseFoam = disturbanceStrength * (0.34 + sea * 0.26);
+    float foam = clamp(max(slopeFoam, max(shoreBreaker, currentShear)) + impulseFoam, 0.0, 1.0);
     vec3 halfDirection = normalize(celestialDirection + viewDirection);
     float celestialSpecular = pow(max(dot(normal, halfDirection), 0.0), mix(120.0, 54.0, sea));
     vec3 celestialColor = mix(vec3(0.42, 0.52, 0.75), vec3(1.00, 0.88, 0.67), celestialDaylight);
 
     vec3 color = mix(transmittedColor, reflectedColor, fresnel);
-    color = mix(color, vec3(0.84, 0.94, 1.0), slopeFoam * (0.08 + sea * 0.18));
+    color = mix(color, vec3(0.84, 0.94, 1.0), foam * (0.16 + sea * 0.30));
     color += celestialColor * celestialSpecular * (0.24 + sea * 0.25);
     // Captured terrain is already lightmapped. Applying the water lightmap to
     // the completed scene-color composite a second time made the seafloor much
@@ -205,6 +240,7 @@ void main() {
         0.10,
         0.96
     ) * ColorModulator.a;
+    alpha = min(0.98, alpha + foam * 0.08);
     float loadedFrontier = smoothstep(0.08, 0.55, surfaceContinuity);
     color = mix(environmentReflection(fresnel, sea), color, loadedFrontier);
     alpha *= mix(0.18, 1.0, loadedFrontier);

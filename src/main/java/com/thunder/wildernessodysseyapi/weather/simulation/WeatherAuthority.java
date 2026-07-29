@@ -10,6 +10,7 @@ import com.thunder.wildernessodysseyapi.weather.api.WindVector;
 import com.thunder.wildernessodysseyapi.weather.config.VanillaWeatherCompatibilityMode;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.integration.SeasonalWeatherInfluence;
+import com.thunder.wildernessodysseyapi.weather.integration.VanillaWeatherCommandAdapter;
 import com.thunder.wildernessodysseyapi.weather.integration.WildernessWeatherWaterInfluence;
 import com.thunder.wildernessodysseyapi.weather.lightning.LocalizedLightningScheduler;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherRegionSyncPayload;
@@ -90,7 +91,17 @@ public final class WeatherAuthority implements WeatherQuery {
             level.setWeatherParameters(6_000, 0, false, false);
         }
 
-        if (isDue(gameTime, scheduling.simulationIntervalTicks())) {
+        boolean simulationDue = isDue(gameTime, scheduling.simulationIntervalTicks());
+        boolean synchronizationDue = isDue(gameTime, scheduling.snapshotSyncIntervalTicks());
+        expireVanillaCommandWeather(level, runtime, data, gameTime);
+        if (runtime.vanillaWeatherState != null) {
+            // The vanilla command owns weather for its requested duration.
+            // Refresh on simulation and sync boundaries so moving players do
+            // not briefly receive autonomous weather in newly relevant cells.
+            if (simulationDue || synchronizationDue) {
+                maintainVanillaCommandWeather(level, runtime, data, scheduling, gameTime);
+            }
+        } else if (simulationDue) {
             simulate(level, runtime, data, scheduling, WeatherConfig.settings(), gameTime);
         }
         runtime.lightningScheduler.tick(
@@ -99,7 +110,7 @@ public final class WeatherAuthority implements WeatherQuery {
                 scheduling.cellSize(),
                 WeatherConfig.lightning()
         );
-        if (isDue(gameTime, scheduling.snapshotSyncIntervalTicks())) {
+        if (synchronizationDue) {
             WeatherSnapshotManager.syncLevel(
                     level,
                     grid,
@@ -267,6 +278,56 @@ public final class WeatherAuthority implements WeatherQuery {
         return changed;
     }
 
+    /**
+     * Mirrors a vanilla weather command across this dimension's retained and
+     * player-relevant atmospheric cells for the exact vanilla duration.
+     *
+     * <p>The command mixin calls this only after vanilla has committed its own
+     * global weather parameters. Normal atmospheric simulation pauses while the
+     * override is active, then resumes from clear command-created state.</p>
+     *
+     * @return the number of atmospheric cells changed immediately
+     */
+    public int applyVanillaCommandWeather(
+            ServerLevel level,
+            VanillaWeatherCommandAdapter.State state,
+            int durationTicks
+    ) {
+        Objects.requireNonNull(level, "level");
+        Objects.requireNonNull(state, "state");
+        if (!WeatherConfig.dimensionEnabled(level.dimension())) {
+            return 0;
+        }
+
+        WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
+        LevelRuntime runtime = runtime(level);
+        AtmosphereSavedData data = data(level, scheduling, runtime);
+        long gameTime = level.getGameTime();
+        runtime.beginVanillaWeather(state, gameTime, durationTicks);
+
+        // Vanilla weather commands are dimension-wide. Existing dormant cells
+        // and every currently player-relevant cell receive the same override.
+        Set<Long> targetKeys = collectActiveKeys(level, scheduling);
+        for (AtmosphereView view : data.grid().views()) {
+            targetKeys.add(view.key().packed());
+        }
+        int changed = applyVanillaState(
+                level,
+                runtime,
+                data,
+                scheduling,
+                targetKeys,
+                state,
+                gameTime,
+                true
+        );
+        if (changed > 0) {
+            data.markChanged();
+            WeatherSnapshotManager.markLevelDirty(level.dimension());
+        }
+        return changed;
+    }
+
     /** Describes why a retained cell is currently scheduled or dormant. */
     public Activity activity(ServerLevel level, AtmosphereView view) {
         if (level == null || view == null) {
@@ -413,6 +474,99 @@ public final class WeatherAuthority implements WeatherQuery {
                     removed
             );
         }
+    }
+
+    private void maintainVanillaCommandWeather(
+            ServerLevel level,
+            LevelRuntime runtime,
+            AtmosphereSavedData data,
+            WeatherConfig.SchedulingSettings scheduling,
+            long gameTime
+    ) {
+        Set<Long> activeKeys = collectActiveKeys(level, scheduling);
+        int changed = applyVanillaState(
+                level,
+                runtime,
+                data,
+                scheduling,
+                activeKeys,
+                runtime.vanillaWeatherState,
+                gameTime,
+                true
+        );
+        for (long packedKey : activeKeys) {
+            data.grid().markActive(AtmosphereCellKey.fromPacked(packedKey), gameTime);
+        }
+        if (!activeKeys.isEmpty()) {
+            data.markChanged();
+        }
+        if (changed > 0) {
+            WeatherSnapshotManager.markLevelDirty(level.dimension());
+        }
+    }
+
+    private void expireVanillaCommandWeather(
+            ServerLevel level,
+            LevelRuntime runtime,
+            AtmosphereSavedData data,
+            long gameTime
+    ) {
+        if (runtime.vanillaWeatherState == null || gameTime < runtime.vanillaWeatherUntilTick) {
+            return;
+        }
+
+        VanillaWeatherCommandAdapter.State expiredState = runtime.vanillaWeatherState;
+        Set<Long> affectedKeys = Set.copyOf(runtime.vanillaWeatherAppliedKeys);
+        runtime.clearVanillaWeather();
+        if (expiredState == VanillaWeatherCommandAdapter.State.CLEAR) {
+            return;
+        }
+
+        int changed = applyVanillaState(
+                level,
+                runtime,
+                data,
+                WeatherConfig.scheduling(),
+                affectedKeys,
+                VanillaWeatherCommandAdapter.State.CLEAR,
+                gameTime,
+                false
+        );
+        runtime.vanillaWeatherAppliedKeys.clear();
+        if (changed > 0) {
+            data.markChanged();
+            WeatherSnapshotManager.markLevelDirty(level.dimension());
+        }
+    }
+
+    private int applyVanillaState(
+            ServerLevel level,
+            LevelRuntime runtime,
+            AtmosphereSavedData data,
+            WeatherConfig.SchedulingSettings scheduling,
+            Set<Long> targetKeys,
+            VanillaWeatherCommandAdapter.State state,
+            long gameTime,
+            boolean createMissing
+    ) {
+        int changed = 0;
+        for (long packedKey : targetKeys) {
+            AtmosphereCellKey key = AtmosphereCellKey.fromPacked(packedKey);
+            AtmosphereView view = data.grid().view(key);
+            if (view == null && createMissing) {
+                view = ensureCell(level, data, key, scheduling);
+            }
+            if (view == null) {
+                continue;
+            }
+
+            WeatherSample next = VanillaWeatherCommandAdapter.apply(view.sample(), state);
+            if (!view.sample().equals(next) && data.grid().force(key, next, gameTime)) {
+                changed++;
+            }
+            runtime.vanillaWeatherAppliedKeys.add(packedKey);
+        }
+        return changed;
     }
 
     private static void addExistingCardinalNeighbors(
@@ -653,7 +807,10 @@ public final class WeatherAuthority implements WeatherQuery {
     private static final class LevelRuntime {
         private final AtmosphereInputSampler inputSampler;
         private final LocalizedLightningScheduler lightningScheduler;
+        private final Set<Long> vanillaWeatherAppliedKeys = new HashSet<>();
         private volatile AtmosphereGrid atmosphereGrid;
+        private VanillaWeatherCommandAdapter.State vanillaWeatherState;
+        private long vanillaWeatherUntilTick;
 
         private LevelRuntime(
                 AtmosphereInputSampler inputSampler,
@@ -661,6 +818,25 @@ public final class WeatherAuthority implements WeatherQuery {
         ) {
             this.inputSampler = inputSampler;
             this.lightningScheduler = lightningScheduler;
+        }
+
+        private void beginVanillaWeather(
+                VanillaWeatherCommandAdapter.State state,
+                long gameTime,
+                int durationTicks
+        ) {
+            long safeDuration = Math.max(1L, durationTicks);
+            vanillaWeatherState = state;
+            vanillaWeatherUntilTick = gameTime > Long.MAX_VALUE - safeDuration
+                    ? Long.MAX_VALUE
+                    : gameTime + safeDuration;
+            vanillaWeatherAppliedKeys.clear();
+        }
+
+        private void clearVanillaWeather() {
+            vanillaWeatherState = null;
+            vanillaWeatherUntilTick = 0L;
+            vanillaWeatherAppliedKeys.clear();
         }
     }
 

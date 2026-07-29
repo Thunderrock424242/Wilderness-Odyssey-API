@@ -29,6 +29,8 @@ public final class ClientWaterChunkSnapshot {
     private final byte[] oceanWeight = new byte[COLUMN_COUNT];
     private final byte[] riverWeight = new byte[COLUMN_COUNT];
     private final byte[] lakeWeight = new byte[COLUMN_COUNT];
+    private final float[] velocityX = new float[COLUMN_COUNT];
+    private final float[] velocityZ = new float[COLUMN_COUNT];
     private final byte[] bodyType = new byte[COLUMN_COUNT];
     private final int[] waterTint = new int[COLUMN_COUNT];
     private final boolean[] surfaceCovered = new boolean[COLUMN_COUNT];
@@ -79,6 +81,8 @@ public final class ClientWaterChunkSnapshot {
                 Byte.toUnsignedInt(oceanWeight[index]),
                 Byte.toUnsignedInt(riverWeight[index]),
                 Byte.toUnsignedInt(lakeWeight[index]),
+                velocityX[index],
+                velocityZ[index],
                 GeneratedWaterChunk.BodyType.values()[Byte.toUnsignedInt(bodyType[index])],
                 waterTint[index],
                 surfaceCovered[index]
@@ -90,7 +94,7 @@ public final class ClientWaterChunkSnapshot {
         int packed = pack(localX, worldY, localZ);
         int sparseOffset = sparseOffset(packed);
         if (sparseOffset >= 0) {
-            return sparseCells[sparseOffset + 1] > 0;
+            return isVisibleSparseWater(sparseOffset);
         }
         return generated != null && generated.spanAt(localX, worldY, localZ) != null;
     }
@@ -99,7 +103,9 @@ public final class ClientWaterChunkSnapshot {
     public int amountUnits(int localX, int worldY, int localZ) {
         int sparseOffset = sparseOffset(pack(localX, worldY, localZ));
         if (sparseOffset >= 0) {
-            return Math.max(0, sparseCells[sparseOffset + 1]);
+            return isVisibleSparseWater(sparseOffset)
+                    ? Math.max(0, sparseCells[sparseOffset + 1])
+                    : 0;
         }
         GeneratedWaterChunk.WaterSpan span = generated == null
                 ? null
@@ -122,6 +128,7 @@ public final class ClientWaterChunkSnapshot {
         return generatedBytes + Integer.BYTES * sparseCells.length
                 + Short.BYTES * (surfaceY.length + floorY.length)
                 + fillAmount.length + oceanWeight.length + riverWeight.length + lakeWeight.length
+                + Float.BYTES * (velocityX.length + velocityZ.length)
                 + bodyType.length + Integer.BYTES * waterTint.length + surfaceCovered.length;
     }
 
@@ -161,7 +168,7 @@ public final class ClientWaterChunkSnapshot {
                 continue;
             }
             int y = unpackY(packed);
-            if (sparseCells[offset + 1] > 0) {
+            if (isVisibleSparseWater(offset)) {
                 candidateTop = Math.max(candidateTop, y);
                 searchFloor = Math.min(searchFloor, y - 1);
             }
@@ -173,13 +180,16 @@ public final class ClientWaterChunkSnapshot {
         for (int y = candidateTop; y >= searchFloor && y >= -2048; y--) {
             int sparseOffset = sparseOffset(pack(localX, y, localZ));
             if (sparseOffset >= 0) {
-                int amount = sparseCells[sparseOffset + 1];
-                if (amount > 0) {
+                if (isVisibleSparseWater(sparseOffset)) {
+                    int sparseVolume = Math.max(0, sparseCells[sparseOffset + 1]);
                     GeneratedWaterChunk.WaterSpan atY = generated == null
                             ? null : generated.spanAt(localX, y, localZ);
-                    setResolvedColumn(column, y, searchFloor, amountToLevel(amount), atY,
+                    setResolvedColumn(column, y, searchFloor,
+                            amountToLevel(sparseVolume), atY,
                             atY != null && generated.surfaceCovered(localX, localZ)
-                                    && generatedTop != null && y == generatedTop.topY());
+                                    && generatedTop != null && y == generatedTop.topY(),
+                            finiteOrZero(Float.intBitsToFloat(sparseCells[sparseOffset + 2])),
+                            finiteOrZero(Float.intBitsToFloat(sparseCells[sparseOffset + 4])));
                     return;
                 }
                 continue;
@@ -189,7 +199,7 @@ public final class ClientWaterChunkSnapshot {
                     : generated.spanAt(localX, y, localZ);
             if (span != null) {
                 setResolvedColumn(column, y, generatedFloor, span.cell().amount(), span,
-                        generated.surfaceCovered(localX, localZ));
+                        generated.surfaceCovered(localX, localZ), 0.0f, 0.0f);
                 return;
             }
         }
@@ -201,12 +211,16 @@ public final class ClientWaterChunkSnapshot {
             int resolvedFloorY,
             int amount,
             GeneratedWaterChunk.WaterSpan bodySpan,
-            boolean covered
+            boolean covered,
+            float resolvedVelocityX,
+            float resolvedVelocityZ
     ) {
         surfaceY[column] = (short) Math.max(Short.MIN_VALUE + 1, Math.min(Short.MAX_VALUE, topY));
         floorY[column] = (short) Math.max(Short.MIN_VALUE + 1, Math.min(Short.MAX_VALUE, resolvedFloorY));
         fillAmount[column] = (byte) Math.max(1, Math.min(8, amount));
         surfaceCovered[column] = covered;
+        velocityX[column] = finiteOrZero(resolvedVelocityX);
+        velocityZ[column] = finiteOrZero(resolvedVelocityZ);
         if (bodySpan == null) {
             lakeWeight[column] = (byte) 255;
             bodyType[column] = (byte) GeneratedWaterChunk.BodyType.LAKE.ordinal();
@@ -236,6 +250,11 @@ public final class ClientWaterChunkSnapshot {
             }
         }
         return -1;
+    }
+
+    private boolean isVisibleSparseWater(int offset) {
+        return sparseCells[offset + 1] > 0
+                && (sparseCells[offset + 5] & WaterVolumeChunk.FLAG_DISPLACEMENT_RESERVOIR) == 0;
     }
 
     private static int[] sortedSparseCopy(int[] source) {
@@ -270,6 +289,10 @@ public final class ClientWaterChunkSnapshot {
                 / WaterVolumeChunk.UNITS_PER_BLOCK));
     }
 
+    private static float finiteOrZero(float value) {
+        return Float.isFinite(value) ? value : 0.0f;
+    }
+
     private static int columnIndex(int localX, int localZ) {
         return (localX & 15) | ((localZ & 15) << 4);
     }
@@ -283,7 +306,7 @@ public final class ClientWaterChunkSnapshot {
         return (y & 0x800) == 0 ? y : y - 0x1000;
     }
 
-    /** Resolved top surface and optical blend for one X/Z column. */
+    /** Resolved top surface, optical body blend, and sparse canonical current for one X/Z column. */
     public record Column(
             boolean wet,
             int surfaceBlockY,
@@ -292,11 +315,13 @@ public final class ClientWaterChunkSnapshot {
             int oceanWeight,
             int riverWeight,
             int lakeWeight,
+            float velocityX,
+            float velocityZ,
             GeneratedWaterChunk.BodyType bodyType,
             int waterTint,
             boolean surfaceCovered
     ) {
-        public static final Column DRY = new Column(false, 0, 0, 0, 0, 0, 0,
+        public static final Column DRY = new Column(false, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f,
                 GeneratedWaterChunk.BodyType.LAKE, GeneratedWaterChunk.Cell.DEFAULT_WATER_TINT, false);
 
         /** Flat Minecraft fluid height before GPU/CPU wave displacement. */
@@ -307,6 +332,11 @@ public final class ClientWaterChunkSnapshot {
         /** Approximate water-column thickness used for absorption. */
         public float depth() {
             return wet ? Math.max(0.0f, baseSurfaceY() - (floorY + 1.0f)) : 0.0f;
+        }
+
+        /** Horizontal canonical flow magnitude retained for client-only material motion. */
+        public float currentSpeed() {
+            return wet ? (float) Math.sqrt(velocityX * velocityX + velocityZ * velocityZ) : 0.0f;
         }
     }
 }

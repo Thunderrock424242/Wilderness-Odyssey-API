@@ -17,7 +17,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
-import static com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.currentVersion;
 
 /**
  * Central queue + executor for chunk migration tasks.
@@ -40,10 +40,12 @@ public final class WorldUpgradeManager {
         QUEUED_KEYS.clear();
 
         WorldUpgradeSavedData state = WorldUpgradeSavedData.get(server);
-        if (state.shouldRunForPackVersion(VERSION)) {
-            LOGGER.info("Detected modpack version change ({} -> {}). Starting world upgrade queue.", state.getLastPackVersion(), VERSION);
+        String packVersion = currentVersion();
+        if (state.shouldRunForPackVersion(packVersion)) {
+            LOGGER.info("Detected modpack version change ({} -> {}). Starting world upgrade queue.",
+                    state.getLastPackVersion(), packVersion);
             state.resetCounters();
-            state.markPackVersionProcessed(VERSION);
+            state.markPackVersionProcessed(packVersion);
             state.setRunning(true);
         } else {
             state.setRunning(false);

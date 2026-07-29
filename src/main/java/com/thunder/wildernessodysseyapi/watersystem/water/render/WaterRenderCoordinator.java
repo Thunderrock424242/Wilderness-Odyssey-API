@@ -94,9 +94,7 @@ public final class WaterRenderCoordinator {
             OceanSeaState.Sample seaState = ClientOceanSeaState.current(level);
             WaterShaders.updateOceanUniforms(
                     timeSeconds,
-                    seaState.strength(),
-                    seaState.windDirectionX(),
-                    seaState.windDirectionZ(),
+                    seaState,
                     ((level.getDayTime() + partialTick) % 24_000L) / 24_000.0f
             );
             WaterShaders.prepareSnapshotMeshPass();
@@ -279,6 +277,8 @@ public final class WaterRenderCoordinator {
     private static void clear() {
         MESHES.clear();
         OWNERSHIP.clear();
+        WaterSurfaceDisplacement.clear();
+        RippleRenderer.clear();
     }
 
     private static void renderDetailSubpasses(

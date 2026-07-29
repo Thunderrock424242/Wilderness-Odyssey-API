@@ -28,14 +28,16 @@ import java.util.*;
 public class RippleRenderer {
 
     private static final float MAX_RADIUS = 1.8f;
-    private static final float EXPAND_SPEED = 0.06f;  // radius per frame
+    private static final int LIFETIME_TICKS = 30;
     private static final float FADE_START = 0.6f;     // fraction of life when fading begins
 
     private static final List<Ripple> activeRipples = new ArrayList<>();
 
     public static void spawnRipple(double x, double y, double z) {
+        var level = Minecraft.getInstance().level;
         if (!WaterRenderingConfig.ENABLE_RIPPLES.get()
-                || !WildernessWaterRules.isEnabled(Minecraft.getInstance().level)) {
+                || level == null
+                || !WildernessWaterRules.isEnabled(level)) {
             return;
         }
 
@@ -48,7 +50,7 @@ public class RippleRenderer {
             activeRipples.remove(0);
         }
 
-        activeRipples.add(new Ripple(x, y, z));
+        activeRipples.add(new Ripple(x, y, z, level.getGameTime()));
     }
 
     public static void onRenderLevel(RenderLevelStageEvent event) {
@@ -59,8 +61,10 @@ public class RippleRenderer {
     }
 
     private static void renderScoped(RenderLevelStageEvent event) {
+        var level = Minecraft.getInstance().level;
         if (!WaterRenderingConfig.ENABLE_RIPPLES.get()
-                || !WildernessWaterRules.isEnabled(Minecraft.getInstance().level)) {
+                || level == null
+                || !WildernessWaterRules.isEnabled(level)) {
             activeRipples.clear();
             return;
         }
@@ -68,9 +72,11 @@ public class RippleRenderer {
 
         PoseStack poseStack = event.getPoseStack();
         Vec3 camera = event.getCamera().getPosition();
+        float sampleTick = level.getGameTime()
+                + event.getPartialTick().getGameTimeDeltaPartialTick(false);
 
-        // Advance + cull dead ripples
-        activeRipples.removeIf(r -> r.radius >= MAX_RADIUS);
+        // Tick-based age keeps expansion stable across different frame rates.
+        activeRipples.removeIf(r -> sampleTick - r.startTick >= LIFETIME_TICKS);
 
         var bufferSource = net.minecraft.client.Minecraft.getInstance()
                 .renderBuffers().bufferSource();
@@ -79,9 +85,9 @@ public class RippleRenderer {
         poseStack.pushPose();
 
         for (Ripple ripple : activeRipples) {
-            ripple.radius += EXPAND_SPEED;
-
-            float life = ripple.radius / MAX_RADIUS;               // 0 → 1
+            float life = Math.max(0.0f, Math.min(1.0f,
+                    (sampleTick - ripple.startTick) / LIFETIME_TICKS));
+            float radius = 0.1f + (MAX_RADIUS - 0.1f) * life;
             float alpha = life < FADE_START
                     ? 0.6f
                     : 0.6f * (1f - (life - FADE_START) / (1f - FADE_START));
@@ -96,13 +102,18 @@ public class RippleRenderer {
             poseStack.pushPose();
             poseStack.translate(rx, ry, rz);
 
-            drawRing(buffer, poseStack, ripple.radius, alphaByte, WaterRenderingConfig.rippleSegments());
+            drawRing(buffer, poseStack, radius, alphaByte, WaterRenderingConfig.rippleSegments());
 
             poseStack.popPose();
         }
 
         poseStack.popPose();
         // WaterRenderCoordinator flushes the shared translucent detail batch.
+    }
+
+    /** Releases cosmetic rings during a client-level handoff. */
+    public static void clear() {
+        activeRipples.clear();
     }
 
     private static void drawRing(VertexConsumer buffer, PoseStack poseStack,
@@ -141,12 +152,13 @@ public class RippleRenderer {
 
     private static class Ripple {
         final double x, y, z;
-        float radius = 0.1f;
+        final long startTick;
 
-        Ripple(double x, double y, double z) {
+        Ripple(double x, double y, double z, long startTick) {
             this.x = x;
             this.y = y;
             this.z = z;
+            this.startTick = startTick;
         }
     }
 }

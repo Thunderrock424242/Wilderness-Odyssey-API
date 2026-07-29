@@ -1,7 +1,10 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.compat;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.watersystem.water.compat.create.CreateWaterCompatibilityAdapter;
+import com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.NeoForgeFluidHandlerAdapter;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla.EntityWaterCompat;
+import net.neoforged.bus.api.IEventBus;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,8 +28,12 @@ public final class WaterCompatibilityRegistry {
     private WaterCompatibilityRegistry() {
     }
 
-    /** Registers built-in adapters and initializes those available at runtime. */
-    public static synchronized void bootstrap() {
+    /**
+     * Registers built-in adapters and initializes those available at runtime.
+     *
+     * @param modEventBus owning mod bus used for capability registration
+     */
+    public static synchronized void bootstrap(IEventBus modEventBus) {
         if (bootstrapped) {
             return;
         }
@@ -35,6 +42,8 @@ public final class WaterCompatibilityRegistry {
         // Entity state is the first proof adapter because swimming, drowning,
         // optics, audio, boats, and mob behavior can all consume its one cache.
         register(new EntityWaterCompat());
+        register(new NeoForgeFluidHandlerAdapter(modEventBus));
+        register(new CreateWaterCompatibilityAdapter());
 
         for (WaterCompatibilityAdapter adapter : ADAPTERS.values()) {
             if (!adapter.isAvailable()) {

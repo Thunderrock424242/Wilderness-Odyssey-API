@@ -137,7 +137,7 @@ public final class ChangelogManager {
             }
             List<String> defaultLines = List.of(
                     "# Wilderness Odyssey Changelog",
-                    "## " + ModConstants.VERSION,
+                    "## " + ModConstants.currentVersion(),
                     "Added:",
                     "- Welcome to your new world!",
                     "Changed:",

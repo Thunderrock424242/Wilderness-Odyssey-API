@@ -6,15 +6,23 @@ folder and displayed by `/changelog`.
 
 ## Release workflow
 
-Commit the intended release changes first, then run:
+Set the release once through the top-level project version in `build.gradle`:
 
-```powershell
-$env:JAVA_HOME="$env:USERPROFILE\.jdks\corretto-21.0.10"
-.\gradlew.bat generateChangelog -PchangelogVersion=0.1.0
+```groovy
+version = "4.2.0"
 ```
 
-`changelogVersion` defaults to `ModConstants.VERSION`, keeping the generated heading aligned with the version shown
-by the in-game command. Passing the property explicitly is recommended in release automation.
+That value also supplies the generated NeoForge metadata and Maven publication version. Commit the intended release
+changes, then run:
+
+```powershell
+.\gradlew.bat generateChangelog
+```
+
+The Gradle task passes the project version to the generator. If it differs from the version stored in the changelog
+marker, the generator creates a new `## <version>` section. If it is unchanged, the existing section is refreshed from
+its original Git baseline instead of creating a duplicate. `-PchangelogVersion=<version>` remains available as an
+explicit recovery or release-automation override.
 
 The first automatic run has no stored Git baseline, so it includes committed changes from the previous 30 days. The
 generated changelog embeds a metadata comment containing its base and HEAD commits. When a different version is
@@ -31,14 +39,13 @@ paths. Commits that only update the generated changelog are ignored.
 Preview without writing:
 
 ```powershell
-.\gradlew.bat generateChangelog -PchangelogVersion=0.1.0 -PchangelogDryRun=true
+.\gradlew.bat generateChangelog -PchangelogDryRun=true
 ```
 
 Change the initial window or output path:
 
 ```powershell
 .\gradlew.bat generateChangelog `
-    -PchangelogVersion=0.1.0 `
     -PchangelogFirstRunDays=45 `
     -PchangelogOutput=build/reports/changelog-preview.txt
 ```

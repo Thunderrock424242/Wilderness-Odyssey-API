@@ -55,6 +55,48 @@ class ClientWaterChunkSnapshotTest {
         assertTrue(snapshot.column(2, 3).surfaceCovered());
     }
 
+    @Test
+    void sparseSurfaceRetainsHorizontalCurrentForRendering() {
+        WaterVolumeChunk sparse = new WaterVolumeChunk();
+        sparse.set(new BlockPos(4, 70, 5), new WaterVolumeChunk.WaterCell(
+                WaterVolumeChunk.UNITS_PER_BLOCK,
+                0.75f,
+                -0.1f,
+                -1.25f,
+                0,
+                WaterVolumeChunk.WaterCell.DEFAULT_TEMPERATURE_MILLI_KELVIN
+        ));
+
+        ClientWaterChunkSnapshot snapshot = new ClientWaterChunkSnapshot(
+                0, 0, null, sparse.revision(), sparse.toNetworkArray());
+
+        ClientWaterChunkSnapshot.Column column = snapshot.column(4, 5);
+        assertEquals(0.75f, column.velocityX(), 1.0e-6f);
+        assertEquals(-1.25f, column.velocityZ(), 1.0e-6f);
+        assertEquals((float) Math.sqrt(2.125f), column.currentSpeed(), 1.0e-6f);
+    }
+
+    @Test
+    void displacementReservoirCannotCreatePhantomSurfaceGeometry() {
+        WaterVolumeChunk sparse = new WaterVolumeChunk();
+        BlockPos reservoir = new BlockPos(6, 72, 7);
+        sparse.set(reservoir, new WaterVolumeChunk.WaterCell(
+                WaterVolumeChunk.UNITS_PER_BLOCK,
+                1.0f,
+                0.0f,
+                -1.0f,
+                WaterVolumeChunk.FLAG_DISPLACEMENT_RESERVOIR,
+                WaterVolumeChunk.WaterCell.DEFAULT_TEMPERATURE_MILLI_KELVIN
+        ));
+
+        ClientWaterChunkSnapshot snapshot = new ClientWaterChunkSnapshot(
+                0, 0, null, sparse.revision(), sparse.toNetworkArray());
+
+        assertFalse(snapshot.contains(6, 72, 7));
+        assertEquals(0, snapshot.amountUnits(6, 72, 7));
+        assertFalse(snapshot.column(6, 7).wet());
+    }
+
     private static GeneratedWaterChunk generatedColumn() {
         GeneratedWaterChunk generated = new GeneratedWaterChunk();
         for (int y = 58; y <= 63; y++) {

@@ -8,11 +8,21 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-/** Computes reusable buoyancy samples from the central water query API. */
+/**
+ * Computes reusable multi-point buoyancy samples from the central water API.
+ *
+ * <p>Four footprint corners and a motion-biased center point resolve partial
+ * hull contact without owning or duplicating any water state. Callers should
+ * use their cached water-contact state as the hot-path dry prefilter.</p>
+ */
 public final class AuthorityWaterBuoyancyProvider implements WaterBuoyancyProvider {
 
+    private static final double MIN_SAMPLE_INSET = 0.02;
+    private static final double MAX_SAMPLE_INSET = 0.18;
+    private static final double LEADING_SAMPLE_BIAS = 0.35;
+
     private final WaterAccess waterAccess;
-    private final ThreadLocal<WaterSample> scratch = ThreadLocal.withInitial(WaterSample::new);
+    private final ThreadLocal<WorkingState> workingState = ThreadLocal.withInitial(WorkingState::new);
 
     /** Creates a provider backed by the supplied water service. */
     public AuthorityWaterBuoyancyProvider(WaterAccess waterAccess) {
@@ -21,26 +31,26 @@ public final class AuthorityWaterBuoyancyProvider implements WaterBuoyancyProvid
 
     @Override
     public BuoyancySample sample(Level level, AABB bounds, Vec3 velocity) {
-        double x = (bounds.minX + bounds.maxX) * 0.5;
-        double z = (bounds.minZ + bounds.maxZ) * 0.5;
-        WaterSample water = scratch.get();
-        waterAccess.sample(level, x, bounds.minY, z, 0.0f, water);
-        if (!water.water()) {
-            return BuoyancySample.DRY;
-        }
+        WorkingState working = workingState.get();
+        working.accumulator.reset();
+        Vec3 motion = velocity == null ? Vec3.ZERO : velocity;
 
-        double fraction = submergedFraction(bounds.minY, bounds.maxY, water.surfaceHeight());
-        if (fraction <= 0.0) {
-            return BuoyancySample.DRY;
-        }
-        return new BuoyancySample(
-                true,
-                fraction >= 1.0,
-                water.surfaceHeight(),
-                fraction,
-                new Vec3(water.currentX(), water.currentY(), water.currentZ()),
-                new Vec3(water.normalX(), water.normalY(), water.normalZ())
-        );
+        double centerX = (bounds.minX + bounds.maxX) * 0.5;
+        double centerZ = (bounds.minZ + bounds.maxZ) * 0.5;
+        double halfSampleX = sampleHalfExtent(bounds.getXsize());
+        double halfSampleZ = sampleHalfExtent(bounds.getZsize());
+        double queryY = bounds.minY + Math.min(0.05, Math.max(0.0, bounds.getYsize() * 0.1));
+
+        // Four hull-footprint samples capture uneven crests while the center
+        // sample is biased slightly into motion to react before the bow enters.
+        samplePoint(level, bounds, working, centerX - halfSampleX, queryY, centerZ - halfSampleZ);
+        samplePoint(level, bounds, working, centerX + halfSampleX, queryY, centerZ - halfSampleZ);
+        samplePoint(level, bounds, working, centerX - halfSampleX, queryY, centerZ + halfSampleZ);
+        samplePoint(level, bounds, working, centerX + halfSampleX, queryY, centerZ + halfSampleZ);
+        double leadX = clamp(motion.x * LEADING_SAMPLE_BIAS, -halfSampleX, halfSampleX);
+        double leadZ = clamp(motion.z * LEADING_SAMPLE_BIAS, -halfSampleZ, halfSampleZ);
+        samplePoint(level, bounds, working, centerX + leadX, queryY, centerZ + leadZ);
+        return working.accumulator.finish();
     }
 
     static double submergedFraction(double minimumY, double maximumY, double surfaceHeight) {
@@ -49,5 +59,31 @@ public final class AuthorityWaterBuoyancyProvider implements WaterBuoyancyProvid
             return 0.0;
         }
         return Math.max(0.0, Math.min(1.0, (surfaceHeight - minimumY) / height));
+    }
+
+    private void samplePoint(
+            Level level,
+            AABB bounds,
+            WorkingState working,
+            double x,
+            double queryY,
+            double z
+    ) {
+        waterAccess.sample(level, x, queryY, z, 0.0f, working.sample);
+        working.accumulator.add(working.sample, bounds.minY, bounds.maxY);
+    }
+
+    private static double sampleHalfExtent(double size) {
+        double inset = clamp(size * 0.15, MIN_SAMPLE_INSET, MAX_SAMPLE_INSET);
+        return Math.max(0.0, size * 0.5 - inset);
+    }
+
+    private static double clamp(double value, double minimum, double maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    private static final class WorkingState {
+        private final WaterSample sample = new WaterSample();
+        private final BuoyancySampleAccumulator accumulator = new BuoyancySampleAccumulator();
     }
 }
