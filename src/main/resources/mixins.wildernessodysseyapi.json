@@ -7,11 +7,13 @@
   "mixins": [
     "BlockEntityMixin",
     "BucketPlaceMixin",
+    "CanonicalWaterProjectionGuardMixin",
     "CanonicalWaterFlowMixin",
     "CanonicalWaterBucketPickupMixin",
     "ChunkMapGenerationErrorMixin",
     "CoralFeatureWaterMixin",
     "CreatePathsMixin",
+    "CreateWaterPredicateMixin",
     "DayNightCycleMixin",
     "EntityAccessor",
     "ForwardExtentCopyMixin",
@@ -32,7 +34,8 @@
     "StructureBlockEntityMixin",
     "StructureTemplateAccessor",
     "StructureTemplatePaletteAccessor",
-    "TropicalFishSpawnMixin"
+    "TropicalFishSpawnMixin",
+    "WaterProjectionMutationMixin"
   ],
   "injectors": {
     "defaultRequire": 1

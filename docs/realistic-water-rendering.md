@@ -84,6 +84,12 @@ neighborhood. Stable generated water is never enrolled in a full-ocean tick
 loop. A dry tombstone intentionally masks the generated baseline after a cell
 is drained, including across save/reload and synchronization.
 
+Solid displacement is conservative. Neighboring loaded capacity receives the
+water first; any enclosed remainder persists at the occupied position with a
+displacement-reservoir flag. Reservoirs retain their diagnostic volume and
+velocity but are non-wet, non-rendered, and non-extractable until terrain
+exposes and wakes them.
+
 ## Immutable client snapshots
 
 `ClientWaterSnapshotStore` publishes one immutable
@@ -119,9 +125,18 @@ body blend weights, so both sides of a loaded chunk boundary select identical
 surface topology. High and Cinematic groups subdivide each block top into a
 stable half-block grid so GPU-displaced silhouettes remain smooth without a
 per-frame CPU rebuild. Continuous Gerstner and tide displacement happens in
-the vertex shader, with displacement tapered at dry or unloaded boundaries.
+the vertex shader, including horizontal crest motion and analytic tangents,
+with displacement tapered at dry or unloaded boundaries.
 Rebuild work uses a deduplicated chunk-key queue and a bounded streaming burst,
 preventing repeated neighbor entries from leaving a distant flat fallback ring.
+
+Sparse snapshot cells retain horizontal canonical velocity. The mesh packs
+bounded current, depth, and shoreline proximity into the low bits of the
+existing block-vertex color channels, preserving the stock vertex format and
+fallback shader. The custom vertex shader decodes those values before
+interpolation. A capped set of the eight nearest tick-aged impacts and wakes is
+uploaded as uniforms, deforming heights and normals without rebuilding the
+cached mesh.
 
 Fallback fluid tops remain visible while a group is absent or rebuilding. Once
 the custom vertex buffer is uploaded, the coordinator requests the affected
@@ -164,7 +179,7 @@ The core water shader uses those textures for:
 - Schlick Fresnel transmission/reflection balance;
 - environment, sky, weather, celestial, and optional bounded SSR reflection;
 - biome/body tint, daylight, rain, thunder, sea state, tide, and Gerstner input;
-  and
+- canonical-current advection, depth/boundary shore breaking, and wake foam; and
 - unloaded-frontier fading into fog/environment reflection.
 
 Invalid depth and unavailable scene textures fail to the environment path
@@ -194,8 +209,16 @@ limits. It is an enhancement, not a requirement for water visibility.
 The mesh shader and `ClientWaterImmersion` consume the same synchronized sea
 state, tide, body blend weights, time base, and world-aligned Gerstner surface
 equation. Shared world coordinates make wave phase continuous at chunk borders.
-Height-only shoreline safety prevents horizontal displacement from opening
-bank cracks.
+The GPU performs full horizontal/vertical Gerstner displacement and derives
+analytic normals from the same component arrays mirrored by
+`GerstnerWaveProfile.sampleAt`. Horizontal displacement tapers into shallow/dry
+boundaries to prevent bank cracks. Client immersion also samples the same
+transient wake/impact height when the built-in shader owns the surface.
+
+Shore foam is intentionally a deterministic visual approximation derived from
+immutable snapshot depth and wet boundaries. The server's bounded shallow-water
+grid remains authoritative for gameplay flow but is not synchronized to the
+renderer; the shader does not claim otherwise.
 
 `UnderwaterOpticsModel` remains the optical foundation for fog, color,
 visibility, caustics, and distortion. Camera immersion adds entry/exit
@@ -240,8 +263,18 @@ water-animal spawn predicates recognize physically present Wilderness water.
 This is intentionally narrow: it supports the flora and fauna that belong in a
 newly generated water body without making externally tagged water authoritative.
 
-Buckets, boats, unrelated mob mechanics, vanilla structures, waterlogging
-replacement, external fluid APIs, other mods, and existing-world conversion are
-not part of this generation/rendering architecture. Later compatibility work
-must adapt to the authority boundary rather than reintroducing completed-chunk
-scanning or migration into the core system.
+Boats, items, and living entities consume multi-point authority samples for
+bounded server-side buoyancy, fluid-relative drag, and current response. Boat
+tilt and wake deformation remain client visual work, so they cannot override
+server movement.
+
+The standalone Wilderness liquid block exposes a transactional NeoForge fluid
+capability. Create receives a focused local water predicate, and guarded
+projected-block writes reconcile open-machine placement/removal with canonical
+volume. These adapters preserve the namespaced fluid and normal water tags; the
+mod does not globally impersonate vanilla `Fluids.WATER`.
+
+Vanilla structures, full waterlogging replacement, direct chunk-internal
+mutations by other mods, and existing-world conversion are still outside this
+generation/rendering architecture. Further integrations must adapt to the
+authority boundary rather than reintroducing completed-chunk scanning.

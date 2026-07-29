@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
-import static com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.currentVersion;
 
 /**
  * Sends event-based telemetry payloads (server lifecycle and player login/logout).
@@ -61,7 +61,7 @@ public final class EventTelemetryReporter {
         payload.addProperty("schema_version", TelemetryPayloads.SCHEMA_VERSION);
         payload.addProperty("event_type", eventType);
         payload.addProperty("timestamp", Instant.now().toString());
-        payload.addProperty("mod_version", VERSION);
+        payload.addProperty("mod_version", currentVersion());
         payload.addProperty("server_online_players", server.getPlayerCount());
         payload.addProperty("server_max_players", server.getMaxPlayers());
 

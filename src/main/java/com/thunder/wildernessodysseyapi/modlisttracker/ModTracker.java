@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.modlisttracker;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.currentVersion;
 
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.moddiscovery.ModInfo;
@@ -36,6 +37,7 @@ public class ModTracker {
         LOGGER.info("Starting mod list change check.");
         Map<String, String> currentMods = getCurrentMods();
         ModTrackingHistory history = loadHistory();
+        String packVersion = currentVersion();
         Map<String, String> previousMods = Collections.emptyMap();
         if (history != null && history.lastVersion != null) {
             previousMods = history.versions.getOrDefault(history.lastVersion, Collections.emptyMap());
@@ -43,8 +45,8 @@ public class ModTracker {
 
         versionChange = "";
         if (history != null && history.lastVersion != null &&
-                !Objects.equals(history.lastVersion, com.thunder.wildernessodysseyapi.core.ModConstants.VERSION)) {
-            versionChange = "Pack updated from " + history.lastVersion + " to " + com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
+                !Objects.equals(history.lastVersion, packVersion)) {
+            versionChange = "Pack updated from " + history.lastVersion + " to " + packVersion;
             LOGGER.info(versionChange);
         }
 
@@ -78,10 +80,10 @@ public class ModTracker {
         // Preserve every observed mod id so removed mods can still be matched to their leftover config files.
         history.knownModIds.addAll(previousMods.keySet());
         history.knownModIds.addAll(currentMods.keySet());
-        history.versionTimestamps.put(com.thunder.wildernessodysseyapi.core.ModConstants.VERSION, System.currentTimeMillis());
+        history.versionTimestamps.put(packVersion, System.currentTimeMillis());
         pruneHistory(history);
-        history.lastVersion = com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
-        history.versions.put(com.thunder.wildernessodysseyapi.core.ModConstants.VERSION, currentMods);
+        history.lastVersion = packVersion;
+        history.versions.put(packVersion, currentMods);
         saveHistory(history);
         LOGGER.info("Mod list change check completed.");
     }

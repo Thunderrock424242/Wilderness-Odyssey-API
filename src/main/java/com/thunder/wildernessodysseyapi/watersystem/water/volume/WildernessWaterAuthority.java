@@ -254,7 +254,8 @@ public final class WildernessWaterAuthority {
 
     /** Returns the fixed-point water amount stored or represented at this cell. */
     public static int getWaterAmount(Level level, BlockPos pos) {
-        return sample(level, pos).volumeUnits();
+        CellAuthority authority = sample(level, pos);
+        return authority.water() && authority.authorityOwned() ? authority.volumeUnits() : 0;
     }
 
     /** Returns whether this position is represented as a full Wilderness water cell. */
@@ -400,7 +401,7 @@ public final class WildernessWaterAuthority {
         return amount * VOLUME_PER_VANILLA_LEVEL;
     }
 
-    private static CellAuthority fromCanonical(
+    static CellAuthority fromCanonical(
             WaterVolumeChunk.WaterCell canonical,
             boolean tagWater,
             boolean plainProjection
@@ -423,6 +424,27 @@ public final class WildernessWaterAuthority {
                     plainProjection,
                     false,
                     false,
+                    false
+            );
+        }
+        if (canonical.displacementReservoir()) {
+            float fillFraction = Math.max(0.0f, Math.min(1.0f, canonical.fillFraction()));
+            return new CellAuthority(
+                    WaterSource.DISPLACEMENT_RESERVOIR,
+                    false,
+                    true,
+                    true,
+                    false,
+                    volumeUnits,
+                    fillFraction,
+                    0.0f,
+                    canonical.velocityX(),
+                    canonical.velocityY(),
+                    canonical.velocityZ(),
+                    tagWater,
+                    plainProjection,
+                    false,
+                    canonical.imported(),
                     false
             );
         }
@@ -542,6 +564,8 @@ public final class WildernessWaterAuthority {
         CANONICAL,
         /** Canonical chunk volume tracks hosted water inside another block. */
         CANONICAL_HOSTED,
+        /** Conserved displacement volume is hidden behind a solid and is not occupiable water. */
+        DISPLACEMENT_RESERVOIR,
         /** Sparse runtime state intentionally suppresses a generated baseline cell. */
         SPARSE_DRY_OVERRIDE,
         /** Compact world-generation metadata owns this matching physical fluid cell. */
@@ -600,7 +624,10 @@ public final class WildernessWaterAuthority {
 
         /** Returns true when this sample is a full non-hosted visible surface. */
         public boolean fullSurfaceWater() {
-            return volumeUnits >= MIN_FULL_VOLUME_UNITS && !hostedWater;
+            return water
+                    && authorityOwned
+                    && volumeUnits >= MIN_FULL_VOLUME_UNITS
+                    && !hostedWater;
         }
 
         /** Returns a compact three-dimensional velocity magnitude. */

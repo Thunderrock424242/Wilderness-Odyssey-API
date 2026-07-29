@@ -31,7 +31,6 @@ import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
-import static com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
 
 /**
  * Wires the Wilderness Odyssey API modules into NeoForge.
@@ -43,6 +42,8 @@ import static com.thunder.wildernessodysseyapi.core.ModConstants.VERSION;
 @Mod(MOD_ID)
 public final class WildernessOdysseyAPIMainModClass {
 
+    private final ModContainer container;
+
     /**
      * Creates the mod and registers its NeoForge integration points.
      *
@@ -50,10 +51,11 @@ public final class WildernessOdysseyAPIMainModClass {
      * @param container the active mod container used for config registration
      */
     public WildernessOdysseyAPIMainModClass(IEventBus modEventBus, ModContainer container) {
+        this.container = container;
         LOGGER.info("Initializing Wilderness Odyssey API and mod-conflict tracking");
 
         WildernessWaterRules.bootstrap();
-        WaterCompatibilityRegistry.bootstrap();
+        WaterCompatibilityRegistry.bootstrap(modEventBus);
 
         // Mod-bus listeners handle lifecycle work that NeoForge runs during startup.
         modEventBus.addListener(this::commonSetup);
@@ -79,7 +81,7 @@ public final class WildernessOdysseyAPIMainModClass {
             }
             LOGGER.info("Wilderness Odyssey API setup complete");
         });
-        LOGGER.info("Mod pack version: {}", VERSION);
+        LOGGER.info("Mod pack version: {}", container.getModInfo().getVersion());
     }
 
     // Adds the mod's utility items only when NeoForge is building the matching vanilla tab.

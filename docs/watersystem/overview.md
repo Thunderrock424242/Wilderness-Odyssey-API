@@ -68,9 +68,16 @@ lakes, aquifers, and springs. `WaterVolumeChunk` remains sparse and stores only
 locally disturbed or simulated cells. Disturbing generated water materializes a
 bounded neighborhood; an entire generated body is never expanded or ticked.
 
+Solid placement first moves canonical volume into loaded neighboring capacity.
+If a completely enclosed placement has nowhere to send all of its water, the
+remainder is persisted as a non-rendered displacement reservoir behind the
+solid. Breaking or otherwise exposing that cell wakes the reservoir so the
+same units can re-enter normal flow. This prevents sealed placements from
+silently deleting water without presenting hidden volume as swimmable or
+machine-extractable fluid.
+
 Previously generated chunks that still contain vanilla water are intentionally
-left unchanged. Existing-world conversion and compatibility behavior are a
-separate development phase.
+left unchanged. The runtime does not reinterpret or scan old vanilla oceans.
 
 ## Client snapshots
 
@@ -117,6 +124,27 @@ vertices. `WaterSurfaceEquation` mirrors the visible surface calculation for
 `ClientWaterImmersion`, while `UnderwaterOpticsModel` smooths near-plane entry
 and exit transitions.
 
+The active vertex shader applies horizontal as well as vertical Gerstner
+displacement with analytic tangents. Sparse canonical currents advect surface
+detail, while a bounded set of tick-aged boat wakes and impacts deforms the
+surface without rebuilding chunk meshes. Depth and wet-boundary metadata drive
+shallow-water foam and breaking cues. That shoreline cue is a deterministic
+client snapshot approximation; the separate server shoreline grid is not
+networked to the renderer.
+
+## Entity hydrodynamics
+
+Boats, items, and living entities use the same `WaterBuoyancyProvider` boundary.
+Four footprint corners plus a motion-biased leading sample resolve partial hull
+contact. The logical server converts the resulting submerged fraction, current,
+body dimensions, and approximate mass into bounded buoyancy and
+fluid-relative drag. Shoreline and local SPH velocity can contribute to the
+same current, while the client owns only visual boat tilt and wake effects.
+
+Global buoyancy, drag, and added-velocity caps are configurable. The force path
+uses the cached entity-water state as a dry fast path, so ordinary land mobs do
+not perform five authority samples every tick.
+
 ## Diagnostics
 
 `WaterRenderDiagnostics` tracks visible and culled mesh groups, vertices,
@@ -141,17 +169,35 @@ predicates recognize generated Wilderness water. The Minecraft 1.21.1 singular
 `tags/fluid/water.json` resource also keeps generic in-water checks working for
 the custom source and flowing fluids without converting waterlogged hosts.
 
-Buckets, boats, unrelated mob mechanics, structures, waterlogging replacement,
-other mods, external fluid APIs, and existing-world conversion remain outside
-the current core architecture. Vanilla or externally tagged water can be
-reported by diagnostics, but it does not become Wilderness-owned automatically.
+The namespaced liquid block exposes a server-only NeoForge fluid handler backed
+directly by `WaterAccess`. Negotiation is simulated before execution, and the
+4,096 authority-unit to 1,000 mB conversion plans transfers from absolute tank
+levels so repeated small operations cannot create volume. Direct projected
+block writes used by open-ended machines are reconciled at a guarded
+`Level#setBlock` boundary; canonical projection writes are explicitly excluded
+from that hook.
+
+Create 6.0.10 receives a narrow adapter for its exact `FluidHelper.isWater`
+predicate. The adapter recognizes only the Wilderness source and flowing
+registry entries, and only when compatibility is enabled. The mod does not
+globally impersonate `Fluids.WATER`, so other exact-identity mods still require
+their own focused adapter. Mods that use `#minecraft:water` or the standard
+NeoForge fluid capability work through their normal contracts.
+
+Vanilla structures, full waterlogging replacement, direct chunk-internal writes
+from other mods, and existing-world conversion remain outside this boundary.
+Vanilla or externally tagged water can be reported by diagnostics, but it does
+not become Wilderness-owned automatically.
 
 ## Validation
 
 The production GameTests exercise real noise generation, `ProtoChunk` writes,
 flowing-state preservation, waterlogged-host exclusion, spring placement,
-generated metadata, and attachment serialization. Unit tests cover compact span
-editing, sparse dry overrides, and immutable snapshot precedence.
+generated metadata, attachment serialization, fluid-handler transactions, and
+guarded projection writes. Unit tests cover compact span editing, conserved
+solid displacement, shoreline scheduler fairness, multi-point buoyancy,
+hydrodynamic force bounds, lossless mB conversion, current/reservoir snapshots,
+vertex metadata, transient impulses, and the CPU/GLSL Gerstner mirror.
 
 Use JDK 21 and the Gradle wrapper:
 
@@ -164,5 +210,8 @@ Use JDK 21 and the Gradle wrapper:
 
 For a manual client pass, create a new world and inspect oceans, rivers, lakes,
 aquifers, springs, frozen shores, chunk frontiers, and repeated surface
-crossings under each water quality profile. Existing chunks containing vanilla
-water are not a valid direct-generation test case.
+crossings under each water quality profile. Drive a boat across crests and
+currents, drop items and mobs into shallow and deep water, place and break a
+solid in an enclosed full cell, and transfer water through a NeoForge/Create
+machine in both directions. Existing chunks containing vanilla water are not a
+valid direct-generation test case.

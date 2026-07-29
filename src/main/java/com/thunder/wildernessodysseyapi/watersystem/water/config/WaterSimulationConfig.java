@@ -17,9 +17,14 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_VANILLA_BUCKET_COMPAT;
     public static final ModConfigSpec.BooleanValue ENABLE_VANILLA_BOAT_COMPAT;
     public static final ModConfigSpec.BooleanValue ENABLE_ENTITY_WATER_COMPAT;
+    public static final ModConfigSpec.BooleanValue ENABLE_ENTITY_HYDRODYNAMICS;
+    public static final ModConfigSpec.DoubleValue ENTITY_BUOYANCY_SCALE;
+    public static final ModConfigSpec.DoubleValue ENTITY_DRAG_SCALE;
+    public static final ModConfigSpec.DoubleValue ENTITY_MAX_ADDED_VELOCITY_SCALE;
     public static final ModConfigSpec.BooleanValue ENABLE_FISHING_COMPAT;
     public static final ModConfigSpec.BooleanValue ENABLE_STRUCTURE_WATER_MARKERS;
     public static final ModConfigSpec.BooleanValue ENABLE_FLUID_HANDLER_COMPAT;
+    public static final ModConfigSpec.BooleanValue ENABLE_CREATE_WATER_COMPAT;
     public static final ModConfigSpec.IntValue LOCAL_FLOW_CELLS_PER_TICK;
     public static final ModConfigSpec.DoubleValue LOCAL_FLOW_SLEEP_SPEED;
     public static final ModConfigSpec.IntValue LARGE_BODY_CACHE_MAX_COLUMNS;
@@ -49,6 +54,18 @@ public final class WaterSimulationConfig {
         ENABLE_ENTITY_WATER_COMPAT = builder
                 .comment("Maintain centralized custom-water contact, submersion, eye, depth, current, and transition state for entities.")
                 .define("enableEntityWaterCompat", true);
+        ENABLE_ENTITY_HYDRODYNAMICS = builder
+                .comment("Apply server-authoritative multi-point buoyancy, fluid-relative drag, currents, and bounded SPH/shoreline forces to boats, items, and living entities.")
+                .define("enableEntityHydrodynamics", true);
+        ENTITY_BUOYANCY_SCALE = builder
+                .comment("Global scale for added displacement buoyancy. Vanilla movement remains responsible for each entity's baseline gravity and swimming behavior.")
+                .defineInRange("entityBuoyancyScale", 1.0, 0.0, 2.0);
+        ENTITY_DRAG_SCALE = builder
+                .comment("Global scale for fluid-relative horizontal and vertical drag from authoritative currents.")
+                .defineInRange("entityDragScale", 1.0, 0.0, 2.0);
+        ENTITY_MAX_ADDED_VELOCITY_SCALE = builder
+                .comment("Scales the per-tick safety cap on velocity added by custom hydrodynamics.")
+                .defineInRange("entityMaxAddedVelocityScale", 1.0, 0.25, 2.0);
         ENABLE_FISHING_COMPAT = builder
                 .comment("Enable future fishing-bobber integration. No fishing adapter is registered yet.")
                 .define("enableFishingCompat", false);
@@ -56,8 +73,11 @@ public final class WaterSimulationConfig {
                 .comment("Enable future one-time structure water-marker conversion. No marker adapter is registered yet.")
                 .define("enableStructureWaterMarkers", false);
         ENABLE_FLUID_HANDLER_COMPAT = builder
-                .comment("Enable future NeoForge fluid-handler translation. No machine bridge is registered yet.")
-                .define("enableFluidHandlerCompat", false);
+                .comment("Expose canonical water through a transactional NeoForge block-fluid capability and reconcile guarded world-fluid writes. Disable this to make all machine bridges read-only/inert.")
+                .define("enableFluidHandlerCompat", true);
+        ENABLE_CREATE_WATER_COMPAT = builder
+                .comment("Let Create recognize Wilderness source/flowing fluid as water and route open-pipe world transfers through the guarded fluid bridge. Requires enableFluidHandlerCompat.")
+                .define("enableCreateWaterCompat", true);
         LOCAL_FLOW_CELLS_PER_TICK = builder
                 .comment("Maximum active detailed water cells processed per server tick. Sleeping cells are skipped until nearby water changes.")
                 .defineInRange("localFlowCellsPerTick", 128, 16, 1024);
@@ -116,6 +136,26 @@ public final class WaterSimulationConfig {
         return wildernessWaterEnabled() && ENABLE_ENTITY_WATER_COMPAT.get();
     }
 
+    /** Returns whether server-authoritative entity hydrodynamic forces are active. */
+    public static boolean entityHydrodynamicsEnabled() {
+        return entityWaterCompatEnabled() && ENABLE_ENTITY_HYDRODYNAMICS.get();
+    }
+
+    /** Returns the configured multiplier for displacement buoyancy. */
+    public static double entityBuoyancyScale() {
+        return ENTITY_BUOYANCY_SCALE.get();
+    }
+
+    /** Returns the configured multiplier for fluid-relative drag. */
+    public static double entityDragScale() {
+        return ENTITY_DRAG_SCALE.get();
+    }
+
+    /** Returns the configured multiplier for the per-tick hydrodynamic safety cap. */
+    public static double entityMaxAddedVelocityScale() {
+        return ENTITY_MAX_ADDED_VELOCITY_SCALE.get();
+    }
+
     /** Returns whether the future fishing adapter is enabled. */
     public static boolean fishingCompatEnabled() {
         return wildernessWaterEnabled() && ENABLE_FISHING_COMPAT.get();
@@ -126,9 +166,14 @@ public final class WaterSimulationConfig {
         return wildernessWaterEnabled() && ENABLE_STRUCTURE_WATER_MARKERS.get();
     }
 
-    /** Returns whether the future NeoForge fluid-handler bridge is enabled. */
+    /** Returns whether the transactional NeoForge fluid-handler bridge is enabled. */
     public static boolean fluidHandlerCompatEnabled() {
         return wildernessWaterEnabled() && ENABLE_FLUID_HANDLER_COMPAT.get();
+    }
+
+    /** Returns whether Create-local water recognition and world transfer reconciliation are enabled. */
+    public static boolean createWaterCompatEnabled() {
+        return fluidHandlerCompatEnabled() && ENABLE_CREATE_WATER_COMPAT.get();
     }
 
     /** Returns the active local-cell flow budget for one server tick. */

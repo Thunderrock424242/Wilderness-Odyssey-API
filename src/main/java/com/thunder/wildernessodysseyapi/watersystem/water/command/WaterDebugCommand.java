@@ -239,11 +239,13 @@ public final class WaterDebugCommand {
         source.sendSuccess(() -> Component.literal("WO water compatibility"), false);
         source.sendSuccess(() -> Component.literal("  flags: entity="
                 + onOff(WaterSimulationConfig.entityWaterCompatEnabled())
+                + ", hydrodynamics=" + onOff(WaterSimulationConfig.entityHydrodynamicsEnabled())
                 + ", bucket=" + onOff(WaterSimulationConfig.vanillaBucketCompatEnabled())
                 + ", boat=" + onOff(WaterSimulationConfig.vanillaBoatCompatEnabled())
                 + ", fishing=" + onOff(WaterSimulationConfig.fishingCompatEnabled())
                 + ", structures=" + onOff(WaterSimulationConfig.structureWaterMarkersEnabled())
-                + ", fluidHandlers=" + onOff(WaterSimulationConfig.fluidHandlerCompatEnabled())), false);
+                + ", fluidHandlers=" + onOff(WaterSimulationConfig.fluidHandlerCompatEnabled())
+                + ", create=" + onOff(WaterSimulationConfig.createWaterCompatEnabled())), false);
         for (WaterCompatibilityRegistry.AdapterStatus status : WaterCompatibilityRegistry.statuses()) {
             source.sendSuccess(() -> Component.literal("  " + status.id()
                     + ": level=" + status.compatibilityLevel()

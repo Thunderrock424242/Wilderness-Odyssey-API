@@ -22,6 +22,17 @@ public interface WaterAccess {
     /** Returns whether authority-owned water occupies this world position. */
     boolean isWaterAt(Level level, Vec3 position);
 
+    /**
+     * Returns authority units at this block, or zero when Wilderness does not own it.
+     *
+     * <p>The default keeps third-party {@code WaterAccess} implementations
+     * binary-compatible; implementations that expose mutable volume should
+     * override it with their authoritative read.</p>
+     */
+    default long getWaterUnits(Level level, BlockPos position) {
+        return 0L;
+    }
+
     /** Returns whether the bounds intersect the custom surface at their center. */
     boolean isSubmerged(Level level, AABB bounds);
 

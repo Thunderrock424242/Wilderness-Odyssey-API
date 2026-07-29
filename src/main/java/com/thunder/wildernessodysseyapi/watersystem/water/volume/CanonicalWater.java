@@ -200,7 +200,9 @@ public final class CanonicalWater {
      * canonical storage without projecting air over the newly placed block. The
      * volume is then pushed into loaded side cells first. If those cannot accept
      * water, nearby upward cells receive it, which visually reads as the local
-     * surface level rising around the obstruction.</p>
+     * surface level rising around the obstruction. Any volume that still cannot
+     * move is retained as a non-projected canonical residual at the solid cell;
+     * later terrain updates can release it without creating or deleting water.</p>
      *
      * @return the number of fixed-point water units successfully moved
      */
@@ -219,9 +221,9 @@ public final class CanonicalWater {
             return 0;
         }
 
-        if (getTracked(level, pos) != null) {
-            set(level, pos, WaterVolumeChunk.WaterCell.EMPTY, false, false);
-        }
+        // Remove the source before writing destinations so block callbacks can
+        // never observe both the original cell and its displaced copies.
+        set(level, pos, WaterVolumeChunk.WaterCell.EMPTY, false, false);
 
         int remaining = source.volumeUnits();
         int moved = 0;
@@ -248,15 +250,50 @@ public final class CanonicalWater {
         }
 
         if (remaining > 0) {
-            moved += distributeDisplacedVolume(
+            int fallbackMoved = distributeDisplacedVolume(
                     level,
                     pos,
                     source,
                     remaining,
                     fallbackDisplacementCandidates(pos)
             );
+            remaining -= fallbackMoved;
+            moved += fallbackMoved;
+        }
+
+        // A completely surrounded block still owns its undisplaced volume. It
+        // stays hidden from the block projection while the solid occupies the
+        // cell and is woken by the normal terrain-change scheduling path.
+        WaterVolumeChunk.WaterCell residual = retainedDisplacementResidual(source, moved);
+        if (residual.volumeUnits() > 0) {
+            set(level, pos, residual, false, false);
         }
         return moved;
+    }
+
+    static WaterVolumeChunk.WaterCell retainedDisplacementResidual(
+            WaterVolumeChunk.WaterCell source,
+            int movedUnits
+    ) {
+        int retainedUnits = Math.max(0, source.volumeUnits() - Math.max(0, movedUnits));
+        if (retainedUnits <= 0) {
+            return WaterVolumeChunk.WaterCell.EMPTY;
+        }
+
+        int residualFlags = source.flags()
+                & ~WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED
+                & ~WaterVolumeChunk.FLAG_SLEEPING
+                & ~WaterVolumeChunk.FLAG_DRY_OVERRIDE
+                & ~WaterVolumeChunk.FLAG_HOSTED_WATER;
+        residualFlags |= WaterVolumeChunk.FLAG_DISPLACEMENT_RESERVOIR;
+        return new WaterVolumeChunk.WaterCell(
+                retainedUnits,
+                source.velocityX(),
+                source.velocityY(),
+                source.velocityZ(),
+                residualFlags,
+                source.temperatureMilliKelvin()
+        ).sanitized();
     }
 
     /** Adds bounded volume and returns the amount accepted by the target cell. */
@@ -428,7 +465,21 @@ public final class CanonicalWater {
 
     /** Polls one active cell for the finite-volume ticker. */
     public static BlockPos pollActive(ServerLevel level) {
-        return queue(level).poll();
+        BlockPos next = queue(level).poll();
+        while (next != null) {
+            WaterVolumeChunk.WaterCell tracked = getTracked(level, next);
+            if (tracked == null
+                    || !tracked.displacementReservoir()
+                    || canAcceptVolume(level, next)) {
+                return next;
+            }
+
+            // Placement callbacks may enqueue a hidden reservoir while its
+            // solid still exists. Drop that attempt; a later terrain callback
+            // queues it again after the cell becomes occupiable.
+            next = queue(level).poll();
+        }
+        return null;
     }
 
     /** Releases runtime queues when a server dimension unloads. */

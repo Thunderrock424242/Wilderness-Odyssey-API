@@ -9,9 +9,12 @@ import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWater
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -33,6 +36,7 @@ public final class ShorelineWaterManager {
     private static final int MAX_REGIONS_PER_LEVEL = 18;
 
     private final Map<ServerLevel, Map<Long, Region>> regionsByLevel = new IdentityHashMap<>();
+    private final Map<ServerLevel, Integer> nextRegionByLevel = new IdentityHashMap<>();
 
     private ShorelineWaterManager() {
     }
@@ -72,20 +76,36 @@ public final class ShorelineWaterManager {
             }
         }
 
-        int updatesRemaining = Math.max(0, WaterSimulationConfig.waterBodyUpdatesPerTick());
+        // Expiry is independent of the simulation budget so stale entries do
+        // not block active regions from entering the round-robin schedule.
         Iterator<Region> iterator = regions.values().iterator();
         while (iterator.hasNext()) {
             Region region = iterator.next();
             if (gameTime - region.lastSeenTick > REGION_EXPIRY_TICKS) {
                 iterator.remove();
-                continue;
             }
-            if (updatesRemaining <= 0) {
-                continue;
-            }
-            region.tick(level, gameTime);
-            updatesRemaining--;
         }
+
+        if (regions.isEmpty()) {
+            nextRegionByLevel.remove(level);
+            return;
+        }
+
+        // HashMap iteration order is not a scheduler. Sort stable region keys
+        // and rotate the starting index so every active shoreline receives a
+        // bounded update even when the per-tick budget is smaller than the set.
+        List<Map.Entry<Long, Region>> activeRegions = new ArrayList<>(regions.entrySet());
+        activeRegions.sort(Comparator.comparingLong(Map.Entry::getKey));
+        int cursor = nextRegionByLevel.getOrDefault(level, 0);
+        int[] updateOrder = roundRobinOrder(
+                activeRegions.size(),
+                cursor,
+                Math.max(0, WaterSimulationConfig.waterBodyUpdatesPerTick())
+        );
+        for (int index : updateOrder) {
+            activeRegions.get(index).getValue().tick(level, gameTime);
+        }
+        nextRegionByLevel.put(level, Math.floorMod(cursor + updateOrder.length, activeRegions.size()));
     }
 
     /**
@@ -113,6 +133,21 @@ public final class ShorelineWaterManager {
     /** Clears runtime regions for an unloading dimension. */
     public void clearLevel(ServerLevel level) {
         regionsByLevel.remove(level);
+        nextRegionByLevel.remove(level);
+    }
+
+    static int[] roundRobinOrder(int regionCount, int cursor, int updateBudget) {
+        if (regionCount <= 0 || updateBudget <= 0) {
+            return new int[0];
+        }
+
+        int updateCount = Math.min(regionCount, updateBudget);
+        int start = Math.floorMod(cursor, regionCount);
+        int[] order = new int[updateCount];
+        for (int offset = 0; offset < updateCount; offset++) {
+            order[offset] = (start + offset) % regionCount;
+        }
+        return order;
     }
 
     /** Describes one shoreline-grid sample in world units. */

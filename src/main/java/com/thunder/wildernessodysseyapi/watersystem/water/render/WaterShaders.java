@@ -3,8 +3,11 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import net.minecraft.client.Minecraft;
@@ -35,6 +38,9 @@ public final class WaterShaders {
     private static Method externalShaderApiGetInstance;
     private static Method externalShaderApiIsPackInUse;
     private static boolean externalShaderApiFailureLogged;
+    private static final float[] GPU_IMPULSE_DATA =
+            new float[WaterSurfaceDisplacement.MAX_GPU_IMPULSES
+                    * WaterSurfaceDisplacement.GPU_IMPULSE_STRIDE];
 
     private WaterShaders() {
     }
@@ -109,6 +115,34 @@ public final class WaterShaders {
     }
 
     /** Updates uniforms consumed by the built-in optical water pass. */
+    public static void updateOceanUniforms(
+            float timeSeconds,
+            OceanSeaState.Sample seaState,
+            float dayTime
+    ) {
+        OceanSeaState.Sample safeState = seaState == null ? OceanSeaState.CALM : seaState;
+        updateOceanUniforms(
+                timeSeconds,
+                safeState.strength(),
+                safeState.windDirectionX(),
+                safeState.windDirectionZ(),
+                dayTime
+        );
+        if (oceanShader != null) {
+            updateSpectrumUniforms(
+                    safeState.spectrum(),
+                    safeState.windSpeed(),
+                    safeState.breakingStrength()
+            );
+        }
+    }
+
+    /**
+     * Updates legacy scalar sea-state callers that do not retain the complete spectrum.
+     *
+     * <p>The active coordinator uses the complete-state overload above. Dormant
+     * surface implementations retain this entry point for binary compatibility.</p>
+     */
     public static void updateOceanUniforms(
             float timeSeconds,
             float seaState,
@@ -204,17 +238,45 @@ public final class WaterShaders {
         oceanShader.safeGetUniform("GpuWaveStrength").set(
                 WaterSurfaceEquation.LEGACY_GPU_COMPLEMENT_SCALE
         );
-        updateWaveUniforms("Ocean", GerstnerWaveProfile.OCEAN);
-        updateWaveUniforms("River", GerstnerWaveProfile.RIVER);
-        updateWaveUniforms("Pond", GerstnerWaveProfile.POND);
+        WaveSpectrumState approximateSpectrum = new WaveSpectrumState(
+                0.72f + seaState * 1.02f,
+                0.50f + seaState * 1.85f,
+                windDirectionX,
+                windDirectionZ,
+                0.10f + seaState * 0.72f
+        );
+        updateSpectrumUniforms(
+                approximateSpectrum,
+                2.0f + seaState * 13.0f,
+                smoothStep(0.22f, 0.92f, seaState)
+        );
+        updateWaveUniforms(
+                "Ocean",
+                GerstnerWaveProfile.OCEAN,
+                configuredWaveLimit(WaterBodyClassifier.WaterType.OCEAN)
+        );
+        updateWaveUniforms(
+                "River",
+                GerstnerWaveProfile.RIVER,
+                configuredWaveLimit(WaterBodyClassifier.WaterType.RIVER)
+        );
+        updateWaveUniforms(
+                "Pond",
+                GerstnerWaveProfile.POND,
+                configuredWaveLimit(WaterBodyClassifier.WaterType.POND)
+        );
+        updateImpulseUniforms(minecraft.level, timeSeconds, cameraPosition.x, cameraPosition.z);
     }
 
-    // Existing meshes already contain their broad CPU Gerstner shape. These
-    // uniforms add a small continuous GPU complement now and can be raised to
-    // full strength when the stable snapshot mesh becomes the only geometry.
-    private static void updateWaveUniforms(String prefix, GerstnerWaveProfile profile) {
+    // Inactive components upload zero amplitude so GPU quality limits match
+    // boat/entity CPU sampling without branching in the vertex shader.
+    private static void updateWaveUniforms(
+            String prefix,
+            GerstnerWaveProfile profile,
+            int waveLimit
+    ) {
         for (int index = 0; index < 4; index++) {
-            boolean active = index < profile.waveCount;
+            boolean active = index < profile.waveCount && index < waveLimit;
             int profileIndex = active ? index : 0;
             float componentBlend = profile.waveCount <= 1
                     ? 0.0f
@@ -232,6 +294,62 @@ public final class WaterShaders {
                     componentBlend
             );
         }
+    }
+
+    private static int configuredWaveLimit(WaterBodyClassifier.WaterType type) {
+        return WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()
+                ? WaterRenderingConfig.waveTrainLimit(type)
+                : 0;
+    }
+
+    private static void updateSpectrumUniforms(
+            WaveSpectrumState spectrum,
+            float windSpeed,
+            float breakingStrength
+    ) {
+        oceanShader.safeGetUniform("SpectrumState").set(
+                spectrum.swellScale(),
+                spectrum.chopScale(),
+                spectrum.directionBlend(),
+                Math.max(0.0f, Math.min(1.0f, breakingStrength))
+        );
+        oceanShader.safeGetUniform("WindSpeed").set(Math.max(0.0f, windSpeed));
+    }
+
+    private static void updateImpulseUniforms(
+            net.minecraft.world.level.Level level,
+            float timeSeconds,
+            double cameraX,
+            double cameraZ
+    ) {
+        int count = WaterSurfaceDisplacement.writeGpuImpulses(
+                level,
+                timeSeconds * 20.0f,
+                cameraX,
+                cameraZ,
+                GPU_IMPULSE_DATA
+        );
+        oceanShader.safeGetUniform("ImpulseCount").set((float) count);
+        for (int index = 0; index < WaterSurfaceDisplacement.MAX_GPU_IMPULSES; index++) {
+            int offset = index * WaterSurfaceDisplacement.GPU_IMPULSE_STRIDE;
+            oceanShader.safeGetUniform("ImpulsePosition" + index).set(
+                    GPU_IMPULSE_DATA[offset],
+                    GPU_IMPULSE_DATA[offset + 1],
+                    GPU_IMPULSE_DATA[offset + 2],
+                    GPU_IMPULSE_DATA[offset + 3]
+            );
+            oceanShader.safeGetUniform("ImpulseShape" + index).set(
+                    GPU_IMPULSE_DATA[offset + 4],
+                    GPU_IMPULSE_DATA[offset + 5],
+                    GPU_IMPULSE_DATA[offset + 6],
+                    GPU_IMPULSE_DATA[offset + 7]
+            );
+        }
+    }
+
+    private static float smoothStep(float edge0, float edge1, float value) {
+        float t = Math.max(0.0f, Math.min(1.0f, (value - edge0) / (edge1 - edge0)));
+        return t * t * (3.0f - 2.0f * t);
     }
 
     /** Enables full GPU displacement for stable snapshot meshes with flat CPU topology. */

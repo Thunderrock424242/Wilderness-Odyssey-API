@@ -54,9 +54,10 @@ public class ChangelogAnnouncements {
         if (!announced.compareAndSet(false, true)) {
             return;
         }
-        boolean sent = ChangelogManager.sendChangelog(player, ModConstants.VERSION);
+        String currentVersion = ModConstants.currentVersion();
+        boolean sent = ChangelogManager.sendChangelog(player, currentVersion);
         if (sent) {
-            ChangelogManager.writeSeenFile(seenPath, ModConstants.VERSION);
+            ChangelogManager.writeSeenFile(seenPath, currentVersion);
         }
     }
 }

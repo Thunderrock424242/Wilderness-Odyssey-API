@@ -2,8 +2,8 @@ package com.thunder.wildernessodysseyapi.changelog.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.changelog.ChangelogManager;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 
@@ -27,7 +27,7 @@ public class ChangelogCommand {
                         })
                         .executes(ctx -> ChangelogManager.sendChangelog(ctx.getSource(),
                                 StringArgumentType.getString(ctx, "version"))))
-                .executes(ctx -> ChangelogManager.sendChangelog(ctx.getSource(), ModConstants.VERSION))
+                .executes(ctx -> ChangelogManager.sendChangelog(ctx.getSource(), ModConstants.currentVersion()))
         );
     }
 }

@@ -641,14 +641,18 @@ The common `ServerLevelLocalizedLightningMixin` wraps only the
 `isThundering()` query inside `ServerLevel.tickChunk`. It reports false while
 localized weather controls that dimension, preventing the preserved global
 weather state from producing duplicate or clear-region natural strikes. Other
-global rain/thunder consumers, channeled lightning, commands, and mod-created
-bolts are untouched.
+global rain/thunder consumers, channeled lightning, and mod-created bolts are
+untouched. Vanilla weather commands additionally bridge their resulting state
+and duration into the localized authority.
 
 ## Commands and diagnostics
 
 All weather commands require permission level 2:
 
 ```text
+/weather clear [duration]
+/weather rain [duration]
+/weather thunder [duration]
 /wilderness weather sample
 /wilderness weather cell
 /wilderness weather set humidity <0..1>
@@ -661,12 +665,24 @@ All weather commands require permission level 2:
 /wilderness weather dump
 ```
 
-`sample` reports the interpolated sample at the command source. `cell` reports
-the containing cell's revision/ticks and `ACTIVE`, `GRACE`, `PERSISTENT_STORM`,
-or `DORMANT` scheduling state. Scalar setters edit one cell. `force` and
-`clear` affect the local `3 x 3` cell area and immediately dirty persistence
-and client synchronization. `dump` summarizes retained and scheduled state.
-Normal play produces no weather log spam unless `debugLogging` is enabled.
+Vanilla remains responsible for parsing, permissions, duration defaults,
+global weather flags, and command feedback. After vanilla commits a clear,
+rain, or thunder command, `WeatherAuthority` mirrors that state across every
+retained and currently player-relevant Overworld cell. Cells that become
+player-relevant during the command receive the same state before their next
+snapshot. Autonomous atmospheric evolution pauses for the vanilla duration;
+rain and thunder clear when that duration expires, then normal simulation
+resumes. Vanilla rain becomes snow in atmospheric cells below the normal snow
+temperature threshold.
+
+The `/wilderness weather` commands remain localized diagnostics and testing
+controls. `sample` reports the interpolated sample at the command source.
+`cell` reports the containing cell's revision/ticks and `ACTIVE`, `GRACE`,
+`PERSISTENT_STORM`, or `DORMANT` scheduling state. Scalar setters edit one
+cell. `force` and `clear` affect the local `3 x 3` cell area and immediately
+dirty persistence and client synchronization. `dump` summarizes retained and
+scheduled state. Normal play produces no weather log spam unless
+`debugLogging` is enabled.
 
 ## Performance characteristics and risks
 
@@ -716,6 +732,14 @@ the vanilla global rain/thunder state continues to exist for compatibility.
 This is currently necessary because Riftfall systems, Riftfall client effects,
 several Rift entities, and other consumers still query global
 `isRaining`/`isThundering` state directly.
+
+Vanilla `/weather clear`, `/weather rain`, and `/weather thunder` are explicit
+global operator overrides in both compatibility modes. They update the
+localized Overworld for the same duration even when `SUPPRESS_GLOBAL` removes
+the vanilla flags on the following tick. This bridge is intentionally scoped to
+the vanilla command implementation; unrelated mods calling
+`ServerLevel.setWeatherParameters` directly do not silently overwrite the
+localized atmosphere.
 
 Position-aware vanilla rain has migrated in both compatibility modes.
 `Level.isRainingAt` now reads authoritative local rain and exposure, which
@@ -791,9 +815,16 @@ explicitly changes them; changing size resets atmospheric state.
    `/wilderness weather sample`, `/wilderness weather cell`, and
    `/wilderness weather dump`. Confirm the command values match the local F3
    sample within network quantization and the two-second client blend.
-2. **Verify rain and snow rendering.** Run
-   `/wilderness weather force rain`; confirm local rain quads, particles,
-   precipitation sounds, sky darkening, air fog, and cloud cover. Run
+2. **Verify vanilla command integration.** Run `/weather rain 20s`; confirm
+   rain quads, particles, precipitation sounds, sky darkening, air fog, and
+   cloud cover around every Overworld player. Move into a newly relevant cell
+   during the duration and confirm it receives the same rain. In a cold
+   atmospheric cell, confirm the command produces snow instead. Run
+   `/weather thunder 20s` and confirm the local sample becomes
+   lightning-eligible. Run `/weather clear` and confirm precipitation stops
+   after synchronization and client blending. Then run
+   `/wilderness weather force rain`; confirm it remains a local `3 x 3` test
+   control. Run
    `/wilderness weather force snow`; confirm snow replaces rain. Run
    `/wilderness weather clear` and confirm both stop after synchronization and
    blending. Walk across the forced-cell edge and confirm nearby rainy columns
@@ -850,9 +881,10 @@ explicitly changes them; changing size resets atmospheric state.
    development check.
    Confirm a real bolt appears only beneath the local storm, a lightning rod
    attracts it, copper and entities receive vanilla effects, and no new chunk
-   tickets appear. Clear the local weather, run `/weather thunder`, and confirm
-   preserved global thunder no longer creates natural strikes in the locally
-   clear region. Restore the default chance afterward.
+   tickets appear. Run `/weather thunder 20s` and confirm the same localized
+   lightning path becomes active around all Overworld players. Run
+   `/weather clear` and confirm natural strikes stop after the synchronized
+   clear state arrives. Restore the default chance afterward.
 10. **Verify localized gameplay rain.** Run `/weather clear`, force local rain,
     and compare an open-sky test area with a roofed area and a neighboring clear
     cell. Verify exposed entity/block fire extinguishes while covered or clear

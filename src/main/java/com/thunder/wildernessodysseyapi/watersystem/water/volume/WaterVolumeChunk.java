@@ -34,6 +34,8 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
     public static final int FLAG_GENERATED_OVERRIDE = 1 << 4;
     /** Zero-volume override that keeps drained generated water from reappearing through metadata. */
     public static final int FLAG_DRY_OVERRIDE = 1 << 5;
+    /** Conserved volume hidden behind a solid until terrain exposes the cell. */
+    public static final int FLAG_DISPLACEMENT_RESERVOIR = 1 << 6;
     /** Primitive integers encoded for each persisted or networked cell. */
     public static final int SERIALIZED_CELL_STRIDE = 7;
 
@@ -247,6 +249,11 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
         /** Returns whether this detailed local cell is asleep until neighboring water changes. */
         public boolean sleeping() {
             return (flags & FLAG_SLEEPING) != 0;
+        }
+
+        /** Returns whether solid displacement has temporarily hidden this conserved volume. */
+        public boolean displacementReservoir() {
+            return (flags & FLAG_DISPLACEMENT_RESERVOIR) != 0;
         }
 
         /** Returns a copy with additional provenance flags preserved through synchronization. */

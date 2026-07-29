@@ -1,27 +1,24 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.entity;
 
-import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
-import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.shore.ShorelineWaterManager;
-import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.BuoyancySample;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla.EntityWaterCompat;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterSurfaceDisplacement;
+import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveAnimator;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
-import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
-import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
-import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
-import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
@@ -29,14 +26,19 @@ import net.neoforged.neoforge.event.tick.EntityTickEvent;
 /**
  * Couples boats and floating entities to the shared wave surface.
  *
- * <p>The client computes only boat pitch, roll, and render bobbing. Horizontal
- * motion is applied on the logical server from the deterministic world-time
- * wave field, preventing client movement from fighting server corrections.</p>
+ * <p>The client computes only boat pitch, roll, and render bobbing. The logical
+ * server consumes the shared authority sample to integrate buoyancy and
+ * fluid-relative drag, preventing client movement from fighting corrections.
+ * Dry entities retain their vanilla movement unchanged.</p>
  */
 @EventBusSubscriber(modid = "wildernessodysseyapi")
 public final class WaveEntityPhysics {
 
     private static final float TICKS_PER_SECOND = 20.0f;
+    private static Level tuningLevel;
+    private static long tuningGameTime = Long.MIN_VALUE;
+    private static HydrodynamicForces.RuntimeTuning cachedRuntimeTuning =
+            HydrodynamicForces.RuntimeTuning.DEFAULT;
 
     private WaveEntityPhysics() {
     }
@@ -57,6 +59,28 @@ public final class WaveEntityPhysics {
             return;
         }
 
+        if (!(entity instanceof Boat)
+                && !(entity instanceof ItemEntity)
+                && !(entity instanceof LivingEntity)) {
+            return;
+        }
+        if (level.isClientSide() && entity instanceof ItemEntity) {
+            return;
+        }
+        if (!level.isClientSide()
+                && entity instanceof Boat
+                && !WaterSimulationConfig.vanillaBoatCompatEnabled()) {
+            return;
+        }
+        HydrodynamicForces.RuntimeTuning runtimeTuning = level.isClientSide()
+                ? HydrodynamicForces.RuntimeTuning.DEFAULT
+                : runtimeTuning(level);
+        if (!level.isClientSide() && !runtimeTuning.enabled()) {
+            return;
+        }
+
+        boolean cachedTouchingWater = (entity instanceof Boat boat && boat.isInWater())
+                || EntityWaterCompat.stateFor(entity).touchingWater();
         var mobileWater = SPHSimulationManager.get().sampleAt(
                 level,
                 entity.getX(),
@@ -64,25 +88,20 @@ public final class WaveEntityPhysics {
                 entity.getZ()
         );
 
-        if (entity instanceof Boat boat
-                && (!WaterSimulationConfig.vanillaBoatCompatEnabled()
-                || (!EntityWaterCompat.stateFor(boat).touchingWater() && !mobileWater.wet()))) {
-            if (level.isClientSide()) {
-                BoatTiltStore.remove(boat.getId());
-            }
-            return;
-        }
-        if (!EntityWaterCompat.stateFor(entity).touchingWater()
-                && !mobileWater.wet()
-                && !(entity instanceof Boat)) {
-            return;
-        }
-
-        WaterBodyClassifier.WaterType type =
-                WaterBodyClassifier.classify(level, entity.blockPosition());
-
-        // Rendering state is client-owned; gameplay movement is server-owned.
+        // Rendering retains the cached compatibility state; authoritative
+        // movement samples the shared water service directly on the server.
         if (level.isClientSide()) {
+            if (entity instanceof Boat boat
+                    && (!WaterSimulationConfig.vanillaBoatCompatEnabled()
+                    || (!cachedTouchingWater && !mobileWater.wet()))) {
+                BoatTiltStore.remove(boat.getId());
+                return;
+            }
+            if (!cachedTouchingWater && !mobileWater.wet()) {
+                return;
+            }
+            WaterBodyClassifier.WaterType type =
+                    WaterBodyClassifier.classify(level, entity.blockPosition());
             if (entity instanceof Boat boat) {
                 updateBoatVisuals(boat, type);
                 WaterSurfaceDisplacement.spawnEntityWake(boat);
@@ -92,20 +111,30 @@ public final class WaveEntityPhysics {
             return;
         }
 
-        if (entity instanceof Boat boat) {
-            applyBoatForces(boat, type, level);
-        } else if (entity instanceof ItemEntity item) {
-            applyItemForces(item, type, level);
-        } else if (entity instanceof LivingEntity livingEntity) {
-            applyWadingForces(livingEntity, type, level);
+        if (!cachedTouchingWater && !mobileWater.wet()) {
+            return;
         }
 
-        if (mobileWater.wet()) {
-            entity.setDeltaMovement(entity.getDeltaMovement().add(
-                    mobileWater.velocityX() * 0.0025f,
-                    mobileWater.velocityY() * 0.0010f,
-                    mobileWater.velocityZ() * 0.0025f
-            ));
+        BuoyancySample buoyancy = cachedTouchingWater
+                ? WaterServices.buoyancy().sample(
+                        level,
+                        entity.getBoundingBox(),
+                        entity.getDeltaMovement()
+                )
+                : BuoyancySample.DRY;
+        if (!buoyancy.touchingWater() && !mobileWater.wet()) {
+            return;
+        }
+        if (buoyancy.touchingWater()) {
+            buoyancy = withLocalCurrents(level, entity, buoyancy, mobileWater);
+        }
+
+        if (entity instanceof Boat boat) {
+            applyBoatForces(boat, buoyancy, mobileWater, runtimeTuning);
+        } else if (entity instanceof ItemEntity item) {
+            applyItemForces(item, buoyancy, mobileWater, runtimeTuning);
+        } else if (entity instanceof LivingEntity livingEntity) {
+            applyLivingForces(livingEntity, buoyancy, mobileWater, runtimeTuning);
         }
     }
 
@@ -177,115 +206,152 @@ public final class WaveEntityPhysics {
         );
     }
 
-    // Server movement uses the same spectrum evaluated from authoritative time.
+    // Server movement consumes the same authority sample used by adapters.
 
-    private static void applyBoatForces(Boat boat, WaterBodyClassifier.WaterType type, Level level) {
-        float[] push = getServerPush(level, (float) boat.getX(), (float) boat.getZ(), type);
-
-        if (type == WaterBodyClassifier.WaterType.OCEAN) {
-            addTidalCurrent(level, push, 0.002f);
-            addShorelineFlow(level, push, boat.getX(), boat.getZ(), 0.0025f);
-        }
-
-        boat.setDeltaMovement(
-                boat.getDeltaMovement().x + push[0],
-                boat.getDeltaMovement().y,
-                boat.getDeltaMovement().z + push[1]
+    private static void applyBoatForces(
+            Boat boat,
+            BuoyancySample buoyancy,
+            SPHSimulationManager.MobileWaterSample mobileWater,
+            HydrodynamicForces.RuntimeTuning runtimeTuning
+    ) {
+        applyForces(
+                boat,
+                buoyancy,
+                mobileWater,
+                HydrodynamicForces.BOAT_PROFILE,
+                0,
+                runtimeTuning
         );
     }
 
-    private static void applyItemForces(ItemEntity item, WaterBodyClassifier.WaterType type, Level level) {
-        float[] push = getServerPush(level, (float) item.getX(), (float) item.getZ(), type);
-        if (type == WaterBodyClassifier.WaterType.OCEAN) {
-            addShorelineFlow(level, push, item.getX(), item.getZ(), 0.0015f);
-        }
-        item.setDeltaMovement(
-                item.getDeltaMovement().x + push[0] * 0.4f,
-                item.getDeltaMovement().y,
-                item.getDeltaMovement().z + push[1] * 0.4f
+    private static void applyItemForces(
+            ItemEntity item,
+            BuoyancySample buoyancy,
+            SPHSimulationManager.MobileWaterSample mobileWater,
+            HydrodynamicForces.RuntimeTuning runtimeTuning
+    ) {
+        applyForces(
+                item,
+                buoyancy,
+                mobileWater,
+                HydrodynamicForces.ITEM_PROFILE,
+                item.getItem().getCount(),
+                runtimeTuning
         );
     }
 
-    private static void applyWadingForces(
+    private static void applyLivingForces(
             LivingEntity entity,
-            WaterBodyClassifier.WaterType type,
-            Level level
+            BuoyancySample buoyancy,
+            SPHSimulationManager.MobileWaterSample mobileWater,
+            HydrodynamicForces.RuntimeTuning runtimeTuning
     ) {
-        if (type == WaterBodyClassifier.WaterType.POND || entity.isSwimming()) {
-            return;
-        }
-
-        float[] push = getServerPush(level, (float) entity.getX(), (float) entity.getZ(), type);
-        if (type == WaterBodyClassifier.WaterType.OCEAN) {
-            float tidalBoost = 1.0f + Math.abs(TideSystem.getTideRate(level)) * 0.5f;
-            push[0] *= tidalBoost;
-            push[1] *= tidalBoost;
-            addShorelineFlow(level, push, entity.getX(), entity.getZ(), 0.0012f);
-        }
-
-        entity.setDeltaMovement(
-                entity.getDeltaMovement().x + push[0],
-                entity.getDeltaMovement().y,
-                entity.getDeltaMovement().z + push[1]
+        applyForces(
+                entity,
+                buoyancy,
+                mobileWater,
+                HydrodynamicForces.LIVING_PROFILE,
+                0,
+                runtimeTuning
         );
     }
 
-    private static float[] getServerPush(
-            Level level,
-            float worldX,
-            float worldZ,
-            WaterBodyClassifier.WaterType type
+    private static void applyForces(
+            Entity entity,
+            BuoyancySample buoyancy,
+            SPHSimulationManager.MobileWaterSample mobileWater,
+            HydrodynamicForces.ForceProfile profile,
+            int payloadUnits,
+            HydrodynamicForces.RuntimeTuning runtimeTuning
     ) {
-        GerstnerWaveProfile profile = profileFor(type);
-        float timeSeconds = level.getGameTime() / TICKS_PER_SECOND;
-        WaveSpectrumState spectrum = type == WaterBodyClassifier.WaterType.OCEAN
-                ? OceanSeaState.sample(level, 0.0f).spectrum()
-                : WaveSpectrumState.NEUTRAL;
-        WaveSurfaceSample sample = profile.sampleAt(
-                worldX,
-                worldZ,
-                timeSeconds,
-                profile.waveCount,
-                spectrum
+        Vec3 delta = HydrodynamicForces.velocityDelta(
+                buoyancy,
+                entity.getBoundingBox(),
+                entity.getDeltaMovement(),
+                profile,
+                payloadUnits,
+                HydrodynamicForces.FIXED_DELTA_SECONDS,
+                runtimeTuning
         );
-        float[] push = new float[]{
-                sample.velocityX() * profile.entityPushStrength,
-                sample.velocityZ() * profile.entityPushStrength
-        };
-        int blockX = (int) Math.floor(worldX);
-        int blockZ = (int) Math.floor(worldZ);
-        int surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE, blockX, blockZ) - 1;
-        var volumeCell = CanonicalWater.get(level, new BlockPos(blockX, surfaceY, blockZ));
-        push[0] += volumeCell.velocityX() * 0.01f;
-        push[1] += volumeCell.velocityZ() * 0.01f;
-        return push;
+
+        // Mobile SPH water has no stable free surface for buoyancy, but its
+        // velocity still contributes drag when spray or a pour is the only hit.
+        if (!buoyancy.touchingWater() && mobileWater.wet()) {
+            delta = delta.add(HydrodynamicForces.dragOnlyVelocityDelta(
+                    mobileCurrent(mobileWater),
+                    entity.getBoundingBox(),
+                    entity.getDeltaMovement(),
+                    HydrodynamicForces.MOBILE_DRAG_FRACTION,
+                    profile,
+                    payloadUnits,
+                    HydrodynamicForces.FIXED_DELTA_SECONDS,
+                    runtimeTuning
+            ));
+        }
+
+        if (delta.lengthSqr() > 0.0) {
+            entity.setDeltaMovement(entity.getDeltaMovement().add(delta));
+        }
     }
 
-    private static void addTidalCurrent(Level level, float[] push, float strength) {
-        float tideRate = TideSystem.getTideRate(level);
-        float[] tidalDirection = TideSystem.getTidalCurrentDirection(level);
-        push[0] += tidalDirection[0] * tideRate * strength;
-        push[1] += tidalDirection[1] * tideRate * strength;
-    }
-
-    private static void addShorelineFlow(
+    private static BuoyancySample withLocalCurrents(
             Level level,
-            float[] push,
-            double worldX,
-            double worldZ,
-            float strength
+            Entity entity,
+            BuoyancySample buoyancy,
+            SPHSimulationManager.MobileWaterSample mobileWater
     ) {
-        if (!(level instanceof ServerLevel serverLevel)) {
-            return;
+        Vec3 additionalCurrent = mobileWater.wet() ? mobileCurrent(mobileWater) : Vec3.ZERO;
+        if (level instanceof ServerLevel serverLevel) {
+            ShorelineWaterManager.FlowSample shoreline =
+                    ShorelineWaterManager.get().sample(serverLevel, entity.getX(), entity.getZ());
+            if (shoreline.wet()) {
+                additionalCurrent = additionalCurrent.add(
+                        shoreline.velocityX() * HydrodynamicForces.SHORELINE_CURRENT_SCALE,
+                        0.0,
+                        shoreline.velocityZ() * HydrodynamicForces.SHORELINE_CURRENT_SCALE
+                );
+            }
+        }
+        if (additionalCurrent.lengthSqr() <= 0.0) {
+            return buoyancy;
+        }
+        return new BuoyancySample(
+                buoyancy.touchingWater(),
+                buoyancy.submerged(),
+                buoyancy.surfaceHeight(),
+                buoyancy.submergedFraction(),
+                buoyancy.current().add(additionalCurrent),
+                buoyancy.surfaceNormal()
+        );
+    }
+
+    private static Vec3 mobileCurrent(
+            SPHSimulationManager.MobileWaterSample mobileWater
+    ) {
+        return new Vec3(
+                mobileWater.velocityX() * HydrodynamicForces.MOBILE_CURRENT_SCALE,
+                mobileWater.velocityY() * HydrodynamicForces.MOBILE_CURRENT_SCALE,
+                mobileWater.velocityZ() * HydrodynamicForces.MOBILE_CURRENT_SCALE
+        );
+    }
+
+    static HydrodynamicForces.RuntimeTuning runtimeTuning(Level level) {
+        long gameTime = level.getGameTime();
+        if (tuningLevel == level && tuningGameTime == gameTime) {
+            return cachedRuntimeTuning;
         }
 
-        ShorelineWaterManager.FlowSample flow =
-                ShorelineWaterManager.get().sample(serverLevel, worldX, worldZ);
-        if (!flow.wet()) {
-            return;
-        }
-        push[0] += flow.velocityX() * strength;
-        push[1] += flow.velocityZ() * strength;
+        // Entity ticks are grouped by level, so sampling once per level tick
+        // avoids allocating a tuning record for every wet or dry mob.
+        cachedRuntimeTuning = new HydrodynamicForces.RuntimeTuning(
+                WaterSimulationConfig.entityHydrodynamicsEnabled(),
+                WaterSimulationConfig.entityBuoyancyScale(),
+                WaterSimulationConfig.entityDragScale(),
+                WaterSimulationConfig.entityMaxAddedVelocityScale()
+        );
+        tuningLevel = level;
+        tuningGameTime = gameTime;
+        return cachedRuntimeTuning;
     }
 
     private static GerstnerWaveProfile profileFor(WaterBodyClassifier.WaterType type) {

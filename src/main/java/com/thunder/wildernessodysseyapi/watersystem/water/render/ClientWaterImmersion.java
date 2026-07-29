@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWater
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LightTexture;
@@ -87,18 +88,33 @@ public final class ClientWaterImmersion {
         float riverWeight = column.riverWeight() / 255.0f;
         float lakeWeight = column.lakeWeight() / 255.0f;
         float timeSeconds = (level.getGameTime() + partialTick) / 20.0f;
+        boolean coreSurface = WaterShaders.shouldUseCoreShader();
+        boolean waveSurface = coreSurface && WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get();
+        float transientHeight = coreSurface
+                ? WaterSurfaceDisplacement.sampleHeight(
+                        level,
+                        cameraPosition.x,
+                        cameraPosition.z,
+                        level.getGameTime() + partialTick
+                )
+                : 0.0f;
         float surfaceY = WaterSurfaceEquation.snapshotSurfaceHeight(
                 column.baseSurfaceY(),
                 (float) cameraPosition.x,
                 (float) cameraPosition.z,
                 timeSeconds,
-                sea.strength(),
-                sea.windDirectionX(),
-                sea.windDirectionZ(),
+                sea.spectrum(),
+                waveSurface
+                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.OCEAN) : 0,
+                waveSurface
+                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.RIVER) : 0,
+                waveSurface
+                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.POND) : 0,
                 oceanWeight,
                 riverWeight,
                 lakeWeight,
-                TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE
+                coreSurface ? TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE : 0.0f,
+                transientHeight
         );
         float depthBelowSurface = surfaceY - (float) cameraPosition.y;
         boolean withinColumn = cameraPosition.y >= column.floorY() + 0.92f
@@ -116,7 +132,7 @@ public final class ClientWaterImmersion {
         UnderwaterOpticsModel.OpticalProperties optics = UnderwaterOpticsModel.evaluate(
                 depthBelowSurface,
                 columnDepth,
-                0.0f,
+                Math.min(1.0f, column.currentSpeed() / WaterSurfaceVertexData.MAX_RENDER_CURRENT),
                 daylight,
                 tint[0],
                 tint[1],

@@ -127,12 +127,17 @@ public final class WaterCompatibility {
     ) {
         /** Returns whether any vanilla or replacement water exists here. */
         public boolean wet() {
-            return authorityVolumeUnits > 0 || tagWater || mobileWater;
+            return (authorityVolumeUnits > 0
+                    && authoritySource != WildernessWaterAuthority.WaterSource.DISPLACEMENT_RESERVOIR)
+                    || tagWater
+                    || mobileWater;
         }
 
         /** Returns whether canonical storage currently owns visible water volume here. */
         public boolean canonicalWater() {
-            return canonicalTracked && canonicalVolumeUnits > 0;
+            return canonicalTracked
+                    && canonicalVolumeUnits > 0
+                    && authoritySource != WildernessWaterAuthority.WaterSource.DISPLACEMENT_RESERVOIR;
         }
 
         /** Returns whether compact generated metadata owns the physical water cell. */

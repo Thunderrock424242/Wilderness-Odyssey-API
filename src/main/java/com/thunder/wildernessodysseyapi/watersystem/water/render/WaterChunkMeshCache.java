@@ -218,6 +218,8 @@ public final class WaterChunkMeshCache {
         float ocean = 0.0f;
         float river = 0.0f;
         float lake = 0.0f;
+        float velocityX = 0.0f;
+        float velocityZ = 0.0f;
         float depth = 0.0f;
         float tintRed = 0.0f;
         float tintGreen = 0.0f;
@@ -239,6 +241,8 @@ public final class WaterChunkMeshCache {
                 ocean += column.oceanWeight() / 255.0f;
                 river += column.riverWeight() / 255.0f;
                 lake += column.lakeWeight() / 255.0f;
+                velocityX += column.velocityX();
+                velocityZ += column.velocityZ();
                 depth += column.depth();
                 tintRed += ((column.waterTint() >>> 16) & 0xFF) / 255.0f;
                 tintGreen += ((column.waterTint() >>> 8) & 0xFF) / 255.0f;
@@ -251,6 +255,8 @@ public final class WaterChunkMeshCache {
             ocean = fallback.oceanWeight() / 255.0f;
             river = fallback.riverWeight() / 255.0f;
             lake = fallback.lakeWeight() / 255.0f;
+            velocityX = fallback.velocityX();
+            velocityZ = fallback.velocityZ();
             depth = fallback.depth();
             tintRed = ((fallback.waterTint() >>> 16) & 0xFF) / 255.0f;
             tintGreen = ((fallback.waterTint() >>> 8) & 0xFF) / 255.0f;
@@ -265,11 +271,20 @@ public final class WaterChunkMeshCache {
         ocean /= total;
         river /= total;
         lake /= total;
+        float averagedDepth = depth * inverse;
+        // The separate server shallow-water solver is not synchronized to this
+        // client mesh. This deterministic approximation uses only immutable
+        // snapshot topology and depth, so it cannot invent mutable authority
+        // state or trigger per-frame world scans.
+        float topologyShore = 1.0f - Math.min(1.0f, count * 0.25f);
+        float shallowShore = 1.0f - smoothStep(0.35f, 4.5f, averagedDepth);
+        float shoreFactor = Math.max(topologyShore, shallowShore);
         int color = opticalColor(ocean, river, lake,
                 tintRed * inverse, tintGreen * inverse, tintBlue * inverse,
-                depth * inverse, count < 4);
+                averagedDepth, count < 4);
         return new VertexSample(height * inverse, ocean, river, lake,
-                Math.max(0.18f, count * 0.25f), color);
+                Math.max(0.18f, count * 0.25f), color,
+                velocityX * inverse, velocityZ * inverse, shoreFactor, averagedDepth);
     }
 
     /** Returns whether the coordinator mesh, rather than the fluid fallback, owns this column. */
@@ -327,7 +342,14 @@ public final class WaterChunkMeshCache {
                         southEast.lakeWeight, northEast.lakeWeight, x, z),
                 bilinear(northWest.continuity, southWest.continuity,
                         southEast.continuity, northEast.continuity, x, z),
-                bilinearColor(northWest.color, southWest.color, southEast.color, northEast.color, x, z)
+                bilinearColor(northWest.color, southWest.color, southEast.color, northEast.color, x, z),
+                bilinear(northWest.velocityX, southWest.velocityX,
+                        southEast.velocityX, northEast.velocityX, x, z),
+                bilinear(northWest.velocityZ, southWest.velocityZ,
+                        southEast.velocityZ, northEast.velocityZ, x, z),
+                bilinear(northWest.shoreFactor, southWest.shoreFactor,
+                        southEast.shoreFactor, northEast.shoreFactor, x, z),
+                bilinear(northWest.depth, southWest.depth, southEast.depth, northEast.depth, x, z)
         );
     }
 
@@ -361,8 +383,15 @@ public final class WaterChunkMeshCache {
             float u,
             float v
     ) {
+        int encodedColor = WaterSurfaceVertexData.encodeColor(
+                sample.color,
+                sample.velocityX,
+                sample.velocityZ,
+                sample.shoreFactor,
+                sample.depth
+        );
         builder.addVertex(worldX, sample.height, worldZ)
-                .setColor(sample.color)
+                .setColor(encodedColor)
                 .setUv(u, v)
                 .setLight(FULL_BRIGHT)
                 // Normal magnitude carries loaded-surface continuity; the
@@ -376,6 +405,11 @@ public final class WaterChunkMeshCache {
         return Math.max(0, Math.min(255, Math.round(value * 255.0f)));
     }
 
+    private static float smoothStep(float edge0, float edge1, float value) {
+        float t = Math.max(0.0f, Math.min(1.0f, (value - edge0) / (edge1 - edge0)));
+        return t * t * (3.0f - 2.0f * t);
+    }
+
     private static long chunkKey(int chunkX, int chunkZ) {
         return ((long) chunkX & 0xFFFFFFFFL) | (((long) chunkZ & 0xFFFFFFFFL) << 32);
     }
@@ -386,7 +420,11 @@ public final class WaterChunkMeshCache {
             float riverWeight,
             float lakeWeight,
             float continuity,
-            int color
+            int color,
+            float velocityX,
+            float velocityZ,
+            float shoreFactor,
+            float depth
     ) {
     }
 
