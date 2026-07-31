@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AtmosphereStorageCodecTest {
 
     @Test
-    void versionOneRoundTripPreservesMeaningfulCellState() {
+    void versionTwoRoundTripPreservesMeaningfulCellState() {
         AtmosphereGrid original = new AtmosphereGrid(256);
         AtmosphereCellKey key = new AtmosphereCellKey(-2, 3);
         WeatherSample sample = new WeatherSample(
@@ -31,7 +31,10 @@ class AtmosphereStorageCodecTest {
                 0.61,
                 0.72,
                 0.65,
-                PrecipitationType.SNOW
+                PrecipitationType.SNOW,
+                0.43,
+                0.84,
+                new WindVector(-0.17, 0.76)
         );
         original.restore(new AtmosphereView(key, sample, 7L, 1_200L, 1_240L));
 
@@ -58,6 +61,26 @@ class AtmosphereStorageCodecTest {
         assertEquals(sample.stormEnergy(), restored.sample().stormEnergy(), 0.001);
         assertEquals(sample.precipitationIntensity(), restored.sample().precipitationIntensity(), 0.001);
         assertEquals(PrecipitationType.SNOW, restored.sample().precipitationType());
+        assertEquals(sample.verticalMotion(), restored.sample().verticalMotion(), 0.001);
+        assertEquals(sample.cloudDepth(), restored.sample().cloudDepth(), 0.001);
+        assertEquals(sample.cloudWind().x(), restored.sample().cloudWind().x(), 0.001);
+        assertEquals(sample.cloudWind().z(), restored.sample().cloudWind().z(), 0.001);
+    }
+
+    @Test
+    void versionOneSaveMigratesWithoutDiscardingWeather() {
+        CompoundTag legacy = encodedSingleCell();
+        legacy.putInt("dataVersion", 1);
+        legacy.remove("weatherC");
+
+        AtmosphereStorageCodec.DecodeResult decoded =
+                AtmosphereStorageCodec.decode(legacy, 256, 64);
+
+        assertEquals(1, decoded.restoredCells());
+        assertTrue(decoded.recovered());
+        WeatherSample restored = decoded.grid().view(new AtmosphereCellKey(0, 0)).sample();
+        assertEquals(restored.wind(), restored.cloudWind());
+        assertTrue(restored.cloudDepth() > 0.0);
     }
 
     @Test

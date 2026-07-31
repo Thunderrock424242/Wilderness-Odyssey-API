@@ -97,6 +97,25 @@ class ClientWaterChunkSnapshotTest {
         assertFalse(snapshot.column(6, 7).wet());
     }
 
+    @Test
+    void delayedGeneratedBaselinePreservesPreviouslyPublishedSparseOverrides() {
+        BlockPos top = new BlockPos(2, 63, 3);
+        WaterVolumeChunk sparse = new WaterVolumeChunk();
+        sparse.set(top, WaterVolumeChunk.WaterCell.still(
+                0,
+                WaterVolumeChunk.FLAG_GENERATED_OVERRIDE | WaterVolumeChunk.FLAG_DRY_OVERRIDE
+        ));
+        ClientWaterChunkSnapshot sparseOnly = new ClientWaterChunkSnapshot(
+                0, 0, null, sparse.revision(), sparse.toNetworkArray());
+
+        ClientWaterChunkSnapshot completed = sparseOnly.withGenerated(generatedColumn().snapshot());
+
+        assertEquals(sparse.revision(), completed.sparseRevision());
+        assertFalse(completed.contains(2, 63, 3));
+        assertTrue(completed.contains(2, 62, 3));
+        assertEquals(62, completed.column(2, 3).surfaceBlockY());
+    }
+
     private static GeneratedWaterChunk generatedColumn() {
         GeneratedWaterChunk generated = new GeneratedWaterChunk();
         for (int y = 58; y <= 63; y++) {

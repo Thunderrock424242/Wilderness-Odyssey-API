@@ -66,6 +66,24 @@ public final class CloudLightingModel {
     }
 
     /**
+     * Adds dense cloud-bank fog while the camera intersects the local column.
+     */
+    public static double fogContribution(
+            WeatherSample weather,
+            CloudFieldSample field,
+            double cameraY,
+            double dimensionCloudHeight
+    ) {
+        double ordinaryFog = fogContribution(weather, field);
+        double immersion = CloudColumnModel.cameraImmersion(
+                field,
+                cameraY,
+                dimensionCloudHeight
+        );
+        return Math.max(ordinaryFog, unit(immersion * 0.82));
+    }
+
+    /**
      * Shortens a vanilla air-fog far plane without weakening a denser owner.
      *
      * <p>Blindness, Darkness, and other render hooks may already supply a far

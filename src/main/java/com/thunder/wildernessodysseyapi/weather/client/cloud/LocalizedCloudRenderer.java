@@ -48,6 +48,7 @@ public final class LocalizedCloudRenderer {
     private static double windDetailOffsetZ;
     private static double builtWindDetailOffsetX;
     private static double builtWindDetailOffsetZ;
+    private static boolean builtVolumetric;
     private static boolean builtMorphologyPotential;
     private static boolean builtTransitionComplete;
     private static boolean samplingBaseCloudColor;
@@ -116,14 +117,14 @@ public final class LocalizedCloudRenderer {
                 diagnostics.vertices(),
                 diagnostics.averageCoverage(),
                 windDetailOffsetX,
-                windDetailOffsetZ
+                windDetailOffsetZ,
+                diagnostics.mode(),
+                diagnostics.layers()
         );
         if (cloudBuffer == null) {
             return;
         }
 
-        // Reuse vanilla's cloud render types so Fabulous targets, resource-pack
-        // cloud textures, fog, and shader hooks retain their expected pipeline.
         FogRenderer.levelFogColor();
         poseStack.pushPose();
         poseStack.mulPose(frustumMatrix);
@@ -133,9 +134,17 @@ public final class LocalizedCloudRenderer {
                 builtOriginTileZ * (double) CloudCoverageModel.CLOUD_TILE_SIZE - camZ
         );
         cloudBuffer.bind();
-        int firstPass = builtCloudStatus == CloudStatus.FANCY ? 0 : 1;
-        for (int pass = firstPass; pass < 2; pass++) {
-            RenderType renderType = pass == 0 ? RenderType.cloudsDepthOnly() : RenderType.clouds();
+        if (builtVolumetric) {
+            VolumetricCloudShaders.updateUniforms(
+                    (float) (renderTicks / 20.0),
+                    windDetailOffsetX,
+                    windDetailOffsetZ,
+                    builtOriginTileX,
+                    builtOriginTileZ,
+                    level.getSunAngle(partialTick),
+                    settings.volumetricDetailStrength()
+            );
+            RenderType renderType = VolumetricCloudRenderTypes.volumetricClouds();
             renderType.setupRenderState();
             cloudBuffer.drawWithShader(
                     poseStack.last().pose(),
@@ -143,6 +152,20 @@ public final class LocalizedCloudRenderer {
                     RenderSystem.getShader()
             );
             renderType.clearRenderState();
+        } else {
+            // Reuse vanilla's cloud render types for the compatibility mesh so
+            // Fabulous targets, resource packs, fog, and shader hooks survive.
+            int firstPass = builtCloudStatus == CloudStatus.FANCY ? 0 : 1;
+            for (int pass = firstPass; pass < 2; pass++) {
+                RenderType renderType = pass == 0 ? RenderType.cloudsDepthOnly() : RenderType.clouds();
+                renderType.setupRenderState();
+                cloudBuffer.drawWithShader(
+                        poseStack.last().pose(),
+                        projectionMatrix,
+                        RenderSystem.getShader()
+                );
+                renderType.clearRenderState();
+            }
         }
         VertexBuffer.unbind();
         poseStack.popPose();
@@ -178,6 +201,7 @@ public final class LocalizedCloudRenderer {
         windDetailOffsetZ = 0.0;
         builtWindDetailOffsetX = 0.0;
         builtWindDetailOffsetZ = 0.0;
+        builtVolumetric = false;
         builtMorphologyPotential = false;
         builtTransitionComplete = false;
         meshCacheValid = false;
@@ -213,10 +237,10 @@ public final class LocalizedCloudRenderer {
 
         CloudFieldSample field = ClientWeatherCoordinator.cloudFieldAt(level, camX, camZ);
         windDetailOffsetX = finiteMotion(
-                windDetailOffsetX + field.windX() * field.support() * speedBlocksPerSecond * elapsedSeconds
+                windDetailOffsetX + field.cloudWindX() * field.support() * speedBlocksPerSecond * elapsedSeconds
         );
         windDetailOffsetZ = finiteMotion(
-                windDetailOffsetZ + field.windZ() * field.support() * speedBlocksPerSecond * elapsedSeconds
+                windDetailOffsetZ + field.cloudWindZ() * field.support() * speedBlocksPerSecond * elapsedSeconds
         );
     }
 
@@ -258,6 +282,7 @@ public final class LocalizedCloudRenderer {
         int radius = boundedRadius(settings);
         int diameter = radius * 2 + 1;
         byte[] heights = new byte[diameter * diameter];
+        CloudFieldSample[] fields = new CloudFieldSample[heights.length];
         float[] darkness = new float[heights.length];
         float[] opacity = new float[heights.length];
         double coverageSum = 0.0;
@@ -308,6 +333,7 @@ public final class LocalizedCloudRenderer {
                 }
 
                 int index = index(localX + radius, localZ + radius, diameter);
+                fields[index] = field;
                 heights[index] = (byte) CloudCoverageModel.thickness(field);
                 darkness[index] = (float) CloudCoverageModel.darkness(field);
                 opacity[index] = (float) CloudCoverageModel.opacity(field, settings.opacityMultiplier());
@@ -320,9 +346,25 @@ public final class LocalizedCloudRenderer {
                 VertexFormat.Mode.QUADS,
                 DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL
         );
-        int vertices = cloudStatus == CloudStatus.FANCY
-                ? emitFancyClouds(builder, heights, darkness, opacity, diameter, radius, baseColor)
-                : emitFastClouds(builder, heights, darkness, opacity, diameter, radius, baseColor);
+        boolean volumetric = cloudStatus == CloudStatus.FANCY
+                && VolumetricCloudShaders.shouldUse(settings);
+        int vertices;
+        if (volumetric) {
+            vertices = emitVolumetricClouds(
+                    builder,
+                    fields,
+                    darkness,
+                    opacity,
+                    diameter,
+                    radius,
+                    baseColor,
+                    settings.volumetricLayerCount()
+            );
+        } else if (cloudStatus == CloudStatus.FANCY) {
+            vertices = emitFancyClouds(builder, heights, darkness, opacity, diameter, radius, baseColor);
+        } else {
+            vertices = emitFastClouds(builder, heights, darkness, opacity, diameter, radius, baseColor);
+        }
         MeshData mesh = builder.build();
         replaceCloudBuffer(mesh);
         // A null VBO is a valid cached result for a completely clear field.
@@ -339,6 +381,7 @@ public final class LocalizedCloudRenderer {
         lastBuildTick = ticks;
         builtWindDetailOffsetX = windDetailOffsetX;
         builtWindDetailOffsetZ = windDetailOffsetZ;
+        builtVolumetric = volumetric;
         builtMorphologyPotential = morphologyPotential;
         builtTransitionComplete = state.interpolationProgress() >= 0.999;
         diagnostics = new Diagnostics(
@@ -347,8 +390,94 @@ public final class LocalizedCloudRenderer {
                 vertices,
                 visibleTiles == 0 ? 0.0 : coverageSum / visibleTiles,
                 windDetailOffsetX,
-                windDetailOffsetZ
+                windDetailOffsetZ,
+                volumetric ? "volume" : cloudStatus == CloudStatus.FANCY ? "voxel" : "fast",
+                volumetric ? settings.volumetricLayerCount() : 1
         );
+    }
+
+    private static int emitVolumetricClouds(
+            BufferBuilder builder,
+            CloudFieldSample[] fields,
+            float[] darkness,
+            float[] opacity,
+            int diameter,
+            int radius,
+            Vec3 baseColor,
+            int layerCount
+    ) {
+        int vertices = 0;
+        float noiseScale = VolumetricCloudShaders.worldNoiseScale();
+        for (int gridZ = 0; gridZ < diameter; gridZ++) {
+            for (int gridX = 0; gridX < diameter; gridX++) {
+                int cell = index(gridX, gridZ, diameter);
+                CloudFieldSample field = fields[cell];
+                if (field == null) {
+                    continue;
+                }
+
+                float x0 = (gridX - radius) * CloudCoverageModel.CLOUD_TILE_SIZE;
+                float z0 = (gridZ - radius) * CloudCoverageModel.CLOUD_TILE_SIZE;
+                float x1 = x0 + CloudCoverageModel.CLOUD_TILE_SIZE;
+                float z1 = z0 + CloudCoverageModel.CLOUD_TILE_SIZE;
+                float base = (float) CloudColumnModel.baseOffsetBlocks(field);
+                float depth = (float) CloudColumnModel.depthBlocks(field);
+                float sliceAlpha = (float) CloudColumnModel.sliceOpacity(opacity[cell], layerCount);
+                float coverage = (float) CloudCoverageModel.coverage(field);
+                float storm = darkness[cell];
+
+                // The normal attribute carries per-column data for the custom
+                // shader: layer fraction, coverage, and storm darkness.
+                for (int layerIndex = layerCount - 1; layerIndex >= 0; layerIndex--) {
+                    float layer = (layerIndex + 0.5F) / layerCount;
+                    float y = base + depth * layer;
+                    float light = 0.88F + layer * 0.12F;
+                    volumetricVertex(
+                            builder, x0, y, z1, x0 * noiseScale, z1 * noiseScale,
+                            baseColor, light, sliceAlpha, layer, coverage, storm
+                    );
+                    volumetricVertex(
+                            builder, x1, y, z1, x1 * noiseScale, z1 * noiseScale,
+                            baseColor, light, sliceAlpha, layer, coverage, storm
+                    );
+                    volumetricVertex(
+                            builder, x1, y, z0, x1 * noiseScale, z0 * noiseScale,
+                            baseColor, light, sliceAlpha, layer, coverage, storm
+                    );
+                    volumetricVertex(
+                            builder, x0, y, z0, x0 * noiseScale, z0 * noiseScale,
+                            baseColor, light, sliceAlpha, layer, coverage, storm
+                    );
+                    vertices += 4;
+                }
+            }
+        }
+        return vertices;
+    }
+
+    private static void volumetricVertex(
+            BufferBuilder builder,
+            float x,
+            float y,
+            float z,
+            float noiseX,
+            float noiseZ,
+            Vec3 baseColor,
+            float light,
+            float alpha,
+            float layer,
+            float coverage,
+            float storm
+    ) {
+        builder.addVertex(x, y, z)
+                .setUv(noiseX, noiseZ)
+                .setColor(
+                        unit((float) baseColor.x * light),
+                        unit((float) baseColor.y * light),
+                        unit((float) baseColor.z * light),
+                        unit(alpha)
+                )
+                .setNormal(unit(layer), unit(coverage), unit(storm));
     }
 
     private static int emitFastClouds(
@@ -695,8 +824,36 @@ public final class LocalizedCloudRenderer {
             int vertices,
             double averageCoverage,
             double windDetailOffsetX,
-            double windDetailOffsetZ
+            double windDetailOffsetZ,
+            String mode,
+            int layers
     ) {
-        private static final Diagnostics INACTIVE = new Diagnostics(false, 0, 0, 0.0, 0.0, 0.0);
+        private static final Diagnostics INACTIVE =
+                new Diagnostics(false, 0, 0, 0.0, 0.0, 0.0, "inactive", 0);
+
+        public Diagnostics(
+                boolean active,
+                int visibleTiles,
+                int vertices,
+                double averageCoverage,
+                double windDetailOffsetX,
+                double windDetailOffsetZ
+        ) {
+            this(
+                    active,
+                    visibleTiles,
+                    vertices,
+                    averageCoverage,
+                    windDetailOffsetX,
+                    windDetailOffsetZ,
+                    active ? "compatibility" : "inactive",
+                    active ? 1 : 0
+            );
+        }
+
+        public Diagnostics {
+            mode = mode == null || mode.isBlank() ? "unknown" : mode;
+            layers = Math.max(0, layers);
+        }
     }
 }

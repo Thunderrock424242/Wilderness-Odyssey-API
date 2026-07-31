@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.temporalrift.client.TemporalRiftShaders;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockEntities;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterShaders;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.VolumetricCloudShaders;
 import net.minecraft.client.renderer.BiomeColors;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
@@ -112,6 +113,14 @@ public class ClientSetup {
             // Enhanced water optics are optional. Keeping registration failure
             // non-fatal preserves the standard translucent fallback path.
             ModConstants.LOGGER.warn("Unable to load built-in water shader; using compatibility rendering", exception);
+        }
+
+        try {
+            VolumetricCloudShaders.register(event);
+        } catch (IOException exception) {
+            // Cloud volumes are optional; the existing Fast/Fancy voxel paths
+            // remain available after a failed resource reload.
+            ModConstants.LOGGER.warn("Unable to load volumetric cloud shader; using voxel cloud fallback", exception);
         }
     }
 }

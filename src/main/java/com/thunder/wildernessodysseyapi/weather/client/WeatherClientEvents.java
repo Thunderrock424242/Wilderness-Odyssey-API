@@ -98,7 +98,12 @@ public final class WeatherClientEvents {
                 level,
                 event.getCamera().getPosition()
         );
-        float fog = (float) CloudLightingModel.fogContribution(sample, cloudField);
+        float fog = (float) CloudLightingModel.fogContribution(
+                sample,
+                cloudField,
+                event.getCamera().getPosition().y,
+                level.effects().getCloudHeight()
+        );
         if (fog <= 0.001F) {
             return;
         }
@@ -130,7 +135,12 @@ public final class WeatherClientEvents {
                 level,
                 event.getCamera().getPosition()
         );
-        float fog = (float) CloudLightingModel.fogContribution(sample, cloudField);
+        float fog = (float) CloudLightingModel.fogContribution(
+                sample,
+                cloudField,
+                event.getCamera().getPosition().y,
+                level.effects().getCloudHeight()
+        );
         if (fog <= 0.001F) {
             return;
         }
@@ -162,14 +172,18 @@ public final class WeatherClientEvents {
         int cellZ = Math.floorDiv(pos.getZ(), state.cellSize());
         WeatherSample sample = ClientWeatherCoordinator.sampleAt(level, pos);
         float thunder = ClientWeatherCoordinator.thunderContribution(sample);
-        float fog = ClientWeatherCoordinator.fogContribution(sample);
         CloudFieldSample cloudField = ClientWeatherCoordinator.cloudFieldAt(
                 level,
                 pos.getX() + 0.5,
                 pos.getZ() + 0.5
         );
         CloudLightingModel.OpticalState optics = CloudLightingModel.evaluate(cloudField);
-        fog = (float) CloudLightingModel.fogContribution(sample, cloudField);
+        float fog = (float) CloudLightingModel.fogContribution(
+                sample,
+                cloudField,
+                pos.getY() + 0.5,
+                level.effects().getCloudHeight()
+        );
         LocalizedCloudRenderer.Diagnostics clouds = LocalizedCloudRenderer.diagnostics();
         LocalizedPrecipitationRenderer.Diagnostics precipitation =
                 LocalizedPrecipitationRenderer.diagnostics();
@@ -186,19 +200,28 @@ public final class WeatherClientEvents {
                 ),
                 String.format(
                         Locale.ROOT,
-                        "T %.1f C | H %.3f | P %.3f | wind %.3f, %.3f",
+                        "T %.1f C | dew %.1f C | H %.3f | P %.3f",
                         sample.temperature(),
+                        sample.dewPointCelsius(),
                         sample.humidity(),
-                        sample.pressure(),
-                        sample.wind().x(),
-                        sample.wind().z()
+                        sample.pressure()
                 ),
                 String.format(
                         Locale.ROOT,
-                        "Cloud %.3f | instability %.3f | storm %.3f",
+                        "Cloud %.3f depth %.3f | lift %.3f | storm %s %.3f",
                         sample.cloudWater(),
-                        sample.instability(),
+                        sample.cloudDepth(),
+                        sample.verticalMotion(),
+                        sample.stormStage(),
                         sample.stormEnergy()
+                ),
+                String.format(
+                        Locale.ROOT,
+                        "Surface wind %.3f, %.3f | cloud wind %.3f, %.3f",
+                        sample.wind().x(),
+                        sample.wind().z(),
+                        sample.cloudWind().x(),
+                        sample.cloudWind().z()
                 ),
                 String.format(
                         Locale.ROOT,
@@ -210,8 +233,10 @@ public final class WeatherClientEvents {
                 ),
                 String.format(
                         Locale.ROOT,
-                        "Cloud mesh %s | %d tiles | %d vertices | coverage %.3f",
+                        "Cloud mesh %s %s/%d | %d tiles | %d vertices | coverage %.3f",
                         clouds.active() ? "active" : "inactive",
+                        clouds.mode(),
+                        clouds.layers(),
                         clouds.visibleTiles(),
                         clouds.vertices(),
                         clouds.averageCoverage()

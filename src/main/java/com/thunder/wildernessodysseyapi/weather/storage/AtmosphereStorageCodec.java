@@ -18,19 +18,21 @@ import java.util.Set;
 /**
  * Versioned compact NBT codec for persistent atmospheric cells.
  *
- * <p>Schema version one uses six parallel primitive long arrays. Two packed
+ * <p>Schema version two uses seven parallel primitive long arrays. Three packed
  * weather words quantize normalized state, while keys, revisions, and activity
- * ticks retain their full range. Parallel arrays avoid a compound-tag object
- * per cell and make a strict configured cell bound inexpensive to enforce.</p>
+ * ticks retain their full range. Version-one saves remain readable and derive
+ * their missing vertical fields from the original cloud state.</p>
  */
 public final class AtmosphereStorageCodec {
-    public static final int DATA_VERSION = 1;
+    public static final int DATA_VERSION = 2;
+    private static final int LEGACY_DATA_VERSION = 1;
 
     private static final String VERSION_KEY = "dataVersion";
     private static final String CELL_SIZE_KEY = "cellSize";
     private static final String CELL_KEYS_KEY = "cellKeys";
     private static final String WEATHER_A_KEY = "weatherA";
     private static final String WEATHER_B_KEY = "weatherB";
+    private static final String WEATHER_C_KEY = "weatherC";
     private static final String REVISIONS_KEY = "revisions";
     private static final String LAST_SIMULATED_KEY = "lastSimulatedTicks";
     private static final String LAST_ACTIVE_KEY = "lastActiveTicks";
@@ -42,6 +44,7 @@ public final class AtmosphereStorageCodec {
     private static final long UNIT_12_MASK = UNIT_12_MAX;
     private static final long UNIT_16_MASK = UNIT_16_MAX;
     private static final long WEATHER_B_RESERVED_MASK = ~((1L << 50) - 1L);
+    private static final long WEATHER_C_RESERVED_MASK = ~((1L << 48) - 1L);
     private static final long MAX_WORLD_COORDINATE = 30_000_000L;
 
     private AtmosphereStorageCodec() {
@@ -58,6 +61,7 @@ public final class AtmosphereStorageCodec {
         long[] keys = new long[count];
         long[] weatherA = new long[count];
         long[] weatherB = new long[count];
+        long[] weatherC = new long[count];
         long[] revisions = new long[count];
         long[] lastSimulated = new long[count];
         long[] lastActive = new long[count];
@@ -67,6 +71,7 @@ public final class AtmosphereStorageCodec {
             keys[index] = view.key().packed();
             weatherA[index] = encodeWeatherA(view.sample());
             weatherB[index] = encodeWeatherB(view.sample());
+            weatherC[index] = encodeWeatherC(view.sample());
             revisions[index] = view.revision();
             lastSimulated[index] = view.lastSimulatedTick();
             lastActive[index] = view.lastActiveTick();
@@ -76,6 +81,7 @@ public final class AtmosphereStorageCodec {
         tag.putLongArray(CELL_KEYS_KEY, keys);
         tag.putLongArray(WEATHER_A_KEY, weatherA);
         tag.putLongArray(WEATHER_B_KEY, weatherB);
+        tag.putLongArray(WEATHER_C_KEY, weatherC);
         tag.putLongArray(REVISIONS_KEY, revisions);
         tag.putLongArray(LAST_SIMULATED_KEY, lastSimulated);
         tag.putLongArray(LAST_ACTIVE_KEY, lastActive);
@@ -83,7 +89,7 @@ public final class AtmosphereStorageCodec {
     }
 
     /**
-     * Decodes valid version-one entries and recovers to an empty grid for an
+     * Decodes valid version-one or version-two entries and recovers to an empty grid for an
      * absent, unsupported, or structurally malformed payload.
      */
     public static DecodeResult decode(CompoundTag tag, int fallbackCellSize, int maximumCells) {
@@ -98,19 +104,38 @@ public final class AtmosphereStorageCodec {
             int storedSize = tag.contains(CELL_SIZE_KEY, Tag.TAG_INT) ? tag.getInt(CELL_SIZE_KEY) : safeFallbackSize;
             int cellSize = storedSize >= 16 && storedSize <= 4_096 ? storedSize : safeFallbackSize;
             AtmosphereGrid grid = new AtmosphereGrid(cellSize);
-            if (version != DATA_VERSION) {
+            if (version != DATA_VERSION && version != LEGACY_DATA_VERSION) {
                 return new DecodeResult(grid, version, 0, 0, true);
             }
 
             long[] keys = readLongArray(tag, CELL_KEYS_KEY);
             long[] weatherA = readLongArray(tag, WEATHER_A_KEY);
             long[] weatherB = readLongArray(tag, WEATHER_B_KEY);
+            long[] weatherC = version >= DATA_VERSION
+                    ? readLongArray(tag, WEATHER_C_KEY)
+                    : new long[keys.length];
             long[] revisions = readLongArray(tag, REVISIONS_KEY);
             long[] lastSimulated = readLongArray(tag, LAST_SIMULATED_KEY);
             long[] lastActive = readLongArray(tag, LAST_ACTIVE_KEY);
-            int commonLength = minimumLength(keys, weatherA, weatherB, revisions, lastSimulated, lastActive);
+            int commonLength = minimumLength(
+                    keys,
+                    weatherA,
+                    weatherB,
+                    weatherC,
+                    revisions,
+                    lastSimulated,
+                    lastActive
+            );
             int attempted = Math.min(commonLength, limit);
-            int structuralSkips = maximumLength(keys, weatherA, weatherB, revisions, lastSimulated, lastActive)
+            int structuralSkips = maximumLength(
+                    keys,
+                    weatherA,
+                    weatherB,
+                    weatherC,
+                    revisions,
+                    lastSimulated,
+                    lastActive
+            )
                     - commonLength;
             int skipped = Math.max(0, structuralSkips) + Math.max(0, commonLength - attempted);
             Set<Long> restoredKeys = new HashSet<>(attempted);
@@ -120,6 +145,8 @@ public final class AtmosphereStorageCodec {
                 if (!validEntry(
                         packedKey,
                         weatherB[index],
+                        weatherC[index],
+                        version,
                         revisions[index],
                         lastSimulated[index],
                         lastActive[index],
@@ -129,7 +156,7 @@ public final class AtmosphereStorageCodec {
                     skipped++;
                     continue;
                 }
-                WeatherSample sample = decodeWeather(weatherA[index], weatherB[index]);
+                WeatherSample sample = decodeWeather(weatherA[index], weatherB[index], weatherC[index], version);
                 if (sample == null) {
                     skipped++;
                     continue;
@@ -145,7 +172,13 @@ public final class AtmosphereStorageCodec {
                 restoredKeys.add(packedKey);
             }
 
-            return new DecodeResult(grid, version, grid.size(), skipped, skipped > 0 || storedSize != cellSize);
+            return new DecodeResult(
+                    grid,
+                    version,
+                    grid.size(),
+                    skipped,
+                    skipped > 0 || storedSize != cellSize || version != DATA_VERSION
+            );
         } catch (RuntimeException exception) {
             return new DecodeResult(new AtmosphereGrid(safeFallbackSize), 0, 0, 0, true);
         }
@@ -207,7 +240,18 @@ public final class AtmosphereStorageCodec {
                 | (precipitationType << 48);
     }
 
-    private static WeatherSample decodeWeather(long weatherA, long weatherB) {
+    private static long encodeWeatherC(WeatherSample sample) {
+        long verticalMotion = quantize(sample.verticalMotion(), -1.0, 1.0, UNIT_12_MAX);
+        long cloudDepth = quantizeUnit(sample.cloudDepth(), UNIT_12_MAX);
+        long cloudWindX = quantize(sample.cloudWind().x(), -1.0, 1.0, UNIT_12_MAX);
+        long cloudWindZ = quantize(sample.cloudWind().z(), -1.0, 1.0, UNIT_12_MAX);
+        return verticalMotion
+                | (cloudDepth << 12)
+                | (cloudWindX << 24)
+                | (cloudWindZ << 36);
+    }
+
+    private static WeatherSample decodeWeather(long weatherA, long weatherB, long weatherC, int version) {
         int typeId = (int) ((weatherB >>> 48) & 0x3L);
         if (typeId < 0 || typeId >= PrecipitationType.values().length) {
             return null;
@@ -231,7 +275,7 @@ public final class AtmosphereStorageCodec {
         double instability = dequantizeUnit((weatherB >>> 12) & UNIT_12_MASK, UNIT_12_MAX);
         double stormEnergy = dequantizeUnit((weatherB >>> 24) & UNIT_12_MASK, UNIT_12_MAX);
         double precipitation = dequantizeUnit((weatherB >>> 36) & UNIT_12_MASK, UNIT_12_MAX);
-        return new WeatherSample(
+        WeatherSample legacySample = new WeatherSample(
                 temperature,
                 humidity,
                 pressure,
@@ -242,11 +286,34 @@ public final class AtmosphereStorageCodec {
                 precipitation,
                 PrecipitationType.values()[typeId]
         );
+        if (version == LEGACY_DATA_VERSION) {
+            return legacySample;
+        }
+        double verticalMotion = dequantize(weatherC & UNIT_12_MASK, -1.0, 1.0, UNIT_12_MAX);
+        double cloudDepth = dequantizeUnit((weatherC >>> 12) & UNIT_12_MASK, UNIT_12_MAX);
+        double cloudWindX = dequantize((weatherC >>> 24) & UNIT_12_MASK, -1.0, 1.0, UNIT_12_MAX);
+        double cloudWindZ = dequantize((weatherC >>> 36) & UNIT_12_MASK, -1.0, 1.0, UNIT_12_MAX);
+        return new WeatherSample(
+                legacySample.temperature(),
+                legacySample.humidity(),
+                legacySample.pressure(),
+                legacySample.wind(),
+                legacySample.cloudWater(),
+                legacySample.instability(),
+                legacySample.stormEnergy(),
+                legacySample.precipitationIntensity(),
+                legacySample.precipitationType(),
+                verticalMotion,
+                cloudDepth,
+                new WindVector(cloudWindX, cloudWindZ)
+        );
     }
 
     private static boolean validEntry(
             long packedKey,
             long weatherB,
+            long weatherC,
+            int version,
             long revision,
             long lastSimulated,
             long lastActive,
@@ -257,6 +324,9 @@ public final class AtmosphereStorageCodec {
             return false;
         }
         if ((weatherB & WEATHER_B_RESERVED_MASK) != 0L) {
+            return false;
+        }
+        if (version >= DATA_VERSION && (weatherC & WEATHER_C_RESERVED_MASK) != 0L) {
             return false;
         }
         AtmosphereCellKey key = AtmosphereCellKey.fromPacked(packedKey);

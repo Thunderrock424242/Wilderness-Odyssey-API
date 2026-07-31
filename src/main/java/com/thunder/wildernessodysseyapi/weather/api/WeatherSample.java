@@ -7,7 +7,8 @@ import java.util.Objects;
  *
  * <p>Temperature is degrees Celsius, pressure is normalized around {@code 1.0},
  * and humidity, cloud water, instability, storm energy, and precipitation use
- * normalized {@code [0, 1]} units. Wind components use {@code [-1, 1]}.</p>
+ * normalized {@code [0, 1]} units. Wind and vertical-motion components use
+ * {@code [-1, 1]}.</p>
  *
  * @param temperature local air temperature in degrees Celsius
  * @param humidity relative humidity
@@ -18,6 +19,9 @@ import java.util.Objects;
  * @param stormEnergy accumulated severe-weather energy
  * @param precipitationIntensity current localized precipitation intensity
  * @param precipitationType current localized precipitation form
+ * @param verticalMotion normalized convective ascent or subsidence
+ * @param cloudDepth normalized vertical cloud development
+ * @param cloudWind normalized wind at cloud level
  */
 public record WeatherSample(
         double temperature,
@@ -28,7 +32,10 @@ public record WeatherSample(
         double instability,
         double stormEnergy,
         double precipitationIntensity,
-        PrecipitationType precipitationType
+        PrecipitationType precipitationType,
+        double verticalMotion,
+        double cloudDepth,
+        WindVector cloudWind
 ) {
     public static final double MIN_TEMPERATURE = -80.0;
     public static final double MAX_TEMPERATURE = 60.0;
@@ -46,8 +53,42 @@ public record WeatherSample(
             0.15,
             0.0,
             0.0,
-            PrecipitationType.NONE
+            PrecipitationType.NONE,
+            0.0,
+            0.0,
+            WindVector.ZERO
     );
+
+    /**
+     * Backward-compatible constructor for integrations that provide only the
+     * original horizontal atmosphere fields.
+     */
+    public WeatherSample(
+            double temperature,
+            double humidity,
+            double pressure,
+            WindVector wind,
+            double cloudWater,
+            double instability,
+            double stormEnergy,
+            double precipitationIntensity,
+            PrecipitationType precipitationType
+    ) {
+        this(
+                temperature,
+                humidity,
+                pressure,
+                wind,
+                cloudWater,
+                instability,
+                stormEnergy,
+                precipitationIntensity,
+                precipitationType,
+                0.0,
+                unit(cloudWater * 0.55 + instability * 0.25 + stormEnergy * 0.35),
+                wind
+        );
+    }
 
     public WeatherSample {
         temperature = clamp(finiteOr(temperature, CLEAR_TEMPERATURE), MIN_TEMPERATURE, MAX_TEMPERATURE);
@@ -66,6 +107,13 @@ public record WeatherSample(
         if (precipitationIntensity == 0.0) {
             precipitationType = PrecipitationType.NONE;
         }
+        verticalMotion = clamp(finiteOr(verticalMotion, 0.0), -1.0, 1.0);
+        cloudDepth = unit(cloudDepth);
+        WindVector safeCloudWind = Objects.requireNonNullElse(cloudWind, wind);
+        cloudWind = new WindVector(
+                clamp(finiteOr(safeCloudWind.x(), wind.x()), -MAX_WIND_COMPONENT, MAX_WIND_COMPONENT),
+                clamp(finiteOr(safeCloudWind.z(), wind.z()), -MAX_WIND_COMPONENT, MAX_WIND_COMPONENT)
+        );
     }
 
     /** Returns whether this position currently has any measurable precipitation. */
@@ -117,6 +165,27 @@ public record WeatherSample(
         return precipitationIntensity >= 0.25 && stormEnergy >= 0.55 && thunderIntensity() >= 0.35;
     }
 
+    /** Returns a bounded dew-point estimate used by cloud-base presentation. */
+    public double dewPointCelsius() {
+        double safeHumidity = Math.max(0.01, humidity);
+        double gamma = Math.log(safeHumidity) + 17.625 * temperature / (243.04 + temperature);
+        return clamp(243.04 * gamma / (17.625 - gamma), MIN_TEMPERATURE, MAX_TEMPERATURE);
+    }
+
+    /** Returns the lifecycle implied by vertical development and precipitation. */
+    public StormStage stormStage() {
+        if (stormEnergy < 0.12 && cloudWater < 0.20) {
+            return StormStage.CALM;
+        }
+        if (precipitationIntensity >= 0.20 && stormEnergy >= 0.42) {
+            return StormStage.MATURE;
+        }
+        if (verticalMotion > 0.08 && instability >= 0.32) {
+            return StormStage.DEVELOPING;
+        }
+        return StormStage.DISSIPATING;
+    }
+
     /** Smoothly interpolates every continuous field between two samples. */
     public static WeatherSample interpolate(WeatherSample from, WeatherSample to, double alpha) {
         WeatherSample safeFrom = Objects.requireNonNullElse(from, CLEAR);
@@ -134,7 +203,10 @@ public record WeatherSample(
                 lerp(safeFrom.instability, safeTo.instability, t),
                 lerp(safeFrom.stormEnergy, safeTo.stormEnergy, t),
                 intensity,
-                type
+                type,
+                lerp(safeFrom.verticalMotion, safeTo.verticalMotion, t),
+                lerp(safeFrom.cloudDepth, safeTo.cloudDepth, t),
+                WindVector.lerp(safeFrom.cloudWind, safeTo.cloudWind, t)
         );
     }
 

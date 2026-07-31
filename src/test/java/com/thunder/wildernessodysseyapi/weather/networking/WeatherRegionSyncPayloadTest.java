@@ -39,7 +39,11 @@ class WeatherRegionSyncPayloadTest {
                 0.51f,
                 0.89f,
                 0.77f,
-                PrecipitationType.SNOW
+                PrecipitationType.SNOW,
+                0.46f,
+                0.81f,
+                -0.18f,
+                0.91f
         );
         var original = new WeatherRegionSyncPayload(
                 OVERWORLD,
@@ -80,6 +84,10 @@ class WeatherRegionSyncPayloadTest {
             assertEquals(0.89f, decodedCell.stormEnergy(), 1.0f / 255.0f);
             assertEquals(0.77f, decodedCell.precipitationIntensity(), 1.0f / 63.0f);
             assertEquals(PrecipitationType.SNOW, decodedCell.precipitationType());
+            assertEquals(0.46f, decodedCell.verticalMotion(), 1.0f / 32_767.0f);
+            assertEquals(0.81f, decodedCell.cloudDepth(), 1.0f / 255.0f);
+            assertEquals(-0.18f, decodedCell.cloudWindX(), 1.0f / 32_767.0f);
+            assertEquals(0.91f, decodedCell.cloudWindZ(), 1.0f / 32_767.0f);
         } finally {
             buffer.release();
         }
@@ -249,7 +257,9 @@ class WeatherRegionSyncPayloadTest {
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         try {
             WeatherRegionSyncPayload.STREAM_CODEC.encode(buffer, payload);
-            buffer.setByte(buffer.writerIndex() - 1, 0b1100_0000);
+            // Version two appends seven vertical/cloud-wind bytes after the
+            // packed precipitation byte.
+            buffer.setByte(buffer.writerIndex() - 8, 0b1100_0000);
 
             assertThrows(
                     IllegalArgumentException.class,

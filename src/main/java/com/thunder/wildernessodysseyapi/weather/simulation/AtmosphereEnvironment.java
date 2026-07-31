@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.simulation;
 
+import com.thunder.wildernessodysseyapi.weather.api.WindVector;
+
 /**
  * Immutable world-derived input captured before atmospheric calculation.
  *
@@ -15,6 +17,11 @@ package com.thunder.wildernessodysseyapi.weather.simulation;
  * @param dimensionTemperatureOffset dimension-specific temperature adjustment
  * @param seasonalTemperatureOffset optional season integration adjustment
  * @param atmosphericVariation deterministic local variation in {@code [-1, 1]}
+ * @param seasonalStorminessOffset seasonal convective adjustment in {@code [-1, 1]}
+ * @param seasonalEvaporationMultiplier seasonal evaporation multiplier
+ * @param terrainGradientX average terrain rise toward positive X
+ * @param terrainGradientZ average terrain rise toward positive Z
+ * @param terrainRoughness normalized local relief
  */
 public record AtmosphereEnvironment(
         double biomeTemperatureCelsius,
@@ -24,7 +31,12 @@ public record AtmosphereEnvironment(
         double daylight,
         double dimensionTemperatureOffset,
         double seasonalTemperatureOffset,
-        double atmosphericVariation
+        double atmosphericVariation,
+        double seasonalStorminessOffset,
+        double seasonalEvaporationMultiplier,
+        double terrainGradientX,
+        double terrainGradientZ,
+        double terrainRoughness
 ) {
     public static final AtmosphereEnvironment TEMPERATE = new AtmosphereEnvironment(
             15.0,
@@ -34,8 +46,41 @@ public record AtmosphereEnvironment(
             0.5,
             0.0,
             0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
             0.0
     );
+
+    /** Retains the original environment constructor for API and test callers. */
+    public AtmosphereEnvironment(
+            double biomeTemperatureCelsius,
+            double biomeHumidity,
+            double elevationBlocks,
+            double waterCoverage,
+            double daylight,
+            double dimensionTemperatureOffset,
+            double seasonalTemperatureOffset,
+            double atmosphericVariation
+    ) {
+        this(
+                biomeTemperatureCelsius,
+                biomeHumidity,
+                elevationBlocks,
+                waterCoverage,
+                daylight,
+                dimensionTemperatureOffset,
+                seasonalTemperatureOffset,
+                atmosphericVariation,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0
+        );
+    }
 
     public AtmosphereEnvironment {
         biomeTemperatureCelsius = clamp(finiteOr(biomeTemperatureCelsius, 15.0), -80.0, 60.0);
@@ -46,6 +91,15 @@ public record AtmosphereEnvironment(
         dimensionTemperatureOffset = clamp(finiteOr(dimensionTemperatureOffset, 0.0), -50.0, 50.0);
         seasonalTemperatureOffset = clamp(finiteOr(seasonalTemperatureOffset, 0.0), -30.0, 30.0);
         atmosphericVariation = clamp(finiteOr(atmosphericVariation, 0.0), -1.0, 1.0);
+        seasonalStorminessOffset = clamp(finiteOr(seasonalStorminessOffset, 0.0), -1.0, 1.0);
+        seasonalEvaporationMultiplier = clamp(
+                finiteOr(seasonalEvaporationMultiplier, 1.0),
+                0.25,
+                2.0
+        );
+        terrainGradientX = clamp(finiteOr(terrainGradientX, 0.0), -1.0, 1.0);
+        terrainGradientZ = clamp(finiteOr(terrainGradientZ, 0.0), -1.0, 1.0);
+        terrainRoughness = unit(terrainRoughness);
     }
 
     /**
@@ -68,7 +122,24 @@ public record AtmosphereEnvironment(
     public double evaporationPotential(double temperature, double windMagnitude) {
         double warmth = clamp((temperature + 10.0) / 45.0, 0.05, 1.0);
         double ventilation = clamp(0.6 + Math.max(0.0, windMagnitude) * 0.4, 0.6, 1.2);
-        return unit((waterCoverage * 0.85 + biomeHumidity * 0.15) * warmth * ventilation);
+        return unit((waterCoverage * 0.85 + biomeHumidity * 0.15)
+                * warmth
+                * ventilation
+                * seasonalEvaporationMultiplier);
+    }
+
+    /**
+     * Returns windward terrain lift without reading terrain during simulation.
+     *
+     * <p>The cached gradient is a rise-over-run value. Only uphill flow
+     * contributes; leeward flow instead receives no artificial uplift.</p>
+     */
+    public double orographicLift(WindVector wind) {
+        if (wind == null) {
+            return 0.0;
+        }
+        double uphill = wind.x() * terrainGradientX + wind.z() * terrainGradientZ;
+        return unit(Math.max(0.0, uphill) * 4.0 + terrainRoughness * wind.magnitude() * 0.12);
     }
 
     private static double unit(double value) {

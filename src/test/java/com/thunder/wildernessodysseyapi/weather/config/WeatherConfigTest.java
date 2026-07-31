@@ -101,6 +101,17 @@ class WeatherConfigTest {
     }
 
     @Test
+    void seasonSettingsClampPackBalanceValues() {
+        WeatherConfig.SeasonSettings settings =
+                new WeatherConfig.SeasonSettings(true, 50.0, -2.0, Double.NaN);
+
+        assertTrue(settings.enabled());
+        assertEquals(20.0, settings.temperatureAmplitudeCelsius());
+        assertEquals(0.0, settings.humidityAmplitude());
+        assertEquals(0.0, settings.storminessAmplitude());
+    }
+
+    @Test
     void denylistOverridesAllowlistAndEmptyAllowlistPermitsNormalDimensions() {
         WeatherConfig.SchedulingSettings selected = new WeatherConfig.SchedulingSettings(
                 true, 256, 60, 2, 2_400, 400, 60, 4_096,

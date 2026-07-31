@@ -8,6 +8,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PrecipitationVisualModelTest {
 
     @Test
+    void topOfColumnLeansUpwindSoFallingPrecipitationLandsDownwind() {
+        float rain = PrecipitationVisualModel.topWindOffset(0.8, 32.0, 10.0, false);
+        float snow = PrecipitationVisualModel.topWindOffset(0.8, 32.0, 10.0, true);
+
+        assertEquals(-5.44F, rain, 1.0E-6F);
+        assertEquals(-8.0F, snow, 1.0E-6F);
+    }
+
+    @Test
     void nearOpacityUsesTheSampledColumnInsteadOfCameraWeather() {
         assertEquals(0.0F, PrecipitationVisualModel.nearAlpha(0.0, 3.0, 10, false));
         assertTrue(PrecipitationVisualModel.nearAlpha(0.8, 3.0, 10, false) > 0.5F);

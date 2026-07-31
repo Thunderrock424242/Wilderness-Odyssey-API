@@ -14,8 +14,14 @@ import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
  * @param precipitationIntensity active rain or snow intensity
  * @param stormEnergy accumulated severe-weather energy
  * @param instability convective instability
+ * @param temperature air temperature in degrees Celsius
+ * @param humidity relative humidity
+ * @param verticalMotion normalized rising or sinking air
+ * @param cloudDepth normalized vertical cloud development
  * @param windX east-west atmospheric motion
  * @param windZ north-south atmospheric motion
+ * @param cloudWindX east-west motion at cloud altitude
+ * @param cloudWindZ north-south motion at cloud altitude
  * @param support fraction of the spatial sample backed by synchronized cells
  */
 public record CloudFieldSample(
@@ -23,19 +29,64 @@ public record CloudFieldSample(
         double precipitationIntensity,
         double stormEnergy,
         double instability,
+        double temperature,
+        double humidity,
+        double verticalMotion,
+        double cloudDepth,
         double windX,
         double windZ,
+        double cloudWindX,
+        double cloudWindZ,
         double support
 ) {
-    public static final CloudFieldSample CLEAR = new CloudFieldSample(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    public static final CloudFieldSample CLEAR = new CloudFieldSample(
+            0.0, 0.0, 0.0, 0.0, 15.0, 0.45, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0
+    );
+
+    /**
+     * Keeps the original render-sample constructor available for focused
+     * callers that do not yet need the vertical cloud-column fields.
+     */
+    public CloudFieldSample(
+            double cloudWater,
+            double precipitationIntensity,
+            double stormEnergy,
+            double instability,
+            double windX,
+            double windZ,
+            double support
+    ) {
+        this(
+                cloudWater,
+                precipitationIntensity,
+                stormEnergy,
+                instability,
+                15.0,
+                0.45,
+                0.0,
+                Math.max(cloudWater, stormEnergy),
+                windX,
+                windZ,
+                windX,
+                windZ,
+                support
+        );
+    }
 
     public CloudFieldSample {
         cloudWater = unit(cloudWater);
         precipitationIntensity = unit(precipitationIntensity);
         stormEnergy = unit(stormEnergy);
         instability = unit(instability);
+        temperature = clamp(finiteOrZero(temperature), WeatherSample.MIN_TEMPERATURE, WeatherSample.MAX_TEMPERATURE);
+        humidity = unit(humidity);
+        verticalMotion = clamp(finiteOrZero(verticalMotion), -1.0, 1.0);
+        cloudDepth = unit(cloudDepth);
         windX = clamp(finiteOrZero(windX), -1.0, 1.0);
         windZ = clamp(finiteOrZero(windZ), -1.0, 1.0);
+        cloudWindX = clamp(finiteOrZero(cloudWindX), -1.0, 1.0);
+        cloudWindZ = clamp(finiteOrZero(cloudWindZ), -1.0, 1.0);
         support = unit(support);
     }
 
@@ -69,8 +120,14 @@ public record CloudFieldSample(
         double precipitation = 0.0;
         double stormEnergy = 0.0;
         double instability = 0.0;
+        double temperature = 0.0;
+        double humidity = 0.0;
+        double verticalMotion = 0.0;
+        double cloudDepth = 0.0;
         double windX = 0.0;
         double windZ = 0.0;
+        double cloudWindX = 0.0;
+        double cloudWindZ = 0.0;
         for (int index = 0; index < samples.length; index++) {
             WeatherSample sample = samples[index];
             if (sample == null) {
@@ -82,8 +139,14 @@ public record CloudFieldSample(
             precipitation += sample.precipitationIntensity() * weight;
             stormEnergy += sample.stormEnergy() * weight;
             instability += sample.instability() * weight;
+            temperature += sample.temperature() * weight;
+            humidity += sample.humidity() * weight;
+            verticalMotion += sample.verticalMotion() * weight;
+            cloudDepth += sample.cloudDepth() * weight;
             windX += sample.wind().x() * weight;
             windZ += sample.wind().z() * weight;
+            cloudWindX += sample.cloudWind().x() * weight;
+            cloudWindZ += sample.cloudWind().z() * weight;
         }
         if (support <= 1.0E-9) {
             return CLEAR;
@@ -95,8 +158,14 @@ public record CloudFieldSample(
                 precipitation * normalization,
                 stormEnergy * normalization,
                 instability * normalization,
+                temperature * normalization,
+                humidity * normalization,
+                verticalMotion * normalization,
+                cloudDepth * normalization,
                 windX * normalization,
                 windZ * normalization,
+                cloudWindX * normalization,
+                cloudWindZ * normalization,
                 support
         );
     }
@@ -123,10 +192,22 @@ public record CloudFieldSample(
                         safeTo.stormEnergy, safeTo.support, alpha, support),
                 interpolateEffective(safeFrom.instability, safeFrom.support,
                         safeTo.instability, safeTo.support, alpha, support),
+                interpolateEffective(safeFrom.temperature, safeFrom.support,
+                        safeTo.temperature, safeTo.support, alpha, support),
+                interpolateEffective(safeFrom.humidity, safeFrom.support,
+                        safeTo.humidity, safeTo.support, alpha, support),
+                interpolateEffective(safeFrom.verticalMotion, safeFrom.support,
+                        safeTo.verticalMotion, safeTo.support, alpha, support),
+                interpolateEffective(safeFrom.cloudDepth, safeFrom.support,
+                        safeTo.cloudDepth, safeTo.support, alpha, support),
                 interpolateEffective(safeFrom.windX, safeFrom.support,
                         safeTo.windX, safeTo.support, alpha, support),
                 interpolateEffective(safeFrom.windZ, safeFrom.support,
                         safeTo.windZ, safeTo.support, alpha, support),
+                interpolateEffective(safeFrom.cloudWindX, safeFrom.support,
+                        safeTo.cloudWindX, safeTo.support, alpha, support),
+                interpolateEffective(safeFrom.cloudWindZ, safeFrom.support,
+                        safeTo.cloudWindZ, safeTo.support, alpha, support),
                 support
         );
     }
