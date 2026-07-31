@@ -38,6 +38,23 @@ public final class PrecipitationVisualModel {
     }
 
     /**
+     * Returns the top-of-column offset needed for precipitation that lands
+     * downwind at the unshifted bottom coordinate.
+     */
+    public static float topWindOffset(
+            double windComponent,
+            double columnHeight,
+            double maximumSlantBlocks,
+            boolean snow
+    ) {
+        double boundedWind = Math.max(-1.0, Math.min(1.0, finiteOrZero(windComponent)));
+        double heightResponse = Math.min(1.0, Math.max(0.0, columnHeight) / 32.0);
+        double drag = snow ? 1.0 : 0.68;
+        double maximum = Math.max(0.0, finiteOrZero(maximumSlantBlocks));
+        return (float) (-boundedWind * maximum * heightResponse * drag);
+    }
+
+    /**
      * Returns a symmetric lattice radius whose circle cannot exceed the cap.
      */
     public static int boundedDistantRadiusBlocks(int requestedBlocks, int spacingBlocks, int maximumShafts) {
@@ -89,5 +106,9 @@ public final class PrecipitationVisualModel {
 
     private static float unit(float value) {
         return Math.max(0.0F, Math.min(1.0F, Float.isFinite(value) ? value : 0.0F));
+    }
+
+    private static double finiteOrZero(double value) {
+        return Double.isFinite(value) ? value : 0.0;
     }
 }

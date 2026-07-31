@@ -14,12 +14,17 @@ class WeatherRenderingConfigTest {
         WeatherRenderingConfig.Settings defaults = WeatherRenderingConfig.settings();
 
         assertTrue(defaults.enabled());
+        assertTrue(defaults.volumetricClouds());
         assertEquals(384, defaults.renderDistanceBlocks());
         assertEquals(5, defaults.rebuildIntervalTicks());
         assertEquals(6.0, defaults.windDetailSpeedBlocksPerSecond(), 1.0E-12);
         assertEquals(4_096, defaults.maximumCloudTiles());
         assertEquals(1.0, defaults.opacityMultiplier(), 1.0E-12);
+        assertEquals(8, defaults.volumetricLayerCount());
+        assertEquals(0.65, defaults.volumetricDetailStrength(), 1.0E-12);
         assertTrue(defaults.distantRainShafts());
+        assertTrue(defaults.windDrivenPrecipitation());
+        assertEquals(10.0, defaults.precipitationWindSlantBlocks(), 1.0E-12);
         assertEquals(96, defaults.distantRainDistanceBlocks());
         assertEquals(6, defaults.distantRainSpacingBlocks());
         assertEquals(768, defaults.maximumDistantRainShafts());

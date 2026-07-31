@@ -49,7 +49,7 @@ public record WeatherRegionSyncPayload(
 ) implements CustomPacketPayload {
 
     /** Current atmospheric snapshot schema understood by server and client. */
-    public static final int DATA_VERSION = 1;
+    public static final int DATA_VERSION = 2;
     /** Descriptive alias used by payload construction and validation code. */
     public static final int CURRENT_DATA_VERSION = DATA_VERSION;
     /** Hard cap for a 17 by 17 region around one player. */
@@ -164,6 +164,10 @@ public record WeatherRegionSyncPayload(
             int precipitation = precipitationTypeId(cell.precipitationType) << 6;
             precipitation |= PrecipitationIntensity.quantize(cell.precipitationIntensity);
             buffer.writeByte(precipitation);
+            buffer.writeShort(quantizeSignedUnit(cell.verticalMotion));
+            buffer.writeByte(quantizeUnit(cell.cloudDepth, UNSIGNED_BYTE_MAX));
+            buffer.writeShort(quantizeSignedUnit(cell.cloudWindX));
+            buffer.writeShort(quantizeSignedUnit(cell.cloudWindZ));
         }
     }
 
@@ -228,6 +232,10 @@ public record WeatherRegionSyncPayload(
             float precipitationIntensity = PrecipitationIntensity.dequantize(
                     precipitation & PrecipitationIntensity.QUANTIZED_MAX
             );
+            float verticalMotion = dequantizeSignedUnit(buffer.readShort());
+            float cloudDepth = dequantizeUnit(buffer.readUnsignedByte(), UNSIGNED_BYTE_MAX);
+            float cloudWindX = dequantizeSignedUnit(buffer.readShort());
+            float cloudWindZ = dequantizeSignedUnit(buffer.readShort());
             cells.add(new CellSnapshot(
                     cellX,
                     cellZ,
@@ -241,7 +249,11 @@ public record WeatherRegionSyncPayload(
                     instability,
                     stormEnergy,
                     precipitationIntensity,
-                    precipitationType
+                    precipitationType,
+                    verticalMotion,
+                    cloudDepth,
+                    cloudWindX,
+                    cloudWindZ
             ));
         }
 
@@ -365,8 +377,48 @@ public record WeatherRegionSyncPayload(
             float instability,
             float stormEnergy,
             float precipitationIntensity,
-            PrecipitationType precipitationType
+            PrecipitationType precipitationType,
+            float verticalMotion,
+            float cloudDepth,
+            float cloudWindX,
+            float cloudWindZ
     ) {
+        /** Preserves the version-one construction shape for focused callers. */
+        public CellSnapshot(
+                int cellX,
+                int cellZ,
+                long revision,
+                float temperature,
+                float humidity,
+                float pressure,
+                float windX,
+                float windZ,
+                float cloudWater,
+                float instability,
+                float stormEnergy,
+                float precipitationIntensity,
+                PrecipitationType precipitationType
+        ) {
+            this(
+                    cellX,
+                    cellZ,
+                    revision,
+                    temperature,
+                    humidity,
+                    pressure,
+                    windX,
+                    windZ,
+                    cloudWater,
+                    instability,
+                    stormEnergy,
+                    precipitationIntensity,
+                    precipitationType,
+                    0.0f,
+                    Math.max(cloudWater, stormEnergy),
+                    windX,
+                    windZ
+            );
+        }
 
         public CellSnapshot {
             if (revision < 0L) {
@@ -385,7 +437,10 @@ public record WeatherRegionSyncPayload(
                     instability,
                     stormEnergy,
                     precipitationIntensity,
-                    precipitationType
+                    precipitationType,
+                    verticalMotion,
+                    cloudDepth,
+                    new WindVector(cloudWindX, cloudWindZ)
             );
             temperature = (float) bounded.temperature();
             humidity = (float) bounded.humidity();
@@ -397,6 +452,10 @@ public record WeatherRegionSyncPayload(
             stormEnergy = (float) bounded.stormEnergy();
             precipitationIntensity = (float) bounded.precipitationIntensity();
             precipitationType = bounded.precipitationType();
+            verticalMotion = (float) bounded.verticalMotion();
+            cloudDepth = (float) bounded.cloudDepth();
+            cloudWindX = (float) bounded.cloudWind().x();
+            cloudWindZ = (float) bounded.cloudWind().z();
         }
 
         /** Copies one immutable grid view into its network representation. */
@@ -426,7 +485,11 @@ public record WeatherRegionSyncPayload(
                     (float) sample.instability(),
                     (float) sample.stormEnergy(),
                     (float) sample.precipitationIntensity(),
-                    sample.precipitationType()
+                    sample.precipitationType(),
+                    (float) sample.verticalMotion(),
+                    (float) sample.cloudDepth(),
+                    (float) sample.cloudWind().x(),
+                    (float) sample.cloudWind().z()
             );
         }
 
@@ -441,7 +504,10 @@ public record WeatherRegionSyncPayload(
                     instability,
                     stormEnergy,
                     precipitationIntensity,
-                    precipitationType
+                    precipitationType,
+                    verticalMotion,
+                    cloudDepth,
+                    new WindVector(cloudWindX, cloudWindZ)
             );
         }
     }

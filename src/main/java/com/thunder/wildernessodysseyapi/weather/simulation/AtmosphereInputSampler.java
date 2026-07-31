@@ -76,7 +76,8 @@ public final class AtmosphereInputSampler {
                 cellSize,
                 refresh
         );
-        SeasonalWeatherInfluence.SeasonalOffset season = seasonalInfluence.sample(level, cell);
+        SeasonalWeatherInfluence.SeasonalOffset season =
+                seasonalInfluence.sample(level, cell, cellSize);
         Climate climate = cached.climate;
         double humidity = clamp01(climate.humidity + season.humidity());
         return new AtmosphereEnvironment(
@@ -87,7 +88,12 @@ public final class AtmosphereInputSampler {
                 daylight(level),
                 dimensionTemperatureOffset(level.dimensionType()),
                 season.temperatureCelsius(),
-                deterministicVariation(level.getSeed(), cell.packed())
+                deterministicVariation(level.getSeed(), cell.packed()),
+                season.storminess(),
+                season.evaporationMultiplier(),
+                climate.terrainGradientX,
+                climate.terrainGradientZ,
+                climate.terrainRoughness
         );
     }
 
@@ -104,6 +110,8 @@ public final class AtmosphereInputSampler {
         double temperature = 0.0;
         double humidity = 0.0;
         double elevation = 0.0;
+        double[][] probeElevations = new double[CLIMATE_PROBES_PER_AXIS][CLIMATE_PROBES_PER_AXIS];
+        boolean[][] probeLoaded = new boolean[CLIMATE_PROBES_PER_AXIS][CLIMATE_PROBES_PER_AXIS];
         int loaded = 0;
 
         for (int probeZ = 0; probeZ < CLIMATE_PROBES_PER_AXIS; probeZ++) {
@@ -130,6 +138,8 @@ public final class AtmosphereInputSampler {
                 temperature += (minecraftTemperature - 0.15) * 25.0;
                 humidity += biome.hasPrecipitation() ? downfall : downfall * 0.25;
                 elevation += surfaceY;
+                probeElevations[probeZ][probeX] = surfaceY;
+                probeLoaded[probeZ][probeX] = true;
                 loaded++;
             }
         }
@@ -138,18 +148,65 @@ public final class AtmosphereInputSampler {
             return Climate.UNKNOWN;
         }
         double inverse = 1.0 / loaded;
-        return new Climate(temperature * inverse, humidity * inverse, elevation * inverse, loaded);
+        double meanElevation = elevation * inverse;
+        double gradientScale = Math.max(1.0, size * (2.0 / 3.0));
+        double gradientX = edgeAverage(probeElevations, probeLoaded, true, false, meanElevation)
+                - edgeAverage(probeElevations, probeLoaded, true, true, meanElevation);
+        double gradientZ = edgeAverage(probeElevations, probeLoaded, false, false, meanElevation)
+                - edgeAverage(probeElevations, probeLoaded, false, true, meanElevation);
+        double variance = 0.0;
+        for (int probeZ = 0; probeZ < CLIMATE_PROBES_PER_AXIS; probeZ++) {
+            for (int probeX = 0; probeX < CLIMATE_PROBES_PER_AXIS; probeX++) {
+                if (!probeLoaded[probeZ][probeX]) {
+                    continue;
+                }
+                double delta = probeElevations[probeZ][probeX] - meanElevation;
+                variance += delta * delta;
+            }
+        }
+        double roughness = clamp01(Math.sqrt(variance * inverse) / 48.0);
+        return new Climate(
+                temperature * inverse,
+                humidity * inverse,
+                meanElevation,
+                loaded,
+                gradientX / gradientScale,
+                gradientZ / gradientScale,
+                roughness
+        );
     }
 
     private static Climate dimensionFallback(ServerLevel level) {
         DimensionType dimension = level.dimensionType();
         if (dimension.ultraWarm()) {
-            return new Climate(38.0, 0.12, 64.0, 1);
+            return new Climate(38.0, 0.12, 64.0, 1, 0.0, 0.0, 0.0);
         }
         if (dimension.hasCeiling()) {
-            return new Climate(12.0, 0.42, 64.0, 1);
+            return new Climate(12.0, 0.42, 64.0, 1, 0.0, 0.0, 0.0);
         }
-        return new Climate(15.0, 0.45, 64.0, 1);
+        return new Climate(15.0, 0.45, 64.0, 1, 0.0, 0.0, 0.0);
+    }
+
+    private static double edgeAverage(
+            double[][] elevations,
+            boolean[][] loaded,
+            boolean xAxis,
+            boolean minimumEdge,
+            double fallback
+    ) {
+        int fixedIndex = minimumEdge ? 0 : CLIMATE_PROBES_PER_AXIS - 1;
+        double total = 0.0;
+        int count = 0;
+        for (int index = 0; index < CLIMATE_PROBES_PER_AXIS; index++) {
+            int z = xAxis ? index : fixedIndex;
+            int x = xAxis ? fixedIndex : index;
+            if (!loaded[z][x]) {
+                continue;
+            }
+            total += elevations[z][x];
+            count++;
+        }
+        return count == 0 ? fallback : total / count;
     }
 
     private static double daylight(ServerLevel level) {
@@ -198,8 +255,16 @@ public final class AtmosphereInputSampler {
     private record CachedClimate(long sampledAtTick, Climate climate) {
     }
 
-    private record Climate(double temperatureCelsius, double humidity, double elevation, int loadedProbes) {
-        private static final Climate UNKNOWN = new Climate(0.0, 0.0, 0.0, 0);
+    private record Climate(
+            double temperatureCelsius,
+            double humidity,
+            double elevation,
+            int loadedProbes,
+            double terrainGradientX,
+            double terrainGradientZ,
+            double terrainRoughness
+    ) {
+        private static final Climate UNKNOWN = new Climate(0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0);
 
         private Climate withFallback(Climate fallback) {
             return loadedProbes > 0 ? this : fallback;

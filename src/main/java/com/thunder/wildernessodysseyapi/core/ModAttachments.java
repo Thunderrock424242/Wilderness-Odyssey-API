@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.core;
 
 import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.GeneratedWaterAttachmentSyncHandler;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -38,7 +39,13 @@ public final class ModAttachments {
             }).build()
     );
 
-    /** Persistent compact baseline recorded while a {@link net.minecraft.world.level.chunk.ProtoChunk} is generated. */
+    /**
+     * Persistent compact baseline recorded while a {@link net.minecraft.world.level.chunk.ProtoChunk} is generated.
+     *
+     * <p>The custom sync handler publishes the decoded client value immediately,
+     * because NeoForge delivers synchronized attachments after the client chunk
+     * load event used by the renderer's normal fast path.</p>
+     */
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<GeneratedWaterChunk>> GENERATED_WATER = ATTACHMENTS.register(
             "generated_water",
             () -> AttachmentType.serializable(holder -> {
@@ -47,7 +54,7 @@ public final class ModAttachments {
                     generated.setDirtyListener(() -> chunk.setUnsaved(true));
                 }
                 return generated;
-            }).sync(GeneratedWaterChunk.STREAM_CODEC).build()
+            }).sync(GeneratedWaterAttachmentSyncHandler.INSTANCE).build()
     );
 
     private ModAttachments() {

@@ -104,3 +104,17 @@ mandatory=true
 versionRange="[6.0.10,)"
 ordering="AFTER"
 side="BOTH"
+
+[[dependencies.wildernessodysseyapi]]
+modId="eclipticseasons"
+type="optional"
+versionRange=""
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.wildernessodysseyapi]]
+modId="sereneseasons"
+type="optional"
+versionRange=""
+ordering="AFTER"
+side="BOTH"

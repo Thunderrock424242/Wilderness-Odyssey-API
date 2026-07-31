@@ -120,6 +120,82 @@ class AtmosphereSimulationEngineTest {
         assertEquals(PrecipitationType.NONE, result.precipitationType());
     }
 
+    @Test
+    void windwardTerrainBuildsMoreVerticalCloudDevelopment() {
+        WeatherSample movingAir = new WeatherSample(
+                18.0,
+                0.85,
+                0.96,
+                new WindVector(0.8, 0.0),
+                0.62,
+                0.55,
+                0.35,
+                0.10,
+                PrecipitationType.RAIN
+        );
+        AtmosphereEnvironment flat = new AtmosphereEnvironment(
+                18.0, 0.85, 96.0, 0.0, 0.5, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0, 0.0
+        );
+        AtmosphereEnvironment windwardSlope = new AtmosphereEnvironment(
+                18.0, 0.85, 96.0, 0.0, 0.5, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.25, 0.0, 0.4
+        );
+
+        WeatherSample flatResult = engine.simulate(
+                movingAir,
+                flat,
+                AtmosphereSimulationEngine.Neighborhood.uniform(movingAir),
+                SimulationSettings.DEFAULT
+        );
+        WeatherSample liftedResult = engine.simulate(
+                movingAir,
+                windwardSlope,
+                AtmosphereSimulationEngine.Neighborhood.uniform(movingAir),
+                SimulationSettings.DEFAULT
+        );
+
+        assertTrue(liftedResult.verticalMotion() > flatResult.verticalMotion());
+        assertTrue(liftedResult.cloudDepth() > flatResult.cloudDepth());
+    }
+
+    @Test
+    void sharedFaceTransportConservesPairVaporInventory() {
+        WeatherSample west = sample(15.0, 0.80, 1.20, 0.0, 0.0, 0.0);
+        WeatherSample east = sample(15.0, 0.20, 0.80, 0.0, 0.0, 0.0);
+        SimulationSettings transportOnly = new SimulationSettings(
+                1.0, 0.8, 0.0, 0.0, 0.0,
+                0.99, 0.99, 1.0, 0.0, 0.0
+        );
+
+        WeatherSample westResult = engine.simulate(
+                west,
+                new AtmosphereEnvironment(15.0, 0.80, 64.0, 0.0, 0.5, 0.0, 0.0, 0.0),
+                new AtmosphereSimulationEngine.Neighborhood(west, east, west, west),
+                transportOnly
+        );
+        WeatherSample eastResult = engine.simulate(
+                east,
+                new AtmosphereEnvironment(15.0, 0.20, 64.0, 0.0, 0.5, 0.0, 0.0, 0.0),
+                new AtmosphereSimulationEngine.Neighborhood(east, east, east, west),
+                transportOnly
+        );
+
+        double before = AtmosphericThermodynamics.vaporContent(15.0, west.humidity())
+                + AtmosphericThermodynamics.vaporContent(15.0, east.humidity());
+        double after = AtmosphericThermodynamics.vaporContent(
+                westResult.temperature(),
+                westResult.humidity()
+        ) + AtmosphericThermodynamics.vaporContent(
+                eastResult.temperature(),
+                eastResult.humidity()
+        );
+
+        assertEquals(before, after, 1.0E-9);
+        assertTrue(westResult.humidity() < west.humidity());
+        assertTrue(eastResult.humidity() > east.humidity());
+    }
+
     private static WeatherSample sample(
             double temperature,
             double humidity,

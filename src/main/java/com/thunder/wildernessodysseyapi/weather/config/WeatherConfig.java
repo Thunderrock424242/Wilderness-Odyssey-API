@@ -40,6 +40,10 @@ public final class WeatherConfig {
     public static final ModConfigSpec.DoubleValue STORM_FORMATION_THRESHOLD;
     public static final ModConfigSpec.DoubleValue MAXIMUM_PRECIPITATION_INTENSITY;
     public static final ModConfigSpec.DoubleValue RANDOM_VARIATION;
+    public static final ModConfigSpec.BooleanValue SEASON_INTEGRATION_ENABLED;
+    public static final ModConfigSpec.DoubleValue SEASON_TEMPERATURE_AMPLITUDE_CELSIUS;
+    public static final ModConfigSpec.DoubleValue SEASON_HUMIDITY_AMPLITUDE;
+    public static final ModConfigSpec.DoubleValue SEASON_STORMINESS_AMPLITUDE;
     public static final ModConfigSpec.BooleanValue LOCALIZED_LIGHTNING_ENABLED;
     public static final ModConfigSpec.IntValue LIGHTNING_CHECK_INTERVAL_TICKS;
     public static final ModConfigSpec.IntValue LIGHTNING_DIMENSION_COOLDOWN_TICKS;
@@ -129,6 +133,22 @@ public final class WeatherConfig {
         RANDOM_VARIATION = builder
                 .comment("Maximum deterministic local atmospheric variation; this never uses per-tick random preset switching.")
                 .defineInRange("randomVariation", 0.04, 0.0, 0.25);
+        builder.pop();
+
+        builder.comment("Optional read-only influence from installed season mods.")
+                .push("seasons");
+        SEASON_INTEGRATION_ENABLED = builder
+                .comment("Allow Ecliptic Seasons or Serene Seasons to shift atmospheric temperature, humidity, and storm potential.")
+                .define("enabled", true);
+        SEASON_TEMPERATURE_AMPLITUDE_CELSIUS = builder
+                .comment("Maximum temperate seasonal temperature shift in degrees Celsius.")
+                .defineInRange("temperatureAmplitudeCelsius", 8.0, 0.0, 20.0);
+        SEASON_HUMIDITY_AMPLITUDE = builder
+                .comment("Maximum seasonal relative-humidity shift.")
+                .defineInRange("humidityAmplitude", 0.12, 0.0, 0.40);
+        SEASON_STORMINESS_AMPLITUDE = builder
+                .comment("Maximum seasonal influence on convective storm development.")
+                .defineInRange("storminessAmplitude", 0.18, 0.0, 0.50);
         builder.pop();
 
         builder.comment("Server-owned localized lightning scheduling.")
@@ -236,6 +256,20 @@ public final class WeatherConfig {
             );
         } catch (IllegalStateException exception) {
             return LightningSettings.DEFAULT;
+        }
+    }
+
+    /** Returns bounded controls for optional Ecliptic/Serene season adapters. */
+    public static SeasonSettings seasons() {
+        try {
+            return new SeasonSettings(
+                    SEASON_INTEGRATION_ENABLED.get(),
+                    SEASON_TEMPERATURE_AMPLITUDE_CELSIUS.get(),
+                    SEASON_HUMIDITY_AMPLITUDE.get(),
+                    SEASON_STORMINESS_AMPLITUDE.get()
+            );
+        } catch (IllegalStateException exception) {
+            return SeasonSettings.DEFAULT;
         }
     }
 
@@ -392,6 +426,27 @@ public final class WeatherConfig {
 
         private static int clamp(int value, int minimum, int maximum) {
             return Math.max(minimum, Math.min(maximum, value));
+        }
+    }
+
+    /** Immutable balance controls shared by every optional season adapter. */
+    public record SeasonSettings(
+            boolean enabled,
+            double temperatureAmplitudeCelsius,
+            double humidityAmplitude,
+            double storminessAmplitude
+    ) {
+        public static final SeasonSettings DEFAULT = new SeasonSettings(true, 8.0, 0.12, 0.18);
+
+        public SeasonSettings {
+            temperatureAmplitudeCelsius = clamp(temperatureAmplitudeCelsius, 0.0, 20.0);
+            humidityAmplitude = clamp(humidityAmplitude, 0.0, 0.40);
+            storminessAmplitude = clamp(storminessAmplitude, 0.0, 0.50);
+        }
+
+        private static double clamp(double value, double minimum, double maximum) {
+            double finite = Double.isFinite(value) ? value : minimum;
+            return Math.max(minimum, Math.min(maximum, finite));
         }
     }
 

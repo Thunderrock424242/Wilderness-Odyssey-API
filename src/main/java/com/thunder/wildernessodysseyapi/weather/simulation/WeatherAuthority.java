@@ -9,9 +9,9 @@ import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindVector;
 import com.thunder.wildernessodysseyapi.weather.config.VanillaWeatherCompatibilityMode;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
-import com.thunder.wildernessodysseyapi.weather.integration.SeasonalWeatherInfluence;
 import com.thunder.wildernessodysseyapi.weather.integration.VanillaWeatherCommandAdapter;
 import com.thunder.wildernessodysseyapi.weather.integration.WildernessWeatherWaterInfluence;
+import com.thunder.wildernessodysseyapi.weather.integration.season.SeasonalWeatherIntegrations;
 import com.thunder.wildernessodysseyapi.weather.lightning.LocalizedLightningScheduler;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherRegionSyncPayload;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherSnapshotManager;
@@ -740,7 +740,7 @@ public final class WeatherAuthority implements WeatherQuery {
         return runtimes.computeIfAbsent(level, ignored -> new LevelRuntime(
                 new AtmosphereInputSampler(
                         new WildernessWeatherWaterInfluence(),
-                        SeasonalWeatherInfluence.NONE
+                        SeasonalWeatherIntegrations.discover()
                 ),
                 new LocalizedLightningScheduler(this)
         ));

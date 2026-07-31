@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.simulation;
 
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
+import com.thunder.wildernessodysseyapi.weather.api.StormStage;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindVector;
 
@@ -16,8 +17,9 @@ import java.util.function.ToDoubleFunction;
  * results by cell revision before applying them.</p>
  *
  * <p>One step applies environmental temperature relaxation, temperature-driven
- * pressure, pressure-driven wind, upwind temperature/moisture transport,
- * evaporation, condensation, precipitation loss, and storm-energy growth.</p>
+ * pressure, pressure-driven wind, conservative face transport, vapor-capacity
+ * condensation, terrain/convergence lift, precipitation loss, vertical cloud
+ * development, and storm lifecycle hysteresis.</p>
  */
 public final class AtmosphereSimulationEngine {
     private static final double TEMPERATURE_RELAXATION = 0.035;
@@ -76,26 +78,33 @@ public final class AtmosphereSimulationEngine {
                 approach(center.wind().z(), targetWindZ, windResponse)
         );
 
-        // Upwind advection moves temperature, vapor, and existing cloud moisture.
-        temperature = transport(
+        // Shared-face fluxes move air properties without the one-sided blur
+        // produced by selecting only one upwind neighbor.
+        temperature = conservativeTransport(
                 temperature,
-                wind,
+                center,
                 neighbors,
                 WeatherSample::temperature,
                 controls.temperatureTransportRate(),
                 step
         );
-        double humidity = transport(
-                center.humidity(),
-                wind,
+        double vapor = conservativeTransport(
+                AtmosphericThermodynamics.vaporContent(
+                        center.temperature(),
+                        center.humidity()
+                ),
+                center,
                 neighbors,
-                WeatherSample::humidity,
+                sample -> AtmosphericThermodynamics.vaporContent(
+                        sample.temperature(),
+                        sample.humidity()
+                ),
                 controls.humidityTransportRate(),
                 step
         );
-        double cloudWater = transport(
+        double cloudWater = conservativeTransport(
                 center.cloudWater(),
-                wind,
+                center,
                 neighbors,
                 WeatherSample::cloudWater,
                 controls.humidityTransportRate() * 0.8,
@@ -103,43 +112,85 @@ public final class AtmosphereSimulationEngine {
         );
 
         // Humid biomes and cached surface water restore vapor without scanning blocks.
-        humidity = approach(humidity, inputs.biomeHumidity(), boundedRate(0.02, step));
+        double vaporCapacity = AtmosphericThermodynamics.saturationCapacity(temperature);
+        double environmentalVapor = inputs.biomeHumidity() * vaporCapacity;
+        vapor = approach(vapor, environmentalVapor, boundedRate(0.02, step));
+        double humidity = AtmosphericThermodynamics.relativeHumidity(temperature, vapor);
         double evaporation = controls.evaporationStrength()
                 * inputs.evaporationPotential(temperature, wind.magnitude())
                 * (1.0 - unit(humidity))
                 * 0.08
                 * step;
-        humidity = unit(humidity + evaporation);
+        vapor += evaporation * vaporCapacity;
+        humidity = AtmosphericThermodynamics.relativeHumidity(temperature, vapor);
 
-        // Cooler air saturates sooner; excess vapor condenses into cloud water.
-        double saturationThreshold = clamp(
-                controls.cloudFormationThreshold() + (temperature - 15.0) * 0.004,
-                0.20,
-                0.98
-        );
-        double saturationExcess = Math.max(0.0, humidity - saturationThreshold);
-        double condensation = Math.min(
-                humidity,
-                saturationExcess * CLOUD_CONDENSATION_RATE * (0.75 + center.instability() * 0.25) * step
-        );
-        humidity = unit(humidity - condensation);
+        // Temperature-dependent vapor capacity makes cooling air condense even
+        // when its absolute moisture inventory has not changed.
+        double saturationInventory = vaporCapacity * controls.cloudFormationThreshold();
+        double saturationExcess = Math.max(0.0, vapor - saturationInventory);
+        double condensation = Math.min(humidity, saturationExcess / vaporCapacity)
+                * CLOUD_CONDENSATION_RATE
+                * (0.75 + center.instability() * 0.25)
+                * step;
+        vapor = Math.max(0.0, vapor - condensation * vaporCapacity);
+        humidity = AtmosphericThermodynamics.relativeHumidity(temperature, vapor);
         cloudWater = unit(cloudWater + condensation);
         double cloudDissipation = boundedRate(0.006 + (1.0 - humidity) * 0.008, step);
         cloudWater = approach(cloudWater, 0.0, cloudDissipation);
 
-        // Temperature contrast and moist air build convective instability.
+        // Convergence, buoyancy, and windward terrain build vertical motion.
         double temperatureContrast = unit(Math.abs(temperature - neighborTemperature) / 30.0);
-        double instabilityTarget = unit(humidity * 0.40 + temperatureContrast * 0.60);
+        double convergence = clamp(
+                (neighbors.west().wind().x() - neighbors.east().wind().x()
+                        + neighbors.north().wind().z() - neighbors.south().wind().z()) * 0.5,
+                -1.0,
+                1.0
+        );
+        double buoyancy = clamp((temperature - neighborTemperature) / 18.0, -1.0, 1.0);
+        double lowPressureSupport = unit((1.04 - pressure) / 0.20);
+        double liftTarget = clamp(
+                convergence * 0.38
+                        + buoyancy * 0.30
+                        + inputs.orographicLift(wind) * 0.42
+                        + lowPressureSupport * 0.16
+                        + inputs.seasonalStorminessOffset() * 0.28
+                        - center.precipitationIntensity() * 0.12,
+                -1.0,
+                1.0
+        );
+        double verticalMotion = approach(
+                center.verticalMotion(),
+                liftTarget,
+                boundedRate(0.14, step)
+        );
+
+        // Moisture, horizontal contrast, and ascent build convective instability.
+        double instabilityTarget = unit(
+                humidity * 0.34
+                        + temperatureContrast * 0.38
+                        + Math.max(0.0, verticalMotion) * 0.28
+                        + inputs.seasonalStorminessOffset() * 0.20
+        );
         double instability = approach(center.instability(), instabilityTarget, boundedRate(0.08, step));
 
-        // Moist, unstable, low-pressure cells accumulate persistent storm energy.
-        double lowPressureSupport = unit((1.04 - pressure) / 0.20);
-        double stormPotential = unit(humidity * instability * (0.55 + lowPressureSupport * 0.45));
+        // Mature storms decay more slowly than forming cells, preventing rapid
+        // threshold flicker while precipitation unloads the cloud column.
+        double stormPotential = unit(
+                humidity
+                        * instability
+                        * (0.44 + lowPressureSupport * 0.34
+                        + Math.max(0.0, verticalMotion) * 0.30)
+                        + inputs.seasonalStorminessOffset()
+        );
         double stormEnergy = center.stormEnergy();
         if (stormPotential > controls.stormFormationThreshold()) {
             stormEnergy += (stormPotential - controls.stormFormationThreshold()) * STORM_GROWTH * step;
         } else {
-            stormEnergy -= STORM_DECAY * step;
+            double lifecycleDecay = center.stormStage()
+                    == StormStage.MATURE
+                    ? STORM_DECAY * 0.45
+                    : STORM_DECAY;
+            stormEnergy -= lifecycleDecay * step;
         }
         stormEnergy = unit(stormEnergy);
 
@@ -150,7 +201,7 @@ public final class AtmosphereSimulationEngine {
                     / Math.max(0.01, 1.0 - controls.precipitationThreshold());
             precipitationTarget = unit(availableCloud)
                     * controls.maximumPrecipitationIntensity()
-                    * (0.75 + stormEnergy * 0.25);
+                    * (0.68 + stormEnergy * 0.22 + Math.max(0.0, verticalMotion) * 0.10);
         }
         double precipitationIntensity = approach(
                 center.precipitationIntensity(),
@@ -164,12 +215,34 @@ public final class AtmosphereSimulationEngine {
                 * (1.0 + stormEnergy * 0.25)
                 * step;
         cloudWater = unit(cloudWater - precipitationLoss);
-        humidity = unit(humidity - precipitationLoss * 0.15);
+        vapor = Math.max(0.0, vapor - precipitationLoss * vaporCapacity * 0.15);
+        humidity = AtmosphericThermodynamics.relativeHumidity(temperature, vapor);
+        double wetBulbTemperature = AtmosphericThermodynamics.wetBulbTemperature(
+                temperature,
+                humidity
+        );
         PrecipitationType precipitationType = precipitationIntensity <= 0.001
                 ? PrecipitationType.NONE
-                : temperature <= WeatherSample.SNOW_MAX_TEMPERATURE
+                : wetBulbTemperature <= WeatherSample.SNOW_MAX_TEMPERATURE
                         ? PrecipitationType.SNOW
                         : PrecipitationType.RAIN;
+
+        double cloudDepthTarget = unit(
+                cloudWater * 0.38
+                        + instability * 0.24
+                        + stormEnergy * 0.24
+                        + Math.max(0.0, verticalMotion) * 0.30
+        );
+        double cloudDepth = approach(center.cloudDepth(), cloudDepthTarget, boundedRate(0.12, step));
+        WindVector cloudWindTarget = new WindVector(
+                wind.x() - verticalMotion * wind.z() * 0.22,
+                wind.z() + verticalMotion * wind.x() * 0.22
+        );
+        WindVector cloudWind = WindVector.lerp(
+                center.cloudWind(),
+                cloudWindTarget,
+                boundedRate(0.10, step)
+        );
 
         return new WeatherSample(
                 temperature,
@@ -180,7 +253,10 @@ public final class AtmosphereSimulationEngine {
                 instability,
                 stormEnergy,
                 precipitationIntensity,
-                precipitationType
+                precipitationType,
+                verticalMotion,
+                cloudDepth,
+                cloudWind
         );
     }
 
@@ -194,25 +270,67 @@ public final class AtmosphereSimulationEngine {
         return simulate(current, environment, neighborhood, settings);
     }
 
-    private static double transport(
+    private static double conservativeTransport(
             double current,
-            WindVector wind,
+            WeatherSample center,
             Neighborhood neighbors,
             ToDoubleFunction<WeatherSample> value,
             double configuredRate,
             double step
     ) {
-        double xWeight = Math.abs(wind.x());
-        double zWeight = Math.abs(wind.z());
-        double weight = xWeight + zWeight;
-        if (weight <= 1.0e-9 || configuredRate <= 0.0) {
+        if (configuredRate <= 0.0) {
             return current;
         }
-        WeatherSample xSource = wind.x() >= 0.0 ? neighbors.west() : neighbors.east();
-        WeatherSample zSource = wind.z() >= 0.0 ? neighbors.north() : neighbors.south();
-        double source = (value.applyAsDouble(xSource) * xWeight + value.applyAsDouble(zSource) * zWeight) / weight;
-        double transportRate = boundedRate(configuredRate * Math.min(1.0, wind.magnitude()), step);
-        return approach(current, source, transportRate);
+
+        double eastFlux = faceFlux(
+                current,
+                value.applyAsDouble(neighbors.east()),
+                center,
+                neighbors.east(),
+                true
+        );
+        double westFlux = faceFlux(
+                value.applyAsDouble(neighbors.west()),
+                current,
+                neighbors.west(),
+                center,
+                true
+        );
+        double southFlux = faceFlux(
+                current,
+                value.applyAsDouble(neighbors.south()),
+                center,
+                neighbors.south(),
+                false
+        );
+        double northFlux = faceFlux(
+                value.applyAsDouble(neighbors.north()),
+                current,
+                neighbors.north(),
+                center,
+                false
+        );
+        double rate = boundedRate(configuredRate * 0.50, step);
+        return current + (westFlux - eastFlux + northFlux - southFlux) * rate;
+    }
+
+    private static double faceFlux(
+            double negativeSideValue,
+            double positiveSideValue,
+            WeatherSample negativeSide,
+            WeatherSample positiveSide,
+            boolean xAxis
+    ) {
+        double negativeWind = xAxis ? negativeSide.wind().x() : negativeSide.wind().z();
+        double positiveWind = xAxis ? positiveSide.wind().x() : positiveSide.wind().z();
+        double pressureVelocity = (negativeSide.pressure() - positiveSide.pressure())
+                * PRESSURE_TO_WIND;
+        double velocity = clamp(
+                pressureVelocity + (negativeWind + positiveWind) * 0.5,
+                -1.0,
+                1.0
+        );
+        return velocity * (velocity >= 0.0 ? negativeSideValue : positiveSideValue);
     }
 
     private static double boundedRate(double rate, double step) {

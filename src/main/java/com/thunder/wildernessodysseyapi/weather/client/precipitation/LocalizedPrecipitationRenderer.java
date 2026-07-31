@@ -7,6 +7,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
+import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import net.minecraft.client.Camera;
@@ -544,6 +545,7 @@ public final class LocalizedPrecipitationRenderer {
         );
         BlockPos.MutableBlockPos lightPos = new BlockPos.MutableBlockPos();
         double renderTicks = ticks + partialTick;
+        WeatherSample localWeather = ClientWeatherCoordinator.localSample(level);
         for (int index = 0; index < renderColumnCount; index++) {
             if (RENDER_TYPE[index] != type) {
                 continue;
@@ -564,6 +566,23 @@ public final class LocalizedPrecipitationRenderer {
             float z1 = (float) (blockZ - camZ + sideZ + 0.5);
             float top = (float) (RENDER_TOP_Y[index] - camY);
             float bottom = (float) (RENDER_BOTTOM_Y[index] - camY);
+            boolean snow = type == SNOW;
+            float topOffsetX = settings.windDrivenPrecipitation()
+                    ? PrecipitationVisualModel.topWindOffset(
+                            localWeather.wind().x(),
+                            top - bottom,
+                            settings.precipitationWindSlantBlocks(),
+                            snow
+                    )
+                    : 0.0F;
+            float topOffsetZ = settings.windDrivenPrecipitation()
+                    ? PrecipitationVisualModel.topWindOffset(
+                            localWeather.wind().z(),
+                            top - bottom,
+                            settings.precipitationWindSlantBlocks(),
+                            snow
+                    )
+                    : 0.0F;
             lightPos.set(blockX, RENDER_LIGHT_Y[index], blockZ);
             int light = LevelRenderer.getLightColor(level, lightPos);
 
@@ -579,6 +598,8 @@ public final class LocalizedPrecipitationRenderer {
                         z1,
                         top,
                         bottom,
+                        topOffsetX,
+                        topOffsetZ,
                         RENDER_TOP_Y[index],
                         RENDER_BOTTOM_Y[index],
                         RENDER_ALPHA[index],
@@ -596,6 +617,8 @@ public final class LocalizedPrecipitationRenderer {
                         z1,
                         top,
                         bottom,
+                        topOffsetX,
+                        topOffsetZ,
                         RENDER_TOP_Y[index],
                         RENDER_BOTTOM_Y[index],
                         RENDER_ALPHA[index],
@@ -617,6 +640,8 @@ public final class LocalizedPrecipitationRenderer {
             float z1,
             float top,
             float bottom,
+            float topOffsetX,
+            float topOffsetZ,
             int topWorldY,
             int bottomWorldY,
             float alpha,
@@ -633,11 +658,11 @@ public final class LocalizedPrecipitationRenderer {
         float scroll = -((time + phase) + (float) (renderTicks - Math.floor(renderTicks)))
                 / 32.0F * speed;
         scroll %= 32.0F;
-        builder.addVertex(x0, top, z0)
+        builder.addVertex(x0 + topOffsetX, top, z0 + topOffsetZ)
                 .setUv(0.0F, bottomWorldY * 0.25F + scroll)
                 .setColor(1.0F, 1.0F, 1.0F, alpha)
                 .setLight(light);
-        builder.addVertex(x1, top, z1)
+        builder.addVertex(x1 + topOffsetX, top, z1 + topOffsetZ)
                 .setUv(1.0F, bottomWorldY * 0.25F + scroll)
                 .setColor(1.0F, 1.0F, 1.0F, alpha)
                 .setLight(light);
@@ -662,6 +687,8 @@ public final class LocalizedPrecipitationRenderer {
             float z1,
             float top,
             float bottom,
+            float topOffsetX,
+            float topOffsetZ,
             int topWorldY,
             int bottomWorldY,
             float alpha,
@@ -682,11 +709,11 @@ public final class LocalizedPrecipitationRenderer {
         int sky = light >> 16 & 65535;
         int block = light & 65535;
         int snowLight = ((sky * 3 + 240) / 4) << 16 | (block * 3 + 240) / 4;
-        builder.addVertex(x0, top, z0)
+        builder.addVertex(x0 + topOffsetX, top, z0 + topOffsetZ)
                 .setUv(uOffset, bottomWorldY * 0.25F + scroll + vOffset)
                 .setColor(1.0F, 1.0F, 1.0F, alpha)
                 .setLight(snowLight);
-        builder.addVertex(x1, top, z1)
+        builder.addVertex(x1 + topOffsetX, top, z1 + topOffsetZ)
                 .setUv(1.0F + uOffset, bottomWorldY * 0.25F + scroll + vOffset)
                 .setColor(1.0F, 1.0F, 1.0F, alpha)
                 .setLight(snowLight);
