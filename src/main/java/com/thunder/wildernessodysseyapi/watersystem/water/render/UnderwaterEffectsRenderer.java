@@ -24,6 +24,7 @@ import net.neoforged.neoforge.client.event.RenderBlockScreenEffectEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
 
 /**
  * Applies Phase 8 fog, transition, distortion, and caustic presentation.
@@ -192,25 +193,44 @@ public final class UnderwaterEffectsRenderer {
         ShaderInstance shader = WaterShaders.getUnderwaterShader();
         WaterShaders.updateUnderwaterUniforms(timeSeconds, state);
 
-        RenderSystem.setShader(() -> shader);
-        RenderSystem.setShaderTexture(0, VANILLA_UNDERWATER_TEXTURE);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
+        boolean depthTestWasEnabled = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
+        boolean depthWriteWasEnabled = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
+        boolean blendWasEnabled = GL11.glIsEnabled(GL11.GL_BLEND);
+        try {
+            // Screen-space optics replace the completed scene and must not be
+            // clipped by hand/HUD depth or write depth into later UI layers.
+            RenderSystem.disableDepthTest();
+            RenderSystem.depthMask(false);
+            RenderSystem.setShader(() -> shader);
+            RenderSystem.setShaderTexture(0, VANILLA_UNDERWATER_TEXTURE);
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+            RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
 
-        Matrix4f matrix = poseStack.last().pose();
-        BufferBuilder buffer = Tesselator.getInstance().begin(
-                VertexFormat.Mode.QUADS,
-                DefaultVertexFormat.POSITION_TEX
-        );
-        buffer.addVertex(matrix, -1.0f, -1.0f, -0.5f).setUv(4.0f, 4.0f);
-        buffer.addVertex(matrix, 1.0f, -1.0f, -0.5f).setUv(0.0f, 4.0f);
-        buffer.addVertex(matrix, 1.0f, 1.0f, -0.5f).setUv(0.0f, 0.0f);
-        buffer.addVertex(matrix, -1.0f, 1.0f, -0.5f).setUv(4.0f, 0.0f);
-        BufferUploader.drawWithShader(buffer.buildOrThrow());
-
-        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-        RenderSystem.disableBlend();
+            Matrix4f matrix = poseStack.last().pose();
+            BufferBuilder buffer = Tesselator.getInstance().begin(
+                    VertexFormat.Mode.QUADS,
+                    DefaultVertexFormat.POSITION_TEX
+            );
+            buffer.addVertex(matrix, -1.0f, -1.0f, -0.5f).setUv(4.0f, 4.0f);
+            buffer.addVertex(matrix, 1.0f, -1.0f, -0.5f).setUv(0.0f, 4.0f);
+            buffer.addVertex(matrix, 1.0f, 1.0f, -0.5f).setUv(0.0f, 0.0f);
+            buffer.addVertex(matrix, -1.0f, 1.0f, -0.5f).setUv(4.0f, 0.0f);
+            BufferUploader.drawWithShader(buffer.buildOrThrow());
+        } finally {
+            RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
+            RenderSystem.depthMask(depthWriteWasEnabled);
+            if (depthTestWasEnabled) {
+                RenderSystem.enableDepthTest();
+            } else {
+                RenderSystem.disableDepthTest();
+            }
+            if (blendWasEnabled) {
+                RenderSystem.enableBlend();
+            } else {
+                RenderSystem.disableBlend();
+            }
+        }
     }
 
     private static boolean canOwnWaterFog(FogType fogType) {

@@ -26,8 +26,8 @@ public abstract class ClientLevelLocalizedRainMixin {
                 || !ClientWeatherCoordinator.controls(level)) {
             return;
         }
-        boolean raining = ClientWeatherCoordinator.currentPrecipitationTypeAt(level, position)
-                == PrecipitationType.RAIN
+        PrecipitationType type = ClientWeatherCoordinator.currentPrecipitationTypeAt(level, position);
+        boolean raining = (type == PrecipitationType.RAIN || type == PrecipitationType.HAIL)
                 && PrecipitationIntensity.isFunctional(
                         ClientWeatherCoordinator.currentPrecipitationIntensityAt(level, position)
                 )

@@ -17,7 +17,8 @@ public record SimulationSettings(
         double precipitationThreshold,
         double stormFormationThreshold,
         double maximumPrecipitationIntensity,
-        double randomVariation
+        double randomVariation,
+        double weatherFrontStrength
 ) {
     public static final SimulationSettings DEFAULT = new SimulationSettings(
             1.0,
@@ -29,8 +30,37 @@ public record SimulationSettings(
             0.58,
             0.42,
             1.0,
-            0.04
+            0.04,
+            0.75
     );
+
+    /** Preserves the pre-front settings shape for integrations and focused tests. */
+    public SimulationSettings(
+            double simulationSpeed,
+            double humidityTransportRate,
+            double temperatureTransportRate,
+            double pressureEqualizationRate,
+            double evaporationStrength,
+            double cloudFormationThreshold,
+            double precipitationThreshold,
+            double stormFormationThreshold,
+            double maximumPrecipitationIntensity,
+            double randomVariation
+    ) {
+        this(
+                simulationSpeed,
+                humidityTransportRate,
+                temperatureTransportRate,
+                pressureEqualizationRate,
+                evaporationStrength,
+                cloudFormationThreshold,
+                precipitationThreshold,
+                stormFormationThreshold,
+                maximumPrecipitationIntensity,
+                randomVariation,
+                0.75
+        );
+    }
 
     public SimulationSettings {
         simulationSpeed = clamp(finiteOr(simulationSpeed, 1.0), 0.0, 8.0);
@@ -43,6 +73,7 @@ public record SimulationSettings(
         stormFormationThreshold = unit(stormFormationThreshold);
         maximumPrecipitationIntensity = unit(maximumPrecipitationIntensity);
         randomVariation = clamp(finiteOr(randomVariation, 0.04), 0.0, 0.25);
+        weatherFrontStrength = unit(weatherFrontStrength);
     }
 
     private static double unit(double value) {

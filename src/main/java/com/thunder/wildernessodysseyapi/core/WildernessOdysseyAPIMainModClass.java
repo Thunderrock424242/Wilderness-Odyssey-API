@@ -18,7 +18,9 @@ import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueProcessor;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideWorldUpdater;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.WaterCompatibilityRegistry;
+import com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla.VanillaWaterBucketCompatibility;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.weather.integration.survival.SurvivalWeatherIntegrations;
 import com.thunder.wildernessodysseyapi.worldgen.biome.BiomeCompatibilityBootstrap;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
@@ -66,6 +68,7 @@ public final class WildernessOdysseyAPIMainModClass {
 
         ModRegistries.register(modEventBus);
         ModConfigRegistration.register(container);
+        SurvivalWeatherIntegrations.bootstrap();
         registerGameEventHandlers();
         RadiationTickHandler.register();
 
@@ -75,6 +78,7 @@ public final class WildernessOdysseyAPIMainModClass {
     // Common setup is queued because biome compatibility touches registries after construction.
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
+            VanillaWaterBucketCompatibility.bootstrap();
             BiomeCompatibilityBootstrap.initialize();
             if (ModList.get().isLoaded("bluemap")) {
                 BlueMapIntegration.bootstrap();

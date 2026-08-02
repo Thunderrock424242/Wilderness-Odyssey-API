@@ -4,21 +4,50 @@
 
 The localized atmosphere is a server-authoritative, dimension-scoped weather
 foundation. It replaces the vanilla global rain flag as the source of truth for
-Wilderness-controlled weather while preserving vanilla global state by default
-for compatibility. The implemented phases provide evolving atmospheric cells,
+Wilderness-controlled weather and suppresses Minecraft's competing global
+scheduler by default. The implemented phases provide evolving atmospheric cells,
 persistence, regional client synchronization, per-column rain and snow,
 Minecraft-style functional cloud masses and distant rain curtains, overhead
 cloud optics, localized natural lightning, position-aware gameplay rain,
 diagnostics, read-only Wilderness water coupling, optional Ecliptic/Serene
 season input, thermodynamic vapor transport, terrain lift, and layered 3D
-cloud volumes with compatibility fallbacks.
+cloud volumes with standard cloud genera, multi-altitude decks, persistent
+moving storm/front identities, forecasting, surface accumulation, typed
+hazards, and compatibility fallbacks.
 
-The system does not provide destructive storms, projected per-block cloud
-shadows, or a complete replacement for every global vanilla weather consumer.
+The system does not provide a projected per-block shadow map or unconstrained
+destructive storms. Severe block damage is a conservative foliage-only option
+and is disabled by default. Cloud shadows remain a camera-local approximation.
 Its volumetric quality tier is a bounded translucent-slice approximation,
 not a fluid simulation or compute-shader raymarch. Those boundaries are
 intentional and are listed under
 [Known limitations](#known-limitations-and-compatibility).
+
+## Weather V3 additions
+
+- `WeatherOwnershipCoordinator` resolves one explicit weather owner. `AUTO`
+  yields to configured installed weather mods, `WILDERNESS` forces this system,
+  and `EXTERNAL` disables Wilderness simulation, rendering, and weather mixins.
+- `WeatherSystemTracker` gives storms and warm, cold, stationary, and occluded
+  fronts persistent IDs. Systems predict movement, retain or change subtype,
+  strengthen from observations, merge when compatible, split only when highly
+  organized, and dissipate after observations disappear.
+- `wildernessodysseyapi_weather_systems` persists those identities separately
+  from atmospheric cells. `/wilderness weather systems` and
+  `/wilderness weather forecast` expose lifecycle, pressure tendency, wind,
+  distance, arrival time, and confidence.
+- Surface memory tracks wetness, puddles, snowpack, and frozen fraction. Wet
+  ground and puddles are cosmetic client overlays; a strict loaded-column
+  budget creates/thaws vanilla snow layers and temporary frosted ice.
+- Lake-effect snow, ocean-fed storms, drought, heat waves, dense fog, hail, and
+  blizzards are continuous derived phenomena rather than random presets. Hail
+  has its own synchronized precipitation type and rendering path.
+- Tornado and cyclone identities are optional. They use bounded particles and
+  entity wind; block damage remains off by default and, when explicitly
+  enabled with mob griefing, is restricted to a tiny foliage/plant budget.
+- A coarse distant cloud tier extends the visible horizon and gives organized
+  storms darker vertical silhouettes. Sun-path cloud sampling adds approximate
+  broad shadowing beneath large systems.
 
 ## Architecture
 
@@ -26,7 +55,8 @@ intentional and are listed under
 flowchart LR
     A["Loaded biome, elevation, daylight, dimension, season, and water inputs"] --> B["AtmosphereInputSampler"]
     B --> C["Immutable AtmosphereEnvironment"]
-    D["Previous AtmosphereGrid snapshot"] --> E["AtmosphereSimulationEngine"]
+    D["Previous AtmosphereGrid snapshot"] --> Q["AtmosphericFrontModel"]
+    Q --> E["AtmosphereSimulationEngine"]
     C --> E
     E --> F["Revision-checked apply by WeatherAuthority"]
     F --> G["Dimension AtmosphereGrid"]
@@ -86,10 +116,11 @@ The public `WeatherSample` fields use these units and enforced ranges:
 | `instability` | normalized `[0, 1]` | Convective instability. |
 | `stormEnergy` | normalized `[0, 1]` | Persistent severe-weather potential. |
 | `precipitationIntensity` | normalized `[0, 1]` | Current local rain or snow strength. |
-| `precipitationType` | `NONE`, `RAIN`, or `SNOW` | Current precipitation form. |
+| `precipitationType` | `NONE`, `RAIN`, `SNOW`, or `HAIL` | Current precipitation form. |
 | `verticalMotion` | normalized `[-1, 1]` | Rising or sinking air derived from convergence, buoyancy, pressure, terrain, and season. |
 | `cloudDepth` | normalized `[0, 1]` | Vertical cloud development used by the 3D column renderer. |
 | `cloudWind.x`, `cloudWind.z` | normalized components `[-1, 1]` | Smoothed motion at cloud altitude; separate from surface precipitation wind. |
+| `surface` | four normalized values `[0, 1]` | Wetness, puddle coverage, snowpack, and frozen fraction. |
 
 Each internal cell also owns a monotonically increasing revision,
 `lastSimulatedTick`, and `lastActiveTick`. These values support safe result
@@ -158,7 +189,10 @@ the pure simulation engine.
   their wet/dry phase.
 - Seasons shift target temperature, humidity, storm development, and
   evaporation. They never replace Wilderness weather state or mutate the
-  external calendar.
+  external calendar. Those continuous shifts also change the derived cloud
+  genus: humid stable seasons favor stratus/nimbostratus decks, warm unstable
+  seasons favor cumulus/cumulonimbus, and drier transition air favors thin
+  upper clouds.
 - Tropical biome classification reads only an already-loaded center chunk.
   Season integration never creates chunk tickets.
 - Atmospheric variation is deterministic from world seed and packed cell key;
@@ -192,6 +226,42 @@ Temperate influence is continuous across season boundaries instead of changing
 weather in four abrupt steps. Warm/wet phases increase convection and warm
 phases increase evaporation; cold/dry phases suppress them. Serene tropical wet
 seasons increase moisture and storm potential, while dry seasons reduce both.
+
+## Cold Sweat and Thirst Was Taken
+
+Both survival integrations are optional, server-owned, and guarded against API
+changes. Their NeoForge dependency entries use `type="optional"`; neither mod is
+required to start Wilderness Odyssey.
+
+- Cold Sweat (`cold_sweat`) keeps ownership of temperature capabilities,
+  insulation, configured structures/dimensions, body-temperature movement, and
+  damage. Wilderness wraps only Cold Sweat's outdoor biome temperature result
+  with a bounded localized offset. Moving air masses, heat waves, wind chill,
+  rain, snow, hail, and humid heat can therefore change experienced ambient
+  temperature without replacing Cold Sweat state. Roofed, submerged, disabled,
+  externally-owned, or not-yet-simulated locations receive no adjustment.
+- Thirst Was Taken (`thirst`) keeps ownership of thirst, quenched points,
+  drinks, difficulty behavior, damage, and packet synchronization. Every 40
+  ticks by default, exposed players can receive a small bounded exhaustion
+  addition from hot air, low humidity, drying wind, drought, and heat waves.
+  Sheltered, submerged, spectator, creative/invulnerable, and disabled players
+  receive no extra weather exhaustion.
+- When both mods are present, Thirst Was Taken already consumes Cold Sweat body
+  temperature. Wilderness therefore reduces its direct thermal thirst weight
+  and contributes mainly humidity, drought, and drying-wind pressure, avoiding
+  double heat penalties.
+- Thirst Was Taken's existing rain-drinking path calls Minecraft's positional
+  rain query, so it automatically follows Wilderness localized precipitation.
+
+Survival integration balance is server-configurable:
+
+| Config path under `weather.survivalIntegrations` | Default | Effect |
+| --- | ---: | --- |
+| `coldSweatEnabled` | `true` | Enables the guarded Cold Sweat ambient-temperature contribution. |
+| `coldSweatMaximumOffsetCelsius` | `12.0` | Maximum absolute localized weather offset, `0..30 C`. |
+| `thirstWasTakenEnabled` | `true` | Enables bounded Thirst Was Taken weather exhaustion. |
+| `thirstIntervalTicks` | `40` | Exposure update cadence, `20..1200` ticks. |
+| `thirstMaximumExhaustionPerInterval` | `0.025` | Extreme-condition cap per interval, `0..0.25`. |
 
 ## Water coupling
 
@@ -396,16 +466,17 @@ the old coordinates no longer represent the same world regions.
 ## Persistence format
 
 Each dimension stores `wildernessodysseyapi_atmosphere` as NeoForge
-`SavedData`. Schema version 2 contains:
+`SavedData`. Schema version 3 contains:
 
 | NBT key | Type | Content |
 | --- | --- | --- |
-| `dataVersion` | int | Schema version, currently `2`. |
+| `dataVersion` | int | Schema version, currently `3`. |
 | `cellSize` | int | Cell width used by the saved coordinates. |
 | `cellKeys` | long array | Packed signed X/Z coordinates. |
 | `weatherA` | long array | Temperature, humidity, pressure, wind X/Z. |
 | `weatherB` | long array | Cloud water, instability, storm energy, precipitation, type. |
 | `weatherC` | long array | Vertical motion, cloud depth, and cloud-altitude wind X/Z. |
+| `weatherD` | long array | Surface wetness, puddle coverage, snowpack, and frozen fraction. |
 | `revisions` | long array | Monotonic cell revisions. |
 | `lastSimulatedTicks` | long array | Simulation watermarks. |
 | `lastActiveTicks` | long array | Activity watermarks. |
@@ -415,11 +486,18 @@ and 10 each for wind X/Z. `weatherB` uses 12 bits each for cloud water,
 instability, storm energy, and precipitation intensity, followed by two bits
 for precipitation type. Remaining `weatherB` bits are reserved and must be
 zero. `weatherC` uses 12 bits each for vertical motion, cloud depth, and the
-two cloud-wind components; its upper 16 bits are reserved.
+two cloud-wind components; its upper 16 bits are reserved. `weatherD` uses 12
+bits per surface field and reserves its upper 16 bits.
 
 Version-one saves load in place. Their missing vertical motion starts neutral,
 cloud depth is derived from existing cloud/storm state, and cloud wind begins
-at the surface wind. The next normal save writes version two.
+at the surface wind. Version-one and version-two saves receive a dry surface
+default. The next normal save writes version three.
+
+Persistent storm/front identities use separate
+`wildernessodysseyapi_weather_systems` saved data with schema version one.
+Separating the two schemas prevents a tracker change from risking the compact
+atmospheric-cell migration path.
 
 The codec writes at most `maxPersistedCells`. If selection is necessary, high
 storm energy and recently active cells win; final output is sorted by packed
@@ -458,7 +536,7 @@ A complete replacement is sent after login, respawn/dimension invalidation,
 cell-region movement (including teleportation), config invalidation, or an
 observed regional cell removal. While the player remains in the same region,
 only cells with changed revisions are sent. A no-change pass sends nothing.
-Because schema version 2 has no deletion tombstone, a removal triggers a full
+Because schema version 3 has no deletion tombstone, a removal triggers a full
 replacement. Disabling weather sends one explicit empty reset and then remains
 silent until state changes again.
 
@@ -478,6 +556,7 @@ values:
 | Vertical motion `[-1, 1]` | signed 16-bit fixed point |
 | Cloud depth `[0, 1]` | unsigned 8-bit fixed point |
 | Cloud wind X/Z `[-1, 1]` | signed 16-bit fixed point each |
+| Surface wetness, puddles, snowpack, frozen fraction | unsigned 8-bit fixed point each |
 
 Gameplay precipitation uses the same six-bit rounding as this payload. Server
 physical queries quantize each cell endpoint before spatial interpolation,
@@ -545,10 +624,16 @@ horizontal footprint:
 
 - the horizontal grid is made from `12 x 12` block cloud voxels, matching
   vanilla's cloud scale;
-- **Fancy + volumetric enabled** builds a continuous vertical column from local
-  humidity, temperature, ascent, cloud depth, and storm energy. Eight
-  translucent slices by default use world-stable procedural 3D noise,
-  height-shaped density, daylight edging, and storm-darkened bases;
+- **Fancy + volumetric enabled** derives clear sky plus the ten standard cloud
+  genera: cirrus, cirrostratus, cirrocumulus, altostratus, altocumulus,
+  stratus, stratocumulus, cumulus, nimbostratus, and cumulonimbus. A tile may
+  blend low, middle, high, and convective decks; cumulonimbus therefore grows a
+  deep tower plus a wind-shear-weighted anvil instead of merely becoming a
+  thicker flat cloud;
+- each active deck receives up to the configured translucent slice count and
+  uses world-stable procedural 3D noise. Wispy, layered, cellular, and
+  convective morphologies have distinct horizontal scales, vertical profiles,
+  daylight edging, and storm-darkened bases;
 - if the custom shader is unavailable, fails to link, is disabled, or an
   Iris/Oculus shader pack is active, **Fancy** falls back to the existing solid
   voxel masses with exposed top, bottom, and sides;
@@ -565,7 +650,8 @@ edge crosses the tile. Cloud water produces deterministic broken coverage,
 while any supported tile with effective precipitation of at least `1.0E-4`
 bypasses morphology noise, so meaningful rain or snow remains under cloud.
 Stronger rain and convection increase column height, voxel thickness, darkness,
-and opacity.
+and opacity. High, middle, and low cloud placement remains derived rather than
+saved, so older weather saves and version-2 packets need no migration.
 
 The broad cloud envelope remains anchored to its authoritative world-space
 weather field. Cloud-altitude wind advances only deterministic small-scale morphology,
@@ -592,7 +678,8 @@ per-block shadow map.
 The F3 overlay adds atmosphere, cloud-optics, and precipitation-mesh lines with
 cell, sequence, synchronized cell count, blend progress, temperature, dew
 point, humidity, pressure, surface/cloud wind, vertical motion, cloud depth,
-storm stage, precipitation, thunder, fog, render mode/layer count, visible tile
+dominant cloud genus, storm stage, precipitation, thunder, fog, render
+mode/layer count, visible tile
 count, vertex count, and average coverage. Server activity state
 remains available through `/wilderness weather cell` and `dump` rather than
 adding activity metadata to every client cell.
@@ -650,12 +737,18 @@ validated by NeoForge and copied into immutable scheduling/simulation records.
 | `simulation.humidityTransportRate` | `0.18` | `0..1`. |
 | `simulation.temperatureTransportRate` | `0.10` | `0..1`. |
 | `simulation.pressureEqualizationRate` | `0.20` | `0..1`. |
+| `simulation.weatherFrontStrength` | `0.75` | `0..1`; scales bounded front lift, gusts, and storm development. |
 | `simulation.evaporationStrength` | `0.12` | `0..1`. |
 | `simulation.cloudFormationThreshold` | `0.72` | `0.05..0.99`. |
 | `simulation.precipitationThreshold` | `0.58` | `0.05..0.99`. |
 | `simulation.stormFormationThreshold` | `0.42` | `0..1`. |
 | `simulation.maximumPrecipitationIntensity` | `1.0` | `0..1`. |
 | `simulation.randomVariation` | `0.04` | `0..0.25`, deterministic by cell. |
+| `survivalIntegrations.coldSweatEnabled` | `true` | Adds bounded exposed localized weather to Cold Sweat ambient temperature. |
+| `survivalIntegrations.coldSweatMaximumOffsetCelsius` | `12.0` | `0..30 C`; preserves Cold Sweat's own structure/dimension rules. |
+| `survivalIntegrations.thirstWasTakenEnabled` | `true` | Adds bounded outdoor weather exhaustion to Thirst Was Taken. |
+| `survivalIntegrations.thirstIntervalTicks` | `40` | `20..1200`; one player pass at this cadence. |
+| `survivalIntegrations.thirstMaximumExhaustionPerInterval` | `0.025` | `0..0.25`; extreme-condition cap. |
 | `lightning.enabled` | `true` | Lets eligible localized storms create natural lightning. Disabling it also leaves vanilla natural strikes suppressed in controlled dimensions. |
 | `lightning.checkIntervalTicks` | `20` | `5..1200`; one bounded candidate pass per dimension. |
 | `lightning.dimensionCooldownTicks` | `120` | `20..72000`; minimum delay between successful strikes in one dimension. |
@@ -665,7 +758,7 @@ validated by NeoForge and copied into immutable scheduling/simulation records.
 | `lightning.maximumChancePerCheck` | `0.20` | `0..1`; strongest eligible storms approach this probability. |
 | `compatibility.dimensionAllowlist` | empty | Empty permits all dimensions not denied. |
 | `compatibility.dimensionDenylist` | empty | Deny entries override allow entries. |
-| `compatibility.vanillaWeatherCompatibilityMode` | `PRESERVE_GLOBAL` | `PRESERVE_GLOBAL` or `SUPPRESS_GLOBAL`. |
+| `compatibility.vanillaWeatherCompatibilityMode` | `SUPPRESS_GLOBAL` | `PRESERVE_GLOBAL` or `SUPPRESS_GLOBAL`. |
 | `debugLogging` | `false` | Logs concise counts on simulation passes that meet the 1,200-tick diagnostics boundary. |
 
 Dimension identifiers are normalized, deduplicated, validated resource
@@ -782,12 +875,17 @@ the baseline until representative Fancy-cloud scenes are profiled.
 
 ## Known limitations and compatibility
 
-`PRESERVE_GLOBAL` is the default. Local snapshots own Wilderness client rain,
-snow, precipitation sound, sky, fog, and built-in water-shader inputs, while
-the vanilla global rain/thunder state continues to exist for compatibility.
-This is currently necessary because Riftfall systems, Riftfall client effects,
-several Rift entities, and other consumers still query global
-`isRaining`/`isThundering` state directly.
+`SUPPRESS_GLOBAL` is the default. Local snapshots own Wilderness client rain,
+snow, hail, precipitation sound, sky, fog, built-in water-shader inputs, and
+the migrated Riftfall/entity weather decisions. Minecraft command behavior is
+preserved through the vanilla command bridge, but the global scheduler is
+cleared before it can compete with localized state.
+
+Ownership is resolved before the cached dimension gate. In `AUTO`, any loaded
+mod ID in `compatibility.externalWeatherModIds` receives the whole weather
+role: Wilderness does not simulate, synchronize, render, or replace vanilla
+weather results. This prevents two complete weather systems from running at
+once. `WILDERNESS` and `EXTERNAL` remain explicit pack-author choices.
 
 Vanilla `/weather clear`, `/weather rain`, and `/weather thunder` are explicit
 global operator overrides in both compatibility modes. They update the
@@ -810,34 +908,34 @@ MixinExtras operation wrappers to avoid direct redirect conflicts. A mod that
 replaces those exact invocations may still require explicit ordering or a
 compatibility adapter because localized authority must replace the result.
 
-`SUPPRESS_GLOBAL` clears active vanilla rain/thunder through server weather
-parameters while keeping localized rendering. This removes the compatibility
-fallback; current Riftfall and other global-weather consumers will stop seeing
-rain. It should be enabled only after those consumers are migrated or when that
-behavior is desired.
+`PRESERVE_GLOBAL` remains a legacy fallback for a pack that deliberately needs
+Minecraft's global flags. It can disagree with local conditions and should not
+be combined with a second full weather renderer.
 
 Additional limits and compatibility boundaries:
 
 - lightning cooldowns are intentionally ephemeral per loaded dimension rather
   than persisted; a clean restart can therefore allow one earlier first strike;
-- global-only `isRaining`/`isThundering` consumers, including current Riftfall
-  paths, can still disagree with local conditions in `PRESERVE_GLOBAL`;
-- ambient water freezing remains biome-owned. A localized thermal replacement
-  is deferred until sustained-cold hysteresis, light, thawing, and canonical or
-  custom-water behavior can be implemented together;
-- fronts move only through the current cardinal transport of continuous cell
-  fields; there is no explicit front object, storm merge identity, or distant
-  storm metadata;
+- third-party global-only `isRaining`/`isThundering` consumers can still
+  disagree with local conditions in `PRESERVE_GLOBAL`; Wilderness Riftfall and
+  entity consumers have already migrated to localized queries;
+- surface freezing is intentionally approximate: loaded sampled source-water
+  columns become temporary frosted ice and vanilla owns their later melting;
+- persistent fronts and storms are regional identities derived from cell
+  physics, not entities and not a full multi-layer fluid solver;
 - distant precipitation is a sparse vanilla-texture rain lattice and there are
   no distant snow curtains;
 - volumetric clouds are layered transparent geometry with procedural density,
-  not compute-shader raymarching, fluid dynamics, self-shadow volumes, or
-  physically simulated vapor. High layer counts can become fill-rate heavy;
-- overhead optical cover feeds Minecraft's camera-local sky/lightmap and fog.
-  It is not a projected terrain shadow map and does not mutate server lighting;
-- cloud coverage is bounded by the synchronized weather region and configured
-  render radius. Support fades at a missing snapshot edge, so this renderer
-  does not provide horizon-scale distant storm silhouettes;
+  not compute-shader raymarching, a vertical fluid grid, self-shadow volumes,
+  or separately simulated ice crystals. Cloud genera and altitude decks are
+  physically informed classifications of the synchronized column, and high
+  layer counts can become fill-rate heavy;
+- overhead and sun-path optical cover feed Minecraft's camera-local
+  sky/lightmap and fog. This approximates broad moving cloud shadows but is not
+  a projected terrain shadow map and does not mutate server lighting;
+- the sparse horizon tier is still bounded by synchronized-region support. It
+  shows front silhouettes where data exists and fades rather than inventing
+  weather beyond the received region;
 - Minecraft's Clouds Off option intentionally hides all cloud geometry even
   while localized precipitation remains authoritative;
 - custom dimension cloud renderers take priority. An active Iris/Oculus pack
@@ -853,9 +951,15 @@ Additional limits and compatibility boundaries:
 - Ecliptic and Serene calendars influence climate, but visual snow cover and
   crop/foliage season behavior remain owned by those mods. If their documented
   APIs change, the guarded adapter logs once and returns neutral influence;
-- anomaly moisture, contaminated rain, drought, lake-effect snow, external
-  weather-mod ownership, radar, destructive wind, tornadoes, cyclones,
-  hurricanes, and block damage are not implemented; and
+- Cold Sweat and Thirst Was Taken adapters intentionally log once and become
+  no-ops if their reflected 1.21.1 APIs change. Their own temperature/thirst
+  state is never replaced, and live tests with each supported release remain
+  required;
+- droughts, heat waves, lake-effect snow, and ocean-fed storms are approximate
+  bounded feedbacks. Puddles are cosmetic, forecasting is trend-based rather
+  than omniscient, and severe vortices use particles/entity force rather than
+  simulated debris. General terrain destruction and hurricane-scale ocean
+  surge are not implemented; and
 - no code, shader, texture, asset, or implementation detail is copied from an
   external weather mod, and none is a hard dependency.
 
@@ -1001,31 +1105,71 @@ explicitly changes them; changing size resets atmospheric state.
     both converge on the same server-authored fields, clients cannot create
     weather locally, and rapid movement/reconnect does not make an older payload
     replace a newer sequence.
+18. **Verify ownership arbitration.** With no external weather mod installed,
+    confirm the startup log names Wilderness as owner. Add one configured
+    external weather mod and leave ownership on `AUTO`; confirm Wilderness F3,
+    precipitation, cloud rendering, and simulation all disable together. Test
+    explicit `WILDERNESS` and `EXTERNAL` modes separately.
+19. **Verify persistent motion and forecasting.** Create adjacent pressure and
+    humidity contrasts, then repeatedly run `/wilderness weather systems` and
+    `/wilderness weather forecast`. Confirm IDs survive saves, centers move with
+    cloud wind, compatible systems merge, organized storms can split, weakening
+    systems disappear, and ETA/pressure wording changes as a front passes.
+20. **Verify surface response.** Sustain rain and confirm dark wet patches and
+    occasional puddles appear without water-block placement. Sustain snow/cold
+    weather and confirm bounded snow layers and temporary frosted ice form only
+    in loaded player areas. Warm the local cell and confirm gradual snow loss
+    and vanilla frosted-ice melting.
+21. **Verify typed hazards.** Exercise cold windy snow, warm ocean storms, humid
+    calm air, and hot dry high pressure. Confirm F3 reports blizzard,
+    ocean-storm, dense-fog, and drought/heat-wave signals respectively. Force
+    hail and confirm its faster icy precipitation visual still counts as wet
+    rain for exposure and precipitation hooks.
+22. **Verify severe safety.** Leave `severe.blockDamageEnabled=false`, develop
+    or instrument a tornado/cyclone identity, and confirm particles/entity wind
+    occur without block changes. Explicitly enable damage in a disposable test
+    world with mob griefing on and confirm the bounded pass affects only sparse
+    exposed leaves/plants. Restore the default afterward.
+23. **Verify survival integrations.** Test Cold Sweat alone outdoors, under a
+    roof, and submerged while forcing hot/dry, blizzard, rain, and hail samples;
+    confirm only exposed ambient temperature moves and Cold Sweat still owns
+    body response. Test Thirst Was Taken alone through mild and hot/dry weather;
+    confirm mild/sheltered conditions add no exhaustion and extreme outdoor
+    conditions add only the configured bounded amount. Install both and confirm
+    thermal thirst pressure is not doubled. Disable each integration separately
+    and confirm the corresponding mod immediately returns to its own behavior.
 
-## Extension points and recommended next phase
+## Weather roadmap
 
-The next phase should deepen the same boundaries rather than replace them:
+The next phases focus on validation, readable forecasting tools, and optional
+visual depth without creating another weather authority:
 
-1. Extend the current conservative cardinal face flux with an advection-aware
-   retained-cell halo or a bounded semi-Lagrangian predictor, plus tests for
-   front translation, strengthening, merging, and dissipation. Keep calculation
-   pure and apply by revision.
-2. Extend localized lightning only where gameplay needs additional metadata,
-   such as strike diagnostics or storm-cell identity. Keep vanilla bolt entity
-   synchronization as the normal path and never let clients request strikes.
-3. Migrate remaining global-only consumers one adapter at a time, beginning
-   with Riftfall and explicitly weather-sensitive mob logic. Design localized
-   freezing only together with sustained-cold hysteresis, thawing, light, and
-   canonical/custom-water rules. Reassess making global suppression the default
-   only after those consumers are gone.
-4. Add a distant low-detail cloud tier, storm-front silhouettes, and optional
-   self-shadow approximation. Preserve the authoritative footprint; any future
-   raymarch/compute tier must remain optional client presentation, not server
-   authority.
-5. Extend the existing `WeatherWaterInfluence` and
-   `SeasonalWeatherInfluence` boundaries for lake-effect snow, ocean-fed storm
-   development, drought, contamination, and anomaly weather without
-   giving weather mutable access to water or third-party systems.
-6. Profile multi-dimension/high-player workloads before increasing active
-   radii. If needed, move only immutable engine calculations to workers while
-   retaining capture and revision-checked apply on the server thread.
+1. **Compatibility and performance validation.** Run Ecliptic-only,
+   Serene-only, Cold-Sweat-only, Thirst-only, combined survival/season, and
+   external-weather-owner client matrices. Profile multi-dimension/high-player
+   workloads and the horizon/surface render tiers before increasing default
+   ranges or budgets. Guarded optional adapters still need live mod
+   combinations.
+2. **Craftable observation and forecasting tools.** Add a basic barometer for
+   current pressure and pressure trend, a directional wind vane, and a forecast
+   screen backed by the existing `WeatherForecast` API. A more expensive
+   weather-radar block can plot synchronized precipitation cells and approaching
+   front silhouettes over a bounded area. Recipes, block-entity update rates,
+   and radar range must be configurable. Forecasts should expose uncertainty
+   and trends rather than reveal exact future simulation state.
+3. **Distant snow curtains.** Extend the low-detail horizon precipitation tier
+   with wind-slanted snow bands below snow-bearing cells and fronts. Curtains
+   should fade into distance fog, use a strict draw budget, remain outside the
+   local particle volume, and disappear when Wilderness does not own weather
+   rendering in the dimension.
+4. **Optional true raymarched clouds and projected terrain shadows.** Add an
+   opt-in high/ultra renderer that raymarches the same synchronized cloud field
+   used by the current cloud tiers. Project cloud transmittance into a
+   low-resolution, temporally filtered terrain-shadow texture instead of
+   changing server light levels. Keep the existing volumetric/fallback renderer
+   for unsupported GPUs, shader packs, external weather owners, and lower
+   quality settings. Acceptance requires bounded frame time, stable temporal
+   reprojection, no duplicate vanilla clouds, and graceful resource reloads.
+5. **Severe-weather expansion.** Add effects only behind explicit pack
+   settings, protection hooks, and disposable-world tests. Block damage must
+   remain off by default.

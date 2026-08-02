@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.client.cloud;
 
+import com.thunder.wildernessodysseyapi.weather.api.CloudType;
+import com.thunder.wildernessodysseyapi.weather.api.CloudTypeClassifier;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 
 /**
@@ -88,6 +90,25 @@ public record CloudFieldSample(
         cloudWindX = clamp(finiteOrZero(cloudWindX), -1.0, 1.0);
         cloudWindZ = clamp(finiteOrZero(cloudWindZ), -1.0, 1.0);
         support = unit(support);
+    }
+
+    /** Returns normalized wind shear between the surface and cloud layer. */
+    public double windShear() {
+        return clamp(Math.hypot(cloudWindX - windX, cloudWindZ - windZ), 0.0, 1.5);
+    }
+
+    /** Returns the cloud genus implied by this spatially blended field. */
+    public CloudType cloudType() {
+        return CloudTypeClassifier.classify(
+                cloudWater,
+                humidity,
+                instability,
+                stormEnergy,
+                precipitationIntensity,
+                verticalMotion,
+                cloudDepth,
+                windShear()
+        );
     }
 
     /**

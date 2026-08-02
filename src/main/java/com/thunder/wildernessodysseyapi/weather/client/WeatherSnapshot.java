@@ -382,6 +382,10 @@ public final class WeatherSnapshot {
         if (to == null || from == to) {
             return from;
         }
+        if (from == PrecipitationType.HAIL || to == PrecipitationType.HAIL) {
+            return intensity >= 0.18D ? PrecipitationType.HAIL
+                    : from == PrecipitationType.HAIL ? to : from;
+        }
         if (from == PrecipitationType.NONE) {
             return to;
         }

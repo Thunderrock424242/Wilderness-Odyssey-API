@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.network.SphLocalEffectPayload;
+import com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla.CanonicalWaterBucketTransactions;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
@@ -31,6 +32,34 @@ import javax.annotation.Nullable;
  */
 @Mixin(BucketItem.class)
 public abstract class BucketPlaceMixin {
+
+    /** Rejects a placement that would consume one bucket without adding its full volume. */
+    @Inject(
+            method = "emptyContents(Lnet/minecraft/world/entity/player/Player;"
+                    + "Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;"
+                    + "Lnet/minecraft/world/phys/BlockHitResult;"
+                    + "Lnet/minecraft/world/item/ItemStack;)Z",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    private void wildernessOdysseyApi$protectExistingCanonicalVolume(
+            @Nullable Player player,
+            Level level,
+            BlockPos pos,
+            @Nullable BlockHitResult result,
+            @Nullable ItemStack container,
+            CallbackInfoReturnable<Boolean> callbackInfo
+    ) {
+        if (level instanceof ServerLevel serverLevel
+                && CanonicalWaterBucketTransactions.wouldOverwriteOwnedWater(
+                        serverLevel,
+                        pos,
+                        level.getBlockState(pos),
+                        ((BucketItem) (Object) this).content
+                )) {
+            callbackInfo.setReturnValue(false);
+        }
+    }
 
     /**
      * Spawns authoritative SPH only after vanilla confirms that placement worked.

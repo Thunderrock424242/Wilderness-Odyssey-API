@@ -44,7 +44,11 @@ public final class VanillaWeatherCommandAdapter {
                     Math.min(old.instability(), 0.25),
                     0.0,
                     0.0,
-                    PrecipitationType.NONE
+                    PrecipitationType.NONE,
+                    old.verticalMotion(),
+                    old.cloudDepth(),
+                    old.cloudWind(),
+                    old.surface()
             );
             case RAIN -> precipitation(old, 0.92, 0.96, 0.88, 0.58, 0.48, 0.90);
             case THUNDER -> precipitation(old, 0.96, 0.90, 0.96, 0.85, 0.90, 1.0);
@@ -72,7 +76,11 @@ public final class VanillaWeatherCommandAdapter {
                 Math.max(instability, old.instability()),
                 stormEnergy,
                 precipitationIntensity,
-                type
+                type,
+                old.verticalMotion(),
+                old.cloudDepth(),
+                old.cloudWind(),
+                old.surface()
         );
     }
 

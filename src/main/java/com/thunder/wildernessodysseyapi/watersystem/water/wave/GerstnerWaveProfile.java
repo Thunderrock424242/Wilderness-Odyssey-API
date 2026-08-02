@@ -17,6 +17,7 @@ public final class GerstnerWaveProfile {
 
     static final float GRAVITY = 9.80665f;
     private static final float TWO_PI = (float) (Math.PI * 2.0);
+    private static final double TWO_PI_DOUBLE = Math.PI * 2.0;
 
     /** Number of overlapping wave components in this profile. */
     public final int waveCount;
@@ -84,6 +85,14 @@ public final class GerstnerWaveProfile {
      * @return the complete surface sample
      */
     public WaveSurfaceSample sampleAt(float worldX, float worldZ, float timeSeconds) {
+        return sampleAt((double) worldX, worldZ, timeSeconds, waveCount);
+    }
+
+    /**
+     * Double-coordinate variant that retains sub-block phase precision near the
+     * Minecraft world border.
+     */
+    public WaveSurfaceSample sampleAt(double worldX, double worldZ, double timeSeconds) {
         return sampleAt(worldX, worldZ, timeSeconds, waveCount);
     }
 
@@ -97,6 +106,16 @@ public final class GerstnerWaveProfile {
      * @return the complete surface sample
      */
     public WaveSurfaceSample sampleAt(float worldX, float worldZ, float timeSeconds, int maxWaveTrains) {
+        return sampleAt((double) worldX, worldZ, timeSeconds, maxWaveTrains, WaveSpectrumState.NEUTRAL);
+    }
+
+    /** Double-coordinate quality-scaled variant for authoritative world queries. */
+    public WaveSurfaceSample sampleAt(
+            double worldX,
+            double worldZ,
+            double timeSeconds,
+            int maxWaveTrains
+    ) {
         return sampleAt(worldX, worldZ, timeSeconds, maxWaveTrains, WaveSpectrumState.NEUTRAL);
     }
 
@@ -112,6 +131,42 @@ public final class GerstnerWaveProfile {
             int maxWaveTrains,
             WaveSpectrumState spectrumState
     ) {
+        return sampleAt((double) worldX, worldZ, timeSeconds, maxWaveTrains, spectrumState);
+    }
+
+    /**
+     * Evaluates the spectrum using double world coordinates and time.
+     *
+     * <p>The returned sample remains float-sized for Minecraft consumers, but
+     * phase construction stays precise enough to preserve half-block variation
+     * after long-running worlds and near the world border.</p>
+     */
+    public WaveSurfaceSample sampleAt(
+            double worldX,
+            double worldZ,
+            double timeSeconds,
+            int maxWaveTrains,
+            WaveSpectrumState spectrumState
+    ) {
+        return sampleAt(worldX, worldZ, timeSeconds, maxWaveTrains, spectrumState, 0.0f, 0.0f);
+    }
+
+    /**
+     * Evaluates a profile after rotating its authored directional spread onto
+     * a local flow heading.
+     *
+     * <p>Callers use this for river profiles backed by synchronized canonical
+     * current. A zero or non-finite flow retains the authored directions.</p>
+     */
+    public WaveSurfaceSample sampleAt(
+            double worldX,
+            double worldZ,
+            double timeSeconds,
+            int maxWaveTrains,
+            WaveSpectrumState spectrumState,
+            float flowDirectionX,
+            float flowDirectionZ
+    ) {
         int count = Math.max(0, Math.min(waveCount, maxWaveTrains));
         if (count == 0) {
             return WaveSurfaceSample.flat();
@@ -119,6 +174,18 @@ public final class GerstnerWaveProfile {
         WaveSpectrumState spectrum = spectrumState == null
                 ? WaveSpectrumState.NEUTRAL
                 : spectrumState;
+        double safeWorldX = finiteOrZero(worldX);
+        double safeWorldZ = finiteOrZero(worldZ);
+        double safeTimeSeconds = finiteOrZero(timeSeconds);
+        float flowLengthSquared = flowDirectionX * flowDirectionX + flowDirectionZ * flowDirectionZ;
+        boolean flowAligned = Float.isFinite(flowLengthSquared) && flowLengthSquared > 1.0e-8f;
+        float normalizedFlowX = 1.0f;
+        float normalizedFlowZ = 0.0f;
+        if (flowAligned) {
+            float inverseFlowLength = 1.0f / (float) Math.sqrt(flowLengthSquared);
+            normalizedFlowX = flowDirectionX * inverseFlowLength;
+            normalizedFlowZ = flowDirectionZ * inverseFlowLength;
+        }
 
         float displacementX = 0.0f;
         float height = 0.0f;
@@ -139,9 +206,21 @@ public final class GerstnerWaveProfile {
         for (int i = 0; i < count; i++) {
             float componentBlend = waveCount <= 1 ? 0.0f : i / (float) (waveCount - 1);
             float windBlend = spectrum.directionBlend() * (0.35f + componentBlend * 0.65f);
-            float directionX = dirX[i] * (1.0f - windBlend)
+            float authoredDirectionX = dirX[i];
+            float authoredDirectionZ = dirZ[i];
+            if (flowAligned) {
+                // The profile is authored around +X. Use flow and its right
+                // vector as a rotated basis without collapsing component spread.
+                float rotatedX = normalizedFlowX * authoredDirectionX
+                        - normalizedFlowZ * authoredDirectionZ;
+                float rotatedZ = normalizedFlowZ * authoredDirectionX
+                        + normalizedFlowX * authoredDirectionZ;
+                authoredDirectionX = rotatedX;
+                authoredDirectionZ = rotatedZ;
+            }
+            float directionX = authoredDirectionX * (1.0f - windBlend)
                     + spectrum.windDirectionX() * windBlend;
-            float directionZ = dirZ[i] * (1.0f - windBlend)
+            float directionZ = authoredDirectionZ * (1.0f - windBlend)
                     + spectrum.windDirectionZ() * windBlend;
             float directionLengthSquared = directionX * directionX + directionZ * directionZ;
             if (directionLengthSquared > 1.0e-8f) {
@@ -155,9 +234,12 @@ public final class GerstnerWaveProfile {
                     + (spectrum.chopScale() - spectrum.swellScale()) * componentBlend;
             float waveAmplitude = amplitude[i] * energyScale;
             float horizontalScale = steepness[i] * waveAmplitude;
-            float phase = k * (directionX * worldX + directionZ * worldZ)
-                    - omega * timeSeconds
-                    + phaseOffset[i];
+            double phase = Math.IEEEremainder(
+                    k * (directionX * safeWorldX + directionZ * safeWorldZ)
+                            - omega * safeTimeSeconds
+                            + phaseOffset[i],
+                    TWO_PI_DOUBLE
+            );
             float sin = (float) Math.sin(phase);
             float cos = (float) Math.cos(phase);
 
@@ -209,6 +291,10 @@ public final class GerstnerWaveProfile {
                 velocityY,
                 velocityZ
         );
+    }
+
+    private static double finiteOrZero(double value) {
+        return Double.isFinite(value) ? value : 0.0;
     }
 
     /**

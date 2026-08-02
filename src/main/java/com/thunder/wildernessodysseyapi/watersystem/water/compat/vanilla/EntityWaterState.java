@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterSample;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -13,7 +14,9 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class EntityWaterState {
 
+    private Level sampledLevel;
     private long sampledGameTime = Long.MIN_VALUE;
+    private boolean authoritativeContactKnown;
     private boolean touchingWater;
     private boolean bodySubmerged;
     private boolean eyesSubmerged;
@@ -25,9 +28,12 @@ public final class EntityWaterState {
     private int ticksInWater;
     private int ticksSinceWater;
     private final WaterSample queryScratch = new WaterSample();
+    private final EntityWaterContactSampler.ContactAccumulator contactAccumulator =
+            new EntityWaterContactSampler.ContactAccumulator();
 
     void update(
             Entity entity,
+            boolean authoritativeContactKnown,
             boolean touchingWater,
             boolean bodySubmerged,
             boolean eyeSubmerged,
@@ -38,15 +44,17 @@ public final class EntityWaterState {
             double currentZ
     ) {
         boolean wasTouching = this.touchingWater;
+        this.authoritativeContactKnown = authoritativeContactKnown;
         this.touchingWater = touchingWater;
         this.bodySubmerged = bodySubmerged;
-        eyesSubmerged = eyeSubmerged;
+        this.eyesSubmerged = eyeSubmerged;
         this.surfaceHeight = surfaceHeight;
         this.depth = Math.max(0.0, depth);
         this.currentX = currentX;
         this.currentY = currentY;
         this.currentZ = currentZ;
-        sampledGameTime = entity.level().getGameTime();
+        sampledLevel = entity.level();
+        sampledGameTime = sampledLevel.getGameTime();
 
         if (this.touchingWater) {
             ticksInWater = wasTouching ? ticksInWater + 1 : 1;
@@ -58,15 +66,29 @@ public final class EntityWaterState {
     }
 
     void clear(Entity entity) {
-        update(entity, false, false, false, Double.NaN, 0.0, 0.0, 0.0, 0.0);
+        update(entity, false, false, false, false, Double.NaN, 0.0, 0.0, 0.0, 0.0);
     }
 
     WaterSample queryScratch() {
         return queryScratch;
     }
 
-    boolean sampledAt(long gameTime) {
-        return sampledGameTime == gameTime;
+    EntityWaterContactSampler.ContactAccumulator contactAccumulator() {
+        return contactAccumulator;
+    }
+
+    boolean sampledAt(Level level, long gameTime) {
+        return sampledLevel == level && sampledGameTime == gameTime;
+    }
+
+    /**
+     * Returns whether authority supplied a nearby surface for this decision.
+     *
+     * <p>Vanilla hooks only replace their result while this is true. Ordinary
+     * vanilla and third-party tagged water therefore keep their original path.</p>
+     */
+    public boolean authoritativeContactKnown() {
+        return authoritativeContactKnown;
     }
 
     /** Returns whether any entity bounds currently intersect custom water. */
@@ -84,7 +106,7 @@ public final class EntityWaterState {
         return eyesSubmerged;
     }
 
-    /** Returns animated surface Y at the entity center. */
+    /** Returns the submerged-footprint-weighted animated surface Y. */
     public double surfaceHeight() {
         return surfaceHeight;
     }

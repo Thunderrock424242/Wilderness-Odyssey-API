@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.weather.api.AtmosphereView;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindVector;
+import com.thunder.wildernessodysseyapi.weather.api.SurfaceWeatherState;
 import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphereGrid;
 import net.minecraft.nbt.CompoundTag;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AtmosphereStorageCodecTest {
 
     @Test
-    void versionTwoRoundTripPreservesMeaningfulCellState() {
+    void versionThreeRoundTripPreservesMeaningfulCellAndSurfaceState() {
         AtmosphereGrid original = new AtmosphereGrid(256);
         AtmosphereCellKey key = new AtmosphereCellKey(-2, 3);
         WeatherSample sample = new WeatherSample(
@@ -34,7 +35,8 @@ class AtmosphereStorageCodecTest {
                 PrecipitationType.SNOW,
                 0.43,
                 0.84,
-                new WindVector(-0.17, 0.76)
+                new WindVector(-0.17, 0.76),
+                new SurfaceWeatherState(0.84, 0.51, 0.68, 0.39)
         );
         original.restore(new AtmosphereView(key, sample, 7L, 1_200L, 1_240L));
 
@@ -65,6 +67,10 @@ class AtmosphereStorageCodecTest {
         assertEquals(sample.cloudDepth(), restored.sample().cloudDepth(), 0.001);
         assertEquals(sample.cloudWind().x(), restored.sample().cloudWind().x(), 0.001);
         assertEquals(sample.cloudWind().z(), restored.sample().cloudWind().z(), 0.001);
+        assertEquals(sample.surface().wetness(), restored.sample().surface().wetness(), 0.001);
+        assertEquals(sample.surface().puddleCoverage(), restored.sample().surface().puddleCoverage(), 0.001);
+        assertEquals(sample.surface().snowpack(), restored.sample().surface().snowpack(), 0.001);
+        assertEquals(sample.surface().frozenFraction(), restored.sample().surface().frozenFraction(), 0.001);
     }
 
     @Test
@@ -81,6 +87,20 @@ class AtmosphereStorageCodecTest {
         WeatherSample restored = decoded.grid().view(new AtmosphereCellKey(0, 0)).sample();
         assertEquals(restored.wind(), restored.cloudWind());
         assertTrue(restored.cloudDepth() > 0.0);
+    }
+
+    @Test
+    void versionTwoSaveMigratesWithDrySurfaceDefaults() {
+        CompoundTag legacy = encodedSingleCell();
+        legacy.putInt("dataVersion", 2);
+        legacy.remove("weatherD");
+
+        AtmosphereStorageCodec.DecodeResult decoded = AtmosphereStorageCodec.decode(legacy, 256, 64);
+
+        assertEquals(1, decoded.restoredCells());
+        assertTrue(decoded.recovered());
+        assertEquals(SurfaceWeatherState.DRY,
+                decoded.grid().view(new AtmosphereCellKey(0, 0)).sample().surface());
     }
 
     @Test

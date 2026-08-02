@@ -6,5 +6,6 @@ package com.thunder.wildernessodysseyapi.weather.api;
 public enum PrecipitationType {
     NONE,
     RAIN,
-    SNOW
+    SNOW,
+    HAIL
 }

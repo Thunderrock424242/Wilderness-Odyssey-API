@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudLightingModel;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.LocalizedCloudRenderer;
 import com.thunder.wildernessodysseyapi.weather.client.precipitation.LocalizedPrecipitationRenderer;
+import com.thunder.wildernessodysseyapi.weather.client.surface.WeatherSurfaceRenderer;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import net.minecraft.client.CloudStatus;
 import net.minecraft.client.Minecraft;
@@ -18,7 +19,9 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
+import com.thunder.wildernessodysseyapi.weather.simulation.WeatherHazardModel;
 
 import java.util.List;
 import java.util.Locale;
@@ -50,6 +53,7 @@ public final class WeatherClientEvents {
         }
         if (!ClientWeatherCoordinator.controls(minecraft.level)) {
             LocalizedPrecipitationRenderer.clear();
+            WeatherSurfaceRenderer.clear();
         }
     }
 
@@ -58,6 +62,7 @@ public final class WeatherClientEvents {
     public static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
         LocalizedCloudRenderer.clear();
         LocalizedPrecipitationRenderer.clear();
+        WeatherSurfaceRenderer.clear();
         ClientWeatherCoordinator.clearAll();
     }
 
@@ -66,6 +71,7 @@ public final class WeatherClientEvents {
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         LocalizedCloudRenderer.clear();
         LocalizedPrecipitationRenderer.clear();
+        WeatherSurfaceRenderer.clear();
         ClientWeatherCoordinator.clearAll();
     }
 
@@ -75,8 +81,15 @@ public final class WeatherClientEvents {
         if (event.getLevel() instanceof ClientLevel clientLevel) {
             LocalizedCloudRenderer.clear();
             LocalizedPrecipitationRenderer.clear();
+            WeatherSurfaceRenderer.clear();
             ClientWeatherCoordinator.clearLevel(clientLevel);
         }
+    }
+
+    /** Draws cosmetic wet-ground and puddle response after translucent terrain. */
+    @SubscribeEvent
+    public static void onRenderLevel(RenderLevelStageEvent event) {
+        WeatherSurfaceRenderer.render(event);
     }
 
     /** Blends humid precipitation haze into vanilla's air fog color. */
@@ -104,6 +117,8 @@ public final class WeatherClientEvents {
                 event.getCamera().getPosition().y,
                 level.effects().getCloudHeight()
         );
+        WeatherHazardModel.HazardProfile hazards = WeatherHazardModel.evaluate(sample);
+        fog = Math.max(fog, (float) Math.max(hazards.denseFog() * 0.92, hazards.blizzard() * 0.78));
         if (fog <= 0.001F) {
             return;
         }
@@ -141,6 +156,8 @@ public final class WeatherClientEvents {
                 event.getCamera().getPosition().y,
                 level.effects().getCloudHeight()
         );
+        WeatherHazardModel.HazardProfile hazards = WeatherHazardModel.evaluate(sample);
+        fog = Math.max(fog, (float) Math.max(hazards.denseFog() * 0.92, hazards.blizzard() * 0.82));
         if (fog <= 0.001F) {
             return;
         }
@@ -187,6 +204,7 @@ public final class WeatherClientEvents {
         LocalizedCloudRenderer.Diagnostics clouds = LocalizedCloudRenderer.diagnostics();
         LocalizedPrecipitationRenderer.Diagnostics precipitation =
                 LocalizedPrecipitationRenderer.diagnostics();
+        WeatherHazardModel.HazardProfile hazards = WeatherHazardModel.evaluate(sample);
 
         return List.of(
                 String.format(
@@ -208,7 +226,8 @@ public final class WeatherClientEvents {
                 ),
                 String.format(
                         Locale.ROOT,
-                        "Cloud %.3f depth %.3f | lift %.3f | storm %s %.3f",
+                        "Cloud %s %.3f depth %.3f | lift %.3f | storm %s %.3f",
+                        sample.cloudType().displayName(),
                         sample.cloudWater(),
                         sample.cloudDepth(),
                         sample.verticalMotion(),
@@ -233,10 +252,21 @@ public final class WeatherClientEvents {
                 ),
                 String.format(
                         Locale.ROOT,
-                        "Cloud mesh %s %s/%d | %d tiles | %d vertices | coverage %.3f",
+                        "Phenomenon %s %.3f | ground wet %.3f puddle %.3f snow %.3f frozen %.3f",
+                        hazards.dominant(),
+                        hazards.dominantIntensity(),
+                        sample.surface().wetness(),
+                        sample.surface().puddleCoverage(),
+                        sample.surface().snowpack(),
+                        sample.surface().frozenFraction()
+                ),
+                String.format(
+                        Locale.ROOT,
+                        "Cloud mesh %s %s/%d | %s | %d tiles | %d vertices | coverage %.3f",
                         clouds.active() ? "active" : "inactive",
                         clouds.mode(),
                         clouds.layers(),
+                        clouds.cloudType(),
                         clouds.visibleTiles(),
                         clouds.vertices(),
                         clouds.averageCoverage()

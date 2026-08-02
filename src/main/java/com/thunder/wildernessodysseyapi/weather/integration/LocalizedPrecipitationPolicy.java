@@ -25,7 +25,9 @@ public final class LocalizedPrecipitationPolicy {
 
     /** Returns whether the sample supplies functional rain. */
     public static boolean isRain(WeatherSample sample) {
-        return hasPrecipitation(sample) && sample.precipitationType() == PrecipitationType.RAIN;
+        return hasPrecipitation(sample)
+                && (sample.precipitationType() == PrecipitationType.RAIN
+                || sample.precipitationType() == PrecipitationType.HAIL);
     }
 
     /** Returns whether the sample supplies functional snow. */

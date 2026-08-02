@@ -1,7 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterAccess;
-import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterSample;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.CompatibilityLevel;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.WaterCompatibilityAdapter;
@@ -18,10 +17,10 @@ import java.util.WeakHashMap;
 /**
  * Maintains one central custom-water state cache for vanilla entities.
  *
- * <p>This proof adapter detects contact, full-body and eye submersion, surface,
- * depth, current, and transition timing. It deliberately does not yet override
- * vanilla swimming or air-supply methods; those are later adapters that should
- * consume this state instead of repeating water-body calculations.</p>
+ * <p>The adapter detects footprint contact, full-body and eye submersion,
+ * animated surface, depth, current, and transition timing. Narrow entity
+ * mixins consume this state for vanilla swimming and breathing without
+ * changing the identity of any registered fluid.</p>
  */
 public final class EntityWaterCompat implements WaterCompatibilityAdapter {
 
@@ -39,7 +38,7 @@ public final class EntityWaterCompat implements WaterCompatibilityAdapter {
 
     @Override
     public CompatibilityLevel compatibilityLevel() {
-        return CompatibilityLevel.BASIC;
+        return CompatibilityLevel.INTEGRATED;
     }
 
     @Override
@@ -63,7 +62,7 @@ public final class EntityWaterCompat implements WaterCompatibilityAdapter {
      */
     public static EntityWaterState stateFor(Entity entity) {
         EntityWaterState state = STATES.computeIfAbsent(entity, ignored -> new EntityWaterState());
-        if (state.sampledAt(entity.level().getGameTime())) {
+        if (state.sampledAt(entity.level(), entity.level().getGameTime())) {
             return state;
         }
         if (!WaterSimulationConfig.entityWaterCompatEnabled()) {
@@ -72,35 +71,7 @@ public final class EntityWaterCompat implements WaterCompatibilityAdapter {
         }
 
         WaterAccess access = WaterServices.access();
-        WaterSample sample = state.queryScratch();
-        access.sample(
-                entity.level(),
-                entity.getX(),
-                entity.getBoundingBox().minY,
-                entity.getZ(),
-                0.0f,
-                sample
-        );
-        double height = Math.max(0.0, entity.getBoundingBox().maxY - entity.getBoundingBox().minY);
-        double submergedFraction = height <= 0.0 || Double.isNaN(sample.surfaceHeight())
-                ? 0.0
-                : Math.max(0.0, Math.min(
-                1.0,
-                (sample.surfaceHeight() - entity.getBoundingBox().minY) / height
-        ));
-        boolean touching = sample.water() && submergedFraction > 0.0;
-        boolean eyesSubmerged = touching && entity.getEyeY() <= sample.surfaceHeight();
-        state.update(
-                entity,
-                touching,
-                touching && submergedFraction >= 1.0,
-                eyesSubmerged,
-                sample.surfaceHeight(),
-                sample.depth(),
-                sample.currentX(),
-                sample.currentY(),
-                sample.currentZ()
-        );
+        EntityWaterContactSampler.sample(access, entity, state);
         return state;
     }
 }

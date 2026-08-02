@@ -26,6 +26,14 @@ public final class WeatherRenderingConfig {
     public static final ModConfigSpec.IntValue DISTANT_RAIN_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue DISTANT_RAIN_SPACING_BLOCKS;
     public static final ModConfigSpec.IntValue MAXIMUM_DISTANT_RAIN_SHAFTS;
+    public static final ModConfigSpec.BooleanValue ENABLE_DISTANT_CLOUD_LAYER;
+    public static final ModConfigSpec.IntValue DISTANT_CLOUD_DISTANCE_BLOCKS;
+    public static final ModConfigSpec.IntValue DISTANT_CLOUD_SPACING_BLOCKS;
+    public static final ModConfigSpec.IntValue MAXIMUM_DISTANT_CLOUD_TILES;
+    public static final ModConfigSpec.DoubleValue CLOUD_SHADOW_STRENGTH;
+    public static final ModConfigSpec.BooleanValue ENABLE_SURFACE_OVERLAYS;
+    public static final ModConfigSpec.IntValue SURFACE_OVERLAY_RADIUS_BLOCKS;
+    public static final ModConfigSpec.IntValue MAXIMUM_SURFACE_PATCHES;
 
     private static final Settings DEFAULTS = new Settings(
             true,
@@ -42,7 +50,15 @@ public final class WeatherRenderingConfig {
             10.0,
             96,
             6,
-            768
+            768,
+            true,
+            1_024,
+            48,
+            512,
+            0.55,
+            true,
+            24,
+            256
     );
     private static volatile Settings activeSettings = DEFAULTS;
 
@@ -77,6 +93,21 @@ public final class WeatherRenderingConfig {
         VOLUMETRIC_DETAIL_STRENGTH = builder
                 .comment("Strength of procedural small-scale erosion applied by the volumetric cloud shader.")
                 .defineInRange("volumetricDetailStrength", 0.65, 0.0, 1.0);
+        ENABLE_DISTANT_CLOUD_LAYER = builder
+                .comment("Render a sparse horizon cloud deck with darker storm-front silhouettes.")
+                .define("distantCloudLayer", true);
+        DISTANT_CLOUD_DISTANCE_BLOCKS = builder
+                .comment("Maximum radius of the low-detail horizon cloud deck.")
+                .defineInRange("distantCloudDistanceBlocks", 1_024, 384, 2_048);
+        DISTANT_CLOUD_SPACING_BLOCKS = builder
+                .comment("World spacing of low-detail horizon cloud samples.")
+                .defineInRange("distantCloudSpacingBlocks", 48, 24, 96);
+        MAXIMUM_DISTANT_CLOUD_TILES = builder
+                .comment("Hard cap for low-detail cloud patches in a mesh rebuild.")
+                .defineInRange("maximumDistantCloudTiles", 512, 64, 2_048);
+        CLOUD_SHADOW_STRENGTH = builder
+                .comment("Strength of approximate sunlight darkening beneath broad cloud masses.")
+                .defineInRange("cloudShadowStrength", 0.55, 0.0, 1.0);
         builder.pop();
 
         builder.comment("Client-side presentation of localized precipitation.")
@@ -99,6 +130,19 @@ public final class WeatherRenderingConfig {
         MAXIMUM_DISTANT_RAIN_SHAFTS = builder
                 .comment("Hard cap on loaded distant rain columns sampled during one cache rebuild.")
                 .defineInRange("maximumDistantRainShafts", 768, 64, 2_048);
+        builder.pop();
+
+        builder.comment("Cosmetic wet-ground and puddle overlays.")
+                .push("surface_overlays");
+        ENABLE_SURFACE_OVERLAYS = builder
+                .comment("Draw bounded translucent wetness and puddle patches from synchronized surface state.")
+                .define("enabled", true);
+        SURFACE_OVERLAY_RADIUS_BLOCKS = builder
+                .comment("Horizontal radius sampled around the camera for wet-ground overlays.")
+                .defineInRange("radiusBlocks", 24, 8, 64);
+        MAXIMUM_SURFACE_PATCHES = builder
+                .comment("Hard cap on rendered wet or puddled ground patches per frame.")
+                .defineInRange("maximumPatches", 256, 32, 1_024);
         builder.pop();
         CONFIG_SPEC = builder.build();
     }
@@ -128,7 +172,15 @@ public final class WeatherRenderingConfig {
                 PRECIPITATION_WIND_SLANT_BLOCKS.get(),
                 DISTANT_RAIN_DISTANCE_BLOCKS.get(),
                 DISTANT_RAIN_SPACING_BLOCKS.get(),
-                MAXIMUM_DISTANT_RAIN_SHAFTS.get()
+                MAXIMUM_DISTANT_RAIN_SHAFTS.get(),
+                ENABLE_DISTANT_CLOUD_LAYER.get(),
+                DISTANT_CLOUD_DISTANCE_BLOCKS.get(),
+                DISTANT_CLOUD_SPACING_BLOCKS.get(),
+                MAXIMUM_DISTANT_CLOUD_TILES.get(),
+                CLOUD_SHADOW_STRENGTH.get(),
+                ENABLE_SURFACE_OVERLAYS.get(),
+                SURFACE_OVERLAY_RADIUS_BLOCKS.get(),
+                MAXIMUM_SURFACE_PATCHES.get()
         );
     }
 
@@ -148,8 +200,42 @@ public final class WeatherRenderingConfig {
             double precipitationWindSlantBlocks,
             int distantRainDistanceBlocks,
             int distantRainSpacingBlocks,
-            int maximumDistantRainShafts
+            int maximumDistantRainShafts,
+            boolean distantCloudLayer,
+            int distantCloudDistanceBlocks,
+            int distantCloudSpacingBlocks,
+            int maximumDistantCloudTiles,
+            double cloudShadowStrength,
+            boolean surfaceOverlays,
+            int surfaceOverlayRadiusBlocks,
+            int maximumSurfacePatches
     ) {
+        /** Preserves the weather-v2 settings shape for compatibility callers. */
+        public Settings(
+                boolean enabled,
+                boolean volumetricClouds,
+                int renderDistanceBlocks,
+                int rebuildIntervalTicks,
+                double windDetailSpeedBlocksPerSecond,
+                int maximumCloudTiles,
+                double opacityMultiplier,
+                int volumetricLayerCount,
+                double volumetricDetailStrength,
+                boolean distantRainShafts,
+                boolean windDrivenPrecipitation,
+                double precipitationWindSlantBlocks,
+                int distantRainDistanceBlocks,
+                int distantRainSpacingBlocks,
+                int maximumDistantRainShafts
+        ) {
+            this(enabled, volumetricClouds, renderDistanceBlocks, rebuildIntervalTicks,
+                    windDetailSpeedBlocksPerSecond, maximumCloudTiles, opacityMultiplier,
+                    volumetricLayerCount, volumetricDetailStrength, distantRainShafts,
+                    windDrivenPrecipitation, precipitationWindSlantBlocks,
+                    distantRainDistanceBlocks, distantRainSpacingBlocks, maximumDistantRainShafts,
+                    true, 1_024, 48, 512, 0.55, true, 24, 256);
+        }
+
         /** Preserves the original settings shape for tests and compatibility callers. */
         public Settings(
                 boolean enabled,
@@ -178,7 +264,15 @@ public final class WeatherRenderingConfig {
                     10.0,
                     distantRainDistanceBlocks,
                     distantRainSpacingBlocks,
-                    maximumDistantRainShafts
+                    maximumDistantRainShafts,
+                    true,
+                    1_024,
+                    48,
+                    512,
+                    0.55,
+                    true,
+                    24,
+                    256
             );
         }
 
@@ -194,6 +288,12 @@ public final class WeatherRenderingConfig {
             distantRainDistanceBlocks = clamp(distantRainDistanceBlocks, 32, 192);
             distantRainSpacingBlocks = clamp(distantRainSpacingBlocks, 4, 16);
             maximumDistantRainShafts = clamp(maximumDistantRainShafts, 64, 2_048);
+            distantCloudDistanceBlocks = clamp(distantCloudDistanceBlocks, 384, 2_048);
+            distantCloudSpacingBlocks = clamp(distantCloudSpacingBlocks, 24, 96);
+            maximumDistantCloudTiles = clamp(maximumDistantCloudTiles, 64, 2_048);
+            cloudShadowStrength = clamp(cloudShadowStrength, 0.0, 1.0);
+            surfaceOverlayRadiusBlocks = clamp(surfaceOverlayRadiusBlocks, 8, 64);
+            maximumSurfacePatches = clamp(maximumSurfacePatches, 32, 1_024);
         }
 
         private static int clamp(int value, int minimum, int maximum) {

@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.compat.WaterCompatibil
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.ExistingWorldWaterConverter;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import net.minecraft.commands.CommandSourceStack;
@@ -50,6 +51,24 @@ public final class WaterDebugCommand {
                                         IntegerArgumentType.getInteger(context, "radius")))))
                 .then(Commands.literal("compat")
                         .executes(WaterDebugCommand::compatibilityStatus))
+                .then(Commands.literal("mode")
+                        .executes(WaterDebugCommand::authorityModeStatus)
+                        .then(Commands.literal("set")
+                                .requires(source -> source.hasPermission(2))
+                                .then(Commands.literal("on")
+                                        .then(Commands.argument(
+                                                        "radius",
+                                                        IntegerArgumentType.integer(
+                                                                1,
+                                                                ExistingWorldWaterConverter.MAX_RADIUS
+                                                        )
+                                                )
+                                                .executes(context -> enableAuthorityMode(
+                                                        context,
+                                                        IntegerArgumentType.getInteger(context, "radius")
+                                                ))))
+                                .then(Commands.literal("off")
+                                        .executes(WaterDebugCommand::refuseAuthorityDisable))))
                 .then(Commands.literal("shipcheck")
                         .executes(context -> shipcheck(context, 16))
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, 64))
@@ -60,7 +79,21 @@ public final class WaterDebugCommand {
                         .executes(context -> repair(context, 4))
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, 64))
                                 .executes(context -> repair(context,
-                                        IntegerArgumentType.getInteger(context, "radius"))))));
+                                        IntegerArgumentType.getInteger(context, "radius")))))
+                .then(Commands.literal("convert")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(context -> convertExistingWater(
+                                context,
+                                ExistingWorldWaterConverter.DEFAULT_RADIUS
+                        ))
+                        .then(Commands.argument(
+                                        "radius",
+                                        IntegerArgumentType.integer(1, ExistingWorldWaterConverter.MAX_RADIUS)
+                                )
+                                .executes(context -> convertExistingWater(
+                                        context,
+                                        IntegerArgumentType.getInteger(context, "radius")
+                                )))));
     }
 
     private static int inspect(CommandContext<CommandSourceStack> context, BlockPos pos) {
@@ -255,12 +288,104 @@ public final class WaterDebugCommand {
         return Math.max(1, WaterCompatibilityRegistry.statuses().size());
     }
 
+    private static int authorityModeStatus(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        WildernessWaterRules.ModeStatus status = WildernessWaterRules.status(source.getLevel());
+        source.sendSuccess(() -> Component.literal("WO water authority mode"
+                + " active=" + onOff(status.active())
+                + ", gamerule=" + onOff(status.gameRule())
+                + ", startupConfig=" + onOff(status.startupConfig())), false);
+        source.sendSuccess(() -> Component.literal(
+                "  Bare gamerule changes are restored. Use /wowater mode set on <radius> for verified activation."
+        ), false);
+        return status.active() ? 1 : 0;
+    }
+
+    private static int enableAuthorityMode(
+            CommandContext<CommandSourceStack> context,
+            int requestedRadius
+    ) {
+        CommandSourceStack source = context.getSource();
+        ServerLevel level = source.getLevel();
+        WildernessWaterRules.ModeStatus modeStatus = WildernessWaterRules.status(level);
+        if (modeStatus.active()) {
+            source.sendSuccess(() -> Component.literal(
+                    "WO water authority is already ON; use /wowater convert <radius> for additional loaded areas."
+            ), false);
+            return 1;
+        }
+        if (!modeStatus.startupConfig()) {
+            source.sendFailure(Component.literal(
+                    "WO water activation refused: enable the server water-simulation master config, "
+                            + "restart, then run this bounded activation command again."
+            ));
+            return 0;
+        }
+
+        BlockPos center = sourceBlockPos(source);
+        ExistingWorldWaterConverter.ActivationPreflight preflight =
+                ExistingWorldWaterConverter.preflightActivation(level, center, requestedRadius);
+        if (!preflight.successful()) {
+            source.sendFailure(Component.literal("WO water activation refused by preflight: unloadedColumns="
+                    + preflight.unloadedColumns()
+                    + ", invalidWater=" + preflight.invalidWater()
+                    + ", mismatchedTrackedWater=" + preflight.mismatchedTrackedWater()
+                    + ", capacityExceededChunks=" + preflight.capacityExceededChunks()));
+            return 0;
+        }
+
+        // Stage canonical cells without changing physical blocks. If proof
+        // fails, authority remains OFF and the still-vanilla world is safe.
+        ExistingWorldWaterConverter.ConversionResult staged =
+                ExistingWorldWaterConverter.stageLoadedForActivation(level, center, preflight);
+        ExistingWorldWaterConverter.StagingVerification stagingVerification =
+                ExistingWorldWaterConverter.verifyStaged(level, center, preflight.radius());
+        if (!stagingVerification.successful()) {
+            source.sendFailure(Component.literal("WO water activation refused after safe staging: "
+                    + stagingVerification.mismatches()
+                    + " canonical cells did not match their vanilla water blocks; authority remains OFF."));
+            return 0;
+        }
+
+        WildernessWaterRules.enableAfterExplicitConversion(level);
+        int projected = ExistingWorldWaterConverter.projectStaged(
+                level, center, preflight.radius());
+        ExistingWorldWaterConverter.ConversionVerification projectionVerification =
+                ExistingWorldWaterConverter.verifyLoaded(level, center, preflight.radius());
+        if (!projectionVerification.successful()) {
+            source.sendFailure(Component.literal("WO water authority is ON, but projection verification found "
+                    + projectionVerification.remainingVanillaWater()
+                    + " remaining vanilla blocks. Run /wowater convert " + preflight.radius()
+                    + " before leaving this area."));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("WO water authority enabled and persisted: radius="
+                + staged.radius()
+                + " staged=" + staged.converted()
+                + " projected=" + projected
+                + " verified=" + projectionVerification.inspected()), true);
+        return 1;
+    }
+
+    private static int refuseAuthorityDisable(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        if (!WildernessWaterRules.status(source.getLevel()).active()) {
+            source.sendSuccess(() -> Component.literal("WO water authority is already OFF."), false);
+            return 1;
+        }
+        source.sendFailure(Component.literal(
+                "WO water authority cannot be disabled automatically: canonical/generated water may exist in "
+                        + "unloaded chunks. A world-wide rollback tool is required before ownership can be released."
+        ));
+        return 0;
+    }
+
     private static int shipcheck(CommandContext<CommandSourceStack> context, int requestedRadius) {
         CommandSourceStack source = context.getSource();
         ServerLevel level = source.getLevel();
         if (!WildernessWaterRules.isEnabled(level)) {
             source.sendSuccess(() -> Component.literal(
-                    "WO water repair skipped: Wilderness Odyssey water is disabled by config or gamerule."
+                    "WO water shipcheck skipped: persisted Wilderness water authority is disabled."
             ), false);
             return 0;
         }
@@ -358,6 +483,33 @@ public final class WaterDebugCommand {
         source.sendSuccess(() -> Component.literal("WO water repaired projected cells=" + finalRepaired
                 + " radius=" + finalRadius), true);
         return Math.max(1, repaired);
+    }
+
+    private static int convertExistingWater(
+            CommandContext<CommandSourceStack> context,
+            int requestedRadius
+    ) {
+        CommandSourceStack source = context.getSource();
+        ServerLevel level = source.getLevel();
+        if (!WildernessWaterRules.isEnabled(level)) {
+            source.sendFailure(Component.literal(
+                    "WO water conversion requires an active persisted authority mode."
+            ));
+            return 0;
+        }
+
+        ExistingWorldWaterConverter.ConversionResult result =
+                ExistingWorldWaterConverter.convertLoaded(level, sourceBlockPos(source), requestedRadius);
+        source.sendSuccess(() -> Component.literal("WO water explicit conversion radius=" + result.radius()
+                + " inspected=" + result.inspected()
+                + " vanillaWater=" + result.vanillaWater()
+                + " converted=" + result.converted()
+                + " reprojected=" + result.reprojected()
+                + " unloadedColumnsSkipped=" + result.unloadedColumns()), true);
+        source.sendSuccess(() -> Component.literal(
+                "  Only currently loaded blocks were inspected; no completed chunk was loaded or scanned automatically."
+        ), false);
+        return Math.max(1, result.converted() + result.reprojected());
     }
 
     private static String onOff(boolean value) {

@@ -6,12 +6,14 @@ import com.thunder.wildernessodysseyapi.watersystem.water.network.WaterVolumeSyn
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.ChunkDataEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
 
@@ -57,6 +59,14 @@ public final class ChunkCapabilityHandler {
     @SubscribeEvent
     public static void onChunkUnwatch(ChunkWatchEvent.UnWatch event) {
         WaterVolumeSynchronizer.forgetChunk(event.getPlayer(), event.getPos());
+    }
+
+    /** Releases bounded revision and baseline cursors immediately on logout. */
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            WaterVolumeSynchronizer.forgetPlayer(player);
+        }
     }
 
     @SubscribeEvent

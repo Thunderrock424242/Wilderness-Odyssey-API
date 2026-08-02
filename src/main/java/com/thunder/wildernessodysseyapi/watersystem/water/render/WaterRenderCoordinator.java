@@ -44,6 +44,11 @@ public final class WaterRenderCoordinator {
     private WaterRenderCoordinator() {
     }
 
+    /** Records that an optional renderer's tagged-water compatibility hook executed. */
+    public static void recordExternalRendererBridgeUse() {
+        WaterRenderDiagnostics.recordExternalRendererBridgeUse();
+    }
+
     /** Coordinates all custom water rendering at Minecraft's translucent stage. */
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
@@ -55,6 +60,8 @@ public final class WaterRenderCoordinator {
         if (level == null || !WaterRenderingConfig.replacementWaterRenderingEnabled(level)) {
             clear();
             externalPackOwnedLastFrame = false;
+            WaterRenderDiagnostics.setRenderPath(WaterRenderDiagnostics.RenderPath.DISABLED);
+            WaterRenderDiagnostics.setSceneCaptureAvailable(false);
             return;
         }
 
@@ -63,6 +70,9 @@ public final class WaterRenderCoordinator {
         // drawing it through stock translucent here would create the flat ring
         // seen around the GPU-wave surface and would hide pack-owned fluid tops.
         if (WaterShaders.externalShaderPackOwnsWater()) {
+            WaterRenderDiagnostics.setRenderPath(
+                    WaterRenderDiagnostics.RenderPath.EXTERNAL_SHADER_PACK);
+            WaterRenderDiagnostics.setSceneCaptureAvailable(false);
             if (!externalPackOwnedLastFrame) {
                 clear();
                 event.getLevelRenderer().allChanged();
@@ -77,6 +87,9 @@ public final class WaterRenderCoordinator {
             ClientWaterSnapshotStore.markAllDirtyMeshes(level);
             event.getLevelRenderer().allChanged();
         }
+        WaterRenderDiagnostics.setRenderPath(WaterShaders.shouldUseCoreShader()
+                ? WaterRenderDiagnostics.RenderPath.CORE_SHADER
+                : WaterRenderDiagnostics.RenderPath.VANILLA_FALLBACK);
 
         long started = System.nanoTime();
         rebuildDirtyGroups(level, event);
@@ -88,8 +101,10 @@ public final class WaterRenderCoordinator {
         int triangles = 0;
         long ssrNanos = 0L;
 
-        if (!visible.isEmpty()) {
-            float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
+        float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
+        boolean submergedOpticsNeedCapture = WaterShaders.shouldUseUnderwaterShader()
+                && ClientWaterImmersion.sample(event.getCamera(), partialTick).isVisuallySubmerged();
+        if (!visible.isEmpty() || submergedOpticsNeedCapture) {
             float timeSeconds = (level.getGameTime() + partialTick) / 20.0f;
             OceanSeaState.Sample seaState = ClientOceanSeaState.current(level);
             WaterShaders.updateOceanUniforms(
@@ -97,6 +112,9 @@ public final class WaterRenderCoordinator {
                     seaState,
                     ((level.getDayTime() + partialTick) % 24_000L) / 24_000.0f
             );
+        }
+
+        if (!visible.isEmpty()) {
             WaterShaders.prepareSnapshotMeshPass();
             boolean timeSsrPass = WaterShaders.shouldUseCoreShader()
                     && WaterRenderingConfig.screenSpaceReflectionSteps() > 0;
@@ -222,11 +240,12 @@ public final class WaterRenderCoordinator {
             RenderLevelStageEvent event,
             List<WaterChunkMeshCache.MeshGroup> visible
     ) {
-        RenderType renderType = WaterShaders.shouldUseCoreShader()
+        boolean coreShader = WaterShaders.shouldUseCoreShader();
+        RenderType renderType = coreShader
                 ? WaterRenderTypes.dynamicOcean()
                 : RenderType.translucent();
         renderType.setupRenderState();
-        ShaderInstance shader = WaterShaders.shouldUseCoreShader()
+        ShaderInstance shader = coreShader
                 ? WaterShaders.getOceanShader()
                 : net.minecraft.client.renderer.GameRenderer.getRendertypeTranslucentShader();
         if (shader == null) {
@@ -234,8 +253,8 @@ public final class WaterRenderCoordinator {
             return;
         }
         var camera = event.getCamera().getPosition();
-        Matrix4f modelView = new Matrix4f(event.getModelViewMatrix())
-                .translate((float) -camera.x, (float) -camera.y, (float) -camera.z);
+        WaterChunkMeshCache.MeshGroup firstGroup = visible.getFirst();
+        Matrix4f modelView = chunkModelView(event, firstGroup, camera.x, camera.y, camera.z);
         shader.setDefaultUniforms(
                 VertexFormat.Mode.QUADS,
                 modelView,
@@ -244,12 +263,41 @@ public final class WaterRenderCoordinator {
         );
         shader.apply();
         for (WaterChunkMeshCache.MeshGroup group : visible) {
+            // Each VBO is chunk-local. Uploading only these two small uniforms
+            // preserves sub-block precision at the world border without
+            // rebinding the complete shader and all scene textures per chunk.
+            if (shader.MODEL_VIEW_MATRIX != null) {
+                shader.MODEL_VIEW_MATRIX.set(chunkModelView(
+                        event, group, camera.x, camera.y, camera.z));
+                shader.MODEL_VIEW_MATRIX.upload();
+            }
+            if (coreShader) {
+                var chunkOrigin = shader.getUniform("ChunkOrigin");
+                if (chunkOrigin != null) {
+                    chunkOrigin.set((float) group.originX(), (float) group.originZ());
+                    chunkOrigin.upload();
+                }
+            }
             group.buffer().bind();
             group.buffer().draw();
         }
         VertexBuffer.unbind();
         shader.clear();
         renderType.clearRenderState();
+    }
+
+    private static Matrix4f chunkModelView(
+            RenderLevelStageEvent event,
+            WaterChunkMeshCache.MeshGroup group,
+            double cameraX,
+            double cameraY,
+            double cameraZ
+    ) {
+        return new Matrix4f(event.getModelViewMatrix()).translate(
+                (float) (group.originX() - cameraX),
+                (float) -cameraY,
+                (float) (group.originZ() - cameraZ)
+        );
     }
 
     private static void markSurfaceSectionsDirty(

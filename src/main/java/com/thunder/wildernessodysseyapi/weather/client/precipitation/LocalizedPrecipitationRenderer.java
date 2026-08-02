@@ -56,6 +56,7 @@ public final class LocalizedPrecipitationRenderer {
     private static final int MAX_RENDER_COLUMNS = MAX_NEAR_COLUMNS + MAX_DISTANT_SHAFTS;
     private static final byte RAIN = 1;
     private static final byte SNOW = 2;
+    private static final byte HAIL = 3;
     private static final byte NEAR = 0;
     private static final byte DISTANT = 1;
 
@@ -73,6 +74,7 @@ public final class LocalizedPrecipitationRenderer {
     private static final int[] DISTANT_BOTTOM_Y = new int[MAX_DISTANT_SHAFTS];
     private static final int[] DISTANT_TOP_Y = new int[MAX_DISTANT_SHAFTS];
     private static final float[] DISTANT_INTENSITY = new float[MAX_DISTANT_SHAFTS];
+    private static final byte[] DISTANT_TYPE = new byte[MAX_DISTANT_SHAFTS];
 
     private static ClientLevel renderedLevel;
     private static int renderColumnCount;
@@ -192,11 +194,12 @@ public final class LocalizedPrecipitationRenderer {
                     Heightmap.Types.MOTION_BLOCKING,
                     queryPos
             );
+            PrecipitationType surfaceType = ClientWeatherCoordinator.precipitationTypeAt(level, surfacePos);
             if (surfacePos.getY() <= levelReader.getMinBuildHeight()
                     || surfacePos.getY() > cameraPos.getY() + 10
                     || surfacePos.getY() < cameraPos.getY() - 10
-                    || ClientWeatherCoordinator.precipitationTypeAt(level, surfacePos)
-                    != PrecipitationType.RAIN) {
+                    || (surfaceType != PrecipitationType.RAIN
+                    && surfaceType != PrecipitationType.HAIL)) {
                 continue;
             }
 
@@ -213,7 +216,9 @@ public final class LocalizedPrecipitationRenderer {
             double collisionHeight = shape.max(Direction.Axis.Y, localX, localZ);
             double fluidHeight = fluidState.getHeight(levelReader, soundPos);
             double particleHeight = Math.max(collisionHeight, fluidHeight);
-            ParticleOptions particle = !fluidState.is(FluidTags.LAVA)
+            ParticleOptions particle = surfaceType == PrecipitationType.HAIL
+                    ? ParticleTypes.SNOWFLAKE
+                    : !fluidState.is(FluidTags.LAVA)
                     && !blockState.is(Blocks.MAGMA_BLOCK)
                     && !CampfireBlock.isLitCampfire(blockState)
                     ? ParticleTypes.RAIN
@@ -325,6 +330,7 @@ public final class LocalizedPrecipitationRenderer {
                 }
                 double distance = Math.hypot(blockX + 0.5 - camX, blockZ + 0.5 - camZ);
                 boolean snow = type == PrecipitationType.SNOW;
+                boolean hail = type == PrecipitationType.HAIL;
                 float alpha = PrecipitationVisualModel.nearAlpha(intensity, distance, radius, snow);
                 if (alpha <= 0.001F) {
                     continue;
@@ -336,7 +342,7 @@ public final class LocalizedPrecipitationRenderer {
                         topY,
                         Math.max(surfaceY, cameraY),
                         alpha,
-                        snow ? SNOW : RAIN,
+                        hail ? HAIL : snow ? SNOW : RAIN,
                         NEAR
                 );
             }
@@ -407,9 +413,9 @@ public final class LocalizedPrecipitationRenderer {
                         blockX + 0.5,
                         blockZ + 0.5
                 );
+                PrecipitationType type = ClientWeatherCoordinator.precipitationTypeAt(level, queryPos);
                 if (intensity <= PrecipitationVisualModel.PRECIPITATION_EPSILON
-                        || ClientWeatherCoordinator.precipitationTypeAt(level, queryPos)
-                        != PrecipitationType.RAIN) {
+                        || (type != PrecipitationType.RAIN && type != PrecipitationType.HAIL)) {
                     continue;
                 }
 
@@ -425,6 +431,7 @@ public final class LocalizedPrecipitationRenderer {
                 DISTANT_BOTTOM_Y[index] = surfaceY;
                 DISTANT_TOP_Y[index] = topY;
                 DISTANT_INTENSITY[index] = (float) intensity;
+                DISTANT_TYPE[index] = type == PrecipitationType.HAIL ? HAIL : RAIN;
             }
         }
 
@@ -466,7 +473,7 @@ public final class LocalizedPrecipitationRenderer {
                     DISTANT_TOP_Y[index],
                     Math.max(DISTANT_BOTTOM_Y[index], cameraY),
                     alpha,
-                    RAIN,
+                    DISTANT_TYPE[index],
                     DISTANT
             );
         }
@@ -515,6 +522,7 @@ public final class LocalizedPrecipitationRenderer {
         try {
             drawBatch(level, ticks, partialTick, camX, camY, camZ, settings, RAIN, RAIN_LOCATION);
             drawBatch(level, ticks, partialTick, camX, camY, camZ, settings, SNOW, SNOW_LOCATION);
+            drawBatch(level, ticks, partialTick, camX, camY, camZ, settings, HAIL, SNOW_LOCATION);
         } finally {
             RenderSystem.enableCull();
             RenderSystem.disableBlend();
@@ -586,7 +594,7 @@ public final class LocalizedPrecipitationRenderer {
             lightPos.set(blockX, RENDER_LIGHT_Y[index], blockZ);
             int light = LevelRenderer.getLightColor(level, lightPos);
 
-            if (type == RAIN) {
+            if (type == RAIN || type == HAIL) {
                 emitRainQuad(
                         builder,
                         blockX,

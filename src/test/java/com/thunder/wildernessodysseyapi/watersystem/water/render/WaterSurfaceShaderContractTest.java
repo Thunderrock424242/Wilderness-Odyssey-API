@@ -19,7 +19,9 @@ class WaterSurfaceShaderContractTest {
 
         assertTrue(descriptor.contains("\"name\": \"SpectrumState\""));
         assertTrue(descriptor.contains("\"name\": \"WindSpeed\""));
+        assertTrue(descriptor.contains("\"name\": \"ChunkOrigin\""));
         assertTrue(descriptor.contains("\"name\": \"ImpulseCount\""));
+        assertTrue(descriptor.contains("\"name\": \"ImpulseChunkIndex\""));
         assertTrue(descriptor.contains("\"name\": \"ImpulsePosition7\""));
         assertTrue(descriptor.contains("\"name\": \"ImpulseShape7\""));
     }
@@ -52,8 +54,18 @@ class WaterSurfaceShaderContractTest {
         assertTrue(vertex.contains("displacedPosition.xz += horizontalDisplacement"));
         assertTrue(vertex.contains("cross(tangentZ, tangentX)"));
         assertTrue(vertex.contains("shoreHorizontalTaper"));
-        assertTrue(vertex.contains("accumulateImpulse(worldXZ"));
-        assertTrue(fragment.contains("advectedPosition = position - current * GameTime"));
+        assertTrue(vertex.contains("accumulateImpulse(localXZ"));
+        assertTrue(vertex.contains("relativeChunkOrigin - impulse.xy"));
+        assertTrue(vertex.contains("float persistentFoam = max(ring, center * 0.30) * shape.w"));
+        assertTrue(vertex.contains("length(gradient) * 0.20 + persistentFoam"));
+        assertTrue(vertex.contains("bodyWeight <= 0.000001 || shape.x <= 0.000001"));
+        assertTrue(vertex.contains("flowRelativeDirection(baseDirection, flowDirection)"));
+        assertTrue(vertex.contains("stableLinearPhase(localXZ"));
+        assertTrue(vertex.contains("phaseChunkIndex = ChunkOrigin / PHASE_CHUNK_SPAN"));
+        assertTrue(fragment.contains("flat in vec2 phaseChunkIndex"));
+        assertTrue(fragment.contains("animatedStablePhase"));
+        assertTrue(fragment.contains("stableWorldPhase(foamDirection"));
+        assertFalse(fragment.contains("dot(worldPosition.xz"));
         assertTrue(fragment.contains("float shoreBreaker = shoreFactor"));
         assertTrue(fragment.contains("float impulseFoam = disturbanceStrength"));
     }

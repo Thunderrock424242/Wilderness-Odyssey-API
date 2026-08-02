@@ -43,7 +43,11 @@ class WeatherRegionSyncPayloadTest {
                 0.46f,
                 0.81f,
                 -0.18f,
-                0.91f
+                0.91f,
+                0.82f,
+                0.44f,
+                0.67f,
+                0.31f
         );
         var original = new WeatherRegionSyncPayload(
                 OVERWORLD,
@@ -88,6 +92,10 @@ class WeatherRegionSyncPayloadTest {
             assertEquals(0.81f, decodedCell.cloudDepth(), 1.0f / 255.0f);
             assertEquals(-0.18f, decodedCell.cloudWindX(), 1.0f / 32_767.0f);
             assertEquals(0.91f, decodedCell.cloudWindZ(), 1.0f / 32_767.0f);
+            assertEquals(0.82f, decodedCell.surfaceWetness(), 1.0f / 255.0f);
+            assertEquals(0.44f, decodedCell.puddleCoverage(), 1.0f / 255.0f);
+            assertEquals(0.67f, decodedCell.snowpack(), 1.0f / 255.0f);
+            assertEquals(0.31f, decodedCell.frozenFraction(), 1.0f / 255.0f);
         } finally {
             buffer.release();
         }
@@ -242,7 +250,7 @@ class WeatherRegionSyncPayloadTest {
     }
 
     @Test
-    void codecRejectsUnknownPrecipitationType() {
+    void codecRoundTripPreservesHailType() {
         var payload = new WeatherRegionSyncPayload(
                 OVERWORLD,
                 WeatherRegionSyncPayload.DATA_VERSION,
@@ -252,19 +260,17 @@ class WeatherRegionSyncPayloadTest {
                 256,
                 0,
                 0,
-                List.of(clearCell(0, 0))
+                List.of(new WeatherRegionSyncPayload.CellSnapshot(
+                        0, 0, 0L, 8.0F, 0.9F, 0.96F,
+                        0.2F, 0.1F, 0.9F, 0.8F, 0.9F, 0.75F,
+                        PrecipitationType.HAIL
+                ))
         );
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         try {
             WeatherRegionSyncPayload.STREAM_CODEC.encode(buffer, payload);
-            // Version two appends seven vertical/cloud-wind bytes after the
-            // packed precipitation byte.
-            buffer.setByte(buffer.writerIndex() - 8, 0b1100_0000);
-
-            assertThrows(
-                    IllegalArgumentException.class,
-                    () -> WeatherRegionSyncPayload.STREAM_CODEC.decode(buffer)
-            );
+            WeatherRegionSyncPayload decoded = WeatherRegionSyncPayload.STREAM_CODEC.decode(buffer);
+            assertEquals(PrecipitationType.HAIL, decoded.cells().getFirst().precipitationType());
         } finally {
             buffer.release();
         }

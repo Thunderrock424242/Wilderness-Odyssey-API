@@ -3,7 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.entity;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Stores client-computed boat surface response for the boat render mixin.
+ * Stores client-computed, inertially smoothed boat surface response.
  *
  * <p>Bobbing is kept render-only rather than changing the entity position each
  * tick. That avoids cumulative vertical drift and server correction while the
@@ -12,6 +12,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class BoatTiltStore {
 
     private static final float[] FLAT = new float[]{0.0f, 0.0f, 0.0f};
+    private static final float ANGULAR_STIFFNESS = 0.18f;
+    private static final float ANGULAR_DAMPING = 0.64f;
+    private static final float BOB_STIFFNESS = 0.24f;
+    private static final float BOB_DAMPING = 0.70f;
     private static final ConcurrentHashMap<Integer, float[]> RESPONSES =
             new ConcurrentHashMap<>(32);
 
@@ -22,10 +26,8 @@ public final class BoatTiltStore {
      * Stores pitch, roll, and vertical render offset for one boat.
      */
     public static void set(int entityId, float pitch, float roll, float bob) {
-        float[] response = RESPONSES.computeIfAbsent(entityId, key -> new float[3]);
-        response[0] = pitch;
-        response[1] = roll;
-        response[2] = bob;
+        float[] response = RESPONSES.computeIfAbsent(entityId, key -> new float[6]);
+        integrateResponse(response, pitch, roll, bob);
     }
 
     /**
@@ -33,6 +35,27 @@ public final class BoatTiltStore {
      */
     public static float[] get(int entityId) {
         return RESPONSES.getOrDefault(entityId, FLAT);
+    }
+
+    // Spring-damper integration gives visible pitch, roll, and heave angular
+    // momentum instead of snapping a rigid model to each sampled wave slope.
+    static void integrateResponse(float[] response, float pitch, float roll, float bob) {
+        integrateAxis(response, 0, 3, pitch, ANGULAR_STIFFNESS, ANGULAR_DAMPING);
+        integrateAxis(response, 1, 4, roll, ANGULAR_STIFFNESS, ANGULAR_DAMPING);
+        integrateAxis(response, 2, 5, bob, BOB_STIFFNESS, BOB_DAMPING);
+    }
+
+    private static void integrateAxis(
+            float[] response,
+            int valueIndex,
+            int velocityIndex,
+            float target,
+            float stiffness,
+            float damping
+    ) {
+        float acceleration = (target - response[valueIndex]) * stiffness;
+        response[velocityIndex] = (response[velocityIndex] + acceleration) * damping;
+        response[valueIndex] += response[velocityIndex];
     }
 
     /** Removes response state for an entity that is no longer tracked. */

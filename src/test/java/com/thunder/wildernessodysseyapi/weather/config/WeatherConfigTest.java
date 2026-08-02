@@ -39,7 +39,8 @@ class WeatherConfigTest {
         assertEquals(64, settings.maxPersistedCells());
         assertEquals(List.of("minecraft:overworld"), settings.dimensionAllowlist());
         assertEquals(List.of("minecraft:the_nether"), settings.dimensionDenylist());
-        assertEquals(VanillaWeatherCompatibilityMode.PRESERVE_GLOBAL, settings.compatibilityMode());
+        assertEquals(VanillaWeatherCompatibilityMode.SUPPRESS_GLOBAL, settings.compatibilityMode());
+        assertEquals(WeatherOwnershipMode.AUTO, settings.ownershipMode());
     }
 
     @Test
@@ -54,7 +55,8 @@ class WeatherConfigTest {
                 4.0,
                 -0.5,
                 7.0,
-                2.0
+                2.0,
+                -2.0
         );
 
         assertEquals(1.0, settings.simulationSpeed());
@@ -67,6 +69,7 @@ class WeatherConfigTest {
         assertEquals(0.0, settings.stormFormationThreshold());
         assertEquals(1.0, settings.maximumPrecipitationIntensity());
         assertEquals(0.25, settings.randomVariation());
+        assertEquals(0.0, settings.weatherFrontStrength());
     }
 
     @Test
@@ -109,6 +112,36 @@ class WeatherConfigTest {
         assertEquals(20.0, settings.temperatureAmplitudeCelsius());
         assertEquals(0.0, settings.humidityAmplitude());
         assertEquals(0.0, settings.storminessAmplitude());
+    }
+
+    @Test
+    void severeWeatherDefaultsKeepBlockDamageDisabled() {
+        WeatherConfig.FeatureSettings defaults = WeatherConfig.FeatureSettings.DEFAULT;
+        assertTrue(defaults.persistentSystemsEnabled());
+        assertTrue(defaults.severeWeatherEnabled());
+        assertTrue(defaults.tornadoesEnabled());
+        assertTrue(defaults.cyclonesEnabled());
+        assertFalse(defaults.severeBlockDamageEnabled());
+        assertEquals(48, defaults.maximumWeatherSystems());
+        assertEquals(5, defaults.maximumSnowLayers());
+    }
+
+    @Test
+    void survivalIntegrationSettingsClampCadenceAndExposure() {
+        WeatherConfig.SurvivalIntegrationSettings unsafe =
+                new WeatherConfig.SurvivalIntegrationSettings(
+                        true,
+                        Double.POSITIVE_INFINITY,
+                        true,
+                        -1,
+                        5.0
+                );
+
+        assertTrue(WeatherConfig.SurvivalIntegrationSettings.DEFAULT.coldSweatEnabled());
+        assertTrue(WeatherConfig.SurvivalIntegrationSettings.DEFAULT.thirstWasTakenEnabled());
+        assertEquals(0.0, unsafe.coldSweatMaximumOffsetCelsius());
+        assertEquals(20, unsafe.thirstIntervalTicks());
+        assertEquals(0.25, unsafe.thirstMaximumExhaustionPerInterval());
     }
 
     @Test

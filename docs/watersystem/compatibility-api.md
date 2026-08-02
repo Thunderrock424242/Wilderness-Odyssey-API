@@ -49,7 +49,9 @@ state without importing blocks, creating attachments, or changing the world.
 ## First proof adapter: entity water state
 
 `EntityWaterCompat` registers through `WaterCompatibilityRegistry` and maintains
-one weak, once-per-game-tick cache per entity. `EntityWaterState` exposes:
+one weak, once-per-game-tick cache per entity. Four inset footprint corners, a
+motion-leading point, and one eye point prevent wide hulls and shoreline contact
+from depending on the entity center. `EntityWaterState` exposes:
 
 - custom-water contact;
 - full-body and eye submersion;
@@ -57,14 +59,59 @@ one weak, once-per-game-tick cache per entity. `EntityWaterState` exposes:
 - current components;
 - ticks in water and ticks since leaving water.
 
-`WaveEntityPhysics` and `WaterEntryEventHandler` consume this state instead of
-independently calling vanilla water detection. Server-side
+`EntityWaterParityMixin` supplies this cached animated contact to vanilla
+`isInWater`, water-tag eye checks, and NeoForge's eye fluid-type path. Swimming,
+air consumption, drowning, and water travel therefore follow the animated
+authority surface. It replaces a vanilla result only when authority observed a
+nearby surface; normal vanilla and third-party tagged water keep their original
+behavior.
+
+`WaveEntityPhysics` and `WaterEntryEventHandler` consume the same state instead
+of independently calling vanilla water detection. Server-side
 `WaveEntityPhysics` now combines the multi-point buoyancy sample with
 mass-aware buoyancy, fluid-relative drag, canonical currents, shoreline flow,
 and bounded local-SPH velocity. It retains per-profile safety caps and
-configurable global scales. It does not overwrite vanilla swimming poses, air
-supply, navigation, or drowning; those future adapters should consume the same
-state cache.
+configurable global scales.
+
+## Vanilla parity adapters
+
+The namespaced fluid remains in `#minecraft:water`, and its NeoForge fluid type
+already opts into hydration. Consequently vanilla open-water fishing, swim-node
+classification, and farmland hydration need no replacement logic. Narrow
+mixins cover only the remaining exact `Blocks.WATER` comparisons:
+
+- full Wilderness sources can form and continue vanilla bubble columns;
+- fishing approach and splash particles render over Wilderness water when
+  `enableFishingCompat` is enabled;
+- floating ground, flying, and ground-navigation surface scans recognize the
+  standalone Wilderness block.
+
+Structure templates can opt into one-time conversion by placing a structure
+block in DATA mode with metadata `wildernessodysseyapi:water`. With
+`enableStructureWaterMarkers` enabled, the processed placement entry becomes a
+Wilderness source block after normal rotation and processors. The stored
+template is unchanged, and no recurring structure scan is performed.
+
+## Buckets and vanilla containers
+
+Player and dispenser pickup share one server-side transaction. Authority-owned
+water produces a bucket only when the cell contains exactly 4,096 visible units;
+the drain is committed before the item is awarded, and an unexpected partial
+drain is restored. Partial finite cells are left unchanged instead of being
+rounded up into a full bucket. Unowned vanilla water remains on the vanilla path.
+
+The resulting item is the vanilla water bucket so recipe, inventory, and
+third-party exact-item checks retain their normal behavior. The namespaced
+Wilderness bucket remains available for machine transfers and has matching
+dispenser placement, cauldron filling, waterlogging, and bucketable-fish
+behavior. It is also published in the common `c:buckets/water` item tag for
+tag-aware recipes and machines. Waterlogging deliberately stores vanilla water in the host block;
+only the container call sees the namespaced fluid as vanilla water. Placement
+refuses to consume a full bucket into a cell that already contains finite
+authority-owned water, preventing hidden volume loss. Disabling the translation
+flag still rejects pickup and overwriting placement for owned projections; it
+never turns off conservation protection, and unowned vanilla water remains on
+the normal path.
 
 ## Machine-fluid integration
 
@@ -100,7 +147,7 @@ NeoForge capabilities without changing global fluid identity.
 
 The server water-simulation config now contains:
 
-- `enableWildernessOdysseyWater` (existing master switch)
+- `enableWildernessOdysseyWater` (initial value for the persisted authority latch)
 - `enableVanillaBucketCompat`
 - `enableVanillaBoatCompat`
 - `enableEntityWaterCompat`
@@ -113,27 +160,28 @@ The server water-simulation config now contains:
 - `enableFluidHandlerCompat`
 - `enableCreateWaterCompat`
 
-Bucket, boat, entity detection, hydrodynamics, NeoForge fluid handling, and
-Create recognition default on. Fishing and structure markers remain off because
-no working adapter exists yet. `enableCreateWaterCompat` depends on
+Bucket, boat, entity detection, hydrodynamics, fishing effects, explicit
+structure markers, NeoForge fluid handling, and Create recognition default on.
+Structure conversion still requires the exact DATA marker, so ordinary
+structure blocks are unaffected. `enableCreateWaterCompat` depends on
 `enableFluidHandlerCompat`; disabling either bridge does not disable canonical
 storage, simulation, or rendering.
 
 ## Integration status
 
-The implemented and remaining boundaries are:
+The implemented boundaries and their final live-validation targets are:
 
-| Area | Current state | Remaining boundary |
+| Area | Current state | Intentional boundary or live validation |
 |---|---|---|
-| Bucket placement/pickup | Existing narrow hooks conserve canonical volume | Move their internal transaction calls fully behind a vanilla adapter if a public bucket API is added |
-| Boat/item/mob motion | Central detection plus multi-point authority sampling and bounded server hydrodynamics | Balance profiles in multiplayer and add vehicle-specific extension hooks |
-| Underwater optics | Snapshot surface equation includes spectrum, tide, transient wakes, and current | Consume cached player eye state everywhere vanilla fallback remains |
+| Bucket placement/pickup | Exact 4,096-unit player/dispenser transaction with vanilla bucket output and rollback safety | Live-test unusual third-party dispensers that bypass `DispensibleContainerItem` |
+| Boat/item/mob motion | Multi-point authority sampling, hull-oriented drag, buoyancy, planing, slamming, angular response, and a public physics-profile registry | Balance on a populated multiplayer server and register profiles for unusual third-party hulls |
+| Underwater optics | Cached eye/body sampling plus the same spectrum, tide, wake, current, and body-color inputs used by the visible surface | Verify the GPU/shader-pack matrix on supported hardware |
 | NeoForge machines | Transactional block capability backed by `WaterAccess` | Add capability GameTests for representative third-party machines |
 | Create | Local water predicate plus guarded open-world projection writes | Add a live open-ended-pipe GameTest against supported Create versions |
-| Tide HUD | Uses vanilla `isInWater()` as a UI visibility hint | Switch to cached player state |
-| Fishing/farmland/AI | Authority helper methods exist but no isolated adapters | Add one adapter at a time with GameTests |
-| Structures | No marker conversion adapter | Convert markers once during placement/post-processing; never scan structures per tick |
-| Waterlogging | Imported as hosted canonical water and excluded from replacement surfaces | Keep as the documented controlled vanilla exception |
+| Tide display | No persistent HUD; a vanilla clock shows tide, trend, and moon context while held or inspected | Verify UI scaling and controller/modded-tooltip combinations |
+| Fishing/farmland/AI | Tag/FluidType-native gameplay plus focused exact-check adapters | Run representative modpack mob and fishing soak tests |
+| Structures | Explicit DATA marker conversion after normal processors | Author templates with `wildernessodysseyapi:water`; no per-tick scan |
+| Waterlogging | Custom bucket translates to vanilla water only at the host-container boundary; the host stores ordinary water | Keep as the documented controlled vanilla exception |
 
 ## Writing future adapters
 
@@ -157,24 +205,33 @@ The implemented and remaining boundaries are:
 
 `UNSUPPORTED`, `DETECTED`, `BASIC`, `INTEGRATED`, and `FULL` are defined by
 `CompatibilityLevel`. `WaterCompatibilityRegistry.statuses()` exposes current
-adapter state to `/wowater compat`. Entity state remains `BASIC` because
-vanilla movement and breathing are not replaced. NeoForge machine transfer and
-Create-local recognition report `INTEGRATED`; neither claims universal support
-for mods that bypass normal block/capability entry points.
+adapter state to `/wowater compat`. Entity state reports `INTEGRATED` because
+vanilla movement and NeoForge breathing consume its animated cache. NeoForge
+machine transfer and Create-local recognition also report `INTEGRATED`; none
+claims universal support for mods that bypass normal block/capability entry
+points.
 
 ## Deliberate limitations
 
 - The current hybrid body model identifies a large body at cached chunk-column
   granularity. `WaterBody#regionKey` is diagnostic and short-lived, not a
   persistent UUID.
-- The API boundary does not solve the audit's dense V1 ocean persistence or full
-  snapshot networking costs. A compressed V2 representation can replace the
-  implementation behind `AuthorityWaterAccess` later without changing adapters.
+- The compact generated baseline solves dense V1 ocean expansion, while sparse
+  runtime cells now use revision deltas and tombstones after a paged baseline.
+  A future representation can still replace `AuthorityWaterAccess` without
+  changing adapters.
 - Mods that mutate chunk sections directly can bypass `Level#setBlock` and the
   NeoForge capability. Exact vanilla-fluid identity comparisons still require a
   focused adapter like Create's; there is intentionally no global identity lie.
 - Integer millibuckets cannot represent every one of the 4,097 possible
   canonical occupancy values. The handler preserves exact units by refusing a
   non-reversible boundary transfer instead of silently rounding it.
-- Swimming/drowning overrides, structure markers, existing-world conversion,
-  and a live Create pipe integration test remain follow-up work.
+- Existing-world conversion is deliberately operator-scoped: `/wowater convert
+  [radius]` visits only a capped loaded cube and never starts an automatic
+  completed-chunk scan. A disabled persisted authority can only be activated by
+  `/wowater mode set on <radius>`, which requires complete loaded coverage and
+  verifies conversion before committing the setting. Automatic disable is
+  refused because unloaded canonical/generated state needs a world-wide
+  rollback tool. A live Create pipe integration test remains follow-up work.
+  Structure markers deliberately require explicit template metadata and can
+  still be disabled independently in server config.

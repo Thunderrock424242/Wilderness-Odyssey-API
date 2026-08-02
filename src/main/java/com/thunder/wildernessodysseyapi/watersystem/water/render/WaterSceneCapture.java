@@ -38,20 +38,42 @@ public final class WaterSceneCapture {
             long started = System.nanoTime();
             int previousRead = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
             int previousDraw = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
-            GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, source.frameBufferId);
-            GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, sceneTarget.frameBufferId);
-            GlStateManager._glBlitFrameBuffer(
-                    0, 0, source.viewWidth, source.viewHeight,
-                    0, 0, sceneTarget.viewWidth, sceneTarget.viewHeight,
-                    GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT,
-                    GL11.GL_NEAREST
-            );
-            GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousRead);
-            GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousDraw);
+            try {
+                GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, source.frameBufferId);
+                GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, sceneTarget.frameBufferId);
+                GlStateManager._glBlitFrameBuffer(
+                        0, 0, source.viewWidth, source.viewHeight,
+                        0, 0, sceneTarget.viewWidth, sceneTarget.viewHeight,
+                        GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT,
+                        GL11.GL_NEAREST
+                );
+            } finally {
+                // A failed resize or driver blit must not strand Minecraft on
+                // the water target for the rest of the frame.
+                GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousRead);
+                GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousDraw);
+            }
             capturedFrameKey = frameKey;
             WaterRenderDiagnostics.recordSceneCopy(System.nanoTime() - started);
         }
 
+        return currentCapture();
+    }
+
+    /**
+     * Returns the existing capture only when it still belongs to {@code frameKey}.
+     *
+     * <p>Overlay hooks run after Minecraft may clear world depth. They must
+     * never turn a failed reuse into a new capture of that later framebuffer.</p>
+     */
+    public static Capture getIfCurrent(long frameKey) {
+        RenderSystem.assertOnRenderThread();
+        return sceneTarget != null && capturedFrameKey == frameKey
+                ? currentCapture()
+                : Capture.UNAVAILABLE;
+    }
+
+    private static Capture currentCapture() {
         return new Capture(
                 sceneTarget.getColorTextureId(),
                 sceneTarget.getDepthTextureId(),
@@ -68,6 +90,7 @@ public final class WaterSceneCapture {
             sceneTarget = null;
         }
         capturedFrameKey = Long.MIN_VALUE;
+        WaterRenderDiagnostics.setSceneCaptureAvailable(false);
     }
 
     private static void ensureTarget(int width, int height) {

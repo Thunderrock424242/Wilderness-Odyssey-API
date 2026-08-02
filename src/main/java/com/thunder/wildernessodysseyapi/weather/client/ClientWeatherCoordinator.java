@@ -4,6 +4,8 @@ import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudLightingModel;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudShadowModel;
+import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherRegionSyncPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -264,6 +266,9 @@ public final class ClientWeatherCoordinator {
         if (currentType == PrecipitationType.NONE) {
             return previousType;
         }
+        if (previousType == PrecipitationType.HAIL || currentType == PrecipitationType.HAIL) {
+            return amount < 0.5D ? previousType : currentType;
+        }
         double previousTemperature = state.previous().temperature(blockX, blockZ);
         double currentTemperature = state.current().temperature(blockX, blockZ);
         return precipitationTypeForTemperature(lerp(previousTemperature, currentTemperature, amount));
@@ -287,10 +292,24 @@ public final class ClientWeatherCoordinator {
         if (position == null) {
             return 0.0F;
         }
-        return (float) CloudLightingModel.skyDarkening(
-                sampleAt(level, position),
-                cloudFieldAt(level, position)
+        CloudFieldSample overhead = cloudFieldAt(level, position);
+        double sunAngle = level.getSunAngle(1.0F) * Math.PI * 2.0;
+        double altitude = Math.max(0.22, Math.abs(Math.sin(sunAngle)));
+        double verticalDistance = Math.max(24.0, level.effects().getCloudHeight() - position.y);
+        double projectedDistance = Math.min(320.0, verticalDistance / altitude);
+        CloudFieldSample towardSun = cloudFieldAt(
+                level,
+                position.x + Math.cos(sunAngle) * projectedDistance,
+                position.z + Math.sin(sunAngle) * projectedDistance
         );
+        double ordinary = CloudLightingModel.skyDarkening(sampleAt(level, position), overhead);
+        double shadow = CloudShadowModel.evaluate(
+                overhead,
+                towardSun,
+                altitude,
+                WeatherRenderingConfig.settings().cloudShadowStrength()
+        );
+        return (float) Math.max(ordinary, shadow);
     }
 
     /**

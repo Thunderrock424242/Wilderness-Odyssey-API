@@ -40,6 +40,7 @@ public class ClientTickHandler {
             ClientOceanSeaState.tick(mc.level);
             ClientWaterVolumeSnapshots.tick(mc.level);
             SPHSimulationManager.get().tickLevel(mc.level, CLIENT_TICK_DELTA);
+            WaterAmbientEffects.tick(mc);
         }
     }
 

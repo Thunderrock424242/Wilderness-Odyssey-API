@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.client.cloud;
 
+import com.thunder.wildernessodysseyapi.weather.api.CloudType;
+
 /**
  * Converts authoritative atmospheric fields into Minecraft-style cloud voxels.
  *
@@ -32,7 +34,9 @@ public final class CloudCoverageModel {
         );
         double precipitationFloor = precipitationShape
                 * (0.72 + field.precipitationIntensity() * 0.28);
-        return unit(Math.max(cloudCoverage, precipitationFloor) * field.support());
+        double layeredCoverage = CloudLayerProfile.evaluate(field).visibleCoverage();
+        return unit(Math.max(Math.max(cloudCoverage * field.support(), layeredCoverage),
+                precipitationFloor * field.support()));
     }
 
     /** Returns whether one 12-block cloud voxel should be occupied. */
@@ -53,7 +57,13 @@ public final class CloudCoverageModel {
         if (coverage <= 0.015) {
             return false;
         }
-        return morphologyNoise(worldTileX, worldTileZ, windDetailOffsetX, windDetailOffsetZ) < coverage;
+        return morphologyNoise(
+                worldTileX,
+                worldTileZ,
+                windDetailOffsetX,
+                windDetailOffsetZ,
+                field.cloudType()
+        ) < coverage;
     }
 
     /** Returns a blocky 4, 8, or 12 block cloud height. */
@@ -86,7 +96,15 @@ public final class CloudCoverageModel {
     public static double opacity(CloudFieldSample field, double multiplier) {
         double coverage = coverage(field);
         double precipitation = field == null ? 0.0 : field.effectivePrecipitation();
-        return clamp((0.68 + coverage * 0.20 + precipitation * 0.10) * multiplier, 0.20, 0.98);
+        CloudType.Shape shape = field == null ? CloudType.Shape.CLEAR : field.cloudType().shape();
+        double baseOpacity = switch (shape) {
+            case CLEAR -> 0.0;
+            case WISPY -> 0.42;
+            case LAYERED -> 0.72;
+            case CELLULAR -> 0.64;
+            case CONVECTIVE -> 0.78;
+        };
+        return clamp((baseOpacity + coverage * 0.20 + precipitation * 0.10) * multiplier, 0.20, 0.98);
     }
 
     /**
@@ -99,11 +117,36 @@ public final class CloudCoverageModel {
             double windDetailOffsetX,
             double windDetailOffsetZ
     ) {
+        return morphologyNoise(
+                worldTileX,
+                worldTileZ,
+                windDetailOffsetX,
+                windDetailOffsetZ,
+                CloudType.CUMULUS
+        );
+    }
+
+    static double morphologyNoise(
+            int worldTileX,
+            int worldTileZ,
+            double windDetailOffsetX,
+            double windDetailOffsetZ,
+            CloudType type
+    ) {
         double x = worldTileX + windDetailOffsetX / CLOUD_TILE_SIZE;
         double z = worldTileZ + windDetailOffsetZ / CLOUD_TILE_SIZE;
-        double broad = valueNoise(x / 6.0, z / 6.0, 0x6A09E667F3BCC909L);
-        double detail = valueNoise(x / 2.25, z / 2.25, 0xBB67AE8584CAA73BL);
-        return broad * 0.72 + detail * 0.28;
+        CloudType.Shape shape = type == null ? CloudType.Shape.CELLULAR : type.shape();
+        return switch (shape) {
+            case CLEAR -> 1.0;
+            case WISPY -> valueNoise(x / 12.0, z / 2.2, 0x3C6EF372FE94F82BL) * 0.78
+                    + valueNoise(x / 4.5, z / 1.4, 0xA54FF53A5F1D36F1L) * 0.22;
+            case LAYERED -> valueNoise(x / 10.0, z / 10.0, 0x510E527FADE682D1L) * 0.86
+                    + valueNoise(x / 3.5, z / 3.5, 0x9B05688C2B3E6C1FL) * 0.14;
+            case CELLULAR -> valueNoise(x / 6.0, z / 6.0, 0x6A09E667F3BCC909L) * 0.72
+                    + valueNoise(x / 2.25, z / 2.25, 0xBB67AE8584CAA73BL) * 0.28;
+            case CONVECTIVE -> valueNoise(x / 8.5, z / 8.5, 0x1F83D9ABFB41BD6BL) * 0.66
+                    + valueNoise(x / 1.8, z / 1.8, 0x5BE0CD19137E2179L) * 0.34;
+        };
     }
 
     private static double valueNoise(double x, double z, long seed) {

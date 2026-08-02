@@ -21,7 +21,7 @@ public final class GerstnerWaveAnimator {
     // same deliberately reduced visual tide amplitude.
     private static final float VISUAL_TIDE_SCALE = 0.18f;
 
-    private static volatile float currentTime = 0.0f;
+    private static volatile double currentTime = 0.0;
     private static float clientTideOffset = 0.0f;
 
     private GerstnerWaveAnimator() {
@@ -34,7 +34,7 @@ public final class GerstnerWaveAnimator {
     public static void update() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level != null) {
-            currentTime = mc.level.getGameTime() / TICKS_PER_SECOND;
+            currentTime = mc.level.getGameTime() / (double) TICKS_PER_SECOND;
             clientTideOffset = TideSystem.getTideOffset(mc.level);
         } else {
             clientTideOffset = 0.0f;
@@ -54,6 +54,20 @@ public final class GerstnerWaveAnimator {
             float worldZ,
             WaterBodyClassifier.WaterType type
     ) {
+        return getSurfaceSampleAt((double) worldX, worldZ, type, 0.0f, 0.0f);
+    }
+
+    /**
+     * Samples the client surface with double world coordinates and optional
+     * local flow alignment for directional river components.
+     */
+    public static WaveSurfaceSample getSurfaceSampleAt(
+            double worldX,
+            double worldZ,
+            WaterBodyClassifier.WaterType type,
+            float flowDirectionX,
+            float flowDirectionZ
+    ) {
         if (!WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get()) {
             return WaveSurfaceSample.flat();
         }
@@ -70,7 +84,9 @@ public final class GerstnerWaveAnimator {
                 WaterRenderingConfig.waveTrainLimit(type),
                 type == WaterBodyClassifier.WaterType.OCEAN
                         ? seaState.spectrum()
-                        : WaveSpectrumState.NEUTRAL
+                        : WaveSpectrumState.NEUTRAL,
+                type == WaterBodyClassifier.WaterType.RIVER ? flowDirectionX : 0.0f,
+                type == WaterBodyClassifier.WaterType.RIVER ? flowDirectionZ : 0.0f
         );
         if (type == WaterBodyClassifier.WaterType.OCEAN) {
             return sample.withHeightOffset(clientTideOffset * VISUAL_TIDE_SCALE);
@@ -142,6 +158,11 @@ public final class GerstnerWaveAnimator {
 
     /** Returns the current world-synchronized wave time in seconds. */
     public static float getTime() {
+        return (float) currentTime;
+    }
+
+    /** Returns precise world-synchronized wave time for CPU surface sampling. */
+    public static double getTimeSeconds() {
         return currentTime;
     }
 

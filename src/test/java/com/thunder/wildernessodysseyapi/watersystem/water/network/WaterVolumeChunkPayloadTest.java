@@ -7,6 +7,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies exact canonical snapshots are split only at cell boundaries. */
 class WaterVolumeChunkPayloadTest {
@@ -40,5 +42,28 @@ class WaterVolumeChunkPayloadTest {
             offset += pageData.length;
         }
         assertArrayEquals(completeData, reassembled);
+    }
+
+    @Test
+    void everyBaselinePageFitsInsideThePerPassCellBudget() {
+        int[] completeData = new int[
+                WaterVolumeChunkPayload.MAX_CELLS_PER_PAGE
+                        * 3
+                        * WaterVolumeChunk.SERIALIZED_CELL_STRIDE
+        ];
+
+        List<WaterVolumeChunkPayload> pages = WaterVolumeChunkPayload.pagesFromData(
+                0, 0, 1L, completeData);
+
+        for (WaterVolumeChunkPayload page : pages) {
+            assertTrue(page.cellCount() <= WaterVolumeChunkPayload.MAX_CELLS_PER_PAGE);
+        }
+    }
+
+    @Test
+    void negativeBaselineRevisionIsRejected() {
+        assertThrows(IllegalArgumentException.class, () -> new WaterVolumeChunkPayload(
+                0, 0, -1L, 0, 1, new int[0]
+        ));
     }
 }

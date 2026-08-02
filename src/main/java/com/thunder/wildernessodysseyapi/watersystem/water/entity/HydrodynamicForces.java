@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.entity;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.api.BuoyancySample;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterPhysicsProfile;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterPhysicsProfileRegistry;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -19,29 +21,11 @@ final class HydrodynamicForces {
     static final double MOBILE_CURRENT_SCALE = 0.20;
     static final double MOBILE_DRAG_FRACTION = 0.20;
 
-    // Per-body baselines stay centralized; server config supplies the global
-    // buoyancy, drag, and safety-cap multipliers through RuntimeTuning.
-    static final ForceProfile BOAT_PROFILE = new ForceProfile(
-            280.0, 180.0, 0.0,
-            0.62,
-            0.55, 0.25,
-            0.70, 0.75,
-            0.032
-    );
-    static final ForceProfile ITEM_PROFILE = new ForceProfile(
-            0.25, 1.0, 0.025,
-            0.040,
-            0.18, 0.08,
-            0.55, 0.40,
-            0.018
-    );
-    static final ForceProfile LIVING_PROFILE = new ForceProfile(
-            48.0, 30.0, 0.0,
-            0.0,
-            0.040, 0.008,
-            0.50, 0.20,
-            0.006
-    );
+    // Per-body baselines are public integration profiles; server config still
+    // supplies global buoyancy, drag, and safety-cap multipliers.
+    static final WaterPhysicsProfile BOAT_PROFILE = WaterPhysicsProfileRegistry.BOAT;
+    static final WaterPhysicsProfile ITEM_PROFILE = WaterPhysicsProfileRegistry.ITEM;
+    static final WaterPhysicsProfile LIVING_PROFILE = WaterPhysicsProfileRegistry.LIVING;
 
     private static final double TICKS_PER_SECOND = 20.0;
     private static final double WATER_DENSITY_KG_PER_CUBIC_BLOCK = 1_000.0;
@@ -56,7 +40,7 @@ final class HydrodynamicForces {
             BuoyancySample sample,
             AABB bounds,
             Vec3 entityVelocity,
-            ForceProfile profile,
+            WaterPhysicsProfile profile,
             int payloadUnits,
             double deltaSeconds
     ) {
@@ -75,7 +59,7 @@ final class HydrodynamicForces {
             BuoyancySample sample,
             AABB bounds,
             Vec3 entityVelocity,
-            ForceProfile profile,
+            WaterPhysicsProfile profile,
             int payloadUnits,
             double deltaSeconds,
             RuntimeTuning tuning
@@ -101,7 +85,7 @@ final class HydrodynamicForces {
             AABB bounds,
             Vec3 entityVelocity,
             double submergedFraction,
-            ForceProfile profile,
+            WaterPhysicsProfile profile,
             int payloadUnits,
             double deltaSeconds
     ) {
@@ -122,7 +106,7 @@ final class HydrodynamicForces {
             AABB bounds,
             Vec3 entityVelocity,
             double submergedFraction,
-            ForceProfile profile,
+            WaterPhysicsProfile profile,
             int payloadUnits,
             double deltaSeconds,
             RuntimeTuning tuning
@@ -145,7 +129,7 @@ final class HydrodynamicForces {
             AABB bounds,
             Vec3 entityVelocity,
             double submergedFraction,
-            ForceProfile profile,
+            WaterPhysicsProfile profile,
             int payloadUnits,
             double deltaSeconds,
             boolean includeBuoyancy,
@@ -170,8 +154,8 @@ final class HydrodynamicForces {
         Vec3 relativeVelocity = current.subtract(velocityPerSecond);
         double accelerationX = dragAcceleration(
                 relativeVelocity.x,
-                Math.max(MINIMUM_AREA, sizeY * sizeZ * profile.horizontalAreaScale()),
-                profile.horizontalDragCoefficient() * tuning.dragScale(),
+                Math.max(MINIMUM_AREA, sizeY * sizeZ * profile.lateralAreaScale()),
+                profile.lateralDragCoefficient() * tuning.dragScale(),
                 fraction,
                 mass
         );
@@ -184,8 +168,8 @@ final class HydrodynamicForces {
         );
         double accelerationZ = dragAcceleration(
                 relativeVelocity.z,
-                Math.max(MINIMUM_AREA, sizeX * sizeY * profile.horizontalAreaScale()),
-                profile.horizontalDragCoefficient() * tuning.dragScale(),
+                Math.max(MINIMUM_AREA, sizeX * sizeY * profile.lateralAreaScale()),
+                profile.lateralDragCoefficient() * tuning.dragScale(),
                 fraction,
                 mass
         );
@@ -208,6 +192,180 @@ final class HydrodynamicForces {
                 delta,
                 profile.maximumDeltaVelocityPerTick() * tuning.maximumDeltaScale()
         );
+    }
+
+    /**
+     * Computes hull-oriented drag, planing lift, and surface-entry slamming.
+     *
+     * <p>Vanilla watercraft expose only a yaw-oriented collision body, so pitch
+     * and roll remain presentation state. Translation is server-authoritative:
+     * longitudinal/lateral drag follows the hull, high-speed partial immersion
+     * creates bounded dynamic lift, and downward entry produces a normal-aligned
+     * impulse instead of passing through a crest before vanilla reacts.</p>
+     */
+    static Vec3 watercraftVelocityDelta(
+            BuoyancySample sample,
+            AABB bounds,
+            Vec3 entityVelocity,
+            float yawDegrees,
+            double previousSubmergedFraction,
+            WaterPhysicsProfile profile,
+            int payloadUnits,
+            double deltaSeconds,
+            RuntimeTuning tuning
+    ) {
+        if (sample == null || !sample.touchingWater() || profile == null
+                || !profile.rigidWatercraft()) {
+            return Vec3.ZERO;
+        }
+        double fraction = clamp(sample.submergedFraction(), 0.0, 1.0);
+        if (tuning == null || !tuning.enabled() || fraction <= 0.0
+                || !(deltaSeconds > 0.0)
+                || !finite(sample.current()) || !finite(entityVelocity)) {
+            return Vec3.ZERO;
+        }
+
+        double sizeX = Math.max(0.0, bounds.getXsize());
+        double sizeY = Math.max(0.0, bounds.getYsize());
+        double sizeZ = Math.max(0.0, bounds.getZsize());
+        double volume = sizeX * sizeY * sizeZ;
+        double mass = Math.max(MINIMUM_MASS, profile.effectiveMass(volume, payloadUnits));
+        double yawRadians = Math.toRadians(yawDegrees);
+        Vec3 forward = new Vec3(-Math.sin(yawRadians), 0.0, Math.cos(yawRadians));
+        Vec3 starboard = new Vec3(Math.cos(yawRadians), 0.0, Math.sin(yawRadians));
+
+        Vec3 velocityPerSecond = entityVelocity.scale(TICKS_PER_SECOND);
+        Vec3 relativeVelocity = sample.current().subtract(velocityPerSecond);
+        double relativeForward = relativeVelocity.dot(forward);
+        double relativeLateral = relativeVelocity.dot(starboard);
+        double hullLength = Math.max(sizeX, sizeZ);
+        double hullWidth = Math.min(sizeX, sizeZ);
+        double forwardArea = Math.max(
+                MINIMUM_AREA,
+                sizeY * Math.max(hullWidth, 0.1) * profile.longitudinalAreaScale()
+        );
+        double lateralArea = Math.max(
+                MINIMUM_AREA,
+                sizeY * Math.max(hullLength, 0.1) * profile.lateralAreaScale()
+        );
+        double planingArea = Math.max(
+                MINIMUM_AREA,
+                sizeX * sizeZ * profile.verticalAreaScale()
+        );
+
+        double accelerationForward = dragAcceleration(
+                relativeForward,
+                forwardArea,
+                profile.longitudinalDragCoefficient() * tuning.dragScale(),
+                fraction,
+                mass
+        );
+        double accelerationLateral = dragAcceleration(
+                relativeLateral,
+                lateralArea,
+                profile.lateralDragCoefficient() * tuning.dragScale(),
+                fraction,
+                mass
+        );
+        double accelerationY = dragAcceleration(
+                relativeVelocity.y,
+                planingArea,
+                profile.verticalDragCoefficient() * tuning.dragScale(),
+                fraction,
+                mass
+        );
+
+        double displacedVolume = volume
+                * fraction
+                * profile.displacedVolumeScale()
+                * tuning.buoyancyScale();
+        accelerationY += WATER_DENSITY_KG_PER_CUBIC_BLOCK
+                * GRAVITY_BLOCKS_PER_SECOND_SQUARED
+                * displacedVolume
+                / mass;
+
+        Vec3 surfaceNormal = safeUpwardNormal(sample.surfaceNormal());
+        double forwardSpeed = Math.abs(velocityPerSecond.dot(forward));
+        double planingWindow = fraction * (1.0 - fraction);
+        double planingAcceleration = 0.5
+                * WATER_DENSITY_KG_PER_CUBIC_BLOCK
+                * forwardSpeed * forwardSpeed
+                * planingArea
+                * profile.planingLiftCoefficient()
+                * tuning.planingScale()
+                * planingWindow
+                / mass;
+
+        double entryFraction = Math.max(
+                0.0,
+                fraction - clamp(previousSubmergedFraction, 0.0, 1.0)
+        );
+        double entrySpeed = Math.max(0.0, -velocityPerSecond.y);
+        double slamAcceleration = entrySpeed
+                * (entryFraction / deltaSeconds)
+                * profile.slammingCoefficient()
+                * tuning.slammingScale();
+
+        Vec3 acceleration = forward.scale(accelerationForward)
+                .add(starboard.scale(accelerationLateral))
+                .add(0.0, accelerationY, 0.0)
+                .add(surfaceNormal.scale(planingAcceleration + slamAcceleration));
+        Vec3 delta = acceleration.scale(deltaSeconds / TICKS_PER_SECOND);
+        return clampMagnitude(
+                delta,
+                profile.maximumDeltaVelocityPerTick() * tuning.maximumDeltaScale()
+        );
+    }
+
+    /** Computes bounded yaw acceleration from lateral hull slip. */
+    static double watercraftYawAcceleration(
+            BuoyancySample sample,
+            AABB bounds,
+            Vec3 entityVelocity,
+            float yawDegrees,
+            WaterPhysicsProfile profile,
+            int payloadUnits,
+            RuntimeTuning tuning
+    ) {
+        if (sample == null || !sample.touchingWater() || profile == null
+                || !profile.rigidWatercraft() || tuning == null || !tuning.enabled()) {
+            return 0.0;
+        }
+        double fraction = clamp(sample.submergedFraction(), 0.0, 1.0);
+        if (fraction <= 0.0 || !finite(sample.current()) || !finite(entityVelocity)) {
+            return 0.0;
+        }
+        double yawRadians = Math.toRadians(yawDegrees);
+        Vec3 forward = new Vec3(-Math.sin(yawRadians), 0.0, Math.cos(yawRadians));
+        Vec3 starboard = new Vec3(Math.cos(yawRadians), 0.0, Math.sin(yawRadians));
+        Vec3 velocityPerSecond = entityVelocity.scale(TICKS_PER_SECOND);
+        Vec3 relative = sample.current().subtract(velocityPerSecond);
+        double lateralSlip = relative.dot(starboard);
+        double forwardSpeed = Math.abs(velocityPerSecond.dot(forward));
+        double sizeX = Math.max(0.1, bounds.getXsize());
+        double sizeY = Math.max(0.1, bounds.getYsize());
+        double sizeZ = Math.max(0.1, bounds.getZsize());
+        double hullLength = Math.max(sizeX, sizeZ);
+        double hullWidth = Math.min(sizeX, sizeZ);
+        double volume = sizeX * sizeY * sizeZ;
+        double mass = profile.effectiveMass(volume, payloadUnits);
+        double momentOfInertia = Math.max(
+                0.01,
+                mass * (hullLength * hullLength + hullWidth * hullWidth) / 12.0
+        );
+        double lateralArea = sizeY * hullLength * profile.lateralAreaScale();
+        double stabilizingForce = 0.5
+                * WATER_DENSITY_KG_PER_CUBIC_BLOCK
+                * lateralArea
+                * profile.angularStabilityCoefficient()
+                * tuning.angularResponseScale()
+                * tuning.dragScale()
+                * fraction
+                * lateralSlip
+                * Math.abs(lateralSlip)
+                * Math.min(1.0, 0.25 + forwardSpeed * 0.10);
+        double torque = stabilizingForce * hullLength * 0.25;
+        return clamp(torque / momentOfInertia, -2.5, 2.5);
     }
 
     private static double dragAcceleration(
@@ -247,22 +405,15 @@ final class HydrodynamicForces {
         return Math.max(minimum, Math.min(maximum, value));
     }
 
-    record ForceProfile(
-            double baseMassKg,
-            double massPerCubicBlockKg,
-            double massPerPayloadUnitKg,
-            double displacedVolumeScale,
-            double horizontalDragCoefficient,
-            double verticalDragCoefficient,
-            double horizontalAreaScale,
-            double verticalAreaScale,
-            double maximumDeltaVelocityPerTick
-    ) {
-        double effectiveMass(double volume, int payloadUnits) {
-            return baseMassKg
-                    + Math.max(0.0, volume) * massPerCubicBlockKg
-                    + Math.max(0, payloadUnits) * massPerPayloadUnitKg;
+    private static Vec3 safeUpwardNormal(Vec3 value) {
+        if (!finite(value) || value.lengthSqr() <= 1.0e-12) {
+            return new Vec3(0.0, 1.0, 0.0);
         }
+        Vec3 normalized = value.normalize();
+        if (normalized.y < 0.20) {
+            normalized = new Vec3(normalized.x, 0.20, normalized.z).normalize();
+        }
+        return normalized;
     }
 
     /**
@@ -275,14 +426,21 @@ final class HydrodynamicForces {
             boolean enabled,
             double buoyancyScale,
             double dragScale,
-            double maximumDeltaScale
+            double maximumDeltaScale,
+            double planingScale,
+            double slammingScale,
+            double angularResponseScale
     ) {
-        static final RuntimeTuning DEFAULT = new RuntimeTuning(true, 1.0, 1.0, 1.0);
+        static final RuntimeTuning DEFAULT = new RuntimeTuning(
+                true, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0);
 
         RuntimeTuning {
             buoyancyScale = clamp(buoyancyScale, 0.0, 2.0);
             dragScale = clamp(dragScale, 0.0, 2.0);
             maximumDeltaScale = clamp(maximumDeltaScale, 0.0, 2.0);
+            planingScale = clamp(planingScale, 0.0, 2.0);
+            slammingScale = clamp(slammingScale, 0.0, 2.0);
+            angularResponseScale = clamp(angularResponseScale, 0.0, 2.0);
         }
     }
 }

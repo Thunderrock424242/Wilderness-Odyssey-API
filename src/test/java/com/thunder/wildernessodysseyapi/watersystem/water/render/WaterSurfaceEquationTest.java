@@ -65,4 +65,40 @@ class WaterSurfaceEquationTest {
 
         assertEquals(10.25f, height, 1.0e-6f);
     }
+
+    @Test
+    void currentAlignedRiverAndContinuityMirrorSnapshotShader() {
+        double x = 22.375;
+        double z = -9.625;
+        double time = 12.45;
+        float currentX = 0.0f;
+        float currentZ = 1.5f;
+        float expectedRiver = GerstnerWaveProfile.RIVER.sampleAt(
+                x,
+                z,
+                time,
+                3,
+                WaveSpectrumState.NEUTRAL,
+                currentX,
+                currentZ
+        ).height();
+
+        float full = WaterSurfaceEquation.snapshotSurfaceHeight(
+                40.0f, x, z, time, WaveSpectrumState.NEUTRAL,
+                0, 3, 0,
+                0.0f, 1.0f, 0.0f,
+                currentX, currentZ, 0.92f,
+                0.0f, 0.08f
+        );
+        float boundary = WaterSurfaceEquation.snapshotSurfaceHeight(
+                40.0f, x, z, time, WaveSpectrumState.NEUTRAL,
+                0, 3, 0,
+                0.0f, 1.0f, 0.0f,
+                currentX, currentZ, 0.18f,
+                0.0f, 0.08f
+        );
+
+        assertEquals(40.0f + expectedRiver + 0.08f, full, 1.0e-6f);
+        assertEquals(40.0f, boundary, 1.0e-6f);
+    }
 }

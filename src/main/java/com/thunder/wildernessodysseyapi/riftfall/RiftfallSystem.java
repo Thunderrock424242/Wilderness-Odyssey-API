@@ -6,6 +6,9 @@ import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
 import com.thunder.wildernessodysseyapi.entity.RiftboundWraithEntity;
 import com.thunder.wildernessodysseyapi.entity.RiftListenerEntity;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftDimensions;
+import com.thunder.wildernessodysseyapi.weather.api.WeatherQuery;
+import com.thunder.wildernessodysseyapi.weather.api.WeatherServices;
+import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -63,13 +66,13 @@ public final class RiftfallSystem {
 
         if (state.cooldownTicksRemaining > 0) state.cooldownTicksRemaining--;
 
-        boolean vanillaWet = level.isRaining() || level.isThundering();
-        if (!vanillaWet && state.stage != RiftfallStage.CLEAR) {
+        LocalWeather localWeather = weatherAtPlayers(level);
+        if (!localWeather.precipitating() && state.stage != RiftfallStage.CLEAR) {
             enterStage(level, RiftfallStage.ENDING, RiftfallConfig.CONFIG.endingTicks());
         }
 
         if (state.stage == RiftfallStage.CLEAR) {
-            maybeStartRiftfall(level);
+            maybeStartRiftfall(level, localWeather);
         } else {
             state.stageTicksRemaining--;
             if (state.stageTicksRemaining <= 0) {
@@ -85,19 +88,43 @@ public final class RiftfallSystem {
         tickRiftboundWraithSpawning(level, currentStage);
     }
 
-    private static void maybeStartRiftfall(ServerLevel level) {
+    private static void maybeStartRiftfall(ServerLevel level, LocalWeather localWeather) {
         RiftfallState state = stateFor(level);
         if (state.cooldownTicksRemaining > 0) return;
-        if (!level.isRaining() && !level.isThundering()) return;
+        if (!localWeather.precipitating()) return;
         if ((level.getGameTime() % RiftfallConfig.CONFIG.checkIntervalTicks()) != 0) return;
 
         double chance = RiftfallConfig.CONFIG.baseStartChance();
-        if (level.isThundering()) chance *= RiftfallConfig.CONFIG.thunderMultiplier();
+        if (localWeather.thundering()) chance *= RiftfallConfig.CONFIG.thunderMultiplier();
 
         if (level.random.nextDouble() < chance) {
             enterStage(level, RiftfallStage.WARNING, RiftfallConfig.CONFIG.warningTicks());
             broadcast(level, "ATLAS WARNING: Atmospheric anomaly detected. Seek shelter.", ChatFormatting.LIGHT_PURPLE);
         }
+    }
+
+    /** Resolves dimension-wide Riftfall eligibility from player-local authority. */
+    private static LocalWeather weatherAtPlayers(ServerLevel level) {
+        if (!WeatherConfig.dimensionEnabled(level.dimension())) {
+            boolean wet = level.isRaining() || level.isThundering();
+            return new LocalWeather(wet, level.isThundering());
+        }
+
+        WeatherQuery weather = WeatherServices.query();
+        boolean precipitating = false;
+        boolean thundering = false;
+        for (ServerPlayer player : level.players()) {
+            BlockPos position = player.blockPosition();
+            precipitating |= weather.isPrecipitatingAt(level, position);
+            thundering |= weather.isThunderingAt(level, position);
+            if (precipitating && thundering) {
+                break;
+            }
+        }
+        return new LocalWeather(precipitating, thundering);
+    }
+
+    private record LocalWeather(boolean precipitating, boolean thundering) {
     }
 
     private static void advanceStage(ServerLevel level) {

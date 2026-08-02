@@ -22,6 +22,7 @@ import java.util.Objects;
  * @param verticalMotion normalized convective ascent or subsidence
  * @param cloudDepth normalized vertical cloud development
  * @param cloudWind normalized wind at cloud level
+ * @param surface persistent normalized ground response beneath the cell
  */
 public record WeatherSample(
         double temperature,
@@ -35,7 +36,8 @@ public record WeatherSample(
         PrecipitationType precipitationType,
         double verticalMotion,
         double cloudDepth,
-        WindVector cloudWind
+        WindVector cloudWind,
+        SurfaceWeatherState surface
 ) {
     public static final double MIN_TEMPERATURE = -80.0;
     public static final double MAX_TEMPERATURE = 60.0;
@@ -56,7 +58,8 @@ public record WeatherSample(
             PrecipitationType.NONE,
             0.0,
             0.0,
-            WindVector.ZERO
+            WindVector.ZERO,
+            SurfaceWeatherState.DRY
     );
 
     /**
@@ -86,7 +89,40 @@ public record WeatherSample(
                 precipitationType,
                 0.0,
                 unit(cloudWater * 0.55 + instability * 0.25 + stormEnergy * 0.35),
-                wind
+                wind,
+                SurfaceWeatherState.DRY
+        );
+    }
+
+    /** Retains the version-two construction shape without surface memory. */
+    public WeatherSample(
+            double temperature,
+            double humidity,
+            double pressure,
+            WindVector wind,
+            double cloudWater,
+            double instability,
+            double stormEnergy,
+            double precipitationIntensity,
+            PrecipitationType precipitationType,
+            double verticalMotion,
+            double cloudDepth,
+            WindVector cloudWind
+    ) {
+        this(
+                temperature,
+                humidity,
+                pressure,
+                wind,
+                cloudWater,
+                instability,
+                stormEnergy,
+                precipitationIntensity,
+                precipitationType,
+                verticalMotion,
+                cloudDepth,
+                cloudWind,
+                SurfaceWeatherState.DRY
         );
     }
 
@@ -114,6 +150,7 @@ public record WeatherSample(
                 clamp(finiteOr(safeCloudWind.x(), wind.x()), -MAX_WIND_COMPONENT, MAX_WIND_COMPONENT),
                 clamp(finiteOr(safeCloudWind.z(), wind.z()), -MAX_WIND_COMPONENT, MAX_WIND_COMPONENT)
         );
+        surface = Objects.requireNonNullElse(surface, SurfaceWeatherState.DRY);
     }
 
     /** Returns whether this position currently has any measurable precipitation. */
@@ -123,12 +160,19 @@ public record WeatherSample(
 
     /** Returns whether localized rain is active at this sample. */
     public boolean isRaining() {
-        return precipitationType == PrecipitationType.RAIN && precipitationIntensity > 0.0;
+        return (precipitationType == PrecipitationType.RAIN
+                || precipitationType == PrecipitationType.HAIL)
+                && precipitationIntensity > 0.0;
     }
 
     /** Returns whether localized snow is active at this sample. */
     public boolean isSnowing() {
         return precipitationType == PrecipitationType.SNOW && precipitationIntensity > 0.0;
+    }
+
+    /** Returns whether hail is active at this sample. */
+    public boolean isHailing() {
+        return precipitationType == PrecipitationType.HAIL && precipitationIntensity > 0.0;
     }
 
     /**
@@ -172,6 +216,19 @@ public record WeatherSample(
         return clamp(243.04 * gamma / (17.625 - gamma), MIN_TEMPERATURE, MAX_TEMPERATURE);
     }
 
+    /** Returns the normalized difference between surface and cloud-level wind. */
+    public double windShear() {
+        return clamp(Math.hypot(
+                cloudWind.x() - wind.x(),
+                cloudWind.z() - wind.z()
+        ), 0.0, 1.5);
+    }
+
+    /** Returns the dominant meteorological cloud genus in this sample. */
+    public CloudType cloudType() {
+        return CloudTypeClassifier.classify(this);
+    }
+
     /** Returns the lifecycle implied by vertical development and precipitation. */
     public StormStage stormStage() {
         if (stormEnergy < 0.12 && cloudWater < 0.20) {
@@ -206,7 +263,8 @@ public record WeatherSample(
                 type,
                 lerp(safeFrom.verticalMotion, safeTo.verticalMotion, t),
                 lerp(safeFrom.cloudDepth, safeTo.cloudDepth, t),
-                WindVector.lerp(safeFrom.cloudWind, safeTo.cloudWind, t)
+                WindVector.lerp(safeFrom.cloudWind, safeTo.cloudWind, t),
+                SurfaceWeatherState.interpolate(safeFrom.surface, safeTo.surface, t)
         );
     }
 
@@ -227,6 +285,10 @@ public record WeatherSample(
         }
         if (from.precipitationType == to.precipitationType) {
             return from.precipitationType;
+        }
+        if (from.precipitationType == PrecipitationType.HAIL
+                || to.precipitationType == PrecipitationType.HAIL) {
+            return alpha < 0.5 ? from.precipitationType : to.precipitationType;
         }
         if (from.precipitationType == PrecipitationType.NONE) {
             return to.precipitationType;

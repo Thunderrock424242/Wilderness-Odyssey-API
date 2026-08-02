@@ -37,7 +37,9 @@ public final class ClientWaterImmersion {
 
     /** Returns the camera's current bounded water-immersion state. */
     public static ImmersionState sample(Camera camera, float partialTick) {
-        if (!(camera.getEntity().level() instanceof ClientLevel level)
+        if (camera == null
+                || camera.getEntity() == null
+                || !(camera.getEntity().level() instanceof ClientLevel level)
                 || !WildernessWaterRules.isEnabled(level)) {
             return ImmersionState.DRY;
         }
@@ -87,34 +89,12 @@ public final class ClientWaterImmersion {
         float oceanWeight = column.oceanWeight() / 255.0f;
         float riverWeight = column.riverWeight() / 255.0f;
         float lakeWeight = column.lakeWeight() / 255.0f;
-        float timeSeconds = (level.getGameTime() + partialTick) / 20.0f;
-        boolean coreSurface = WaterShaders.shouldUseCoreShader();
-        boolean waveSurface = coreSurface && WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get();
-        float transientHeight = coreSurface
-                ? WaterSurfaceDisplacement.sampleHeight(
-                        level,
-                        cameraPosition.x,
-                        cameraPosition.z,
-                        level.getGameTime() + partialTick
-                )
-                : 0.0f;
-        float surfaceY = WaterSurfaceEquation.snapshotSurfaceHeight(
-                column.baseSurfaceY(),
-                (float) cameraPosition.x,
-                (float) cameraPosition.z,
-                timeSeconds,
-                sea.spectrum(),
-                waveSurface
-                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.OCEAN) : 0,
-                waveSurface
-                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.RIVER) : 0,
-                waveSurface
-                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.POND) : 0,
-                oceanWeight,
-                riverWeight,
-                lakeWeight,
-                coreSurface ? TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE : 0.0f,
-                transientHeight
+        float surfaceY = visibleSurfaceHeight(
+                level,
+                column,
+                cameraPosition.x,
+                cameraPosition.z,
+                partialTick
         );
         float depthBelowSurface = surfaceY - (float) cameraPosition.y;
         boolean withinColumn = cameraPosition.y >= column.floorY() + 0.92f
@@ -128,7 +108,7 @@ public final class ClientWaterImmersion {
                 level.dimensionType(),
                 level.getMaxLocalRawBrightness(new BlockPos(blockX, column.surfaceBlockY(), blockZ))
         );
-        float[] tint = bodyTint(oceanWeight, riverWeight, lakeWeight);
+        float[] tint = bodyTint(oceanWeight, riverWeight, lakeWeight, column.waterTint());
         UnderwaterOpticsModel.OpticalProperties optics = UnderwaterOpticsModel.evaluate(
                 depthBelowSurface,
                 columnDepth,
@@ -143,6 +123,135 @@ public final class ClientWaterImmersion {
         );
         return new ImmersionState(true, surfaceY, depthBelowSurface,
                 sea.strength() * oceanWeight, optics);
+    }
+
+    // Snapshot mesh vertices average the four touching custom columns. Sampling
+    // the same triangle interpolation here prevents camera entry from crossing
+    // a full-amplitude CPU crest after the GPU has tapered that shoreline flat.
+    /**
+     * Samples the snapshot mesh's interpolated loaded-surface continuity.
+     *
+     * <p>Client-only consumers such as boat presentation use this to follow the
+     * same shoreline taper as the active GPU mesh. It never changes authority
+     * state or server physics.</p>
+     */
+    public static float sampleSurfaceContinuity(
+            ClientLevel level,
+            double worldX,
+            double worldZ
+    ) {
+        int minimumX = (int) Math.floor(worldX);
+        int minimumZ = (int) Math.floor(worldZ);
+        float localX = (float) (worldX - minimumX);
+        float localZ = (float) (worldZ - minimumZ);
+        return interpolateQuadContinuity(
+                vertexContinuity(level, minimumX, minimumZ),
+                vertexContinuity(level, minimumX, minimumZ + 1),
+                vertexContinuity(level, minimumX + 1, minimumZ + 1),
+                vertexContinuity(level, minimumX + 1, minimumZ),
+                localX,
+                localZ
+        );
+    }
+
+    /**
+     * Samples the same body-blended, shoreline-tapered surface used by immersion.
+     *
+     * <p>Ambient spray uses this path so tides and transient wakes cannot leave
+     * particles floating above or clipping below the built-in mesh. An external
+     * shader pack has no inspectable displacement equation, so its safe fallback
+     * is the synchronized flat fluid height.</p>
+     */
+    static float visibleSurfaceHeight(
+            ClientLevel level,
+            ClientWaterChunkSnapshot.Column column,
+            double worldX,
+            double worldZ,
+            float partialTick
+    ) {
+        float oceanWeight = column.oceanWeight() / 255.0f;
+        float riverWeight = column.riverWeight() / 255.0f;
+        float lakeWeight = column.lakeWeight() / 255.0f;
+        double timeSeconds = (level.getGameTime() + (double) partialTick) / 20.0;
+        boolean customSurface = WaterShaders.shouldUseCoreShader()
+                && WaterChunkMeshCache.usesCustomSurface(column);
+        boolean waveSurface = customSurface && WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get();
+        float transientHeight = customSurface
+                ? WaterSurfaceDisplacement.sampleHeight(
+                        level,
+                        worldX,
+                        worldZ,
+                        level.getGameTime() + partialTick
+                )
+                : 0.0f;
+        float surfaceContinuity = customSurface
+                ? sampleSurfaceContinuity(level, worldX, worldZ)
+                : 1.0f;
+        return WaterSurfaceEquation.snapshotSurfaceHeight(
+                column.baseSurfaceY(),
+                worldX,
+                worldZ,
+                timeSeconds,
+                ClientOceanSeaState.current(level).spectrum(),
+                waveSurface
+                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.OCEAN) : 0,
+                waveSurface
+                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.RIVER) : 0,
+                waveSurface
+                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.POND) : 0,
+                oceanWeight,
+                riverWeight,
+                lakeWeight,
+                column.velocityX(),
+                column.velocityZ(),
+                surfaceContinuity,
+                customSurface ? TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE : 0.0f,
+                transientHeight
+        );
+    }
+
+    private static float vertexContinuity(ClientLevel level, int vertexX, int vertexZ) {
+        int count = 0;
+        for (int offsetZ = -1; offsetZ <= 0; offsetZ++) {
+            for (int offsetX = -1; offsetX <= 0; offsetX++) {
+                int columnX = vertexX + offsetX;
+                int columnZ = vertexZ + offsetZ;
+                ClientWaterChunkSnapshot snapshot = ClientWaterSnapshotStore.getAtBlock(
+                        level,
+                        columnX,
+                        columnZ
+                );
+                if (snapshot == null) {
+                    continue;
+                }
+                ClientWaterChunkSnapshot.Column column = snapshot.column(columnX & 15, columnZ & 15);
+                if (column.wet() && WaterChunkMeshCache.usesCustomSurface(column)) {
+                    count++;
+                }
+            }
+        }
+        return Math.max(0.18f, count * 0.25f);
+    }
+
+    static float interpolateQuadContinuity(
+            float northWest,
+            float southWest,
+            float southEast,
+            float northEast,
+            float x,
+            float z
+    ) {
+        float boundedX = clamp(x, 0.0f, 1.0f);
+        float boundedZ = clamp(z, 0.0f, 1.0f);
+        // QUADS uses the north-west to south-east diagonal.
+        if (boundedX <= boundedZ) {
+            return northWest * (1.0f - boundedZ)
+                    + southWest * (boundedZ - boundedX)
+                    + southEast * boundedX;
+        }
+        return northWest * (1.0f - boundedX)
+                + southEast * boundedZ
+                + northEast * (boundedX - boundedZ);
     }
 
     private static ImmersionState resolveMobileWater(ClientLevel level, Vec3 cameraPosition) {
@@ -168,11 +277,30 @@ public final class ClientWaterImmersion {
                 0.35f, 0.0f, optics);
     }
 
-    private static float[] bodyTint(float ocean, float river, float lake) {
+    static float[] bodyTint(float ocean, float river, float lake, int waterTint) {
+        float bodyWeight = ocean + river + lake;
+        float normalizedOcean = bodyWeight > 0.001f ? ocean / bodyWeight : 0.0f;
+        float normalizedRiver = bodyWeight > 0.001f ? river / bodyWeight : 0.0f;
+        float normalizedLake = bodyWeight > 0.001f ? lake / bodyWeight : 1.0f;
+        float bodyRed = 0.018f * normalizedOcean
+                + 0.035f * normalizedRiver
+                + 0.045f * normalizedLake;
+        float bodyGreen = 0.25f * normalizedOcean
+                + 0.35f * normalizedRiver
+                + 0.38f * normalizedLake;
+        float bodyBlue = 0.62f * normalizedOcean
+                + 0.58f * normalizedRiver
+                + 0.52f * normalizedLake;
+        float biomeRed = ((waterTint >>> 16) & 0xFF) / 255.0f;
+        float biomeGreen = ((waterTint >>> 8) & 0xFF) / 255.0f;
+        float biomeBlue = (waterTint & 0xFF) / 255.0f;
+
+        // Match the visible mesh's optical mix: body identity remains dominant
+        // while the synchronized biome tint differentiates local water color.
         return new float[]{
-                0.018f * ocean + 0.035f * river + 0.045f * lake,
-                0.25f * ocean + 0.35f * river + 0.38f * lake,
-                0.62f * ocean + 0.58f * river + 0.52f * lake
+                bodyRed * 0.72f + biomeRed * 0.28f,
+                bodyGreen * 0.72f + biomeGreen * 0.28f,
+                bodyBlue * 0.72f + biomeBlue * 0.28f
         };
     }
 

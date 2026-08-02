@@ -10,6 +10,7 @@ import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
+import com.thunder.wildernessodysseyapi.weather.api.CloudType;
 import net.minecraft.client.CloudStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -17,6 +18,9 @@ import net.minecraft.client.renderer.FogRenderer;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
+
+import java.util.EnumMap;
+import java.util.Map;
 
 /**
  * Renders cached blocky cloud geometry from synchronized atmospheric cells.
@@ -119,7 +123,8 @@ public final class LocalizedCloudRenderer {
                 windDetailOffsetX,
                 windDetailOffsetZ,
                 diagnostics.mode(),
-                diagnostics.layers()
+                diagnostics.layers(),
+                diagnostics.cloudType()
         );
         if (cloudBuffer == null) {
             return;
@@ -282,9 +287,12 @@ public final class LocalizedCloudRenderer {
         int radius = boundedRadius(settings);
         int diameter = radius * 2 + 1;
         byte[] heights = new byte[diameter * diameter];
+        float[] baseOffsets = new float[diameter * diameter];
         CloudFieldSample[] fields = new CloudFieldSample[heights.length];
+        CloudLayerProfile[] profiles = new CloudLayerProfile[heights.length];
         float[] darkness = new float[heights.length];
         float[] opacity = new float[heights.length];
+        Map<CloudType, Double> cloudTypeWeights = new EnumMap<>(CloudType.class);
         double coverageSum = 0.0;
         int visibleTiles = 0;
         boolean morphologyPotential = false;
@@ -334,10 +342,15 @@ public final class LocalizedCloudRenderer {
 
                 int index = index(localX + radius, localZ + radius, diameter);
                 fields[index] = field;
+                CloudLayerProfile profile = CloudLayerProfile.evaluate(field);
+                profiles[index] = profile;
+                CloudLayerProfile.BandProfile dominantBand = profile.dominantBand();
+                baseOffsets[index] = (float) dominantBand.baseOffsetBlocks();
                 heights[index] = (byte) CloudCoverageModel.thickness(field);
                 darkness[index] = (float) CloudCoverageModel.darkness(field);
                 opacity[index] = (float) CloudCoverageModel.opacity(field, settings.opacityMultiplier());
                 coverageSum += coverage;
+                cloudTypeWeights.merge(profile.dominantType(), Math.max(0.01, coverage), Double::sum);
                 visibleTiles++;
             }
         }
@@ -353,6 +366,7 @@ public final class LocalizedCloudRenderer {
             vertices = emitVolumetricClouds(
                     builder,
                     fields,
+                    profiles,
                     darkness,
                     opacity,
                     diameter,
@@ -361,10 +375,27 @@ public final class LocalizedCloudRenderer {
                     settings.volumetricLayerCount()
             );
         } else if (cloudStatus == CloudStatus.FANCY) {
-            vertices = emitFancyClouds(builder, heights, darkness, opacity, diameter, radius, baseColor);
+            vertices = emitFancyClouds(
+                    builder, heights, baseOffsets, darkness, opacity, diameter, radius, baseColor
+            );
         } else {
-            vertices = emitFastClouds(builder, heights, darkness, opacity, diameter, radius, baseColor);
+            vertices = emitFastClouds(
+                    builder, heights, baseOffsets, darkness, opacity, diameter, radius, baseColor
+            );
         }
+        DistantCloudResult distant = emitDistantCloudLayer(
+                builder,
+                level,
+                settings,
+                originTileX,
+                originTileZ,
+                radius * CloudCoverageModel.CLOUD_TILE_SIZE,
+                baseColor,
+                volumetric
+        );
+        vertices += distant.vertices();
+        visibleTiles += distant.tiles();
+        coverageSum += distant.coverageSum();
         MeshData mesh = builder.build();
         replaceCloudBuffer(mesh);
         // A null VBO is a valid cached result for a completely clear field.
@@ -392,13 +423,15 @@ public final class LocalizedCloudRenderer {
                 windDetailOffsetX,
                 windDetailOffsetZ,
                 volumetric ? "volume" : cloudStatus == CloudStatus.FANCY ? "voxel" : "fast",
-                volumetric ? settings.volumetricLayerCount() : 1
+                volumetric ? settings.volumetricLayerCount() : 1,
+                dominantCloudType(cloudTypeWeights).displayName()
         );
     }
 
     private static int emitVolumetricClouds(
             BufferBuilder builder,
             CloudFieldSample[] fields,
+            CloudLayerProfile[] profiles,
             float[] darkness,
             float[] opacity,
             int diameter,
@@ -412,7 +445,8 @@ public final class LocalizedCloudRenderer {
             for (int gridX = 0; gridX < diameter; gridX++) {
                 int cell = index(gridX, gridZ, diameter);
                 CloudFieldSample field = fields[cell];
-                if (field == null) {
+                CloudLayerProfile profile = profiles[cell];
+                if (field == null || profile == null) {
                     continue;
                 }
 
@@ -420,39 +454,141 @@ public final class LocalizedCloudRenderer {
                 float z0 = (gridZ - radius) * CloudCoverageModel.CLOUD_TILE_SIZE;
                 float x1 = x0 + CloudCoverageModel.CLOUD_TILE_SIZE;
                 float z1 = z0 + CloudCoverageModel.CLOUD_TILE_SIZE;
-                float base = (float) CloudColumnModel.baseOffsetBlocks(field);
-                float depth = (float) CloudColumnModel.depthBlocks(field);
-                float sliceAlpha = (float) CloudColumnModel.sliceOpacity(opacity[cell], layerCount);
                 float coverage = (float) CloudCoverageModel.coverage(field);
                 float storm = darkness[cell];
 
-                // The normal attribute carries per-column data for the custom
-                // shader: layer fraction, coverage, and storm darkness.
-                for (int layerIndex = layerCount - 1; layerIndex >= 0; layerIndex--) {
-                    float layer = (layerIndex + 0.5F) / layerCount;
-                    float y = base + depth * layer;
-                    float light = 0.88F + layer * 0.12F;
-                    volumetricVertex(
-                            builder, x0, y, z1, x0 * noiseScale, z1 * noiseScale,
-                            baseColor, light, sliceAlpha, layer, coverage, storm
-                    );
-                    volumetricVertex(
-                            builder, x1, y, z1, x1 * noiseScale, z1 * noiseScale,
-                            baseColor, light, sliceAlpha, layer, coverage, storm
-                    );
-                    volumetricVertex(
-                            builder, x1, y, z0, x1 * noiseScale, z0 * noiseScale,
-                            baseColor, light, sliceAlpha, layer, coverage, storm
-                    );
-                    volumetricVertex(
-                            builder, x0, y, z0, x0 * noiseScale, z0 * noiseScale,
-                            baseColor, light, sliceAlpha, layer, coverage, storm
-                    );
-                    vertices += 4;
+                // Each genus may contribute more than one physical deck. The
+                // packed normal carries band, local layer, morphology, and
+                // storm darkness without expanding the vertex format.
+                for (CloudLayerProfile.BandProfile band : profile.bands()) {
+                    if (!band.visible()) {
+                        continue;
+                    }
+                    int bandLayers = Math.max(2, (int) Math.round(
+                            layerCount * (0.45 + band.density() * 0.55)
+                    ));
+                    float base = (float) band.baseOffsetBlocks();
+                    float depth = (float) band.depthBlocks();
+                    float bandOpacity = (float) Math.min(0.985, opacity[cell] * band.density());
+                    float sliceAlpha = (float) CloudColumnModel.sliceOpacity(bandOpacity, bandLayers);
+                    for (int layerIndex = bandLayers - 1; layerIndex >= 0; layerIndex--) {
+                        float layer = (layerIndex + 0.5F) / bandLayers;
+                        float y = base + depth * layer;
+                        float light = 0.86F + layer * 0.14F;
+                        volumetricVertex(
+                                builder, x0, y, z1, x0 * noiseScale, z1 * noiseScale,
+                                baseColor, light, sliceAlpha, layer, coverage, storm, band
+                        );
+                        volumetricVertex(
+                                builder, x1, y, z1, x1 * noiseScale, z1 * noiseScale,
+                                baseColor, light, sliceAlpha, layer, coverage, storm, band
+                        );
+                        volumetricVertex(
+                                builder, x1, y, z0, x1 * noiseScale, z0 * noiseScale,
+                                baseColor, light, sliceAlpha, layer, coverage, storm, band
+                        );
+                        volumetricVertex(
+                                builder, x0, y, z0, x0 * noiseScale, z0 * noiseScale,
+                                baseColor, light, sliceAlpha, layer, coverage, storm, band
+                        );
+                        vertices += 4;
+                    }
                 }
             }
         }
         return vertices;
+    }
+
+    /** Emits sparse horizon patches and deeper storm-front walls at a coarse cadence. */
+    private static DistantCloudResult emitDistantCloudLayer(
+            BufferBuilder builder,
+            ClientLevel level,
+            WeatherRenderingConfig.Settings settings,
+            int originTileX,
+            int originTileZ,
+            int nearDistance,
+            Vec3 baseColor,
+            boolean volumetric
+    ) {
+        if (!settings.distantCloudLayer()) {
+            return DistantCloudResult.NONE;
+        }
+        int spacing = settings.distantCloudSpacingBlocks();
+        int maximumDistance = settings.distantCloudDistanceBlocks();
+        int maximumTiles = settings.maximumDistantCloudTiles();
+        int tiles = 0;
+        int vertices = 0;
+        double coverageSum = 0.0;
+        double originBlockX = originTileX * (double) CloudCoverageModel.CLOUD_TILE_SIZE;
+        double originBlockZ = originTileZ * (double) CloudCoverageModel.CLOUD_TILE_SIZE;
+        double minimumSquared = Math.max(nearDistance + spacing, settings.renderDistanceBlocks());
+        minimumSquared *= minimumSquared;
+        double maximumSquared = (double) maximumDistance * maximumDistance;
+        float noiseScale = VolumetricCloudShaders.worldNoiseScale();
+        for (int z = -maximumDistance; z <= maximumDistance && tiles < maximumTiles; z += spacing) {
+            for (int x = -maximumDistance; x <= maximumDistance && tiles < maximumTiles; x += spacing) {
+                double distanceSquared = (double) x * x + (double) z * z;
+                if (distanceSquared < minimumSquared || distanceSquared > maximumSquared) {
+                    continue;
+                }
+                CloudFieldSample field = ClientWeatherCoordinator.cloudFieldAt(
+                        level,
+                        originBlockX + x,
+                        originBlockZ + z
+                );
+                double coverage = CloudCoverageModel.coverage(field);
+                if (field.support() < 0.08 || coverage < 0.07) {
+                    continue;
+                }
+                CloudLayerProfile profile = CloudLayerProfile.evaluate(field);
+                CloudLayerProfile.BandProfile band = profile.dominantBand();
+                float base = (float) band.baseOffsetBlocks();
+                float depth = (float) Math.max(2.0, band.depthBlocks() * (0.52 + field.stormEnergy() * 0.48));
+                float top = base + depth;
+                float x0 = x - spacing * 0.48F;
+                float x1 = x + spacing * 0.48F;
+                float z0 = z - spacing * 0.48F;
+                float z1 = z + spacing * 0.48F;
+                float storm = (float) field.stormEnergy();
+                float alpha = (float) Math.min(0.70,
+                        CloudCoverageModel.opacity(field, settings.opacityMultiplier()) * (0.30 + storm * 0.34));
+                float light = Math.max(0.28F, 0.84F - storm * 0.48F);
+                if (volumetric) {
+                    float sliceAlpha = (float) CloudColumnModel.sliceOpacity(alpha, 2);
+                    for (int layer = 0; layer < 2; layer++) {
+                        float layerAmount = 0.30F + layer * 0.48F;
+                        float y = base + depth * layerAmount;
+                        volumetricVertex(builder, x0, y, z1, x0 * noiseScale, z1 * noiseScale,
+                                baseColor, light, sliceAlpha, layerAmount, (float) coverage, storm, band);
+                        volumetricVertex(builder, x1, y, z1, x1 * noiseScale, z1 * noiseScale,
+                                baseColor, light, sliceAlpha, layerAmount, (float) coverage, storm, band);
+                        volumetricVertex(builder, x1, y, z0, x1 * noiseScale, z0 * noiseScale,
+                                baseColor, light, sliceAlpha, layerAmount, (float) coverage, storm, band);
+                        volumetricVertex(builder, x0, y, z0, x0 * noiseScale, z0 * noiseScale,
+                                baseColor, light, sliceAlpha, layerAmount, (float) coverage, storm, band);
+                        vertices += 4;
+                    }
+                } else {
+                    emitHorizontalQuad(builder, x0, x1, top, z0, z1, baseColor, light, alpha, 1.0F);
+                    vertices += 4;
+                }
+                if (!volumetric && storm >= 0.42F) {
+                    // A dark vertical rim makes an approaching squall line
+                    // legible at the horizon without expensive distant voxels.
+                    vertices += emitWestSide(builder, x0, z0, z1, Float.NEGATIVE_INFINITY,
+                            base, top, baseColor, storm, alpha * 0.85F);
+                    vertices += emitEastSide(builder, x1, z0, z1, Float.NEGATIVE_INFINITY,
+                            base, top, baseColor, storm, alpha * 0.85F);
+                    vertices += emitNorthSide(builder, x0, x1, z0, Float.NEGATIVE_INFINITY,
+                            base, top, baseColor, storm, alpha * 0.85F);
+                    vertices += emitSouthSide(builder, x0, x1, z1, Float.NEGATIVE_INFINITY,
+                            base, top, baseColor, storm, alpha * 0.85F);
+                }
+                tiles++;
+                coverageSum += coverage;
+            }
+        }
+        return new DistantCloudResult(tiles, vertices, coverageSum);
     }
 
     private static void volumetricVertex(
@@ -467,8 +603,13 @@ public final class LocalizedCloudRenderer {
             float alpha,
             float layer,
             float coverage,
-            float storm
+            float storm,
+            CloudLayerProfile.BandProfile band
     ) {
+        // Margins keep byte-normalized normals away from integer boundaries,
+        // preventing a high deck or convective family from decoding one bin low.
+        float packedLayer = (band.band().ordinal() + 0.08F + unit(layer) * 0.84F) / 4.0F;
+        float packedShape = (shapeCode(band.shape()) + 0.10F + unit(storm) * 0.80F) / 4.0F;
         builder.addVertex(x, y, z)
                 .setUv(noiseX, noiseZ)
                 .setColor(
@@ -477,12 +618,13 @@ public final class LocalizedCloudRenderer {
                         unit((float) baseColor.z * light),
                         unit(alpha)
                 )
-                .setNormal(unit(layer), unit(coverage), unit(storm));
+                .setNormal(unit(packedLayer), unit(coverage), unit(packedShape));
     }
 
     private static int emitFastClouds(
             BufferBuilder builder,
             byte[] heights,
+            float[] baseOffsets,
             float[] darkness,
             float[] opacity,
             int diameter,
@@ -501,7 +643,10 @@ public final class LocalizedCloudRenderer {
                 float x1 = x0 + CloudCoverageModel.CLOUD_TILE_SIZE;
                 float z1 = z0 + CloudCoverageModel.CLOUD_TILE_SIZE;
                 float light = (float) (1.0 - darkness[cell] * 0.38);
-                emitHorizontalQuad(builder, x0, x1, 0.0F, z0, z1, baseColor, light, opacity[cell], 1.0F);
+                emitHorizontalQuad(
+                        builder, x0, x1, baseOffsets[cell], z0, z1,
+                        baseColor, light, opacity[cell], 1.0F
+                );
                 vertices += 4;
             }
         }
@@ -511,6 +656,7 @@ public final class LocalizedCloudRenderer {
     private static int emitFancyClouds(
             BufferBuilder builder,
             byte[] heights,
+            float[] baseOffsets,
             float[] darkness,
             float[] opacity,
             int diameter,
@@ -531,12 +677,14 @@ public final class LocalizedCloudRenderer {
                 float z1 = z0 + CloudCoverageModel.CLOUD_TILE_SIZE;
                 float alpha = opacity[cell];
                 float stormDarkness = darkness[cell];
+                float base = baseOffsets[cell];
+                float top = base + height;
 
                 emitHorizontalQuad(
                         builder,
                         x0,
                         x1,
-                        height - 9.765625E-4F,
+                        top - 9.765625E-4F,
                         z0,
                         z1,
                         baseColor,
@@ -548,7 +696,7 @@ public final class LocalizedCloudRenderer {
                         builder,
                         x0,
                         x1,
-                        0.0F,
+                        base,
                         z0,
                         z1,
                         baseColor,
@@ -563,8 +711,9 @@ public final class LocalizedCloudRenderer {
                         x0,
                         z0,
                         z1,
-                        neighborHeight(heights, diameter, gridX - 1, gridZ),
-                        height,
+                        neighborTop(heights, baseOffsets, diameter, gridX - 1, gridZ),
+                        base,
+                        top,
                         baseColor,
                         stormDarkness,
                         alpha
@@ -574,8 +723,9 @@ public final class LocalizedCloudRenderer {
                         x1 - 9.765625E-4F,
                         z0,
                         z1,
-                        neighborHeight(heights, diameter, gridX + 1, gridZ),
-                        height,
+                        neighborTop(heights, baseOffsets, diameter, gridX + 1, gridZ),
+                        base,
+                        top,
                         baseColor,
                         stormDarkness,
                         alpha
@@ -585,8 +735,9 @@ public final class LocalizedCloudRenderer {
                         x0,
                         x1,
                         z0,
-                        neighborHeight(heights, diameter, gridX, gridZ - 1),
-                        height,
+                        neighborTop(heights, baseOffsets, diameter, gridX, gridZ - 1),
+                        base,
+                        top,
                         baseColor,
                         stormDarkness,
                         alpha
@@ -596,8 +747,9 @@ public final class LocalizedCloudRenderer {
                         x0,
                         x1,
                         z1 - 9.765625E-4F,
-                        neighborHeight(heights, diameter, gridX, gridZ + 1),
-                        height,
+                        neighborTop(heights, baseOffsets, diameter, gridX, gridZ + 1),
+                        base,
+                        top,
                         baseColor,
                         stormDarkness,
                         alpha
@@ -630,20 +782,22 @@ public final class LocalizedCloudRenderer {
             float x,
             float z0,
             float z1,
-            int adjacentHeight,
-            int height,
+            float adjacentTop,
+            float base,
+            float top,
             Vec3 color,
             float darkness,
             float alpha
     ) {
-        if (adjacentHeight >= height) {
+        if (adjacentTop >= top) {
             return 0;
         }
+        float lower = Math.max(base, adjacentTop);
         float light = (float) Math.max(0.24, 0.88 - darkness * 0.38);
-        vertex(builder, x, adjacentHeight, z1, color, light, alpha, -1.0F, 0.0F, 0.0F);
-        vertex(builder, x, height, z1, color, light, alpha, -1.0F, 0.0F, 0.0F);
-        vertex(builder, x, height, z0, color, light, alpha, -1.0F, 0.0F, 0.0F);
-        vertex(builder, x, adjacentHeight, z0, color, light, alpha, -1.0F, 0.0F, 0.0F);
+        vertex(builder, x, lower, z1, color, light, alpha, -1.0F, 0.0F, 0.0F);
+        vertex(builder, x, top, z1, color, light, alpha, -1.0F, 0.0F, 0.0F);
+        vertex(builder, x, top, z0, color, light, alpha, -1.0F, 0.0F, 0.0F);
+        vertex(builder, x, lower, z0, color, light, alpha, -1.0F, 0.0F, 0.0F);
         return 4;
     }
 
@@ -652,20 +806,22 @@ public final class LocalizedCloudRenderer {
             float x,
             float z0,
             float z1,
-            int adjacentHeight,
-            int height,
+            float adjacentTop,
+            float base,
+            float top,
             Vec3 color,
             float darkness,
             float alpha
     ) {
-        if (adjacentHeight >= height) {
+        if (adjacentTop >= top) {
             return 0;
         }
+        float lower = Math.max(base, adjacentTop);
         float light = (float) Math.max(0.24, 0.88 - darkness * 0.38);
-        vertex(builder, x, adjacentHeight, z0, color, light, alpha, 1.0F, 0.0F, 0.0F);
-        vertex(builder, x, height, z0, color, light, alpha, 1.0F, 0.0F, 0.0F);
-        vertex(builder, x, height, z1, color, light, alpha, 1.0F, 0.0F, 0.0F);
-        vertex(builder, x, adjacentHeight, z1, color, light, alpha, 1.0F, 0.0F, 0.0F);
+        vertex(builder, x, lower, z0, color, light, alpha, 1.0F, 0.0F, 0.0F);
+        vertex(builder, x, top, z0, color, light, alpha, 1.0F, 0.0F, 0.0F);
+        vertex(builder, x, top, z1, color, light, alpha, 1.0F, 0.0F, 0.0F);
+        vertex(builder, x, lower, z1, color, light, alpha, 1.0F, 0.0F, 0.0F);
         return 4;
     }
 
@@ -674,20 +830,22 @@ public final class LocalizedCloudRenderer {
             float x0,
             float x1,
             float z,
-            int adjacentHeight,
-            int height,
+            float adjacentTop,
+            float base,
+            float top,
             Vec3 color,
             float darkness,
             float alpha
     ) {
-        if (adjacentHeight >= height) {
+        if (adjacentTop >= top) {
             return 0;
         }
+        float lower = Math.max(base, adjacentTop);
         float light = (float) Math.max(0.22, 0.80 - darkness * 0.40);
-        vertex(builder, x0, adjacentHeight, z, color, light, alpha, 0.0F, 0.0F, -1.0F);
-        vertex(builder, x0, height, z, color, light, alpha, 0.0F, 0.0F, -1.0F);
-        vertex(builder, x1, height, z, color, light, alpha, 0.0F, 0.0F, -1.0F);
-        vertex(builder, x1, adjacentHeight, z, color, light, alpha, 0.0F, 0.0F, -1.0F);
+        vertex(builder, x0, lower, z, color, light, alpha, 0.0F, 0.0F, -1.0F);
+        vertex(builder, x0, top, z, color, light, alpha, 0.0F, 0.0F, -1.0F);
+        vertex(builder, x1, top, z, color, light, alpha, 0.0F, 0.0F, -1.0F);
+        vertex(builder, x1, lower, z, color, light, alpha, 0.0F, 0.0F, -1.0F);
         return 4;
     }
 
@@ -696,20 +854,22 @@ public final class LocalizedCloudRenderer {
             float x0,
             float x1,
             float z,
-            int adjacentHeight,
-            int height,
+            float adjacentTop,
+            float base,
+            float top,
             Vec3 color,
             float darkness,
             float alpha
     ) {
-        if (adjacentHeight >= height) {
+        if (adjacentTop >= top) {
             return 0;
         }
+        float lower = Math.max(base, adjacentTop);
         float light = (float) Math.max(0.22, 0.80 - darkness * 0.40);
-        vertex(builder, x1, adjacentHeight, z, color, light, alpha, 0.0F, 0.0F, 1.0F);
-        vertex(builder, x1, height, z, color, light, alpha, 0.0F, 0.0F, 1.0F);
-        vertex(builder, x0, height, z, color, light, alpha, 0.0F, 0.0F, 1.0F);
-        vertex(builder, x0, adjacentHeight, z, color, light, alpha, 0.0F, 0.0F, 1.0F);
+        vertex(builder, x1, lower, z, color, light, alpha, 0.0F, 0.0F, 1.0F);
+        vertex(builder, x1, top, z, color, light, alpha, 0.0F, 0.0F, 1.0F);
+        vertex(builder, x0, top, z, color, light, alpha, 0.0F, 0.0F, 1.0F);
+        vertex(builder, x0, lower, z, color, light, alpha, 0.0F, 0.0F, 1.0F);
         return 4;
     }
 
@@ -759,15 +919,49 @@ public final class LocalizedCloudRenderer {
         return Math.min(requested, tileCapRadius);
     }
 
-    private static int neighborHeight(byte[] heights, int diameter, int x, int z) {
+    private static float neighborTop(
+            byte[] heights,
+            float[] baseOffsets,
+            int diameter,
+            int x,
+            int z
+    ) {
         if (x < 0 || z < 0 || x >= diameter || z >= diameter) {
-            return 0;
+            return Float.NEGATIVE_INFINITY;
         }
-        return heights[index(x, z, diameter)];
+        int cell = index(x, z, diameter);
+        return heights[cell] == 0
+                ? Float.NEGATIVE_INFINITY
+                : baseOffsets[cell] + Byte.toUnsignedInt(heights[cell]);
+    }
+
+    private static CloudType dominantCloudType(Map<CloudType, Double> weights) {
+        CloudType result = CloudType.CLEAR;
+        double greatestWeight = 0.0;
+        for (Map.Entry<CloudType, Double> entry : weights.entrySet()) {
+            if (entry.getValue() > greatestWeight) {
+                result = entry.getKey();
+                greatestWeight = entry.getValue();
+            }
+        }
+        return result;
+    }
+
+    private static int shapeCode(CloudType.Shape shape) {
+        return switch (shape) {
+            case CLEAR, WISPY -> 0;
+            case LAYERED -> 1;
+            case CELLULAR -> 2;
+            case CONVECTIVE -> 3;
+        };
     }
 
     private static int index(int x, int z, int diameter) {
         return z * diameter + x;
+    }
+
+    private record DistantCloudResult(int tiles, int vertices, double coverageSum) {
+        private static final DistantCloudResult NONE = new DistantCloudResult(0, 0, 0.0);
     }
 
     private static void replaceCloudBuffer(MeshData mesh) {
@@ -826,10 +1020,11 @@ public final class LocalizedCloudRenderer {
             double windDetailOffsetX,
             double windDetailOffsetZ,
             String mode,
-            int layers
+            int layers,
+            String cloudType
     ) {
         private static final Diagnostics INACTIVE =
-                new Diagnostics(false, 0, 0, 0.0, 0.0, 0.0, "inactive", 0);
+                new Diagnostics(false, 0, 0, 0.0, 0.0, 0.0, "inactive", 0, "Clear");
 
         public Diagnostics(
                 boolean active,
@@ -847,13 +1042,15 @@ public final class LocalizedCloudRenderer {
                     windDetailOffsetX,
                     windDetailOffsetZ,
                     active ? "compatibility" : "inactive",
-                    active ? 1 : 0
+                    active ? 1 : 0,
+                    "Clear"
             );
         }
 
         public Diagnostics {
             mode = mode == null || mode.isBlank() ? "unknown" : mode;
             layers = Math.max(0, layers);
+            cloudType = cloudType == null || cloudType.isBlank() ? "Unknown" : cloudType;
         }
     }
 }

@@ -165,6 +165,10 @@ configurations {
     // NeoForge unit tests load the mod and therefore need the same externally
     // supplied runtime mods (currently Spark) as runClient/runServer.
     testRuntimeClasspath.extendsFrom localRuntime
+    sodiumService {
+        canBeConsumed = false
+        canBeResolved = true
+    }
 }
 
 repositories {
@@ -173,6 +177,58 @@ repositories {
     }
     maven {
         url "https://repo.bluecolored.de/releases"
+    }
+    maven {
+        // Sodium publishes loader-specific developer artifacts here. Restrict
+        // the repository so unrelated dependencies keep their normal source.
+        name = "CaffeineMC"
+        url = "https://maven.caffeinemc.net/releases"
+        content {
+            includeGroup "net.caffeinemc"
+        }
+    }
+    maven {
+        // Sodium's NeoForge build embeds these Forgified Fabric API modules in
+        // its release wrapper; the flattened dev runtime declares them directly.
+        name = "Sinytra"
+        url = "https://maven.su5ed.dev/releases"
+        content {
+            includeGroup "org.sinytra.forgified-fabric-api"
+        }
+    }
+}
+
+def sodiumVersion = "0.8.12+mc1.21.1"
+
+// Sodium's published NeoForge release is a bootstrap wrapper whose actual mod
+// lives in META-INF/jarjar. Cross-mod mixins are prepared before that nested JAR
+// becomes visible, so development runs use the separately published direct mod
+// artifact plus a bootstrap-only copy of the wrapper. Player installations
+// still use Sodium's normal release JAR.
+def sodiumServiceDevJar = tasks.register("sodiumServiceDevJar", Jar) {
+    archiveBaseName.set("sodium-service-dev")
+    archiveVersion.set(sodiumVersion)
+    destinationDirectory.set(layout.buildDirectory.dir("sodium-dev-runtime"))
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from {
+        configurations.sodiumService.collect { zipTree(it) }
+    }
+
+    // The direct mod and Forgified modules are normal runtime dependencies.
+    // Removing the nested locator prevents the bootstrap from discovering a
+    // second copy of those same mods.
+    exclude "META-INF/jarjar/**"
+    exclude "META-INF/neoforge.mods.toml"
+    exclude "META-INF/services/net.neoforged.neoforgespi.locating.IModFileCandidateLocator"
+    exclude "META-INF/MANIFEST.MF"
+    exclude "META-INF/*.SF", "META-INF/*.RSA", "META-INF/*.DSA"
+
+    manifest {
+        attributes(
+                "FMLModType": "LIBRARY",
+                "Automatic-Module-Name": "sodium_service"
+        )
     }
 }
 
@@ -197,7 +253,17 @@ dependencies {
     implementation "curse.maven:supplementaries-412082:8244187"
     implementation "curse.maven:multipart-machines-cooking-885587:5686941"
     implementation "curse.maven:bluemap-406463:6239407"
-    implementation "curse.maven:embeddium-908741:6118392"
+    localRuntime("net.caffeinemc:sodium-neoforge-mod:${sodiumVersion}") {
+        transitive = false
+    }
+    localRuntime "org.sinytra.forgified-fabric-api:fabric-api-base:0.4.42+d1308ded19"
+    localRuntime "org.sinytra.forgified-fabric-api:fabric-renderer-api-v1:3.4.1+9125b6dc19"
+    localRuntime "org.sinytra.forgified-fabric-api:fabric-rendering-data-attachment-v1:0.3.48+73761d2e19"
+    localRuntime "org.sinytra.forgified-fabric-api:fabric-block-view-api-v2:1.0.10+9afaaf8c19"
+    sodiumService("net.caffeinemc:sodium-neoforge:${sodiumVersion}") {
+        transitive = false
+    }
+    clientAdditionalRuntimeClasspath files(sodiumServiceDevJar)
     jarJar(implementation("org.yaml:snakeyaml:2.2")) {
         version {
             strictly '[2.2,3.0)'
