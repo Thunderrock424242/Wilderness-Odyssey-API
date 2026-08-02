@@ -68,6 +68,52 @@ public final class WaterSurfaceEquation {
             float tideOffset,
             float transientHeight
     ) {
+        return snapshotSurfaceHeight(
+                baseSurfaceY,
+                worldX,
+                worldZ,
+                timeSeconds,
+                oceanSpectrum,
+                oceanWaveLimit,
+                riverWaveLimit,
+                pondWaveLimit,
+                oceanWeight,
+                riverWeight,
+                lakeWeight,
+                0.0f,
+                0.0f,
+                1.0f,
+                tideOffset,
+                transientHeight
+        );
+    }
+
+    /**
+     * Mirrors the active snapshot vertex shader, including current-relative
+     * river direction and loaded-surface continuity taper.
+     *
+     * <p>World position and time remain double precision until profile phase
+     * evaluation. The flow inputs are authoritative synchronized snapshot data;
+     * callers must not substitute unsynchronized client prediction.</p>
+     */
+    public static float snapshotSurfaceHeight(
+            float baseSurfaceY,
+            double worldX,
+            double worldZ,
+            double timeSeconds,
+            WaveSpectrumState oceanSpectrum,
+            int oceanWaveLimit,
+            int riverWaveLimit,
+            int pondWaveLimit,
+            float oceanWeight,
+            float riverWeight,
+            float lakeWeight,
+            float currentX,
+            float currentZ,
+            float surfaceContinuity,
+            float tideOffset,
+            float transientHeight
+    ) {
         WaveSpectrumState safeOceanSpectrum = oceanSpectrum == null
                 ? WaveSpectrumState.NEUTRAL
                 : oceanSpectrum;
@@ -80,20 +126,30 @@ public final class WaterSurfaceEquation {
         boundedRiverWeight /= weightNormalizer;
         boundedLakeWeight /= weightNormalizer;
 
-        float boundedTime = finiteOrZero(timeSeconds);
         float waveHeight = GerstnerWaveProfile.OCEAN.sampleAt(
-                worldX, worldZ, boundedTime, Math.max(0, oceanWaveLimit), safeOceanSpectrum
+                worldX, worldZ, finiteOrZero(timeSeconds), Math.max(0, oceanWaveLimit), safeOceanSpectrum
         ).height() * boundedOceanWeight;
         waveHeight += GerstnerWaveProfile.RIVER.sampleAt(
-                worldX, worldZ, boundedTime, Math.max(0, riverWaveLimit), WaveSpectrumState.NEUTRAL
+                worldX,
+                worldZ,
+                finiteOrZero(timeSeconds),
+                Math.max(0, riverWaveLimit),
+                WaveSpectrumState.NEUTRAL,
+                currentX,
+                currentZ
         ).height() * boundedRiverWeight;
         waveHeight += GerstnerWaveProfile.POND.sampleAt(
-                worldX, worldZ, boundedTime, Math.max(0, pondWaveLimit), WaveSpectrumState.NEUTRAL
+                worldX, worldZ, finiteOrZero(timeSeconds), Math.max(0, pondWaveLimit), WaveSpectrumState.NEUTRAL
         ).height() * boundedLakeWeight;
+        float continuity = surfaceContinuityFactor(surfaceContinuity);
         return finiteOrZero(baseSurfaceY)
-                + waveHeight
-                + finiteOrZero(tideOffset) * boundedOceanWeight
-                + clamp(finiteOrZero(transientHeight), -0.25f, 0.25f);
+                + (waveHeight + clamp(finiteOrZero(transientHeight), -0.25f, 0.25f)) * continuity
+                + finiteOrZero(tideOffset) * boundedOceanWeight * continuity;
+    }
+
+    /** Converts encoded mesh continuity into the exact GPU vertical-wave taper. */
+    public static float surfaceContinuityFactor(float surfaceContinuity) {
+        return smoothStep(0.18f, 0.92f, finiteOrZero(surfaceContinuity));
     }
 
     /**
@@ -148,8 +204,17 @@ public final class WaterSurfaceEquation {
         return Float.isFinite(value) ? value : 0.0f;
     }
 
+    private static double finiteOrZero(double value) {
+        return Double.isFinite(value) ? value : 0.0;
+    }
+
     private static float clamp(float value, float minimum, float maximum) {
         return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    private static float smoothStep(float edge0, float edge1, float value) {
+        float t = clamp((value - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+        return t * t * (3.0f - 2.0f * t);
     }
 
 }

@@ -31,7 +31,11 @@ public final class WaterSurfaceDisplacement {
     private static final int BOAT_WAKE_INTERVAL_TICKS = 2;
     private static final int IMPACT_LIFETIME_TICKS = 42;
     private static final int WAKE_LIFETIME_TICKS = 34;
-    private static final float MAX_HEIGHT_OFFSET = 0.22f;
+    private static final int IMPACT_FOAM_LIFETIME_TICKS = 82;
+    private static final int WAKE_FOAM_LIFETIME_TICKS = 70;
+    private static final int BOW_WAVE_FOAM_LIFETIME_TICKS = 96;
+    /** Shared CPU/GPU cap for the sum of all active impulse heights. */
+    public static final float MAX_COMBINED_HEIGHT_OFFSET = 0.25f;
 
     private static final List<Disturbance> DISTURBANCES = new ArrayList<>();
     private static final Map<Integer, Long> LAST_ENTITY_WAKE_TICK = new HashMap<>();
@@ -118,6 +122,25 @@ public final class WaterSurfaceDisplacement {
      * @return a small signed height offset in blocks
      */
     public static float sampleHeight(Level level, double x, double z, float sampleTick) {
+        return sampleHeight(level, x, z, (double) sampleTick, x, z);
+    }
+
+    /**
+     * Samples the temporary height using the same impulse-selection origin as
+     * the GPU upload.
+     *
+     * <p>Boat footprint points pass the render camera as the selection origin,
+     * ensuring all points sum the same bounded eight wakes visible in the
+     * shader instead of independently choosing a different nearest set.</p>
+     */
+    public static float sampleHeight(
+            Level level,
+            double x,
+            double z,
+            double sampleTick,
+            double selectionX,
+            double selectionZ
+    ) {
         if (!level.isClientSide() || !activate(level) || DISTURBANCES.isEmpty()) {
             return 0.0f;
         }
@@ -129,11 +152,11 @@ public final class WaterSurfaceDisplacement {
         prune(level.getGameTime());
 
         float height = 0.0f;
-        int selected = selectNearest(sampleTick, x, z);
+        int selected = selectNearest(sampleTick, selectionX, selectionZ, false);
         for (int index = 0; index < selected; index++) {
             Disturbance disturbance = GPU_SELECTION[index];
-            float age = sampleTick - disturbance.startTick;
-            float life = age / disturbance.lifetimeTicks;
+            double age = sampleTick - disturbance.startTick;
+            float life = (float) (age / disturbance.displacementLifetimeTicks);
             float fade = (1.0f - life) * (1.0f - life);
             double dx = x - disturbance.x;
             double dz = z - disturbance.z;
@@ -147,21 +170,33 @@ public final class WaterSurfaceDisplacement {
                     disturbance.kind.ringScale
             );
         }
-        return clamp(height, -MAX_HEIGHT_OFFSET, MAX_HEIGHT_OFFSET);
+        return clampCombinedHeight(height);
     }
 
     /**
      * Writes the nearest active impulses into a reusable shader-upload array.
      *
      * <p>Each entry stores {@code x, z, radius, faded amplitude} followed by
-     * {@code center width, ring width, ring scale, enabled}. Selection and
-     * animation are client-tick based, capped, and never rebuild chunk meshes.</p>
+     * {@code center width, ring width, ring scale, persistent foam strength}.
+     * Selection and animation are client-tick based, capped, and never rebuild
+     * chunk meshes.</p>
      *
      * @return number of active entries written
      */
     public static int writeGpuImpulses(
             Level level,
             float sampleTick,
+            double cameraX,
+            double cameraZ,
+            float[] destination
+    ) {
+        return writeGpuImpulses(level, (double) sampleTick, cameraX, cameraZ, destination);
+    }
+
+    /** Double-tick variant that preserves wake age in long-running worlds. */
+    public static int writeGpuImpulses(
+            Level level,
+            double sampleTick,
             double cameraX,
             double cameraZ,
             float[] destination
@@ -175,21 +210,36 @@ public final class WaterSurfaceDisplacement {
             return 0;
         }
         prune(level.getGameTime());
-        int selected = selectNearest(sampleTick, cameraX, cameraZ);
+        float foamScale = WaterRenderingConfig.persistentWakeFoamScale();
+        int selected = selectNearest(sampleTick, cameraX, cameraZ, foamScale > 0.0f);
+        double anchorX = impulseAnchor(cameraX);
+        double anchorZ = impulseAnchor(cameraZ);
 
         for (int index = 0; index < selected; index++) {
             Disturbance disturbance = GPU_SELECTION[index];
-            float life = (sampleTick - disturbance.startTick) / disturbance.lifetimeTicks;
-            float fade = (1.0f - life) * (1.0f - life);
+            double age = sampleTick - disturbance.startTick;
+            float life = clamp(
+                    (float) (age / disturbance.displacementLifetimeTicks),
+                    0.0f,
+                    1.0f
+            );
+            float fade = age <= disturbance.displacementLifetimeTicks
+                    ? (1.0f - life) * (1.0f - life)
+                    : 0.0f;
+            float foamStrength = persistentFoamEnvelope(
+                    age,
+                    disturbance.displacementLifetimeTicks,
+                    disturbance.foamLifetimeTicks
+            ) * disturbance.kind.foamScale * foamScale;
             int offset = index * GPU_IMPULSE_STRIDE;
-            destination[offset] = (float) disturbance.x;
-            destination[offset + 1] = (float) disturbance.z;
+            destination[offset] = (float) (disturbance.x - anchorX);
+            destination[offset + 1] = (float) (disturbance.z - anchorZ);
             destination[offset + 2] = disturbance.radius * (0.30f + life * 1.15f);
             destination[offset + 3] = disturbance.amplitude * fade;
             destination[offset + 4] = Math.max(0.35f, disturbance.radius * 0.36f);
             destination[offset + 5] = Math.max(0.22f, disturbance.radius * 0.16f);
             destination[offset + 6] = disturbance.kind.ringScale;
-            destination[offset + 7] = 1.0f;
+            destination[offset + 7] = foamStrength;
         }
         return selected;
     }
@@ -228,7 +278,8 @@ public final class WaterSurfaceDisplacement {
                 z,
                 level.getGameTime(),
                 Math.max(8, lifetimeTicks),
-                clamp(amplitude, 0.0f, MAX_HEIGHT_OFFSET),
+                kind.foamLifetimeTicks,
+                clamp(amplitude, 0.0f, MAX_COMBINED_HEIGHT_OFFSET),
                 Math.max(0.35f, radius),
                 kind
         ));
@@ -238,7 +289,8 @@ public final class WaterSurfaceDisplacement {
         Iterator<Disturbance> iterator = DISTURBANCES.iterator();
         while (iterator.hasNext()) {
             Disturbance disturbance = iterator.next();
-            if (gameTime - disturbance.startTick > disturbance.lifetimeTicks) {
+            if (gameTime - disturbance.startTick
+                    > Math.max(disturbance.displacementLifetimeTicks, disturbance.foamLifetimeTicks)) {
                 iterator.remove();
             }
         }
@@ -256,8 +308,15 @@ public final class WaterSurfaceDisplacement {
         return true;
     }
 
-    private static boolean isActive(Disturbance disturbance, float age) {
-        return age >= 0.0f && age <= disturbance.lifetimeTicks;
+    private static boolean isActive(
+            Disturbance disturbance,
+            double age,
+            boolean includePersistentFoam
+    ) {
+        int lifetime = includePersistentFoam
+                ? Math.max(disturbance.displacementLifetimeTicks, disturbance.foamLifetimeTicks)
+                : disturbance.displacementLifetimeTicks;
+        return age >= 0.0f && age <= lifetime;
     }
 
     static boolean wakeIntervalElapsed(long gameTime, long lastWake, int intervalTicks) {
@@ -266,33 +325,69 @@ public final class WaterSurfaceDisplacement {
         return lastWake == Long.MIN_VALUE || gameTime - lastWake >= intervalTicks;
     }
 
-    private static int selectNearest(float sampleTick, double sampleX, double sampleZ) {
+    private static int selectNearest(
+            double sampleTick,
+            double sampleX,
+            double sampleZ,
+            boolean includePersistentFoam
+    ) {
         Arrays.fill(GPU_SELECTION, null);
         int selected = 0;
-        for (Disturbance disturbance : DISTURBANCES) {
-            if (!isActive(disturbance, sampleTick - disturbance.startTick)) {
-                continue;
-            }
-            double dx = disturbance.x - sampleX;
-            double dz = disturbance.z - sampleZ;
-            double distanceSquared = dx * dx + dz * dz;
-            if (selected < MAX_GPU_IMPULSES) {
-                GPU_SELECTION[selected] = disturbance;
-                GPU_SELECTION_DISTANCE[selected] = distanceSquared;
-                selected++;
-                continue;
-            }
 
-            int farthest = 0;
-            for (int index = 1; index < selected; index++) {
-                if (GPU_SELECTION_DISTANCE[index] > GPU_SELECTION_DISTANCE[farthest]) {
-                    farthest = index;
-                }
+        // Physical disturbances are selected first so the GPU always receives
+        // the same nearest active height impulses used by CPU immersion and
+        // boat-footprint sampling. Older foam tails may use only spare slots.
+        for (Disturbance disturbance : DISTURBANCES) {
+            double age = sampleTick - disturbance.startTick;
+            if (!isActive(disturbance, age, false)) {
+                continue;
             }
-            if (distanceSquared < GPU_SELECTION_DISTANCE[farthest]) {
-                GPU_SELECTION[farthest] = disturbance;
-                GPU_SELECTION_DISTANCE[farthest] = distanceSquared;
+            selected = retainNearest(
+                    disturbance, sampleX, sampleZ, selected, 0);
+        }
+        if (!includePersistentFoam || selected >= MAX_GPU_IMPULSES) {
+            return selected;
+        }
+
+        int physicalCount = selected;
+        for (Disturbance disturbance : DISTURBANCES) {
+            double age = sampleTick - disturbance.startTick;
+            boolean foamTailOnly = age > disturbance.displacementLifetimeTicks
+                    && isActive(disturbance, age, true);
+            if (!foamTailOnly) {
+                continue;
             }
+            selected = retainNearest(
+                    disturbance, sampleX, sampleZ, selected, physicalCount);
+        }
+        return selected;
+    }
+
+    private static int retainNearest(
+            Disturbance disturbance,
+            double sampleX,
+            double sampleZ,
+            int selected,
+            int replacementStart
+    ) {
+        double dx = disturbance.x - sampleX;
+        double dz = disturbance.z - sampleZ;
+        double distanceSquared = dx * dx + dz * dz;
+        if (selected < MAX_GPU_IMPULSES) {
+            GPU_SELECTION[selected] = disturbance;
+            GPU_SELECTION_DISTANCE[selected] = distanceSquared;
+            return selected + 1;
+        }
+
+        int farthest = replacementStart;
+        for (int index = replacementStart + 1; index < selected; index++) {
+            if (GPU_SELECTION_DISTANCE[index] > GPU_SELECTION_DISTANCE[farthest]) {
+                farthest = index;
+            }
+        }
+        if (distanceSquared < GPU_SELECTION_DISTANCE[farthest]) {
+            GPU_SELECTION[farthest] = disturbance;
+            GPU_SELECTION_DISTANCE[farthest] = distanceSquared;
         }
         return selected;
     }
@@ -313,6 +408,40 @@ public final class WaterSurfaceDisplacement {
         return depression + ring;
     }
 
+    static float clampCombinedHeight(float height) {
+        return clamp(height, -MAX_COMBINED_HEIGHT_OFFSET, MAX_COMBINED_HEIGHT_OFFSET);
+    }
+
+    /**
+     * Keeps foam visible after the short physical displacement settles.
+     *
+     * <p>The plateau lasts through the displacement lifetime, then a smooth
+     * tail removes the foam before the bounded disturbance slot is released.</p>
+     */
+    static float persistentFoamEnvelope(
+            double ageTicks,
+            int displacementLifetimeTicks,
+            int foamLifetimeTicks
+    ) {
+        int displacementLifetime = Math.max(1, displacementLifetimeTicks);
+        int foamLifetime = Math.max(displacementLifetime, foamLifetimeTicks);
+        if (!Double.isFinite(ageTicks) || ageTicks < 0.0 || ageTicks >= foamLifetime) {
+            return 0.0f;
+        }
+        if (ageTicks <= displacementLifetime || foamLifetime == displacementLifetime) {
+            return 1.0f;
+        }
+        float tail = (float) ((ageTicks - displacementLifetime)
+                / (foamLifetime - (double) displacementLifetime));
+        float smoothTail = tail * tail * (3.0f - 2.0f * tail);
+        return 1.0f - smoothTail;
+    }
+
+    /** Returns the chunk-aligned frame used for precision-safe GPU wake positions. */
+    static double impulseAnchor(double coordinate) {
+        return Math.floor(coordinate / 16.0) * 16.0;
+    }
+
     private static float gaussian(float normalizedDistance) {
         return (float) Math.exp(-(normalizedDistance * normalizedDistance));
     }
@@ -322,14 +451,18 @@ public final class WaterSurfaceDisplacement {
     }
 
     private enum DisturbanceKind {
-        IMPACT(0.75f),
-        WAKE(0.55f),
-        BOW_WAVE(0.95f);
+        IMPACT(0.75f, 0.82f, IMPACT_FOAM_LIFETIME_TICKS),
+        WAKE(0.55f, 0.58f, WAKE_FOAM_LIFETIME_TICKS),
+        BOW_WAVE(0.95f, 1.0f, BOW_WAVE_FOAM_LIFETIME_TICKS);
 
         private final float ringScale;
+        private final float foamScale;
+        private final int foamLifetimeTicks;
 
-        DisturbanceKind(float ringScale) {
+        DisturbanceKind(float ringScale, float foamScale, int foamLifetimeTicks) {
             this.ringScale = ringScale;
+            this.foamScale = foamScale;
+            this.foamLifetimeTicks = foamLifetimeTicks;
         }
     }
 
@@ -337,7 +470,8 @@ public final class WaterSurfaceDisplacement {
             double x,
             double z,
             long startTick,
-            int lifetimeTicks,
+            int displacementLifetimeTicks,
+            int foamLifetimeTicks,
             float amplitude,
             float radius,
             DisturbanceKind kind

@@ -78,12 +78,10 @@ public class IrisShaderDebugCommand {
     private static int runIrisDebug(Consumer<String> successSink, Consumer<String> failureSink) {
         boolean irisLoaded = ModList.get().isLoaded("iris");
         boolean oculusLoaded = ModList.get().isLoaded("oculus");
-        boolean embeddiumLoaded = ModList.get().isLoaded("embeddium");
         boolean sodiumLoaded = ModList.get().isLoaded("sodium");
 
         successSink.accept("[WO Shader Debug] Iris loaded: " + irisLoaded);
         successSink.accept("[WO Shader Debug] Oculus loaded: " + oculusLoaded);
-        successSink.accept("[WO Shader Debug] Embeddium loaded: " + embeddiumLoaded);
         successSink.accept("[WO Shader Debug] Sodium loaded: " + sodiumLoaded);
         successSink.accept("[WO Shader Debug] Water rendering profile: " + WaterRenderingConfig.profileName());
         successSink.accept("[WO Shader Debug] Water SPH render cap: " + WaterRenderingConfig.maxRenderedSphSimulations()

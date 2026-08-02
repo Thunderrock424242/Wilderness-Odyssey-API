@@ -93,7 +93,9 @@ public final class AtmosphereInputSampler {
                 season.evaporationMultiplier(),
                 climate.terrainGradientX,
                 climate.terrainGradientZ,
-                climate.terrainRoughness
+                climate.terrainRoughness,
+                water.oceanCoverage() * water.loadedProbeFraction(),
+                water.inlandWaterCoverage() * water.loadedProbeFraction()
         );
     }
 

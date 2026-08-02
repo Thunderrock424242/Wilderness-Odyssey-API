@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.weather.simulation;
 
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.StormStage;
+import com.thunder.wildernessodysseyapi.weather.api.SurfaceWeatherState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindVector;
 
@@ -50,6 +51,7 @@ public final class AtmosphereSimulationEngine {
         AtmosphereEnvironment inputs = Objects.requireNonNullElse(environment, AtmosphereEnvironment.TEMPERATE);
         SimulationSettings controls = Objects.requireNonNullElse(settings, SimulationSettings.DEFAULT);
         Neighborhood neighbors = neighborhood == null ? Neighborhood.uniform(center) : neighborhood.withFallback(center);
+        AtmosphericFrontModel.FrontState front = AtmosphericFrontModel.analyze(center, neighbors);
         double step = controls.simulationSpeed();
         if (step == 0.0) {
             return center;
@@ -70,8 +72,11 @@ public final class AtmosphereSimulationEngine {
         double pressure = equalizedPressure + thermalPressureDelta;
 
         // Pressure gradients accelerate air from higher pressure toward lower pressure.
-        double targetWindX = (neighbors.west().pressure() - neighbors.east().pressure()) * PRESSURE_TO_WIND;
-        double targetWindZ = (neighbors.north().pressure() - neighbors.south().pressure()) * PRESSURE_TO_WIND;
+        double frontStrength = controls.weatherFrontStrength();
+        double targetWindX = (neighbors.west().pressure() - neighbors.east().pressure()) * PRESSURE_TO_WIND
+                + front.gust().x() * frontStrength;
+        double targetWindZ = (neighbors.north().pressure() - neighbors.south().pressure()) * PRESSURE_TO_WIND
+                + front.gust().z() * frontStrength;
         double windResponse = boundedRate(0.12 + controls.pressureEqualizationRate() * 0.45, step);
         WindVector wind = new WindVector(
                 approach(center.wind().x(), targetWindX, windResponse),
@@ -153,6 +158,7 @@ public final class AtmosphereSimulationEngine {
                         + buoyancy * 0.30
                         + inputs.orographicLift(wind) * 0.42
                         + lowPressureSupport * 0.16
+                        + front.lift() * frontStrength * 0.42
                         + inputs.seasonalStorminessOffset() * 0.28
                         - center.precipitationIntensity() * 0.12,
                 -1.0,
@@ -169,6 +175,7 @@ public final class AtmosphereSimulationEngine {
                 humidity * 0.34
                         + temperatureContrast * 0.38
                         + Math.max(0.0, verticalMotion) * 0.28
+                        + front.stormBoost() * frontStrength * 0.25
                         + inputs.seasonalStorminessOffset() * 0.20
         );
         double instability = approach(center.instability(), instabilityTarget, boundedRate(0.08, step));
@@ -180,6 +187,7 @@ public final class AtmosphereSimulationEngine {
                         * instability
                         * (0.44 + lowPressureSupport * 0.34
                         + Math.max(0.0, verticalMotion) * 0.30)
+                        + front.stormBoost() * frontStrength * 0.18
                         + inputs.seasonalStorminessOffset()
         );
         double stormEnergy = center.stormEnergy();
@@ -244,7 +252,7 @@ public final class AtmosphereSimulationEngine {
                 boundedRate(0.10, step)
         );
 
-        return new WeatherSample(
+        WeatherSample atmosphere = new WeatherSample(
                 temperature,
                 humidity,
                 pressure,
@@ -256,7 +264,30 @@ public final class AtmosphereSimulationEngine {
                 precipitationType,
                 verticalMotion,
                 cloudDepth,
-                cloudWind
+                cloudWind,
+                center.surface()
+        );
+        atmosphere = WeatherPhenomenaModel.apply(atmosphere, inputs, front, step);
+        SurfaceWeatherState surface = SurfaceWeatherModel.simulate(
+                center.surface(),
+                atmosphere,
+                inputs,
+                step
+        );
+        return new WeatherSample(
+                atmosphere.temperature(),
+                atmosphere.humidity(),
+                atmosphere.pressure(),
+                atmosphere.wind(),
+                atmosphere.cloudWater(),
+                atmosphere.instability(),
+                atmosphere.stormEnergy(),
+                atmosphere.precipitationIntensity(),
+                atmosphere.precipitationType(),
+                atmosphere.verticalMotion(),
+                atmosphere.cloudDepth(),
+                atmosphere.cloudWind(),
+                surface
         );
     }
 
@@ -366,7 +397,7 @@ public final class AtmosphereSimulationEngine {
             return new Neighborhood(value, value, value, value);
         }
 
-        private Neighborhood withFallback(WeatherSample fallback) {
+        Neighborhood withFallback(WeatherSample fallback) {
             return new Neighborhood(
                     Objects.requireNonNullElse(north, fallback),
                     Objects.requireNonNullElse(east, fallback),

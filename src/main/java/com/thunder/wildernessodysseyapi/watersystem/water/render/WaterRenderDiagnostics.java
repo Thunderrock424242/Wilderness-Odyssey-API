@@ -19,6 +19,9 @@ public final class WaterRenderDiagnostics {
     private static final AtomicLong SNAPSHOT_BYTES = new AtomicLong();
     private static final AtomicLong GENERATED_METADATA_BYTES = new AtomicLong();
     private static volatile FrameStats frameStats = FrameStats.EMPTY;
+    private static volatile RenderPath renderPath = RenderPath.DISABLED;
+    private static volatile boolean sceneCaptureAvailable;
+    private static volatile boolean externalRendererBridgeObserved;
 
     private WaterRenderDiagnostics() {
     }
@@ -44,6 +47,21 @@ public final class WaterRenderDiagnostics {
         GENERATED_METADATA_BYTES.set(Math.max(0L, bytes));
     }
 
+    /** Records which renderer currently owns Wilderness water pixels. */
+    public static void setRenderPath(RenderPath path) {
+        renderPath = path == null ? RenderPath.DISABLED : path;
+    }
+
+    /** Records whether the optical pass has a valid color/depth scene copy. */
+    public static void setSceneCaptureAvailable(boolean available) {
+        sceneCaptureAvailable = available;
+    }
+
+    /** Records that the optional Sodium fluid bridge is active. */
+    public static void recordExternalRendererBridgeUse() {
+        externalRendererBridgeObserved = true;
+    }
+
     /** Publishes the immutable counters for the most recently completed frame. */
     public static void publishFrame(int visibleGroups, int culledGroups, int vertices, int triangles,
                                     long waterRenderNanos, long ssrNanos) {
@@ -65,7 +83,10 @@ public final class WaterRenderDiagnostics {
                 GENERATED_METADATA_BYTES.get(),
                 SCENE_COPY_NANOS.get(),
                 SCENE_COPY_COUNT.get(),
-                MESH_REBUILDS.get()
+                MESH_REBUILDS.get(),
+                renderPath,
+                sceneCaptureAvailable,
+                externalRendererBridgeObserved
         );
     }
 
@@ -87,7 +108,14 @@ public final class WaterRenderDiagnostics {
                 "WO Water CPU: " + formatMillis(frame.waterRenderNanos()) + " render | "
                         + formatMillis(snapshot.sceneCopyNanos()) + " scene copy x"
                         + snapshot.sceneCopyCount(),
-                "WO Water SSR optical GPU: " + formatMillis(frame.ssrNanos())
+                "WO Water SSR optical GPU: " + formatMillis(frame.ssrNanos()),
+                "WO Water path: " + snapshot.renderPath().label + " | scene capture "
+                        + (snapshot.sceneCaptureAvailable() ? "ready" : "fallback") + " | "
+                        + WaterRenderingConfig.profileName(),
+                "WO Water shader-pack alias: "
+                        + ExternalShaderWaterMaterialBridge.status().label()
+                        + " | renderer bridge "
+                        + (snapshot.externalRendererBridgeObserved() ? "active" : "not observed")
         );
     }
 
@@ -112,8 +140,23 @@ public final class WaterRenderDiagnostics {
         private static final FrameStats EMPTY = new FrameStats(0, 0, 0, 0, 0L, 0L);
     }
 
+    /** Pixel owner selected by the coordinator for the current client frame. */
+    public enum RenderPath {
+        DISABLED("disabled"),
+        CORE_SHADER("built-in optical shader"),
+        VANILLA_FALLBACK("vanilla-safe fallback"),
+        EXTERNAL_SHADER_PACK("external shader pack");
+
+        private final String label;
+
+        RenderPath(String label) {
+            this.label = label;
+        }
+    }
+
     /** Complete client water diagnostics view. */
     public record Snapshot(FrameStats frame, long snapshotBytes, long generatedMetadataBytes, long sceneCopyNanos,
-                           long sceneCopyCount, long meshRebuildCount) {
+                           long sceneCopyCount, long meshRebuildCount, RenderPath renderPath,
+                           boolean sceneCaptureAvailable, boolean externalRendererBridgeObserved) {
     }
 }

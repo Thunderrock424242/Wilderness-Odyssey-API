@@ -196,10 +196,13 @@ buried or otherwise unclaimed fluid faces.
 All tiers retain snapshot culling, cached geometry, and the environment
 reflection fallback.
 
-- `LOW` uses reduced refraction and no SSR.
-- `MEDIUM` adds stronger optical detail while keeping SSR disabled.
-- `HIGH` enables a bounded 10-step SSR march and more local detail.
-- `CINEMATIC` raises the rebuild budget and permits an 18-step SSR march.
+- `LOW` uses reduced refraction, no SSR, and no ambient particle layer.
+- `MEDIUM` adds stronger optical detail, one capped ambient particle sample,
+  and reduced wake foam while keeping SSR disabled.
+- `HIGH` enables a bounded SSR march, up to two ambient particles per emission,
+  and a longer wake-foam tail.
+- `CINEMATIC` raises the bounded optical/rebuild budgets and permits up to three
+  ambient particles per emission. Renderer-mod optimization reduces that to two.
 
 SSR is bounded by shader step count, travel distance, valid depth, and screen
 limits. It is an enhancement, not a requirement for water visibility.
@@ -225,6 +228,39 @@ visibility, caustics, and distortion. Camera immersion adds entry/exit
 hysteresis and near-plane tolerance around the displaced surface so repeated
 surface crossings do not rapidly flicker. Local SPH volumes participate where
 their synchronized bounds contain the camera.
+
+Snapshot biome water tint now feeds the same underwater optical model. The
+camera path uses the surface renderer's 72 percent body profile and 28 percent
+biome tint blend, so oceans, rivers, and lakes keep distinct optical character
+without losing local biome coloration.
+
+Vanilla underwater audio remains the sole ambience owner. The entity-water
+parity hook feeds Wilderness eye submersion into `LocalPlayer.isUnderWater()`,
+which already drives Minecraft's entry/exit sounds, fading loop, and rare
+underwater additions. No second loop is layered on top. A separate client-only
+particle pass restores the suspended motes that vanilla `WaterFluid.animateTick`
+normally supplies, plus high-current bubbles and breaking/current-driven surface
+spray. Every candidate is checked against an immutable water snapshot and the
+pass runs every two ticks under a quality and renderer-aware hard budget.
+
+Impact rings and boat wakes now carry two lifetimes in the same capped eight
+GPU impulse slots. Geometry settles quickly, while a slower foam envelope keeps
+the disturbed ring visible for several seconds before a smooth release. This
+adds persistent-looking wake and impact foam without a new framebuffer, an
+unbounded trail buffer, canonical-water mutations, or extra network traffic.
+
+## Clock tide information
+
+Tide information is attached to Minecraft's vanilla clock instead of occupying
+an independent always-available HUD. Hovering a clock appends the live tide,
+trend, and moon phase to its normal tooltip. Holding a clock in either hand, or
+looking directly at one mounted in an item frame, shows one compact line above
+the hotbar; unrelated views never show tide UI. The clock item, model animation,
+recipes, and vanilla timekeeping behavior remain unchanged.
+
+The client options `showClockTideTooltip` and
+`showContextualClockTideDisplay` can disable either presentation independently.
+Both default to enabled.
 
 ## Diagnostics
 
@@ -274,7 +310,10 @@ projected-block writes reconcile open-machine placement/removal with canonical
 volume. These adapters preserve the namespaced fluid and normal water tags; the
 mod does not globally impersonate vanilla `Fluids.WATER`.
 
-Vanilla structures, full waterlogging replacement, direct chunk-internal
-mutations by other mods, and existing-world conversion are still outside this
-generation/rendering architecture. Further integrations must adapt to the
-authority boundary rather than reintroducing completed-chunk scanning.
+Vanilla structures can opt in with the explicit
+`wildernessodysseyapi:water` DATA marker, and operators can upgrade a bounded,
+fully loaded area of an existing world with `/wowater convert [radius]`.
+Waterlogged hosts remain vanilla-owned, and direct chunk-section mutations by
+other mods can still bypass the supported block/capability boundaries. Further
+integrations must adapt to the authority API rather than reintroducing automatic
+completed-chunk scanning or a global vanilla-fluid identity lie.

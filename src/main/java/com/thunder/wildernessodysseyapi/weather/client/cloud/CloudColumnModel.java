@@ -15,21 +15,12 @@ public final class CloudColumnModel {
 
     /** Returns the cloud-base offset from the dimension's configured cloud height. */
     public static double baseOffsetBlocks(CloudFieldSample field) {
-        CloudFieldSample sample = field == null ? CloudFieldSample.CLEAR : field;
-        double warmLift = Math.max(0.0, sample.temperature() - 18.0) * 0.18;
-        double moistureLowering = sample.humidity() * 16.0;
-        double ascentLowering = Math.max(0.0, sample.verticalMotion()) * 8.0;
-        return clamp(10.0 + warmLift - moistureLowering - ascentLowering, -10.0, 18.0);
+        return CloudLayerProfile.evaluate(field).dominantBand().baseOffsetBlocks();
     }
 
     /** Returns the visible vertical development in blocks. */
     public static double depthBlocks(CloudFieldSample field) {
-        CloudFieldSample sample = field == null ? CloudFieldSample.CLEAR : field;
-        double depth = 5.0
-                + sample.cloudDepth() * 44.0
-                + sample.stormEnergy() * 24.0
-                + Math.max(0.0, sample.verticalMotion()) * 12.0;
-        return clamp(depth, 4.0, 82.0);
+        return CloudLayerProfile.evaluate(field).dominantBand().depthBlocks();
     }
 
     /**
@@ -48,14 +39,29 @@ public final class CloudColumnModel {
             double cameraY,
             double dimensionCloudHeight
     ) {
-        CloudFieldSample sample = field == null ? CloudFieldSample.CLEAR : field;
-        double base = dimensionCloudHeight + baseOffsetBlocks(sample);
-        double depth = depthBlocks(sample);
+        CloudLayerProfile profile = CloudLayerProfile.evaluate(field);
+        double immersion = 0.0;
+        for (CloudLayerProfile.BandProfile band : profile.bands()) {
+            immersion = Math.max(immersion, bandImmersion(band, cameraY, dimensionCloudHeight));
+        }
+        return clamp(immersion, 0.0, 1.0);
+    }
+
+    private static double bandImmersion(
+            CloudLayerProfile.BandProfile band,
+            double cameraY,
+            double dimensionCloudHeight
+    ) {
+        if (!band.visible()) {
+            return 0.0;
+        }
+        double base = dimensionCloudHeight + band.baseOffsetBlocks();
+        double depth = band.depthBlocks();
         double top = base + depth;
         double edge = Math.min(6.0, depth * 0.25);
         double lowerFade = smoothstep(base - edge, base + edge, cameraY);
         double upperFade = 1.0 - smoothstep(top - edge, top + edge, cameraY);
-        return clamp(lowerFade * upperFade * sample.support() * sample.cloudWater(), 0.0, 1.0);
+        return clamp(lowerFade * upperFade * band.density(), 0.0, 1.0);
     }
 
     private static double smoothstep(double edge0, double edge1, double value) {

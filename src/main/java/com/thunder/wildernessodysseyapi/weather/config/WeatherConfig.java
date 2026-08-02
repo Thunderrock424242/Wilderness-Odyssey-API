@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.weather.config;
 
 import com.thunder.wildernessodysseyapi.weather.simulation.SimulationSettings;
+import com.thunder.wildernessodysseyapi.weather.integration.WeatherOwnershipCoordinator;
+import com.thunder.wildernessodysseyapi.weather.system.WeatherSystemTracker;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
@@ -34,6 +36,7 @@ public final class WeatherConfig {
     public static final ModConfigSpec.DoubleValue HUMIDITY_TRANSPORT_RATE;
     public static final ModConfigSpec.DoubleValue TEMPERATURE_TRANSPORT_RATE;
     public static final ModConfigSpec.DoubleValue PRESSURE_EQUALIZATION_RATE;
+    public static final ModConfigSpec.DoubleValue WEATHER_FRONT_STRENGTH;
     public static final ModConfigSpec.DoubleValue EVAPORATION_STRENGTH;
     public static final ModConfigSpec.DoubleValue CLOUD_FORMATION_THRESHOLD;
     public static final ModConfigSpec.DoubleValue PRECIPITATION_THRESHOLD;
@@ -44,6 +47,11 @@ public final class WeatherConfig {
     public static final ModConfigSpec.DoubleValue SEASON_TEMPERATURE_AMPLITUDE_CELSIUS;
     public static final ModConfigSpec.DoubleValue SEASON_HUMIDITY_AMPLITUDE;
     public static final ModConfigSpec.DoubleValue SEASON_STORMINESS_AMPLITUDE;
+    public static final ModConfigSpec.BooleanValue COLD_SWEAT_INTEGRATION_ENABLED;
+    public static final ModConfigSpec.DoubleValue COLD_SWEAT_MAXIMUM_OFFSET_CELSIUS;
+    public static final ModConfigSpec.BooleanValue THIRST_WAS_TAKEN_INTEGRATION_ENABLED;
+    public static final ModConfigSpec.IntValue THIRST_WEATHER_INTERVAL_TICKS;
+    public static final ModConfigSpec.DoubleValue THIRST_MAXIMUM_EXHAUSTION_PER_INTERVAL;
     public static final ModConfigSpec.BooleanValue LOCALIZED_LIGHTNING_ENABLED;
     public static final ModConfigSpec.IntValue LIGHTNING_CHECK_INTERVAL_TICKS;
     public static final ModConfigSpec.IntValue LIGHTNING_DIMENSION_COOLDOWN_TICKS;
@@ -54,6 +62,21 @@ public final class WeatherConfig {
     public static final ModConfigSpec.ConfigValue<List<? extends String>> DIMENSION_ALLOWLIST;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> DIMENSION_DENYLIST;
     public static final ModConfigSpec.EnumValue<VanillaWeatherCompatibilityMode> VANILLA_WEATHER_COMPATIBILITY_MODE;
+    public static final ModConfigSpec.EnumValue<WeatherOwnershipMode> WEATHER_OWNERSHIP_MODE;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> EXTERNAL_WEATHER_MOD_IDS;
+    public static final ModConfigSpec.BooleanValue PERSISTENT_SYSTEMS_ENABLED;
+    public static final ModConfigSpec.IntValue MAXIMUM_WEATHER_SYSTEMS;
+    public static final ModConfigSpec.DoubleValue WEATHER_SYSTEM_MOVEMENT_SPEED;
+    public static final ModConfigSpec.BooleanValue WEATHER_SYSTEM_SPLITTING_ENABLED;
+    public static final ModConfigSpec.BooleanValue SURFACE_WEATHERING_ENABLED;
+    public static final ModConfigSpec.IntValue SURFACE_WEATHERING_INTERVAL_TICKS;
+    public static final ModConfigSpec.IntValue SURFACE_WEATHERING_ATTEMPTS_PER_PLAYER;
+    public static final ModConfigSpec.IntValue MAXIMUM_SNOW_LAYERS;
+    public static final ModConfigSpec.BooleanValue SEVERE_WEATHER_ENABLED;
+    public static final ModConfigSpec.BooleanValue TORNADOES_ENABLED;
+    public static final ModConfigSpec.BooleanValue CYCLONES_ENABLED;
+    public static final ModConfigSpec.BooleanValue SEVERE_BLOCK_DAMAGE_ENABLED;
+    public static final ModConfigSpec.DoubleValue SEVERE_ENTITY_WIND_STRENGTH;
     public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
 
     private static final int DEFAULT_CELL_SIZE = 256;
@@ -115,6 +138,9 @@ public final class WeatherConfig {
         PRESSURE_EQUALIZATION_RATE = builder
                 .comment("Rate at which pressure equalizes and pressure gradients accelerate wind.")
                 .defineInRange("pressureEqualizationRate", 0.20, 0.0, 1.0);
+        WEATHER_FRONT_STRENGTH = builder
+                .comment("Strength of lift, gusts, and storm development where contrasting air masses form weather fronts.")
+                .defineInRange("weatherFrontStrength", 0.75, 0.0, 1.0);
         EVAPORATION_STRENGTH = builder
                 .comment("Humidity gain from cached surface water and humid biomes.")
                 .defineInRange("evaporationStrength", 0.12, 0.0, 1.0);
@@ -151,6 +177,25 @@ public final class WeatherConfig {
                 .defineInRange("storminessAmplitude", 0.18, 0.0, 0.50);
         builder.pop();
 
+        builder.comment("Optional survival-mod responses to authoritative local weather.")
+                .push("survivalIntegrations");
+        COLD_SWEAT_INTEGRATION_ENABLED = builder
+                .comment("Allow localized air temperature, wind, humidity, and precipitation to influence Cold Sweat world temperature.")
+                .define("coldSweatEnabled", true);
+        COLD_SWEAT_MAXIMUM_OFFSET_CELSIUS = builder
+                .comment("Maximum absolute weather offset applied to Cold Sweat in degrees Celsius.")
+                .defineInRange("coldSweatMaximumOffsetCelsius", 12.0, 0.0, 30.0);
+        THIRST_WAS_TAKEN_INTEGRATION_ENABLED = builder
+                .comment("Allow outdoor heat, dry air, drought, and wind to add bounded Thirst Was Taken exhaustion.")
+                .define("thirstWasTakenEnabled", true);
+        THIRST_WEATHER_INTERVAL_TICKS = builder
+                .comment("Ticks between bounded weather-exposure updates for Thirst Was Taken players.")
+                .defineInRange("thirstIntervalTicks", 40, 20, 1_200);
+        THIRST_MAXIMUM_EXHAUSTION_PER_INTERVAL = builder
+                .comment("Maximum thirst exhaustion added per weather interval under extreme exposed conditions.")
+                .defineInRange("thirstMaximumExhaustionPerInterval", 0.025, 0.0, 0.25);
+        builder.pop();
+
         builder.comment("Server-owned localized lightning scheduling.")
                 .push("lightning");
         LOCALIZED_LIGHTNING_ENABLED = builder
@@ -185,8 +230,69 @@ public final class WeatherConfig {
                 .comment("Dimension ids that must not run localized weather. Deny entries override the allowlist.")
                 .defineListAllowEmpty("dimensionDenylist", List.of(), WeatherConfig::isDimensionIdentifier);
         VANILLA_WEATHER_COMPATIBILITY_MODE = builder
-                .comment("PRESERVE_GLOBAL retains rain/thunder for unmigrated and Riftfall consumers while localized adapters use atmospheric cells. SUPPRESS_GLOBAL disables that global fallback.")
-                .defineEnum("vanillaWeatherCompatibilityMode", VanillaWeatherCompatibilityMode.PRESERVE_GLOBAL);
+                .comment("SUPPRESS_GLOBAL prevents Minecraft's global rain/thunder scheduler from competing with localized weather. PRESERVE_GLOBAL is a legacy mod-compatibility fallback.")
+                .defineEnum("vanillaWeatherCompatibilityMode", VanillaWeatherCompatibilityMode.SUPPRESS_GLOBAL);
+        WEATHER_OWNERSHIP_MODE = builder
+                .comment("AUTO yields to configured external weather mods, WILDERNESS forces this system, and EXTERNAL disables Wilderness weather ownership.")
+                .defineEnum("weatherOwnershipMode", WeatherOwnershipMode.AUTO);
+        EXTERNAL_WEATHER_MOD_IDS = builder
+                .comment("Mod ids treated as full weather-system owners in AUTO mode. Season-only mods do not belong here.")
+                .defineListAllowEmpty(
+                        "externalWeatherModIds",
+                        List.of("weather2", "simpleclouds", "betterweather"),
+                        WeatherConfig::isModIdentifier
+                );
+        builder.pop();
+
+        builder.comment("Persistent fronts, ground response, and opt-in severe-weather effects.")
+                .push("systems");
+        PERSISTENT_SYSTEMS_ENABLED = builder
+                .comment("Track moving storm and front identities that can strengthen, merge, split, and dissipate.")
+                .define("persistentSystemsEnabled", true);
+        MAXIMUM_WEATHER_SYSTEMS = builder
+                .comment("Maximum persistent storm and front identities retained per dimension.")
+                .defineInRange("maximumWeatherSystems", 48, 1, 256);
+        WEATHER_SYSTEM_MOVEMENT_SPEED = builder
+                .comment("Maximum block movement per second for a normalized atmospheric-system wind.")
+                .defineInRange("movementBlocksPerSecond", 3.0, 0.0, 16.0);
+        WEATHER_SYSTEM_SPLITTING_ENABLED = builder
+                .comment("Allow sufficiently organized storm cells to split into child cells.")
+                .define("splittingEnabled", true);
+        builder.pop();
+
+        builder.comment("Bounded server-side snow and freezing response.")
+                .push("surface");
+        SURFACE_WEATHERING_ENABLED = builder
+                .comment("Allow accumulated snow layers and temporary frosted ice in loaded player areas.")
+                .define("enabled", true);
+        SURFACE_WEATHERING_INTERVAL_TICKS = builder
+                .comment("Ticks between bounded surface-weathering passes.")
+                .defineInRange("intervalTicks", 40, 10, 1_200);
+        SURFACE_WEATHERING_ATTEMPTS_PER_PLAYER = builder
+                .comment("Maximum loaded columns sampled around each player per surface pass.")
+                .defineInRange("attemptsPerPlayer", 4, 1, 32);
+        MAXIMUM_SNOW_LAYERS = builder
+                .comment("Maximum accumulated vanilla snow layers created by weathering.")
+                .defineInRange("maximumSnowLayers", 5, 1, 8);
+        builder.pop();
+
+        builder.comment("Rare severe-weather effects. Block damage is deliberately disabled by default.")
+                .push("severe");
+        SEVERE_WEATHER_ENABLED = builder
+                .comment("Allow persistent systems to develop tornado or cyclone identities.")
+                .define("enabled", true);
+        TORNADOES_ENABLED = builder
+                .comment("Allow highly sheared supercells to develop tornado effects.")
+                .define("tornadoesEnabled", true);
+        CYCLONES_ENABLED = builder
+                .comment("Allow warm ocean-fed low pressure systems to develop cyclone effects.")
+                .define("cyclonesEnabled", true);
+        SEVERE_BLOCK_DAMAGE_ENABLED = builder
+                .comment("Allow severe systems to remove a very small number of exposed leaves and plants. Disabled by default.")
+                .define("blockDamageEnabled", false);
+        SEVERE_ENTITY_WIND_STRENGTH = builder
+                .comment("Maximum bounded push applied to nearby entities by severe weather.")
+                .defineInRange("entityWindStrength", 0.22, 0.0, 0.6);
         builder.pop();
 
         DEBUG_LOGGING = builder
@@ -213,7 +319,8 @@ public final class WeatherConfig {
                     PRECIPITATION_THRESHOLD.get(),
                     STORM_FORMATION_THRESHOLD.get(),
                     MAXIMUM_PRECIPITATION_INTENSITY.get(),
-                    RANDOM_VARIATION.get()
+                    RANDOM_VARIATION.get(),
+                    WEATHER_FRONT_STRENGTH.get()
             );
         } catch (IllegalStateException exception) {
             return SimulationSettings.DEFAULT;
@@ -235,6 +342,8 @@ public final class WeatherConfig {
                     copyStrings(DIMENSION_ALLOWLIST.get()),
                     copyStrings(DIMENSION_DENYLIST.get()),
                     VANILLA_WEATHER_COMPATIBILITY_MODE.get(),
+                    WEATHER_OWNERSHIP_MODE.get(),
+                    copyStrings(EXTERNAL_WEATHER_MOD_IDS.get()),
                     DEBUG_LOGGING.get()
             );
         } catch (IllegalStateException exception) {
@@ -273,6 +382,44 @@ public final class WeatherConfig {
         }
     }
 
+    /** Returns bounded controls for optional Cold Sweat and thirst adapters. */
+    public static SurvivalIntegrationSettings survivalIntegrations() {
+        try {
+            return new SurvivalIntegrationSettings(
+                    COLD_SWEAT_INTEGRATION_ENABLED.get(),
+                    COLD_SWEAT_MAXIMUM_OFFSET_CELSIUS.get(),
+                    THIRST_WAS_TAKEN_INTEGRATION_ENABLED.get(),
+                    THIRST_WEATHER_INTERVAL_TICKS.get(),
+                    THIRST_MAXIMUM_EXHAUSTION_PER_INTERVAL.get()
+            );
+        } catch (IllegalStateException exception) {
+            return SurvivalIntegrationSettings.DEFAULT;
+        }
+    }
+
+    /** Returns bounded lifecycle, surface, and severe-weather feature controls. */
+    public static FeatureSettings features() {
+        try {
+            return new FeatureSettings(
+                    PERSISTENT_SYSTEMS_ENABLED.get(),
+                    MAXIMUM_WEATHER_SYSTEMS.get(),
+                    WEATHER_SYSTEM_MOVEMENT_SPEED.get(),
+                    WEATHER_SYSTEM_SPLITTING_ENABLED.get(),
+                    SURFACE_WEATHERING_ENABLED.get(),
+                    SURFACE_WEATHERING_INTERVAL_TICKS.get(),
+                    SURFACE_WEATHERING_ATTEMPTS_PER_PLAYER.get(),
+                    MAXIMUM_SNOW_LAYERS.get(),
+                    SEVERE_WEATHER_ENABLED.get(),
+                    TORNADOES_ENABLED.get(),
+                    CYCLONES_ENABLED.get(),
+                    SEVERE_BLOCK_DAMAGE_ENABLED.get(),
+                    SEVERE_ENTITY_WIND_STRENGTH.get()
+            );
+        } catch (IllegalStateException exception) {
+            return FeatureSettings.DEFAULT;
+        }
+    }
+
     /**
      * Refreshes allocation-free dimension selection used from chunk tick hooks.
      *
@@ -281,7 +428,9 @@ public final class WeatherConfig {
      * throttled call sites.</p>
      */
     public static void reload() {
-        cachedDimensionSelection = DimensionSelection.capture(scheduling());
+        SchedulingSettings settings = scheduling();
+        boolean ownsWeather = WeatherOwnershipCoordinator.resolve(settings).wildernessOwnsWeather();
+        cachedDimensionSelection = DimensionSelection.capture(settings, ownsWeather);
     }
 
     /** Returns whether localized weather is enabled using the cached dimension selection. */
@@ -303,6 +452,14 @@ public final class WeatherConfig {
         return value instanceof String string && ResourceLocation.tryParse(string) != null;
     }
 
+    private static boolean isModIdentifier(Object value) {
+        if (!(value instanceof String string)) {
+            return false;
+        }
+        String normalized = string.trim().toLowerCase(Locale.ROOT);
+        return !normalized.isEmpty() && normalized.matches("[a-z][a-z0-9_-]{1,63}");
+    }
+
     private static List<String> copyStrings(List<? extends String> source) {
         return source == null ? List.of() : List.copyOf(source);
     }
@@ -310,19 +467,22 @@ public final class WeatherConfig {
     /** Parsed immutable dimension ids used by the per-ticking-chunk hook. */
     private record DimensionSelection(
             boolean enabled,
+            boolean ownsWeather,
             Set<ResourceLocation> allowlist,
             Set<ResourceLocation> denylist
     ) {
         private static final DimensionSelection DEFAULT = new DimensionSelection(
                 true,
+                true,
                 Set.of(),
                 Set.of()
         );
 
-        private static DimensionSelection capture(SchedulingSettings settings) {
+        private static DimensionSelection capture(SchedulingSettings settings, boolean ownsWeather) {
             SchedulingSettings safe = settings == null ? SchedulingSettings.DEFAULT : settings;
             return new DimensionSelection(
                     safe.enabled(),
+                    ownsWeather,
                     parseLocations(safe.dimensionAllowlist()),
                     parseLocations(safe.dimensionDenylist())
             );
@@ -330,6 +490,7 @@ public final class WeatherConfig {
 
         private boolean dimensionEnabled(ResourceLocation dimension) {
             return enabled
+                    && ownsWeather
                     && dimension != null
                     && (allowlist.isEmpty() || allowlist.contains(dimension))
                     && !denylist.contains(dimension);
@@ -365,6 +526,8 @@ public final class WeatherConfig {
             List<String> dimensionAllowlist,
             List<String> dimensionDenylist,
             VanillaWeatherCompatibilityMode compatibilityMode,
+            WeatherOwnershipMode ownershipMode,
+            List<String> externalWeatherModIds,
             boolean debugLogging
     ) {
         public static final SchedulingSettings DEFAULT = new SchedulingSettings(
@@ -378,9 +541,44 @@ public final class WeatherConfig {
                 DEFAULT_MAX_PERSISTED_CELLS,
                 List.of(),
                 List.of(),
-                VanillaWeatherCompatibilityMode.PRESERVE_GLOBAL,
+                VanillaWeatherCompatibilityMode.SUPPRESS_GLOBAL,
+                WeatherOwnershipMode.AUTO,
+                List.of("weather2", "simpleclouds", "betterweather"),
                 false
         );
+
+        /** Retains the pre-ownership construction shape for integrations and tests. */
+        public SchedulingSettings(
+                boolean enabled,
+                int cellSize,
+                int simulationIntervalTicks,
+                int activeSimulationRadius,
+                int inactiveCellGracePeriodTicks,
+                int environmentResampleIntervalTicks,
+                int snapshotSyncIntervalTicks,
+                int maxPersistedCells,
+                List<String> dimensionAllowlist,
+                List<String> dimensionDenylist,
+                VanillaWeatherCompatibilityMode compatibilityMode,
+                boolean debugLogging
+        ) {
+            this(
+                    enabled,
+                    cellSize,
+                    simulationIntervalTicks,
+                    activeSimulationRadius,
+                    inactiveCellGracePeriodTicks,
+                    environmentResampleIntervalTicks,
+                    snapshotSyncIntervalTicks,
+                    maxPersistedCells,
+                    dimensionAllowlist,
+                    dimensionDenylist,
+                    compatibilityMode,
+                    WeatherOwnershipMode.AUTO,
+                    List.of("weather2", "simpleclouds", "betterweather"),
+                    debugLogging
+            );
+        }
 
         public SchedulingSettings {
             cellSize = clamp(cellSize, 16, 4_096);
@@ -393,8 +591,10 @@ public final class WeatherConfig {
             dimensionAllowlist = sanitizeDimensions(dimensionAllowlist);
             dimensionDenylist = sanitizeDimensions(dimensionDenylist);
             compatibilityMode = compatibilityMode == null
-                    ? VanillaWeatherCompatibilityMode.PRESERVE_GLOBAL
+                    ? VanillaWeatherCompatibilityMode.SUPPRESS_GLOBAL
                     : compatibilityMode;
+            ownershipMode = ownershipMode == null ? WeatherOwnershipMode.AUTO : ownershipMode;
+            externalWeatherModIds = sanitizeModIds(externalWeatherModIds);
         }
 
         /** Applies allowlist-first and denylist-last dimension selection. */
@@ -424,6 +624,23 @@ public final class WeatherConfig {
             return List.copyOf(sanitized);
         }
 
+        private static List<String> sanitizeModIds(List<String> modIds) {
+            if (modIds == null || modIds.isEmpty()) {
+                return List.of();
+            }
+            List<String> sanitized = new ArrayList<>(modIds.size());
+            for (String candidate : modIds) {
+                if (candidate == null) {
+                    continue;
+                }
+                String normalized = candidate.trim().toLowerCase(Locale.ROOT);
+                if (isModIdentifier(normalized) && !sanitized.contains(normalized)) {
+                    sanitized.add(normalized);
+                }
+            }
+            return List.copyOf(sanitized);
+        }
+
         private static int clamp(int value, int minimum, int maximum) {
             return Math.max(minimum, Math.min(maximum, value));
         }
@@ -442,6 +659,94 @@ public final class WeatherConfig {
             temperatureAmplitudeCelsius = clamp(temperatureAmplitudeCelsius, 0.0, 20.0);
             humidityAmplitude = clamp(humidityAmplitude, 0.0, 0.40);
             storminessAmplitude = clamp(storminessAmplitude, 0.0, 0.50);
+        }
+
+        private static double clamp(double value, double minimum, double maximum) {
+            double finite = Double.isFinite(value) ? value : minimum;
+            return Math.max(minimum, Math.min(maximum, finite));
+        }
+    }
+
+    /** Immutable balance and cadence controls for optional survival mods. */
+    public record SurvivalIntegrationSettings(
+            boolean coldSweatEnabled,
+            double coldSweatMaximumOffsetCelsius,
+            boolean thirstWasTakenEnabled,
+            int thirstIntervalTicks,
+            double thirstMaximumExhaustionPerInterval
+    ) {
+        public static final SurvivalIntegrationSettings DEFAULT =
+                new SurvivalIntegrationSettings(true, 12.0, true, 40, 0.025);
+
+        public SurvivalIntegrationSettings {
+            coldSweatMaximumOffsetCelsius = clamp(coldSweatMaximumOffsetCelsius, 0.0, 30.0);
+            thirstIntervalTicks = Math.max(20, Math.min(1_200, thirstIntervalTicks));
+            thirstMaximumExhaustionPerInterval = clamp(
+                    thirstMaximumExhaustionPerInterval,
+                    0.0,
+                    0.25
+            );
+        }
+
+        private static double clamp(double value, double minimum, double maximum) {
+            double finite = Double.isFinite(value) ? value : minimum;
+            return Math.max(minimum, Math.min(maximum, finite));
+        }
+    }
+
+    /** Immutable safety and lifecycle settings for the weather-v3 additions. */
+    public record FeatureSettings(
+            boolean persistentSystemsEnabled,
+            int maximumWeatherSystems,
+            double movementBlocksPerSecond,
+            boolean splittingEnabled,
+            boolean surfaceWeatheringEnabled,
+            int surfaceWeatheringIntervalTicks,
+            int surfaceWeatheringAttemptsPerPlayer,
+            int maximumSnowLayers,
+            boolean severeWeatherEnabled,
+            boolean tornadoesEnabled,
+            boolean cyclonesEnabled,
+            boolean severeBlockDamageEnabled,
+            double severeEntityWindStrength
+    ) {
+        public static final FeatureSettings DEFAULT = new FeatureSettings(
+                true, 48, 3.0, true, true, 40, 4, 5,
+                true, true, true, false, 0.22
+        );
+
+        public FeatureSettings {
+            maximumWeatherSystems = clamp(maximumWeatherSystems, 1, 256);
+            movementBlocksPerSecond = clamp(movementBlocksPerSecond, 0.0, 16.0);
+            surfaceWeatheringIntervalTicks = clamp(surfaceWeatheringIntervalTicks, 10, 1_200);
+            surfaceWeatheringAttemptsPerPlayer = clamp(surfaceWeatheringAttemptsPerPlayer, 1, 32);
+            maximumSnowLayers = clamp(maximumSnowLayers, 1, 8);
+            severeEntityWindStrength = clamp(severeEntityWindStrength, 0.0, 0.6);
+        }
+
+        /** Maps public config values to the pure persistent-identity tracker. */
+        public WeatherSystemTracker.TrackingSettings trackingSettings(int nominalIntervalTicks) {
+            WeatherSystemTracker.TrackingSettings defaults = WeatherSystemTracker.TrackingSettings.DEFAULT;
+            return new WeatherSystemTracker.TrackingSettings(
+                    persistentSystemsEnabled,
+                    maximumWeatherSystems,
+                    nominalIntervalTicks,
+                    movementBlocksPerSecond,
+                    defaults.observationSeparationBlocks(),
+                    defaults.matchDistanceBlocks(),
+                    defaults.spawnIntensity(),
+                    defaults.minimumRetainedIntensity(),
+                    defaults.dissipationPerUpdate(),
+                    defaults.mergeRadiusMultiplier(),
+                    splittingEnabled,
+                    defaults.splitIntensity(),
+                    defaults.splitOrganization(),
+                    defaults.splitCooldownTicks()
+            );
+        }
+
+        private static int clamp(int value, int minimum, int maximum) {
+            return Math.max(minimum, Math.min(maximum, value));
         }
 
         private static double clamp(double value, double minimum, double maximum) {

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Numerically mirrors the GLSL Gerstner component equation against the CPU model.
@@ -39,6 +40,30 @@ class WaterSurfaceGerstnerMirrorTest {
                 () -> assertEquals(cpu.normalZ(), shader.normalZ, 1.0e-5f),
                 () -> assertNotEquals(0.0f, shader.displacementX),
                 () -> assertNotEquals(0.0f, shader.displacementZ)
+        );
+    }
+
+    @Test
+    void splitChunkPhasePreservesSubBlockDetailWithoutChunkSeamAtWorldBorder() {
+        float origin = 30_000_000.0f;
+        float coefficientX = GerstnerWaveProfile.OCEAN.waveNumber[0]
+                * GerstnerWaveProfile.OCEAN.dirX[0];
+        float coefficientZ = GerstnerWaveProfile.OCEAN.waveNumber[0]
+                * GerstnerWaveProfile.OCEAN.dirZ[0];
+
+        float edgeFromWest = stableLinearPhase(16.0f, 7.25f, origin, origin,
+                coefficientX, coefficientZ);
+        float edgeFromEast = stableLinearPhase(0.0f, 7.25f, origin + 16.0f, origin,
+                coefficientX, coefficientZ);
+        float halfBlock = stableLinearPhase(0.5f, 7.25f, origin, origin,
+                coefficientX, coefficientZ);
+        float wholeBlock = stableLinearPhase(0.0f, 7.25f, origin, origin,
+                coefficientX, coefficientZ);
+
+        assertAll(
+                () -> assertEquals(Math.sin(edgeFromWest), Math.sin(edgeFromEast), 1.0e-5),
+                () -> assertEquals(Math.cos(edgeFromWest), Math.cos(edgeFromEast), 1.0e-5),
+                () -> assertTrue(Math.abs(Math.sin(halfBlock) - Math.sin(wholeBlock)) > 1.0e-4)
         );
     }
 
@@ -111,6 +136,40 @@ class WaterSurfaceGerstnerMirrorTest {
                 normalY * inverseNormalLength,
                 normalZ * inverseNormalLength
         );
+    }
+
+    private static float stableLinearPhase(
+            float localX,
+            float localZ,
+            float originX,
+            float originZ,
+            float coefficientX,
+            float coefficientZ
+    ) {
+        float localChunkX = (float) Math.floor(localX / 16.0f);
+        float localChunkZ = (float) Math.floor(localZ / 16.0f);
+        float canonicalLocalX = localX - localChunkX * 16.0f;
+        float canonicalLocalZ = localZ - localChunkZ * 16.0f;
+        float chunkX = originX / 16.0f + localChunkX;
+        float chunkZ = originZ / 16.0f + localChunkZ;
+        float coarseX = (float) Math.floor(chunkX / 1024.0f);
+        float coarseZ = (float) Math.floor(chunkZ / 1024.0f);
+        float fineX = chunkX - coarseX * 1024.0f;
+        float fineZ = chunkZ - coarseZ * 1024.0f;
+        float coarseStepX = glslMod(coefficientX * 16_384.0f, (float) (Math.PI * 2.0));
+        float coarseStepZ = glslMod(coefficientZ * 16_384.0f, (float) (Math.PI * 2.0));
+        float fineCoordinateX = fineX * 16.0f + canonicalLocalX;
+        float fineCoordinateZ = fineZ * 16.0f + canonicalLocalZ;
+        float axisPhaseX = glslMod(coarseX * coarseStepX + fineCoordinateX * coefficientX,
+                (float) (Math.PI * 2.0));
+        float axisPhaseZ = glslMod(coarseZ * coarseStepZ + fineCoordinateZ * coefficientZ,
+                (float) (Math.PI * 2.0));
+        return glslMod(axisPhaseX + axisPhaseZ,
+                (float) (Math.PI * 2.0));
+    }
+
+    private static float glslMod(float value, float divisor) {
+        return value - divisor * (float) Math.floor(value / divisor);
     }
 
     private record MirrorSample(

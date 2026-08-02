@@ -59,19 +59,19 @@ public final class UnderwaterOpticsModel {
         // The biome tint remains recognizable while depth approaches a cool,
         // low-luminance ocean color rather than an opaque blue wall.
         float red = (0.025f + tintR * 0.36f)
-                * exponentialAttenuation(0.070f, attenuationDepth) * lightScale;
+                * transmission(0.070f, attenuationDepth) * lightScale;
         float green = (0.080f + tintG * 0.48f)
-                * exponentialAttenuation(0.029f, attenuationDepth) * lightScale;
+                * transmission(0.029f, attenuationDepth) * lightScale;
         float blue = (0.155f + tintB * 0.56f)
-                * exponentialAttenuation(0.014f, attenuationDepth) * lightScale;
+                * transmission(0.014f, attenuationDepth) * lightScale;
 
         float visibility = visibilityLimit * clarity
-                * exponentialAttenuation(0.018f, positiveDepth)
+                * transmission(0.018f, positiveDepth)
                 * (0.88f + light * 0.12f);
         visibility = clamp(visibility, 6.0f, visibilityLimit);
         float immersionBlend = smoothStep(-0.04f, 0.18f, depth);
         float causticStrength = light * clarity
-                * exponentialAttenuation(0.10f, positiveDepth)
+                * transmission(0.10f, positiveDepth)
                 * (1.0f - storm * 0.22f);
         float distortionStrength = (0.0025f + storm * 0.0040f + movement * 0.0025f)
                 * immersionBlend;
@@ -88,8 +88,33 @@ public final class UnderwaterOpticsModel {
         );
     }
 
-    private static float exponentialAttenuation(float coefficient, float distance) {
-        return (float) Math.exp(-coefficient * distance);
+    /**
+     * Returns the spectral absorption uploaded to the underwater shader.
+     *
+     * <p>Keeping this calculation beside the CPU optical model prevents fog
+     * tuning and per-pixel scene transmission from silently using different
+     * definitions of clear and turbid water.</p>
+     */
+    public static AbsorptionCoefficients absorptionForClarity(float clarity) {
+        float turbidity = 1.0f - clamp(finiteOrZero(clarity), 0.0f, 1.0f);
+        return new AbsorptionCoefficients(
+                0.018f + turbidity * 0.018f,
+                0.007f + turbidity * 0.010f,
+                0.0035f + turbidity * 0.006f
+        );
+    }
+
+    /** Returns the bounded volumetric scattering coefficient for a clarity sample. */
+    public static float scatteringForClarity(float clarity) {
+        float safeClarity = clamp(finiteOrZero(clarity), 0.0f, 1.0f);
+        return 0.018f + (1.0f - safeClarity) * 0.037f;
+    }
+
+    /** Evaluates Beer-Lambert transmission with finite, non-negative inputs. */
+    public static float transmission(float coefficient, float distance) {
+        float safeCoefficient = Math.max(0.0f, finiteOrZero(coefficient));
+        float safeDistance = Math.max(0.0f, finiteOrZero(distance));
+        return (float) Math.exp(-safeCoefficient * safeDistance);
     }
 
     private static float smoothStep(float edge0, float edge1, float value) {
@@ -116,5 +141,9 @@ public final class UnderwaterOpticsModel {
             float causticStrength,
             float distortionStrength
     ) {
+    }
+
+    /** Immutable red, green, and blue absorption coefficients in inverse blocks. */
+    public record AbsorptionCoefficients(float red, float green, float blue) {
     }
 }

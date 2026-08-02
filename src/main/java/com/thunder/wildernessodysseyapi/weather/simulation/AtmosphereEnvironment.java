@@ -22,6 +22,8 @@ import com.thunder.wildernessodysseyapi.weather.api.WindVector;
  * @param terrainGradientX average terrain rise toward positive X
  * @param terrainGradientZ average terrain rise toward positive Z
  * @param terrainRoughness normalized local relief
+ * @param oceanCoverage exposed ocean-water coverage
+ * @param inlandWaterCoverage exposed lake and inland-water coverage
  */
 public record AtmosphereEnvironment(
         double biomeTemperatureCelsius,
@@ -36,7 +38,9 @@ public record AtmosphereEnvironment(
         double seasonalEvaporationMultiplier,
         double terrainGradientX,
         double terrainGradientZ,
-        double terrainRoughness
+        double terrainRoughness,
+        double oceanCoverage,
+        double inlandWaterCoverage
 ) {
     public static final AtmosphereEnvironment TEMPERATE = new AtmosphereEnvironment(
             15.0,
@@ -51,8 +55,45 @@ public record AtmosphereEnvironment(
             1.0,
             0.0,
             0.0,
+            0.0,
+            0.0,
             0.0
     );
+
+    /** Retains the weather-v2 construction shape without typed water coverage. */
+    public AtmosphereEnvironment(
+            double biomeTemperatureCelsius,
+            double biomeHumidity,
+            double elevationBlocks,
+            double waterCoverage,
+            double daylight,
+            double dimensionTemperatureOffset,
+            double seasonalTemperatureOffset,
+            double atmosphericVariation,
+            double seasonalStorminessOffset,
+            double seasonalEvaporationMultiplier,
+            double terrainGradientX,
+            double terrainGradientZ,
+            double terrainRoughness
+    ) {
+        this(
+                biomeTemperatureCelsius,
+                biomeHumidity,
+                elevationBlocks,
+                waterCoverage,
+                daylight,
+                dimensionTemperatureOffset,
+                seasonalTemperatureOffset,
+                atmosphericVariation,
+                seasonalStorminessOffset,
+                seasonalEvaporationMultiplier,
+                terrainGradientX,
+                terrainGradientZ,
+                terrainRoughness,
+                0.0,
+                0.0
+        );
+    }
 
     /** Retains the original environment constructor for API and test callers. */
     public AtmosphereEnvironment(
@@ -78,6 +119,8 @@ public record AtmosphereEnvironment(
                 1.0,
                 0.0,
                 0.0,
+                0.0,
+                0.0,
                 0.0
         );
     }
@@ -100,6 +143,8 @@ public record AtmosphereEnvironment(
         terrainGradientX = clamp(finiteOr(terrainGradientX, 0.0), -1.0, 1.0);
         terrainGradientZ = clamp(finiteOr(terrainGradientZ, 0.0), -1.0, 1.0);
         terrainRoughness = unit(terrainRoughness);
+        oceanCoverage = unit(oceanCoverage);
+        inlandWaterCoverage = unit(inlandWaterCoverage);
     }
 
     /**
@@ -140,6 +185,19 @@ public record AtmosphereEnvironment(
         }
         double uphill = wind.x() * terrainGradientX + wind.z() * terrainGradientZ;
         return unit(Math.max(0.0, uphill) * 4.0 + terrainRoughness * wind.magnitude() * 0.12);
+    }
+
+    /** Returns warm-ocean support for organized maritime storms. */
+    public double oceanStormPotential(double airTemperature, double humidity) {
+        double warmth = unit((airTemperature - 17.0) / 18.0);
+        return unit(oceanCoverage * warmth * (0.35 + unit(humidity) * 0.65));
+    }
+
+    /** Returns cold-air-over-water support for lake-effect snow bands. */
+    public double lakeEffectPotential(double airTemperature, double windMagnitude) {
+        double coldAir = unit((5.0 - airTemperature) / 16.0);
+        double ventilation = unit(0.25 + Math.max(0.0, windMagnitude) * 0.75);
+        return unit(inlandWaterCoverage * coldAir * ventilation * 2.2);
     }
 
     private static double unit(double value) {

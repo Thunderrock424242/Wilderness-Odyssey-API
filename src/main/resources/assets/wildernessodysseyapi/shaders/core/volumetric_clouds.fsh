@@ -48,16 +48,47 @@ float cloudNoise(vec3 point) {
 }
 
 void main() {
-    float layer = clamp(columnData.x, 0.0, 1.0);
+    float packedLayer = min(clamp(columnData.x, 0.0, 1.0) * 4.0, 3.999);
+    float band = floor(packedLayer);
+    float layer = clamp((fract(packedLayer) - 0.08) / 0.84, 0.0, 1.0);
     float coverage = clamp(columnData.y, 0.0, 1.0);
-    float storm = clamp(columnData.z, 0.0, 1.0);
+    float packedShape = min(clamp(columnData.z, 0.0, 1.0) * 4.0, 3.999);
+    float morphology = floor(packedShape);
+    float storm = clamp((fract(packedShape) - 0.10) / 0.80, 0.0, 1.0);
     vec2 wind = WindOffset + vec2(GameTime * 0.006, GameTime * 0.002);
     vec2 world = localNoisePosition + WorldOrigin + wind;
-    float detail = cloudNoise(vec3(world * 1.32, layer * 4.6 - GameTime * 0.008));
+
+    // Meteorological families use distinct spatial scales: stretched high
+    // wisps, broad sheets, cauliflower cells, and vertically varied towers.
+    vec2 shapedWorld = world;
+    shapedWorld = mix(shapedWorld, vec2(world.x * 0.34 + world.y * 0.08, world.y * 2.45),
+            1.0 - step(0.5, morphology));
+    shapedWorld = mix(shapedWorld, world * 0.62, step(0.5, morphology) * (1.0 - step(1.5, morphology)));
+    shapedWorld = mix(shapedWorld, world * 1.18, step(1.5, morphology) * (1.0 - step(2.5, morphology)));
+    shapedWorld = mix(shapedWorld, world * (0.82 + layer * 0.58), step(2.5, morphology));
+
+    float verticalFrequency = mix(2.2, 5.2, step(1.5, morphology));
+    verticalFrequency = mix(verticalFrequency, 7.0, step(2.5, morphology));
+    float detail = cloudNoise(vec3(shapedWorld * 1.32,
+            layer * verticalFrequency - GameTime * (0.004 + band * 0.0015)));
     detail = mix(0.58, detail, clamp(DetailStrength, 0.0, 1.0));
 
-    float verticalShape = pow(max(0.0, sin(layer * 3.14159265)), 0.42);
-    float threshold = 0.72 - coverage * 0.40 + (1.0 - verticalShape) * 0.24;
+    float cellularShape = pow(max(0.0, sin(layer * 3.14159265)), 0.42);
+    float sheetShape = smoothstep(0.02, 0.18, layer) * (1.0 - smoothstep(0.82, 0.98, layer));
+    float wispyShape = pow(max(0.0, sin(layer * 3.14159265)), 0.22);
+    float towerShape = pow(max(0.0, sin(layer * 3.14159265)), 0.30)
+            * (0.80 + detail * 0.30);
+    float verticalShape = wispyShape;
+    verticalShape = mix(verticalShape, sheetShape, step(0.5, morphology));
+    verticalShape = mix(verticalShape, cellularShape, step(1.5, morphology));
+    verticalShape = mix(verticalShape, towerShape, step(2.5, morphology));
+
+    float familyThreshold = 0.03 * (1.0 - step(0.5, morphology));
+    familyThreshold -= 0.05 * (step(0.5, morphology) * (1.0 - step(1.5, morphology)));
+    familyThreshold += 0.02 * step(2.5, morphology);
+    float altitudeThinning = band == 2.0 ? 0.035 : 0.0;
+    float threshold = 0.72 + familyThreshold + altitudeThinning
+            - coverage * 0.40 + (1.0 - verticalShape) * 0.24;
     float density = smoothstep(threshold - 0.10, threshold + 0.10, detail);
     if (density < 0.015) {
         discard;
@@ -65,7 +96,8 @@ void main() {
 
     vec3 sun = normalize(SunDirection);
     float daylight = 0.72 + max(0.0, sun.y) * 0.22;
-    float silverEdge = smoothstep(threshold - 0.03, threshold + 0.12, detail) * (1.0 - storm);
+    float silverEdge = smoothstep(threshold - 0.03, threshold + 0.12, detail)
+            * (1.0 - storm) * (0.65 + band * 0.10);
     vec3 color = vertexColor.rgb * daylight;
     color += vec3(0.10, 0.11, 0.13) * silverEdge * max(0.0, sun.y);
     color *= 1.0 - storm * (0.20 + (1.0 - layer) * 0.20);

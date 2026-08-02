@@ -367,6 +367,9 @@ public final class AtmosphereGrid {
         if (second == null || first == second) {
             return first;
         }
+        if (first == PrecipitationType.HAIL || second == PrecipitationType.HAIL) {
+            return amount < 0.5 ? first : second;
+        }
         if (first == PrecipitationType.NONE) {
             return second;
         }

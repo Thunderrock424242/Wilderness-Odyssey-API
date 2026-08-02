@@ -21,6 +21,9 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.DoubleValue ENTITY_BUOYANCY_SCALE;
     public static final ModConfigSpec.DoubleValue ENTITY_DRAG_SCALE;
     public static final ModConfigSpec.DoubleValue ENTITY_MAX_ADDED_VELOCITY_SCALE;
+    public static final ModConfigSpec.DoubleValue ENTITY_PLANING_SCALE;
+    public static final ModConfigSpec.DoubleValue ENTITY_SLAMMING_SCALE;
+    public static final ModConfigSpec.DoubleValue ENTITY_ANGULAR_RESPONSE_SCALE;
     public static final ModConfigSpec.BooleanValue ENABLE_FISHING_COMPAT;
     public static final ModConfigSpec.BooleanValue ENABLE_STRUCTURE_WATER_MARKERS;
     public static final ModConfigSpec.BooleanValue ENABLE_FLUID_HANDLER_COMPAT;
@@ -43,10 +46,10 @@ public final class WaterSimulationConfig {
                 .push("water_simulation");
 
         ENABLE_WILDERNESS_ODYSSEY_WATER = builder
-                .comment("Master server-config switch for Wilderness Odyssey water authority, local flow, SPH gameplay water, and replacement rendering. The per-world gamerule enableWildernessOdysseyWater can still disable it at runtime.")
+                .comment("Initial server choice for Wilderness Odyssey water authority, local flow, SPH gameplay water, and replacement rendering. The first world start persists this together with enableWildernessOdysseyWater; live changes cannot suspend established authority.")
                 .define("enableWildernessOdysseyWater", true);
         ENABLE_VANILLA_BUCKET_COMPAT = builder
-                .comment("Allow vanilla and Wilderness water buckets to translate successful placement and pickup through canonical authority. Disable independently while experimental bucket behavior is being tested.")
+                .comment("Allow vanilla and Wilderness water buckets to translate successful placement and pickup through canonical authority. When disabled, authority-owned projections reject pickup and volume-overwriting placement instead of falling through to unsafe vanilla behavior.")
                 .define("enableVanillaBucketCompat", true);
         ENABLE_VANILLA_BOAT_COMPAT = builder
                 .comment("Allow vanilla boats to consume custom surface and current data. This does not change core water simulation when disabled.")
@@ -66,12 +69,21 @@ public final class WaterSimulationConfig {
         ENTITY_MAX_ADDED_VELOCITY_SCALE = builder
                 .comment("Scales the per-tick safety cap on velocity added by custom hydrodynamics.")
                 .defineInRange("entityMaxAddedVelocityScale", 1.0, 0.25, 2.0);
+        ENTITY_PLANING_SCALE = builder
+                .comment("Scales hull-oriented dynamic lift for fast, partially submerged watercraft.")
+                .defineInRange("entityPlaningScale", 1.0, 0.0, 2.0);
+        ENTITY_SLAMMING_SCALE = builder
+                .comment("Scales the bounded surface-entry impulse when a hull strikes water while descending.")
+                .defineInRange("entitySlammingScale", 1.0, 0.0, 2.0);
+        ENTITY_ANGULAR_RESPONSE_SCALE = builder
+                .comment("Scales empty-watercraft yaw stability from lateral current and hull slip.")
+                .defineInRange("entityAngularResponseScale", 1.0, 0.0, 2.0);
         ENABLE_FISHING_COMPAT = builder
-                .comment("Enable future fishing-bobber integration. No fishing adapter is registered yet.")
-                .define("enableFishingCompat", false);
+                .comment("Let fishing approach and splash effects recognize standalone Wilderness water. Open-water loot validation remains vanilla and tag-based.")
+                .define("enableFishingCompat", true);
         ENABLE_STRUCTURE_WATER_MARKERS = builder
-                .comment("Enable future one-time structure water-marker conversion. No marker adapter is registered yet.")
-                .define("enableStructureWaterMarkers", false);
+                .comment("Convert DATA structure blocks with metadata wildernessodysseyapi:water into Wilderness source water once during placement.")
+                .define("enableStructureWaterMarkers", true);
         ENABLE_FLUID_HANDLER_COMPAT = builder
                 .comment("Expose canonical water through a transactional NeoForge block-fluid capability and reconcile guarded world-fluid writes. Disable this to make all machine bridges read-only/inert.")
                 .define("enableFluidHandlerCompat", true);
@@ -156,12 +168,27 @@ public final class WaterSimulationConfig {
         return ENTITY_MAX_ADDED_VELOCITY_SCALE.get();
     }
 
-    /** Returns whether the future fishing adapter is enabled. */
+    /** Returns the configured multiplier for watercraft planing lift. */
+    public static double entityPlaningScale() {
+        return ENTITY_PLANING_SCALE.get();
+    }
+
+    /** Returns the configured multiplier for watercraft entry slamming. */
+    public static double entitySlammingScale() {
+        return ENTITY_SLAMMING_SCALE.get();
+    }
+
+    /** Returns the configured multiplier for watercraft angular stability. */
+    public static double entityAngularResponseScale() {
+        return ENTITY_ANGULAR_RESPONSE_SCALE.get();
+    }
+
+    /** Returns whether exact fishing-effect checks recognize Wilderness water. */
     public static boolean fishingCompatEnabled() {
         return wildernessWaterEnabled() && ENABLE_FISHING_COMPAT.get();
     }
 
-    /** Returns whether the future structure marker adapter is enabled. */
+    /** Returns whether explicit structure water markers convert during placement. */
     public static boolean structureWaterMarkersEnabled() {
         return wildernessWaterEnabled() && ENABLE_STRUCTURE_WATER_MARKERS.get();
     }

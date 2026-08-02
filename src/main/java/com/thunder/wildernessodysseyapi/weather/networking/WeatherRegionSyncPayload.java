@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereView;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationIntensity;
+import com.thunder.wildernessodysseyapi.weather.api.SurfaceWeatherState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindVector;
 import net.minecraft.network.FriendlyByteBuf;
@@ -49,7 +50,7 @@ public record WeatherRegionSyncPayload(
 ) implements CustomPacketPayload {
 
     /** Current atmospheric snapshot schema understood by server and client. */
-    public static final int DATA_VERSION = 2;
+    public static final int DATA_VERSION = 3;
     /** Descriptive alias used by payload construction and validation code. */
     public static final int CURRENT_DATA_VERSION = DATA_VERSION;
     /** Hard cap for a 17 by 17 region around one player. */
@@ -168,6 +169,10 @@ public record WeatherRegionSyncPayload(
             buffer.writeByte(quantizeUnit(cell.cloudDepth, UNSIGNED_BYTE_MAX));
             buffer.writeShort(quantizeSignedUnit(cell.cloudWindX));
             buffer.writeShort(quantizeSignedUnit(cell.cloudWindZ));
+            buffer.writeByte(quantizeUnit(cell.surfaceWetness, UNSIGNED_BYTE_MAX));
+            buffer.writeByte(quantizeUnit(cell.puddleCoverage, UNSIGNED_BYTE_MAX));
+            buffer.writeByte(quantizeUnit(cell.snowpack, UNSIGNED_BYTE_MAX));
+            buffer.writeByte(quantizeUnit(cell.frozenFraction, UNSIGNED_BYTE_MAX));
         }
     }
 
@@ -236,6 +241,10 @@ public record WeatherRegionSyncPayload(
             float cloudDepth = dequantizeUnit(buffer.readUnsignedByte(), UNSIGNED_BYTE_MAX);
             float cloudWindX = dequantizeSignedUnit(buffer.readShort());
             float cloudWindZ = dequantizeSignedUnit(buffer.readShort());
+            float surfaceWetness = dequantizeUnit(buffer.readUnsignedByte(), UNSIGNED_BYTE_MAX);
+            float puddleCoverage = dequantizeUnit(buffer.readUnsignedByte(), UNSIGNED_BYTE_MAX);
+            float snowpack = dequantizeUnit(buffer.readUnsignedByte(), UNSIGNED_BYTE_MAX);
+            float frozenFraction = dequantizeUnit(buffer.readUnsignedByte(), UNSIGNED_BYTE_MAX);
             cells.add(new CellSnapshot(
                     cellX,
                     cellZ,
@@ -253,7 +262,11 @@ public record WeatherRegionSyncPayload(
                     verticalMotion,
                     cloudDepth,
                     cloudWindX,
-                    cloudWindZ
+                    cloudWindZ,
+                    surfaceWetness,
+                    puddleCoverage,
+                    snowpack,
+                    frozenFraction
             ));
         }
 
@@ -319,6 +332,7 @@ public record WeatherRegionSyncPayload(
             case NONE -> 0;
             case RAIN -> 1;
             case SNOW -> 2;
+            case HAIL -> 3;
         };
     }
 
@@ -327,6 +341,7 @@ public record WeatherRegionSyncPayload(
             case 0 -> PrecipitationType.NONE;
             case 1 -> PrecipitationType.RAIN;
             case 2 -> PrecipitationType.SNOW;
+            case 3 -> PrecipitationType.HAIL;
             default -> throw new IllegalArgumentException("Invalid precipitation type id: " + typeId);
         };
     }
@@ -381,7 +396,11 @@ public record WeatherRegionSyncPayload(
             float verticalMotion,
             float cloudDepth,
             float cloudWindX,
-            float cloudWindZ
+            float cloudWindZ,
+            float surfaceWetness,
+            float puddleCoverage,
+            float snowpack,
+            float frozenFraction
     ) {
         /** Preserves the version-one construction shape for focused callers. */
         public CellSnapshot(
@@ -416,7 +435,56 @@ public record WeatherRegionSyncPayload(
                     0.0f,
                     Math.max(cloudWater, stormEnergy),
                     windX,
-                    windZ
+                    windZ,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f
+            );
+        }
+
+        /** Retains the weather-v2 construction shape without surface fields. */
+        public CellSnapshot(
+                int cellX,
+                int cellZ,
+                long revision,
+                float temperature,
+                float humidity,
+                float pressure,
+                float windX,
+                float windZ,
+                float cloudWater,
+                float instability,
+                float stormEnergy,
+                float precipitationIntensity,
+                PrecipitationType precipitationType,
+                float verticalMotion,
+                float cloudDepth,
+                float cloudWindX,
+                float cloudWindZ
+        ) {
+            this(
+                    cellX,
+                    cellZ,
+                    revision,
+                    temperature,
+                    humidity,
+                    pressure,
+                    windX,
+                    windZ,
+                    cloudWater,
+                    instability,
+                    stormEnergy,
+                    precipitationIntensity,
+                    precipitationType,
+                    verticalMotion,
+                    cloudDepth,
+                    cloudWindX,
+                    cloudWindZ,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f
             );
         }
 
@@ -440,7 +508,8 @@ public record WeatherRegionSyncPayload(
                     precipitationType,
                     verticalMotion,
                     cloudDepth,
-                    new WindVector(cloudWindX, cloudWindZ)
+                    new WindVector(cloudWindX, cloudWindZ),
+                    new SurfaceWeatherState(surfaceWetness, puddleCoverage, snowpack, frozenFraction)
             );
             temperature = (float) bounded.temperature();
             humidity = (float) bounded.humidity();
@@ -456,6 +525,10 @@ public record WeatherRegionSyncPayload(
             cloudDepth = (float) bounded.cloudDepth();
             cloudWindX = (float) bounded.cloudWind().x();
             cloudWindZ = (float) bounded.cloudWind().z();
+            surfaceWetness = (float) bounded.surface().wetness();
+            puddleCoverage = (float) bounded.surface().puddleCoverage();
+            snowpack = (float) bounded.surface().snowpack();
+            frozenFraction = (float) bounded.surface().frozenFraction();
         }
 
         /** Copies one immutable grid view into its network representation. */
@@ -489,7 +562,11 @@ public record WeatherRegionSyncPayload(
                     (float) sample.verticalMotion(),
                     (float) sample.cloudDepth(),
                     (float) sample.cloudWind().x(),
-                    (float) sample.cloudWind().z()
+                    (float) sample.cloudWind().z(),
+                    (float) sample.surface().wetness(),
+                    (float) sample.surface().puddleCoverage(),
+                    (float) sample.surface().snowpack(),
+                    (float) sample.surface().frozenFraction()
             );
         }
 
@@ -507,7 +584,8 @@ public record WeatherRegionSyncPayload(
                     precipitationType,
                     verticalMotion,
                     cloudDepth,
-                    new WindVector(cloudWindX, cloudWindZ)
+                    new WindVector(cloudWindX, cloudWindZ),
+                    new SurfaceWeatherState(surfaceWetness, puddleCoverage, snowpack, frozenFraction)
             );
         }
     }

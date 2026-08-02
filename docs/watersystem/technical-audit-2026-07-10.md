@@ -5,6 +5,16 @@
 > in `overview.md` supersedes its current-state descriptions; keep the findings
 > below as design history and regression context.
 
+> Hardening update (2026-08-02): C-02, H-01, H-02, and H-06 are addressed by a
+> persisted authority mode with bounded, verified one-way activation;
+> independent strict sparse/SPH persistence formats with legacy migration; and
+> bounded revision deltas with tombstones plus paged baseline fallback. Bucket
+> pickup now requires and atomically drains exactly 4,096 authority units before
+> awarding an item, with player and dispenser regression coverage.
+> Existing-world conversion is an explicit loaded-only `/wowater convert
+> [radius]` operation. No automatic scan or unsafe live disable was
+> reintroduced.
+
 Date: 2026-07-10  
 Target: Wilderness Odyssey API, NeoForge 1.21.1  
 Verdict: **major restructuring required before normal-player release; suitable only for controlled experimental testing with backups**
@@ -138,7 +148,7 @@ canonical storage is not yet the single final source of truth.
 | H-03 | `SPHSimulator#publishRenderSnapshot/#step`; `SpatialHashGrid#insert/#queryNeighbours`; `FluidMesh#rebuild`; `MarchingCubes#extract` | High | The spatial hash uses boxed `Long` keys and boxed `Integer` particle indices despite claiming zero allocation. Each physics step performs two neighbor queries per particle, while render snapshots clone every particle each tick. Marching cubes copies a potentially large float array for every mesh revision. Multiple active bodies create heavy allocation and GC pressure. | Replace boxed collections with primitive fastutil structures, use two reusable particle snapshot buffers, cap swept collision samples, and move density/mesh preparation to immutable worker jobs with render-thread upload only. | Yes before raising SPH limits or making it common gameplay water. |
 | H-04 | `OceanSurfaceRenderer#refreshCacheIfNeeded/#drawPatch`; `ShorelineSurfaceRenderer#refreshCacheIfNeeded`; `WaterRenderingConfig.WaterQuality.CINEMATIC` | High | Default Cinematic mode permits 18,000 ocean patches out to 192 blocks. All cached patches are emitted even behind the camera; there is distance LOD but no camera-frustum test or occlusion. Per-frame wave/normal/color work remains CPU-side. Flying over an ocean and high FOV/view distance can cause render-thread spikes. | Cache immutable chunk/section water meshes, frustum-cull patch groups, evaluate waves in the vertex shader, add horizon/altitude LOD, and instrument cache rebuild and draw time. | Yes before calling the renderer normal-player ready. |
 | H-05 | `FluidRenderer#renderScoped`; `DensityField#rebuild`; `MarchingCubes#extract` | High | SPH density and marching-cubes extraction run synchronously in `AFTER_TRANSLUCENT_BLOCKS`. Each mesh may retain an 80^3 float field (~2 MiB) plus a growing vertex array. A rebuild can freeze the render thread; multiple meshes can retain tens of MiB even without a GPU-buffer leak. | Build capped immutable CPU meshes off-thread from render snapshots, discard stale jobs by revision, use pooled direct upload buffers, and expose retained mesh bytes. | Yes before increasing mesh/body limits. |
-| H-06 | `CanonicalWaterBucketPickupMixin#commitCanonicalBucket`; `WildernessWaterAuthority#canBucketPickup`; `CanonicalWater#projectCompatibility` | High | The mixin checks only liquid block level 0, not `canBucketPickup`. A canonical cell projected as a source near the full threshold can yield a full bucket while containing less than 4,096 units. Automation and repeated partial states can violate volume conservation. | Gate pickup through the authority, require a full non-hosted cell, perform an atomic drain, and only let vanilla return the bucket if the drain succeeds. Cover player and dispenser paths. | Yes before finite water is a gameplay promise. |
+| H-06 | `CanonicalWaterBucketTransactions`; `CanonicalWaterBucketPickupMixin`; `WildernessWaterAuthority#canBucketPickup` | High, fixed 2026-08-02 | The former mixin checked only liquid block level 0, so a near-full projected cell could yield a full bucket while containing fewer than 4,096 units. | Implemented one exact authority-owned transaction: require a full non-hosted cell, drain before awarding the vanilla bucket, restore an unexpected partial drain, and cover both player and dispenser paths. | Resolved; retain the exact-volume GameTests. |
 | H-07 | `ShorelineWaterManager#tick` | High | A stable `HashMap` iteration order and a per-tick update cap mean the same first regions can consume the budget every tick while later regions never advance. Multiple players in separate areas can receive permanently stale shoreline flow. | Maintain a per-level round-robin cursor or queue and allocate a fair per-player/region budget. | Yes before shoreline flow affects more gameplay. |
 | H-08 | `WaterBodyClassifier#doClassify`; `WildernessWaterAuthority#sample`; `HybridWaterBodyModel#findSurfaceColumn` | High | A cache miss in a non-ocean biome samples 81 positions. Dry samples can invoke large-body vertical scans, floor searches, and server SavedData lookups. Renderer cache rebuilds can trigger this on the client thread; entity and shore logic trigger it on the server. | Classify from biome/body metadata first, use a bounded flood/shape result computed once per water body, and keep rendering from initiating authority discovery. | Yes for large mixed-biome coastlines and modded biomes. |
 | H-09 | `WaterVolumeSynchronizer.PLAYER_REVISIONS`; `ChunkCapabilityHandler#onChunkUnwatch` | High, fixed in this audit | Revision maps previously grew for every explored chunk and suppressed resending unchanged canonical data after the client unloaded and recreated a chunk attachment. Returning players could render with empty/stale authority. | Implemented: prune to the loaded sync window and remove the player's revision on `ChunkWatchEvent.UnWatch`, forcing a fresh baseline on the next watch. | Resolved; a multiplayer watch/unwatch test is still required. |
@@ -410,7 +420,7 @@ mixins. Core simulation and render snapshots should not import `Blocks.WATER` or
 ### Rendering/manual matrix
 
 - Fast/Fancy/Fabulous, built-in shader on/off, Iris/Oculus shader pack, and
-  Sodium/Embeddium-like renderers;
+  Sodium-like renderers;
 - F3+A/resource reload, shader reload, disconnect/reconnect, dimensions, world
   border, frozen/waterlogged shores, high altitude, high FOV, and rapid flight;
 - capture CPU render time, cache rebuild time, triangle/patch counts, retained

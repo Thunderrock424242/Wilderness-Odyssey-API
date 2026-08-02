@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies generated baseline and sparse runtime precedence in immutable snapshots. */
@@ -114,6 +115,32 @@ class ClientWaterChunkSnapshotTest {
         assertFalse(completed.contains(2, 63, 3));
         assertTrue(completed.contains(2, 62, 3));
         assertEquals(62, completed.column(2, 3).surfaceBlockY());
+    }
+
+    @Test
+    void sparseDeltaAppliesUpsertAndTombstoneOnlyAtTheExpectedRevision() {
+        BlockPos removed = new BlockPos(2, 63, 3);
+        BlockPos added = new BlockPos(4, 66, 5);
+        WaterVolumeChunk server = new WaterVolumeChunk();
+        server.set(removed, WaterVolumeChunk.WaterCell.still(2_048, 0));
+        long baselineRevision = server.revision();
+        ClientWaterChunkSnapshot baseline = new ClientWaterChunkSnapshot(
+                0, 0, null, baselineRevision, server.toNetworkArray());
+
+        server.set(removed, WaterVolumeChunk.WaterCell.EMPTY);
+        server.set(added, WaterVolumeChunk.WaterCell.still(3_072, 0));
+        WaterVolumeChunk.DeltaSnapshot delta = server.deltaSince(baselineRevision, 16);
+        ClientWaterChunkSnapshot updated = baseline.withSparseDelta(
+                delta.fromRevision(), delta.toRevision(), delta.upsertData(), delta.tombstones());
+
+        assertFalse(updated.contains(2, 63, 3));
+        assertEquals(3_072, updated.amountUnits(4, 66, 5));
+        assertNull(baseline.withSparseDelta(
+                baselineRevision + 1L,
+                delta.toRevision() + 1L,
+                delta.upsertData(),
+                delta.tombstones()
+        ));
     }
 
     private static GeneratedWaterChunk generatedColumn() {

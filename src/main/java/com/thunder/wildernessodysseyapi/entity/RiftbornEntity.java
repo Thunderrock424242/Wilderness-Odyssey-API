@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.entity;
 
+import com.thunder.wildernessodysseyapi.weather.api.WeatherServices;
+import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
@@ -37,7 +39,9 @@ public class RiftbornEntity extends Zombie {
                                                   RandomSource random) {
         return Monster.isDarkEnoughToSpawn(level, pos, random)
                 && checkMobSpawnRules(type, level, reason, pos, random)
-                && level.getLevel().isRaining();
+                && (WeatherConfig.dimensionEnabled(level.getLevel().dimension())
+                ? WeatherServices.query().isPrecipitatingAt(level.getLevel(), pos)
+                : level.getLevel().isRainingAt(pos));
     }
 
     @Override

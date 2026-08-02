@@ -16,17 +16,20 @@
   "uniforms": [
     { "name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] },
     { "name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] },
+    { "name": "ChunkOrigin", "type": "float", "count": 2, "values": [0, 0] },
     { "name": "ColorModulator", "type": "float", "count": 4, "values": [1, 1, 1, 1] },
     { "name": "FogStart", "type": "float", "count": 1, "values": [0] },
     { "name": "FogEnd", "type": "float", "count": 1, "values": [1] },
     { "name": "FogColor", "type": "float", "count": 4, "values": [0, 0, 0, 0] },
-    { "name": "GameTime", "type": "float", "count": 1, "values": [0] },
+    { "name": "TimeFrameLow", "type": "float", "count": 4, "values": [0, 0, 0, 0] },
+    { "name": "TimeFrameHigh", "type": "float", "count": 3, "values": [0, 0, 0] },
     { "name": "DayTime", "type": "float", "count": 1, "values": [0.25] },
     { "name": "SeaState", "type": "float", "count": 1, "values": [0.18] },
     { "name": "WindDirection", "type": "float", "count": 2, "values": [1, 0] }
     ,{ "name": "WindSpeed", "type": "float", "count": 1, "values": [2.5] }
     ,{ "name": "SpectrumState", "type": "float", "count": 4, "values": [0.82, 0.72, 0.14, 0] }
     ,{ "name": "ImpulseCount", "type": "float", "count": 1, "values": [0] }
+    ,{ "name": "ImpulseChunkIndex", "type": "float", "count": 2, "values": [0, 0] }
     ,{ "name": "ImpulsePosition0", "type": "float", "count": 4, "values": [0, 0, 0, 0] }
     ,{ "name": "ImpulsePosition1", "type": "float", "count": 4, "values": [0, 0, 0, 0] }
     ,{ "name": "ImpulsePosition2", "type": "float", "count": 4, "values": [0, 0, 0, 0] }
@@ -48,6 +51,9 @@
     ,{ "name": "Weather", "type": "float", "count": 4, "values": [0, 0, 1, 0] }
     ,{ "name": "EnvironmentColor", "type": "float", "count": 4, "values": [0.35, 0.55, 0.75, 1] }
     ,{ "name": "OpticalQuality", "type": "float", "count": 4, "values": [2, 1, 10, 28] }
+    ,{ "name": "SurfaceAnimationPhases0", "type": "float", "count": 4, "values": [0, 0, 0, 0] }
+    ,{ "name": "SurfaceAnimationPhases1", "type": "float", "count": 4, "values": [0, 0, 0, 0] }
+    ,{ "name": "SurfaceOpacityStrength", "type": "float", "count": 1, "values": [1.5] }
     ,{ "name": "AbsorptionCoefficients", "type": "float", "count": 3, "values": [0.082, 0.030, 0.014] }
     ,{ "name": "SceneCaptureValid", "type": "float", "count": 1, "values": [0] }
     ,{ "name": "TideOffset", "type": "float", "count": 1, "values": [0] }

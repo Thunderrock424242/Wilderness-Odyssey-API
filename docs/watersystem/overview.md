@@ -77,15 +77,35 @@ silently deleting water without presenting hidden volume as swimmable or
 machine-extractable fluid.
 
 Previously generated chunks that still contain vanilla water are intentionally
-left unchanged. The runtime does not reinterpret or scan old vanilla oceans.
+left unchanged during normal runtime. Operators may run `/wowater convert
+[radius]` to convert only an explicitly bounded cube of currently loaded exact
+vanilla water blocks. The command never loads or scans completed chunks.
+
+The authority mode is persisted in overworld SavedData the first time a world
+runs this architecture. The config and gamerule select that initial value; bare
+gamerule changes are restored to the persisted value so namespaced fluid can
+never resume native flow while canonical storage is paused. An operator can
+activate a previously disabled world with `/wowater mode set on <radius>`: every
+column in the bounded cube must already be loaded, exact vanilla water is
+converted, the result is verified, and only then is ownership persisted. Live
+disable is refused because canonical/generated water in unloaded chunks cannot
+be proven safe or rolled back by a bounded command.
 
 ## Client snapshots
 
 `ClientWaterSnapshotStore` builds immutable `ClientWaterChunkSnapshot` values
-from the synchronized generated attachment and sparse runtime payloads. Each
-chunk entry is replaced atomically. Sparse changes rebuild only the affected
-chunk snapshot and invalidate only neighboring mesh boundaries that can share
-topology.
+from the synchronized generated attachment and sparse runtime payloads. A newly
+watched chunk receives a bounded paged baseline. Later changes use contiguous
+revision deltas containing only final cell upserts and packed-position
+tombstones; expired history falls back to another paged baseline. Per-player
+cell and payload budgets spread dense baselines across synchronization passes.
+Each chunk entry is replaced atomically, and sparse changes invalidate only the
+neighboring mesh boundaries that can share topology.
+
+Sparse chunk and mobile-SPH persistence have independent format versions,
+declared counts, hard structural bounds, finite-value validation, and legacy
+decoders for the former unversioned layouts. Unsupported or malformed formats
+are rejected instead of being silently truncated and re-saved.
 
 Rendering and camera immersion read snapshots, not mutable server authority,
 heightmaps, or repeated block-column scans. An absent or unloaded snapshot is
@@ -158,9 +178,14 @@ Server-side ownership can be inspected with:
 - `/wowater authority [radius]`
 - `/wowater shipcheck [radius]`
 - `/wowater compat`
+- `/wowater mode` for persisted authority status
+- `/wowater mode set on <radius>` for bounded, verified activation
+- `/wowater mode set off` to report why a world-wide rollback is required
 - `/wowater repair [radius]` for sparse projection gaps only
+- `/wowater convert [radius]` for an explicit loaded-only vanilla-water upgrade
 
-These commands do not import or convert vanilla water.
+Only the operator-only `convert` command imports vanilla water. Its radius is
+capped at 24 blocks and unloaded chunk columns are skipped.
 
 ## Compatibility boundary
 
@@ -184,20 +209,34 @@ globally impersonate `Fluids.WATER`, so other exact-identity mods still require
 their own focused adapter. Mods that use `#minecraft:water` or the standard
 NeoForge fluid capability work through their normal contracts.
 
-Vanilla structures, full waterlogging replacement, direct chunk-internal writes
-from other mods, and existing-world conversion remain outside this boundary.
-Vanilla or externally tagged water can be reported by diagnostics, but it does
-not become Wilderness-owned automatically.
+Buckets use that same focused-boundary approach. Player and dispenser pickup
+award a vanilla water bucket only after an exact 4,096-unit authority drain;
+partial finite cells remain unchanged. The namespaced bucket supports dispenser
+placement, cauldrons, waterlogging, bucketable fish, and the common
+`c:buckets/water` item tag, while waterlogged host blocks continue to store
+ordinary vanilla water for broad mod compatibility.
+
+Vanilla structures can opt in with the exact
+`wildernessodysseyapi:water` DATA marker. Existing worlds can be upgraded only
+through the explicit, loaded-only conversion command above; there is no
+automatic completed-chunk scan. Waterlogged hosts remain a controlled vanilla
+exception, and direct chunk-section writes from other mods can still bypass the
+supported block/capability boundary. Externally tagged water can be reported by
+diagnostics, but it does not become Wilderness-owned automatically.
 
 ## Validation
 
 The production GameTests exercise real noise generation, `ProtoChunk` writes,
 flowing-state preservation, waterlogged-host exclusion, spring placement,
-generated metadata, attachment serialization, fluid-handler transactions, and
-guarded projection writes. Unit tests cover compact span editing, conserved
-solid displacement, shoreline scheduler fairness, multi-point buoyancy,
-hydrodynamic force bounds, lossless mB conversion, current/reservoir snapshots,
-vertex metadata, transient impulses, and the CPU/GLSL Gerstner mirror.
+generated metadata, attachment serialization, fluid-handler transactions,
+guarded projection writes, exact player/dispenser bucket transactions, custom
+bucket waterlogging/cauldron/fish parity, vanilla gameplay parity, bubble
+columns, and structure markers. Unit tests cover compact span editing, conserved solid
+displacement, staged authority activation, strict persistence and paged/delta
+network decoding, shoreline scheduler fairness, multi-point buoyancy and hull
+forces, lossless mB conversion, clock tide display, ambience budgets, current
+and reservoir snapshots, vertex precision, persistent foam, and CPU/GLSL
+surface contracts.
 
 Use JDK 21 and the Gradle wrapper:
 
@@ -213,5 +252,7 @@ aquifers, springs, frozen shores, chunk frontiers, and repeated surface
 crossings under each water quality profile. Drive a boat across crests and
 currents, drop items and mobs into shallow and deep water, place and break a
 solid in an enclosed full cell, and transfer water through a NeoForge/Create
-machine in both directions. Existing chunks containing vanilla water are not a
-valid direct-generation test case.
+machine in both directions. Also test player and dispenser pickup from full and
+partial finite cells, then use the namespaced bucket with a dispenser, cauldron,
+waterloggable block, and bucketable fish. Existing chunks containing vanilla
+water are not a valid direct-generation test case.

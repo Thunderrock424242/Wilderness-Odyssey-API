@@ -28,6 +28,14 @@ class WeatherRenderingConfigTest {
         assertEquals(96, defaults.distantRainDistanceBlocks());
         assertEquals(6, defaults.distantRainSpacingBlocks());
         assertEquals(768, defaults.maximumDistantRainShafts());
+        assertTrue(defaults.distantCloudLayer());
+        assertEquals(1_024, defaults.distantCloudDistanceBlocks());
+        assertEquals(48, defaults.distantCloudSpacingBlocks());
+        assertEquals(512, defaults.maximumDistantCloudTiles());
+        assertEquals(0.55, defaults.cloudShadowStrength(), 1.0E-12);
+        assertTrue(defaults.surfaceOverlays());
+        assertEquals(24, defaults.surfaceOverlayRadiusBlocks());
+        assertEquals(256, defaults.maximumSurfacePatches());
     }
 
     @Test

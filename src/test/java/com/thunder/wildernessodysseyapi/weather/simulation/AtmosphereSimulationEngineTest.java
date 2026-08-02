@@ -196,6 +196,56 @@ class AtmosphereSimulationEngineTest {
         assertTrue(eastResult.humidity() > east.humidity());
     }
 
+    @Test
+    void weatherFrontStrengthAddsLiftAndConvectiveDevelopment() {
+        WeatherSample center = new WeatherSample(
+                20.0,
+                0.86,
+                0.94,
+                WindVector.ZERO,
+                0.58,
+                0.28,
+                0.18,
+                0.0,
+                PrecipitationType.NONE
+        );
+        WeatherSample coldWest = new WeatherSample(
+                7.0,
+                0.52,
+                1.08,
+                new WindVector(0.55, 0.0),
+                0.18,
+                0.12,
+                0.0,
+                0.0,
+                PrecipitationType.NONE
+        );
+        AtmosphereSimulationEngine.Neighborhood neighborhood = new AtmosphereSimulationEngine.Neighborhood(
+                center,
+                center,
+                center,
+                coldWest
+        );
+        AtmosphereEnvironment environment = new AtmosphereEnvironment(
+                20.0, 0.86, 64.0, 0.0, 0.5, 0.0, 0.0, 0.0
+        );
+        SimulationSettings disabled = new SimulationSettings(
+                1.0, 0.0, 0.0, 0.2, 0.0,
+                0.95, 0.95, 0.42, 1.0, 0.0, 0.0
+        );
+        SimulationSettings enabled = new SimulationSettings(
+                1.0, 0.0, 0.0, 0.2, 0.0,
+                0.95, 0.95, 0.42, 1.0, 0.0, 1.0
+        );
+
+        WeatherSample withoutFront = engine.simulate(center, environment, neighborhood, disabled);
+        WeatherSample withFront = engine.simulate(center, environment, neighborhood, enabled);
+
+        assertTrue(withFront.verticalMotion() > withoutFront.verticalMotion());
+        assertTrue(withFront.instability() > withoutFront.instability());
+        assertTrue(withFront.cloudDepth() > withoutFront.cloudDepth());
+    }
+
     private static WeatherSample sample(
             double temperature,
             double humidity,

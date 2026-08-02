@@ -133,7 +133,7 @@ public final class WaterChunkMeshCache {
                     minimumY = Math.min(minimumY, column.floorY());
                     maximumY = Math.max(maximumY, column.surfaceBlockY());
                     emitColumn(level, snapshot, builder, sprite, chunkMinX + localX,
-                            chunkMinZ + localZ, column, subdivisions);
+                            chunkMinZ + localZ, column, subdivisions, chunkMinX, chunkMinZ);
                 }
             }
             MeshData mesh = builder.buildOrThrow();
@@ -153,6 +153,8 @@ public final class WaterChunkMeshCache {
                     chunkKey(snapshot.chunkX(), snapshot.chunkZ()),
                     snapshot.generatedRevision(),
                     snapshot.sparseRevision(),
+                    chunkMinX,
+                    chunkMinZ,
                     buffer,
                     bounds,
                     vertexCount,
@@ -169,7 +171,9 @@ public final class WaterChunkMeshCache {
             int worldX,
             int worldZ,
             ClientWaterChunkSnapshot.Column column,
-            int subdivisions
+            int subdivisions,
+            int chunkMinX,
+            int chunkMinZ
     ) {
         VertexSample northWest = sampleVertex(level, worldX, worldZ, column);
         VertexSample southWest = sampleVertex(level, worldX, worldZ + 1, column);
@@ -198,10 +202,17 @@ public final class WaterChunkMeshCache {
                 float subU1 = mix(u0, u1, x1);
                 float subV0 = mix(v0, v1, z0);
                 float subV1 = mix(v0, v1, z1);
-                emit(builder, worldX + x0, subNorthWest, worldZ + z0, subU0, subV0);
-                emit(builder, worldX + x0, subSouthWest, worldZ + z1, subU0, subV1);
-                emit(builder, worldX + x1, subSouthEast, worldZ + z1, subU1, subV1);
-                emit(builder, worldX + x1, subNorthEast, worldZ + z0, subU1, subV0);
+                // Keep GPU positions chunk-local so half-block subdivisions remain
+                // precise millions of blocks from spawn. The render coordinator
+                // supplies the exact integer chunk origin for projection and phase.
+                emit(builder, localCoordinate(worldX, chunkMinX, x0), subNorthWest,
+                        localCoordinate(worldZ, chunkMinZ, z0), subU0, subV0);
+                emit(builder, localCoordinate(worldX, chunkMinX, x0), subSouthWest,
+                        localCoordinate(worldZ, chunkMinZ, z1), subU0, subV1);
+                emit(builder, localCoordinate(worldX, chunkMinX, x1), subSouthEast,
+                        localCoordinate(worldZ, chunkMinZ, z1), subU1, subV1);
+                emit(builder, localCoordinate(worldX, chunkMinX, x1), subNorthEast,
+                        localCoordinate(worldZ, chunkMinZ, z0), subU1, subV0);
             }
         }
     }
@@ -375,6 +386,13 @@ public final class WaterChunkMeshCache {
         return from + (to - from) * amount;
     }
 
+    // Subtract integer world coordinates before introducing the fractional
+    // subdivision. Converting the absolute coordinate to float first loses the
+    // half-block detail that HIGH and CINEMATIC meshes rely on far from spawn.
+    static float localCoordinate(int worldCoordinate, int chunkMinimum, float offset) {
+        return (worldCoordinate - chunkMinimum) + offset;
+    }
+
     private static void emit(
             BufferBuilder builder,
             float worldX,
@@ -433,12 +451,14 @@ public final class WaterChunkMeshCache {
             long chunkKey,
             long generatedRevision,
             long sparseRevision,
+            int originX,
+            int originZ,
             VertexBuffer buffer,
             AABB bounds,
             int vertices,
             int triangles
     ) implements AutoCloseable {
-        private static final MeshGroup EMPTY = new MeshGroup(0L, 0L, 0L, null,
+        private static final MeshGroup EMPTY = new MeshGroup(0L, 0L, 0L, 0, 0, null,
                 new AABB(0, 0, 0, 0, 0, 0), 0, 0);
 
         public boolean empty() {

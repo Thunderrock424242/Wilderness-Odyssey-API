@@ -16,10 +16,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * boundary whenever a shader pack is loaded or reloaded.</p>
  */
 @Pseudo
-@Mixin(targets = {
-        "net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings",
-        "net.coderbot.iris.block_rendering.BlockRenderingSettings"
-}, remap = false)
+@Mixin(
+        targets = "net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings",
+        remap = false
+)
 public abstract class IrisWaterMaterialBridgeMixin {
 
     @Inject(
@@ -29,6 +29,35 @@ public abstract class IrisWaterMaterialBridgeMixin {
             remap = false
     )
     private void wildernessOdyssey$aliasWildernessWaterMaterial(CallbackInfo callbackInfo) {
+        ExternalShaderWaterMaterialBridge.applyToSettings(this);
+    }
+
+    // Some Iris forks expose the same publication boundary through the JDK Map
+    // interface rather than fastutil's Object2IntMap. Supporting both erased
+    // descriptors keeps the alias optional without silently narrowing versions.
+    @Inject(
+            method = "setBlockStateIds(Ljava/util/Map;)V",
+            at = @At("RETURN"),
+            require = 0,
+            remap = false
+    )
+    private void wildernessOdyssey$aliasMapBackedWaterMaterial(CallbackInfo callbackInfo) {
+        ExternalShaderWaterMaterialBridge.applyToSettings(this);
+    }
+
+    // A small number of Oculus/Iris forks renamed the setter while retaining
+    // the resolved-map contract. These optional descriptors preserve their
+    // vanilla-water material path and remain inert on upstream builds.
+    @Inject(
+            method = {
+                    "setBlockStateIdMap(Lit/unimi/dsi/fastutil/objects/Object2IntMap;)V",
+                    "setBlockStateIdMap(Ljava/util/Map;)V"
+            },
+            at = @At("RETURN"),
+            require = 0,
+            remap = false
+    )
+    private void wildernessOdyssey$aliasRenamedWaterMaterialMap(CallbackInfo callbackInfo) {
         ExternalShaderWaterMaterialBridge.applyToSettings(this);
     }
 }

@@ -4,6 +4,8 @@ import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.crouching.CrouchNoiseHelper;
 import com.thunder.wildernessodysseyapi.cloak.item.CloakState;
 import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
+import com.thunder.wildernessodysseyapi.weather.api.WeatherServices;
+import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -78,7 +80,9 @@ public class RiftListenerEntity extends Monster {
                                                       RandomSource random) {
         return Monster.isDarkEnoughToSpawn(level, pos, random)
                 && checkMobSpawnRules(type, level, reason, pos, random)
-                && level.getLevel().isRaining();
+                && (WeatherConfig.dimensionEnabled(level.getLevel().dimension())
+                ? WeatherServices.query().isPrecipitatingAt(level.getLevel(), pos)
+                : level.getLevel().isRainingAt(pos));
     }
 
     @Override

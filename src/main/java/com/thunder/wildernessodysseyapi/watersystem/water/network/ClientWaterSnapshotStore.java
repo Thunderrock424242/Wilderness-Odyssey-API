@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Atomically publishes immutable water snapshots for the active client level.
@@ -69,6 +70,39 @@ public final class ClientWaterSnapshotStore {
                 ? new ClientWaterChunkSnapshot(chunkX, chunkZ, null, revision, sparseCells)
                 : previous.withSparse(revision, sparseCells));
         markDirty(key);
+    }
+
+    /** Applies one exact sparse revision range without rebuilding from a full server baseline. */
+    static DeltaApplyResult publishSparseDelta(Level level, WaterVolumeDeltaPayload delta) {
+        selectLevel(level);
+        long key = ChunkPos.asLong(delta.chunkX(), delta.chunkZ());
+        AtomicReference<DeltaApplyResult> result = new AtomicReference<>(DeltaApplyResult.MISSING_BASELINE);
+        SNAPSHOTS.computeIfPresent(key, (ignored, previous) -> {
+            if (delta.toRevision() <= previous.sparseRevision()) {
+                result.set(DeltaApplyResult.STALE);
+                return previous;
+            }
+            if (delta.fromRevision() != previous.sparseRevision()) {
+                result.set(DeltaApplyResult.REVISION_GAP);
+                return previous;
+            }
+            ClientWaterChunkSnapshot next = previous.withSparseDelta(
+                    delta.fromRevision(),
+                    delta.toRevision(),
+                    delta.upsertData(),
+                    delta.tombstones()
+            );
+            if (next == null) {
+                result.set(DeltaApplyResult.REVISION_GAP);
+                return previous;
+            }
+            result.set(DeltaApplyResult.APPLIED);
+            return next;
+        });
+        if (result.get() == DeltaApplyResult.APPLIED) {
+            markDirty(key);
+        }
+        return result.get();
     }
 
     /** Removes all snapshot and mesh ownership for an unloaded chunk. */
@@ -199,5 +233,13 @@ public final class ClientWaterSnapshotStore {
         if (DIRTY_MESH_KEYS.add(key)) {
             DIRTY_MESHES.offer(key);
         }
+    }
+
+    /** Result used by the page assembler to retain deltas until their baseline exists. */
+    enum DeltaApplyResult {
+        APPLIED,
+        STALE,
+        MISSING_BASELINE,
+        REVISION_GAP
     }
 }

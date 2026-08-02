@@ -11,7 +11,9 @@ in vec3 Normal;
 uniform sampler2D Sampler2;
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
-uniform float GameTime;
+uniform vec2 ChunkOrigin;
+uniform vec4 TimeFrameLow;
+uniform vec3 TimeFrameHigh;
 uniform float DayTime;
 uniform float SeaState;
 uniform vec2 WindDirection;
@@ -20,6 +22,7 @@ uniform vec4 SpectrumState;
 uniform float TideOffset;
 uniform float GpuWaveStrength;
 uniform float ImpulseCount;
+uniform vec2 ImpulseChunkIndex;
 uniform vec4 ImpulsePosition0;
 uniform vec4 ImpulsePosition1;
 uniform vec4 ImpulsePosition2;
@@ -67,8 +70,9 @@ out vec2 texCoord0;
 out vec3 lightColor;
 out vec3 viewPosition;
 out vec3 viewNormal;
-out vec3 worldPosition;
 out vec3 worldNormal;
+out vec2 phaseLocalXZ;
+flat out vec2 phaseChunkIndex;
 out vec3 waterBodyBlend;
 out float surfaceContinuity;
 out vec2 localCurrent;
@@ -81,6 +85,66 @@ out float celestialDaylight;
 vec2 normalizedOr(vec2 direction, vec2 fallbackDirection) {
     float directionLength = length(direction);
     return directionLength > 0.000001 ? direction / directionLength : fallbackDirection;
+}
+
+const float TWO_PI = 6.28318530718;
+const float PHASE_CHUNK_SPAN = 16.0;
+const float PHASE_COARSE_CHUNKS = 1024.0;
+
+// Java uploads the exact long game tick as seven base-1024 digits. Rebuilding
+// only a periodic phase here keeps animation smooth after float seconds would
+// have stopped representing individual ticks.
+float stableTimePhase(float radiansPerSecond) {
+    float phaseStep = mod(radiansPerSecond / 20.0, TWO_PI);
+    float phase = mod(TimeFrameLow.x * phaseStep, TWO_PI);
+    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
+    phase = mod(phase + TimeFrameLow.y * phaseStep, TWO_PI);
+    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
+    phase = mod(phase + TimeFrameLow.z * phaseStep, TWO_PI);
+    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
+    phase = mod(phase + TimeFrameLow.w * phaseStep, TWO_PI);
+    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
+    phase = mod(phase + TimeFrameHigh.x * phaseStep, TWO_PI);
+    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
+    phase = mod(phase + TimeFrameHigh.y * phaseStep, TWO_PI);
+    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
+    return mod(phase + TimeFrameHigh.z * phaseStep, TWO_PI);
+}
+
+// Evaluates a linear world-space phase without first adding a fractional local
+// vertex to a multi-million-block world coordinate. Splitting the integral
+// chunk origin preserves sub-block waves and texture motion near the world edge.
+float stableLinearPhase(vec2 localXZ, vec2 coefficient) {
+    // Canonicalize boundary vertices before any phase math. A west-chunk
+    // vertex at local x=16 then has the exact same operands as the east-chunk
+    // copy at local x=0, including at Minecraft's world border.
+    vec2 localChunkOffset = floor(localXZ / PHASE_CHUNK_SPAN);
+    vec2 canonicalLocal = localXZ - localChunkOffset * PHASE_CHUNK_SPAN;
+    vec2 chunkIndex = ChunkOrigin / PHASE_CHUNK_SPAN + localChunkOffset;
+    vec2 coarseIndex = floor(chunkIndex / PHASE_COARSE_CHUNKS);
+    vec2 fineIndex = chunkIndex - coarseIndex * PHASE_COARSE_CHUNKS;
+    vec2 coarseStep = mod(
+        coefficient * (PHASE_CHUNK_SPAN * PHASE_COARSE_CHUNKS),
+        vec2(TWO_PI)
+    );
+    vec2 fineCoordinate = fineIndex * PHASE_CHUNK_SPAN + canonicalLocal;
+    vec2 axisPhase = mod(coarseIndex * coarseStep + fineCoordinate * coefficient,
+        vec2(TWO_PI));
+    return mod(axisPhase.x + axisPhase.y, TWO_PI);
+}
+
+// River components are authored as a spread around +X. Rotating that local
+// basis onto the decoded current preserves the authored spread while making
+// crests travel with real synchronized canonical flow where it is available.
+vec2 flowRelativeDirection(vec2 authoredDirection, vec2 flowDirection) {
+    float flowLength = length(flowDirection);
+    if (flowLength <= 0.000001) {
+        return authoredDirection;
+    }
+    vec2 flow = flowDirection / flowLength;
+    vec2 flowRight = vec2(-flow.y, flow.x);
+    return normalizedOr(flow * authoredDirection.x + flowRight * authoredDirection.y,
+        authoredDirection);
 }
 
 float decodeSignedPayload(float channelByte) {
@@ -102,19 +166,24 @@ float displayChannel(float channelByte) {
     return min(255.0, floor(channelByte / 8.0) * 8.0 + 4.0) / 255.0;
 }
 
-void accumulateWave(vec2 worldXZ, vec4 parameters, vec4 shape,
-                    float spectrumBlend, float bodyWeight,
+void accumulateWave(vec2 localXZ, vec4 parameters, vec4 shape,
+                    float spectrumBlend, float bodyWeight, vec2 flowDirection,
                     inout float height, inout vec2 horizontalDisplacement,
                     inout vec3 tangentXDelta, inout vec3 tangentZDelta) {
+    // Disabled quality-tier components and absent body blends avoid all
+    // normalization, phase, sine, and cosine work.
+    if (bodyWeight <= 0.000001 || shape.x <= 0.000001) {
+        return;
+    }
     vec2 baseDirection = normalizedOr(parameters.xy, vec2(1.0, 0.0));
+    baseDirection = flowRelativeDirection(baseDirection, flowDirection);
     vec2 wind = normalizedOr(WindDirection, vec2(1.0, 0.0));
     float directionBlend = SpectrumState.z * (0.35 + shape.w * 0.65) * spectrumBlend;
     vec2 direction = normalizedOr(mix(baseDirection, wind, directionBlend), baseDirection);
     float spectrumEnergy = mix(SpectrumState.x, SpectrumState.y, shape.w);
     float energy = mix(1.0, spectrumEnergy, spectrumBlend);
     float amplitude = shape.x * energy * bodyWeight;
-    float phase = parameters.z * dot(worldXZ, direction)
-        - parameters.w * GameTime + shape.y;
+    float phase = stableLinearPhase(localXZ, parameters.z * direction) + shape.y;
     float sine = sin(phase);
     float cosine = cos(phase);
     float horizontalScale = shape.z * amplitude;
@@ -137,12 +206,19 @@ void accumulateWave(vec2 worldXZ, vec4 parameters, vec4 shape,
     );
 }
 
-void accumulateImpulse(vec2 worldXZ, vec4 impulse, vec4 shape,
+void accumulateImpulse(vec2 localXZ, vec4 impulse, vec4 shape,
                        inout float height, inout vec2 gradient, inout float activity) {
-    if (shape.w < 0.5 || abs(impulse.w) < 0.000001) {
+    // Shape.w carries a slower foam envelope. This lets the white wake trail
+    // remain after the short geometric depression settles without adding a
+    // second unbounded buffer or another fragment-stage search.
+    if (shape.w <= 0.000001 && abs(impulse.w) < 0.000001) {
         return;
     }
-    vec2 delta = worldXZ - impulse.xy;
+    // Both operands stay close to the camera: chunk indices subtract exactly,
+    // while each uploaded wake center is relative to the camera chunk origin.
+    vec2 relativeChunkOrigin = (ChunkOrigin / PHASE_CHUNK_SPAN
+        - ImpulseChunkIndex) * PHASE_CHUNK_SPAN;
+    vec2 delta = localXZ + relativeChunkOrigin - impulse.xy;
     float centerWidth = max(shape.x, 0.001);
     float ringWidth = max(shape.y, 0.001);
     float influenceRadius = max(centerWidth * 3.0, impulse.z + ringWidth * 3.0);
@@ -162,12 +238,14 @@ void accumulateImpulse(vec2 worldXZ, vec4 impulse, vec4 shape,
         * (2.0 * (distance - impulse.z) / (ringWidth * ringWidth));
     height += localHeight;
     gradient += (centerDerivative + ringDerivative) * delta / distance;
-    activity += abs(localHeight) * 4.0 + length(gradient) * 0.20;
+    float persistentFoam = max(ring, center * 0.30) * shape.w;
+    activity += abs(localHeight) * 4.0 + length(gradient) * 0.20 + persistentFoam;
 }
 
 void main() {
     float sea = clamp(SeaState, 0.0, 1.0);
-    vec2 worldXZ = Position.xz;
+    vec2 localXZ = Position.xz;
+    vec2 worldXZ = localXZ + ChunkOrigin;
     vec4 encodedColor = floor(Color * 255.0 + 0.5);
     localCurrent = vec2(
         decodeSignedPayload(encodedColor.r),
@@ -189,63 +267,63 @@ void main() {
     vec2 horizontalDisplacement = vec2(0.0);
     vec3 tangentXDelta = vec3(0.0);
     vec3 tangentZDelta = vec3(0.0);
-    accumulateWave(worldXZ, OceanWaveParam0, OceanWaveShape0, 1.0, bodyBlend.x,
+    accumulateWave(localXZ, OceanWaveParam0, OceanWaveShape0, 1.0, bodyBlend.x, vec2(0.0),
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(worldXZ, OceanWaveParam1, OceanWaveShape1, 1.0, bodyBlend.x,
+    accumulateWave(localXZ, OceanWaveParam1, OceanWaveShape1, 1.0, bodyBlend.x, vec2(0.0),
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(worldXZ, OceanWaveParam2, OceanWaveShape2, 1.0, bodyBlend.x,
+    accumulateWave(localXZ, OceanWaveParam2, OceanWaveShape2, 1.0, bodyBlend.x, vec2(0.0),
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(worldXZ, OceanWaveParam3, OceanWaveShape3, 1.0, bodyBlend.x,
+    accumulateWave(localXZ, OceanWaveParam3, OceanWaveShape3, 1.0, bodyBlend.x, vec2(0.0),
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(worldXZ, RiverWaveParam0, RiverWaveShape0, 0.0, bodyBlend.y,
+    accumulateWave(localXZ, RiverWaveParam0, RiverWaveShape0, 0.0, bodyBlend.y, localCurrent,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(worldXZ, RiverWaveParam1, RiverWaveShape1, 0.0, bodyBlend.y,
+    accumulateWave(localXZ, RiverWaveParam1, RiverWaveShape1, 0.0, bodyBlend.y, localCurrent,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(worldXZ, RiverWaveParam2, RiverWaveShape2, 0.0, bodyBlend.y,
+    accumulateWave(localXZ, RiverWaveParam2, RiverWaveShape2, 0.0, bodyBlend.y, localCurrent,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(worldXZ, RiverWaveParam3, RiverWaveShape3, 0.0, bodyBlend.y,
+    accumulateWave(localXZ, RiverWaveParam3, RiverWaveShape3, 0.0, bodyBlend.y, localCurrent,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(worldXZ, PondWaveParam0, PondWaveShape0, 0.0, bodyBlend.z,
+    accumulateWave(localXZ, PondWaveParam0, PondWaveShape0, 0.0, bodyBlend.z, vec2(0.0),
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(worldXZ, PondWaveParam1, PondWaveShape1, 0.0, bodyBlend.z,
+    accumulateWave(localXZ, PondWaveParam1, PondWaveShape1, 0.0, bodyBlend.z, vec2(0.0),
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(worldXZ, PondWaveParam2, PondWaveShape2, 0.0, bodyBlend.z,
+    accumulateWave(localXZ, PondWaveParam2, PondWaveShape2, 0.0, bodyBlend.z, vec2(0.0),
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(worldXZ, PondWaveParam3, PondWaveShape3, 0.0, bodyBlend.z,
+    accumulateWave(localXZ, PondWaveParam3, PondWaveShape3, 0.0, bodyBlend.z, vec2(0.0),
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     float impulseHeight = 0.0;
     vec2 impulseGradient = vec2(0.0);
     float impulseActivity = 0.0;
     if (ImpulseCount > 0.5) {
-        accumulateImpulse(worldXZ, ImpulsePosition0, ImpulseShape0,
+        accumulateImpulse(localXZ, ImpulsePosition0, ImpulseShape0,
             impulseHeight, impulseGradient, impulseActivity);
     }
     if (ImpulseCount > 1.5) {
-        accumulateImpulse(worldXZ, ImpulsePosition1, ImpulseShape1,
+        accumulateImpulse(localXZ, ImpulsePosition1, ImpulseShape1,
             impulseHeight, impulseGradient, impulseActivity);
     }
     if (ImpulseCount > 2.5) {
-        accumulateImpulse(worldXZ, ImpulsePosition2, ImpulseShape2,
+        accumulateImpulse(localXZ, ImpulsePosition2, ImpulseShape2,
             impulseHeight, impulseGradient, impulseActivity);
     }
     if (ImpulseCount > 3.5) {
-        accumulateImpulse(worldXZ, ImpulsePosition3, ImpulseShape3,
+        accumulateImpulse(localXZ, ImpulsePosition3, ImpulseShape3,
             impulseHeight, impulseGradient, impulseActivity);
     }
     if (ImpulseCount > 4.5) {
-        accumulateImpulse(worldXZ, ImpulsePosition4, ImpulseShape4,
+        accumulateImpulse(localXZ, ImpulsePosition4, ImpulseShape4,
             impulseHeight, impulseGradient, impulseActivity);
     }
     if (ImpulseCount > 5.5) {
-        accumulateImpulse(worldXZ, ImpulsePosition5, ImpulseShape5,
+        accumulateImpulse(localXZ, ImpulsePosition5, ImpulseShape5,
             impulseHeight, impulseGradient, impulseActivity);
     }
     if (ImpulseCount > 6.5) {
-        accumulateImpulse(worldXZ, ImpulsePosition6, ImpulseShape6,
+        accumulateImpulse(localXZ, ImpulsePosition6, ImpulseShape6,
             impulseHeight, impulseGradient, impulseActivity);
     }
     if (ImpulseCount > 7.5) {
-        accumulateImpulse(worldXZ, ImpulsePosition7, ImpulseShape7,
+        accumulateImpulse(localXZ, ImpulsePosition7, ImpulseShape7,
             impulseHeight, impulseGradient, impulseActivity);
     }
     impulseHeight = clamp(impulseHeight, -0.25, 0.25);
@@ -282,8 +360,9 @@ void main() {
     vec4 view = ModelViewMat * vec4(displacedPosition, 1.0);
     viewPosition = view.xyz;
     viewNormal = normalize(mat3(ModelViewMat) * combinedNormal);
-    worldPosition = displacedPosition;
     worldNormal = combinedNormal;
+    phaseLocalXZ = displacedPosition.xz;
+    phaseChunkIndex = ChunkOrigin / PHASE_CHUNK_SPAN;
 
     float celestialAngle = DayTime * 6.28318530718;
     vec3 sunDirection = normalize(vec3(cos(celestialAngle), sin(celestialAngle), 0.20));
@@ -292,16 +371,17 @@ void main() {
     celestialDirection = normalize(mat3(ModelViewMat) * activeLightDirection);
     vertexDistance = length(view.xyz);
     vec2 wind = normalize(WindDirection + vec2(0.0001, 0.0));
-    float windPhase = dot(worldXZ, wind) * 0.16
-        + GameTime * (0.24 + WindSpeed * 0.055);
+    float windPhase = stableLinearPhase(localXZ, wind * 0.16)
+        + stableTimePhase(0.24 + WindSpeed * 0.055);
     vec2 windRipple = wind * sin(windPhase) * (0.0015 + sea * 0.0035);
+    vec2 currentDirection = normalizedOr(localCurrent, wind);
     vec2 currentRipple = normalizedOr(localCurrent, vec2(0.0))
-        * sin(dot(worldXZ, normalizedOr(localCurrent, wind)) * 0.55
-            - GameTime * (0.7 + length(localCurrent) * 1.4))
+        * sin(stableLinearPhase(localXZ, currentDirection * 0.55)
+            - stableTimePhase(0.7 + length(localCurrent) * 1.4))
         * min(0.0045, length(localCurrent) * 0.0025);
     texCoord0 = UV0 + windRipple + vec2(
-        sin(GameTime * 0.35 + worldXZ.y * 0.18),
-        cos(GameTime * 0.27 + worldXZ.x * 0.16)
+        sin(stableTimePhase(0.35) + stableLinearPhase(localXZ, vec2(0.0, 0.18))),
+        cos(stableTimePhase(0.27) + stableLinearPhase(localXZ, vec2(0.16, 0.0)))
     ) * 0.0035 + currentRipple;
     lightColor = minecraft_sample_lightmap(Sampler2, UV2).rgb;
     gl_Position = ProjMat * view;

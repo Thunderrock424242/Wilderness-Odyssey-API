@@ -7,10 +7,10 @@ import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
- * Defines client water-quality limits and renderer-mod compatibility defaults.
+ * Defines client water rendering, contextual display, and compatibility defaults.
  *
  * <p>The normal and optimized profiles keep visual choices centralized instead
- * of scattering Sodium/Embeddium checks through render and simulation code.</p>
+ * of scattering Sodium checks through render and simulation code.</p>
  */
 public final class WaterRenderingConfig {
     private static final int ABSOLUTE_OCEAN_SURFACE_DISTANCE_CAP_BLOCKS = 256;
@@ -28,8 +28,12 @@ public final class WaterRenderingConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_UNDERWATER_CAUSTICS;
     public static final ModConfigSpec.BooleanValue ENABLE_SPH_WATER_RENDERING;
     public static final ModConfigSpec.BooleanValue ENABLE_RIPPLES;
+    public static final ModConfigSpec.BooleanValue ENABLE_AMBIENT_WATER_PARTICLES;
+    public static final ModConfigSpec.BooleanValue ENABLE_PERSISTENT_WAKE_FOAM;
     public static final ModConfigSpec.BooleanValue AUTO_OPTIMIZE_WITH_RENDERER_MODS;
     public static final ModConfigSpec.BooleanValue MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE;
+    public static final ModConfigSpec.BooleanValue SHOW_CLOCK_TIDE_TOOLTIP;
+    public static final ModConfigSpec.BooleanValue SHOW_CONTEXTUAL_CLOCK_TIDE_DISPLAY;
     public static final ModConfigSpec.EnumValue<WaterQuality> WATER_QUALITY;
     public static final ModConfigSpec.EnumValue<SphLocalEffectQuality> SPH_LOCAL_EFFECT_QUALITY;
 
@@ -110,12 +114,24 @@ public final class WaterRenderingConfig {
         ENABLE_RIPPLES = builder
                 .comment("Render cosmetic ripple rings and splash particles when entities enter water.")
                 .define("enableRipples", true);
+        ENABLE_AMBIENT_WATER_PARTICLES = builder
+                .comment("Add a quality-capped layer of suspended underwater motes, current bubbles, and wind/current-driven surface spray using vanilla particles.")
+                .define("enableAmbientWaterParticles", true);
+        ENABLE_PERSISTENT_WAKE_FOAM = builder
+                .comment("Let impact and wake foam outlive their short surface displacement while remaining bounded by the eight nearest GPU impulses.")
+                .define("enablePersistentWakeFoam", true);
         AUTO_OPTIMIZE_WITH_RENDERER_MODS = builder
-                .comment("Use the optimized profile automatically when Sodium or Embeddium is loaded.")
+                .comment("Use the optimized profile automatically when Sodium is loaded.")
                 .define("autoOptimizeWithRendererMods", true);
         MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE = builder
                 .comment("Extend the replacement surface toward the client view distance using coarser distant LODs.")
                 .define("matchOceanSurfaceToViewDistance", true);
+        SHOW_CLOCK_TIDE_TOOLTIP = builder
+                .comment("Append live tide, trend, and moon information to the vanilla clock tooltip.")
+                .define("showClockTideTooltip", true);
+        SHOW_CONTEXTUAL_CLOCK_TIDE_DISPLAY = builder
+                .comment("Show one compact tide line while a vanilla clock is held or targeted in an item frame.")
+                .define("showContextualClockTideDisplay", true);
         WATER_QUALITY = builder
                 .comment("Overall water quality target. LOW is cheap waves/no SPH, MEDIUM adds basic foam/ripples, HIGH enables capped local SPH, and CINEMATIC raises client visuals while still keeping hard safety caps.")
                 .defineEnum("waterQuality", WaterQuality.CINEMATIC);
@@ -148,7 +164,7 @@ public final class WaterRenderingConfig {
                 .comment("Scales how quickly the replacement surface shifts toward deep-water color with depth. Higher values hide blocky seafloors sooner.")
                 .defineInRange("surfaceAbsorptionStrength", 1.70, 0.25, 3.0);
         SURFACE_OPACITY_STRENGTH = builder
-                .comment("Scales replacement-surface alpha after depth, foam, and shoreline fades. Higher values make the water medium less see-through.")
+                .comment("Scales replacement-water optical density and translucent fallback opacity without changing custom-mesh ownership coverage.")
                 .defineInRange("surfaceOpacityStrength", 1.50, 0.50, 2.0);
         SHORELINE_OVERLAY_STRENGTH = builder
                 .comment("Scales shoreline overlay alpha, foam, and local vertical motion.")
@@ -197,7 +213,7 @@ public final class WaterRenderingConfig {
                 .defineInRange("maxShorelineSurfacePatches", 1200, 128, 4096);
         builder.pop();
 
-        builder.comment("Optimized profile used when Sodium or Embeddium is loaded.")
+        builder.comment("Optimized profile used when Sodium is loaded.")
                 .push("optimized_profile");
         OPTIMIZED_SPH_RENDER_DISTANCE_BLOCKS = builder
                 .comment("Maximum distance for rendering SPH water meshes.")
@@ -249,10 +265,10 @@ public final class WaterRenderingConfig {
         return AUTO_OPTIMIZE_WITH_RENDERER_MODS.get() && isRendererOptimizationModLoaded();
     }
 
-    /** Returns whether Sodium or Embeddium is present at runtime. */
+    /** Returns whether Sodium is present at runtime. */
     public static boolean isRendererOptimizationModLoaded() {
         ModList modList = ModList.get();
-        return modList.isLoaded("sodium") || modList.isLoaded("embeddium");
+        return modList.isLoaded("sodium");
     }
 
     /** Returns the human-readable active quality profile name. */
@@ -267,22 +283,44 @@ public final class WaterRenderingConfig {
 
     /** Returns the bounded SSR march count for the active quality tier. */
     public static int screenSpaceReflectionSteps() {
-        if (!ENABLE_SCREEN_SPACE_REFLECTIONS.get()) {
+        return screenSpaceReflectionSteps(
+                waterQuality(),
+                usesOptimizedProfile(),
+                ENABLE_SCREEN_SPACE_REFLECTIONS.get()
+        );
+    }
+
+    // The optimized profile must affect the optical pass as well as local SPH.
+    // Binary hit refinement in the shader recovers precision after this cheaper
+    // broad march, so renderer-heavy modpacks save work without losing edges.
+    static int screenSpaceReflectionSteps(
+            WaterQuality quality,
+            boolean optimizedProfile,
+            boolean reflectionsEnabled
+    ) {
+        if (!reflectionsEnabled) {
             return 0;
         }
-        return switch (waterQuality()) {
+        return switch (quality) {
             case LOW, MEDIUM -> 0;
-            case HIGH -> 10;
-            case CINEMATIC -> 18;
+            case HIGH -> optimizedProfile ? 8 : 12;
+            case CINEMATIC -> optimizedProfile ? 14 : 20;
         };
     }
 
     /** Returns the maximum view-space distance covered by SSR rays. */
     public static float screenSpaceReflectionDistance() {
-        return switch (waterQuality()) {
+        return screenSpaceReflectionDistance(waterQuality(), usesOptimizedProfile());
+    }
+
+    static float screenSpaceReflectionDistance(
+            WaterQuality quality,
+            boolean optimizedProfile
+    ) {
+        return switch (quality) {
             case LOW, MEDIUM -> 0.0f;
-            case HIGH -> 28.0f;
-            case CINEMATIC -> 52.0f;
+            case HIGH -> optimizedProfile ? 28.0f : 32.0f;
+            case CINEMATIC -> optimizedProfile ? 48.0f : 56.0f;
         };
     }
 
@@ -410,6 +448,56 @@ public final class WaterRenderingConfig {
         return waterQuality().splashParticles(configured);
     }
 
+    /** Returns the hard per-emission budget for ambient water particles. */
+    public static int ambientWaterParticleBudget() {
+        return ambientWaterParticleBudget(
+                waterQuality(),
+                usesOptimizedProfile(),
+                ENABLE_AMBIENT_WATER_PARTICLES.get()
+        );
+    }
+
+    static int ambientWaterParticleBudget(
+            WaterQuality quality,
+            boolean optimizedProfile,
+            boolean enabled
+    ) {
+        if (!enabled) {
+            return 0;
+        }
+        return switch (quality) {
+            case LOW -> 0;
+            case MEDIUM -> 1;
+            case HIGH -> optimizedProfile ? 1 : 2;
+            case CINEMATIC -> optimizedProfile ? 2 : 3;
+        };
+    }
+
+    /** Returns the quality-scaled strength of tick-aged wake and impact foam. */
+    public static float persistentWakeFoamScale() {
+        return persistentWakeFoamScale(
+                waterQuality(),
+                usesOptimizedProfile(),
+                ENABLE_PERSISTENT_WAKE_FOAM.get()
+        );
+    }
+
+    static float persistentWakeFoamScale(
+            WaterQuality quality,
+            boolean optimizedProfile,
+            boolean enabled
+    ) {
+        if (!enabled) {
+            return 0.0f;
+        }
+        return switch (quality) {
+            case LOW -> 0.0f;
+            case MEDIUM -> 0.50f;
+            case HIGH -> optimizedProfile ? 0.70f : 0.85f;
+            case CINEMATIC -> optimizedProfile ? 0.85f : 1.0f;
+        };
+    }
+
     /** Returns the wave-component limit for a classified water body. */
     public static int waveTrainLimit(WaterBodyClassifier.WaterType type) {
         int requested = usesOptimizedProfile()
@@ -507,7 +595,7 @@ public final class WaterRenderingConfig {
         return suppressVanillaWaterTopFaces() ? Math.max(configured, 1.45f) : configured;
     }
 
-    /** Returns the alpha multiplier used by surface renderers. */
+    /** Returns the optical-density control used by surface renderers. */
     public static float surfaceOpacityStrength() {
         float configured = SURFACE_OPACITY_STRENGTH.get().floatValue();
         return suppressVanillaWaterTopFaces() ? Math.max(configured, 1.55f) : configured;

@@ -18,8 +18,26 @@ public interface WeatherQuery {
     /** Returns whether localized rain is active at the position. */
     default boolean isRainingAt(ServerLevel level, BlockPos position) {
         WeatherSample sample = sample(level, position);
-        return sample.precipitationType() == PrecipitationType.RAIN
+        return (sample.precipitationType() == PrecipitationType.RAIN
+                || sample.precipitationType() == PrecipitationType.HAIL)
                 && PrecipitationIntensity.isFunctional(sample.precipitationIntensity());
+    }
+
+    /** Returns whether any functional localized precipitation is active. */
+    default boolean isPrecipitatingAt(ServerLevel level, BlockPos position) {
+        WeatherSample sample = sample(level, position);
+        return sample.precipitationType() != PrecipitationType.NONE
+                && PrecipitationIntensity.isFunctional(sample.precipitationIntensity());
+    }
+
+    /** Returns whether the local storm is producing meaningful thunder. */
+    default boolean isThunderingAt(ServerLevel level, BlockPos position) {
+        return thunderIntensityAt(level, position) >= 0.35;
+    }
+
+    /** Returns normalized local thunder intensity. */
+    default double thunderIntensityAt(ServerLevel level, BlockPos position) {
+        return sample(level, position).thunderIntensity();
     }
 
     /** Returns whether localized snow is active at the position. */

@@ -33,4 +33,29 @@ class WaterSurfaceDisplacementTest {
                 4
         ));
     }
+
+    @Test
+    void combinedImpulseHeightUsesShaderCap() {
+        assertEquals(0.25f, WaterSurfaceDisplacement.MAX_COMBINED_HEIGHT_OFFSET, 0.0f);
+        assertEquals(0.25f, WaterSurfaceDisplacement.clampCombinedHeight(0.8f), 0.0f);
+        assertEquals(-0.25f, WaterSurfaceDisplacement.clampCombinedHeight(-0.8f), 0.0f);
+    }
+
+    @Test
+    void foamOutlivesDisplacementButReleasesItsBoundedSlot() {
+        assertEquals(1.0f, WaterSurfaceDisplacement.persistentFoamEnvelope(42.0, 42, 82));
+        assertTrue(WaterSurfaceDisplacement.persistentFoamEnvelope(62.0, 42, 82) > 0.0f);
+        assertEquals(0.0f, WaterSurfaceDisplacement.persistentFoamEnvelope(82.0, 42, 82));
+        assertEquals(0.0f, WaterSurfaceDisplacement.persistentFoamEnvelope(-1.0, 42, 82));
+    }
+
+    @Test
+    void farWorldImpulseAnchorPreservesSubBlockRelativePosition() {
+        double camera = 29_999_998.375;
+        double disturbance = 29_999_999.8125;
+        double anchor = WaterSurfaceDisplacement.impulseAnchor(camera);
+
+        assertEquals(29_999_984.0, anchor, 0.0);
+        assertEquals(15.8125f, (float) (disturbance - anchor), 0.0f);
+    }
 }

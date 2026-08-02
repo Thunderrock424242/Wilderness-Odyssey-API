@@ -45,6 +45,88 @@ public final class ExternalShaderWaterMaterialBridgeGameTests {
                         "Wilderness water state did not inherit vanilla water material ID");
             }
         }
+        helper.assertTrue(ExternalShaderWaterMaterialBridge.aliasMissingWaterStates(stateIds) == 0,
+                "Shader material alias must be idempotent across pack reload callbacks");
         helper.succeed();
+    }
+
+    /** Ensures an unusual pack without a vanilla-water ID is never assigned a guessed material. */
+    @GameTest(template = "empty")
+    public static void skipsAliasWhenShaderPackDoesNotMapVanillaWater(GameTestHelper helper) {
+        Map<BlockState, Integer> stateIds = new HashMap<>();
+        stateIds.put(Blocks.STONE.defaultBlockState(), 7);
+
+        int aliases = ExternalShaderWaterMaterialBridge.aliasMissingWaterStates(stateIds);
+        helper.assertTrue(aliases == 0,
+                "Shader bridge invented a material ID without a vanilla-water mapping");
+        for (BlockState state : WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get()
+                .getStateDefinition().getPossibleStates()) {
+            helper.assertTrue(!stateIds.containsKey(state),
+                    "Shader bridge mutated Wilderness water without a canonical pack mapping");
+        }
+        helper.succeed();
+    }
+
+    /** Ensures the supported public Iris accessor is resolved and applied. */
+    @GameTest(template = "empty")
+    public static void appliesAliasThroughPublicSettingsAccessor(GameTestHelper helper) {
+        PublicGetterSettings settings = new PublicGetterSettings(vanillaWaterMap());
+
+        int aliases = ExternalShaderWaterMaterialBridge.applyToSettings(settings);
+        helper.assertTrue(aliases > 0, "Public shader settings accessor was not applied");
+        helper.assertTrue(ExternalShaderWaterMaterialBridge.status()
+                        == ExternalShaderWaterMaterialBridge.MaterialBridgeStatus.MAPPED,
+                "Public shader settings accessor did not report mapped status");
+        helper.succeed();
+    }
+
+    /** Ensures forked settings can inherit the narrow private-field fallback. */
+    @GameTest(template = "empty")
+    public static void appliesAliasThroughInheritedPrivateField(GameTestHelper helper) {
+        InheritedPrivateFieldSettings settings =
+                new InheritedPrivateFieldSettings(vanillaWaterMap());
+
+        int aliases = ExternalShaderWaterMaterialBridge.applyToSettings(settings);
+        helper.assertTrue(aliases > 0, "Inherited shader settings field was not applied");
+        helper.assertTrue(ExternalShaderWaterMaterialBridge.status()
+                        == ExternalShaderWaterMaterialBridge.MaterialBridgeStatus.MAPPED,
+                "Inherited shader settings field did not report mapped status");
+        helper.succeed();
+    }
+
+    private static Map<BlockState, Integer> vanillaWaterMap() {
+        Map<BlockState, Integer> stateIds = new HashMap<>();
+        for (BlockState state : Blocks.WATER.getStateDefinition().getPossibleStates()) {
+            stateIds.put(state, 32_000);
+        }
+        return stateIds;
+    }
+
+    /** Minimal stand-in for the current Iris public API. */
+    public static final class PublicGetterSettings {
+        private final Map<BlockState, Integer> stateIds;
+
+        private PublicGetterSettings(Map<BlockState, Integer> stateIds) {
+            this.stateIds = stateIds;
+        }
+
+        public Map<BlockState, Integer> getBlockStateIds() {
+            return stateIds;
+        }
+    }
+
+    private static class PrivateFieldSettingsBase {
+        @SuppressWarnings("unused")
+        private final Map<BlockState, Integer> blockStateIds;
+
+        private PrivateFieldSettingsBase(Map<BlockState, Integer> blockStateIds) {
+            this.blockStateIds = blockStateIds;
+        }
+    }
+
+    private static final class InheritedPrivateFieldSettings extends PrivateFieldSettingsBase {
+        private InheritedPrivateFieldSettings(Map<BlockState, Integer> blockStateIds) {
+            super(blockStateIds);
+        }
     }
 }

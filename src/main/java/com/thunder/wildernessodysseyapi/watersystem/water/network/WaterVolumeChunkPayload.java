@@ -33,8 +33,8 @@ public record WaterVolumeChunkPayload(
 ) implements CustomPacketPayload {
 
     /** Keeps each payload bounded while allowing a complete chunk to span pages. */
-    public static final int MAX_CELLS_PER_PAGE = 16_384;
-    private static final int MAX_NETWORK_PAGES = 64;
+    public static final int MAX_CELLS_PER_PAGE = 1_024;
+    private static final int MAX_NETWORK_PAGES = 128;
     private static final int MAX_NETWORK_INTS = MAX_CELLS_PER_PAGE * WaterVolumeChunk.SERIALIZED_CELL_STRIDE;
 
     /** Payload identifier used by NeoForge's play protocol. */
@@ -47,7 +47,8 @@ public record WaterVolumeChunkPayload(
 
     public WaterVolumeChunkPayload {
         cellData = cellData == null ? new int[0] : cellData.clone();
-        if (pageCount < 1 || pageCount > MAX_NETWORK_PAGES
+        if (revision < 0L
+                || pageCount < 1 || pageCount > MAX_NETWORK_PAGES
                 || pageIndex < 0 || pageIndex >= pageCount
                 || cellData.length > MAX_NETWORK_INTS
                 || cellData.length % WaterVolumeChunk.SERIALIZED_CELL_STRIDE != 0) {
@@ -59,6 +60,11 @@ public record WaterVolumeChunkPayload(
     @Override
     public int[] cellData() {
         return cellData.clone();
+    }
+
+    /** Number of complete sparse cells carried by this bounded page. */
+    public int cellCount() {
+        return cellData.length / WaterVolumeChunk.SERIALIZED_CELL_STRIDE;
     }
 
     /** Builds bounded payload pages from a complete server chunk attachment. */

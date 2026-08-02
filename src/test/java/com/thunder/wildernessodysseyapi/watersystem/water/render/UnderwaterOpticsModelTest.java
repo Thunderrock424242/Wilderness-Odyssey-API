@@ -81,6 +81,33 @@ class UnderwaterOpticsModelTest {
                 "night and overhangs may be dark but retain bounded ambient water color");
     }
 
+    @Test
+    void turbidWaterRaisesAbsorptionAndVolumetricScattering() {
+        var clear = UnderwaterOpticsModel.absorptionForClarity(1.0f);
+        var turbid = UnderwaterOpticsModel.absorptionForClarity(0.2f);
+
+        assertTrue(turbid.red() > clear.red());
+        assertTrue(turbid.green() > clear.green());
+        assertTrue(turbid.blue() > clear.blue());
+        assertTrue(UnderwaterOpticsModel.scatteringForClarity(0.2f)
+                > UnderwaterOpticsModel.scatteringForClarity(1.0f));
+    }
+
+    @Test
+    void spectralTransmissionIsFiniteBoundedAndDistanceMonotonic() {
+        var absorption = UnderwaterOpticsModel.absorptionForClarity(0.72f);
+        float nearRed = UnderwaterOpticsModel.transmission(absorption.red(), 2.0f);
+        float farRed = UnderwaterOpticsModel.transmission(absorption.red(), 24.0f);
+        float farBlue = UnderwaterOpticsModel.transmission(absorption.blue(), 24.0f);
+
+        assertTrue(farRed < nearRed);
+        assertTrue(farRed < farBlue, "red wavelengths must attenuate before blue");
+        assertTrue(farRed >= 0.0f && farRed <= 1.0f);
+        assertEquals(1.0f,
+                UnderwaterOpticsModel.transmission(Float.NaN, Float.POSITIVE_INFINITY),
+                1.0e-6f);
+    }
+
     private static UnderwaterOpticsModel.OpticalProperties sample(
             float depth,
             float columnDepth,

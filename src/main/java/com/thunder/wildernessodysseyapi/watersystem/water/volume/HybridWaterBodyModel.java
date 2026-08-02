@@ -74,16 +74,32 @@ final class HybridWaterBodyModel {
             return SurfaceSample.INVALID;
         }
 
-        float worldX = (float) x;
-        float worldZ = (float) z;
         WaterBodyClassifier.WaterType type = column.waterType();
         float tideOffset = type == WaterBodyClassifier.WaterType.OCEAN
                 ? TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE
                 : 0.0f;
-        WaveSurfaceSample wave = sampleWave(level, worldX, worldZ, type, partialTick);
-        float localDisturbance = sampleLocalDisturbance(level, x, column.baseSurfaceHeight(), z);
+        BlockPos surfacePosition = BlockPos.containing(x, column.baseSurfaceHeight(), z);
+        WaterVolumeChunk.WaterCell localCell = CanonicalWater.get(level, surfacePosition);
+        float canonicalCurrentX = localCell.velocityX();
+        float canonicalCurrentZ = localCell.velocityZ();
+        WaveSurfaceSample wave = sampleWave(
+                level,
+                x,
+                z,
+                type,
+                partialTick,
+                canonicalCurrentX,
+                canonicalCurrentZ
+        );
+        float localDisturbance = sampleLocalDisturbance(
+                level,
+                x,
+                column.baseSurfaceHeight(),
+                z,
+                localCell
+        );
         float surfaceHeight = column.baseSurfaceHeight() + tideOffset + wave.height() + localDisturbance;
-        float[] flow = sampleFlow(level, type, wave);
+        float[] flow = sampleFlow(level, type, wave, canonicalCurrentX, canonicalCurrentZ);
 
         return new SurfaceSample(
                 true,
@@ -179,17 +195,27 @@ final class HybridWaterBodyModel {
 
     private static WaveSurfaceSample sampleWave(
             Level level,
-            float worldX,
-            float worldZ,
+            double worldX,
+            double worldZ,
             WaterBodyClassifier.WaterType type,
-            float partialTick
+            float partialTick,
+            float canonicalCurrentX,
+            float canonicalCurrentZ
     ) {
         GerstnerWaveProfile profile = profileFor(type);
         WaveSpectrumState spectrum = type == WaterBodyClassifier.WaterType.OCEAN
                 ? OceanSeaState.sample(level, partialTick).spectrum()
                 : WaveSpectrumState.NEUTRAL;
-        float timeSeconds = (level.getGameTime() + partialTick) / TICKS_PER_SECOND;
-        return profile.sampleAt(worldX, worldZ, timeSeconds, profile.waveCount, spectrum);
+        double timeSeconds = (level.getGameTime() + (double) partialTick) / TICKS_PER_SECOND;
+        return profile.sampleAt(
+                worldX,
+                worldZ,
+                timeSeconds,
+                profile.waveCount,
+                spectrum,
+                type == WaterBodyClassifier.WaterType.RIVER ? canonicalCurrentX : 0.0f,
+                type == WaterBodyClassifier.WaterType.RIVER ? canonicalCurrentZ : 0.0f
+        );
     }
 
     private static GerstnerWaveProfile profileFor(WaterBodyClassifier.WaterType type) {
@@ -200,7 +226,13 @@ final class HybridWaterBodyModel {
         };
     }
 
-    private static float sampleLocalDisturbance(Level level, double x, float surfaceY, double z) {
+    private static float sampleLocalDisturbance(
+            Level level,
+            double x,
+            float surfaceY,
+            double z,
+            WaterVolumeChunk.WaterCell localCell
+    ) {
         SPHSimulationManager.MobileWaterSample mobile = SPHSimulationManager.get().sampleAt(
                 level,
                 x,
@@ -210,24 +242,51 @@ final class HybridWaterBodyModel {
         float mobileRipple = mobile.wet()
                 ? Math.max(-0.15f, Math.min(0.15f, mobile.velocityY() * 0.018f))
                 : 0.0f;
-        WaterVolumeChunk.WaterCell localCell = CanonicalWater.get(
-                level,
-                BlockPos.containing(x, surfaceY, z)
-        );
         float flowRipple = Math.max(-0.08f, Math.min(0.08f, localCell.velocityY() * 0.01f));
         return mobileRipple + flowRipple;
     }
 
-    private static float[] sampleFlow(Level level, WaterBodyClassifier.WaterType type, WaveSurfaceSample wave) {
-        float flowX = wave.velocityX();
-        float flowZ = wave.velocityZ();
+    private static float[] sampleFlow(
+            Level level,
+            WaterBodyClassifier.WaterType type,
+            WaveSurfaceSample wave,
+            float canonicalCurrentX,
+            float canonicalCurrentZ
+    ) {
+        float tideRate = 0.0f;
+        float tideDirectionX = 0.0f;
+        float tideDirectionZ = 0.0f;
         if (type == WaterBodyClassifier.WaterType.OCEAN) {
-            float tideRate = TideSystem.getTideRate(level);
+            tideRate = TideSystem.getTideRate(level);
             float[] tideDirection = TideSystem.getTidalCurrentDirection(level);
-            flowX += tideDirection[0] * tideRate;
-            flowZ += tideDirection[1] * tideRate;
+            tideDirectionX = tideDirection[0];
+            tideDirectionZ = tideDirection[1];
+        }
+        return combineFlow(type, wave, canonicalCurrentX, canonicalCurrentZ,
+                tideRate, tideDirectionX, tideDirectionZ);
+    }
+
+    static float[] combineFlow(
+            WaterBodyClassifier.WaterType type,
+            WaveSurfaceSample wave,
+            float canonicalCurrentX,
+            float canonicalCurrentZ,
+            float tideRate,
+            float tideDirectionX,
+            float tideDirectionZ
+    ) {
+        WaveSurfaceSample safeWave = wave == null ? WaveSurfaceSample.flat() : wave;
+        float flowX = finiteOrZero(canonicalCurrentX) + safeWave.velocityX();
+        float flowZ = finiteOrZero(canonicalCurrentZ) + safeWave.velocityZ();
+        if (type == WaterBodyClassifier.WaterType.OCEAN) {
+            flowX += finiteOrZero(tideDirectionX) * finiteOrZero(tideRate);
+            flowZ += finiteOrZero(tideDirectionZ) * finiteOrZero(tideRate);
         }
         return new float[]{flowX, flowZ};
+    }
+
+    private static float finiteOrZero(float value) {
+        return Float.isFinite(value) ? value : 0.0f;
     }
 
     /** Large-body occupancy for one block position. */

@@ -1,6 +1,9 @@
 package com.thunder.wildernessodysseyapi.riftfall.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.weather.api.PrecipitationIntensity;
+import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.DustParticleOptions;
@@ -52,6 +55,12 @@ public final class RiftfallClientEffects {
     }
 
     private static boolean isRiftfallVisualActive(Level level) {
+        if (level instanceof net.minecraft.client.multiplayer.ClientLevel clientLevel
+                && ClientWeatherCoordinator.controls(clientLevel)) {
+            WeatherSample sample = ClientWeatherCoordinator.localSample(clientLevel);
+            return PrecipitationIntensity.isFunctional(sample.precipitationIntensity())
+                    && sample.thunderIntensity() >= 0.35;
+        }
         return level.isRaining() && level.isThundering();
     }
 }

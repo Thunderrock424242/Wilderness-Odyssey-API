@@ -5,8 +5,12 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereView;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.api.WeatherForecast;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
+import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphereSimulationEngine;
+import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphericFrontModel;
 import com.thunder.wildernessodysseyapi.weather.simulation.WeatherAuthority;
+import com.thunder.wildernessodysseyapi.weather.system.TrackedWeatherSystem;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -38,6 +42,10 @@ public final class WeatherDebugCommand {
                                 .executes(context -> sample(context.getSource())))
                         .then(Commands.literal("cell")
                                 .executes(context -> cell(context.getSource())))
+                        .then(Commands.literal("forecast")
+                                .executes(context -> forecast(context.getSource())))
+                        .then(Commands.literal("systems")
+                                .executes(context -> systems(context.getSource())))
                         .then(Commands.literal("set")
                                 .then(scalar("humidity", WeatherAuthority.ControlField.HUMIDITY, 0.0, 1.0))
                                 .then(scalar("pressure", WeatherAuthority.ControlField.PRESSURE, 0.5, 1.5))
@@ -49,7 +57,10 @@ public final class WeatherDebugCommand {
                                                 context.getSource(), PrecipitationType.RAIN)))
                                 .then(Commands.literal("snow")
                                         .executes(context -> force(
-                                                context.getSource(), PrecipitationType.SNOW))))
+                                                context.getSource(), PrecipitationType.SNOW)))
+                                .then(Commands.literal("hail")
+                                        .executes(context -> force(
+                                                context.getSource(), PrecipitationType.HAIL))))
                         .then(Commands.literal("clear")
                                 .executes(context -> clear(context.getSource())))
                         .then(Commands.literal("dump")
@@ -74,10 +85,21 @@ public final class WeatherDebugCommand {
     private static int sample(CommandSourceStack source) {
         ServerLevel level = source.getLevel();
         BlockPos position = BlockPos.containing(source.getPosition());
-        WeatherSample sample = WeatherAuthority.get().sample(level, position);
+        WeatherAuthority authority = WeatherAuthority.get();
+        WeatherSample sample = authority.sample(level, position);
+        int cellSize = WeatherConfig.scheduling().cellSize();
+        AtmosphericFrontModel.FrontState front = AtmosphericFrontModel.analyze(
+                sample,
+                new AtmosphereSimulationEngine.Neighborhood(
+                        authority.sample(level, position.offset(0, 0, -cellSize)),
+                        authority.sample(level, position.offset(cellSize, 0, 0)),
+                        authority.sample(level, position.offset(0, 0, cellSize)),
+                        authority.sample(level, position.offset(-cellSize, 0, 0))
+                )
+        );
         source.sendSuccess(() -> Component.literal(String.format(
                 Locale.ROOT,
-                "Weather at %d %d %d: T %.2f C, H %.3f, P %.3f, wind %.3f %.3f, cloud %.3f, instability %.3f, storm %.3f, %s %.3f",
+                "Weather at %d %d %d: T %.2f C, H %.3f, P %.3f, wind %.3f %.3f, cloud %s %.3f, instability %.3f, storm %.3f, front %s %.3f, %s %.3f",
                 position.getX(),
                 position.getY(),
                 position.getZ(),
@@ -86,9 +108,12 @@ public final class WeatherDebugCommand {
                 sample.pressure(),
                 sample.wind().x(),
                 sample.wind().z(),
+                sample.cloudType().displayName(),
                 sample.cloudWater(),
                 sample.instability(),
                 sample.stormEnergy(),
+                front.type(),
+                front.strength(),
                 sample.precipitationType(),
                 sample.precipitationIntensity()
         )), false);
@@ -117,6 +142,56 @@ public final class WeatherDebugCommand {
                 activity
         )), false);
         return 1;
+    }
+
+    private static int forecast(CommandSourceStack source) {
+        BlockPos position = BlockPos.containing(source.getPosition());
+        WeatherForecast forecast = WeatherAuthority.get().forecast(source.getLevel(), position);
+        String approaching = forecast.approachingSystem() == null
+                ? "no organized system detected"
+                : String.format(
+                        Locale.ROOT,
+                        "%s in %.0f blocks, ETA about %.1f minutes",
+                        forecast.approachingSystem().name().toLowerCase(Locale.ROOT).replace('_', ' '),
+                        forecast.distanceBlocks(),
+                        forecast.estimatedArrivalTicks() / 1_200.0
+                );
+        source.sendSuccess(() -> Component.literal(String.format(
+                Locale.ROOT,
+                "Forecast: %s pressure (trend %+.4f), wind %.2f %.2f; %s; confidence %.0f%%",
+                forecast.pressureTendency(),
+                forecast.pressureTrend(),
+                forecast.wind().x(),
+                forecast.wind().z(),
+                approaching,
+                forecast.confidence() * 100.0
+        )), false);
+        return 1;
+    }
+
+    private static int systems(CommandSourceStack source) {
+        BlockPos position = BlockPos.containing(source.getPosition());
+        List<TrackedWeatherSystem> systems = WeatherAuthority.get().systems(source.getLevel());
+        TrackedWeatherSystem nearest = systems.stream()
+                .min(java.util.Comparator.comparingDouble(system ->
+                        system.distanceSquared(position.getX(), position.getZ())))
+                .orElse(null);
+        if (nearest == null) {
+            source.sendSuccess(() -> Component.literal("No persistent storm or front identities are active."), false);
+            return 0;
+        }
+        double distance = Math.sqrt(nearest.distanceSquared(position.getX(), position.getZ()));
+        source.sendSuccess(() -> Component.literal(String.format(
+                Locale.ROOT,
+                "%d persistent systems; nearest #%d %s is %.0f blocks away, %s at %.0f%% intensity.",
+                systems.size(),
+                nearest.id(),
+                nearest.type().name().toLowerCase(Locale.ROOT).replace('_', ' '),
+                distance,
+                nearest.stage().name().toLowerCase(Locale.ROOT),
+                nearest.intensity() * 100.0
+        )), false);
+        return systems.size();
     }
 
     private static int set(

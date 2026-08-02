@@ -1,6 +1,9 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftDimensions;
+import com.thunder.wildernessodysseyapi.weather.api.PrecipitationIntensity;
+import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
@@ -49,6 +52,11 @@ public class ClientLevelWeatherColorMixin {
     }
 
     private static boolean shouldApplyRiftfallTint(ClientLevel level) {
+        if (ClientWeatherCoordinator.controls(level)) {
+            WeatherSample sample = ClientWeatherCoordinator.localSample(level);
+            return PrecipitationIntensity.isFunctional(sample.precipitationIntensity())
+                    && sample.thunderIntensity() >= 0.35;
+        }
         return level.isRaining() && level.isThundering();
     }
 

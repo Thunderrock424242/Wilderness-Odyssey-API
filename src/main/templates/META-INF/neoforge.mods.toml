@@ -118,3 +118,17 @@ type="optional"
 versionRange=""
 ordering="AFTER"
 side="BOTH"
+
+[[dependencies.wildernessodysseyapi]]
+modId="cold_sweat"
+type="optional"
+versionRange=""
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.wildernessodysseyapi]]
+modId="thirst"
+type="optional"
+versionRange=""
+ordering="AFTER"
+side="BOTH"

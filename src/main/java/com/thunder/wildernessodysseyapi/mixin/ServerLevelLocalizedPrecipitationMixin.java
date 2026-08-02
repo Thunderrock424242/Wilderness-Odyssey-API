@@ -93,6 +93,7 @@ public abstract class ServerLevelLocalizedPrecipitationMixin {
         return switch (LocalizedPrecipitationController.get().precipitationTypeAt(level, position)) {
             case RAIN -> Biome.Precipitation.RAIN;
             case SNOW -> Biome.Precipitation.SNOW;
+            case HAIL -> Biome.Precipitation.RAIN;
             case NONE -> Biome.Precipitation.NONE;
         };
     }

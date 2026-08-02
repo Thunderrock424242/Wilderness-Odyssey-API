@@ -668,6 +668,20 @@ public final class CanonicalWater {
     // eight physical levels.
     private static void projectCompatibility(ServerLevel level, BlockPos pos, int volumeUnits) {
         BlockState current = level.getBlockState(pos);
+
+        // A vanilla bubble column is a hosted projection of one full canonical
+        // cell. Preserve it while the cell stays full, but remove or repaint it
+        // as soon as canonical volume no longer supports a source block.
+        if (current.is(Blocks.BUBBLE_COLUMN)) {
+            if (volumeUnits >= WildernessWaterAuthority.MIN_FULL_VOLUME_UNITS) {
+                return;
+            }
+            if (volumeUnits <= 0) {
+                level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                return;
+            }
+        }
+
         if (volumeUnits <= 0) {
             if (isPlainWaterProjection(current)) {
                 level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);

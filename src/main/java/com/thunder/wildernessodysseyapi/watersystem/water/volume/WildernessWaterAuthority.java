@@ -346,7 +346,7 @@ public final class WildernessWaterAuthority {
         CellAuthority authority = sample(level, pos);
         return authority.water()
                 && authority.authorityOwned()
-                && authority.fullSurfaceWater()
+                && authority.volumeUnits() == WaterVolumeChunk.UNITS_PER_BLOCK
                 && !authority.hostedWater();
     }
 

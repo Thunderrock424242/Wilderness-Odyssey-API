@@ -66,6 +66,23 @@ public final class ClientWaterChunkSnapshot {
         return new ClientWaterChunkSnapshot(chunkX, chunkZ, generated, nextRevision, nextSparseCells);
     }
 
+    /** Returns a copy with one exact contiguous sparse delta, or {@code null} on a revision gap. */
+    public ClientWaterChunkSnapshot withSparseDelta(
+            long fromRevision,
+            long nextRevision,
+            int[] upserts,
+            int[] tombstones
+    ) {
+        if (nextRevision <= sparseRevision) {
+            return this;
+        }
+        if (fromRevision != sparseRevision || nextRevision <= fromRevision) {
+            return null;
+        }
+        int[] merged = WaterVolumeChunk.mergeNetworkDelta(sparseCells, upserts, tombstones);
+        return new ClientWaterChunkSnapshot(chunkX, chunkZ, generated, nextRevision, merged);
+    }
+
     /** Samples one resolved surface column, or {@link Column#DRY}. */
     public Column column(int localX, int localZ) {
         int index = columnIndex(localX, localZ);
