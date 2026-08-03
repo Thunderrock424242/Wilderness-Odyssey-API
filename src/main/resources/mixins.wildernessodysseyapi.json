@@ -53,6 +53,7 @@
   "client": [
     "BoatRenderMixin",
     "ClientLevelLocalizedRainMixin",
+    "ClientLevelChunkWaterMeshMixin",
     "ClientLevelLocalizedWeatherMixin",
     "ClientLevelTrueDarknessMixin",
     "ClientLevelWeatherColorMixin",

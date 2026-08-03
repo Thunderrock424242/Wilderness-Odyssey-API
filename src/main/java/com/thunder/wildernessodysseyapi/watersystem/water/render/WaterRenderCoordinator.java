@@ -170,7 +170,7 @@ public final class WaterRenderCoordinator {
         }
         ClientWaterChunkSnapshot.Column column = snapshot.column(pos.getX() & 15, pos.getZ() & 15);
         return column.wet()
-                && WaterChunkMeshCache.usesCustomSurface(column)
+                && MESHES.ownsSurface(key, pos.getX() & 15, pos.getZ() & 15)
                 && column.surfaceBlockY() == pos.getY();
     }
 

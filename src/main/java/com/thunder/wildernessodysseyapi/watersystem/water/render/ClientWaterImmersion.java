@@ -12,14 +12,17 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.phys.Vec3;
 
 /**
  * Resolves camera immersion from immutable snapshots and the GPU surface equation.
  *
- * <p>No block, heightmap, or mutable authority scan occurs here. The same base
- * surface, body blend, tide, synchronized sea state, and shader-compatible
- * Gerstner calculation drive both visible geometry and underwater transitions.</p>
+ * <p>No heightmap or mutable-authority scan occurs here. One physical fluid
+ * sample prevents stale generated metadata from tinting excavated air, while
+ * the same base surface, body blend, tide, synchronized sea state, and
+ * shader-compatible Gerstner calculation drive visible geometry and underwater
+ * transitions.</p>
  */
 public final class ClientWaterImmersion {
 
@@ -96,6 +99,16 @@ public final class ClientWaterImmersion {
                 cameraPosition.z,
                 partialTick
         );
+        BlockPos cameraBlock = BlockPos.containing(cameraPosition);
+        boolean cameraInPhysicalWater = level.getFluidState(cameraBlock).is(FluidTags.WATER);
+        boolean insideDisplacedCrest = WaterShaders.shouldUseCoreShader()
+                && WaterChunkMeshCache.usesCustomSurface(level, blockX, blockZ, column)
+                && cameraPosition.y >= column.baseSurfaceY()
+                && cameraPosition.y <= surfaceY
+                        + (previous.waterColumnPresent() ? EXIT_HYSTERESIS : 0.0f);
+        if (!cameraInPhysicalWater && !insideDisplacedCrest) {
+            return resolveMobileWater(level, cameraPosition);
+        }
         float depthBelowSurface = surfaceY - (float) cameraPosition.y;
         boolean withinColumn = cameraPosition.y >= column.floorY() + 0.92f
                 && cameraPosition.y <= surfaceY + (previous.waterColumnPresent() ? EXIT_HYSTERESIS : 0.0f);
@@ -173,8 +186,10 @@ public final class ClientWaterImmersion {
         float riverWeight = column.riverWeight() / 255.0f;
         float lakeWeight = column.lakeWeight() / 255.0f;
         double timeSeconds = (level.getGameTime() + (double) partialTick) / 20.0;
+        int blockX = (int) Math.floor(worldX);
+        int blockZ = (int) Math.floor(worldZ);
         boolean customSurface = WaterShaders.shouldUseCoreShader()
-                && WaterChunkMeshCache.usesCustomSurface(column);
+                && WaterChunkMeshCache.usesCustomSurface(level, blockX, blockZ, column);
         boolean waveSurface = customSurface && WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get();
         float transientHeight = customSurface
                 ? WaterSurfaceDisplacement.sampleHeight(
@@ -225,7 +240,8 @@ public final class ClientWaterImmersion {
                     continue;
                 }
                 ClientWaterChunkSnapshot.Column column = snapshot.column(columnX & 15, columnZ & 15);
-                if (column.wet() && WaterChunkMeshCache.usesCustomSurface(column)) {
+                if (column.wet() && WaterChunkMeshCache.usesCustomSurface(
+                        level, columnX, columnZ, column)) {
                     count++;
                 }
             }
