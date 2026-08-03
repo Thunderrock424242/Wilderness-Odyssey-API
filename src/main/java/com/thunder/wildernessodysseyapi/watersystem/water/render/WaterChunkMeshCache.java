@@ -14,11 +14,16 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.client.textures.FluidSpriteCache;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,9 +31,10 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Owns stable, world-aligned GPU meshes derived only from immutable water snapshots.
  *
- * <p>Topology changes only when one chunk-local snapshot changes. Continuous
- * tide and Gerstner displacement is applied by the shader, so oceans do not
- * rebuild every frame.</p>
+ * <p>Topology changes when a chunk-local snapshot or a relevant client block
+ * changes. Each rebuild verifies the compact snapshot surface against the
+ * matching physical water projection; continuous tide and Gerstner displacement
+ * remains shader-owned, so oceans still do not rebuild every frame.</p>
  */
 public final class WaterChunkMeshCache {
 
@@ -84,6 +90,12 @@ public final class WaterChunkMeshCache {
         return groups.containsKey(chunkKey);
     }
 
+    /** Returns whether the uploaded mesh physically verified and emitted one column. */
+    public boolean ownsSurface(long chunkKey, int localX, int localZ) {
+        MeshGroup group = groups.get(chunkKey);
+        return group != null && group.ownsSurface(localX, localZ);
+    }
+
     /** Releases all GPU objects during dimension/resource teardown. */
     public void clear() {
         for (MeshGroup group : groups.values()) {
@@ -93,12 +105,24 @@ public final class WaterChunkMeshCache {
     }
 
     private MeshGroup build(ClientLevel level, ClientWaterChunkSnapshot snapshot) {
+        int chunkMinX = snapshot.chunkX() << 4;
+        int chunkMinZ = snapshot.chunkZ() << 4;
+        Map<Long, Boolean> liveSurfaceEligibility = new HashMap<>(324);
+        long[] ownedSurfaceMask = new long[4];
         int wetColumns = 0;
         int firstSurfaceY = 0;
         for (int localZ = 0; localZ < 16; localZ++) {
             for (int localX = 0; localX < 16; localX++) {
                 ClientWaterChunkSnapshot.Column column = snapshot.column(localX, localZ);
-                if (column.wet() && usesCustomSurface(column)) {
+                if (column.wet() && usesCustomSurface(
+                        level,
+                        chunkMinX + localX,
+                        chunkMinZ + localZ,
+                        column,
+                        liveSurfaceEligibility
+                )) {
+                    int columnIndex = localX | (localZ << 4);
+                    ownedSurfaceMask[columnIndex >>> 6] |= 1L << (columnIndex & 63);
                     if (wetColumns++ == 0) {
                         firstSurfaceY = column.surfaceBlockY();
                     }
@@ -109,8 +133,6 @@ public final class WaterChunkMeshCache {
             return MeshGroup.EMPTY;
         }
 
-        int chunkMinX = snapshot.chunkX() << 4;
-        int chunkMinZ = snapshot.chunkZ() << 4;
         TextureAtlasSprite sprite = FluidSpriteCache.getFluidSprites(
                 level,
                 new BlockPos(chunkMinX + 8, firstSurfaceY, chunkMinZ + 8),
@@ -127,13 +149,20 @@ public final class WaterChunkMeshCache {
             for (int localZ = 0; localZ < 16; localZ++) {
                 for (int localX = 0; localX < 16; localX++) {
                     ClientWaterChunkSnapshot.Column column = snapshot.column(localX, localZ);
-                    if (!column.wet() || !usesCustomSurface(column)) {
+                    if (!column.wet() || !usesCustomSurface(
+                            level,
+                            chunkMinX + localX,
+                            chunkMinZ + localZ,
+                            column,
+                            liveSurfaceEligibility
+                    )) {
                         continue;
                     }
                     minimumY = Math.min(minimumY, column.floorY());
                     maximumY = Math.max(maximumY, column.surfaceBlockY());
                     emitColumn(level, snapshot, builder, sprite, chunkMinX + localX,
-                            chunkMinZ + localZ, column, subdivisions, chunkMinX, chunkMinZ);
+                            chunkMinZ + localZ, column, subdivisions, chunkMinX, chunkMinZ,
+                            liveSurfaceEligibility);
                 }
             }
             MeshData mesh = builder.buildOrThrow();
@@ -158,7 +187,11 @@ public final class WaterChunkMeshCache {
                     buffer,
                     bounds,
                     vertexCount,
-                    wetColumns * quadsPerColumn * 2
+                    wetColumns * quadsPerColumn * 2,
+                    ownedSurfaceMask[0],
+                    ownedSurfaceMask[1],
+                    ownedSurfaceMask[2],
+                    ownedSurfaceMask[3]
             );
         }
     }
@@ -173,12 +206,17 @@ public final class WaterChunkMeshCache {
             ClientWaterChunkSnapshot.Column column,
             int subdivisions,
             int chunkMinX,
-            int chunkMinZ
+            int chunkMinZ,
+            Map<Long, Boolean> liveSurfaceEligibility
     ) {
-        VertexSample northWest = sampleVertex(level, worldX, worldZ, column);
-        VertexSample southWest = sampleVertex(level, worldX, worldZ + 1, column);
-        VertexSample southEast = sampleVertex(level, worldX + 1, worldZ + 1, column);
-        VertexSample northEast = sampleVertex(level, worldX + 1, worldZ, column);
+        VertexSample northWest = sampleVertex(
+                level, worldX, worldZ, column, liveSurfaceEligibility);
+        VertexSample southWest = sampleVertex(
+                level, worldX, worldZ + 1, column, liveSurfaceEligibility);
+        VertexSample southEast = sampleVertex(
+                level, worldX + 1, worldZ + 1, column, liveSurfaceEligibility);
+        VertexSample northEast = sampleVertex(
+                level, worldX + 1, worldZ, column, liveSurfaceEligibility);
         float u0 = sprite.getU0();
         float u1 = sprite.getU1();
         float v0 = sprite.getV0();
@@ -223,7 +261,8 @@ public final class WaterChunkMeshCache {
             ClientLevel level,
             int worldVertexX,
             int worldVertexZ,
-            ClientWaterChunkSnapshot.Column fallback
+            ClientWaterChunkSnapshot.Column fallback,
+            Map<Long, Boolean> liveSurfaceEligibility
     ) {
         float height = 0.0f;
         float ocean = 0.0f;
@@ -245,7 +284,13 @@ public final class WaterChunkMeshCache {
                     continue;
                 }
                 ClientWaterChunkSnapshot.Column column = neighbor.column(columnX & 15, columnZ & 15);
-                if (!column.wet() || !usesCustomSurface(column)) {
+                if (!column.wet() || !usesCustomSurface(
+                        level,
+                        columnX,
+                        columnZ,
+                        column,
+                        liveSurfaceEligibility
+                )) {
                     continue;
                 }
                 height += column.baseSurfaceY();
@@ -306,6 +351,71 @@ public final class WaterChunkMeshCache {
         return !column.surfaceCovered()
                 && column.bodyType() != GeneratedWaterChunk.BodyType.AQUIFER
                 && column.oceanWeight() + column.riverWeight() + column.lakeWeight() > 0;
+    }
+
+    /** Returns whether the immutable surface still has an exposed physical water projection. */
+    static boolean usesCustomSurface(
+            ClientLevel level,
+            int worldX,
+            int worldZ,
+            ClientWaterChunkSnapshot.Column column
+    ) {
+        if (!usesCustomSurface(column)) {
+            return false;
+        }
+        return hasExposedPhysicalSurface(level, worldX, worldZ, column);
+    }
+
+    private static boolean usesCustomSurface(
+            ClientLevel level,
+            int worldX,
+            int worldZ,
+            ClientWaterChunkSnapshot.Column column,
+            Map<Long, Boolean> liveSurfaceEligibility
+    ) {
+        if (!usesCustomSurface(column)) {
+            return false;
+        }
+        long surfaceKey = BlockPos.asLong(worldX, column.surfaceBlockY(), worldZ);
+        return liveSurfaceEligibility.computeIfAbsent(
+                surfaceKey,
+                ignored -> hasExposedPhysicalSurface(level, worldX, worldZ, column)
+        );
+    }
+
+    private static boolean hasExposedPhysicalSurface(
+            ClientLevel level,
+            int worldX,
+            int worldZ,
+            ClientWaterChunkSnapshot.Column column
+    ) {
+        BlockPos surfacePos = new BlockPos(worldX, column.surfaceBlockY(), worldZ);
+        FluidState surfaceFluid = level.getFluidState(surfacePos);
+        BlockPos abovePos = surfacePos.above();
+        BlockState aboveState = level.getBlockState(abovePos);
+        return isLiveSurfaceEligible(
+                column,
+                surfaceFluid.is(FluidTags.WATER),
+                aboveState.getFluidState().is(FluidTags.WATER),
+                aboveState.shouldHideAdjacentFluidFace(Direction.DOWN, surfaceFluid),
+                aboveState.getCollisionShape(level, abovePos).isEmpty()
+        );
+    }
+
+    // Kept independent from world access so dry excavations and covered tops
+    // remain directly regression-testable without constructing a client level.
+    static boolean isLiveSurfaceEligible(
+            ClientWaterChunkSnapshot.Column column,
+            boolean surfaceContainsTaggedWater,
+            boolean aboveContainsTaggedWater,
+            boolean aboveHidesFluidFace,
+            boolean aboveCollisionIsEmpty
+    ) {
+        return usesCustomSurface(column)
+                && surfaceContainsTaggedWater
+                && !aboveContainsTaggedWater
+                && !aboveHidesFluidFace
+                && aboveCollisionIsEmpty;
     }
 
     private static int opticalColor(float ocean, float river, float lake,
@@ -456,13 +566,29 @@ public final class WaterChunkMeshCache {
             VertexBuffer buffer,
             AABB bounds,
             int vertices,
-            int triangles
+            int triangles,
+            long surfaceMask0,
+            long surfaceMask1,
+            long surfaceMask2,
+            long surfaceMask3
     ) implements AutoCloseable {
         private static final MeshGroup EMPTY = new MeshGroup(0L, 0L, 0L, 0, 0, null,
-                new AABB(0, 0, 0, 0, 0, 0), 0, 0);
+                new AABB(0, 0, 0, 0, 0, 0), 0, 0, 0L, 0L, 0L, 0L);
 
         public boolean empty() {
             return buffer == null || vertices == 0;
+        }
+
+        /** Returns whether this immutable upload contains the requested local column. */
+        public boolean ownsSurface(int localX, int localZ) {
+            int columnIndex = (localX & 15) | ((localZ & 15) << 4);
+            long mask = switch (columnIndex >>> 6) {
+                case 0 -> surfaceMask0;
+                case 1 -> surfaceMask1;
+                case 2 -> surfaceMask2;
+                default -> surfaceMask3;
+            };
+            return (mask & (1L << (columnIndex & 63))) != 0L;
         }
 
         public double distanceSquared(double x, double y, double z) {

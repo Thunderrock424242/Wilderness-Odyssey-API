@@ -100,13 +100,19 @@ blend weights, and wet boundaries.
 
 Concurrent-map value replacement makes publication atomic for the render
 thread. Sparse payloads replace only their chunk snapshot, and dirty mesh work
-is queued for that chunk and its border neighbors. Chunk unload removes the
-snapshot immediately. A missing snapshot is always dry, so neither rendering
-nor camera immersion can project water across an unloaded frontier.
+is queued for that chunk and its border neighbors. Relevant physical client
+block changes at a synchronized surface or immediately above it queue the same
+bounded rebuild. Chunk unload removes the snapshot immediately. A missing
+snapshot is always dry, so neither rendering nor camera immersion can project
+water across an unloaded frontier.
 
-The render path does not repeatedly query block states, heightmaps, or mutable
-authority data. Snapshot memory is bounded by compact generated spans plus the
-small disturbed sparse set.
+The per-frame surface pass does not scan block states, heightmaps, or mutable
+authority data. A queued mesh rebuild performs one cached exposure check per
+nearby snapshot column, matching generated metadata to physical tagged water
+and an unobstructed top before emitting geometry. Camera immersion performs one
+physical fluid sample so an excavated air shaft cannot inherit underwater
+optics from stale column metadata. Snapshot memory remains bounded by compact
+generated spans plus the small disturbed sparse set.
 
 ## WaterRenderCoordinator
 

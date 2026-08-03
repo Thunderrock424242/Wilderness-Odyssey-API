@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.network;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -140,6 +141,34 @@ public final class ClientWaterSnapshotStore {
         for (long key : SNAPSHOTS.keySet()) {
             offerDirty(key);
         }
+    }
+
+    /** Queues surface topology after a relevant physical client block changes. */
+    public static void notifyBlockChange(Level level, BlockPos position) {
+        if (activeLevel != level || position == null) {
+            return;
+        }
+        ClientWaterChunkSnapshot snapshot = getAtBlock(
+                level, position.getX(), position.getZ());
+        if (snapshot == null) {
+            return;
+        }
+        ClientWaterChunkSnapshot.Column column = snapshot.column(
+                position.getX() & 15,
+                position.getZ() & 15
+        );
+        if (affectsRenderedSurface(column, position.getY())) {
+            markDirty(ChunkPos.asLong(position.getX() >> 4, position.getZ() >> 4));
+        }
+    }
+
+    static boolean affectsRenderedSurface(
+            ClientWaterChunkSnapshot.Column column,
+            int changedBlockY
+    ) {
+        return column.wet()
+                && (changedBlockY == column.surfaceBlockY()
+                || changedBlockY == column.surfaceBlockY() + 1);
     }
 
     /** Approximate primitive snapshot memory for diagnostics. */
