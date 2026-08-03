@@ -117,7 +117,8 @@ public final class OceanSurfaceRenderer {
         float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
         float timeSeconds = (level.getGameTime() + partialTick) / 20.0f;
         float tideOffset = TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE;
-        OceanSeaState.Sample seaState = ClientOceanSeaState.current(level);
+        OceanSeaState.Sample seaState = ClientOceanSeaState.sampleAt(
+                level, camera.x, camera.z);
 
         boolean coreShader = WaterShaders.shouldUseCoreShader();
         RenderType renderType = coreShader ? WaterRenderTypes.dynamicOcean() : RenderType.translucent();

@@ -204,7 +204,7 @@ final class HybridWaterBodyModel {
     ) {
         GerstnerWaveProfile profile = profileFor(type);
         WaveSpectrumState spectrum = type == WaterBodyClassifier.WaterType.OCEAN
-                ? OceanSeaState.sample(level, partialTick).spectrum()
+                ? OceanSeaState.sampleAt(level, worldX, worldZ, partialTick).spectrum()
                 : WaveSpectrumState.NEUTRAL;
         double timeSeconds = (level.getGameTime() + (double) partialTick) / TICKS_PER_SECOND;
         return profile.sampleAt(

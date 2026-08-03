@@ -34,6 +34,7 @@ public class ClientTickHandler {
         if (mc.level != null) {
             if (!WildernessWaterRules.isEnabled(mc.level)) {
                 SPHSimulationManager.get().clearLevel(mc.level);
+                ClientOceanSeaState.clear(mc.level);
                 ClientWaterVolumeSnapshots.clear(mc.level);
                 return;
             }

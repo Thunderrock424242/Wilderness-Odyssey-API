@@ -24,6 +24,8 @@ import com.thunder.wildernessodysseyapi.weather.api.WindVector;
  * @param terrainRoughness normalized local relief
  * @param oceanCoverage exposed ocean-water coverage
  * @param inlandWaterCoverage exposed lake and inland-water coverage
+ * @param fireSeasonFactor normalized temperate-summer or tropical-dry-season strength
+ * @param seasonCalendarAvailable whether an external calendar supplied a season phase
  */
 public record AtmosphereEnvironment(
         double biomeTemperatureCelsius,
@@ -40,7 +42,9 @@ public record AtmosphereEnvironment(
         double terrainGradientZ,
         double terrainRoughness,
         double oceanCoverage,
-        double inlandWaterCoverage
+        double inlandWaterCoverage,
+        double fireSeasonFactor,
+        boolean seasonCalendarAvailable
 ) {
     public static final AtmosphereEnvironment TEMPERATE = new AtmosphereEnvironment(
             15.0,
@@ -57,8 +61,49 @@ public record AtmosphereEnvironment(
             0.0,
             0.0,
             0.0,
-            0.0
+            0.0,
+            0.0,
+            false
     );
+
+    /** Retains the weather-v3 construction shape without wildfire-season metadata. */
+    public AtmosphereEnvironment(
+            double biomeTemperatureCelsius,
+            double biomeHumidity,
+            double elevationBlocks,
+            double waterCoverage,
+            double daylight,
+            double dimensionTemperatureOffset,
+            double seasonalTemperatureOffset,
+            double atmosphericVariation,
+            double seasonalStorminessOffset,
+            double seasonalEvaporationMultiplier,
+            double terrainGradientX,
+            double terrainGradientZ,
+            double terrainRoughness,
+            double oceanCoverage,
+            double inlandWaterCoverage
+    ) {
+        this(
+                biomeTemperatureCelsius,
+                biomeHumidity,
+                elevationBlocks,
+                waterCoverage,
+                daylight,
+                dimensionTemperatureOffset,
+                seasonalTemperatureOffset,
+                atmosphericVariation,
+                seasonalStorminessOffset,
+                seasonalEvaporationMultiplier,
+                terrainGradientX,
+                terrainGradientZ,
+                terrainRoughness,
+                oceanCoverage,
+                inlandWaterCoverage,
+                0.0,
+                false
+        );
+    }
 
     /** Retains the weather-v2 construction shape without typed water coverage. */
     public AtmosphereEnvironment(
@@ -91,7 +136,9 @@ public record AtmosphereEnvironment(
                 terrainGradientZ,
                 terrainRoughness,
                 0.0,
-                0.0
+                0.0,
+                0.0,
+                false
         );
     }
 
@@ -121,7 +168,9 @@ public record AtmosphereEnvironment(
                 0.0,
                 0.0,
                 0.0,
-                0.0
+                0.0,
+                0.0,
+                false
         );
     }
 
@@ -145,6 +194,7 @@ public record AtmosphereEnvironment(
         terrainRoughness = unit(terrainRoughness);
         oceanCoverage = unit(oceanCoverage);
         inlandWaterCoverage = unit(inlandWaterCoverage);
+        fireSeasonFactor = unit(fireSeasonFactor);
     }
 
     /**

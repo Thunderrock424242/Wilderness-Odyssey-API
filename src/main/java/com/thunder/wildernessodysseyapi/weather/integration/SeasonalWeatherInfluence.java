@@ -25,14 +25,28 @@ public interface SeasonalWeatherInfluence {
      * @param humidity relative-humidity shift
      * @param storminess convective development shift
      * @param evaporationMultiplier seasonal surface evaporation multiplier
+     * @param fireSeasonFactor normalized temperate-summer or tropical-dry-season strength
+     * @param calendarAvailable whether an external calendar supplied a real season phase
      */
     record SeasonalOffset(
             double temperatureCelsius,
             double humidity,
             double storminess,
-            double evaporationMultiplier
+            double evaporationMultiplier,
+            double fireSeasonFactor,
+            boolean calendarAvailable
     ) {
-        public static final SeasonalOffset NONE = new SeasonalOffset(0.0, 0.0, 0.0, 1.0);
+        public static final SeasonalOffset NONE = new SeasonalOffset(0.0, 0.0, 0.0, 1.0, 0.0, false);
+
+        /** Retains the original construction shape for API callers without fire-season metadata. */
+        public SeasonalOffset(
+                double temperatureCelsius,
+                double humidity,
+                double storminess,
+                double evaporationMultiplier
+        ) {
+            this(temperatureCelsius, humidity, storminess, evaporationMultiplier, 0.0, false);
+        }
 
         public SeasonalOffset {
             temperatureCelsius = Double.isFinite(temperatureCelsius)
@@ -43,6 +57,8 @@ public interface SeasonalWeatherInfluence {
                     ? Math.max(-1.0, Math.min(1.0, storminess)) : 0.0;
             evaporationMultiplier = Double.isFinite(evaporationMultiplier)
                     ? Math.max(0.25, Math.min(2.0, evaporationMultiplier)) : 1.0;
+            fireSeasonFactor = Double.isFinite(fireSeasonFactor)
+                    ? Math.max(0.0, Math.min(1.0, fireSeasonFactor)) : 0.0;
         }
     }
 }

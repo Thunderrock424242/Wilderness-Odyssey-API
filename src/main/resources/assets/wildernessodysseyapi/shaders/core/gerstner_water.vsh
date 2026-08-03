@@ -19,6 +19,7 @@ uniform float SeaState;
 uniform vec2 WindDirection;
 uniform float WindSpeed;
 uniform vec4 SpectrumState;
+uniform vec4 Weather;
 uniform float TideOffset;
 uniform float GpuWaveStrength;
 uniform float ImpulseCount;
@@ -336,20 +337,24 @@ void main() {
     // raised, visibly flat perimeter ring or cracks between ownership modes.
     float continuityWave = smoothstep(0.18, 0.92, surfaceContinuity);
     float shoreHorizontalTaper = 1.0 - smoothstep(0.18, 0.88, shoreFactor);
-    float horizontalTaper = continuityWave * shoreHorizontalTaper;
+    float frozen = clamp(Weather.w, 0.0, 1.0);
+    float waveFreedom = 1.0 - frozen * 0.94;
+    float horizontalTaper = continuityWave * shoreHorizontalTaper * waveFreedom;
+    disturbanceStrength *= waveFreedom;
     displacedPosition.xz += horizontalDisplacement * GpuWaveStrength * horizontalTaper;
-    displacedPosition.y += (gpuHeight * GpuWaveStrength + impulseHeight) * continuityWave
+    displacedPosition.y += (gpuHeight * GpuWaveStrength + impulseHeight)
+        * continuityWave * waveFreedom
         + TideOffset * bodyBlend.x * continuityWave;
     vec3 tangentX = vec3(
         1.0 + tangentXDelta.x * GpuWaveStrength * horizontalTaper,
-        tangentXDelta.y * GpuWaveStrength * continuityWave
-            + impulseGradient.x * continuityWave,
+        tangentXDelta.y * GpuWaveStrength * continuityWave * waveFreedom
+            + impulseGradient.x * continuityWave * waveFreedom,
         tangentXDelta.z * GpuWaveStrength * horizontalTaper
     );
     vec3 tangentZ = vec3(
         tangentZDelta.x * GpuWaveStrength * horizontalTaper,
-        tangentZDelta.y * GpuWaveStrength * continuityWave
-            + impulseGradient.y * continuityWave,
+        tangentZDelta.y * GpuWaveStrength * continuityWave * waveFreedom
+            + impulseGradient.y * continuityWave * waveFreedom,
         1.0 + tangentZDelta.z * GpuWaveStrength * horizontalTaper
     );
     vec3 analyticNormal = cross(tangentZ, tangentX);

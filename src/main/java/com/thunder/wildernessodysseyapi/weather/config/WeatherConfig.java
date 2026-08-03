@@ -59,6 +59,15 @@ public final class WeatherConfig {
     public static final ModConfigSpec.IntValue LIGHTNING_CANDIDATE_RADIUS_BLOCKS;
     public static final ModConfigSpec.IntValue LIGHTNING_MAX_CANDIDATE_ATTEMPTS;
     public static final ModConfigSpec.DoubleValue LIGHTNING_MAXIMUM_CHANCE_PER_CHECK;
+    public static final ModConfigSpec.BooleanValue WILDFIRES_ENABLED;
+    public static final ModConfigSpec.IntValue WILDFIRE_CHECK_INTERVAL_TICKS;
+    public static final ModConfigSpec.IntValue WILDFIRE_DIMENSION_COOLDOWN_TICKS;
+    public static final ModConfigSpec.IntValue WILDFIRE_CELL_COOLDOWN_TICKS;
+    public static final ModConfigSpec.IntValue WILDFIRE_CANDIDATE_CHUNK_RADIUS;
+    public static final ModConfigSpec.IntValue WILDFIRE_CANDIDATE_CHUNKS_PER_PLAYER;
+    public static final ModConfigSpec.IntValue WILDFIRE_EMBER_RANGE_BLOCKS;
+    public static final ModConfigSpec.IntValue WILDFIRE_TARGET_ATTEMPTS;
+    public static final ModConfigSpec.DoubleValue WILDFIRE_MAXIMUM_CHANCE_PER_CHECK;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> DIMENSION_ALLOWLIST;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> DIMENSION_DENYLIST;
     public static final ModConfigSpec.EnumValue<VanillaWeatherCompatibilityMode> VANILLA_WEATHER_COMPATIBILITY_MODE;
@@ -92,6 +101,14 @@ public final class WeatherConfig {
     private static final int DEFAULT_LIGHTNING_CANDIDATE_RADIUS = 96;
     private static final int DEFAULT_LIGHTNING_MAX_CANDIDATES = 4;
     private static final double DEFAULT_LIGHTNING_MAXIMUM_CHANCE = 0.20;
+    private static final int DEFAULT_WILDFIRE_CHECK_INTERVAL = 600;
+    private static final int DEFAULT_WILDFIRE_DIMENSION_COOLDOWN = 48_000;
+    private static final int DEFAULT_WILDFIRE_CELL_COOLDOWN = 168_000;
+    private static final int DEFAULT_WILDFIRE_CANDIDATE_CHUNK_RADIUS = 2;
+    private static final int DEFAULT_WILDFIRE_CANDIDATE_CHUNKS_PER_PLAYER = 4;
+    private static final int DEFAULT_WILDFIRE_EMBER_RANGE = 10;
+    private static final int DEFAULT_WILDFIRE_TARGET_ATTEMPTS = 12;
+    private static final double DEFAULT_WILDFIRE_MAXIMUM_CHANCE = 0.01;
     private static volatile DimensionSelection cachedDimensionSelection = DimensionSelection.DEFAULT;
 
     static {
@@ -219,6 +236,37 @@ public final class WeatherConfig {
         LIGHTNING_MAXIMUM_CHANCE_PER_CHECK = builder
                 .comment("Maximum probability that one eligible candidate produces a strike during a check.")
                 .defineInRange("maximumChancePerCheck", DEFAULT_LIGHTNING_MAXIMUM_CHANCE, 0.0, 1.0);
+        builder.pop();
+
+        builder.comment("Rare campfire-ember wildfires during extreme summer or dry-season drought.")
+                .push("wildfire");
+        WILDFIRES_ENABLED = builder
+                .comment("Allow exposed normal campfires to throw rare downwind embers into tagged natural fuel. Vanilla fire owns all later spread and damage.")
+                .define("enabled", true);
+        WILDFIRE_CHECK_INTERVAL_TICKS = builder
+                .comment("Server ticks between bounded wildfire candidate checks.")
+                .defineInRange("checkIntervalTicks", DEFAULT_WILDFIRE_CHECK_INTERVAL, 100, 72_000);
+        WILDFIRE_DIMENSION_COOLDOWN_TICKS = builder
+                .comment("Minimum ticks between successful campfire ignitions in one dimension.")
+                .defineInRange("dimensionCooldownTicks", DEFAULT_WILDFIRE_DIMENSION_COOLDOWN, 1_200, 1_728_000);
+        WILDFIRE_CELL_COOLDOWN_TICKS = builder
+                .comment("Minimum ticks before the same atmospheric cell can start another campfire wildfire.")
+                .defineInRange("cellCooldownTicks", DEFAULT_WILDFIRE_CELL_COOLDOWN, 1_200, 1_728_000);
+        WILDFIRE_CANDIDATE_CHUNK_RADIUS = builder
+                .comment("Loaded chunk radius around players rotated through by the wildfire scheduler.")
+                .defineInRange("candidateChunkRadius", DEFAULT_WILDFIRE_CANDIDATE_CHUNK_RADIUS, 0, 8);
+        WILDFIRE_CANDIDATE_CHUNKS_PER_PLAYER = builder
+                .comment("Maximum loaded chunks inspected per player during one wildfire check.")
+                .defineInRange("candidateChunksPerPlayer", DEFAULT_WILDFIRE_CANDIDATE_CHUNKS_PER_PLAYER, 1, 16);
+        WILDFIRE_EMBER_RANGE_BLOCKS = builder
+                .comment("Maximum downwind distance a successful campfire ember may travel.")
+                .defineInRange("emberRangeBlocks", DEFAULT_WILDFIRE_EMBER_RANGE, 4, 24);
+        WILDFIRE_TARGET_ATTEMPTS = builder
+                .comment("Maximum exposed tagged-fuel columns sampled after the single ignition roll succeeds.")
+                .defineInRange("targetAttempts", DEFAULT_WILDFIRE_TARGET_ATTEMPTS, 1, 32);
+        WILDFIRE_MAXIMUM_CHANCE_PER_CHECK = builder
+                .comment("Maximum probability for the strongest eligible campfire in one due check. Actual chance is reduced by local fire risk.")
+                .defineInRange("maximumChancePerCheck", DEFAULT_WILDFIRE_MAXIMUM_CHANCE, 0.0, 1.0);
         builder.pop();
 
         builder.comment("Dimension and vanilla-weather compatibility controls.")
@@ -365,6 +413,25 @@ public final class WeatherConfig {
             );
         } catch (IllegalStateException exception) {
             return LightningSettings.DEFAULT;
+        }
+    }
+
+    /** Returns bounded campfire wildfire cadence, rarity, and scan controls. */
+    public static WildfireSettings wildfires() {
+        try {
+            return new WildfireSettings(
+                    WILDFIRES_ENABLED.get(),
+                    WILDFIRE_CHECK_INTERVAL_TICKS.get(),
+                    WILDFIRE_DIMENSION_COOLDOWN_TICKS.get(),
+                    WILDFIRE_CELL_COOLDOWN_TICKS.get(),
+                    WILDFIRE_CANDIDATE_CHUNK_RADIUS.get(),
+                    WILDFIRE_CANDIDATE_CHUNKS_PER_PLAYER.get(),
+                    WILDFIRE_EMBER_RANGE_BLOCKS.get(),
+                    WILDFIRE_TARGET_ATTEMPTS.get(),
+                    WILDFIRE_MAXIMUM_CHANCE_PER_CHECK.get()
+            );
+        } catch (IllegalStateException exception) {
+            return WildfireSettings.DEFAULT;
         }
     }
 
@@ -793,6 +860,59 @@ public final class WeatherConfig {
                     Double.isFinite(maximumChancePerCheck)
                             ? maximumChancePerCheck
                             : DEFAULT_LIGHTNING_MAXIMUM_CHANCE,
+                    0.0,
+                    1.0
+            );
+        }
+
+        private static int clamp(int value, int minimum, int maximum) {
+            return Math.max(minimum, Math.min(maximum, value));
+        }
+
+        private static double clamp(double value, double minimum, double maximum) {
+            return Math.max(minimum, Math.min(maximum, value));
+        }
+    }
+
+    /** Immutable rarity and world-access limits for campfire-started wildfires. */
+    public record WildfireSettings(
+            boolean enabled,
+            int checkIntervalTicks,
+            int dimensionCooldownTicks,
+            int cellCooldownTicks,
+            int candidateChunkRadius,
+            int candidateChunksPerPlayer,
+            int emberRangeBlocks,
+            int targetAttempts,
+            double maximumChancePerCheck
+    ) {
+        public static final WildfireSettings DEFAULT = new WildfireSettings(
+                true,
+                DEFAULT_WILDFIRE_CHECK_INTERVAL,
+                DEFAULT_WILDFIRE_DIMENSION_COOLDOWN,
+                DEFAULT_WILDFIRE_CELL_COOLDOWN,
+                DEFAULT_WILDFIRE_CANDIDATE_CHUNK_RADIUS,
+                DEFAULT_WILDFIRE_CANDIDATE_CHUNKS_PER_PLAYER,
+                DEFAULT_WILDFIRE_EMBER_RANGE,
+                DEFAULT_WILDFIRE_TARGET_ATTEMPTS,
+                DEFAULT_WILDFIRE_MAXIMUM_CHANCE
+        );
+
+        public WildfireSettings {
+            checkIntervalTicks = clamp(checkIntervalTicks, 100, 72_000);
+            dimensionCooldownTicks = clamp(dimensionCooldownTicks, 1_200, 1_728_000);
+            cellCooldownTicks = Math.max(
+                    dimensionCooldownTicks,
+                    clamp(cellCooldownTicks, 1_200, 1_728_000)
+            );
+            candidateChunkRadius = clamp(candidateChunkRadius, 0, 8);
+            candidateChunksPerPlayer = clamp(candidateChunksPerPlayer, 1, 16);
+            emberRangeBlocks = clamp(emberRangeBlocks, 4, 24);
+            targetAttempts = clamp(targetAttempts, 1, 32);
+            maximumChancePerCheck = clamp(
+                    Double.isFinite(maximumChancePerCheck)
+                            ? maximumChancePerCheck
+                            : DEFAULT_WILDFIRE_MAXIMUM_CHANCE,
                     0.0,
                     1.0
             );

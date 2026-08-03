@@ -11,6 +11,9 @@ import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphereSimulationE
 import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphericFrontModel;
 import com.thunder.wildernessodysseyapi.weather.simulation.WeatherAuthority;
 import com.thunder.wildernessodysseyapi.weather.system.TrackedWeatherSystem;
+import com.thunder.wildernessodysseyapi.weather.wildfire.WildfireIgnitionPolicy;
+import com.thunder.wildernessodysseyapi.weather.wildfire.WildfireRiskModel;
+import com.thunder.wildernessodysseyapi.weather.wildfire.WildfireScheduler;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -46,6 +49,11 @@ public final class WeatherDebugCommand {
                                 .executes(context -> forecast(context.getSource())))
                         .then(Commands.literal("systems")
                                 .executes(context -> systems(context.getSource())))
+                        .then(Commands.literal("wildfire")
+                                .then(Commands.literal("risk")
+                                        .executes(context -> wildfireRisk(context.getSource())))
+                                .then(Commands.literal("ignite")
+                                        .executes(context -> igniteWildfire(context.getSource()))))
                         .then(Commands.literal("set")
                                 .then(scalar("humidity", WeatherAuthority.ControlField.HUMIDITY, 0.0, 1.0))
                                 .then(scalar("pressure", WeatherAuthority.ControlField.PRESSURE, 0.5, 1.5))
@@ -192,6 +200,52 @@ public final class WeatherDebugCommand {
                 nearest.intensity() * 100.0
         )), false);
         return systems.size();
+    }
+
+    private static int wildfireRisk(CommandSourceStack source) {
+        BlockPos position = BlockPos.containing(source.getPosition());
+        WildfireRiskModel.RiskProfile risk = WeatherAuthority.get().wildfireRisk(
+                source.getLevel(),
+                position
+        );
+        double chance = WildfireIgnitionPolicy.ignitionChance(risk, WeatherConfig.wildfires());
+        String seasonSource = risk.calendarAvailable() ? "external calendar" : "extreme-weather fallback";
+        source.sendSuccess(() -> Component.literal(String.format(
+                Locale.ROOT,
+                "Wildfire risk: %s, score %.1f%%, chance %.4f%% per due scan; drought %.3f, fire season %.3f (%s), air dryness %.3f, ground dryness %.3f, wind %.3f.",
+                risk.eligible() ? "ELIGIBLE" : "not eligible",
+                risk.risk() * 100.0,
+                chance * 100.0,
+                risk.drought(),
+                risk.fireSeason(),
+                seasonSource,
+                risk.airDryness(),
+                risk.groundDryness(),
+                risk.wind()
+        )), false);
+        return risk.eligible() ? 1 : 0;
+    }
+
+    private static int igniteWildfire(CommandSourceStack source) {
+        WildfireScheduler.IgnitionResult result = WeatherAuthority.get().forceWildfireIgnition(
+                source.getLevel(),
+                BlockPos.containing(source.getPosition())
+        );
+        if (result == WildfireScheduler.IgnitionResult.IGNITED) {
+            source.sendSuccess(() -> Component.literal(
+                    "Forced one nearby open campfire ember into exposed tagged fuel."
+            ), true);
+            return 1;
+        }
+        String reason = switch (result) {
+            case DISABLED -> "Wildfires or localized weather are disabled here.";
+            case FIRE_TICK_DISABLED -> "The dimension lacks open sky or doFireTick is disabled.";
+            case NO_CAMPFIRE -> "No open, lit normal campfire was found within 32 blocks.";
+            case NO_FUEL -> "No exposed tagged ignition fuel was found within ember range.";
+            case IGNITED -> throw new IllegalStateException("Handled successful wildfire ignition");
+        };
+        source.sendFailure(Component.literal(reason));
+        return 0;
     }
 
     private static int set(

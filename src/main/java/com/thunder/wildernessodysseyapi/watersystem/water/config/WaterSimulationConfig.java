@@ -37,6 +37,21 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.IntValue SERVER_SPH_MAX_ACTIVE_BODIES;
     public static final ModConfigSpec.IntValue SERVER_SPH_MAX_PARTICLES_PER_BODY;
     public static final ModConfigSpec.IntValue SERVER_SPH_PARTICLE_TICK_BUDGET;
+    public static final ModConfigSpec.BooleanValue ENABLE_WEATHER_WATER_COUPLING;
+    public static final ModConfigSpec.IntValue SEA_STATE_CELL_SIZE;
+    public static final ModConfigSpec.IntValue SEA_STATE_SYNC_RADIUS_CELLS;
+    public static final ModConfigSpec.IntValue SEA_STATE_UPDATE_INTERVAL_TICKS;
+    public static final ModConfigSpec.DoubleValue SEA_STATE_BUILD_TIME_SECONDS;
+    public static final ModConfigSpec.DoubleValue SEA_STATE_DECAY_TIME_SECONDS;
+    public static final ModConfigSpec.IntValue SEA_STATE_MAX_CELLS;
+    public static final ModConfigSpec.BooleanValue ENABLE_WEATHER_HYDROLOGY;
+    public static final ModConfigSpec.IntValue HYDROLOGY_INTERVAL_TICKS;
+    public static final ModConfigSpec.IntValue HYDROLOGY_PROBES_PER_PLAYER;
+    public static final ModConfigSpec.IntValue HYDROLOGY_MAX_TRANSFERS_PER_TICK;
+    public static final ModConfigSpec.IntValue HYDROLOGY_RAIN_UNITS_PER_PROBE;
+    public static final ModConfigSpec.IntValue HYDROLOGY_EVAPORATION_UNITS_PER_PROBE;
+    public static final ModConfigSpec.IntValue HYDROLOGY_MIN_TRANSFER_UNITS;
+    public static final ModConfigSpec.IntValue HYDROLOGY_MAX_LEDGER_ENTRIES;
     public static final ModConfigSpec.IntValue DEBUG_COMMAND_MAX_RADIUS;
 
     static {
@@ -117,6 +132,58 @@ public final class WaterSimulationConfig {
         SERVER_SPH_PARTICLE_TICK_BUDGET = builder
                 .comment("Maximum server-owned SPH particles advanced per dimension tick. Bodies past the budget wait for a later tick.")
                 .defineInRange("serverSphParticleTickBudget", 900, 0, 4096);
+
+        // Weather coupling is kept behind its own server controls because it
+        // changes authoritative waves and long-timescale canonical volume.
+        builder.comment("Localized weather response and bounded water-cycle coupling.")
+                .push("weather_coupling");
+        ENABLE_WEATHER_WATER_COUPLING = builder
+                .comment("Let localized Wilderness weather drive regional waves, swell, shoreline breaking, water physics, optics, and ambient effects. External/vanilla weather remains the fallback when Wilderness does not own weather.")
+                .define("enabled", true);
+        SEA_STATE_CELL_SIZE = builder
+                .comment("Width in blocks of one regional sea-state cell. Smaller cells follow storm edges more closely but increase server and network work.")
+                .defineInRange("seaStateCellSize", 128, 64, 512);
+        SEA_STATE_SYNC_RADIUS_CELLS = builder
+                .comment("Sea-state cells synchronized around each player. The maximum value sends at most a 9 by 9 lattice.")
+                .defineInRange("seaStateSyncRadiusCells", 2, 1, 4);
+        SEA_STATE_UPDATE_INTERVAL_TICKS = builder
+                .comment("Ticks between regional sea-state target updates. Wave animation still advances every frame.")
+                .defineInRange("seaStateUpdateIntervalTicks", 10, 1, 100);
+        SEA_STATE_BUILD_TIME_SECONDS = builder
+                .comment("Approximate response time for wind waves and swell to build toward stronger weather.")
+                .defineInRange("seaStateBuildTimeSeconds", 35.0, 1.0, 600.0);
+        SEA_STATE_DECAY_TIME_SECONDS = builder
+                .comment("Approximate response time for swell to decay after a storm leaves. This should normally exceed build time.")
+                .defineInRange("seaStateDecayTimeSeconds", 180.0, 1.0, 1800.0);
+        SEA_STATE_MAX_CELLS = builder
+                .comment("Maximum ephemeral regional sea-state cells retained per dimension.")
+                .defineInRange("seaStateMaxCells", 2048, 64, 16384);
+        ENABLE_WEATHER_HYDROLOGY = builder
+                .comment("Allow sustained localized rain, thaw, and evaporation to exchange bounded fixed-point volume with loaded non-ocean Wilderness water.")
+                .define("enableHydrology", true);
+        HYDROLOGY_INTERVAL_TICKS = builder
+                .comment("Ticks between loaded-only hydrology sampling passes.")
+                .defineInRange("hydrologyIntervalTicks", 40, 20, 1200);
+        HYDROLOGY_PROBES_PER_PLAYER = builder
+                .comment("Deterministic surface-water probes attempted around each player per hydrology pass.")
+                .defineInRange("hydrologyProbesPerPlayer", 4, 1, 32);
+        HYDROLOGY_MAX_TRANSFERS_PER_TICK = builder
+                .comment("Maximum canonical add/remove operations committed by hydrology in one dimension pass.")
+                .defineInRange("hydrologyMaxTransfersPerTick", 4, 1, 64);
+        HYDROLOGY_RAIN_UNITS_PER_PROBE = builder
+                .comment("Maximum fixed-point water units credited by one fully intense rain/thaw probe. One full block is 4096 units.")
+                .defineInRange("hydrologyRainUnitsPerProbe", 48, 0, 4096);
+        HYDROLOGY_EVAPORATION_UNITS_PER_PROBE = builder
+                .comment("Maximum fixed-point water units debited by one hot, dry, windy evaporation probe.")
+                .defineInRange("hydrologyEvaporationUnitsPerProbe", 18, 0, 4096);
+        HYDROLOGY_MIN_TRANSFER_UNITS = builder
+                .comment("Minimum accumulated absolute balance before hydrology mutates canonical water, avoiding tiny noisy writes.")
+                .defineInRange("hydrologyMinTransferUnits", 64, 1, 4096);
+        HYDROLOGY_MAX_LEDGER_ENTRIES = builder
+                .comment("Maximum persisted chunk-scale fractional hydrology balances per dimension.")
+                .defineInRange("hydrologyMaxLedgerEntries", 4096, 128, 65536);
+        builder.pop();
+
         DEBUG_COMMAND_MAX_RADIUS = builder
                 .comment("Maximum block radius accepted by /wowater summary and /wowater repair.")
                 .defineInRange("debugCommandMaxRadius", 16, 1, 64);
@@ -249,6 +316,81 @@ public final class WaterSimulationConfig {
     /** Returns the per-dimension server SPH particle simulation budget. */
     public static int serverSphParticleTickBudget() {
         return serverSphLocalSimulationEnabled() ? SERVER_SPH_PARTICLE_TICK_BUDGET.get() : 0;
+    }
+
+    /** Returns whether localized weather may drive authoritative water response. */
+    public static boolean weatherWaterCouplingEnabled() {
+        return wildernessWaterEnabled() && ENABLE_WEATHER_WATER_COUPLING.get();
+    }
+
+    /** Returns the regional sea-state cell width in blocks. */
+    public static int seaStateCellSize() {
+        return SEA_STATE_CELL_SIZE.get();
+    }
+
+    /** Returns the regional synchronization radius around each player. */
+    public static int seaStateSyncRadiusCells() {
+        return SEA_STATE_SYNC_RADIUS_CELLS.get();
+    }
+
+    /** Returns the server update interval for weather-driven sea state. */
+    public static int seaStateUpdateIntervalTicks() {
+        return SEA_STATE_UPDATE_INTERVAL_TICKS.get();
+    }
+
+    /** Returns the stronger-weather sea-state response time in seconds. */
+    public static float seaStateBuildTimeSeconds() {
+        return SEA_STATE_BUILD_TIME_SECONDS.get().floatValue();
+    }
+
+    /** Returns the post-storm swell decay time in seconds. */
+    public static float seaStateDecayTimeSeconds() {
+        return SEA_STATE_DECAY_TIME_SECONDS.get().floatValue();
+    }
+
+    /** Returns the maximum retained regional sea-state cells per dimension. */
+    public static int seaStateMaxCells() {
+        return SEA_STATE_MAX_CELLS.get();
+    }
+
+    /** Returns whether loaded finite water participates in rain/evaporation exchange. */
+    public static boolean weatherHydrologyEnabled() {
+        return weatherWaterCouplingEnabled() && ENABLE_WEATHER_HYDROLOGY.get();
+    }
+
+    /** Returns the loaded-only hydrology sampling interval. */
+    public static int hydrologyIntervalTicks() {
+        return HYDROLOGY_INTERVAL_TICKS.get();
+    }
+
+    /** Returns the hydrology probe budget for each player. */
+    public static int hydrologyProbesPerPlayer() {
+        return HYDROLOGY_PROBES_PER_PLAYER.get();
+    }
+
+    /** Returns the maximum committed hydrology transfers per dimension pass. */
+    public static int hydrologyMaxTransfersPerTick() {
+        return HYDROLOGY_MAX_TRANSFERS_PER_TICK.get();
+    }
+
+    /** Returns the maximum rain/thaw credit produced by one probe. */
+    public static int hydrologyRainUnitsPerProbe() {
+        return HYDROLOGY_RAIN_UNITS_PER_PROBE.get();
+    }
+
+    /** Returns the maximum evaporation debit produced by one probe. */
+    public static int hydrologyEvaporationUnitsPerProbe() {
+        return HYDROLOGY_EVAPORATION_UNITS_PER_PROBE.get();
+    }
+
+    /** Returns the accumulated balance required before a canonical mutation. */
+    public static int hydrologyMinTransferUnits() {
+        return HYDROLOGY_MIN_TRANSFER_UNITS.get();
+    }
+
+    /** Returns the maximum persisted chunk-scale hydrology balances. */
+    public static int hydrologyMaxLedgerEntries() {
+        return HYDROLOGY_MAX_LEDGER_ENTRIES.get();
     }
 
     /** Returns the maximum debug radius allowed by server config. */

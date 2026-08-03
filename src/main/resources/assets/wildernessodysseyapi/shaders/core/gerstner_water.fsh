@@ -187,6 +187,7 @@ float screenEdgeConfidence(vec2 uv) {
 vec3 environmentReflection(vec3 reflectionDirection, float fresnel, float sea) {
     float rain = clamp(Weather.x, 0.0, 1.0);
     float thunder = clamp(Weather.y, 0.0, 1.0);
+    float frozen = clamp(Weather.w, 0.0, 1.0);
     float overcast = clamp(rain * 0.74 + thunder * 0.55, 0.0, 1.0);
     vec3 nightSky = vec3(0.045, 0.075, 0.145);
     vec3 clearSky = mix(nightSky, max(EnvironmentColor.rgb, vec3(0.0)), celestialDaylight);
@@ -203,7 +204,11 @@ vec3 environmentReflection(vec3 reflectionDirection, float fresnel, float sea) {
     // directional highlight even when screen-space tracing cannot see the sky.
     float lightAlignment = max(dot(normalize(reflectionDirection),
         normalize(celestialDirection)), 0.0);
-    float opticalRoughness = clamp(sea * 0.62 + rain * 0.48 + thunder * 0.22, 0.0, 1.0);
+    float opticalRoughness = clamp(
+        sea * 0.62 + rain * 0.48 + thunder * 0.22 + frozen * 0.38,
+        0.0,
+        1.0
+    );
     float lightDisc = pow(lightAlignment, mix(720.0, 76.0, opticalRoughness));
     float lightBloom = pow(lightAlignment, mix(46.0, 18.0, opticalRoughness)) * 0.10;
     vec3 celestialColor = mix(vec3(0.42, 0.54, 0.82),
@@ -312,11 +317,12 @@ void main() {
     }
 
     float sea = clamp(SeaState, 0.0, 1.0);
+    float frozen = clamp(Weather.w, 0.0, 1.0);
     vec3 baseWorldNormal = normalize(worldNormal);
     vec3 microWorldNormal = proceduralWorldNormal(localCurrent, sea);
     float continuousSurface = smoothstep(0.10, 0.70, surfaceContinuity);
     vec3 combinedWorldNormal = normalize(mix(baseWorldNormal, microWorldNormal,
-        (0.30 + sea * 0.18) * continuousSurface));
+        (0.30 + sea * 0.18) * continuousSurface * (1.0 - frozen * 0.90)));
     vec3 normal = normalize(mat3(ModelViewMat) * combinedWorldNormal);
     vec3 viewDirection = normalize(-viewPosition);
     float facing = clamp(dot(normal, viewDirection), 0.0, 1.0);
@@ -498,7 +504,8 @@ void main() {
         }
     }
     float impulseFoam = disturbanceStrength * (0.34 + sea * 0.26);
-    float foam = clamp(max(slopeFoam, max(shoreBreaker, currentShear)) + impulseFoam, 0.0, 1.0);
+    float foam = clamp(max(slopeFoam, max(shoreBreaker, currentShear)) + impulseFoam, 0.0, 1.0)
+        * (1.0 - frozen * 0.88);
     vec3 halfVector = celestialDirection + viewDirection;
     vec3 halfDirection = dot(halfVector, halfVector) > 0.000001
         ? normalize(halfVector)
@@ -531,12 +538,17 @@ void main() {
     vec3 materialNumerator = waterMaterialNumerator * (1.0 - foamCoverage)
         + foamColor * foamCoverage;
     vec3 materialColor = materialNumerator / max(materialWeight, vec3(0.0001));
+    float iceCoverage = smoothstep(0.34, 0.88, frozen);
+    vec3 iceColor = vec3(0.72, 0.86, 0.94) * waterLighting * ColorModulator.rgb;
+    materialColor = mix(materialColor, iceColor, iceCoverage * 0.82);
+    materialWeight = mix(materialWeight, vec3(0.94), iceCoverage * 0.86);
 
     float fogRange = max(0.001, FogEnd - FogStart);
     float fogFactor = clamp((vertexDistance - FogStart) / fogRange, 0.0, 1.0);
     vec3 foggedMaterial = mix(materialColor, FogColor.rgb, fogFactor);
     vec3 transmittedScene = sceneColor * transmission * (1.0 - fresnel)
         * (1.0 - foamCoverage);
+    transmittedScene *= 1.0 - iceCoverage * 0.88;
     vec3 color = transmittedScene + foggedMaterial * materialWeight;
 
     float mediumOpacity = 1.0 - dot(transmission, vec3(0.2126, 0.7152, 0.0722));
@@ -546,6 +558,7 @@ void main() {
         0.96
     ) * ColorModulator.a * mix(0.78, 1.28, opacityControl);
     fallbackAlpha = min(0.98, fallbackAlpha + foam * 0.08);
+    fallbackAlpha = min(0.995, fallbackAlpha + iceCoverage * 0.72);
     float loadedFrontier = smoothstep(0.08, 0.55, surfaceContinuity);
 
     if (capturedScene) {

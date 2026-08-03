@@ -106,7 +106,8 @@ public final class WaterRenderCoordinator {
                 && ClientWaterImmersion.sample(event.getCamera(), partialTick).isVisuallySubmerged();
         if (!visible.isEmpty() || submergedOpticsNeedCapture) {
             float timeSeconds = (level.getGameTime() + partialTick) / 20.0f;
-            OceanSeaState.Sample seaState = ClientOceanSeaState.current(level);
+            OceanSeaState.Sample seaState = ClientOceanSeaState.sampleAt(
+                    level, camera.x, camera.z);
             WaterShaders.updateOceanUniforms(
                     timeSeconds,
                     seaState,

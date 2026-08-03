@@ -104,6 +104,43 @@ class WeatherConfigTest {
     }
 
     @Test
+    void wildfireSettingsClampRarityCooldownAndLoadedChunkBudgets() {
+        WeatherConfig.WildfireSettings unsafe = new WeatherConfig.WildfireSettings(
+                true,
+                -1,
+                Integer.MAX_VALUE,
+                0,
+                Integer.MAX_VALUE,
+                0,
+                Integer.MAX_VALUE,
+                0,
+                Double.NaN
+        );
+        WeatherConfig.WildfireSettings cellBelowDimension = new WeatherConfig.WildfireSettings(
+                true,
+                600,
+                48_000,
+                1_200,
+                2,
+                4,
+                10,
+                12,
+                2.0
+        );
+
+        assertEquals(100, unsafe.checkIntervalTicks());
+        assertEquals(1_728_000, unsafe.dimensionCooldownTicks());
+        assertEquals(1_728_000, unsafe.cellCooldownTicks());
+        assertEquals(8, unsafe.candidateChunkRadius());
+        assertEquals(1, unsafe.candidateChunksPerPlayer());
+        assertEquals(24, unsafe.emberRangeBlocks());
+        assertEquals(1, unsafe.targetAttempts());
+        assertEquals(0.01, unsafe.maximumChancePerCheck());
+        assertEquals(48_000, cellBelowDimension.cellCooldownTicks());
+        assertEquals(1.0, cellBelowDimension.maximumChancePerCheck());
+    }
+
+    @Test
     void seasonSettingsClampPackBalanceValues() {
         WeatherConfig.SeasonSettings settings =
                 new WeatherConfig.SeasonSettings(true, 50.0, -2.0, Double.NaN);

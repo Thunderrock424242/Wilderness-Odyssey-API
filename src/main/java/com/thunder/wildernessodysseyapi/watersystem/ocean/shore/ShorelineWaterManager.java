@@ -190,7 +190,7 @@ public final class ShorelineWaterManager {
                     centerZ,
                     timeSeconds,
                     GerstnerWaveProfile.OCEAN.waveCount,
-                    OceanSeaState.sample(level, 0.0f).spectrum()
+                    OceanSeaState.sampleAt(level, centerX, centerZ, 0.0f).spectrum()
             );
             float boundarySurface = TideSystem.getTideOffset(level) + oceanBoundary.height();
             grid.step(0.05f, boundarySurface);

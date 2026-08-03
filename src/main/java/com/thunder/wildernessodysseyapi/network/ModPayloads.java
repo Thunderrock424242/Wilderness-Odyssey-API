@@ -28,7 +28,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModPayloads {
 
-    private static final String NETWORK_VERSION = "8";
+    private static final String NETWORK_VERSION = "9";
 
     private ModPayloads() {
     }
@@ -96,7 +96,7 @@ public final class ModPayloads {
                 OceanSeaStatePayload.TYPE,
                 OceanSeaStatePayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() ->
-                        ClientOceanSeaState.accept(context.player().level(), payload.toSample()))
+                        ClientOceanSeaState.accept(context.player().level(), payload))
         );
         registrar.playToClient(
                 WeatherRegionSyncPayload.TYPE,

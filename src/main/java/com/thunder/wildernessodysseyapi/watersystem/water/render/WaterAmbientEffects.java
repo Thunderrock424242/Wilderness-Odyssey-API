@@ -119,7 +119,8 @@ public final class WaterAmbientEffects {
             RandomSource random,
             int budget
     ) {
-        OceanSeaState.Sample sea = ClientOceanSeaState.current(level);
+        OceanSeaState.Sample sea = ClientOceanSeaState.sampleAt(
+                level, player.getX(), player.getZ());
         int emitted = 0;
         int attempts = attemptBudget(budget);
         for (int attempt = 0; attempt < attempts && emitted < budget; attempt++) {

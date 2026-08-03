@@ -95,7 +95,9 @@ public final class AtmosphereInputSampler {
                 climate.terrainGradientZ,
                 climate.terrainRoughness,
                 water.oceanCoverage() * water.loadedProbeFraction(),
-                water.inlandWaterCoverage() * water.loadedProbeFraction()
+                water.inlandWaterCoverage() * water.loadedProbeFraction(),
+                season.fireSeasonFactor(),
+                season.calendarAvailable()
         );
     }
 
