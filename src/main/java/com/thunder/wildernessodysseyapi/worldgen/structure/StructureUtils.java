@@ -5,10 +5,10 @@ package com.thunder.wildernessodysseyapi.worldgen.structure;
  */
 public final class StructureUtils {
     /**
-     * Maximum number of blocks that a structure placement operation may affect.
-     * <p>
-     * The vanilla limit is 48 blocks, but Wilderness Odyssey expands this to 256
-     * to better accommodate larger modded structures.
+     * Maximum supported template span along any one axis.
+     *
+     * <p>Wilderness Odyssey allows a larger span than the vanilla structure
+     * block so imported modpack prefabs can be placed by the custom loader.</p>
      */
     public static final int STRUCTURE_BLOCK_LIMIT = 256;
 

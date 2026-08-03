@@ -160,9 +160,9 @@ public class NBTStructurePlacer {
         try {
             LargeStructurePlacementOptimizer.preparePlacement(level, foundation.origin(), data.size());
             if (LargeStructurePlacementOptimizer.exceedsStructureBlockLimit(data.size())) {
-                int estimated = LargeStructurePlacementOptimizer.estimateAffectedBlocks(data.size());
-                ModConstants.LOGGER.warn("Placing structure {} will touch approximately {} blocks, exceeding the recommended limit of {}.",
-                        id, estimated, StructureUtils.STRUCTURE_BLOCK_LIMIT);
+                ModConstants.LOGGER.warn(
+                        "Structure {} has template size {} and exceeds the supported per-axis span of {}.",
+                        id, data.size(), StructureUtils.STRUCTURE_BLOCK_LIMIT);
             }
 
             BoundingBox placementBox = expandPlacementBox(foundation.origin(), data.size(), data.template());
@@ -287,33 +287,12 @@ public class NBTStructurePlacer {
         }
 
         SurfaceSample sample = TerrainReplacerEngine.sampleSurface(level, anchor);
-        int surfaceAnchorY = sample.y() + 1;
-        int desiredY = anchor.getY() - levelingOffset.getY();
-        int maxDepth = StructureConfig.MAX_LEVELING_DEPTH.get();
-        if (maxDepth >= 0) {
-            int clampedY = Math.max(desiredY, surfaceAnchorY - maxDepth);
-            if (clampedY != desiredY) {
-                ModConstants.LOGGER.warn("Clamping leveling depth for structure {}. Desired bury depth {} exceeds limit {} at marker {}.",
-                        id, surfaceAnchorY - desiredY, maxDepth, levelingOffset);
-                desiredY = clampedY;
-            }
-        }
 
-        int markerY = desiredY + levelingOffset.getY();
-        if (markerY < MIN_LEVELING_MARKER_Y) {
-            ModConstants.LOGGER.warn(
-                    "Raising structure {} so the leveling marker sits at y={} instead of y={}.",
-                    id, MIN_LEVELING_MARKER_Y, markerY);
-            desiredY = MIN_LEVELING_MARKER_Y - levelingOffset.getY();
-        } else if (markerY > MAX_LEVELING_MARKER_Y) {
-            ModConstants.LOGGER.warn(
-                    "Lowering structure {} so the leveling marker sits at y={} instead of y={}.",
-                    id, MAX_LEVELING_MARKER_Y, markerY);
-            desiredY = MAX_LEVELING_MARKER_Y - levelingOffset.getY();
-        }
-
-        BlockPos placementOrigin = new BlockPos(origin.getX(), desiredY, origin.getZ());
-        return new PlacementFoundation(placementOrigin, sample.state());
+        // The anchored API receives an explicit world position for the marker.
+        // Reapplying generic terrain-depth clamps here treated the marker's
+        // local Y offset as burial depth, then immediately undid that clamp to
+        // force the marker back to sea level. Honor the caller-owned anchor.
+        return new PlacementFoundation(origin, sample.state());
     }
 
     public List<BlockPos> getCryoOffsets(ServerLevel level) {

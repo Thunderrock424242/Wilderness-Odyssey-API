@@ -2,6 +2,9 @@ package com.thunder.wildernessodysseyapi.mixinconfig;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,5 +39,15 @@ class WildernessMixinConfigPluginTest {
                 PACKAGE + "SodiumBlockOcclusionCacheMixin", ignored -> true));
         assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
                 PACKAGE + "BoatRenderMixin", ignored -> false));
+    }
+
+    @Test
+    void embeddiumMixinIsOnlyParsedWhenItsLegacyTargetExists() {
+        assertEquals(List.of(), WildernessMixinConfigPlugin.discoverOptionalMixins(ignored -> false));
+        assertEquals(
+                List.of("EmbeddiumWaterRenderMixin"),
+                WildernessMixinConfigPlugin.discoverOptionalMixins(name -> name.equals(
+                        "org.embeddedt.embeddium.impl.render.chunk.compile.pipeline.FluidRenderer"))
+        );
     }
 }

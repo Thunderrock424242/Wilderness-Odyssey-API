@@ -36,14 +36,19 @@ public final class LargeStructurePlacementOptimizer {
     }
 
     /**
-     * Checks whether the given template size exceeds the mod's soft limit for structure placements.
-     * This can be used to log warnings before starting expensive operations.
+     * Checks whether any template axis exceeds the supported structure span.
+     *
+     * <p>The structure-block limit describes the maximum size of one axis, not
+     * the total bounding-box volume. Large but valid prefabs such as the starter
+     * bunker should therefore not be reported as invalid merely because their
+     * three-dimensional volume is greater than the per-axis limit.</p>
      *
      * @param size the template size
      * @return {@code true} when the placement should be considered heavy
      */
     public static boolean exceedsStructureBlockLimit(Vec3i size) {
-        return estimateAffectedBlocks(size) > StructureUtils.STRUCTURE_BLOCK_LIMIT;
+        return Math.max(size.getX(), Math.max(size.getY(), size.getZ()))
+                > StructureUtils.STRUCTURE_BLOCK_LIMIT;
     }
 
     /**

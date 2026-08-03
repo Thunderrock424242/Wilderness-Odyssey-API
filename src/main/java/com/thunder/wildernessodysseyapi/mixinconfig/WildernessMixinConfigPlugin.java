@@ -19,6 +19,9 @@ import java.util.function.Predicate;
 public final class WildernessMixinConfigPlugin implements IMixinConfigPlugin {
 
     private static final String MIXIN_PACKAGE = "com.thunder.wildernessodysseyapi.mixin.";
+    private static final String EMBEDDIUM_MIXIN = "EmbeddiumWaterRenderMixin";
+    private static final String EMBEDDIUM_TARGET =
+            "org.embeddedt.embeddium.impl.render.chunk.compile.pipeline.FluidRenderer";
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -51,7 +54,7 @@ public final class WildernessMixinConfigPlugin implements IMixinConfigPlugin {
             case MIXIN_PACKAGE + "LegacyIrisWaterMaterialBridgeMixin" ->
                     "net.coderbot.iris.block_rendering.BlockRenderingSettings";
             case MIXIN_PACKAGE + "EmbeddiumWaterRenderMixin" ->
-                    "org.embeddedt.embeddium.impl.render.chunk.compile.pipeline.FluidRenderer";
+                    EMBEDDIUM_TARGET;
             case MIXIN_PACKAGE + "SodiumFluidRenderMixin" ->
                     "net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.DefaultFluidRenderer";
             case MIXIN_PACKAGE + "SodiumBlockOcclusionCacheMixin" ->
@@ -76,7 +79,21 @@ public final class WildernessMixinConfigPlugin implements IMixinConfigPlugin {
 
     @Override
     public List<String> getMixins() {
-        return null;
+        return discoverOptionalMixins(WildernessMixinConfigPlugin::classResourceExists);
+    }
+
+    /**
+     * Discovers optional mixins that must not be parsed when their targets are absent.
+     *
+     * <p>Embeddium's legacy target is added through the plugin instead of the
+     * static client list because Mixin reads a statically listed pseudo target
+     * early enough to emit a ClassNotFound warning even when
+     * {@link #shouldApplyMixin(String, String)} later vetoes it.</p>
+     */
+    static List<String> discoverOptionalMixins(Predicate<String> classExists) {
+        return classExists.test(EMBEDDIUM_TARGET)
+                ? List.of(EMBEDDIUM_MIXIN)
+                : List.of();
     }
 
     @Override

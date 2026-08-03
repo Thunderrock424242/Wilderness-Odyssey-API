@@ -1,6 +1,9 @@
 {
   "replace": false,
   "values": [
-    "wildernessodysseyapi:impact_zone"
+    {
+      "id": "wildernessodysseyapi:impact_zone",
+      "required": false
+    }
   ]
 }
