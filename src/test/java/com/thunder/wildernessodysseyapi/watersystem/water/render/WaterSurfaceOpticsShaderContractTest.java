@@ -50,6 +50,29 @@ class WaterSurfaceOpticsShaderContractTest {
     }
 
     @Test
+    void foregroundTerrainOccludesDisplacedWaterWithStableViewSpaceTolerance() throws IOException {
+        String fragment = readSurfaceFragment();
+        int depthSample = fragment.indexOf("float sceneDepth =");
+        int terrainRejection = fragment.indexOf(
+                "sceneViewDepth + depthTolerance < surfaceViewDepth");
+        int opticalDepth = fragment.indexOf("bool validDepth =", terrainRejection);
+
+        assertTrue(depthSample >= 0, "Missing captured scene depth sample");
+        assertTrue(terrainRejection > depthSample,
+                "Foreground terrain must be compared after sampling captured depth");
+        assertTrue(opticalDepth > terrainRejection,
+                "Foreground rejection must run before behind-water optical depth");
+        assertTrue(fragment.substring(terrainRejection, opticalDepth).contains("discard;"),
+                "Foreground terrain must reject the hidden water fragment");
+        assertTrue(fragment.contains(
+                "float depthTolerance = max(0.015, surfaceViewDepth * 0.0005)"));
+        assertTrue(fragment.contains(
+                "sceneViewDepth > surfaceViewDepth + depthTolerance"));
+        assertFalse(fragment.contains("sceneDepth > gl_FragCoord.z + 0.00001"),
+                "Non-linear depth thresholds shimmer and lose precision at long range");
+    }
+
+    @Test
     void screenSpaceReflectionUsesBoundedRefinementAndConfidence() throws IOException {
         String fragment = readSurfaceFragment();
 

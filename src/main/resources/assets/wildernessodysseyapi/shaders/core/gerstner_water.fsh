@@ -325,9 +325,28 @@ void main() {
     vec2 screenUv = gl_FragCoord.xy / max(ScreenSize, vec2(1.0));
     bool capturedScene = SceneCaptureValid > 0.5;
     float sceneDepth = capturedScene ? texture(SceneDepth, screenUv).r : 1.0;
-    bool validDepth = capturedScene && sceneDepth < 0.99998
-        && sceneDepth > gl_FragCoord.z + 0.00001;
-    vec3 sceneView = validDepth ? reconstructViewPosition(screenUv, sceneDepth) : viewPosition;
+    bool sceneHasDepth = capturedScene && sceneDepth < 0.99998;
+    vec3 sampledSceneView = sceneHasDepth
+        ? reconstructViewPosition(screenUv, sceneDepth)
+        : viewPosition;
+    float surfaceViewDepth = max(0.0, -viewPosition.z);
+    float sceneViewDepth = max(0.0, -sampledSceneView.z);
+
+    // The custom pass can target a separate translucent framebuffer whose
+    // hardware depth does not always retain every opaque terrain sample. The
+    // captured scene is the authoritative visibility source: reject a wave
+    // behind foreground terrain before it can replace that terrain's color.
+    // A small view-space tolerance treats nearly coincident fallback water as
+    // the same surface and scales gently with distance to avoid grazing-angle
+    // shimmer without letting full terrain blocks leak through.
+    float depthTolerance = max(0.015, surfaceViewDepth * 0.0005);
+    if (sceneHasDepth && sceneViewDepth + depthTolerance < surfaceViewDepth) {
+        discard;
+    }
+
+    bool validDepth = sceneHasDepth
+        && sceneViewDepth > surfaceViewDepth + depthTolerance;
+    vec3 sceneView = validDepth ? sampledSceneView : viewPosition;
     vec3 incidentRay = normalize(viewPosition);
     float centerThickness = validDepth
         ? clamp(dot(sceneView - viewPosition, incidentRay), 0.0, 64.0)

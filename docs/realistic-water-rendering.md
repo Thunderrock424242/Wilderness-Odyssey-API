@@ -173,6 +173,7 @@ being written and restores both framebuffer bindings after the blit.
 The core water shader uses those textures for:
 
 - depth-aware screen-space refraction with wave-normal distortion;
+- captured-depth rejection when solid terrain is in front of a displaced wave;
 - clamped screen sampling and silhouette/discontinuity rejection;
 - approximate water thickness reconstructed from scene and surface depth;
 - Beer-Lambert transmission and body-weighted absorption;
@@ -185,7 +186,10 @@ The core water shader uses those textures for:
 Invalid depth and unavailable scene textures fail to the environment path
 instead of producing halos or framebuffer feedback. Shallow face-on water
 retains transmission, deep paths absorb progressively, and grazing angles
-favor reflection without forcing uniform opacity.
+favor reflection without forcing uniform opacity. Foreground rejection and
+refraction share a view-space tolerance, preventing cave walls from leaking the
+surface while avoiding distance-dependent shimmer against nearly coincident
+fallback water.
 
 The source and flowing Wilderness fluids are registered as translucent. This
 keeps a safe fallback visible before a custom chunk mesh is ready and preserves
