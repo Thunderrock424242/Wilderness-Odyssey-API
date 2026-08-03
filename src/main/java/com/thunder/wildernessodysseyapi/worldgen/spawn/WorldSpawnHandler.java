@@ -47,8 +47,13 @@ public class WorldSpawnHandler {
                     .min(Comparator.comparingDouble(pos -> pos.distSqr(anchor)))
                     .orElse(spawnBlockPositions.get(0));
             world.setDefaultSpawnPos(spawnBlockPos, 0.0F);
+        } else if (data.hasStarterBunkerPlaced()) {
+            LOGGER.warn("Starter bunker data for {} contains no Cryo Tube Blocks; players will remain at the vanilla spawn.",
+                    world.dimension().location());
         } else {
-            LOGGER.warn("No Cryo Tube Blocks found in {}; players will remain at the vanilla spawn until one generates.",
+            // New-world level load runs before CreateSpawnPosition places the
+            // starter bunker, so an empty list at this point is expected.
+            LOGGER.debug("Cryo Tube spawn data for {} is awaiting starter bunker placement.",
                     world.dimension().location());
         }
     }

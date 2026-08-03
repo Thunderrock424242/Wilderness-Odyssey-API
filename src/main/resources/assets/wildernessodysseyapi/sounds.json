@@ -16,5 +16,32 @@
         "stream": true
       }
     ]
+  },
+  "anomaly_priority_track": {
+    "category": "music",
+    "sounds": [
+      {
+        "name": "wildernessodysseyapi:music/outside_the_box",
+        "stream": true
+      }
+    ]
+  },
+  "anomaly_biome_music": {
+    "category": "music",
+    "sounds": [
+      {
+        "name": "wildernessodysseyapi:music/outside_the_box",
+        "stream": true
+      }
+    ]
+  },
+  "impact_site_music": {
+    "category": "music",
+    "sounds": [
+      {
+        "name": "wildernessodysseyapi:music/dont_be_so_serious",
+        "stream": true
+      }
+    ]
   }
 }
