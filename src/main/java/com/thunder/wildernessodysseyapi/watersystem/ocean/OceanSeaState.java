@@ -1,15 +1,17 @@
 package com.thunder.wildernessodysseyapi.watersystem.ocean;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
+import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 
 /**
- * Derives a deterministic ocean state from server-owned world weather.
+ * Defines the bounded physical response of ocean water to weather.
  *
- * <p>Rain, thunder, game time, and the dimension key are already synchronized
- * Minecraft state. The server samples them into a compact snapshot for clients,
- * keeping wind direction, wave energy, shore breaking, and gameplay forces on
- * one timeline without altering vanilla water tags or fluid blocks.</p>
+ * <p>Localized Wilderness weather is converted through
+ * {@link #targetFromWeather(WeatherSample, Sample)} and retained by
+ * {@link OceanSeaStateField}. {@link #vanillaFallback(Level, float)} remains a
+ * deliberate compatibility path when Wilderness does not own weather.</p>
  */
 public final class OceanSeaState {
 
@@ -32,8 +34,59 @@ public final class OceanSeaState {
     private OceanSeaState() {
     }
 
-    /** Samples the authoritative environmental sea state for a world. */
-    public static Sample sample(Level level, float partialTick) {
+    /**
+     * Derives a localized target from one immutable atmospheric sample.
+     *
+     * <p>Chop follows current surface wind, while accumulated storm energy and
+     * pressure deficit contribute organized swell. When the atmosphere is
+     * calm, the previous direction is retained so waves do not snap to an
+     * arbitrary compass heading.</p>
+     */
+    public static Sample targetFromWeather(WeatherSample weather, Sample previous) {
+        WeatherSample safeWeather = weather == null ? WeatherSample.CLEAR : weather;
+        Sample safePrevious = previous == null ? CALM : previous;
+        float windX = (float) safeWeather.wind().x();
+        float windZ = (float) safeWeather.wind().z();
+        float windMagnitude = finiteClamp((float) Math.hypot(windX, windZ), 0.0f, 1.4142136f, 0.0f);
+        float normalizedWind = clamp01(windMagnitude / 1.4142136f);
+        if (windMagnitude <= 0.035f) {
+            windX = safePrevious.windDirectionX();
+            windZ = safePrevious.windDirectionZ();
+        }
+
+        float storm = clamp01((float) safeWeather.stormEnergy());
+        float precipitation = clamp01((float) safeWeather.precipitationIntensity());
+        float thunder = clamp01((float) safeWeather.thunderIntensity());
+        float pressureDeficit = clamp01((float) ((1.0 - safeWeather.pressure()) / 0.22));
+        float weatherEnergy = clamp01(
+                normalizedWind * 0.52f
+                        + storm * 0.34f
+                        + precipitation * 0.10f
+                        + thunder * 0.12f
+                        + pressureDeficit * 0.10f
+        );
+        float strength = clamp01(0.10f + weatherEnergy * 0.90f);
+        float windSpeed = 1.5f + normalizedWind * 18.0f + storm * 4.0f;
+        float swellScale = 0.62f + strength * 0.92f + storm * 0.28f;
+        float chopScale = 0.42f + normalizedWind * 1.45f + precipitation * 0.18f;
+        float directionBlend = 0.08f + normalizedWind * 0.78f;
+        float breakingStrength = smoothStep(0.20f, 0.88f, strength)
+                * (0.72f + storm * 0.28f);
+
+        return new Sample(
+                strength,
+                windX,
+                windZ,
+                windSpeed,
+                swellScale,
+                chopScale,
+                directionBlend,
+                breakingStrength
+        );
+    }
+
+    /** Samples synchronized vanilla/external weather when localized authority is inactive. */
+    public static Sample vanillaFallback(Level level, float partialTick) {
         float rain = clamp01(level.getRainLevel(partialTick));
         float thunder = clamp01(level.getThunderLevel(partialTick));
         float time = level.getGameTime() + partialTick;
@@ -67,6 +120,29 @@ public final class OceanSeaState {
                 directionBlend,
                 breakingStrength
         );
+    }
+
+    /**
+     * Retained compatibility alias for integrations compiled against the
+     * original dimension-wide model. New water code should sample the regional
+     * field with world coordinates.
+     */
+    @Deprecated(forRemoval = false)
+    public static Sample sample(Level level, float partialTick) {
+        return vanillaFallback(level, partialTick);
+    }
+
+    /** Resolves the authoritative regional state for server or client callers. */
+    public static Sample sampleAt(
+            Level level,
+            double worldX,
+            double worldZ,
+            float partialTick
+    ) {
+        if (level instanceof ServerLevel serverLevel) {
+            return OceanSeaStateField.sampleAt(serverLevel, worldX, worldZ, partialTick);
+        }
+        return ClientOceanSeaState.sampleAt(level, worldX, worldZ);
     }
 
     /** Complete bounded state shared by rendering, physics, and networking. */
@@ -113,8 +189,18 @@ public final class OceanSeaState {
         /** Smooths infrequent network snapshots without predicting server weather. */
         public Sample interpolate(Sample target, float factor) {
             float t = clamp01(factor);
-            float blendedWindX = lerp(windDirectionX, target.windDirectionX, t);
-            float blendedWindZ = lerp(windDirectionZ, target.windDirectionZ, t);
+            float startAngle = (float) Math.atan2(windDirectionZ, windDirectionX);
+            float targetAngle = (float) Math.atan2(
+                    target.windDirectionZ,
+                    target.windDirectionX
+            );
+            float angleDelta = (float) Math.atan2(
+                    Math.sin(targetAngle - startAngle),
+                    Math.cos(targetAngle - startAngle)
+            );
+            float blendedAngle = startAngle + angleDelta * t;
+            float blendedWindX = (float) Math.cos(blendedAngle);
+            float blendedWindZ = (float) Math.sin(blendedAngle);
             return new Sample(
                     lerp(strength, target.strength, t),
                     blendedWindX,
@@ -125,6 +211,29 @@ public final class OceanSeaState {
                     lerp(directionBlend, target.directionBlend, t),
                     lerp(breakingStrength, target.breakingStrength, t)
             );
+        }
+
+        /**
+         * Advances toward a target with slower post-storm decay than buildup.
+         *
+         * @param target bounded environmental target
+         * @param elapsedTicks number of server ticks represented by this update
+         * @param buildTimeSeconds response time while energy is increasing
+         * @param decayTimeSeconds response time while energy is decreasing
+         */
+        public Sample approach(
+                Sample target,
+                long elapsedTicks,
+                float buildTimeSeconds,
+                float decayTimeSeconds
+        ) {
+            Sample safeTarget = target == null ? CALM : target;
+            float seconds = Math.max(0.0f, elapsedTicks) / 20.0f;
+            float responseSeconds = safeTarget.strength >= strength
+                    ? Math.max(0.05f, buildTimeSeconds)
+                    : Math.max(0.05f, decayTimeSeconds);
+            float response = clamp01(1.0f - (float) Math.exp(-seconds / responseSeconds));
+            return interpolate(safeTarget, response);
         }
     }
 

@@ -26,6 +26,8 @@ import com.thunder.wildernessodysseyapi.weather.system.TrackedWeatherSystem;
 import com.thunder.wildernessodysseyapi.weather.system.WeatherSystemInfluenceModel;
 import com.thunder.wildernessodysseyapi.weather.system.WeatherSystemTracker;
 import com.thunder.wildernessodysseyapi.weather.system.WeatherSystemType;
+import com.thunder.wildernessodysseyapi.weather.wildfire.WildfireRiskModel;
+import com.thunder.wildernessodysseyapi.weather.wildfire.WildfireScheduler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -120,6 +122,13 @@ public final class WeatherAuthority implements WeatherQuery {
                 scheduling.cellSize(),
                 WeatherConfig.lightning()
         );
+        runtime.wildfireScheduler.tick(
+                level,
+                gameTime,
+                scheduling.cellSize(),
+                scheduling.environmentResampleIntervalTicks(),
+                WeatherConfig.wildfires()
+        );
         WeatherConfig.FeatureSettings features = WeatherConfig.features();
         runtime.surfaceWeatheringScheduler.tick(level, gameTime, this, features);
         runtime.severeWeatherScheduler.tick(level, gameTime, systems(level), features);
@@ -202,6 +211,34 @@ public final class WeatherAuthority implements WeatherQuery {
             return List.of();
         }
         return WeatherSystemsSavedData.get(level, WeatherConfig.features()).tracker().systems();
+    }
+
+    /** Returns the campfire wildfire risk currently sampled at one position. */
+    public WildfireRiskModel.RiskProfile wildfireRisk(ServerLevel level, BlockPos position) {
+        if (level == null || position == null || !WeatherConfig.dimensionEnabled(level.dimension())) {
+            return WildfireRiskModel.evaluate(WeatherSample.CLEAR, AtmosphereEnvironment.TEMPERATE);
+        }
+        WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
+        return runtime(level).wildfireScheduler.riskAt(
+                level,
+                position,
+                scheduling.cellSize(),
+                scheduling.environmentResampleIntervalTicks()
+        );
+    }
+
+    /** Forces one nearby safe-bounded campfire ignition for operator verification. */
+    public WildfireScheduler.IgnitionResult forceWildfireIgnition(ServerLevel level, BlockPos position) {
+        if (level == null || position == null || !WeatherConfig.dimensionEnabled(level.dimension())) {
+            return WildfireScheduler.IgnitionResult.DISABLED;
+        }
+        WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
+        return runtime(level).wildfireScheduler.forceIgnition(
+                level,
+                position,
+                scheduling.cellSize(),
+                WeatherConfig.wildfires()
+        );
     }
 
     /** Forecasts local pressure tendency and the nearest approaching front or storm. */
@@ -404,6 +441,7 @@ public final class WeatherAuthority implements WeatherQuery {
             data(entry.getKey(), scheduling, entry.getValue());
             entry.getValue().inputSampler.clear();
             entry.getValue().lightningScheduler.reset();
+            entry.getValue().wildfireScheduler.reset();
             WeatherSnapshotManager.markLevelDirty(entry.getKey().dimension());
         }
     }
@@ -414,6 +452,7 @@ public final class WeatherAuthority implements WeatherQuery {
         if (runtime != null) {
             runtime.inputSampler.clear();
             runtime.lightningScheduler.reset();
+            runtime.wildfireScheduler.reset();
         }
         WeatherSnapshotManager.clearLevel(level.dimension());
     }
@@ -423,6 +462,7 @@ public final class WeatherAuthority implements WeatherQuery {
         for (LevelRuntime runtime : runtimes.values()) {
             runtime.inputSampler.clear();
             runtime.lightningScheduler.reset();
+            runtime.wildfireScheduler.reset();
         }
         runtimes.clear();
         WeatherSnapshotManager.clear();
@@ -893,13 +933,17 @@ public final class WeatherAuthority implements WeatherQuery {
     }
 
     private LevelRuntime runtime(ServerLevel level) {
-        return runtimes.computeIfAbsent(level, ignored -> new LevelRuntime(
-                new AtmosphereInputSampler(
-                        new WildernessWeatherWaterInfluence(),
-                        SeasonalWeatherIntegrations.discover()
-                ),
-                new LocalizedLightningScheduler(this)
-        ));
+        return runtimes.computeIfAbsent(level, ignored -> {
+            AtmosphereInputSampler inputSampler = new AtmosphereInputSampler(
+                    new WildernessWeatherWaterInfluence(),
+                    SeasonalWeatherIntegrations.discover()
+            );
+            return new LevelRuntime(
+                    inputSampler,
+                    new LocalizedLightningScheduler(this),
+                    new WildfireScheduler(this, inputSampler)
+            );
+        });
     }
 
     private AtmosphereSavedData data(
@@ -963,6 +1007,7 @@ public final class WeatherAuthority implements WeatherQuery {
     private static final class LevelRuntime {
         private final AtmosphereInputSampler inputSampler;
         private final LocalizedLightningScheduler lightningScheduler;
+        private final WildfireScheduler wildfireScheduler;
         private final SurfaceWeatheringScheduler surfaceWeatheringScheduler = new SurfaceWeatheringScheduler();
         private final SevereWeatherScheduler severeWeatherScheduler = new SevereWeatherScheduler();
         private final Set<Long> vanillaWeatherAppliedKeys = new HashSet<>();
@@ -972,10 +1017,12 @@ public final class WeatherAuthority implements WeatherQuery {
 
         private LevelRuntime(
                 AtmosphereInputSampler inputSampler,
-                LocalizedLightningScheduler lightningScheduler
+                LocalizedLightningScheduler lightningScheduler,
+                WildfireScheduler wildfireScheduler
         ) {
             this.inputSampler = inputSampler;
             this.lightningScheduler = lightningScheduler;
+            this.wildfireScheduler = wildfireScheduler;
         }
 
         private void beginVanillaWeather(

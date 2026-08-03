@@ -36,12 +36,17 @@ public final class SeasonCycleProfile {
         double warmConvection = Math.max(0.0, temperatureWave) * 0.72
                 + Math.max(0.0, moistureWave) * 0.28;
         double coldStability = Math.max(0.0, -temperatureWave) * 0.38;
+        // Wildfire season is narrowest around the warmest part of the year.
+        // Actual ignition still requires independently simulated extreme drought.
+        double fireSeasonFactor = unit((temperatureWave - 0.35) / 0.65);
 
         return new SeasonalWeatherInfluence.SeasonalOffset(
                 temperatureWave * controls.temperatureAmplitudeCelsius(),
                 moistureWave * controls.humidityAmplitude(),
                 (warmConvection - coldStability) * controls.storminessAmplitude(),
-                1.0 + temperatureWave * 0.18
+                1.0 + temperatureWave * 0.18,
+                fireSeasonFactor,
+                true
         );
     }
 
@@ -68,14 +73,18 @@ public final class SeasonCycleProfile {
                     -controls.temperatureAmplitudeCelsius() * 0.12 * intensity,
                     controls.humidityAmplitude() * intensity,
                     controls.storminessAmplitude() * 0.85 * intensity,
-                    0.92
+                    0.92,
+                    0.0,
+                    true
             );
         }
         return new SeasonalWeatherInfluence.SeasonalOffset(
                 controls.temperatureAmplitudeCelsius() * 0.18 * intensity,
                 -controls.humidityAmplitude() * intensity,
                 -controls.storminessAmplitude() * 0.55 * intensity,
-                1.16
+                1.16,
+                intensity,
+                true
         );
     }
 
@@ -84,5 +93,9 @@ public final class SeasonCycleProfile {
             return 0.0;
         }
         return value - Math.floor(value);
+    }
+
+    private static double unit(double value) {
+        return Math.max(0.0, Math.min(1.0, Double.isFinite(value) ? value : 0.0));
     }
 }

@@ -221,6 +221,7 @@ public final class WaterShaders {
 
         float rain;
         float thunder;
+        float frozen;
         if (ClientWeatherCoordinator.controls(minecraft.level)) {
             // Water remains read-only from weather's perspective; only these
             // client shader uniforms consume the local immutable snapshot.
@@ -230,12 +231,14 @@ public final class WaterShaders {
             );
             rain = (float) localWeather.precipitationIntensity();
             thunder = ClientWeatherCoordinator.thunderContribution(localWeather);
+            frozen = (float) localWeather.surface().frozenFraction();
         } else {
             rain = minecraft.level.getRainLevel(partialTick);
             thunder = minecraft.level.getThunderLevel(partialTick);
+            frozen = 0.0f;
         }
         float skyBrightness = Math.max(0.12f, 1.0f - rain * 0.32f - thunder * 0.38f);
-        oceanShader.safeGetUniform("Weather").set(rain, thunder, skyBrightness, 0.0f);
+        oceanShader.safeGetUniform("Weather").set(rain, thunder, skyBrightness, frozen);
         var sky = minecraft.level.getSkyColor(cameraPosition, partialTick);
         oceanShader.safeGetUniform("EnvironmentColor").set(
                 (float) sky.x,

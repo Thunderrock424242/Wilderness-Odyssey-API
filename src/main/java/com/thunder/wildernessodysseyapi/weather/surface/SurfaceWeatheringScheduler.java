@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.weather.api.SurfaceWeatherState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.simulation.WeatherAuthority;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -76,14 +77,17 @@ public final class SurfaceWeatheringScheduler {
                     : topState.setValue(SnowLayerBlock.LAYERS, layers - 1));
         }
 
-        // Frosted ice owns its own vanilla melt ticks, giving gradual thawing
-        // without permanently replacing lakes or Wilderness water bodies.
+        // Vanilla water can use temporary frosted ice. Wilderness-owned water
+        // remains canonical and receives synchronized shader freezing instead;
+        // replacing its projection here would separate the block from volume.
+        BlockPos water = top.below();
+        boolean wildernessWater = WaterServices.access().isWaterAt(level, water);
         if (surface.frozenFraction() >= 0.58
                 && sample.temperature() <= -1.5
                 && belowState.getFluidState().is(FluidTags.WATER)
                 && belowState.getFluidState().isSource()
-                && topState.isAir()) {
-            BlockPos water = top.below();
+                && topState.isAir()
+                && !wildernessWater) {
             level.setBlockAndUpdate(water, Blocks.FROSTED_ICE.defaultBlockState());
             level.scheduleTick(water, Blocks.FROSTED_ICE, 80 + (int) Math.floorMod(randomBits, 80L));
         }

@@ -13,7 +13,7 @@ diagnostics, read-only Wilderness water coupling, optional Ecliptic/Serene
 season input, thermodynamic vapor transport, terrain lift, and layered 3D
 cloud volumes with standard cloud genera, multi-altitude decks, persistent
 moving storm/front identities, forecasting, surface accumulation, typed
-hazards, and compatibility fallbacks.
+hazards, rare campfire-ember wildfires, and compatibility fallbacks.
 
 The system does not provide a projected per-block shadow map or unconstrained
 destructive storms. Severe block damage is a conservative foliage-only option
@@ -62,7 +62,7 @@ flowchart LR
     F --> G["Dimension AtmosphereGrid"]
     G --> H["AtmosphereSavedData"]
     G --> I["WeatherServices / WeatherQuery"]
-    I --> J["LocalizedPrecipitationController, gameplay adapters, and lightning scheduler"]
+    I --> J["LocalizedPrecipitationController, gameplay adapters, lightning, and wildfire schedulers"]
     G --> K["WeatherSnapshotManager"]
     K --> L["WeatherRegionSyncPayload"]
     L --> M["Immutable WeatherSnapshot"]
@@ -88,6 +88,8 @@ The principal ownership boundaries are:
   need to know cell coordinates, storage, scheduling, or payload details.
 - Each level runtime owns one bounded `LocalizedLightningScheduler`; clients
   receive the resulting vanilla lightning entity and never request a strike.
+- Each level runtime also owns one bounded `WildfireScheduler`. It reads loaded
+  campfires and authoritative weather, but vanilla fire owns all later spread.
 
 The first implementation is synchronous and throttled. World, chunk, biome,
 registry, and water reads stay on the server thread. The engine accepts only
@@ -756,6 +758,15 @@ validated by NeoForge and copied into immutable scheduling/simulation records.
 | `lightning.candidateRadiusBlocks` | `96` | `16..256`; player-centered horizontal candidate radius. |
 | `lightning.maxCandidateAttempts` | `4` | `1..16`; hard per-check sampling cap, with at most one successful bolt. |
 | `lightning.maximumChancePerCheck` | `0.20` | `0..1`; strongest eligible storms approach this probability. |
+| `wildfire.enabled` | `true` | Allows rare embers from exposed lit normal campfires; later spread still requires `doFireTick`. |
+| `wildfire.checkIntervalTicks` | `600` | `100..72000`; one rotating loaded-chunk pass per dimension. |
+| `wildfire.dimensionCooldownTicks` | `48000` | `1200..1728000`; minimum delay between successful campfire ignitions in one dimension. |
+| `wildfire.cellCooldownTicks` | `168000` | `1200..1728000`, and never below the dimension cooldown. |
+| `wildfire.candidateChunkRadius` | `2` | `0..8`; loaded chunk square rotated around active players. |
+| `wildfire.candidateChunksPerPlayer` | `4` | `1..16`; the dimension-wide hard cap remains 64 chunks per check. |
+| `wildfire.emberRangeBlocks` | `10` | `4..24`; maximum downwind travel distance. |
+| `wildfire.targetAttempts` | `12` | `1..32`; loaded exposed fuel-column attempts after the one probability roll succeeds. |
+| `wildfire.maximumChancePerCheck` | `0.01` | `0..1`; multiplied by squared local risk, so threshold conditions remain much rarer. |
 | `compatibility.dimensionAllowlist` | empty | Empty permits all dimensions not denied. |
 | `compatibility.dimensionDenylist` | empty | Deny entries override allow entries. |
 | `compatibility.vanillaWeatherCompatibilityMode` | `SUPPRESS_GLOBAL` | `PRESERVE_GLOBAL` or `SUPPRESS_GLOBAL`. |
@@ -763,7 +774,7 @@ validated by NeoForge and copied into immutable scheduling/simulation records.
 
 Dimension identifiers are normalized, deduplicated, validated resource
 locations, and cached on config load/reload for the chunk-tick lightning gate.
-A config reload also clears environment/lightning runtime caches and marks
+A config reload also clears environment, lightning, and wildfire runtime caches and marks
 tracked players for complete regional snapshots.
 
 ## Localized natural lightning
@@ -793,6 +804,39 @@ global rain/thunder consumers, channeled lightning, and mod-created bolts are
 untouched. Vanilla weather commands additionally bridge their resulting state
 and duration into the localized authority.
 
+## Summer drought wildfires
+
+`WildfireRiskModel` combines the existing drought hazard with air temperature,
+humidity, persistent surface wetness/snowpack, wind, precipitation, and a new
+normalized fire-season signal. Ecliptic and temperate Serene calendars expose a
+narrow midsummer window. Serene tropical dry phases supply the corresponding
+fire season. If no calendar is available, Wilderness does not create another
+calendar; only a stricter exceptional-heat and drought fallback can qualify.
+
+The normal eligibility gates are drought at least `0.80`, humidity no more than
+`0.28`, temperature at least `30 C`, surface wetness no more than `0.08`, no
+meaningful snowpack or precipitation, sufficient wind, and fire-season strength
+at least `0.65`. A missing calendar raises the effective requirements to drought
+at least `0.92`, humidity no more than `0.16`, and temperature at least `38 C`.
+Passing these gates does not ignite immediately: the configured maximum chance
+is multiplied by squared risk, and only the strongest candidate receives one
+roll per due dimension check.
+
+`WildfireScheduler` rotates through loaded chunks near non-spectator players,
+inspects bounded block-entity/campfire counts, and never creates chunk tickets.
+Only a lit normal campfire with open sky is a source; soul campfires and covered
+campfires are excluded. A successful ember travels roughly downwind and may
+place one normal vanilla fire above an exposed block in the
+`wildernessodysseyapi:wildfire_ignition_fuels` block tag. The default tag
+contains leaves so the scheduler does not directly select a wooden building;
+datapacks can extend or replace it.
+
+The scheduler refuses to act without sky light, with `doFireTick=false`, in
+localized rain, outside loaded/entity-ticking chunks, or during its dimension
+and atmospheric-cell cooldowns. Once the single fire block is placed, Minecraft
+owns its spread, decay, block loss, particles, and rain extinguishing. There is
+no custom accelerated fire simulation and no unexplained spontaneous ignition.
+
 ## Commands and diagnostics
 
 All weather commands require permission level 2:
@@ -810,6 +854,8 @@ All weather commands require permission level 2:
 /wilderness weather force rain
 /wilderness weather force snow
 /wilderness weather clear
+/wilderness weather wildfire risk
+/wilderness weather wildfire ignite
 /wilderness weather dump
 ```
 
@@ -856,7 +902,9 @@ a block-scale weather system:
   movement, while sequence, camera-tile, quality, and config changes invalidate
   the cache immediately;
 - localized lightning checks a fixed candidate budget, uses only loaded and
-  entity-ticking chunks, and can add at most one bolt per dimension check; and
+  entity-ticking chunks, and can add at most one bolt per dimension check;
+- wildfire checks rotate through at most 64 loaded chunks, cap inspected block
+  entities/campfires, make one probability roll, and place at most one fire; and
 - all world reads are server-thread confined.
 
 Remaining risks are bounded but worth profiling. Each simulation
@@ -916,6 +964,9 @@ Additional limits and compatibility boundaries:
 
 - lightning cooldowns are intentionally ephemeral per loaded dimension rather
   than persisted; a clean restart can therefore allow one earlier first strike;
+- wildfire cooldowns are likewise ephemeral. A restart does not preserve them,
+  but every climate, gamerule, campfire, fuel, loaded-chunk, and probability gate
+  still applies before another ignition;
 - third-party global-only `isRaining`/`isThundering` consumers can still
   disagree with local conditions in `PRESERVE_GLOBAL`; Wilderness Riftfall and
   entity consumers have already migrated to localized queries;
@@ -1068,7 +1119,18 @@ explicitly changes them; changing size resets atmospheric state.
    lightning path becomes active around all Overworld players. Run
    `/weather clear` and confirm natural strikes stop after the synchronized
    clear state arrives. Restore the default chance afterward.
-11. **Verify localized gameplay rain.** Run `/weather clear`, force local rain,
+11. **Verify summer drought wildfires.** In a disposable Overworld test area,
+    place one lit normal campfire under open sky and a broad ring of leaves four
+    to ten blocks away. Run `/wilderness weather wildfire risk` and confirm
+    ordinary, wet, rainy, winter, and low-wind conditions are not eligible. Use
+    Ecliptic or Serene to enter midsummer/dry season and create an extreme hot,
+    dry, windy cell; confirm the diagnostic exposes every factor. For a direct
+    world-path check, run `/wilderness weather wildfire ignite` and confirm one
+    vanilla fire appears on exposed tagged fuel without loading new chunks.
+    Repeat with a soul campfire, roof, local rain, and `doFireTick=false`; each
+    must fail. Restore `doFireTick=true`, allow vanilla spread, then force local
+    rain and confirm exposed fire extinguishes through the localized rain hook.
+12. **Verify localized gameplay rain.** Run `/weather clear`, force local rain,
     and compare an open-sky test area with a roofed area and a neighboring clear
     cell. Verify exposed entity/block fire extinguishes while covered or clear
     fire does not, dry farmland reaches moisture 7 and feeds normal crop
@@ -1077,60 +1139,60 @@ explicitly changes them; changing size resets atmospheric state.
     needed, and verify vanilla/modded precipitation hooks fill them. Force snow
     and verify snow layers plus powder-snow cauldrons, then restore
     `randomTickSpeed` to 3.
-12. **Verify dimension synchronization.** Enter another dimension and confirm
+13. **Verify dimension synchronization.** Enter another dimension and confirm
     F3 changes to that dimension's new regional sequence/state. Return and
     confirm the original dimension state is resynchronized. Repeat with a
     same-dimension teleport across at least one atmospheric-cell boundary.
-13. **Verify reconnect behavior.** Disconnect during forced weather, reconnect,
+14. **Verify reconnect behavior.** Disconnect during forced weather, reconnect,
     and confirm the first full snapshot restores the correct local visuals and
     F3 sample. Confirm stale state from the previous connection or dimension is
     not briefly used.
-14. **Verify water is read-only.** At an ocean/river/lake, record
+15. **Verify water is read-only.** At an ocean/river/lake, record
     `/wowater inspect` and `/wowater authority 16`, then record nearby weather
     humidity. Wait through an environment refresh and repeat. Confirm wet
     regions contribute moisture over time while the water ownership/coverage
     diagnostics and blocks are unchanged by weather.
-15. **Verify every debug edit.** Exercise all scalar setters, `force rain`,
+16. **Verify every debug edit.** Exercise all scalar setters, `force rain`,
     `force snow`, `clear`, and `dump` as an operator. Confirm a non-operator is
     denied. Confirm edits increment the cell revision and appear on connected
     clients at the next synchronization pass.
-16. **Verify disable/reset behavior.** Set `weather.enabled=false` in the
+17. **Verify disable/reset behavior.** Set `weather.enabled=false` in the
     server config and reload/restart. Confirm clients receive an empty reset,
     the F3 atmosphere lines disappear, rendering falls back safely to vanilla,
     and server weather queries return clear. Re-enable it and confirm a complete
     regional snapshot resumes. Test both compatibility modes separately if the
     pack intends to use `SUPPRESS_GLOBAL`.
-17. **Verify multiplayer authority.** Put both clients at the same coordinates,
+18. **Verify multiplayer authority.** Put both clients at the same coordinates,
     issue edits from the server/operator, and compare F3/sample values. Confirm
     both converge on the same server-authored fields, clients cannot create
     weather locally, and rapid movement/reconnect does not make an older payload
     replace a newer sequence.
-18. **Verify ownership arbitration.** With no external weather mod installed,
+19. **Verify ownership arbitration.** With no external weather mod installed,
     confirm the startup log names Wilderness as owner. Add one configured
     external weather mod and leave ownership on `AUTO`; confirm Wilderness F3,
     precipitation, cloud rendering, and simulation all disable together. Test
     explicit `WILDERNESS` and `EXTERNAL` modes separately.
-19. **Verify persistent motion and forecasting.** Create adjacent pressure and
+20. **Verify persistent motion and forecasting.** Create adjacent pressure and
     humidity contrasts, then repeatedly run `/wilderness weather systems` and
     `/wilderness weather forecast`. Confirm IDs survive saves, centers move with
     cloud wind, compatible systems merge, organized storms can split, weakening
     systems disappear, and ETA/pressure wording changes as a front passes.
-20. **Verify surface response.** Sustain rain and confirm dark wet patches and
+21. **Verify surface response.** Sustain rain and confirm dark wet patches and
     occasional puddles appear without water-block placement. Sustain snow/cold
     weather and confirm bounded snow layers and temporary frosted ice form only
     in loaded player areas. Warm the local cell and confirm gradual snow loss
     and vanilla frosted-ice melting.
-21. **Verify typed hazards.** Exercise cold windy snow, warm ocean storms, humid
+22. **Verify typed hazards.** Exercise cold windy snow, warm ocean storms, humid
     calm air, and hot dry high pressure. Confirm F3 reports blizzard,
     ocean-storm, dense-fog, and drought/heat-wave signals respectively. Force
     hail and confirm its faster icy precipitation visual still counts as wet
     rain for exposure and precipitation hooks.
-22. **Verify severe safety.** Leave `severe.blockDamageEnabled=false`, develop
+23. **Verify severe safety.** Leave `severe.blockDamageEnabled=false`, develop
     or instrument a tornado/cyclone identity, and confirm particles/entity wind
     occur without block changes. Explicitly enable damage in a disposable test
     world with mob griefing on and confirm the bounded pass affects only sparse
     exposed leaves/plants. Restore the default afterward.
-23. **Verify survival integrations.** Test Cold Sweat alone outdoors, under a
+24. **Verify survival integrations.** Test Cold Sweat alone outdoors, under a
     roof, and submerged while forcing hot/dry, blizzard, rain, and hail samples;
     confirm only exposed ambient temperature moves and Cold Sweat still owns
     body response. Test Thirst Was Taken alone through mild and hot/dry weather;

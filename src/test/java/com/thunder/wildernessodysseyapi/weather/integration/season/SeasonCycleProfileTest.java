@@ -24,6 +24,9 @@ class SeasonCycleProfileTest {
         assertEquals(-8.0, winter.temperatureCelsius(), 1.0E-9);
         assertTrue(summer.storminess() > winter.storminess());
         assertTrue(summer.evaporationMultiplier() > winter.evaporationMultiplier());
+        assertEquals(1.0, summer.fireSeasonFactor(), 1.0E-9);
+        assertEquals(0.0, winter.fireSeasonFactor(), 1.0E-9);
+        assertTrue(summer.calendarAvailable());
     }
 
     @Test
@@ -37,6 +40,8 @@ class SeasonCycleProfileTest {
         assertTrue(wet.storminess() > 0.0);
         assertTrue(dry.humidity() < 0.0);
         assertTrue(dry.storminess() < 0.0);
+        assertEquals(0.0, wet.fireSeasonFactor(), 1.0E-9);
+        assertEquals(1.0, dry.fireSeasonFactor(), 1.0E-9);
     }
 
     @Test

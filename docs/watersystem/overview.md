@@ -152,6 +152,45 @@ shallow-water foam and breaking cues. That shoreline cue is a deterministic
 client snapshot approximation; the separate server shoreline grid is not
 networked to the renderer.
 
+## Local weather and the water cycle
+
+Localized atmosphere cells now drive a matching regional sea-state field. The
+server samples the public weather query at bounded water cells around players,
+builds wind, swell, chop, and breaking-wave targets, then approaches those
+targets with separate storm-build and calm-decay times. Water gameplay reads
+the server field at the actual world position. Clients receive the nearby cell
+window and interpolate both between updates and across cell boundaries, so a
+storm front can roughen one coast while water beyond the front remains calm.
+
+This is a two-way connection rather than a second weather or water authority:
+
+```text
+Wilderness water bodies -> moisture/thermal context -> atmosphere simulation
+atmosphere query -> regional sea state -> waves, shore behavior, immersion
+atmosphere query -> persistent finite-body ledger -> WaterAccess transfers
+```
+
+Rain and hail can add conserved volume to finite Wilderness lakes and rivers.
+Settled snow contributes only after thawing, while hot, dry, windy conditions
+can remove volume through evaporation. Large oceans remain neutral reservoirs,
+and every realized change passes through `WaterAccess`; the persistent ledger
+only carries sub-cell or temporarily unrealizable balance. Sampling and
+transfers are player-bounded, rate-limited, deduplicated by chunk, and never
+force an unloaded chunk to load.
+
+Freezing also respects water ownership. Vanilla or externally tagged water may
+still be replaced by frosted ice, but Wilderness-owned water is not directly
+replaced because doing so would split the projected block from canonical
+volume. Instead, the synchronized frozen fraction progressively damps custom
+surface motion and applies the visual ice response. This keeps the liquid
+ledger authoritative; custom frozen water is therefore visual rather than a
+walkable solid until a dedicated frozen-volume projection is implemented.
+
+If localized weather ownership is disabled for a dimension, the regional field
+is cleared and consumers fall back to Minecraft's dimension-wide rain and
+thunder levels. Full configuration and verification details are documented in
+[`weather-coupling.md`](weather-coupling.md).
+
 ## Entity hydrodynamics
 
 Boats, items, and living entities use the same `WaterBuoyancyProvider` boundary.
@@ -238,6 +277,11 @@ forces, lossless mB conversion, clock tide display, ambience budgets, current
 and reservoir snapshots, vertex precision, persistent foam, and CPU/GLSL
 surface contracts.
 
+Weather-water unit coverage additionally exercises localized wind and storm
+response, asymmetric sea-state build/decay, bounded regional payload decoding,
+finite-body rainfall/evaporation/snowmelt flux, persistent fractional balances,
+and the frozen-surface shader contract.
+
 Use JDK 21 and the Gradle wrapper:
 
 ```powershell
@@ -255,4 +299,11 @@ solid in an enclosed full cell, and transfer water through a NeoForge/Create
 machine in both directions. Also test player and dispenser pickup from full and
 partial finite cells, then use the namespaced bucket with a dispenser, cauldron,
 waterloggable block, and bucketable fish. Existing chunks containing vanilla
-water are not a valid direct-generation test case.
+water are not a valid direct-generation test case. For the coupled pass, use
+`/weather clear`, `/weather rain`, and `/weather thunder` while standing near a
+coast to confirm the vanilla command bridge drives smooth wave buildup and
+decay. Then use `/wilderness weather force rain` and `/wilderness weather clear`
+in separate local areas to create a boundary. Confirm two distant players can
+see different sea conditions, crossing the boundary is smooth, finite inland
+water responds gradually without loading neighboring chunks, and frozen custom
+water remains volume-consistent.

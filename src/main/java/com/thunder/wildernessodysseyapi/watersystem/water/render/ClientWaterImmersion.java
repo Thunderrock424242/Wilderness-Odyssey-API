@@ -88,7 +88,8 @@ public final class ClientWaterImmersion {
             return resolveMobileWater(level, cameraPosition);
         }
 
-        OceanSeaState.Sample sea = ClientOceanSeaState.current(level);
+        OceanSeaState.Sample sea = ClientOceanSeaState.sampleAt(
+                level, cameraPosition.x, cameraPosition.z);
         float oceanWeight = column.oceanWeight() / 255.0f;
         float riverWeight = column.riverWeight() / 255.0f;
         float lakeWeight = column.lakeWeight() / 255.0f;
@@ -207,7 +208,7 @@ public final class ClientWaterImmersion {
                 worldX,
                 worldZ,
                 timeSeconds,
-                ClientOceanSeaState.current(level).spectrum(),
+                ClientOceanSeaState.sampleAt(level, worldX, worldZ).spectrum(),
                 waveSurface
                         ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.OCEAN) : 0,
                 waveSurface

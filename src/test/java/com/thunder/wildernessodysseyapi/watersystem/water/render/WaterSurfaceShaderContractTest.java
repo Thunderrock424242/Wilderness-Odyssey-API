@@ -68,6 +68,9 @@ class WaterSurfaceShaderContractTest {
         assertFalse(fragment.contains("dot(worldPosition.xz"));
         assertTrue(fragment.contains("float shoreBreaker = shoreFactor"));
         assertTrue(fragment.contains("float impulseFoam = disturbanceStrength"));
+        assertTrue(vertex.contains("float waveFreedom = 1.0 - frozen * 0.94"));
+        assertTrue(fragment.contains("float iceCoverage = smoothstep"));
+        assertTrue(fragment.contains("Weather.w"));
     }
 
     private static String readResource(String path) throws IOException {

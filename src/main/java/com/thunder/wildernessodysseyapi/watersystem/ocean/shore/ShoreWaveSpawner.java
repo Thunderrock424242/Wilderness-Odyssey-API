@@ -56,25 +56,27 @@ public final class ShoreWaveSpawner {
 
         float tideRate = TideSystem.getTideRate(level);
         float tideMotion = Math.min(1.0f, Math.abs(tideRate) * 45.0f);
-        OceanSeaState.Sample seaState = OceanSeaState.sample(level, 0.0f);
-        float shoreActivity = Math.max(tideMotion, seaState.breakingStrength());
-        if (shoreActivity < 0.20f) return;
-
         Map<Long, Long> levelCooldowns = cooldowns.computeIfAbsent(key, ignored -> new HashMap<>());
         long now = level.getGameTime();
         if (levelCooldowns.size() > 2048) {
             levelCooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
         }
 
-        level.players().forEach(player -> spawnNearPlayer(
-                level,
-                player.blockPosition(),
-                tideRate,
-                tideMotion,
-                seaState,
-                levelCooldowns,
-                now
-        ));
+        level.players().forEach(player -> {
+            OceanSeaState.Sample seaState = OceanSeaState.sampleAt(
+                    level, player.getX(), player.getZ(), 0.0f);
+            if (Math.max(tideMotion, seaState.breakingStrength()) >= 0.20f) {
+                spawnNearPlayer(
+                        level,
+                        player.blockPosition(),
+                        tideRate,
+                        tideMotion,
+                        seaState,
+                        levelCooldowns,
+                        now
+                );
+            }
+        });
     }
 
     @SubscribeEvent

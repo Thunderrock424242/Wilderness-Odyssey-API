@@ -76,7 +76,7 @@ public final class GerstnerWaveAnimator {
         Minecraft minecraft = Minecraft.getInstance();
         OceanSeaState.Sample seaState = minecraft.level == null
                 ? OceanSeaState.CALM
-                : ClientOceanSeaState.current(minecraft.level);
+                : ClientOceanSeaState.sampleAt(minecraft.level, worldX, worldZ);
         WaveSurfaceSample sample = profile.sampleAt(
                 worldX,
                 worldZ,
