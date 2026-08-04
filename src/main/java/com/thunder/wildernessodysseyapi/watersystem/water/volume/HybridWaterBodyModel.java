@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
@@ -82,9 +83,10 @@ final class HybridWaterBodyModel {
                 : 0.0f;
         BlockPos surfacePosition = BlockPos.containing(x, column.baseSurfaceHeight(), z);
         WatershedConditions watershed = WatershedServices.conditions(level, surfacePosition);
+        WatershedLocalFlow localFlow = WatershedServices.localFlow(level, surfacePosition);
         WaterVolumeChunk.WaterCell localCell = CanonicalWater.get(level, surfacePosition);
-        float canonicalCurrentX = localCell.velocityX() + watershed.currentX();
-        float canonicalCurrentZ = localCell.velocityZ() + watershed.currentZ();
+        float canonicalCurrentX = localCell.velocityX() + localFlow.currentX();
+        float canonicalCurrentZ = localCell.velocityZ() + localFlow.currentZ();
         WaveSurfaceSample wave = sampleWave(
                 level,
                 x,

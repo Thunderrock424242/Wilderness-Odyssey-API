@@ -5,11 +5,14 @@ import com.thunder.wildernessodysseyapi.watersystem.water.api.BuoyancySample;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterPhysicsProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterPhysicsProfileRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla.EntityWaterCompat;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.vehicle.Boat;
@@ -84,14 +87,25 @@ public final class WaveEntityPhysics {
                 entity.getY() + entity.getBbHeight() * 0.35,
                 entity.getZ()
         );
+        BlockPos hydrologyPosition = BlockPos.containing(
+                entity.getX(), entity.getY(), entity.getZ());
+        WatershedConditions watershed = WaterServices.access().getWatershedConditions(
+                level, hydrologyPosition);
+        boolean raisedWatershedSurface = watershed.hasSurfaceWater()
+                && (watershed.waterLevelOffset() > 0.02f || watershed.flooding());
 
-        if (!cachedTouchingWater && !mobileWater.wet() && !physicsProfile.rigidWatercraft()) {
+        if (!cachedTouchingWater
+                && !mobileWater.wet()
+                && !physicsProfile.rigidWatercraft()
+                && !raisedWatershedSurface) {
             return;
         }
 
         // Rigid craft always execute the multi-point sample. A center-only dry
         // prefilter can otherwise miss a bow or corner entering a crest.
-        BuoyancySample buoyancy = (cachedTouchingWater || physicsProfile.rigidWatercraft())
+        BuoyancySample buoyancy = (cachedTouchingWater
+                || physicsProfile.rigidWatercraft()
+                || raisedWatershedSurface)
                 ? WaterServices.buoyancy().sample(
                         level,
                         entity.getBoundingBox(),
@@ -105,7 +119,8 @@ public final class WaveEntityPhysics {
             return;
         }
         if (buoyancy.touchingWater()) {
-            buoyancy = withLocalCurrents(level, entity, buoyancy, mobileWater);
+            buoyancy = withLocalCurrents(
+                    level, entity, hydrologyPosition, watershed, buoyancy, mobileWater);
         }
 
         int payloadUnits = entity instanceof ItemEntity item ? item.getItem().getCount() : 0;
@@ -183,10 +198,20 @@ public final class WaveEntityPhysics {
     private static BuoyancySample withLocalCurrents(
             Level level,
             Entity entity,
+            BlockPos position,
+            WatershedConditions watershed,
             BuoyancySample buoyancy,
             SPHSimulationManager.MobileWaterSample mobileWater
     ) {
         Vec3 additionalCurrent = mobileWater.wet() ? mobileCurrent(mobileWater) : Vec3.ZERO;
+        WatershedLocalFlow localFlow = WaterServices.access().getLocalWatershedFlow(level, position);
+        if (localFlow != WatershedLocalFlow.NONE) {
+            additionalCurrent = additionalCurrent.add(
+                    localFlow.currentX() - watershed.currentX(),
+                    0.0,
+                    localFlow.currentZ() - watershed.currentZ()
+            );
+        }
         if (level instanceof ServerLevel serverLevel) {
             ShorelineWaterManager.FlowSample shoreline =
                     ShorelineWaterManager.get().sample(serverLevel, entity.getX(), entity.getZ());

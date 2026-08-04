@@ -32,6 +32,12 @@ or NeoForge fluid constants. `WaterAccess#getWaterUnits` exposes visible,
 authority-owned volume for transaction adapters; hidden displacement reservoirs
 deliberately return zero through this public read.
 
+API version 3 also exposes `getWatershedConditions` for canonical basin-scale
+state and `getLocalWatershedFlow` for the compact four-by-four tributary cell at
+a position. Both are read-only metadata over the same authority. Consumers
+must not treat level offset, discharge, debris, or confluence fields as a second
+physical-volume store.
+
 Queries intended for render loops or entity ticks should retain a `WaterSample`
 and call `WaterAccess#sample(...)`. This avoids allocating `Vec3`, `Optional`, or
 record results in hot callers. The convenience methods remain appropriate for
@@ -174,12 +180,12 @@ The implemented boundaries and their final live-validation targets are:
 | Area | Current state | Intentional boundary or live validation |
 |---|---|---|
 | Bucket placement/pickup | Exact 4,096-unit player/dispenser transaction with vanilla bucket output and rollback safety | Live-test unusual third-party dispensers that bypass `DispensibleContainerItem` |
-| Boat/item/mob motion | Multi-point authority sampling, hull-oriented drag, buoyancy, planing, slamming, angular response, and a public physics-profile registry | Balance on a populated multiplayer server and register profiles for unusual third-party hulls |
+| Boat/item/mob motion | Multi-point authority sampling, watershed-raised surfaces, local tributary current, hull-oriented drag, buoyancy, planing, slamming, angular response, and a public physics-profile registry | Balance on a populated multiplayer server and register profiles for unusual third-party hulls |
 | Underwater optics | Cached eye/body sampling plus the same spectrum, tide, wake, current, and body-color inputs used by the visible surface | Verify the GPU/shader-pack matrix on supported hardware |
 | NeoForge machines | Transactional block capability backed by `WaterAccess` | Add capability GameTests for representative third-party machines |
 | Create | Local water predicate plus guarded open-world projection writes | Add a live open-ended-pipe GameTest against supported Create versions |
 | Tide display | No persistent HUD; a vanilla clock shows tide, trend, and moon context while held or inspected | Verify UI scaling and controller/modded-tooltip combinations |
-| Fishing/farmland/AI | Tag/FluidType-native gameplay plus focused exact-check adapters | Run representative modpack mob and fishing soak tests |
+| Fishing/farmland/AI | Tag/FluidType-native gameplay, focused exact-check adapters, and ecosystem drinking/shelter decisions informed by flood risk/current | Run representative modpack mob and fishing soak tests |
 | Structures | Explicit DATA marker conversion after normal processors | Author templates with `wildernessodysseyapi:water`; no per-tick scan |
 | Waterlogging | Custom bucket translates to vanilla water only at the host-container boundary; the host stores ordinary water | Keep as the documented controlled vanilla exception |
 

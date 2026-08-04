@@ -77,11 +77,13 @@ public final class TemporaryFloodManager {
                     || !adjacentWater(level, water, target)) {
                 continue;
             }
+            BlockState originalState = level.getBlockState(target);
+            var localFlow = WatershedServices.localFlow(level, target);
             if (!CanonicalWater.placeTemporaryFlood(
                     level,
                     target,
-                    conditions.currentX(),
-                    conditions.currentZ()
+                    localFlow.currentX(),
+                    localFlow.currentZ()
             )) {
                 continue;
             }
@@ -89,11 +91,13 @@ public final class TemporaryFloodManager {
                     target,
                     conditions.basinId(),
                     level.getGameTime(),
-                    WaterSimulationConfig.watershedMaxTemporaryFloodCells()
+                    WaterSimulationConfig.watershedMaxTemporaryFloodCells(),
+                    originalState
             )) {
                 // A reduced/full ledger must never strand untracked temporary
                 // water. Roll back only the exact cell placed above.
                 CanonicalWater.removeTemporaryFlood(level, target);
+                restoreOriginalState(level, target, originalState);
                 continue;
             }
             placed++;
@@ -149,6 +153,7 @@ public final class TemporaryFloodManager {
                     level.getBlockState(position));
             if (TemporaryFloodSavedData.mayRemoveTrackedCell(true, flags, projection)) {
                 if (CanonicalWater.removeTemporaryFlood(level, position)) {
+                    restoreOriginalState(level, position, ledger.originalState(packedPosition));
                     ledger.forget(packedPosition);
                     removed++;
                 }
@@ -197,5 +202,19 @@ public final class TemporaryFloodManager {
             }
         }
         return false;
+    }
+
+    private static void restoreOriginalState(
+            ServerLevel level,
+            BlockPos position,
+            BlockState originalState
+    ) {
+        if (originalState == null || originalState.isAir()) {
+            return;
+        }
+        BlockState current = level.getBlockState(position);
+        if (current.isAir() && originalState.canSurvive(level, position)) {
+            level.setBlock(position, originalState, 3);
+        }
     }
 }

@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import net.minecraft.core.BlockPos;
 import net.minecraft.client.Minecraft;
@@ -150,12 +151,16 @@ public final class WaterAmbientEffects {
                     level,
                     new BlockPos(blockX, column.surfaceBlockY(), blockZ)
             );
+            WatershedLocalFlow localFlow = WatershedServices.localFlow(
+                    level,
+                    new BlockPos(blockX, column.surfaceBlockY(), blockZ)
+            );
             float shore = shorelineFactor(level, blockX, blockZ);
             float intensity = surfaceSprayIntensity(
                     sea.strength(),
                     sea.breakingStrength(),
                     column.oceanWeight() / 255.0f,
-                    column.currentSpeed() + watershed.currentStrength(),
+                    column.currentSpeed() + localFlow.currentStrength(),
                     shore
             );
             if (random.nextFloat() >= intensity) {
@@ -171,13 +176,33 @@ public final class WaterAmbientEffects {
                 continue;
             }
             double velocityX = sea.windDirectionX() * intensity * 0.055
-                    + (column.velocityX() + watershed.currentX()) * 0.035;
+                    + (column.velocityX() + localFlow.currentX()) * 0.035;
             double velocityZ = sea.windDirectionZ() * intensity * 0.055
-                    + (column.velocityZ() + watershed.currentZ()) * 0.035;
+                    + (column.velocityZ() + localFlow.currentZ()) * 0.035;
+            if (localFlow.confluence() || intensity >= 0.52f) {
+                WaterEnvironmentalEffectPool.offer(
+                        WaterEnvironmentalEffectPool.Kind.FOAM,
+                        x, surfaceY, z, velocityX, velocityZ,
+                        Math.max(intensity, localFlow.currentStrength() / 1.4f),
+                        level.getGameTime()
+                );
+            }
+            if (random.nextFloat() < watershed.debris() * 0.28f) {
+                WaterEnvironmentalEffectPool.offer(
+                        WaterEnvironmentalEffectPool.Kind.DEBRIS,
+                        x, surfaceY, z, velocityX, velocityZ,
+                        watershed.debris(), level.getGameTime()
+                );
+            }
+            if (watershed.sediment() >= 0.42f && localFlow.currentStrength() >= 0.22f) {
+                WaterEnvironmentalEffectPool.offer(
+                        WaterEnvironmentalEffectPool.Kind.MIST,
+                        x, surfaceY, z, velocityX, velocityZ,
+                        watershed.sediment() * 0.58f, level.getGameTime()
+                );
+            }
             level.addParticle(
-                    random.nextFloat() < watershed.debris() * 0.18f
-                            ? ParticleTypes.COMPOSTER
-                            : ParticleTypes.SPLASH,
+                    ParticleTypes.SPLASH,
                     x,
                     surfaceY + 0.03,
                     z,

@@ -54,6 +54,7 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.IntValue HYDROLOGY_MAX_LEDGER_ENTRIES;
     public static final ModConfigSpec.BooleanValue ENABLE_WATERSHED_SIMULATION;
     public static final ModConfigSpec.DoubleValue WATERSHED_RAINFALL_ACCUMULATION_RATE;
+    public static final ModConfigSpec.DoubleValue WATERSHED_SNOWMELT_RATE;
     public static final ModConfigSpec.DoubleValue WATERSHED_DRAINAGE_RATE;
     public static final ModConfigSpec.DoubleValue WATERSHED_MAX_WATER_LEVEL_OFFSET;
     public static final ModConfigSpec.BooleanValue ENABLE_LOCALIZED_FLOODING;
@@ -211,6 +212,9 @@ public final class WaterSimulationConfig {
         WATERSHED_RAINFALL_ACCUMULATION_RATE = builder
                 .comment("Normalized rainfall memory added by one fully intense precipitation pass.")
                 .defineInRange("rainfallAccumulationRate", 0.045, 0.0, 0.5);
+        WATERSHED_SNOWMELT_RATE = builder
+                .comment("Normalized stored snowpack routed as delayed runoff during one warm watershed pass.")
+                .defineInRange("snowmeltRate", 0.035, 0.0, 0.5);
         WATERSHED_DRAINAGE_RATE = builder
                 .comment("Normalized per-pass soil drainage, runoff decay, and dry-weather evaporation rate.")
                 .defineInRange("drainageRate", 0.025, 0.001, 0.25);
@@ -472,6 +476,11 @@ public final class WaterSimulationConfig {
     /** Returns normalized rainfall memory added by one simulation pass. */
     public static float watershedRainfallAccumulationRate() {
         return WATERSHED_RAINFALL_ACCUMULATION_RATE.get().floatValue();
+    }
+
+    /** Returns the per-pass stored-snow thaw contribution to watershed runoff. */
+    public static float watershedSnowmeltRate() {
+        return WATERSHED_SNOWMELT_RATE.get().floatValue();
     }
 
     /** Returns normalized soil/runoff drainage applied by one pass. */

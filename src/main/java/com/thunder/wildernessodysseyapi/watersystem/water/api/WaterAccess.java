@@ -58,6 +58,11 @@ public interface WaterAccess {
         return WatershedConditions.NONE;
     }
 
+    /** Returns compact within-chunk tributary flow without exposing storage internals. */
+    default WatershedLocalFlow getLocalWatershedFlow(Level level, BlockPos position) {
+        return WatershedLocalFlow.NONE;
+    }
+
     /** Returns whether the loaded server position can accept local volume. */
     boolean canAddWater(Level level, BlockPos position);
 

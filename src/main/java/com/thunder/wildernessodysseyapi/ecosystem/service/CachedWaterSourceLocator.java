@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
 import com.thunder.wildernessodysseyapi.ecosystem.api.WaterSourceLocator;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterAccess;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
@@ -120,17 +121,40 @@ public final class CachedWaterSourceLocator implements WaterSourceLocator {
                 continue;
             }
             double depth = waterDepth(level, waterPosition);
+            WatershedConditions conditions = water.getWatershedConditions(level, waterPosition);
+            float safeCurrent = settings.canSwim() ? 1.10f : 0.40f;
+            if (conditions.flooding()
+                    || conditions.floodRisk() >= 0.88f
+                    || conditions.currentStrength() > safeCurrent) {
+                continue;
+            }
             for (Direction direction : Direction.Plane.HORIZONTAL) {
                 BlockPos approach = waterPosition.relative(direction);
                 if (isStandable(level, approach) && !isWater(level, approach)) {
-                    return new EnvironmentalContext.WaterTarget(waterPosition, approach, depth);
+                    return target(waterPosition, approach, depth, conditions);
                 }
             }
             if (settings.canSwim() && depth <= settings.maximumSafeDepth()) {
-                return new EnvironmentalContext.WaterTarget(waterPosition, waterPosition, depth);
+                return target(waterPosition, waterPosition, depth, conditions);
             }
         }
         return null;
+    }
+
+    private static EnvironmentalContext.WaterTarget target(
+            BlockPos waterPosition,
+            BlockPos approachPosition,
+            double depth,
+            WatershedConditions conditions
+    ) {
+        return new EnvironmentalContext.WaterTarget(
+                waterPosition,
+                approachPosition,
+                depth,
+                conditions.floodRisk(),
+                conditions.currentStrength(),
+                conditions.clarity()
+        );
     }
 
     private boolean valid(ServerLevel level, EnvironmentalContext.WaterTarget target) {

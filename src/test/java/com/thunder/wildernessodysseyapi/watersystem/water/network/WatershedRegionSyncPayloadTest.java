@@ -45,6 +45,10 @@ class WatershedRegionSyncPayloadTest {
             assertEquals(8, decoded.chunks().getFirst().chunkZ());
             assertEquals(state.conditions(), WatershedChunkState.fromPacked(
                     decoded.chunks().getFirst().packed()).conditions());
+            assertEquals(
+                    state.packed().drainageDirectionBits(),
+                    decoded.chunks().getFirst().packed().drainageDirectionBits()
+            );
         } finally {
             buffer.release();
         }

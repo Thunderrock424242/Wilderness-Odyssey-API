@@ -4,10 +4,15 @@ import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtUtils;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,12 +32,13 @@ import java.util.Map;
 public final class TemporaryFloodSavedData extends SavedData {
 
     private static final String DATA_NAME = ModConstants.MOD_ID + "_temporary_floodwater";
-    private static final int DATA_VERSION = 1;
+    private static final int DATA_VERSION = 2;
     private static final int HARD_MAX_ENTRIES = 65_536;
     private static final String VERSION_KEY = "version";
     private static final String POSITIONS = "positions";
     private static final String BASINS = "basins";
     private static final String PLACED_TICKS = "placed_ticks";
+    private static final String ORIGINAL_STATES = "original_states";
 
     private final LinkedHashMap<Long, FloodEntry> entries = new LinkedHashMap<>();
     private final Map<Long, Integer> chunkCounts = new HashMap<>();
@@ -47,15 +53,30 @@ public final class TemporaryFloodSavedData extends SavedData {
 
     static TemporaryFloodSavedData load(CompoundTag tag, HolderLookup.Provider registries) {
         TemporaryFloodSavedData data = new TemporaryFloodSavedData();
-        if (tag == null || tag.getInt(VERSION_KEY) != DATA_VERSION) {
+        int version = tag == null ? 0 : tag.getInt(VERSION_KEY);
+        if (version < 1 || version > DATA_VERSION) {
             return data;
         }
         long[] positions = tag.getLongArray(POSITIONS);
         long[] basins = tag.getLongArray(BASINS);
         long[] placedTicks = tag.getLongArray(PLACED_TICKS);
+        ListTag originals = tag.getList(ORIGINAL_STATES, Tag.TAG_COMPOUND);
         int count = Math.min(positions.length, Math.min(basins.length, placedTicks.length));
         for (int index = 0; index < count && data.entries.size() < HARD_MAX_ENTRIES; index++) {
-            data.put(positions[index], new FloodEntry(basins[index], Math.max(0L, placedTicks[index])));
+            CompoundTag originalTag = version >= 2 && index < originals.size()
+                    ? originals.getCompound(index)
+                    : new CompoundTag();
+            BlockState original = !originalTag.isEmpty() && registries != null
+                    ? NbtUtils.readBlockState(
+                    registries.lookupOrThrow(Registries.BLOCK),
+                    originalTag
+            )
+                    : null;
+            data.put(positions[index], new FloodEntry(
+                    basins[index],
+                    Math.max(0L, placedTicks[index]),
+                    original
+            ));
         }
         return data;
     }
@@ -65,28 +86,54 @@ public final class TemporaryFloodSavedData extends SavedData {
         long[] positions = new long[entries.size()];
         long[] basins = new long[entries.size()];
         long[] placedTicks = new long[entries.size()];
+        ListTag originals = new ListTag();
         int index = 0;
         for (Map.Entry<Long, FloodEntry> entry : entries.entrySet()) {
             positions[index] = entry.getKey();
             basins[index] = entry.getValue().basinId;
             placedTicks[index] = entry.getValue().placedTick;
+            originals.add(entry.getValue().originalState == null
+                    ? new CompoundTag()
+                    : NbtUtils.writeBlockState(entry.getValue().originalState));
             index++;
         }
         tag.putInt(VERSION_KEY, DATA_VERSION);
         tag.putLongArray(POSITIONS, positions);
         tag.putLongArray(BASINS, basins);
         tag.putLongArray(PLACED_TICKS, placedTicks);
+        tag.put(ORIGINAL_STATES, originals);
         return tag;
     }
 
     /** Records one position only after canonical flood placement succeeds. */
     public boolean record(BlockPos position, long basinId, long gameTime, int maximumEntries) {
+        return record(
+                position,
+                basinId,
+                gameTime,
+                maximumEntries,
+                null
+        );
+    }
+
+    /** Records the exact original replaceable state for reversible recession. */
+    public boolean record(
+            BlockPos position,
+            long basinId,
+            long gameTime,
+            int maximumEntries,
+            BlockState originalState
+    ) {
         if (position == null
                 || entries.containsKey(position.asLong())
                 || entries.size() >= Math.max(1, maximumEntries)) {
             return false;
         }
-        put(position.asLong(), new FloodEntry(basinId, Math.max(0L, gameTime)));
+        put(position.asLong(), new FloodEntry(
+                basinId,
+                Math.max(0L, gameTime),
+                originalState
+        ));
         setDirty();
         return true;
     }
@@ -133,6 +180,12 @@ public final class TemporaryFloodSavedData extends SavedData {
         return entries.size();
     }
 
+    /** Returns the saved original block state, or null for air/legacy entries. */
+    public BlockState originalState(long packedPosition) {
+        FloodEntry entry = entries.get(packedPosition);
+        return entry == null ? null : entry.originalState;
+    }
+
     /** Pure recession gate used by runtime code and preservation tests. */
     public static boolean mayRemoveTrackedCell(
             boolean ledgerTracked,
@@ -158,6 +211,6 @@ public final class TemporaryFloodSavedData extends SavedData {
         return ChunkPos.asLong(position.getX() >> 4, position.getZ() >> 4);
     }
 
-    private record FloodEntry(long basinId, long placedTick) {
+    private record FloodEntry(long basinId, long placedTick, BlockState originalState) {
     }
 }

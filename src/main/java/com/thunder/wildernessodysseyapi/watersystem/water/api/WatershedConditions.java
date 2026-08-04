@@ -32,6 +32,36 @@ public record WatershedConditions(
         WaterFeature waterFeature
 ) {
 
+    /** Retains the version-two construction shape for optional integrations. */
+    public WatershedConditions(
+            long basinId,
+            int averageTerrainElevation,
+            DrainageDirection downstreamDirection,
+            float drainageAccumulation,
+            float soilSaturation,
+            float recentRainfall,
+            float storedRunoff,
+            float riverDischarge,
+            float waterLevelOffset,
+            float floodRisk,
+            float floodThreshold,
+            boolean flooding,
+            int activeTemporaryFloodCells,
+            float sediment,
+            float clarity,
+            float currentX,
+            float currentZ,
+            float debris,
+            WaterFeature waterFeature
+    ) {
+        this(
+                basinId, averageTerrainElevation, downstreamDirection, drainageAccumulation,
+                soilSaturation, recentRainfall, 0.0f, storedRunoff, riverDischarge,
+                waterLevelOffset, floodRisk, floodThreshold, flooding, activeTemporaryFloodCells,
+                sediment, clarity, currentX, currentZ, debris, waterFeature
+        );
+    }
+
     /** Shared result for an uninitialized, disabled, or unloaded chunk. */
     public static final WatershedConditions NONE = new WatershedConditions(
             0L,

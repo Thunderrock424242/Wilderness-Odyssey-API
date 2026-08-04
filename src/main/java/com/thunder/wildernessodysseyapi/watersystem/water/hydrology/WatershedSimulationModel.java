@@ -29,6 +29,14 @@ public final class WatershedSimulationModel {
         float precipitation = input.weatherEnabled && isLiquid(weather.precipitationType())
                 ? unit((float) weather.precipitationIntensity())
                 : 0.0f;
+        float thawWarmth = input.weatherEnabled
+                ? unit((float) ((weather.temperature() - 0.5) / 8.0))
+                : 0.0f;
+        float snowmeltGenerated = unit((float) weather.surface().snowpack()
+                * thawWarmth
+                * unit(input.snowmeltRate));
+        float recentSnowmelt = unit(previous.recentSnowmelt() * (1.0f - drainageRate * 0.55f)
+                + snowmeltGenerated);
 
         // Rain memory and soil saturation build over multiple passes. Saturated
         // soil converts a larger share of later rain into mobile runoff.
@@ -42,6 +50,7 @@ public final class WatershedSimulationModel {
                 : drainageRate * 0.45f;
         float soilSaturation = unit(previous.soilSaturation()
                 + precipitation * rainfallRate * (0.42f - previous.soilSaturation() * 0.12f)
+                + snowmeltGenerated * 0.36f
                 - evaporation * 0.22f);
 
         float accumulation = unit(previous.drainageAccumulation());
@@ -49,6 +58,8 @@ public final class WatershedSimulationModel {
                 * rainfallRate
                 * (0.08f + soilSaturation * soilSaturation * 0.78f)
                 * (0.40f + accumulation * 0.60f);
+        runoffGenerated = unit(runoffGenerated
+                + snowmeltGenerated * (0.34f + accumulation * 0.46f));
         float storedBeforeRouting = unit(previous.storedRunoff()
                 * (1.0f - drainageRate * 0.22f)
                 + runoffGenerated
@@ -129,7 +140,8 @@ public final class WatershedSimulationModel {
                 currentX,
                 currentZ,
                 debris,
-                downstreamTransfer
+                downstreamTransfer,
+                recentSnowmelt
         );
     }
 
@@ -195,8 +207,29 @@ public final class WatershedSimulationModel {
             boolean weatherEnabled,
             boolean downstreamAvailable,
             boolean sedimentEffects,
-            boolean debrisEffects
+            boolean debrisEffects,
+            float snowmeltRate
     ) {
+        /** Retains the version-one pure-model construction shape. */
+        public Input(
+                WatershedConditions previous,
+                WeatherSample weather,
+                float incomingRunoff,
+                float rainfallAccumulationRate,
+                float drainageRate,
+                float maximumWaterLevelOffset,
+                float floodThreshold,
+                boolean weatherEnabled,
+                boolean downstreamAvailable,
+                boolean sedimentEffects,
+                boolean debrisEffects
+        ) {
+            this(
+                    previous, weather, incomingRunoff, rainfallAccumulationRate, drainageRate,
+                    maximumWaterLevelOffset, floodThreshold, weatherEnabled, downstreamAvailable,
+                    sedimentEffects, debrisEffects, 0.035f
+            );
+        }
     }
 
     /** Immutable results committed to one packed chunk state. */
@@ -213,7 +246,30 @@ public final class WatershedSimulationModel {
             float currentX,
             float currentZ,
             float debris,
-            float downstreamTransfer
+            float downstreamTransfer,
+            float recentSnowmelt
     ) {
+        /** Retains the version-one result shape for tests and optional adapters. */
+        public Result(
+                float soilSaturation,
+                float recentRainfall,
+                float storedRunoff,
+                float riverDischarge,
+                float waterLevelOffset,
+                float floodRisk,
+                boolean flooding,
+                float sediment,
+                float clarity,
+                float currentX,
+                float currentZ,
+                float debris,
+                float downstreamTransfer
+        ) {
+            this(
+                    soilSaturation, recentRainfall, storedRunoff, riverDischarge,
+                    waterLevelOffset, floodRisk, flooding, sediment, clarity,
+                    currentX, currentZ, debris, downstreamTransfer, 0.0f
+            );
+        }
     }
 }

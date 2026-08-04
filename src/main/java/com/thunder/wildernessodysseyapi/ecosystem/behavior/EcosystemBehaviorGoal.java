@@ -208,9 +208,12 @@ public final class EcosystemBehaviorGoal extends Goal {
         );
         needs.setNeeds(updated.thirst(), updated.hunger(), updated.rest(), updated.social(), updated.safetyConcern());
 
+        var watershed = WaterServices.access().getWatershedConditions(level, animal.blockPosition());
         boolean weatherHazard = weather.precipitationIntensity() >= profile.shelter().precipitationThreshold()
                 || weather.thunderIntensity() >= profile.shelter().thunderThreshold()
-                || weather.wind().magnitude() >= profile.shelter().windThreshold();
+                || weather.wind().magnitude() >= profile.shelter().windThreshold()
+                || watershed.flooding()
+                || watershed.floodRisk() >= 0.82f;
         Optional<EnvironmentalContext.WaterTarget> water = profile.drinking().enabled()
                 && needs.thirst() >= profile.drinking().thirstThreshold()
                 ? EcosystemServices.water().find(
@@ -238,6 +241,7 @@ public final class EcosystemBehaviorGoal extends Goal {
                 level.getDayTime(),
                 biome,
                 weather,
+                watershed,
                 exposed,
                 foodAvailability,
                 water,
