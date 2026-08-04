@@ -3,6 +3,8 @@ package com.thunder.wildernessodysseyapi.watersystem.water.volume;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.FluidTags;
@@ -243,6 +245,11 @@ public final class WildernessWaterAuthority {
                 column.estimatedVolumeUnits(),
                 column.waterType().name()
         );
+    }
+
+    /** Returns server-authoritative or immutable synchronized watershed metadata. */
+    public static WatershedConditions getWatershedConditions(Level level, BlockPos pos) {
+        return WatershedServices.conditions(level, pos);
     }
 
     /** Returns whether the entity's eye is inside Wilderness-owned water. */

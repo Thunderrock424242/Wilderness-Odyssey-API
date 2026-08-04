@@ -4,7 +4,9 @@ import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
+import com.thunder.wildernessodysseyapi.ecosystem.EcosystemEvents;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
+import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileManager;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapConfig;
 import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapServerConfig;
@@ -27,6 +29,7 @@ import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.config.ModConfigEvent;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
 
@@ -115,6 +118,11 @@ public final class ModConfigRegistration {
             WeatherRenderingConfig.reload();
         } else if (config.getSpec() == EcosystemConfig.CONFIG_SPEC) {
             EcosystemConfig.reload();
+            SpeciesBehaviorProfileManager.clearConfiguredProfiles();
+            var server = ServerLifecycleHooks.getCurrentServer();
+            if (server != null) {
+                server.execute(() -> EcosystemEvents.refreshLoadedControllers(server));
+            }
         }
     }
 }

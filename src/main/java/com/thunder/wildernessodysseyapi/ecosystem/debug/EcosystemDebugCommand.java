@@ -5,6 +5,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
+import com.thunder.wildernessodysseyapi.ecosystem.data.ModdedMobBehaviorDetector;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileManager;
 import com.thunder.wildernessodysseyapi.ecosystem.service.EcosystemServices;
 import com.thunder.wildernessodysseyapi.ecosystem.service.EcosystemUpdateBudget;
@@ -43,7 +44,11 @@ public final class EcosystemDebugCommand {
         EcosystemUpdateBudget.Snapshot budget = EcosystemServices.budget().snapshot(context.getSource().getLevel());
         context.getSource().sendSuccess(() -> Component.literal(
                 "WO ecosystem enabled=" + onOff(EcosystemConfig.ENABLED.get())
-                        + " profiles=" + SpeciesBehaviorProfileManager.profiles().size()
+                        + " configAssignments=" + EcosystemConfig.behaviorTagAssignmentCount()
+                        + " generatedProfiles=" + SpeciesBehaviorProfileManager.configuredProfiles().size()
+                        + " autoDetection=" + onOff(EcosystemConfig.AUTO_DETECT_MODDED_ANIMALS.get())
+                        + " autoDetectedProfiles=" + SpeciesBehaviorProfileManager.autoDetectedProfiles().size()
+                        + " jsonProfiles=" + SpeciesBehaviorProfileManager.profiles().size()
                         + " updateTicks=" + EcosystemConfig.BEHAVIOR_UPDATE_FREQUENCY.get()
                         + " searchCap=" + EcosystemConfig.MAXIMUM_SEARCH_RADIUS.get()), false);
         context.getSource().sendSuccess(() -> Component.literal(
@@ -57,9 +62,33 @@ public final class EcosystemDebugCommand {
         if (!debugEnabled(context.getSource())) {
             return 0;
         }
+        for (var rule : EcosystemConfig.behaviorTagRules()) {
+            context.getSource().sendSuccess(() -> Component.literal(
+                    "config " + rule.selectorExpression() + "="
+                            + rule.behaviorTags().stream()
+                            .map(tag -> tag.serializedName())
+                            .sorted()
+                            .toList()), false);
+        }
+        for (SpeciesBehaviorProfile profile : SpeciesBehaviorProfileManager.configuredProfiles()) {
+            context.getSource().sendSuccess(() -> Component.literal(
+                    "generated " + profile.id() + " entities=" + profile.entities()
+                            + " herd=" + onOff(profile.herd().enabled())
+                            + " prey=" + onOff(profile.prey().enabled())
+                            + " predator=" + onOff(profile.predator().enabled())), false);
+        }
+        for (SpeciesBehaviorProfile profile : SpeciesBehaviorProfileManager.autoDetectedProfiles()) {
+            context.getSource().sendSuccess(() -> Component.literal(
+                    "auto-detected " + profile.id() + " entities=" + profile.entities()
+                            + " drink=" + onOff(profile.drinking().enabled())
+                            + " shelter=" + onOff(profile.shelter().enabled())
+                            + " herd=" + onOff(profile.herd().enabled())
+                            + " prey=" + onOff(profile.prey().enabled())
+                            + " predator=" + onOff(profile.predator().enabled())), false);
+        }
         for (SpeciesBehaviorProfile profile : SpeciesBehaviorProfileManager.profiles()) {
             context.getSource().sendSuccess(() -> Component.literal(
-                    profile.id() + " entities=" + profile.entities()
+                    "json " + profile.id() + " entities=" + profile.entities()
                             + " tags=" + profile.entityTags()
                             + " drink=" + onOff(profile.drinking().enabled())
                             + " shelter=" + onOff(profile.shelter().enabled())
@@ -67,7 +96,11 @@ public final class EcosystemDebugCommand {
                             + " prey=" + onOff(profile.prey().enabled())
                             + " predator=" + onOff(profile.predator().enabled())), false);
         }
-        return Math.max(1, SpeciesBehaviorProfileManager.profiles().size());
+        return Math.max(1,
+                EcosystemConfig.behaviorTagAssignmentCount()
+                        + SpeciesBehaviorProfileManager.configuredProfiles().size()
+                        + SpeciesBehaviorProfileManager.autoDetectedProfiles().size()
+                        + SpeciesBehaviorProfileManager.profiles().size());
     }
 
     private static int inspect(CommandContext<CommandSourceStack> context) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
@@ -90,6 +123,18 @@ public final class EcosystemDebugCommand {
                 "WO ecosystem " + animal.getDisplayName().getString()
                         + " profile=" + profile.get().id()
                         + " state=" + needs.behavior()), false);
+        EcosystemConfig.behaviorTagsFor(animal).ifPresent(tags -> source.sendSuccess(() -> Component.literal(
+                "  configBehaviorTags=" + tags.stream()
+                        .map(tag -> tag.serializedName())
+                        .sorted()
+                        .toList()), false));
+        if (profile.get().id().getPath().startsWith("detected/")) {
+            ModdedMobBehaviorDetector.detect(animal).ifPresent(tags -> source.sendSuccess(() -> Component.literal(
+                    "  autoDetectedBehaviorTags=" + tags.stream()
+                            .map(tag -> tag.serializedName())
+                            .sorted()
+                            .toList()), false));
+        }
         source.sendSuccess(() -> Component.literal(
                 "  needs thirst=" + number(needs.thirst())
                         + " hunger=" + number(needs.hunger())

@@ -9,6 +9,8 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LightTexture;
@@ -274,6 +276,8 @@ public final class WaterChunkMeshCache {
         float tintRed = 0.0f;
         float tintGreen = 0.0f;
         float tintBlue = 0.0f;
+        float sediment = 0.0f;
+        float clarity = 0.0f;
         int count = 0;
         for (int offsetZ = -1; offsetZ <= 0; offsetZ++) {
             for (int offsetX = -1; offsetX <= 0; offsetX++) {
@@ -293,30 +297,42 @@ public final class WaterChunkMeshCache {
                 )) {
                     continue;
                 }
-                height += column.baseSurfaceY();
+                WatershedConditions conditions = WatershedServices.conditions(
+                        level,
+                        new BlockPos(columnX, column.surfaceBlockY(), columnZ)
+                );
+                height += column.baseSurfaceY() + conditions.waterLevelOffset();
                 ocean += column.oceanWeight() / 255.0f;
                 river += column.riverWeight() / 255.0f;
                 lake += column.lakeWeight() / 255.0f;
-                velocityX += column.velocityX();
-                velocityZ += column.velocityZ();
+                velocityX += column.velocityX() + conditions.currentX();
+                velocityZ += column.velocityZ() + conditions.currentZ();
                 depth += column.depth();
                 tintRed += ((column.waterTint() >>> 16) & 0xFF) / 255.0f;
                 tintGreen += ((column.waterTint() >>> 8) & 0xFF) / 255.0f;
                 tintBlue += (column.waterTint() & 0xFF) / 255.0f;
+                sediment += conditions.sediment();
+                clarity += conditions.clarity();
                 count++;
             }
         }
         if (count == 0) {
-            height = fallback.baseSurfaceY();
+            WatershedConditions conditions = WatershedServices.conditions(
+                    level,
+                    new BlockPos(worldVertexX, fallback.surfaceBlockY(), worldVertexZ)
+            );
+            height = fallback.baseSurfaceY() + conditions.waterLevelOffset();
             ocean = fallback.oceanWeight() / 255.0f;
             river = fallback.riverWeight() / 255.0f;
             lake = fallback.lakeWeight() / 255.0f;
-            velocityX = fallback.velocityX();
-            velocityZ = fallback.velocityZ();
+            velocityX = fallback.velocityX() + conditions.currentX();
+            velocityZ = fallback.velocityZ() + conditions.currentZ();
             depth = fallback.depth();
             tintRed = ((fallback.waterTint() >>> 16) & 0xFF) / 255.0f;
             tintGreen = ((fallback.waterTint() >>> 8) & 0xFF) / 255.0f;
             tintBlue = (fallback.waterTint() & 0xFF) / 255.0f;
+            sediment = conditions.sediment();
+            clarity = conditions.clarity();
             count = 1;
         }
         float inverse = 1.0f / count;
@@ -338,9 +354,35 @@ public final class WaterChunkMeshCache {
         int color = opticalColor(ocean, river, lake,
                 tintRed * inverse, tintGreen * inverse, tintBlue * inverse,
                 averagedDepth, count < 4);
+        color = applySedimentColor(color, sediment * inverse, clarity * inverse);
         return new VertexSample(height * inverse, ocean, river, lake,
                 Math.max(0.18f, count * 0.25f), color,
                 velocityX * inverse, velocityZ * inverse, shoreFactor, averagedDepth);
+    }
+
+    /** Applies bounded brown sediment absorption to one packed RGB surface tint. */
+    static int applySedimentColor(int color, float sediment, float clarity) {
+        float mud = clamp(sediment, 0.0f, 1.0f);
+        float transmission = clamp(clarity, 0.0f, 1.0f);
+        int red = (color >>> 16) & 0xFF;
+        int green = (color >>> 8) & 0xFF;
+        int blue = color & 0xFF;
+        red = Math.round(mix(red, 82.0f, mud * 0.48f));
+        green = Math.round(mix(green, 67.0f, mud * 0.52f));
+        blue = Math.round(mix(blue, 42.0f, mud * 0.62f));
+        float dim = 0.72f + transmission * 0.28f;
+        return (color & 0xFF000000)
+                | (clampColor(Math.round(red * dim)) << 16)
+                | (clampColor(Math.round(green * dim)) << 8)
+                | clampColor(Math.round(blue * dim));
+    }
+
+    private static int clampColor(int value) {
+        return Math.max(0, Math.min(255, value));
+    }
+
+    private static float clamp(float value, float minimum, float maximum) {
+        return Math.max(minimum, Math.min(maximum, Float.isFinite(value) ? value : 0.0f));
     }
 
     /** Returns whether the coordinator mesh, rather than the fluid fallback, owns this column. */

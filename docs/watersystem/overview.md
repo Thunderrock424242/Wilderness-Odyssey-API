@@ -168,6 +168,7 @@ This is a two-way connection rather than a second weather or water authority:
 Wilderness water bodies -> moisture/thermal context -> atmosphere simulation
 atmosphere query -> regional sea state -> waves, shore behavior, immersion
 atmosphere query -> persistent finite-body ledger -> WaterAccess transfers
+atmosphere query -> packed watershed cells -> dynamic river conditions/flood budgets
 ```
 
 Rain and hail can add conserved volume to finite Wilderness lakes and rivers.
@@ -177,6 +178,16 @@ and every realized change passes through `WaterAccess`; the persistent ledger
 only carries sub-cell or temporarily unrealizable balance. Sampling and
 transfers are player-bounded, rate-limited, deduplicated by chunk, and never
 force an unloaded chunk to load.
+
+The default watershed phase supersedes the older probe ledger with compact
+chunk conditions for rainfall memory, saturation, runoff, downstream discharge,
+bounded river/lake offsets, sediment, clarity, current, debris, and localized
+flood risk. It retains runoff when a cached downstream chunk is unavailable and
+never loads that neighbor. Exact temporary overflow uses separately flagged
+canonical sparse cells plus an exact-position recession ledger; permanent or
+player-placed water cannot pass that two-key removal gate. See
+[`watersheds-and-flooding.md`](watersheds-and-flooding.md) for the model,
+budgets, safety tags, configuration, and phase-one basin limitation.
 
 Freezing also respects water ownership. Vanilla or externally tagged water may
 still be replaced by frosted ice, but Wilderness-owned water is not directly
@@ -213,6 +224,7 @@ SSR cost, and mesh rebuild counts.
 Server-side ownership can be inspected with:
 
 - `/wowater inspect [pos]`
+- `/wowater watershed [pos]`
 - `/wowater summary [radius]`
 - `/wowater authority [radius]`
 - `/wowater shipcheck [radius]`

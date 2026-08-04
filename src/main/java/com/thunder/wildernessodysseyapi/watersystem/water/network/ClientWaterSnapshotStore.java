@@ -143,6 +143,17 @@ public final class ClientWaterSnapshotStore {
         }
     }
 
+    /** Queues one loaded water mesh after synchronized condition metadata changes. */
+    public static void markChunkDirty(Level level, int chunkX, int chunkZ) {
+        if (activeLevel != level) {
+            return;
+        }
+        long key = ChunkPos.asLong(chunkX, chunkZ);
+        if (SNAPSHOTS.containsKey(key)) {
+            markDirty(key);
+        }
+    }
+
     /** Queues surface topology after a relevant physical client block changes. */
     public static void notifyBlockChange(Level level, BlockPos position) {
         if (activeLevel != level || position == null) {
@@ -217,6 +228,7 @@ public final class ClientWaterSnapshotStore {
         if (event.getLevel() instanceof Level level && level.isClientSide
                 && event.getChunk() instanceof LevelChunk chunk) {
             remove(level, chunk.getPos().x, chunk.getPos().z);
+            ClientWatershedSnapshotStore.remove(level, chunk.getPos().x, chunk.getPos().z);
         }
     }
 
@@ -227,6 +239,7 @@ public final class ClientWaterSnapshotStore {
             SNAPSHOTS.clear();
             DIRTY_MESHES.clear();
             DIRTY_MESH_KEYS.clear();
+            ClientWatershedSnapshotStore.clear(activeLevel);
             activeLevel = null;
         }
     }

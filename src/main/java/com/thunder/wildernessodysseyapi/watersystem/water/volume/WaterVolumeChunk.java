@@ -45,6 +45,8 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
     public static final int FLAG_DRY_OVERRIDE = 1 << 5;
     /** Conserved volume hidden behind a solid until terrain exposes the cell. */
     public static final int FLAG_DISPLACEMENT_RESERVOIR = 1 << 6;
+    /** Exact reversible floodwater owned by the temporary-flood ledger. */
+    public static final int FLAG_TEMPORARY_FLOOD = 1 << 7;
     /** Primitive integers encoded for each persisted or networked cell. */
     public static final int SERIALIZED_CELL_STRIDE = 7;
     /** Structural limit prevents malformed attachments from allocating unbounded maps. */
@@ -432,6 +434,11 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
         /** Returns whether solid displacement has temporarily hidden this conserved volume. */
         public boolean displacementReservoir() {
             return (flags & FLAG_DISPLACEMENT_RESERVOIR) != 0;
+        }
+
+        /** Returns whether recession may consider this exact canonical cell. */
+        public boolean temporaryFlood() {
+            return (flags & FLAG_TEMPORARY_FLOOD) != 0;
         }
 
         /** Returns a copy with additional provenance flags preserved through synchronization. */

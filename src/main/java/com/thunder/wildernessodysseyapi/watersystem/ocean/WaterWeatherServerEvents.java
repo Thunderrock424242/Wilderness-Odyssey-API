@@ -2,7 +2,10 @@ package com.thunder.wildernessodysseyapi.watersystem.ocean;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WeatherHydrologyManager;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedSimulationManager;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.OceanSeaStateSynchronizer;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.WatershedSynchronizer;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -33,9 +36,13 @@ public final class WaterWeatherServerEvents {
         }
         for (ServerLevel level : event.getServer().getAllLevels()) {
             OceanSeaStateField.tickLevel(level);
-            WeatherHydrologyManager.tickLevel(level);
+            WatershedSimulationManager.tickLevel(level);
+            if (!WaterSimulationConfig.watershedSimulationEnabled()) {
+                WeatherHydrologyManager.tickLevel(level);
+            }
             if (Math.floorMod(level.getGameTime(), NETWORK_INTERVAL_TICKS) == 0L) {
                 OceanSeaStateSynchronizer.syncLevel(level);
+                WatershedSynchronizer.syncLevel(level);
             }
         }
     }

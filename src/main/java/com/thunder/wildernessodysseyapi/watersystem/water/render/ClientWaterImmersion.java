@@ -6,6 +6,8 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.client.Camera;
@@ -93,6 +95,10 @@ public final class ClientWaterImmersion {
         float oceanWeight = column.oceanWeight() / 255.0f;
         float riverWeight = column.riverWeight() / 255.0f;
         float lakeWeight = column.lakeWeight() / 255.0f;
+        WatershedConditions watershed = WatershedServices.conditions(
+                level,
+                new BlockPos(blockX, column.surfaceBlockY(), blockZ)
+        );
         float surfaceY = visibleSurfaceHeight(
                 level,
                 column,
@@ -126,14 +132,17 @@ public final class ClientWaterImmersion {
         UnderwaterOpticsModel.OpticalProperties optics = UnderwaterOpticsModel.evaluate(
                 depthBelowSurface,
                 columnDepth,
-                Math.min(1.0f, column.currentSpeed() / WaterSurfaceVertexData.MAX_RENDER_CURRENT),
+                Math.min(1.0f, (column.currentSpeed() + watershed.currentStrength())
+                        / WaterSurfaceVertexData.MAX_RENDER_CURRENT),
                 daylight,
                 tint[0],
                 tint[1],
                 tint[2],
                 sea.strength() * oceanWeight,
-                WaterRenderingConfig.UNDERWATER_VISIBILITY_BLOCKS.get().floatValue(),
+                WaterRenderingConfig.UNDERWATER_VISIBILITY_BLOCKS.get().floatValue()
+                        * (1.0f - watershed.sediment() * 0.55f),
                 WaterRenderingConfig.UNDERWATER_TURBIDITY_STRENGTH.get().floatValue()
+                        * (1.0f + watershed.sediment() * 1.35f)
         );
         return new ImmersionState(true, surfaceY, depthBelowSurface,
                 sea.strength() * oceanWeight, optics);
@@ -189,6 +198,10 @@ public final class ClientWaterImmersion {
         double timeSeconds = (level.getGameTime() + (double) partialTick) / 20.0;
         int blockX = (int) Math.floor(worldX);
         int blockZ = (int) Math.floor(worldZ);
+        WatershedConditions watershed = WatershedServices.conditions(
+                level,
+                new BlockPos(blockX, column.surfaceBlockY(), blockZ)
+        );
         boolean customSurface = WaterShaders.shouldUseCoreShader()
                 && WaterChunkMeshCache.usesCustomSurface(level, blockX, blockZ, column);
         boolean waveSurface = customSurface && WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get();
@@ -204,7 +217,7 @@ public final class ClientWaterImmersion {
                 ? sampleSurfaceContinuity(level, worldX, worldZ)
                 : 1.0f;
         return WaterSurfaceEquation.snapshotSurfaceHeight(
-                column.baseSurfaceY(),
+                column.baseSurfaceY() + watershed.waterLevelOffset(),
                 worldX,
                 worldZ,
                 timeSeconds,
@@ -218,8 +231,8 @@ public final class ClientWaterImmersion {
                 oceanWeight,
                 riverWeight,
                 lakeWeight,
-                column.velocityX(),
-                column.velocityZ(),
+                column.velocityX() + watershed.currentX(),
+                column.velocityZ() + watershed.currentZ(),
                 surfaceContinuity,
                 customSurface ? TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE : 0.0f,
                 transientHeight

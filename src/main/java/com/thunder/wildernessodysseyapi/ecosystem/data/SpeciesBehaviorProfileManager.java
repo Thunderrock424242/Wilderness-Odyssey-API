@@ -3,7 +3,9 @@ package com.thunder.wildernessodysseyapi.ecosystem.data;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.thunder.wildernessodysseyapi.ecosystem.api.AnimalBehaviorTag;
 import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
+import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.PathfinderMob;
@@ -16,18 +18,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 
 /**
  * Thread-safe registry populated by server data-pack reloads.
  *
- * <p>Explicit entity selectors win over tag selectors. Profiles are sorted by
- * resource id so overlapping tag selectors remain deterministic.</p>
+ * <p>Server-config behavior assignments are the primary easy path and override
+ * JSON for matching entities. JSON explicit selectors then win over JSON tag
+ * selectors. Conservative third-party-animal inference is the final fallback,
+ * so automatic compatibility never replaces pack-authored knowledge.</p>
  */
 public final class SpeciesBehaviorProfileManager {
 
     private static volatile Snapshot snapshot = Snapshot.EMPTY;
+    private static final Map<ConfiguredProfileKey, SpeciesBehaviorProfile> configuredProfiles =
+            new ConcurrentHashMap<>();
+    private static final Map<ConfiguredProfileKey, SpeciesBehaviorProfile> autoDetectedProfiles =
+            new ConcurrentHashMap<>();
 
     private SpeciesBehaviorProfileManager() {
     }
@@ -35,6 +44,17 @@ public final class SpeciesBehaviorProfileManager {
     /** Returns the active data-driven profile for an entity, if one exists. */
     public static Optional<SpeciesBehaviorProfile> profileFor(PathfinderMob animal) {
         ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(animal.getType());
+        Optional<Set<AnimalBehaviorTag>> behaviorTags = EcosystemConfig.behaviorTagsFor(animal);
+        if (behaviorTags.isPresent()) {
+            if (behaviorTags.get().contains(AnimalBehaviorTag.DISABLED)) {
+                return Optional.empty();
+            }
+            ConfiguredProfileKey key = new ConfiguredProfileKey(entityId, Set.copyOf(behaviorTags.get()));
+            return Optional.of(configuredProfiles.computeIfAbsent(
+                    key,
+                    configured -> BehaviorTagProfileFactory.create(configured.entityId(), configured.behaviorTags())
+            ));
+        }
         SpeciesBehaviorProfile explicit = snapshot.explicit().get(entityId);
         if (explicit != null) {
             return Optional.of(explicit);
@@ -47,6 +67,22 @@ public final class SpeciesBehaviorProfileManager {
                 }
             }
         }
+        if (EcosystemConfig.AUTO_DETECT_MODDED_ANIMALS.get()) {
+            Optional<Set<AnimalBehaviorTag>> detected = ModdedMobBehaviorDetector.detect(animal);
+            if (detected.isPresent()) {
+                ConfiguredProfileKey key = new ConfiguredProfileKey(entityId, Set.copyOf(detected.get()));
+                return Optional.of(autoDetectedProfiles.computeIfAbsent(key, inferred -> {
+                    LOGGER.info("Auto-detected ecosystem behavior for modded animal {} as {}",
+                            inferred.entityId(),
+                            inferred.behaviorTags().stream()
+                                    .map(AnimalBehaviorTag::serializedName)
+                                    .sorted()
+                                    .toList());
+                    return BehaviorTagProfileFactory.createAutoDetected(
+                            inferred.entityId(), inferred.behaviorTags());
+                }));
+            }
+        }
         return Optional.empty();
     }
 
@@ -55,8 +91,29 @@ public final class SpeciesBehaviorProfileManager {
         return snapshot.all();
     }
 
+    /** Returns runtime profiles generated for animals encountered since config load. */
+    public static List<SpeciesBehaviorProfile> configuredProfiles() {
+        return configuredProfiles.values().stream()
+                .sorted(Comparator.comparing(profile -> profile.id().toString()))
+                .toList();
+    }
+
+    /** Returns runtime profiles inferred for compatible third-party animals. */
+    public static List<SpeciesBehaviorProfile> autoDetectedProfiles() {
+        return autoDetectedProfiles.values().stream()
+                .sorted(Comparator.comparing(profile -> profile.id().toString()))
+                .toList();
+    }
+
+    /** Clears config-generated and inferred profiles so runtime settings rebuild on next lookup. */
+    public static void clearConfiguredProfiles() {
+        configuredProfiles.clear();
+        autoDetectedProfiles.clear();
+    }
+
     /** Parses and atomically publishes one complete reload generation. */
     public static void apply(Map<ResourceLocation, JsonElement> resources) {
+        clearConfiguredProfiles();
         List<Map.Entry<ResourceLocation, JsonElement>> ordered = resources.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey(Comparator.comparing(ResourceLocation::toString)))
                 .toList();
@@ -205,5 +262,11 @@ public final class SpeciesBehaviorProfileManager {
             List<SpeciesBehaviorProfile> all
     ) {
         private static final Snapshot EMPTY = new Snapshot(Map.of(), List.of(), List.of());
+    }
+
+    private record ConfiguredProfileKey(
+            ResourceLocation entityId,
+            Set<AnimalBehaviorTag> behaviorTags
+    ) {
     }
 }

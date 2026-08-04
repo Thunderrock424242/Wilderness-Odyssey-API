@@ -52,6 +52,22 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.IntValue HYDROLOGY_EVAPORATION_UNITS_PER_PROBE;
     public static final ModConfigSpec.IntValue HYDROLOGY_MIN_TRANSFER_UNITS;
     public static final ModConfigSpec.IntValue HYDROLOGY_MAX_LEDGER_ENTRIES;
+    public static final ModConfigSpec.BooleanValue ENABLE_WATERSHED_SIMULATION;
+    public static final ModConfigSpec.DoubleValue WATERSHED_RAINFALL_ACCUMULATION_RATE;
+    public static final ModConfigSpec.DoubleValue WATERSHED_DRAINAGE_RATE;
+    public static final ModConfigSpec.DoubleValue WATERSHED_MAX_WATER_LEVEL_OFFSET;
+    public static final ModConfigSpec.BooleanValue ENABLE_LOCALIZED_FLOODING;
+    public static final ModConfigSpec.DoubleValue WATERSHED_FLOOD_THRESHOLD;
+    public static final ModConfigSpec.IntValue FLOOD_MAX_PLACEMENTS_PER_TICK;
+    public static final ModConfigSpec.IntValue FLOOD_MAX_REMOVALS_PER_TICK;
+    public static final ModConfigSpec.IntValue WATERSHED_SIMULATION_DISTANCE_CHUNKS;
+    public static final ModConfigSpec.IntValue WATERSHED_UPDATE_INTERVAL_TICKS;
+    public static final ModConfigSpec.IntValue WATERSHED_CHUNKS_PER_TICK;
+    public static final ModConfigSpec.IntValue WATERSHED_MAX_SAVED_CHUNKS;
+    public static final ModConfigSpec.IntValue WATERSHED_MAX_TEMPORARY_FLOOD_CELLS;
+    public static final ModConfigSpec.BooleanValue ENABLE_WATERSHED_SEDIMENT_EFFECTS;
+    public static final ModConfigSpec.BooleanValue ENABLE_WATERSHED_DEBRIS_EFFECTS;
+    public static final ModConfigSpec.BooleanValue WATERSHED_DEBUG_LOGGING;
     public static final ModConfigSpec.IntValue DEBUG_COMMAND_MAX_RADIUS;
 
     static {
@@ -182,6 +198,61 @@ public final class WaterSimulationConfig {
         HYDROLOGY_MAX_LEDGER_ENTRIES = builder
                 .comment("Maximum persisted chunk-scale fractional hydrology balances per dimension.")
                 .defineInRange("hydrologyMaxLedgerEntries", 4096, 128, 65536);
+        builder.pop();
+
+        // Watersheds retain only chunk-scale packed conditions. They extend
+        // the authority's surface/current metadata and never replace canonical
+        // volume or start a second fluid-tick simulation.
+        builder.comment("Chunk-scale watersheds, dynamic river conditions, and conservative temporary flooding.")
+                .push("watersheds");
+        ENABLE_WATERSHED_SIMULATION = builder
+                .comment("Enable deterministic loaded-only watershed metadata and river-condition updates.")
+                .define("enabled", true);
+        WATERSHED_RAINFALL_ACCUMULATION_RATE = builder
+                .comment("Normalized rainfall memory added by one fully intense precipitation pass.")
+                .defineInRange("rainfallAccumulationRate", 0.045, 0.0, 0.5);
+        WATERSHED_DRAINAGE_RATE = builder
+                .comment("Normalized per-pass soil drainage, runoff decay, and dry-weather evaporation rate.")
+                .defineInRange("drainageRate", 0.025, 0.001, 0.25);
+        WATERSHED_MAX_WATER_LEVEL_OFFSET = builder
+                .comment("Maximum visual/gameplay river or lake surface offset in blocks. Physical generated columns are not rewritten for this offset.")
+                .defineInRange("maximumWaterLevelOffset", 0.45, 0.0, 1.5);
+        ENABLE_LOCALIZED_FLOODING = builder
+                .comment("Allow high-risk loaded river/lake chunks to place separately tracked temporary floodwater through canonical authority.")
+                .define("floodingEnabled", true);
+        WATERSHED_FLOOD_THRESHOLD = builder
+                .comment("Normalized combined discharge, saturation, and rainfall risk required to start flooding.")
+                .defineInRange("floodThreshold", 0.88, 0.5, 1.0);
+        FLOOD_MAX_PLACEMENTS_PER_TICK = builder
+                .comment("Global per-dimension cap on temporary floodwater placements in one server tick.")
+                .defineInRange("maximumFloodPlacementsPerTick", 2, 0, 32);
+        FLOOD_MAX_REMOVALS_PER_TICK = builder
+                .comment("Global per-dimension cap on exact temporary floodwater recession removals in one server tick.")
+                .defineInRange("maximumFloodRemovalsPerTick", 4, 0, 64);
+        WATERSHED_SIMULATION_DISTANCE_CHUNKS = builder
+                .comment("Loaded chunk radius around players eligible for staggered watershed simulation and condition sync.")
+                .defineInRange("simulationDistanceChunks", 6, 1, 16);
+        WATERSHED_UPDATE_INTERVAL_TICKS = builder
+                .comment("Ticks between additions of player-relevant loaded chunks to the time-sliced watershed queue.")
+                .defineInRange("updateIntervalTicks", 40, 20, 1200);
+        WATERSHED_CHUNKS_PER_TICK = builder
+                .comment("Maximum queued watershed chunks simulated in one dimension tick.")
+                .defineInRange("chunksPerTick", 6, 1, 64);
+        WATERSHED_MAX_SAVED_CHUNKS = builder
+                .comment("Maximum compact watershed cells retained per dimension save.")
+                .defineInRange("maximumSavedChunks", 32768, 1024, 65536);
+        WATERSHED_MAX_TEMPORARY_FLOOD_CELLS = builder
+                .comment("Maximum exact temporary flood positions retained per dimension.")
+                .defineInRange("maximumTemporaryFloodCells", 8192, 128, 65536);
+        ENABLE_WATERSHED_SEDIMENT_EFFECTS = builder
+                .comment("Let runoff and floods raise synchronized sediment/turbidity metadata.")
+                .define("sedimentEffects", true);
+        ENABLE_WATERSHED_DEBRIS_EFFECTS = builder
+                .comment("Let runoff and floods produce lightweight synchronized debris metadata for pooled particles/render hooks.")
+                .define("debrisEffects", true);
+        WATERSHED_DEBUG_LOGGING = builder
+                .comment("Log bounded watershed queue and flood summaries. Leave disabled outside diagnostics.")
+                .define("debugLogging", false);
         builder.pop();
 
         DEBUG_COMMAND_MAX_RADIUS = builder
@@ -391,6 +462,88 @@ public final class WaterSimulationConfig {
     /** Returns the maximum persisted chunk-scale hydrology balances. */
     public static int hydrologyMaxLedgerEntries() {
         return HYDROLOGY_MAX_LEDGER_ENTRIES.get();
+    }
+
+    /** Returns whether chunk-scale watershed conditions are active. */
+    public static boolean watershedSimulationEnabled() {
+        return wildernessWaterEnabled() && ENABLE_WATERSHED_SIMULATION.get();
+    }
+
+    /** Returns normalized rainfall memory added by one simulation pass. */
+    public static float watershedRainfallAccumulationRate() {
+        return WATERSHED_RAINFALL_ACCUMULATION_RATE.get().floatValue();
+    }
+
+    /** Returns normalized soil/runoff drainage applied by one pass. */
+    public static float watershedDrainageRate() {
+        return WATERSHED_DRAINAGE_RATE.get().floatValue();
+    }
+
+    /** Returns the absolute river/lake surface-offset limit in blocks. */
+    public static float watershedMaximumWaterLevelOffset() {
+        return WATERSHED_MAX_WATER_LEVEL_OFFSET.get().floatValue();
+    }
+
+    /** Returns whether exact temporary floodwater placement is allowed. */
+    public static boolean localizedFloodingEnabled() {
+        return watershedSimulationEnabled()
+                && ENABLE_LOCALIZED_FLOODING.get()
+                && FLOOD_MAX_PLACEMENTS_PER_TICK.get() > 0;
+    }
+
+    /** Returns the normalized flood activation threshold. */
+    public static float watershedFloodThreshold() {
+        return WATERSHED_FLOOD_THRESHOLD.get().floatValue();
+    }
+
+    /** Returns the per-dimension temporary placement budget. */
+    public static int maximumFloodPlacementsPerTick() {
+        return localizedFloodingEnabled() ? FLOOD_MAX_PLACEMENTS_PER_TICK.get() : 0;
+    }
+
+    /** Returns the per-dimension exact recession budget. */
+    public static int maximumFloodRemovalsPerTick() {
+        return wildernessWaterEnabled() ? FLOOD_MAX_REMOVALS_PER_TICK.get() : 0;
+    }
+
+    /** Returns the player-centered loaded-chunk simulation radius. */
+    public static int watershedSimulationDistanceChunks() {
+        return WATERSHED_SIMULATION_DISTANCE_CHUNKS.get();
+    }
+
+    /** Returns the queue refresh interval. */
+    public static int watershedUpdateIntervalTicks() {
+        return WATERSHED_UPDATE_INTERVAL_TICKS.get();
+    }
+
+    /** Returns the time-sliced per-dimension chunk update budget. */
+    public static int watershedChunksPerTick() {
+        return watershedSimulationEnabled() ? WATERSHED_CHUNKS_PER_TICK.get() : 0;
+    }
+
+    /** Returns the persisted compact watershed-cell budget. */
+    public static int watershedMaxSavedChunks() {
+        return WATERSHED_MAX_SAVED_CHUNKS.get();
+    }
+
+    /** Returns the exact temporary-flood ledger budget. */
+    public static int watershedMaxTemporaryFloodCells() {
+        return WATERSHED_MAX_TEMPORARY_FLOOD_CELLS.get();
+    }
+
+    /** Returns whether sediment/clarity state should respond to runoff. */
+    public static boolean watershedSedimentEffectsEnabled() {
+        return watershedSimulationEnabled() && ENABLE_WATERSHED_SEDIMENT_EFFECTS.get();
+    }
+
+    /** Returns whether pooled client debris effects should receive metadata. */
+    public static boolean watershedDebrisEffectsEnabled() {
+        return watershedSimulationEnabled() && ENABLE_WATERSHED_DEBRIS_EFFECTS.get();
+    }
+
+    /** Returns whether bounded watershed diagnostics should be logged. */
+    public static boolean watershedDebugLoggingEnabled() {
+        return watershedSimulationEnabled() && WATERSHED_DEBUG_LOGGING.get();
     }
 
     /** Returns the maximum debug radius allowed by server config. */

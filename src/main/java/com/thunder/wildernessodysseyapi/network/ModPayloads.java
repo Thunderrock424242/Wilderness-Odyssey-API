@@ -13,6 +13,8 @@ import com.thunder.wildernessodysseyapi.watersystem.water.network.SphLocalEffect
 import com.thunder.wildernessodysseyapi.watersystem.water.network.SphSimulationSnapshotPayload;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.WaterVolumeChunkPayload;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.WaterVolumeDeltaPayload;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWatershedSnapshotStore;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.WatershedRegionSyncPayload;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherRegionSyncPayload;
@@ -28,7 +30,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModPayloads {
 
-    private static final String NETWORK_VERSION = "9";
+    private static final String NETWORK_VERSION = "11";
 
     private ModPayloads() {
     }
@@ -97,6 +99,12 @@ public final class ModPayloads {
                 OceanSeaStatePayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() ->
                         ClientOceanSeaState.accept(context.player().level(), payload))
+        );
+        registrar.playToClient(
+                WatershedRegionSyncPayload.TYPE,
+                WatershedRegionSyncPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        ClientWatershedSnapshotStore.accept(context.player().level(), payload))
         );
         registrar.playToClient(
                 WeatherRegionSyncPayload.TYPE,
