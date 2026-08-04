@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterAccess;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterBody;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterInteractionResult;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterSample;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import net.minecraft.core.BlockPos;
@@ -119,6 +120,11 @@ public final class AuthorityWaterAccess implements WaterAccess {
                 cell.volumeUnits(),
                 new Vec3(cell.velocityX(), cell.velocityY(), cell.velocityZ())
         ));
+    }
+
+    @Override
+    public WatershedConditions getWatershedConditions(Level level, BlockPos position) {
+        return WildernessWaterAuthority.getWatershedConditions(level, position);
     }
 
     @Override

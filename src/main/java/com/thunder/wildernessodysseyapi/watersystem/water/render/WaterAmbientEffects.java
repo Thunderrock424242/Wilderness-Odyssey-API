@@ -4,6 +4,9 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
+import net.minecraft.core.BlockPos;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
@@ -143,12 +146,16 @@ public final class WaterAmbientEffects {
                 continue;
             }
 
+            WatershedConditions watershed = WatershedServices.conditions(
+                    level,
+                    new BlockPos(blockX, column.surfaceBlockY(), blockZ)
+            );
             float shore = shorelineFactor(level, blockX, blockZ);
             float intensity = surfaceSprayIntensity(
                     sea.strength(),
                     sea.breakingStrength(),
                     column.oceanWeight() / 255.0f,
-                    column.currentSpeed(),
+                    column.currentSpeed() + watershed.currentStrength(),
                     shore
             );
             if (random.nextFloat() >= intensity) {
@@ -164,11 +171,13 @@ public final class WaterAmbientEffects {
                 continue;
             }
             double velocityX = sea.windDirectionX() * intensity * 0.055
-                    + column.velocityX() * 0.035;
+                    + (column.velocityX() + watershed.currentX()) * 0.035;
             double velocityZ = sea.windDirectionZ() * intensity * 0.055
-                    + column.velocityZ() * 0.035;
+                    + (column.velocityZ() + watershed.currentZ()) * 0.035;
             level.addParticle(
-                    ParticleTypes.SPLASH,
+                    random.nextFloat() < watershed.debris() * 0.18f
+                            ? ParticleTypes.COMPOSTER
+                            : ParticleTypes.SPLASH,
                     x,
                     surfaceY + 0.03,
                     z,

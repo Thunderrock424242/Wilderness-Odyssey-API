@@ -48,6 +48,16 @@ public interface WaterAccess {
     /** Returns read-only metadata for the authority body occupying a position. */
     Optional<WaterBody> getWaterBody(Level level, BlockPos position);
 
+    /**
+     * Returns authoritative chunk-scale river and watershed conditions.
+     *
+     * <p>The default preserves binary compatibility for optional third-party
+     * implementations that have not adopted watershed metadata.</p>
+     */
+    default WatershedConditions getWatershedConditions(Level level, BlockPos position) {
+        return WatershedConditions.NONE;
+    }
+
     /** Returns whether the loaded server position can accept local volume. */
     boolean canAddWater(Level level, BlockPos position);
 

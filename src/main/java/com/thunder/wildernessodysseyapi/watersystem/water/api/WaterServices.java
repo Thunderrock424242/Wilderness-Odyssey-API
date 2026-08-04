@@ -12,7 +12,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.authority.AuthorityWat
 public final class WaterServices {
 
     /** Public compatibility/API contract version for optional integrations. */
-    public static final int API_VERSION = 1;
+    public static final int API_VERSION = 2;
 
     private static final WaterAccess ACCESS = new AuthorityWaterAccess();
     private static final WaterBuoyancyProvider BUOYANCY = new AuthorityWaterBuoyancyProvider(ACCESS);

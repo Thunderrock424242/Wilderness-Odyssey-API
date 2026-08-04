@@ -4,6 +4,8 @@ import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
@@ -79,9 +81,10 @@ final class HybridWaterBodyModel {
                 ? TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE
                 : 0.0f;
         BlockPos surfacePosition = BlockPos.containing(x, column.baseSurfaceHeight(), z);
+        WatershedConditions watershed = WatershedServices.conditions(level, surfacePosition);
         WaterVolumeChunk.WaterCell localCell = CanonicalWater.get(level, surfacePosition);
-        float canonicalCurrentX = localCell.velocityX();
-        float canonicalCurrentZ = localCell.velocityZ();
+        float canonicalCurrentX = localCell.velocityX() + watershed.currentX();
+        float canonicalCurrentZ = localCell.velocityZ() + watershed.currentZ();
         WaveSurfaceSample wave = sampleWave(
                 level,
                 x,
@@ -98,7 +101,11 @@ final class HybridWaterBodyModel {
                 z,
                 localCell
         );
-        float surfaceHeight = column.baseSurfaceHeight() + tideOffset + wave.height() + localDisturbance;
+        float surfaceHeight = column.baseSurfaceHeight()
+                + watershed.waterLevelOffset()
+                + tideOffset
+                + wave.height()
+                + localDisturbance;
         float[] flow = sampleFlow(level, type, wave, canonicalCurrentX, canonicalCurrentZ);
 
         return new SurfaceSample(

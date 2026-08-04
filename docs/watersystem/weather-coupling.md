@@ -20,7 +20,8 @@ GeneratedWaterChunk / WaterAccess
   -> AtmosphereSimulationEngine
   -> WeatherQuery
        -> OceanSeaStateField
-       -> WeatherHydrologyManager
+       -> WatershedSimulationManager (default)
+       -> WeatherHydrologyManager (fallback when watersheds are disabled)
        -> SurfaceWeatheringScheduler
 ```
 
@@ -65,7 +66,16 @@ conditions.
 
 ## Finite-body hydrology
 
-`WeatherHydrologyManager` performs a small deterministic set of surface probes
+When `water_simulation.watersheds.enabled` is true, the time-sliced
+`WatershedSimulationManager` consumes localized weather into compact rainfall,
+saturation, runoff, downstream discharge, level, flood, sediment, clarity,
+current, and debris conditions. It operates only on already-loaded chunks near
+players and retains runoff when the cached downstream chunk is unavailable.
+The full ownership and flood-recession model is documented in
+[`watersheds-and-flooding.md`](watersheds-and-flooding.md).
+
+When watersheds are disabled, `WeatherHydrologyManager` remains as the legacy
+fallback and performs a small deterministic set of surface probes
 around each player at a configurable interval. It uses only already-loaded
 chunks, deduplicates probes by chunk, and ignores dry locations and large
 oceans. Each valid lake or river sample passes through `WaterCycleFluxModel`:
@@ -129,6 +139,10 @@ All settings live under `water_simulation.weather_coupling`:
 | `hydrologyEvaporationUnitsPerProbe` | `18` | Maximum dry-weather debit per probe. |
 | `hydrologyMinTransferUnits` | `64` | Balance required before a physical transfer. |
 | `hydrologyMaxLedgerEntries` | `4096` | Runtime persistent-ledger budget per level. |
+
+The default watershed settings are under `water_simulation.watersheds`; see
+[`watersheds-and-flooding.md`](watersheds-and-flooding.md#configuration) for
+the complete conservative configuration table.
 
 ## Verification
 

@@ -361,6 +361,66 @@ public final class CanonicalWater {
     }
 
     /**
+     * Places one separately owned full temporary-flood cell.
+     *
+     * <p>The caller must complete terrain, structure, and block-entity safety
+     * checks first. This authority method performs the final loaded/dry check,
+     * writes canonical sparse state, and projects the namespaced fluid without
+     * enabling vanilla fluid tick spread.</p>
+     */
+    public static boolean placeTemporaryFlood(
+            ServerLevel level,
+            BlockPos pos,
+            float velocityX,
+            float velocityZ
+    ) {
+        if (level == null
+                || pos == null
+                || !level.hasChunkAt(pos)
+                || getTracked(level, pos) != null
+                || WildernessWaterAuthority.generatedSpanAt(level, pos) != null
+                || !canAcceptVolume(level, pos)) {
+            return false;
+        }
+        WaterVolumeChunk.WaterCell floodCell = new WaterVolumeChunk.WaterCell(
+                WaterVolumeChunk.UNITS_PER_BLOCK,
+                velocityX,
+                0.0f,
+                velocityZ,
+                WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED
+                        | WaterVolumeChunk.FLAG_SLEEPING
+                        | WaterVolumeChunk.FLAG_TEMPORARY_FLOOD,
+                293_150
+        ).sanitized();
+        set(level, pos, floodCell, true, false);
+        WaterVolumeChunk.WaterCell placed = getTracked(level, pos);
+        return placed != null
+                && placed.temporaryFlood()
+                && WildernessWaterAuthority.isPlainWaterProjection(level.getBlockState(pos));
+    }
+
+    /**
+     * Removes only an unchanged temporary-flood projection during recession.
+     *
+     * <p>Player, mod, generated, imported, and ordinary canonical water never
+     * pass the exact flag/projection gate, so recession cannot delete them.</p>
+     */
+    public static boolean removeTemporaryFlood(ServerLevel level, BlockPos pos) {
+        if (level == null || pos == null || !level.hasChunkAt(pos)) {
+            return false;
+        }
+        WaterVolumeChunk.WaterCell tracked = getTracked(level, pos);
+        if (tracked == null
+                || !tracked.temporaryFlood()
+                || !WildernessWaterAuthority.isPlainWaterProjection(level.getBlockState(pos))) {
+            return false;
+        }
+        set(level, pos, WaterVolumeChunk.WaterCell.EMPTY, true, false);
+        WaterVolumeChunk.WaterCell remaining = getTracked(level, pos);
+        return remaining == null || !remaining.temporaryFlood();
+    }
+
+    /**
      * Re-applies the namespaced physical projection for one tracked cell.
      *
      * <p>This is primarily used by debug/repair tooling. It

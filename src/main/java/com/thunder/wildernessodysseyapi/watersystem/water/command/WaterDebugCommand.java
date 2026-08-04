@@ -10,6 +10,9 @@ import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.ExistingWorldWaterConverter;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedSimulationDiagnostics;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
@@ -42,8 +45,13 @@ public final class WaterDebugCommand {
                 .then(Commands.literal("summary")
                         .executes(context -> summary(context, 4))
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, 64))
-                                .executes(context -> summary(context,
-                                        IntegerArgumentType.getInteger(context, "radius")))))
+                                 .executes(context -> summary(context,
+                                         IntegerArgumentType.getInteger(context, "radius")))))
+                .then(Commands.literal("watershed")
+                        .executes(context -> watershed(context, sourceBlockPos(context.getSource())))
+                        .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                                .executes(context -> watershed(context,
+                                        BlockPosArgument.getLoadedBlockPos(context, "pos")))))
                 .then(Commands.literal("authority")
                         .executes(context -> authority(context, 16))
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, 64))
@@ -123,6 +131,47 @@ public final class WaterDebugCommand {
                 + ", sleeping=" + snapshot.sleeping()), false);
         source.sendSuccess(() -> Component.literal("  canonicalSpeed=" + format(snapshot.canonicalSpeed())
                 + ", mobileSpeed=" + format(snapshot.mobileSpeed())), false);
+        return 1;
+    }
+
+    /** Reports the authoritative watershed cell containing a loaded position. */
+    private static int watershed(CommandContext<CommandSourceStack> context, BlockPos pos) {
+        CommandSourceStack source = context.getSource();
+        ServerLevel level = source.getLevel();
+        WatershedConditions conditions = WaterServices.access().getWatershedConditions(level, pos);
+        WatershedSimulationDiagnostics.Snapshot diagnostics =
+                WatershedSimulationDiagnostics.snapshot(level);
+
+        source.sendSuccess(() -> Component.literal("WO watershed @ chunk "
+                + (pos.getX() >> 4) + ", " + (pos.getZ() >> 4)), false);
+        source.sendSuccess(() -> Component.literal("  basin="
+                + Long.toUnsignedString(conditions.basinId(), 16)
+                + ", feature=" + conditions.waterFeature()
+                + ", averageElevation=" + conditions.averageTerrainElevation()
+                + ", downstream=" + conditions.downstreamDirection()
+                + ", accumulation=" + format(conditions.drainageAccumulation())), false);
+        source.sendSuccess(() -> Component.literal("  rainfall=" + format(conditions.recentRainfall())
+                + ", saturation=" + format(conditions.soilSaturation())
+                + ", runoff=" + format(conditions.storedRunoff())
+                + ", discharge=" + format(conditions.riverDischarge())), false);
+        source.sendSuccess(() -> Component.literal("  levelOffset=" + format(conditions.waterLevelOffset())
+                + ", floodRisk=" + format(conditions.floodRisk())
+                + ", threshold=" + format(conditions.floodThreshold())
+                + ", flooding=" + conditions.flooding()
+                + ", temporaryCells=" + conditions.activeTemporaryFloodCells()), false);
+        source.sendSuccess(() -> Component.literal("  current=" + format(conditions.currentX())
+                + ", " + format(conditions.currentZ())
+                + " (strength=" + format(conditions.currentStrength()) + ")"
+                + ", sediment=" + format(conditions.sediment())
+                + ", clarity=" + format(conditions.clarity())
+                + ", debris=" + format(conditions.debris())), false);
+        source.sendSuccess(() -> Component.literal("  scheduler queued=" + diagnostics.queuedChunks()
+                + ", processed=" + diagnostics.processedChunks()
+                + ", initialized=" + diagnostics.initializedChunks()
+                + ", placed=" + diagnostics.floodPlacements()
+                + ", removed=" + diagnostics.floodRemovals()
+                + ", activeFlood=" + diagnostics.activeFloodCells()
+                + ", elapsedMicros=" + diagnostics.elapsedMicros()), false);
         return 1;
     }
 
