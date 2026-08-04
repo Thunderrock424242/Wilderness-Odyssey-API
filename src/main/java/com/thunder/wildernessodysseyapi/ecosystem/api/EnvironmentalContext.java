@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.ecosystem.api;
 
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -22,6 +23,7 @@ public record EnvironmentalContext(
         long dayTime,
         ResourceLocation biome,
         WeatherSample weather,
+        WatershedConditions watershed,
         boolean exposedToSky,
         double foodAvailability,
         Optional<WaterTarget> water,
@@ -32,8 +34,58 @@ public record EnvironmentalContext(
         Optional<Disturbance> disturbance
 ) {
 
+    /** Retains the original context shape for external behavior controllers. */
+    public EnvironmentalContext(
+            ServerLevel level,
+            PathfinderMob animal,
+            SpeciesBehaviorProfile profile,
+            long gameTime,
+            long dayTime,
+            ResourceLocation biome,
+            WeatherSample weather,
+            boolean exposedToSky,
+            double foodAvailability,
+            Optional<WaterTarget> water,
+            Optional<ShelterTarget> shelter,
+            Optional<Threat> threat,
+            Optional<HerdCenter> herd,
+            Optional<PreyTarget> preyTarget,
+            Optional<Disturbance> disturbance
+    ) {
+        this(
+                level, animal, profile, gameTime, dayTime, biome, weather,
+                WatershedConditions.NONE, exposedToSky, foodAvailability, water,
+                shelter, threat, herd, preyTarget, disturbance
+        );
+    }
+
+    public EnvironmentalContext {
+        watershed = watershed == null ? WatershedConditions.NONE : watershed;
+    }
+
     /** Safe dry approach adjacent to a detected water position. */
-    public record WaterTarget(BlockPos waterPosition, BlockPos approachPosition, double depth) {
+    public record WaterTarget(
+            BlockPos waterPosition,
+            BlockPos approachPosition,
+            double depth,
+            float floodRisk,
+            float currentStrength,
+            float clarity
+    ) {
+        /** Retains the original target shape for third-party locators. */
+        public WaterTarget(BlockPos waterPosition, BlockPos approachPosition, double depth) {
+            this(waterPosition, approachPosition, depth, 0.0f, 0.0f, 1.0f);
+        }
+
+        public WaterTarget {
+            floodRisk = unit(floodRisk);
+            currentStrength = Math.max(0.0f, Float.isFinite(currentStrength) ? currentStrength : 0.0f);
+            clarity = unit(clarity);
+        }
+
+        private static float unit(float value) {
+            return Math.max(0.0f, Math.min(1.0f, Float.isFinite(value) ? value : 0.0f));
+        }
     }
 
     /** Standable position protected from the sky. */

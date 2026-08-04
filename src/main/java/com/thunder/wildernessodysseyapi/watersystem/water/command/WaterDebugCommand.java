@@ -139,6 +139,7 @@ public final class WaterDebugCommand {
         CommandSourceStack source = context.getSource();
         ServerLevel level = source.getLevel();
         WatershedConditions conditions = WaterServices.access().getWatershedConditions(level, pos);
+        var localFlow = WaterServices.access().getLocalWatershedFlow(level, pos);
         WatershedSimulationDiagnostics.Snapshot diagnostics =
                 WatershedSimulationDiagnostics.snapshot(level);
 
@@ -151,6 +152,7 @@ public final class WaterDebugCommand {
                 + ", downstream=" + conditions.downstreamDirection()
                 + ", accumulation=" + format(conditions.drainageAccumulation())), false);
         source.sendSuccess(() -> Component.literal("  rainfall=" + format(conditions.recentRainfall())
+                + ", snowmelt=" + format(conditions.recentSnowmelt())
                 + ", saturation=" + format(conditions.soilSaturation())
                 + ", runoff=" + format(conditions.storedRunoff())
                 + ", discharge=" + format(conditions.riverDischarge())), false);
@@ -165,6 +167,12 @@ public final class WaterDebugCommand {
                 + ", sediment=" + format(conditions.sediment())
                 + ", clarity=" + format(conditions.clarity())
                 + ", debris=" + format(conditions.debris())), false);
+        source.sendSuccess(() -> Component.literal("  localCell=" + localFlow.cell()
+                + ", localDirection=" + localFlow.direction()
+                + ", contributingCells=" + localFlow.contributingCells()
+                + ", confluence=" + localFlow.confluence()
+                + ", localCurrent=" + format(localFlow.currentX())
+                + ", " + format(localFlow.currentZ())), false);
         source.sendSuccess(() -> Component.literal("  scheduler queued=" + diagnostics.queuedChunks()
                 + ", processed=" + diagnostics.processedChunks()
                 + ", initialized=" + diagnostics.initializedChunks()

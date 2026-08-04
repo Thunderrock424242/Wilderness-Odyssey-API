@@ -100,7 +100,9 @@ public final class DefaultEcosystemBehaviorController implements EcosystemBehavi
     ) {
         return context.weather().precipitationIntensity() >= shelter.precipitationThreshold()
                 || context.weather().thunderIntensity() >= shelter.thunderThreshold()
-                || context.weather().wind().magnitude() >= shelter.windThreshold();
+                || context.weather().wind().magnitude() >= shelter.windThreshold()
+                || context.watershed().flooding()
+                || context.watershed().floodRisk() >= 0.82f;
     }
 
     private static BlockPos fallbackAway(BlockPos origin, BlockPos threat, int distance) {

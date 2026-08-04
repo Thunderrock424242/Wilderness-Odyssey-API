@@ -24,7 +24,11 @@ class WatershedSavedDataTest {
                 0.68f,
                 445566L,
                 0.84f,
-                120L
+                120L,
+                WatershedDrainageGrid.fromHeights(
+                        new int[]{9, 8, 9, 10, 8, 4, 8, 9, 9, 8, 9, 10, 10, 9, 10, 11},
+                        DrainageDirection.NORTH_WEST
+                )
         );
         state.apply(new WatershedSimulationModel.Result(
                 0.77f,
@@ -39,7 +43,8 @@ class WatershedSavedDataTest {
                 -0.48f,
                 -0.48f,
                 0.57f,
-                0.12f
+                0.12f,
+                0.33f
         ), 0.84f, 160L);
         state.setActiveFloodCells(9);
 
@@ -57,5 +62,10 @@ class WatershedSavedDataTest {
         assertTrue(conditions.flooding());
         assertEquals(state.conditions().riverDischarge(), conditions.riverDischarge(), 0.0001f);
         assertEquals(state.conditions().waterLevelOffset(), conditions.waterLevelOffset(), 0.0001f);
+        assertEquals(state.conditions().recentSnowmelt(), conditions.recentSnowmelt(), 0.0001f);
+        assertEquals(
+                state.drainageGrid().directionBits(),
+                decoded.state(key).drainageGrid().directionBits()
+        );
     }
 }

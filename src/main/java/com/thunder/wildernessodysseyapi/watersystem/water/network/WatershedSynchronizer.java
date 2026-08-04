@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.network;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedChunkState;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedSavedData;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedBasinSavedData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -27,6 +28,7 @@ public final class WatershedSynchronizer {
             return;
         }
         WatershedSavedData data = WatershedSavedData.get(level);
+        WatershedBasinSavedData basins = WatershedBasinSavedData.get(level);
         int radius = WaterSimulationConfig.watershedSimulationDistanceChunks();
         for (var player : level.players()) {
             List<WatershedRegionSyncPayload.ChunkSnapshot> chunks = new ArrayList<>();
@@ -44,7 +46,7 @@ public final class WatershedSynchronizer {
                     chunks.add(new WatershedRegionSyncPayload.ChunkSnapshot(
                             chunkX,
                             chunkZ,
-                            state.packed()
+                            state.packed().withBasinId(basins.resolve(state.localBasinId()))
                     ));
                 }
             }

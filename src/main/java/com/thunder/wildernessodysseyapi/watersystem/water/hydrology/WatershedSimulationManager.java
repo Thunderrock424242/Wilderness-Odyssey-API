@@ -36,7 +36,9 @@ public final class WatershedSimulationManager {
     /** Initializes metadata for one chunk after normal promotion/loading finishes. */
     public static void onChunkLoad(ServerLevel level, LevelChunk chunk) {
         if (WaterSimulationConfig.watershedSimulationEnabled()) {
-            WatershedSavedData.get(level).getOrCreate(level, chunk);
+            WatershedSavedData data = WatershedSavedData.get(level);
+            data.getOrCreate(level, chunk);
+            reconcileLoadedConnections(level, data, chunk.getPos().toLong());
         }
     }
 
@@ -44,6 +46,7 @@ public final class WatershedSimulationManager {
     public static void tickLevel(ServerLevel level) {
         long started = System.nanoTime();
         WatershedSavedData data = WatershedSavedData.get(level);
+        WatershedBasinSavedData basins = WatershedBasinSavedData.get(level);
         RuntimeState runtime = RUNTIMES.computeIfAbsent(level, ignored -> new RuntimeState());
         int initialized = 0;
         int processed = 0;
@@ -73,8 +76,12 @@ public final class WatershedSimulationManager {
                     continue;
                 }
                 WatershedChunkState state = data.getOrCreate(level, chunk);
-                WatershedConditions previous = state.conditions();
+                WatershedConditions previous = state.conditions(basins.resolve(state.localBasinId()));
                 Downstream downstream = downstream(level, data, chunkKey, previous.downstreamDirection());
+                if (downstream.state != null) {
+                    long canonical = basins.union(state.localBasinId(), downstream.state.localBasinId());
+                    previous = state.conditions(canonical);
+                }
                 WeatherSample weather = weatherEnabled
                         ? WeatherServices.query().sample(level, samplePosition(level, chunk, state))
                         : WeatherSample.CLEAR;
@@ -90,7 +97,8 @@ public final class WatershedSimulationManager {
                                 weatherEnabled,
                                 downstream.state != null,
                                 WaterSimulationConfig.watershedSedimentEffectsEnabled(),
-                                WaterSimulationConfig.watershedDebrisEffectsEnabled()
+                                WaterSimulationConfig.watershedDebrisEffectsEnabled(),
+                                WaterSimulationConfig.watershedSnowmeltRate()
                         )
                 );
                 boolean changed = state.apply(
@@ -210,6 +218,49 @@ public final class WatershedSimulationManager {
             return Downstream.UNAVAILABLE;
         }
         return new Downstream(data.getOrCreate(level, chunk));
+    }
+
+    private static void reconcileLoadedConnections(
+            ServerLevel level,
+            WatershedSavedData data,
+            long loadedChunkKey
+    ) {
+        WatershedBasinSavedData basins = WatershedBasinSavedData.get(level);
+        WatershedChunkState loadedState = data.state(loadedChunkKey);
+        if (loadedState == null) {
+            return;
+        }
+        mergeDownstreamIfLoaded(level, data, basins, loadedChunkKey, loadedState);
+        int loadedX = ChunkPos.getX(loadedChunkKey);
+        int loadedZ = ChunkPos.getZ(loadedChunkKey);
+        for (WatershedConditions.DrainageDirection direction : WatershedConditions.DrainageDirection.values()) {
+            if (direction == WatershedConditions.DrainageDirection.SINK) {
+                continue;
+            }
+            int neighborX = loadedX - direction.stepX();
+            int neighborZ = loadedZ - direction.stepZ();
+            LevelChunk neighbor = level.getChunkSource().getChunkNow(neighborX, neighborZ);
+            if (neighbor == null) {
+                continue;
+            }
+            WatershedChunkState neighborState = data.getOrCreate(level, neighbor);
+            if (neighborState.conditions().downstreamDirection() == direction) {
+                basins.union(neighborState.localBasinId(), loadedState.localBasinId());
+            }
+        }
+    }
+
+    private static void mergeDownstreamIfLoaded(
+            ServerLevel level,
+            WatershedSavedData data,
+            WatershedBasinSavedData basins,
+            long sourceKey,
+            WatershedChunkState source
+    ) {
+        Downstream downstream = downstream(level, data, sourceKey, source.conditions().downstreamDirection());
+        if (downstream.state != null) {
+            basins.union(source.localBasinId(), downstream.state.localBasinId());
+        }
     }
 
     private static BlockPos samplePosition(

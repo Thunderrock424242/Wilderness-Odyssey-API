@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWater
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
@@ -99,6 +100,10 @@ public final class ClientWaterImmersion {
                 level,
                 new BlockPos(blockX, column.surfaceBlockY(), blockZ)
         );
+        WatershedLocalFlow localFlow = WatershedServices.localFlow(
+                level,
+                new BlockPos(blockX, column.surfaceBlockY(), blockZ)
+        );
         float surfaceY = visibleSurfaceHeight(
                 level,
                 column,
@@ -132,7 +137,7 @@ public final class ClientWaterImmersion {
         UnderwaterOpticsModel.OpticalProperties optics = UnderwaterOpticsModel.evaluate(
                 depthBelowSurface,
                 columnDepth,
-                Math.min(1.0f, (column.currentSpeed() + watershed.currentStrength())
+                Math.min(1.0f, (column.currentSpeed() + localFlow.currentStrength())
                         / WaterSurfaceVertexData.MAX_RENDER_CURRENT),
                 daylight,
                 tint[0],
@@ -202,6 +207,10 @@ public final class ClientWaterImmersion {
                 level,
                 new BlockPos(blockX, column.surfaceBlockY(), blockZ)
         );
+        WatershedLocalFlow localFlow = WatershedServices.localFlow(
+                level,
+                new BlockPos(blockX, column.surfaceBlockY(), blockZ)
+        );
         boolean customSurface = WaterShaders.shouldUseCoreShader()
                 && WaterChunkMeshCache.usesCustomSurface(level, blockX, blockZ, column);
         boolean waveSurface = customSurface && WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get();
@@ -231,8 +240,8 @@ public final class ClientWaterImmersion {
                 oceanWeight,
                 riverWeight,
                 lakeWeight,
-                column.velocityX() + watershed.currentX(),
-                column.velocityZ() + watershed.currentZ(),
+                column.velocityX() + localFlow.currentX(),
+                column.velocityZ() + localFlow.currentZ(),
                 surfaceContinuity,
                 customSurface ? TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE : 0.0f,
                 transientHeight

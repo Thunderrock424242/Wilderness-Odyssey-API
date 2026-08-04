@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedCondition
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindVector;
+import com.thunder.wildernessodysseyapi.weather.api.SurfaceWeatherState;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -100,6 +101,26 @@ class WatershedSimulationModelTest {
 
         assertTrue(disabled.recentRainfall() < previous.recentRainfall());
         assertTrue(disabled.soilSaturation() < previous.soilSaturation());
+    }
+
+    @Test
+    void warmStoredSnowBecomesDelayedRunoffWithoutLiquidRain() {
+        WeatherSample thaw = new WeatherSample(
+                8.0, 0.55, 1.0, WindVector.ZERO,
+                0.0, 0.1, 0.0, 0.0, PrecipitationType.NONE,
+                0.0, 0.0, WindVector.ZERO,
+                new SurfaceWeatherState(0.2, 0.0, 0.9, 0.0)
+        );
+        WatershedSimulationModel.Result result = WatershedSimulationModel.advance(
+                new WatershedSimulationModel.Input(
+                        riverState().conditions(), thaw, 0.0f, 0.08f, 0.035f,
+                        0.45f, 0.72f, true, true, true, true, 0.20f
+                )
+        );
+
+        assertTrue(result.recentSnowmelt() > 0.0f);
+        assertTrue(result.storedRunoff() > 0.0f);
+        assertTrue(result.recentRainfall() == 0.0f);
     }
 
     private static void apply(

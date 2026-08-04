@@ -42,4 +42,14 @@ class TemporaryFloodSavedDataTest {
         ));
         assertFalse(TemporaryFloodSavedData.mayRemoveTrackedCell(true, floodFlags, false));
     }
+
+    @Test
+    void versionTwoLedgerIncludesAnOriginalStatePaletteEntry() {
+        TemporaryFloodSavedData data = new TemporaryFloodSavedData();
+        BlockPos position = new BlockPos(4, 65, 9);
+
+        assertTrue(data.record(position, 9L, 30L, 16));
+        assertEquals(1, data.save(new CompoundTag(), null)
+                .getList("original_states", net.minecraft.nbt.Tag.TAG_COMPOUND).size());
+    }
 }

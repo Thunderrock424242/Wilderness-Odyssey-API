@@ -10,6 +10,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidR
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -301,12 +302,16 @@ public final class WaterChunkMeshCache {
                         level,
                         new BlockPos(columnX, column.surfaceBlockY(), columnZ)
                 );
+                WatershedLocalFlow localFlow = WatershedServices.localFlow(
+                        level,
+                        new BlockPos(columnX, column.surfaceBlockY(), columnZ)
+                );
                 height += column.baseSurfaceY() + conditions.waterLevelOffset();
                 ocean += column.oceanWeight() / 255.0f;
                 river += column.riverWeight() / 255.0f;
                 lake += column.lakeWeight() / 255.0f;
-                velocityX += column.velocityX() + conditions.currentX();
-                velocityZ += column.velocityZ() + conditions.currentZ();
+                velocityX += column.velocityX() + localFlow.currentX();
+                velocityZ += column.velocityZ() + localFlow.currentZ();
                 depth += column.depth();
                 tintRed += ((column.waterTint() >>> 16) & 0xFF) / 255.0f;
                 tintGreen += ((column.waterTint() >>> 8) & 0xFF) / 255.0f;
@@ -321,12 +326,16 @@ public final class WaterChunkMeshCache {
                     level,
                     new BlockPos(worldVertexX, fallback.surfaceBlockY(), worldVertexZ)
             );
+            WatershedLocalFlow localFlow = WatershedServices.localFlow(
+                    level,
+                    new BlockPos(worldVertexX, fallback.surfaceBlockY(), worldVertexZ)
+            );
             height = fallback.baseSurfaceY() + conditions.waterLevelOffset();
             ocean = fallback.oceanWeight() / 255.0f;
             river = fallback.riverWeight() / 255.0f;
             lake = fallback.lakeWeight() / 255.0f;
-            velocityX = fallback.velocityX() + conditions.currentX();
-            velocityZ = fallback.velocityZ() + conditions.currentZ();
+            velocityX = fallback.velocityX() + localFlow.currentX();
+            velocityZ = fallback.velocityZ() + localFlow.currentZ();
             depth = fallback.depth();
             tintRed = ((fallback.waterTint() >>> 16) & 0xFF) / 255.0f;
             tintGreen = ((fallback.waterTint() >>> 8) & 0xFF) / 255.0f;
