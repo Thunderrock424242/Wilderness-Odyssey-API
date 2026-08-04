@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.core;
 
 import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
+import com.thunder.wildernessodysseyapi.ecosystem.state.AnimalNeedsState;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.GeneratedWaterAttachmentSyncHandler;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
@@ -55,6 +56,12 @@ public final class ModAttachments {
                 }
                 return generated;
             }).sync(GeneratedWaterAttachmentSyncHandler.INSTANCE).build()
+    );
+
+    /** Compact persistent motivations for animals with a loaded ecosystem profile. */
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<AnimalNeedsState>> ANIMAL_NEEDS = ATTACHMENTS.register(
+            "animal_needs",
+            () -> AttachmentType.serializable(holder -> new AnimalNeedsState()).build()
     );
 
     private ModAttachments() {

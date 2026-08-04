@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.server;
 
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
+import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileReloadListener;
 import com.thunder.wildernessodysseyapi.faq.FaqReloadListener;
 import com.thunder.wildernessodysseyapi.gamerules.GameRulesListManager;
 import com.thunder.wildernessodysseyapi.modpack.structure.ModpackStructureRegistry;
@@ -85,5 +86,6 @@ public final class ServerLifecycleEvents {
     @SubscribeEvent
     public static void onAddReloadListeners(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
+        event.addListener(new SpeciesBehaviorProfileReloadListener());
     }
 }
