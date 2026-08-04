@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
+import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapConfig;
 import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapServerConfig;
@@ -88,6 +89,8 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-water-simulation-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, WeatherConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-weather-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, EcosystemConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-ecosystem-server.toml");
     }
 
     /** Applies runtime-backed settings after NeoForge loads a config file. */
@@ -110,6 +113,8 @@ public final class ModConfigRegistration {
             WeatherAuthority.get().onConfigurationReload();
         } else if (config.getSpec() == WeatherRenderingConfig.CONFIG_SPEC) {
             WeatherRenderingConfig.reload();
+        } else if (config.getSpec() == EcosystemConfig.CONFIG_SPEC) {
+            EcosystemConfig.reload();
         }
     }
 }

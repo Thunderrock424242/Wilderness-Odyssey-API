@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.changelog.command.ChangelogCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
+import com.thunder.wildernessodysseyapi.ecosystem.debug.EcosystemDebugCommand;
 import com.thunder.wildernessodysseyapi.faq.FaqCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
 import com.thunder.wildernessodysseyapi.lorebook.command.LoreBookCommand;
@@ -60,5 +61,6 @@ public final class ModCommands {
         MinecraftVerificationCommands.register(dispatcher);
         WaterDebugCommand.register(dispatcher);
         WeatherDebugCommand.register(dispatcher);
+        EcosystemDebugCommand.register(dispatcher);
     }
 }

@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.command.ModCommands;
 import com.thunder.wildernessodysseyapi.config.ModConfigRegistration;
 import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
+import com.thunder.wildernessodysseyapi.ecosystem.EcosystemEvents;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
 import com.thunder.wildernessodysseyapi.lorebook.map.BlueMapIntegration;
@@ -107,6 +108,7 @@ public final class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(EventTelemetryReporter.class);
         NeoForge.EVENT_BUS.register(TelemetryQueueProcessor.class);
         NeoForge.EVENT_BUS.register(LoreBookEvents.class);
+        NeoForge.EVENT_BUS.register(EcosystemEvents.class);
         NeoForge.EVENT_BUS.register(TideWorldUpdater.class);
         NeoForge.EVENT_BUS.register(ModCommands.class);
         NeoForge.EVENT_BUS.register(ServerLifecycleEvents.class);
