@@ -19,6 +19,9 @@ class WaterSurfaceShaderContractTest {
 
         assertTrue(descriptor.contains("\"name\": \"SpectrumState\""));
         assertTrue(descriptor.contains("\"name\": \"WindSpeed\""));
+        assertTrue(descriptor.contains("\"name\": \"RegionalSeaStateEnabled\""));
+        assertTrue(descriptor.contains("\"name\": \"RegionalSeaStateCorners\""));
+        assertTrue(descriptor.contains("\"name\": \"RegionalSpectrumCorners\""));
         assertTrue(descriptor.contains("\"name\": \"ChunkOrigin\""));
         assertTrue(descriptor.contains("\"name\": \"ImpulseCount\""));
         assertTrue(descriptor.contains("\"name\": \"ImpulseChunkIndex\""));
@@ -48,8 +51,10 @@ class WaterSurfaceShaderContractTest {
         String fragment = readResource(
                 "assets/wildernessodysseyapi/shaders/core/gerstner_water.fsh");
 
-        assertTrue(vertex.contains("SpectrumState.z * (0.35 + shape.w * 0.65)"));
-        assertTrue(vertex.contains("mix(SpectrumState.x, SpectrumState.y, shape.w)"));
+        assertTrue(vertex.contains("float directionalEnergy = mix(1.0, alignedEnergy, regionalSpectrum.z)"));
+        assertTrue(vertex.contains("mix(regionalSpectrum.x, regionalSpectrum.y, shape.w)"));
+        assertTrue(vertex.contains("vec2 direction = baseDirection"));
+        assertFalse(vertex.contains("mix(baseDirection, wind"));
         assertTrue(vertex.contains("float horizontalScale = shape.z * amplitude"));
         assertTrue(vertex.contains("displacedPosition.xz += horizontalDisplacement"));
         assertTrue(vertex.contains("cross(tangentZ, tangentX)"));
@@ -61,10 +66,29 @@ class WaterSurfaceShaderContractTest {
         assertTrue(vertex.contains("bodyWeight <= 0.000001 || shape.x <= 0.000001"));
         assertTrue(vertex.contains("flowRelativeDirection(baseDirection, flowDirection)"));
         assertTrue(vertex.contains("stableLinearPhase(localXZ"));
+        assertTrue(vertex.contains("phaseLocalXZ = localXZ;"));
         assertTrue(vertex.contains("phaseChunkIndex = ChunkOrigin / PHASE_CHUNK_SPAN"));
+        assertTrue(vertex.contains("resolveRegionalOceanState(localXZ, frameSeaState, frameSpectrum)"));
+        assertTrue(vertex.contains("mix(corners[0], corners[3], blend.x)"));
+        assertTrue(vertex.contains("mix(corners[1], corners[2], blend.x)"));
+        assertTrue(vertex.contains("regionalSeaState = sea;"));
         assertTrue(fragment.contains("flat in vec2 phaseChunkIndex"));
+        assertTrue(fragment.contains("in float regionalSeaState;"));
+        assertTrue(fragment.contains("in vec2 regionalWindDirection;"));
+        assertTrue(fragment.contains("in vec4 regionalSpectrumState;"));
+        assertFalse(fragment.contains("uniform float SeaState;"));
+        assertFalse(fragment.contains("uniform vec2 WindDirection;"));
+        assertFalse(fragment.contains("uniform vec4 SpectrumState;"));
         assertTrue(fragment.contains("animatedStablePhase"));
-        assertTrue(fragment.contains("stableWorldPhase(foamDirection"));
+        assertTrue(fragment.contains("phaseStableDirectionalWeight"));
+        assertTrue(fragment.contains("phaseBandLimit"));
+        assertTrue(fragment.contains(") * 0.66;"));
+        assertFalse(fragment.contains(") * (0.42 + sea * 0.48)"));
+        assertTrue(fragment.contains("stableWorldPhase(SHORE_BREAK_DIRECTION"));
+        assertFalse(fragment.contains("stableTimePhase"));
+        assertFalse(fragment.contains("currentAdvectionPhase"));
+        assertFalse(vertex.contains("stableTimePhase(0.24 + WindSpeed"));
+        assertFalse(vertex.contains("stableTimePhase(0.7 + length(localCurrent)"));
         assertFalse(fragment.contains("dot(worldPosition.xz"));
         assertTrue(fragment.contains("float shoreBreaker = shoreFactor"));
         assertTrue(fragment.contains("float impulseFoam = disturbanceStrength"));

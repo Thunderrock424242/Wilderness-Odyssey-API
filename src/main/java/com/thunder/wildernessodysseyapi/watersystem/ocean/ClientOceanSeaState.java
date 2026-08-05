@@ -43,7 +43,10 @@ public final class ClientOceanSeaState {
             retained.add(key);
             CellState state = regional.cells.get(key);
             if (state == null) {
-                regional.cells.put(key, new CellState(cell.sample(), cell.sample()));
+                regional.cells.put(
+                        key,
+                        new CellState(cell.sample(), cell.sample(), cell.sample())
+                );
             } else {
                 state.target = cell.sample();
             }
@@ -58,10 +61,7 @@ public final class ClientOceanSeaState {
             return;
         }
         for (CellState state : regional.cells.values()) {
-            state.current = state.current.interpolate(
-                    state.target,
-                    SNAPSHOT_INTERPOLATION
-            );
+            state.advance();
         }
     }
 
@@ -73,16 +73,43 @@ public final class ClientOceanSeaState {
                     ? OceanSeaState.CALM
                     : OceanSeaState.vanillaFallback(level, 0.0f);
         }
+        return sampleAt(level, worldX, worldZ, 1.0f);
+    }
+
+    /**
+     * Returns the render-interpolated regional material state.
+     *
+     * <p>Previous/current snapshots are blended with the same partial tick as
+     * the water frame. Environmental energy can therefore change smoothly at
+     * high frame rates without becoming another animation clock.</p>
+     */
+    public static OceanSeaState.Sample sampleAt(
+            Level level,
+            double worldX,
+            double worldZ,
+            float partialTick
+    ) {
+        float framePartialTick = clamp01(partialTick);
+        RegionalState regional = STATES.get(level);
+        if (regional == null || !regional.localized || regional.cells.isEmpty()) {
+            return level == null
+                    ? OceanSeaState.CALM
+                    : OceanSeaState.vanillaFallback(level, framePartialTick);
+        }
         double gridX = worldX / regional.cellSize - 0.5;
         double gridZ = worldZ / regional.cellSize - 0.5;
         int minimumX = floorToInt(gridX);
         int minimumZ = floorToInt(gridZ);
         float blendX = (float) (gridX - minimumX);
         float blendZ = (float) (gridZ - minimumZ);
-        OceanSeaState.Sample northWest = regional.sample(minimumX, minimumZ, worldX, worldZ);
-        OceanSeaState.Sample northEast = regional.sample(minimumX + 1, minimumZ, worldX, worldZ);
-        OceanSeaState.Sample southWest = regional.sample(minimumX, minimumZ + 1, worldX, worldZ);
-        OceanSeaState.Sample southEast = regional.sample(minimumX + 1, minimumZ + 1, worldX, worldZ);
+        OceanSeaState.Sample northWest = regional.sample(
+                minimumX, minimumZ, worldX, worldZ, framePartialTick);
+        OceanSeaState.Sample northEast = regional.sample(
+                minimumX + 1, minimumZ, worldX, worldZ, framePartialTick);
+        OceanSeaState.Sample southWest = regional.sample(
+                minimumX, minimumZ + 1, worldX, worldZ, framePartialTick);
+        OceanSeaState.Sample southEast = regional.sample(
+                minimumX + 1, minimumZ + 1, worldX, worldZ, framePartialTick);
         OceanSeaState.Sample north = northWest.interpolate(northEast, blendX);
         OceanSeaState.Sample south = southWest.interpolate(southEast, blendX);
         return north.interpolate(south, blendZ);
@@ -115,6 +142,12 @@ public final class ClientOceanSeaState {
         return value < truncated ? truncated - 1 : truncated;
     }
 
+    private static float clamp01(float value) {
+        return Float.isFinite(value)
+                ? Math.max(0.0f, Math.min(1.0f, value))
+                : 0.0f;
+    }
+
     private static long packed(int cellX, int cellZ) {
         return ((long) cellX << 32) | (cellZ & 0xFFFFFFFFL);
     }
@@ -128,11 +161,12 @@ public final class ClientOceanSeaState {
                 int cellX,
                 int cellZ,
                 double worldX,
-                double worldZ
+                double worldZ,
+                float partialTick
         ) {
             CellState exact = cells.get(packed(cellX, cellZ));
             if (exact != null) {
-                return exact.current;
+                return exact.sample(partialTick);
             }
 
             // A packet edge may temporarily omit one interpolation corner.
@@ -151,17 +185,34 @@ public final class ClientOceanSeaState {
                     nearest = entry.getValue();
                 }
             }
-            return nearest == null ? OceanSeaState.CALM : nearest.current;
+            return nearest == null ? OceanSeaState.CALM : nearest.sample(partialTick);
         }
     }
 
-    private static final class CellState {
+    static final class CellState {
+        private OceanSeaState.Sample previous;
         private OceanSeaState.Sample current;
         private OceanSeaState.Sample target;
 
-        private CellState(OceanSeaState.Sample current, OceanSeaState.Sample target) {
+        CellState(
+                OceanSeaState.Sample previous,
+                OceanSeaState.Sample current,
+                OceanSeaState.Sample target
+        ) {
+            this.previous = previous;
             this.current = current;
             this.target = target;
+        }
+
+        /** Advances one simulation tick while retaining the prior render endpoint. */
+        void advance() {
+            previous = current;
+            current = current.interpolate(target, SNAPSHOT_INTERPOLATION);
+        }
+
+        /** Blends only between the two most recent tick endpoints. */
+        OceanSeaState.Sample sample(float partialTick) {
+            return previous.interpolate(current, clamp01(partialTick));
         }
     }
 }

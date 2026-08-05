@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderType;
@@ -39,6 +40,8 @@ public final class WaterRenderCoordinator {
 
     private static final WaterChunkMeshCache MESHES = new WaterChunkMeshCache();
     private static final Map<Long, Ownership> OWNERSHIP = new ConcurrentHashMap<>();
+    private static final Long2ObjectOpenHashMap<OceanSeaState.Sample> REGIONAL_SEA_CORNERS =
+            new Long2ObjectOpenHashMap<>(256);
     private static boolean externalPackOwnedLastFrame;
 
     private WaterRenderCoordinator() {
@@ -105,13 +108,14 @@ public final class WaterRenderCoordinator {
         boolean submergedOpticsNeedCapture = WaterShaders.shouldUseUnderwaterShader()
                 && ClientWaterImmersion.sample(event.getCamera(), partialTick).isVisuallySubmerged();
         if (!visible.isEmpty() || submergedOpticsNeedCapture) {
-            float timeSeconds = (level.getGameTime() + partialTick) / 20.0f;
             OceanSeaState.Sample seaState = ClientOceanSeaState.sampleAt(
-                    level, camera.x, camera.z);
+                    level, camera.x, camera.z, partialTick);
             WaterShaders.updateOceanUniforms(
-                    timeSeconds,
+                    level.getGameTime(),
+                    partialTick,
                     seaState,
-                    ((level.getDayTime() + partialTick) % 24_000L) / 24_000.0f
+                    WaterAnimationClock.periodicFraction(
+                            level.getDayTime(), partialTick, 24_000L)
             );
         }
 
@@ -122,7 +126,7 @@ public final class WaterRenderCoordinator {
             if (timeSsrPass) {
                 WaterGpuTimer.begin();
             }
-            renderSurfaceGroups(event, visible);
+            renderSurfaceGroups(event, visible, level, partialTick);
             if (timeSsrPass) {
                 WaterGpuTimer.end();
                 ssrNanos = WaterGpuTimer.latestNanos();
@@ -239,7 +243,9 @@ public final class WaterRenderCoordinator {
 
     private static void renderSurfaceGroups(
             RenderLevelStageEvent event,
-            List<WaterChunkMeshCache.MeshGroup> visible
+            List<WaterChunkMeshCache.MeshGroup> visible,
+            ClientLevel level,
+            float partialTick
     ) {
         boolean coreShader = WaterShaders.shouldUseCoreShader();
         RenderType renderType = coreShader
@@ -263,16 +269,34 @@ public final class WaterRenderCoordinator {
                 Minecraft.getInstance().getWindow()
         );
         shader.apply();
+        if (coreShader) {
+            // Reuse primitive-key storage each frame to avoid boxed corner keys
+            // and per-frame hash-table allocation in large ocean views.
+            REGIONAL_SEA_CORNERS.clear();
+            WaterShaders.beginRegionalOceanStatePass();
+        }
         for (WaterChunkMeshCache.MeshGroup group : visible) {
-            // Each VBO is chunk-local. Uploading only these two small uniforms
-            // preserves sub-block precision at the world border without
-            // rebinding the complete shader and all scene textures per chunk.
+            // Each VBO is chunk-local. Neighboring groups share exact corner
+            // samples, so the vertex shader can vary regional sea energy in
+            // world space without camera-global morphing or boundary cracks.
             if (shader.MODEL_VIEW_MATRIX != null) {
                 shader.MODEL_VIEW_MATRIX.set(chunkModelView(
                         event, group, camera.x, camera.y, camera.z));
                 shader.MODEL_VIEW_MATRIX.upload();
             }
             if (coreShader) {
+                int minimumX = group.originX();
+                int minimumZ = group.originZ();
+                WaterShaders.uploadRegionalOceanState(
+                        regionalSeaCorner(
+                                level, minimumX, minimumZ, partialTick),
+                        regionalSeaCorner(
+                                level, minimumX + 16, minimumZ, partialTick),
+                        regionalSeaCorner(
+                                level, minimumX, minimumZ + 16, partialTick),
+                        regionalSeaCorner(
+                                level, minimumX + 16, minimumZ + 16, partialTick)
+                );
                 var chunkOrigin = shader.getUniform("ChunkOrigin");
                 if (chunkOrigin != null) {
                     chunkOrigin.set((float) group.originX(), (float) group.originZ());
@@ -285,6 +309,20 @@ public final class WaterRenderCoordinator {
         VertexBuffer.unbind();
         shader.clear();
         renderType.clearRenderState();
+    }
+
+    private static OceanSeaState.Sample regionalSeaCorner(
+            ClientLevel level,
+            int worldX,
+            int worldZ,
+            float partialTick
+    ) {
+        long key = ((long) worldX << 32) | (worldZ & 0xFFFF_FFFFL);
+        return REGIONAL_SEA_CORNERS.computeIfAbsent(
+                key,
+                ignored -> ClientOceanSeaState.sampleAt(
+                        level, worldX, worldZ, partialTick)
+        );
     }
 
     private static Matrix4f chunkModelView(
@@ -326,6 +364,7 @@ public final class WaterRenderCoordinator {
     private static void clear() {
         MESHES.clear();
         OWNERSHIP.clear();
+        REGIONAL_SEA_CORNERS.clear();
         WaterSurfaceDisplacement.clear();
         RippleRenderer.clear();
     }

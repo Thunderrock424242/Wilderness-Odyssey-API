@@ -89,19 +89,19 @@ class WaterSurfaceGerstnerMirrorTest {
             float componentBlend = profile.waveCount <= 1
                     ? 0.0f
                     : index / (float) (profile.waveCount - 1);
-            float directionBlend = spectrum.directionBlend()
-                    * (0.35f + componentBlend * 0.65f);
-            float directionX = profile.dirX[index] * (1.0f - directionBlend)
-                    + spectrum.windDirectionX() * directionBlend;
-            float directionZ = profile.dirZ[index] * (1.0f - directionBlend)
-                    + spectrum.windDirectionZ() * directionBlend;
-            float inverseDirectionLength = 1.0f
-                    / (float) Math.sqrt(directionX * directionX + directionZ * directionZ);
-            directionX *= inverseDirectionLength;
-            directionZ *= inverseDirectionLength;
+            float directionX = profile.dirX[index];
+            float directionZ = profile.dirZ[index];
 
             float energy = spectrum.swellScale()
                     + (spectrum.chopScale() - spectrum.swellScale()) * componentBlend;
+            float windAlignment = Math.max(
+                    0.0f,
+                    directionX * spectrum.windDirectionX()
+                            + directionZ * spectrum.windDirectionZ()
+            );
+            float alignedEnergy = 0.55f + windAlignment * 0.90f;
+            energy *= 1.0f
+                    + spectrum.directionBlend() * (alignedEnergy - 1.0f);
             float amplitude = profile.amplitude[index] * energy;
             float horizontalScale = profile.steepness[index] * amplitude;
             float phase = profile.waveNumber[index] * (x * directionX + z * directionZ)

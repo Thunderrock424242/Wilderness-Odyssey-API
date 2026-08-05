@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GerstnerWaveProfileTest {
@@ -105,6 +106,34 @@ class GerstnerWaveProfileTest {
                 () -> assertEquals(neutral.height() * 2.0f, energetic.height(), 1.0e-6f),
                 () -> assertEquals(neutral.velocityY() * 2.0f, energetic.velocityY(), 1.0e-6f),
                 () -> assertEquals(originalFrequency, profile.angularFrequency[0], 0.0f)
+        );
+    }
+
+    @Test
+    void windHeadingChangesEnergyWithoutRephasingExistingCarrier() {
+        GerstnerWaveProfile profile = singleWave(12.0f, 8.0f);
+        WaveSpectrumState aligned = new WaveSpectrumState(
+                1.0f, 1.0f, 1.0f, 0.0f, 1.0f);
+        WaveSpectrumState opposed = new WaveSpectrumState(
+                1.0f, 1.0f, -1.0f, 0.0f, 1.0f);
+
+        WaveSurfaceSample alignedSample = profile.sampleAt(
+                36.25, -19.75, 14.2, 1, aligned);
+        WaveSurfaceSample opposedSample = profile.sampleAt(
+                36.25, -19.75, 14.2, 1, opposed);
+        float omega = profile.angularFrequency[0];
+        double alignedPhase = Math.atan2(
+                alignedSample.height(),
+                -alignedSample.velocityY() / omega
+        );
+        double opposedPhase = Math.atan2(
+                opposedSample.height(),
+                -opposedSample.velocityY() / omega
+        );
+
+        assertAll(
+                () -> assertEquals(alignedPhase, opposedPhase, 1.0e-6),
+                () -> assertNotEquals(alignedSample.height(), opposedSample.height())
         );
     }
 

@@ -40,6 +40,8 @@ public final class WaterShaders {
     private static boolean externalShaderApiFailureLogged;
     private static final Matrix4f CAPTURED_INVERSE_PROJECTION = new Matrix4f();
     private static final Matrix4f CAPTURED_VIEW_TO_WORLD = new Matrix4f();
+    private static final Matrix4f REGIONAL_SEA_STATE_CORNERS = new Matrix4f();
+    private static final Matrix4f REGIONAL_SPECTRUM_CORNERS = new Matrix4f();
     private static long capturedOpticalFrameKey = Long.MIN_VALUE;
     private static final float[] GPU_IMPULSE_DATA =
             new float[WaterSurfaceDisplacement.MAX_GPU_IMPULSES
@@ -119,14 +121,32 @@ public final class WaterShaders {
     }
 
     /** Updates uniforms consumed by the built-in optical water pass. */
+    @Deprecated(forRemoval = false)
     public static void updateOceanUniforms(
             float timeSeconds,
             OceanSeaState.Sample seaState,
             float dayTime
     ) {
+        LegacyAnimationFrame frame = legacyFrame(timeSeconds);
+        updateOceanUniforms(frame.gameTime(), frame.partialTick(), seaState, dayTime);
+    }
+
+    /**
+     * Updates surface uniforms from one exact simulation frame.
+     *
+     * <p>Render coordinators should use this overload so the shader, scene
+     * capture, wakes, and weather all observe the same tick boundary.</p>
+     */
+    public static void updateOceanUniforms(
+            long gameTime,
+            float partialTick,
+            OceanSeaState.Sample seaState,
+            float dayTime
+    ) {
         OceanSeaState.Sample safeState = seaState == null ? OceanSeaState.CALM : seaState;
         updateOceanUniforms(
-                timeSeconds,
+                gameTime,
+                partialTick,
                 safeState.strength(),
                 safeState.windDirectionX(),
                 safeState.windDirectionZ(),
@@ -144,11 +164,32 @@ public final class WaterShaders {
     /**
      * Updates legacy scalar sea-state callers that do not retain the complete spectrum.
      *
-     * <p>The active coordinator uses the complete-state overload above. Dormant
-     * surface implementations retain this entry point for binary compatibility.</p>
+     * <p>This float-seconds overload remains for binary compatibility. New
+     * callers should pass an exact tick and partial tick to the overload below.</p>
      */
+    @Deprecated(forRemoval = false)
     public static void updateOceanUniforms(
             float timeSeconds,
+            float seaState,
+            float windDirectionX,
+            float windDirectionZ,
+            float dayTime
+    ) {
+        LegacyAnimationFrame frame = legacyFrame(timeSeconds);
+        updateOceanUniforms(
+                frame.gameTime(),
+                frame.partialTick(),
+                seaState,
+                windDirectionX,
+                windDirectionZ,
+                dayTime
+        );
+    }
+
+    /** Updates scalar sea-state uniforms from one exact simulation frame. */
+    public static void updateOceanUniforms(
+            long gameTime,
+            float partialTick,
             float seaState,
             float windDirectionX,
             float windDirectionZ,
@@ -161,6 +202,9 @@ public final class WaterShaders {
         oceanShader.safeGetUniform("SeaState").set(seaState);
         oceanShader.safeGetUniform("WindDirection").set(windDirectionX, windDirectionZ);
         oceanShader.safeGetUniform("DayTime").set(dayTime);
+        // Camera-global values remain the compatibility fallback. The active
+        // snapshot pass enables seam-safe world-anchored corner interpolation.
+        oceanShader.safeGetUniform("RegionalSeaStateEnabled").set(0.0f);
 
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) {
@@ -170,20 +214,18 @@ public final class WaterShaders {
             return;
         }
 
-        float partialTick = minecraft.gameRenderer.getMainCamera().getPartialTickTime();
-        uploadStableTime(oceanShader, minecraft.level.getGameTime(), partialTick);
+        long frameGameTime = Math.max(0L, gameTime);
+        float framePartialTick = WaterAnimationClock.clampPartialTick(partialTick);
+        uploadStableTime(oceanShader, frameGameTime, framePartialTick);
         uploadSurfaceAnimationPhases(
                 oceanShader,
-                minecraft.level.getGameTime(),
-                partialTick,
-                seaState,
-                windDirectionX,
-                windDirectionZ
+                frameGameTime,
+                framePartialTick
         );
         long frameKey = sceneFrameKey(
                 minecraft.level,
-                minecraft.level.getGameTime(),
-                partialTick
+                frameGameTime,
+                framePartialTick
         );
         Matrix4f inverseProjection = new Matrix4f(RenderSystem.getProjectionMatrix()).invert();
         Matrix4f viewToWorld = new Matrix4f().rotation(
@@ -233,13 +275,13 @@ public final class WaterShaders {
             thunder = ClientWeatherCoordinator.thunderContribution(localWeather);
             frozen = (float) localWeather.surface().frozenFraction();
         } else {
-            rain = minecraft.level.getRainLevel(partialTick);
-            thunder = minecraft.level.getThunderLevel(partialTick);
+            rain = minecraft.level.getRainLevel(framePartialTick);
+            thunder = minecraft.level.getThunderLevel(framePartialTick);
             frozen = 0.0f;
         }
         float skyBrightness = Math.max(0.12f, 1.0f - rain * 0.32f - thunder * 0.38f);
         oceanShader.safeGetUniform("Weather").set(rain, thunder, skyBrightness, frozen);
-        var sky = minecraft.level.getSkyColor(cameraPosition, partialTick);
+        var sky = minecraft.level.getSkyColor(cameraPosition, framePartialTick);
         oceanShader.safeGetUniform("EnvironmentColor").set(
                 (float) sky.x,
                 (float) sky.y,
@@ -288,26 +330,26 @@ public final class WaterShaders {
                 "Ocean",
                 GerstnerWaveProfile.OCEAN,
                 configuredWaveLimit(WaterBodyClassifier.WaterType.OCEAN),
-                minecraft.level.getGameTime(),
-                partialTick
+                frameGameTime,
+                framePartialTick
         );
         updateWaveUniforms(
                 "River",
                 GerstnerWaveProfile.RIVER,
                 configuredWaveLimit(WaterBodyClassifier.WaterType.RIVER),
-                minecraft.level.getGameTime(),
-                partialTick
+                frameGameTime,
+                framePartialTick
         );
         updateWaveUniforms(
                 "Pond",
                 GerstnerWaveProfile.POND,
                 configuredWaveLimit(WaterBodyClassifier.WaterType.POND),
-                minecraft.level.getGameTime(),
-                partialTick
+                frameGameTime,
+                framePartialTick
         );
         updateImpulseUniforms(
                 minecraft.level,
-                minecraft.level.getGameTime() + (double) partialTick,
+                frameGameTime + (double) framePartialTick,
                 cameraPosition.x,
                 cameraPosition.z
         );
@@ -414,9 +456,86 @@ public final class WaterShaders {
         }
     }
 
+    // The snapshot renderer has already applied the shader when these methods
+    // run, so regional uniforms are uploaded immediately before each VBO draw.
+    static void beginRegionalOceanStatePass() {
+        uploadScalarUniform("RegionalSeaStateEnabled", 1.0f);
+    }
+
+    static void uploadRegionalOceanState(
+            OceanSeaState.Sample northWest,
+            OceanSeaState.Sample northEast,
+            OceanSeaState.Sample southWest,
+            OceanSeaState.Sample southEast
+    ) {
+        OceanSeaState.Sample nw = northWest == null ? OceanSeaState.CALM : northWest;
+        OceanSeaState.Sample ne = northEast == null ? OceanSeaState.CALM : northEast;
+        OceanSeaState.Sample sw = southWest == null ? OceanSeaState.CALM : southWest;
+        OceanSeaState.Sample se = southEast == null ? OceanSeaState.CALM : southEast;
+        WaveSpectrumState nwSpectrum = nw.spectrum();
+        WaveSpectrumState neSpectrum = ne.spectrum();
+        WaveSpectrumState swSpectrum = sw.spectrum();
+        WaveSpectrumState seSpectrum = se.spectrum();
+
+        // GLSL matrix columns are NW, SW, SE, NE. This winding makes the
+        // shader's north/south bilinear interpolation explicit and keeps the
+        // two uploads contiguous instead of issuing eight vec4 driver calls.
+        REGIONAL_SEA_STATE_CORNERS.set(
+                nw.strength(), nw.windDirectionX(), nw.windDirectionZ(), nw.windSpeed(),
+                sw.strength(), sw.windDirectionX(), sw.windDirectionZ(), sw.windSpeed(),
+                se.strength(), se.windDirectionX(), se.windDirectionZ(), se.windSpeed(),
+                ne.strength(), ne.windDirectionX(), ne.windDirectionZ(), ne.windSpeed()
+        );
+        REGIONAL_SPECTRUM_CORNERS.set(
+                nwSpectrum.swellScale(), nwSpectrum.chopScale(),
+                nwSpectrum.directionBlend(), nw.breakingStrength(),
+                swSpectrum.swellScale(), swSpectrum.chopScale(),
+                swSpectrum.directionBlend(), sw.breakingStrength(),
+                seSpectrum.swellScale(), seSpectrum.chopScale(),
+                seSpectrum.directionBlend(), se.breakingStrength(),
+                neSpectrum.swellScale(), neSpectrum.chopScale(),
+                neSpectrum.directionBlend(), ne.breakingStrength()
+        );
+        uploadMatrixUniform("RegionalSeaStateCorners", REGIONAL_SEA_STATE_CORNERS);
+        uploadMatrixUniform("RegionalSpectrumCorners", REGIONAL_SPECTRUM_CORNERS);
+    }
+
+    private static void uploadScalarUniform(String name, float value) {
+        if (oceanShader == null) {
+            return;
+        }
+        var uniform = oceanShader.getUniform(name);
+        if (uniform != null) {
+            uniform.set(value);
+            uniform.upload();
+        }
+    }
+
+    private static void uploadMatrixUniform(String name, Matrix4f value) {
+        if (oceanShader == null) {
+            return;
+        }
+        var uniform = oceanShader.getUniform(name);
+        if (uniform != null) {
+            uniform.set(value);
+            uniform.upload();
+        }
+    }
+
     /** Updates the bounded uniforms consumed by the underwater overlay. */
+    @Deprecated(forRemoval = false)
     public static void updateUnderwaterUniforms(
             float timeSeconds,
+            ClientWaterImmersion.ImmersionState state
+    ) {
+        LegacyAnimationFrame frame = legacyFrame(timeSeconds);
+        updateUnderwaterUniforms(frame.gameTime(), frame.partialTick(), state);
+    }
+
+    /** Updates underwater uniforms from one exact simulation frame. */
+    public static void updateUnderwaterUniforms(
+            long gameTime,
+            float partialTick,
             ClientWaterImmersion.ImmersionState state
     ) {
         if (underwaterShader == null) {
@@ -441,20 +560,19 @@ public final class WaterShaders {
         // water stage; copying here would create a second full-resolution blit
         // whose depth texture cannot reconstruct the terrain scene.
         Minecraft minecraft = Minecraft.getInstance();
-        float partialTick = minecraft.gameRenderer.getMainCamera().getPartialTickTime();
-        long gameTime = minecraft.level == null ? 0L : minecraft.level.getGameTime();
+        long frameGameTime = Math.max(0L, gameTime);
+        float framePartialTick = WaterAnimationClock.clampPartialTick(partialTick);
         uploadUnderwaterAnimationPhases(
                 underwaterShader,
-                gameTime,
-                partialTick,
-                state.seaState()
+                frameGameTime,
+                framePartialTick
         );
         WaterSceneCapture.Capture capture = null;
         if (minecraft.level != null) {
             long frameKey = sceneFrameKey(
                     minecraft.level,
-                    minecraft.level.getGameTime(),
-                    partialTick
+                    frameGameTime,
+                    framePartialTick
             );
             if (capturedOpticalFrameKey == frameKey) {
                 try {
@@ -503,7 +621,9 @@ public final class WaterShaders {
                 Math.max(6.0f, optics.visibilityBlocks())
         );
 
-        float sunAngle = minecraft.level == null ? 0.0f : minecraft.level.getSunAngle(partialTick);
+        float sunAngle = minecraft.level == null
+                ? 0.0f
+                : minecraft.level.getSunAngle(framePartialTick);
         boolean skyLight = minecraft.level != null && minecraft.level.dimensionType().hasSkyLight();
         underwaterShader.safeGetUniform("SunDirection").set(
                 skyLight ? -(float) Math.sin(sunAngle) : 0.0f,
@@ -561,16 +681,13 @@ public final class WaterShaders {
     private static void uploadUnderwaterAnimationPhases(
             ShaderInstance shader,
             long gameTime,
-            float partialTick,
-            float seaState
+            float partialTick
     ) {
-        double sea = Math.max(0.0, Math.min(1.0, seaState));
-        double speed = 0.58 + sea * 0.82;
         shader.safeGetUniform("DistortionPhases").set(
-                stableAnimationPhase(gameTime, partialTick, speed),
-                stableAnimationPhase(gameTime, partialTick, -speed * 0.83),
-                stableAnimationPhase(gameTime, partialTick, speed * 1.34),
-                stableAnimationPhase(gameTime, partialTick, -speed * 1.12)
+                WaterAnimationClock.underwaterDistortionPhase(gameTime, partialTick, 0),
+                WaterAnimationClock.underwaterDistortionPhase(gameTime, partialTick, 1),
+                WaterAnimationClock.underwaterDistortionPhase(gameTime, partialTick, 2),
+                WaterAnimationClock.underwaterDistortionPhase(gameTime, partialTick, 3)
         );
         shader.safeGetUniform("CausticPhases0").set(
                 stableAnimationPhase(gameTime, partialTick, 0.42),
@@ -584,51 +701,27 @@ public final class WaterShaders {
                 stableAnimationPhase(gameTime, partialTick, -0.028)
         );
         shader.safeGetUniform("FallbackPhases").set(
-                stableAnimationPhase(gameTime, partialTick, 0.65 + sea * 0.85),
-                stableAnimationPhase(gameTime, partialTick, -(0.52 + sea * 0.72))
+                WaterAnimationClock.underwaterFallbackPhase(gameTime, partialTick, 0),
+                WaterAnimationClock.underwaterFallbackPhase(gameTime, partialTick, 1)
         );
     }
 
     private static void uploadSurfaceAnimationPhases(
             ShaderInstance shader,
             long gameTime,
-            float partialTick,
-            float seaState,
-            float windDirectionX,
-            float windDirectionZ
+            float partialTick
     ) {
-        double sea = Math.max(0.0, Math.min(1.0, seaState));
-        double windX = windDirectionX + 0.0001;
-        double windZ = windDirectionZ;
-        double windLength = Math.hypot(windX, windZ);
-        if (windLength <= 1.0e-8) {
-            windX = 1.0;
-            windZ = 0.0;
-        } else {
-            windX /= windLength;
-            windZ /= windLength;
-        }
-        double crossX = -windZ;
-        double crossZ = windX;
-        double glassX = windX * 0.58 - crossX * 0.81;
-        double glassZ = windZ * 0.58 - crossZ * 0.81;
-        double glassLength = Math.hypot(glassX, glassZ);
-        glassX /= glassLength;
-        glassZ /= glassLength;
-        double glassAdvection = (windX * glassX + windZ * glassZ) * 13.73 * 0.11;
-
         shader.safeGetUniform("SurfaceAnimationPhases0").set(
-                stableAnimationPhase(gameTime, partialTick, 0.19),
-                stableAnimationPhase(gameTime, partialTick, -0.16),
-                stableAnimationPhase(gameTime, partialTick, 0.51 + sea * 1.07),
-                stableAnimationPhase(gameTime, partialTick, -0.39 - sea * 0.83)
+                WaterAnimationClock.surfacePhase(gameTime, partialTick, 0),
+                WaterAnimationClock.surfacePhase(gameTime, partialTick, 1),
+                WaterAnimationClock.surfacePhase(gameTime, partialTick, 2),
+                WaterAnimationClock.surfacePhase(gameTime, partialTick, 3)
         );
         shader.safeGetUniform("SurfaceAnimationPhases1").set(
-                stableAnimationPhase(gameTime, partialTick, 1.63 + sea * 2.91),
-                stableAnimationPhase(
-                        gameTime, partialTick, 2.31 + sea * 4.07 + glassAdvection),
-                stableAnimationPhase(gameTime, partialTick, 1.15),
-                stableAnimationPhase(gameTime, partialTick, 0.55)
+                WaterAnimationClock.surfacePhase(gameTime, partialTick, 4),
+                WaterAnimationClock.surfacePhase(gameTime, partialTick, 5),
+                WaterAnimationClock.surfacePhase(gameTime, partialTick, 6),
+                WaterAnimationClock.surfacePhase(gameTime, partialTick, 7)
         );
     }
 
@@ -637,27 +730,27 @@ public final class WaterShaders {
             float partialTick,
             double radiansPerSecond
     ) {
-        long remainingTicks = Math.max(0L, gameTime);
-        double phaseStep = Math.IEEEremainder(radiansPerSecond / 20.0, Math.PI * 2.0);
-        double phase = Math.IEEEremainder(
-                Math.max(0.0f, Math.min(1.0f, partialTick)) * phaseStep,
-                Math.PI * 2.0
-        );
-        for (int digit = 0; digit < 7; digit++) {
-            phase = Math.IEEEremainder(
-                    phase + (remainingTicks & 1023L) * phaseStep,
-                    Math.PI * 2.0
-            );
-            remainingTicks >>>= 10;
-            phaseStep = Math.IEEEremainder(phaseStep * 1024.0, Math.PI * 2.0);
+        return WaterAnimationClock.stablePhase(gameTime, partialTick, radiansPerSecond);
+    }
+
+    private static LegacyAnimationFrame legacyFrame(float timeSeconds) {
+        double ticks = Float.isFinite(timeSeconds)
+                ? Math.max(0.0, (double) timeSeconds * 20.0)
+                : 0.0;
+        if (ticks >= Long.MAX_VALUE) {
+            return new LegacyAnimationFrame(Long.MAX_VALUE, 0.0f);
         }
-        return (float) phase;
+        long gameTime = (long) Math.floor(ticks);
+        return new LegacyAnimationFrame(gameTime, (float) (ticks - gameTime));
     }
 
     private static float wrappedHorizontalAnchor(double coordinate) {
         double period = 4096.0;
         double wrapped = coordinate % period;
         return (float) (wrapped < 0.0 ? wrapped + period : wrapped);
+    }
+
+    private record LegacyAnimationFrame(long gameTime, float partialTick) {
     }
 
     /**
