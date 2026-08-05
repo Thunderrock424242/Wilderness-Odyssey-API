@@ -1,9 +1,12 @@
 package com.thunder.wildernessodysseyapi.anomaly.block;
 
+import com.thunder.wildernessodysseyapi.anomaly.AnomalyDimensionRules;
+import com.thunder.wildernessodysseyapi.anomaly.AnomalyGatewayTravelData;
 import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
 import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyDimensions;
 import com.thunder.wildernessodysseyapi.temporalrift.SafeTeleportHelper;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -28,13 +31,19 @@ import net.minecraft.world.phys.BlockHitResult;
 
 import java.util.Set;
 
+/**
+ * A two-way gateway between the Anomaly and its linked temporal layers.
+ *
+ * <p>Gateways in the Overworld and The Before preserve their source dimension
+ * and coordinates on the player. The matching Anomaly gateway is placed beside
+ * a safe landing position so standing still cannot immediately retrigger it.</p>
+ */
 public class AnomalyPortalBlock extends Block {
-    private static final String NBT_RETURN_X = "anomaly_gateway_return_x";
-    private static final String NBT_RETURN_Y = "anomaly_gateway_return_y";
-    private static final String NBT_RETURN_Z = "anomaly_gateway_return_z";
     private static final String NBT_LAST_TRANSFER_TICK = "anomaly_gateway_last_transfer_tick";
     private static final long TRANSFER_COOLDOWN_TICKS = 80L;
+    private static final int GATEWAY_SEARCH_RADIUS = 4;
 
+    /** Creates a gateway block with the registry-owned block properties. */
     public AnomalyPortalBlock(Properties properties) {
         super(properties);
     }
@@ -87,12 +96,14 @@ public class AnomalyPortalBlock extends Block {
             return;
         }
 
-        if (currentLevel.dimension().equals(AnomalyDimensions.ANOMALY_DIMENSION_KEY)) {
-            returnToOverworld(player, currentLevel);
-        } else if (currentLevel.dimension().equals(Level.OVERWORLD)) {
+        if (AnomalyDimensionRules.isAnomaly(currentLevel.dimension())) {
+            returnToOrigin(player, currentLevel);
+        } else if (AnomalyDimensionRules.isGatewaySource(currentLevel.dimension())) {
             enterAnomalyDimension(player, currentLevel, portalPos);
         } else {
-            player.sendSystemMessage(Component.literal("[Anomaly Gateway] The frame hums, but this dimension cannot tune the signal."));
+            player.sendSystemMessage(Component.translatable(
+                    "message.wildernessodysseyapi.anomaly_gateway.unsupported_source"
+            ));
         }
     }
 
@@ -108,51 +119,63 @@ public class AnomalyPortalBlock extends Block {
         return false;
     }
 
-    private static void enterAnomalyDimension(ServerPlayer player, ServerLevel overworld, BlockPos portalPos) {
-        ServerLevel anomalyLevel = overworld.getServer().getLevel(AnomalyDimensions.ANOMALY_DIMENSION_KEY);
+    private static void enterAnomalyDimension(ServerPlayer player, ServerLevel sourceLevel, BlockPos portalPos) {
+        ServerLevel anomalyLevel = sourceLevel.getServer().getLevel(AnomalyDimensions.ANOMALY_DIMENSION_KEY);
         if (anomalyLevel == null) {
-            player.sendSystemMessage(Component.literal("[Anomaly Gateway] The anomaly dimension is unreachable. Contact a server admin."));
+            player.sendSystemMessage(Component.translatable(
+                    "message.wildernessodysseyapi.anomaly_gateway.anomaly_unreachable"
+            ));
             return;
         }
 
         CompoundTag data = player.getPersistentData();
-        data.putInt(NBT_RETURN_X, portalPos.getX());
-        data.putInt(NBT_RETURN_Y, portalPos.getY());
-        data.putInt(NBT_RETURN_Z, portalPos.getZ());
+        AnomalyGatewayTravelData.store(data, sourceLevel.dimension(), portalPos);
 
-        BlockPos arrival = findArrival(anomalyLevel, portalPos.getX(), portalPos.getZ());
-        ensureGateway(anomalyLevel, arrival);
-        playGatewayEffects(overworld, portalPos);
-        teleport(player, anomalyLevel, arrival);
-        playGatewayEffects(anomalyLevel, arrival);
-        player.sendSystemMessage(Component.literal("[Anomaly Gateway] The meteor signal locks on. You cross into the Anomaly Dimension."));
+        GatewayArrival arrival = prepareArrival(anomalyLevel, portalPos.getX(), portalPos.getZ());
+        playGatewayEffects(sourceLevel, portalPos);
+        teleport(player, anomalyLevel, arrival.playerPos());
+        playGatewayEffects(anomalyLevel, arrival.gatewayPos());
+        player.sendSystemMessage(Component.translatable(
+                "message.wildernessodysseyapi.anomaly_gateway.entered"
+        ));
     }
 
-    private static void returnToOverworld(ServerPlayer player, ServerLevel anomalyLevel) {
-        ServerLevel overworld = anomalyLevel.getServer().getLevel(Level.OVERWORLD);
-        if (overworld == null) {
-            player.sendSystemMessage(Component.literal("[Anomaly Gateway] The Overworld signal is gone."));
+    private static void returnToOrigin(ServerPlayer player, ServerLevel anomalyLevel) {
+        CompoundTag data = player.getPersistentData();
+        AnomalyGatewayTravelData.ReturnTarget target = AnomalyGatewayTravelData.read(
+                data,
+                Level.OVERWORLD,
+                player.blockPosition()
+        );
+        ServerLevel targetLevel = anomalyLevel.getServer().getLevel(target.dimension());
+        if (targetLevel == null) {
+            player.sendSystemMessage(Component.translatable(
+                    "message.wildernessodysseyapi.anomaly_gateway.origin_unreachable"
+            ));
             return;
         }
 
-        CompoundTag data = player.getPersistentData();
-        int x = data.contains(NBT_RETURN_X) ? data.getInt(NBT_RETURN_X) : (int) Math.floor(player.getX());
-        int y = data.contains(NBT_RETURN_Y) ? data.getInt(NBT_RETURN_Y) : (int) Math.floor(player.getY());
-        int z = data.contains(NBT_RETURN_Z) ? data.getInt(NBT_RETURN_Z) : (int) Math.floor(player.getZ());
-        data.remove(NBT_RETURN_X);
-        data.remove(NBT_RETURN_Y);
-        data.remove(NBT_RETURN_Z);
-
-        BlockPos arrival = SafeTeleportHelper.findSafePositionNearby(overworld, x, y, z, 12);
+        BlockPos sourceGateway = target.gatewayPos();
+        ensureGateway(targetLevel, sourceGateway);
+        BlockPos arrival = findSafePositionBesideGateway(targetLevel, sourceGateway, 12);
         if (arrival == null) {
-            arrival = findArrival(overworld, x, z);
+            arrival = findArrival(targetLevel, sourceGateway.getX(), sourceGateway.getZ());
         }
 
-        ensureGateway(overworld, arrival);
         playGatewayEffects(anomalyLevel, player.blockPosition());
-        teleport(player, overworld, arrival);
-        playGatewayEffects(overworld, arrival);
-        player.sendSystemMessage(Component.literal("[Anomaly Gateway] You tumble back through the meteor-lit frame."));
+        teleport(player, targetLevel, arrival);
+        playGatewayEffects(targetLevel, sourceGateway);
+        AnomalyGatewayTravelData.clear(data);
+        player.sendSystemMessage(Component.translatable(
+                "message.wildernessodysseyapi.anomaly_gateway.returned"
+        ));
+    }
+
+    private static GatewayArrival prepareArrival(ServerLevel level, int x, int z) {
+        BlockPos playerPos = findArrival(level, x, z);
+        BlockPos gatewayPos = findGatewayPosition(level, playerPos);
+        ensureGateway(level, gatewayPos);
+        return new GatewayArrival(playerPos, gatewayPos);
     }
 
     private static BlockPos findArrival(ServerLevel level, int x, int z) {
@@ -162,14 +185,78 @@ public class AnomalyPortalBlock extends Block {
         return safePos != null ? safePos : new BlockPos(x, clampedY, z);
     }
 
+    private static BlockPos findGatewayPosition(ServerLevel level, BlockPos playerPos) {
+        for (int radius = 1; radius <= GATEWAY_SEARCH_RADIUS; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
+                        continue;
+                    }
+                    BlockPos candidate = SafeTeleportHelper.findSafePosition(
+                            level,
+                            playerPos.getX() + dx,
+                            playerPos.getY(),
+                            playerPos.getZ() + dz
+                    );
+                    if (candidate != null && canReplaceWithGateway(level, candidate)) {
+                        return candidate;
+                    }
+                }
+            }
+        }
+
+        // A floating fallback keeps the player's two-block landing column clear.
+        return playerPos.above(2);
+    }
+
+    private static BlockPos findSafePositionBesideGateway(ServerLevel level, BlockPos gatewayPos, int radius) {
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            BlockPos candidate = gatewayPos.relative(direction);
+            BlockPos safePos = SafeTeleportHelper.findSafePosition(
+                    level,
+                    candidate.getX(),
+                    candidate.getY(),
+                    candidate.getZ()
+            );
+            if (safePos != null && !safePos.equals(gatewayPos)) {
+                return safePos;
+            }
+        }
+
+        for (int searchRadius = 2; searchRadius <= radius; searchRadius++) {
+            for (int dx = -searchRadius; dx <= searchRadius; dx++) {
+                for (int dz = -searchRadius; dz <= searchRadius; dz++) {
+                    if (Math.abs(dx) != searchRadius && Math.abs(dz) != searchRadius) {
+                        continue;
+                    }
+                    BlockPos safePos = SafeTeleportHelper.findSafePosition(
+                            level,
+                            gatewayPos.getX() + dx,
+                            gatewayPos.getY(),
+                            gatewayPos.getZ() + dz
+                    );
+                    if (safePos != null) {
+                        return safePos;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     private static void ensureGateway(ServerLevel level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         if (state.is(AnomalyBlocks.ANOMALY_GATEWAY.get())) {
             return;
         }
-        if (state.isAir() || !state.isSolid()) {
+        if (canReplaceWithGateway(level, pos)) {
             level.setBlock(pos, AnomalyBlocks.ANOMALY_GATEWAY.get().defaultBlockState(), 3);
         }
+    }
+
+    private static boolean canReplaceWithGateway(ServerLevel level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        return state.isAir() || (!state.isSolid() && !state.liquid());
     }
 
     private static void teleport(ServerPlayer player, ServerLevel targetLevel, BlockPos pos) {
@@ -205,5 +292,8 @@ public class AnomalyPortalBlock extends Block {
                 0.35D,
                 0.35D,
                 0.04D);
+    }
+
+    private record GatewayArrival(BlockPos playerPos, BlockPos gatewayPos) {
     }
 }

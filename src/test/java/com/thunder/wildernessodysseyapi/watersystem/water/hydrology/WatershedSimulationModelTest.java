@@ -45,6 +45,8 @@ class WatershedSimulationModelTest {
         assertTrue(wet.flooding());
         assertTrue(wet.sediment() > 0.2f);
         assertTrue(wet.debris() > 0.1f);
+        assertTrue(wet.groundwaterRecharge() > 0.0f);
+        assertTrue(wet.aquiferStorage() > 0.12f);
     }
 
     @Test
@@ -121,6 +123,31 @@ class WatershedSimulationModelTest {
         assertTrue(result.recentSnowmelt() > 0.0f);
         assertTrue(result.storedRunoff() > 0.0f);
         assertTrue(result.recentRainfall() == 0.0f);
+        assertTrue(result.groundwaterRecharge() > 0.0f);
+    }
+
+    @Test
+    void storedAquiferMaintainsBaseflowAfterRainStops() {
+        WatershedConditions saturatedAquifer = new WatershedConditions(
+                91L, 67, DrainageDirection.SOUTH_EAST, 0.82f,
+                0.45f, 0.0f, 0.0f,
+                0.04f, 0.86f, 0.0f,
+                0.0f, 0.05f, 0.0f, 0.2f, 0.72f,
+                false, 0, 0,
+                0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+                WaterFeature.RIVER
+        );
+        WatershedSimulationModel.Result result = WatershedSimulationModel.advance(
+                new WatershedSimulationModel.Input(
+                        saturatedAquifer, WeatherSample.CLEAR, 0.0f, 0.08f, 0.035f,
+                        0.45f, 0.72f, true, true, true, true, 0.20f,
+                        true, 0.32f, 0.025f, 0.78f
+                )
+        );
+
+        assertTrue(result.groundwaterDischarge() > 0.0f);
+        assertTrue(result.storedRunoff() > 0.0f);
+        assertTrue(result.aquiferStorage() < saturatedAquifer.aquiferStorage());
     }
 
     private static void apply(

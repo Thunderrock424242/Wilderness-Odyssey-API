@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.meteor.entity;
 import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.meteor.worldgen.CraterGenerator;
+import com.thunder.wildernessodysseyapi.meteor.worldgen.MeteorSavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -194,6 +195,10 @@ public class MeteorEntity extends Entity {
                 level.random,
                 MeteorConfig.GOUGE_LENGTH_MULTIPLIER.get()
         );
+
+        // Persist dynamically-created impact sites so the existing radiation,
+        // map marker, story, and impact-site systems can discover this crater.
+        MeteorSavedData.get(level).addMeteor(impactPos, craterRadius);
 
         discard();
     }

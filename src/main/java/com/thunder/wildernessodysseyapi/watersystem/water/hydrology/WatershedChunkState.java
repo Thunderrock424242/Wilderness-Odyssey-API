@@ -7,10 +7,10 @@ import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedCondition
 /**
  * Compact mutable server state for one chunk-scale watershed cell.
  *
- * <p>Terrain identity, four hydrologic scalars, four environmental scalars,
- * and flow/flood values are stored in four packed longs. Save data and network
- * payloads reuse those exact packed words, avoiding per-field NBT compounds and
- * preventing the chunk model from growing into a per-block simulation.</p>
+ * <p>Terrain identity, hydrology, groundwater, environment, flow, and the
+ * four-by-four drainage lattice are stored in seven packed longs. Save data and
+ * network payloads reuse those exact words, avoiding per-field NBT compounds
+ * and preventing the chunk model from growing into a per-block simulation.</p>
  */
 public final class WatershedChunkState {
 
@@ -22,6 +22,7 @@ public final class WatershedChunkState {
     private static final long DIRECTION_MASK = 0xFL;
     private static final long FEATURE_MASK = 0x7L;
     private static final long FLOODING_BIT = 1L << 23;
+    private static final int DYNAMIC_FEATURE_SHIFT = 24;
 
     private final long basinId;
     private long terrainBits;
@@ -36,6 +37,7 @@ public final class WatershedChunkState {
     private long lastUpdatedTick;
     private int floodCursor;
     private int activeFloodCells;
+    private int activeSurfaceWaterCells;
 
     private WatershedChunkState(
             long basinId,
@@ -50,7 +52,8 @@ public final class WatershedChunkState {
             long revision,
             long lastUpdatedTick,
             int floodCursor,
-            int activeFloodCells
+            int activeFloodCells,
+            int activeSurfaceWaterCells
     ) {
         this.basinId = basinId;
         this.terrainBits = terrainBits;
@@ -65,6 +68,7 @@ public final class WatershedChunkState {
         this.lastUpdatedTick = Math.max(0L, lastUpdatedTick);
         this.floodCursor = Math.floorMod(floodCursor, 256);
         this.activeFloodCells = Math.max(0, activeFloodCells);
+        this.activeSurfaceWaterCells = Math.max(0, activeSurfaceWaterCells);
     }
 
     /** Creates a new terrain-initialized watershed cell with dry conditions. */
@@ -87,7 +91,8 @@ public final class WatershedChunkState {
                 representativePosition,
                 floodThreshold,
                 gameTime,
-                WatershedDrainageGrid.uniform(downstreamDirection)
+                WatershedDrainageGrid.uniform(downstreamDirection),
+                0.12f
         );
     }
 
@@ -103,19 +108,47 @@ public final class WatershedChunkState {
             long gameTime,
             WatershedDrainageGrid drainageGrid
     ) {
+        return create(
+                basinId,
+                averageTerrainElevation,
+                downstreamDirection,
+                waterFeature,
+                drainageAccumulation,
+                representativePosition,
+                floodThreshold,
+                gameTime,
+                drainageGrid,
+                0.12f
+        );
+    }
+
+    /** Creates a terrain cell with deterministic initial aquifer storage. */
+    public static WatershedChunkState create(
+            long basinId,
+            int averageTerrainElevation,
+            DrainageDirection downstreamDirection,
+            WaterFeature waterFeature,
+            float drainageAccumulation,
+            long representativePosition,
+            float floodThreshold,
+            long gameTime,
+            WatershedDrainageGrid drainageGrid,
+            float initialAquiferStorage
+    ) {
         long terrain = Short.toUnsignedLong((short) averageTerrainElevation);
         terrain |= (long) safeDirection(downstreamDirection).ordinal() << 16;
         terrain |= (long) safeFeature(waterFeature).ordinal() << 20;
         terrain |= (long) quantizeUnit(drainageAccumulation) << 32;
         long environment = (long) quantizeUnit(1.0f) << 32;
         long flow = (long) quantizeUnit(floodThreshold) << 48;
+        long climate = (long) quantizeUnit(initialAquiferStorage) << 32;
         WatershedDrainageGrid grid = drainageGrid == null
                 ? WatershedDrainageGrid.uniform(downstreamDirection)
                 : drainageGrid;
         return new WatershedChunkState(
                 basinId,
                 terrain,
-                0L,
+                climate,
                 environment,
                 flow,
                 0L,
@@ -124,6 +157,7 @@ public final class WatershedChunkState {
                 representativePosition,
                 1L,
                 gameTime,
+                0,
                 0,
                 0
         );
@@ -139,9 +173,13 @@ public final class WatershedChunkState {
         long sanitizedTerrain = packed.terrainBits;
         int directionId = (int) ((sanitizedTerrain >>> 16) & DIRECTION_MASK);
         int featureId = (int) ((sanitizedTerrain >>> 20) & FEATURE_MASK);
-        sanitizedTerrain &= ~((DIRECTION_MASK << 16) | (FEATURE_MASK << 20));
+        int dynamicFeatureId = (int) ((sanitizedTerrain >>> DYNAMIC_FEATURE_SHIFT) & FEATURE_MASK);
+        sanitizedTerrain &= ~((DIRECTION_MASK << 16)
+                | (FEATURE_MASK << 20)
+                | (FEATURE_MASK << DYNAMIC_FEATURE_SHIFT));
         sanitizedTerrain |= (long) DrainageDirection.fromId(directionId).ordinal() << 16;
         sanitizedTerrain |= (long) featureFromId(featureId).ordinal() << 20;
+        sanitizedTerrain |= (long) featureFromId(dynamicFeatureId).ordinal() << DYNAMIC_FEATURE_SHIFT;
         return new WatershedChunkState(
                 packed.basinId,
                 sanitizedTerrain,
@@ -155,7 +193,8 @@ public final class WatershedChunkState {
                 packed.revision,
                 packed.lastUpdatedTick,
                 packed.floodCursor,
-                packed.activeFloodCells
+                packed.activeFloodCells,
+                packed.activeSurfaceWaterCells
         );
     }
 
@@ -174,7 +213,8 @@ public final class WatershedChunkState {
                 revision,
                 lastUpdatedTick,
                 floodCursor,
-                activeFloodCells
+                activeFloodCells,
+                activeSurfaceWaterCells
         );
     }
 
@@ -193,6 +233,9 @@ public final class WatershedChunkState {
                 dequantizeUnit(word(hydrologyBits, 0)),
                 dequantizeUnit(word(hydrologyBits, 1)),
                 dequantizeUnit(word(climateBits, 0)),
+                dequantizeUnit(word(climateBits, 1)),
+                dequantizeUnit(word(climateBits, 2)),
+                dequantizeUnit(word(climateBits, 3)),
                 dequantizeUnit(word(hydrologyBits, 2)),
                 dequantizeUnit(word(hydrologyBits, 3)),
                 dequantizeSigned(word(flowBits, 0)),
@@ -200,12 +243,13 @@ public final class WatershedChunkState {
                 dequantizeUnit(word(flowBits, 3)),
                 (terrainBits & FLOODING_BIT) != 0L,
                 activeFloodCells,
+                activeSurfaceWaterCells,
                 dequantizeUnit(word(environmentBits, 1)),
                 dequantizeUnit(word(environmentBits, 2)),
                 dequantizeSigned(word(flowBits, 1)),
                 dequantizeSigned(word(flowBits, 2)),
                 dequantizeUnit(word(environmentBits, 3)),
-                featureFromId((int) ((terrainBits >>> 20) & FEATURE_MASK))
+                effectiveWaterFeature()
         );
     }
 
@@ -239,6 +283,9 @@ public final class WatershedChunkState {
                 floodThreshold
         );
         long nextClimate = replaceWord(climateBits, 0, quantizeUnit(safe.recentSnowmelt()));
+        nextClimate = replaceWord(nextClimate, 1, quantizeUnit(safe.groundwaterRecharge()));
+        nextClimate = replaceWord(nextClimate, 2, quantizeUnit(safe.aquiferStorage()));
+        nextClimate = replaceWord(nextClimate, 3, quantizeUnit(safe.groundwaterDischarge()));
         long nextTerrain = safe.flooding()
                 ? terrainBits | FLOODING_BIT
                 : terrainBits & ~FLOODING_BIT;
@@ -281,6 +328,40 @@ public final class WatershedChunkState {
         activeFloodCells = bounded;
         revision++;
         return true;
+    }
+
+    /** Updates the number of exact pond, wetland, and spring cells in this chunk. */
+    public boolean setActiveSurfaceWaterCells(int count) {
+        int bounded = Math.max(0, count);
+        if (activeSurfaceWaterCells == bounded) {
+            return false;
+        }
+        activeSurfaceWaterCells = bounded;
+        revision++;
+        return true;
+    }
+
+    /** Sets a reversible surface feature while retaining generated terrain identity. */
+    public boolean setDynamicWaterFeature(WaterFeature feature) {
+        WaterFeature safe = safeFeature(feature);
+        long nextTerrain = terrainBits & ~(FEATURE_MASK << DYNAMIC_FEATURE_SHIFT);
+        nextTerrain |= (long) safe.ordinal() << DYNAMIC_FEATURE_SHIFT;
+        if (nextTerrain == terrainBits) {
+            return false;
+        }
+        terrainBits = nextTerrain;
+        revision++;
+        return true;
+    }
+
+    /** Returns the immutable generated feature beneath reversible surface water. */
+    public WaterFeature baseWaterFeature() {
+        return featureFromId((int) ((terrainBits >>> 20) & FEATURE_MASK));
+    }
+
+    /** Returns the active reversible pond, wetland, or spring classification. */
+    public WaterFeature dynamicWaterFeature() {
+        return featureFromId((int) ((terrainBits >>> DYNAMIC_FEATURE_SHIFT) & FEATURE_MASK));
     }
 
     /** Returns and advances the persisted deterministic 16 by 16 flood probe cursor. */
@@ -379,6 +460,11 @@ public final class WatershedChunkState {
         return id >= 0 && id < values.length ? values[id] : WaterFeature.NONE;
     }
 
+    private WaterFeature effectiveWaterFeature() {
+        WaterFeature dynamic = dynamicWaterFeature();
+        return dynamic == WaterFeature.NONE ? baseWaterFeature() : dynamic;
+    }
+
     private static float unit(float value) {
         return clamp(finiteOrZero(value), 0.0f, 1.0f);
     }
@@ -405,13 +491,15 @@ public final class WatershedChunkState {
             long revision,
             long lastUpdatedTick,
             int floodCursor,
-            int activeFloodCells
+            int activeFloodCells,
+            int activeSurfaceWaterCells
     ) {
         public Packed {
             revision = Math.max(0L, revision);
             lastUpdatedTick = Math.max(0L, lastUpdatedTick);
             floodCursor = Math.floorMod(floodCursor, 256);
             activeFloodCells = Math.max(0, activeFloodCells);
+            activeSurfaceWaterCells = Math.max(0, activeSurfaceWaterCells);
         }
 
         /** Returns the same compact state under a reconciled canonical basin id. */
@@ -429,7 +517,8 @@ public final class WatershedChunkState {
                     revision,
                     lastUpdatedTick,
                     floodCursor,
-                    activeFloodCells
+                    activeFloodCells,
+                    activeSurfaceWaterCells
             );
         }
     }

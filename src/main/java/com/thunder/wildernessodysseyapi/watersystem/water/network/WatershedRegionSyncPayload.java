@@ -62,6 +62,7 @@ public record WatershedRegionSyncPayload(
             buffer.writeLong(packed.representativePosition());
             buffer.writeVarLong(packed.revision());
             buffer.writeVarInt(packed.activeFloodCells());
+            buffer.writeVarInt(packed.activeSurfaceWaterCells());
         }
     }
 
@@ -88,6 +89,7 @@ public record WatershedRegionSyncPayload(
                     buffer.readVarLong(),
                     0L,
                     0,
+                    buffer.readVarInt(),
                     buffer.readVarInt()
             );
             chunks.add(new ChunkSnapshot(chunkX, chunkZ, packed));

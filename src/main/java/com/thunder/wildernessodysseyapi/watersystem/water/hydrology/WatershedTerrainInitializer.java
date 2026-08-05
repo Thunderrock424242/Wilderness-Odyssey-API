@@ -57,7 +57,8 @@ public final class WatershedTerrainInitializer {
                 classification.representativePosition,
                 WaterSimulationConfig.watershedFloodThreshold(),
                 level.getGameTime(),
-                drainageGrid
+                drainageGrid,
+                initialAquiferStorage(classification, relief(heights), accumulation)
         );
     }
 
@@ -121,10 +122,14 @@ public final class WatershedTerrainInitializer {
         int[] counts = new int[WaterFeature.values().length];
         long representative = WatershedChunkState.NO_REPRESENTATIVE;
         int exposed = 0;
+        int aquiferColumns = 0;
         GeneratedWaterChunk.Snapshot snapshot = generated.snapshot();
         for (int localZ = 0; localZ < 16; localZ++) {
             for (int localX = 0; localX < 16; localX++) {
                 GeneratedWaterChunk.WaterSpan top = snapshot.topSpan(localX, localZ);
+                if (top != null && top.cell().bodyType() == GeneratedWaterChunk.BodyType.AQUIFER) {
+                    aquiferColumns++;
+                }
                 if (top == null || snapshot.surfaceCovered(localX, localZ)) {
                     continue;
                 }
@@ -149,8 +154,13 @@ public final class WatershedTerrainInitializer {
             }
         }
         return dominantCount == 0
-                ? WaterClassification.DRY
-                : new WaterClassification(dominant, exposed, representative);
+                ? new WaterClassification(
+                WaterFeature.NONE,
+                0,
+                WatershedChunkState.NO_REPRESENTATIVE,
+                aquiferColumns
+        )
+                : new WaterClassification(dominant, exposed, representative, aquiferColumns);
     }
 
     private static WaterFeature feature(GeneratedWaterChunk.BodyType bodyType) {
@@ -173,9 +183,29 @@ public final class WatershedTerrainInitializer {
             case WETLAND -> 0.44f;
             case COASTAL -> 0.78f;
             case AQUIFER -> 0.18f;
+            case POND -> 0.38f;
             case NONE -> 0.08f;
         };
         return Math.min(1.0f, base + coverage * 0.24f + reliefContribution * 0.10f);
+    }
+
+    private static float initialAquiferStorage(
+            WaterClassification classification,
+            int relief,
+            float accumulation
+    ) {
+        float generatedAquiferCoverage = classification.aquiferColumns / 256.0f;
+        float lowReliefRetention = 1.0f - Math.min(1.0f, relief / 48.0f);
+        float surfaceWaterRecharge = classification.feature == WaterFeature.LAKE
+                || classification.feature == WaterFeature.WETLAND
+                ? 0.08f
+                : 0.0f;
+        return Math.min(0.72f,
+                0.08f
+                        + generatedAquiferCoverage * 0.52f
+                        + lowReliefRetention * 0.08f
+                        + accumulation * 0.05f
+                        + surfaceWaterRecharge);
     }
 
     private static long localBasinId(ServerLevel level, ChunkPos chunkPos) {
@@ -196,12 +226,14 @@ public final class WatershedTerrainInitializer {
     private record WaterClassification(
             WaterFeature feature,
             int exposedColumns,
-            long representativePosition
+            long representativePosition,
+            int aquiferColumns
     ) {
         private static final WaterClassification DRY = new WaterClassification(
                 WaterFeature.NONE,
                 0,
-                WatershedChunkState.NO_REPRESENTATIVE
+                WatershedChunkState.NO_REPRESENTATIVE,
+                0
         );
     }
 }

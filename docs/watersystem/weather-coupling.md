@@ -68,8 +68,10 @@ conditions.
 
 When `water_simulation.watersheds.enabled` is true, the time-sliced
 `WatershedSimulationManager` consumes localized weather into compact rainfall,
-saturation, runoff, downstream discharge, level, flood, sediment, clarity,
-current, and debris conditions. It operates only on already-loaded chunks near
+saturation, runoff, aquifer recharge/storage, delayed baseflow, downstream
+discharge, level, flood, sediment, clarity, current, and debris conditions.
+Closed local sinks can form reversible rain ponds, shallow wetlands, and
+groundwater-fed springs. It operates only on already-loaded chunks near
 players and retains runoff when the cached downstream chunk is unavailable.
 The full ownership and flood-recession model is documented in
 [`watersheds-and-flooding.md`](watersheds-and-flooding.md).

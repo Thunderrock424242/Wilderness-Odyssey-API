@@ -17,35 +17,60 @@ import java.util.List;
 /**
  * Handles the random scheduling of the meteor impact weather event.
  * <p>
- * Each game tick, the server checks a cooldown timer. When it fires,
- * there is a 1-in-N chance of triggering a meteor shower. On trigger,
- * 2–5 meteors are spawned per player in the overworld, each aimed at
- * a landing spot that:
- *   - Avoids being too close to any player
- *   - Has a bias toward landing near crying obsidian blocks
+ * While players are present in the Overworld, the server checks a configurable
+ * rare-event timer. A successful roll spawns the configured meteor count around
+ * active players while keeping impact positions outside the safety radius.
  */
-public class MeteorImpactEvent {
+public final class MeteorImpactEvent {
 
-    // Per-dimension tick counter (we use server time via level.getGameTime())
-    private static long lastCheckTime = 0;
+    private static final long UNINITIALIZED_CHECK_TIME = Long.MIN_VALUE;
+    private static long lastCheckTime = UNINITIALIZED_CHECK_TIME;
 
+    private MeteorImpactEvent() {
+    }
+
+    /**
+     * Advances the natural meteor timer after each Overworld tick.
+     *
+     * <p>The timer starts when a player is present and waits a complete interval
+     * before its first roll. This prevents server restarts and empty-world uptime
+     * from making an intentionally rare event happen more often.</p>
+     *
+     * @param event the completed level tick supplied by NeoForge
+     */
     @SubscribeEvent
     public static void onLevelTick(LevelTickEvent.Post event) {
-        if (!(event.getLevel() instanceof ServerLevel level)) return;
-        // Only run in the overworld (dimension key check)
-        if (!level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)) return;
+        if (!(event.getLevel() instanceof ServerLevel level)
+                || !level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)) {
+            return;
+        }
 
         long gameTime = level.getGameTime();
+        if (!MeteorConfig.NATURAL_EVENTS_ENABLED.get() || level.players().isEmpty()) {
+            // Pausing or disabling natural events resets the cadence anchor so
+            // empty-server uptime cannot produce an immediate roll on rejoin.
+            lastCheckTime = gameTime;
+            return;
+        }
 
         int checkInterval = MeteorConfig.EVENT_CHECK_INTERVAL_TICKS.get();
-        if (gameTime - lastCheckTime < checkInterval) return;
+
+        // Initialize against current world time so loading or changing worlds
+        // never grants an immediate extra rare-event roll.
+        if (lastCheckTime == UNINITIALIZED_CHECK_TIME || gameTime < lastCheckTime) {
+            lastCheckTime = gameTime;
+            return;
+        }
+        if (gameTime - lastCheckTime < checkInterval) {
+            return;
+        }
         lastCheckTime = gameTime;
 
-        // Random chance gate
         int chance = MeteorConfig.EVENT_CHANCE_PER_CHECK.get();
-        if (level.random.nextInt(chance) != 0) return;
+        if (level.random.nextInt(chance) != 0) {
+            return;
+        }
 
-        // Trigger the event!
         spawnMeteorShower(level, -1);
     }
 

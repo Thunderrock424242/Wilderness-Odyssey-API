@@ -44,9 +44,14 @@ class WatershedSavedDataTest {
                 -0.48f,
                 0.57f,
                 0.12f,
-                0.33f
+                0.33f,
+                0.24f,
+                0.61f,
+                0.08f
         ), 0.84f, 160L);
         state.setActiveFloodCells(9);
+        state.setActiveSurfaceWaterCells(4);
+        state.setDynamicWaterFeature(WaterFeature.POND);
 
         WatershedSavedData data = new WatershedSavedData();
         data.store(key, state);
@@ -57,12 +62,15 @@ class WatershedSavedDataTest {
         assertEquals(state.conditions().basinId(), conditions.basinId());
         assertEquals(-34, conditions.averageTerrainElevation());
         assertEquals(DrainageDirection.NORTH_WEST, conditions.downstreamDirection());
-        assertEquals(WaterFeature.LAKE, conditions.waterFeature());
+        assertEquals(WaterFeature.POND, conditions.waterFeature());
         assertEquals(9, conditions.activeTemporaryFloodCells());
+        assertEquals(4, conditions.activeSurfaceWaterCells());
         assertTrue(conditions.flooding());
         assertEquals(state.conditions().riverDischarge(), conditions.riverDischarge(), 0.0001f);
         assertEquals(state.conditions().waterLevelOffset(), conditions.waterLevelOffset(), 0.0001f);
         assertEquals(state.conditions().recentSnowmelt(), conditions.recentSnowmelt(), 0.0001f);
+        assertEquals(state.conditions().aquiferStorage(), conditions.aquiferStorage(), 0.0001f);
+        assertEquals(state.conditions().groundwaterDischarge(), conditions.groundwaterDischarge(), 0.0001f);
         assertEquals(
                 state.drainageGrid().directionBits(),
                 decoded.state(key).drainageGrid().directionBits()

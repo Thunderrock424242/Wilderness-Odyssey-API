@@ -73,36 +73,27 @@ public final class TemporaryFloodManager {
             int targetY = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX, localZ);
             BlockPos target = new BlockPos(worldX, targetY, worldZ);
             if (targetY > representative.getY() + 1
-                    || !safeOverflowTarget(level, chunk, target)
+                    || !safeTemporaryWaterTarget(level, chunk, target)
                     || !adjacentWater(level, water, target)) {
                 continue;
             }
-            BlockState originalState = level.getBlockState(target);
             var localFlow = WatershedServices.localFlow(level, target);
-            if (!CanonicalWater.placeTemporaryFlood(
+            if (!placeTrackedSurfaceWater(
                     level,
+                    watersheds,
+                    chunkKey,
+                    state,
                     target,
+                    SurfaceWaterKind.FLOOD,
+                    WaterVolumeChunk.UNITS_PER_BLOCK,
                     localFlow.currentX(),
                     localFlow.currentZ()
             )) {
                 continue;
             }
-            if (!ledger.record(
-                    target,
-                    conditions.basinId(),
-                    level.getGameTime(),
-                    WaterSimulationConfig.watershedMaxTemporaryFloodCells(),
-                    originalState
-            )) {
-                // A reduced/full ledger must never strand untracked temporary
-                // water. Roll back only the exact cell placed above.
-                CanonicalWater.removeTemporaryFlood(level, target);
-                restoreOriginalState(level, target, originalState);
-                continue;
-            }
             placed++;
         }
-        boolean countChanged = state.setActiveFloodCells(ledger.countInChunk(chunkKey));
+        boolean countChanged = synchronizeStateCounts(state, ledger, chunkKey);
         if (placed > 0 || countChanged || attempts > 0) {
             watersheds.markChanged();
         }
@@ -142,8 +133,19 @@ public final class TemporaryFloodManager {
             WatershedConditions conditions = state == null
                     ? WatershedConditions.NONE
                     : state.conditions();
-            if (conditions.flooding()
-                    || conditions.floodRisk() >= conditions.floodThreshold() * 0.72f) {
+            SurfaceWaterKind kind = ledger.kind(packedPosition);
+            long ageTicks = Math.max(0L, level.getGameTime() - ledger.placedTick(packedPosition));
+            if (TransientSurfaceWaterModel.retains(
+                    kind,
+                    conditions,
+                    ageTicks,
+                    kind == SurfaceWaterKind.FLOOD
+                            ? 0
+                            : WaterSimulationConfig.surfaceWaterMinimumLifetimeTicks(),
+                    WaterSimulationConfig.watershedPondFormationThreshold(),
+                    WaterSimulationConfig.watershedWetlandFormationThreshold(),
+                    WaterSimulationConfig.watershedSpringThreshold()
+            )) {
                 continue;
             }
 
@@ -162,14 +164,59 @@ public final class TemporaryFloodManager {
                 // the position. Drop only our stale ledger claim.
                 ledger.forget(packedPosition);
             }
-            if (state != null && state.setActiveFloodCells(ledger.countInChunk(chunkKey))) {
+            if (state != null && synchronizeStateCounts(state, ledger, chunkKey)) {
                 watersheds.markChanged();
             }
         }
         return removed;
     }
 
-    private static boolean safeOverflowTarget(
+    /** Places and records one exact reversible cell, rolling back if the ledger rejects it. */
+    static boolean placeTrackedSurfaceWater(
+            ServerLevel level,
+            WatershedSavedData watersheds,
+            long chunkKey,
+            WatershedChunkState state,
+            BlockPos target,
+            SurfaceWaterKind kind,
+            int volumeUnits,
+            float velocityX,
+            float velocityZ
+    ) {
+        if (state == null || kind == null || kind == SurfaceWaterKind.NONE) {
+            return false;
+        }
+        BlockState originalState = level.getBlockState(target);
+        if (!CanonicalWater.placeTemporarySurfaceWater(
+                level,
+                target,
+                volumeUnits,
+                velocityX,
+                velocityZ
+        )) {
+            return false;
+        }
+        TemporaryFloodSavedData ledger = TemporaryFloodSavedData.get(level);
+        if (!ledger.record(
+                target,
+                state.conditions().basinId(),
+                level.getGameTime(),
+                WaterSimulationConfig.watershedMaxTransientWaterCells(),
+                originalState,
+                kind
+        )) {
+            CanonicalWater.removeTemporaryFlood(level, target);
+            restoreOriginalState(level, target, originalState);
+            return false;
+        }
+        if (synchronizeStateCounts(state, ledger, chunkKey)) {
+            watersheds.markChanged();
+        }
+        return true;
+    }
+
+    /** Returns whether terrain is safe for any reversible watershed surface water. */
+    static boolean safeTemporaryWaterTarget(
             ServerLevel level,
             LevelChunk chunk,
             BlockPos target
@@ -204,7 +251,7 @@ public final class TemporaryFloodManager {
         return false;
     }
 
-    private static void restoreOriginalState(
+    static void restoreOriginalState(
             ServerLevel level,
             BlockPos position,
             BlockState originalState
@@ -216,5 +263,20 @@ public final class TemporaryFloodManager {
         if (current.isAir() && originalState.canSurvive(level, position)) {
             level.setBlock(position, originalState, 3);
         }
+    }
+
+    private static boolean synchronizeStateCounts(
+            WatershedChunkState state,
+            TemporaryFloodSavedData ledger,
+            long chunkKey
+    ) {
+        boolean changed = state.setActiveFloodCells(
+                ledger.countInChunk(chunkKey, SurfaceWaterKind.FLOOD)
+        );
+        changed |= state.setActiveSurfaceWaterCells(ledger.standingWaterCountInChunk(chunkKey));
+        changed |= state.setDynamicWaterFeature(
+                ledger.dominantStandingKind(chunkKey).waterFeature()
+        );
+        return changed;
     }
 }
