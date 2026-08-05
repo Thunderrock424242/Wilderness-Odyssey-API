@@ -18,6 +18,8 @@ public final class GerstnerWaveProfile {
     static final float GRAVITY = 9.80665f;
     private static final float TWO_PI = (float) (Math.PI * 2.0);
     private static final double TWO_PI_DOUBLE = Math.PI * 2.0;
+    private static final float MIN_DIRECTIONAL_ENERGY = 0.55f;
+    private static final float DIRECTIONAL_ENERGY_RANGE = 0.90f;
 
     /** Number of overlapping wave components in this profile. */
     public final int waveCount;
@@ -121,8 +123,9 @@ public final class GerstnerWaveProfile {
 
     /**
      * Evaluates the profile with synchronized environmental energy and wind.
-     * Wavelength-based dispersion remains unchanged; only component amplitude
-     * and travel heading are blended toward the supplied sea state.
+     * Wavelength-based dispersion and carrier headings remain unchanged. Wind
+     * shifts energy between the authored directional trains, so weather can
+     * reshape the sea without relocating every crest when its heading changes.
      */
     public WaveSurfaceSample sampleAt(
             float worldX,
@@ -205,7 +208,6 @@ public final class GerstnerWaveProfile {
 
         for (int i = 0; i < count; i++) {
             float componentBlend = waveCount <= 1 ? 0.0f : i / (float) (waveCount - 1);
-            float windBlend = spectrum.directionBlend() * (0.35f + componentBlend * 0.65f);
             float authoredDirectionX = dirX[i];
             float authoredDirectionZ = dirZ[i];
             if (flowAligned) {
@@ -218,20 +220,21 @@ public final class GerstnerWaveProfile {
                 authoredDirectionX = rotatedX;
                 authoredDirectionZ = rotatedZ;
             }
-            float directionX = authoredDirectionX * (1.0f - windBlend)
-                    + spectrum.windDirectionX() * windBlend;
-            float directionZ = authoredDirectionZ * (1.0f - windBlend)
-                    + spectrum.windDirectionZ() * windBlend;
-            float directionLengthSquared = directionX * directionX + directionZ * directionZ;
-            if (directionLengthSquared > 1.0e-8f) {
-                float inverseDirectionLength = 1.0f / (float) Math.sqrt(directionLengthSquared);
-                directionX *= inverseDirectionLength;
-                directionZ *= inverseDirectionLength;
-            }
+            float directionX = authoredDirectionX;
+            float directionZ = authoredDirectionZ;
             float k = waveNumber[i];
             float omega = angularFrequency[i];
             float energyScale = spectrum.swellScale()
                     + (spectrum.chopScale() - spectrum.swellScale()) * componentBlend;
+            float windAlignment = Math.max(
+                    0.0f,
+                    directionX * spectrum.windDirectionX()
+                            + directionZ * spectrum.windDirectionZ()
+            );
+            float alignedEnergy = MIN_DIRECTIONAL_ENERGY
+                    + windAlignment * DIRECTIONAL_ENERGY_RANGE;
+            energyScale *= 1.0f
+                    + spectrum.directionBlend() * (alignedEnergy - 1.0f);
             float waveAmplitude = amplitude[i] * energyScale;
             float horizontalScale = steepness[i] * waveAmplitude;
             double phase = Math.IEEEremainder(

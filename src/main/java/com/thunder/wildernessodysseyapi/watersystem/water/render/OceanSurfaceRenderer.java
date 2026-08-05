@@ -118,17 +118,19 @@ public final class OceanSurfaceRenderer {
         float timeSeconds = (level.getGameTime() + partialTick) / 20.0f;
         float tideOffset = TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE;
         OceanSeaState.Sample seaState = ClientOceanSeaState.sampleAt(
-                level, camera.x, camera.z);
+                level, camera.x, camera.z, partialTick);
 
         boolean coreShader = WaterShaders.shouldUseCoreShader();
         RenderType renderType = coreShader ? WaterRenderTypes.dynamicOcean() : RenderType.translucent();
         if (coreShader) {
             WaterShaders.updateOceanUniforms(
-                    timeSeconds,
+                    level.getGameTime(),
+                    partialTick,
                     seaState.strength(),
                     seaState.windDirectionX(),
                     seaState.windDirectionZ(),
-                    ((level.getDayTime() + partialTick) % 24_000L) / 24_000.0f
+                    WaterAnimationClock.periodicFraction(
+                            level.getDayTime(), partialTick, 24_000L)
             );
         }
 

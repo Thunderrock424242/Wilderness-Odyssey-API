@@ -189,9 +189,12 @@ public final class UnderwaterEffectsRenderer {
         }
 
         float partialTick = minecraft.gameRenderer.getMainCamera().getPartialTickTime();
-        float timeSeconds = (minecraft.level.getGameTime() + partialTick) / 20.0f;
         ShaderInstance shader = WaterShaders.getUnderwaterShader();
-        WaterShaders.updateUnderwaterUniforms(timeSeconds, state);
+        WaterShaders.updateUnderwaterUniforms(
+                minecraft.level.getGameTime(),
+                partialTick,
+                state
+        );
 
         boolean depthTestWasEnabled = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
         boolean depthWriteWasEnabled = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);

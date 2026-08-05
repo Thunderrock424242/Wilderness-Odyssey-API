@@ -4,9 +4,10 @@ package com.thunder.wildernessodysseyapi.watersystem.water.wave;
  * Immutable environmental modifiers applied to a Gerstner wave spectrum.
  *
  * <p>The base profile still owns physically meaningful wavelength and finite-
- * depth dispersion. This state changes energy and direction without assigning
- * arbitrary animation speeds, allowing server weather to drive the same model
- * used by rendering and entity physics.</p>
+ * depth dispersion. This state changes total energy and the relative weight of
+ * fixed directional carriers without assigning arbitrary animation speeds or
+ * rotating an existing crest field. Server weather can therefore drive the
+ * same phase-stable model used by rendering and entity physics.</p>
  */
 public record WaveSpectrumState(
         float swellScale,

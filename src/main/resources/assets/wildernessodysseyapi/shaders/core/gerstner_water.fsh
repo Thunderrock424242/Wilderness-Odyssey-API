@@ -10,11 +10,6 @@ uniform vec4 FogColor;
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
 uniform mat4 InverseProjMat;
-uniform vec4 TimeFrameLow;
-uniform vec3 TimeFrameHigh;
-uniform float SeaState;
-uniform vec2 WindDirection;
-uniform vec4 SpectrumState;
 uniform vec2 ScreenSize;
 uniform vec4 Weather;
 uniform vec4 EnvironmentColor;
@@ -42,35 +37,27 @@ in vec2 localCurrent;
 in float shoreFactor;
 in float depthFactor;
 in float disturbanceStrength;
+in float regionalSeaState;
+in vec2 regionalWindDirection;
+in vec4 regionalSpectrumState;
 
 out vec4 fragColor;
 
 const float TWO_PI = 6.28318530718;
 const float PHASE_CHUNK_SPAN = 16.0;
 const float PHASE_COARSE_CHUNKS = 1024.0;
-
-float stableTimePhase(float radiansPerSecond) {
-    float phaseStep = mod(radiansPerSecond / 20.0, TWO_PI);
-    float phase = mod(TimeFrameLow.x * phaseStep, TWO_PI);
-    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
-    phase = mod(phase + TimeFrameLow.y * phaseStep, TWO_PI);
-    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
-    phase = mod(phase + TimeFrameLow.z * phaseStep, TWO_PI);
-    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
-    phase = mod(phase + TimeFrameLow.w * phaseStep, TWO_PI);
-    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
-    phase = mod(phase + TimeFrameHigh.x * phaseStep, TWO_PI);
-    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
-    phase = mod(phase + TimeFrameHigh.y * phaseStep, TWO_PI);
-    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
-    return mod(phase + TimeFrameHigh.z * phaseStep, TWO_PI);
-}
+const vec2 DETAIL_PRIMARY_DIRECTION = vec2(0.857493, 0.514496);
+const vec2 DETAIL_CROSS_DIRECTION = vec2(-0.514496, 0.857493);
+const vec2 DETAIL_DIAGONAL_DIRECTION = vec2(0.312230, 0.950007);
+const vec2 DETAIL_GLASS_DIRECTION = vec2(0.914354, -0.404916);
+const vec2 SHORE_BREAK_DIRECTION = vec2(0.780869, 0.624695);
+const vec2 SHORE_SHEAR_DIRECTION = vec2(-0.624695, 0.780869);
 
 // Mirrors the vertex-stage origin split so fragment detail retains sub-block
 // phase precision near Minecraft's world border instead of quantizing against
 // a multi-million-block interpolated world position.
 float stableWorldPhase(vec2 coefficient) {
-    // Displacement can carry an interpolated point beyond its source chunk.
+    // Mesh-edge interpolation can land exactly on the neighboring chunk.
     // Canonicalizing it keeps fragment detail continuous across both ordinary
     // and coarse phase-chunk boundaries.
     vec2 localChunkOffset = floor(phaseLocalXZ / PHASE_CHUNK_SPAN);
@@ -88,22 +75,23 @@ float stableWorldPhase(vec2 coefficient) {
     return mod(axisPhase.x + axisPhase.y, TWO_PI);
 }
 
-float currentAdvectionPhase(vec2 coefficient, vec2 current) {
-    return dot(current, current) > 0.000001
-        ? stableTimePhase(-dot(current, coefficient) * 1.35)
-        : 0.0;
+float animatedStablePhase(vec2 coefficient, float basePhase) {
+    return mod(stableWorldPhase(coefficient) + basePhase, TWO_PI);
 }
 
-float animatedStablePhase(vec2 coefficient, vec2 current, float basePhase) {
-    return mod(stableWorldPhase(coefficient) + basePhase
-        + currentAdvectionPhase(coefficient, current), TWO_PI);
+float phaseBandLimit(vec2 coefficient) {
+    // Analytic waves have no texture mip chain. Fade only frequencies whose
+    // world-space footprint spans more than a pixel to prevent motion shimmer.
+    vec2 pixelSpan = abs(dFdx(phaseLocalXZ)) + abs(dFdy(phaseLocalXZ));
+    float radiansPerPixel = dot(pixelSpan, abs(coefficient));
+    return 1.0 - smoothstep(0.65, 1.75, radiansPerPixel);
 }
 
-float stableWaveLayer(vec2 localOffset, vec2 current, vec2 direction,
+float stableWaveLayer(vec2 localOffset, vec2 direction,
                       float frequency, float basePhase) {
     vec2 coefficient = direction * frequency;
-    return sin(mod(animatedStablePhase(coefficient, current, basePhase)
-        + dot(localOffset, coefficient), TWO_PI));
+    return sin(mod(animatedStablePhase(coefficient, basePhase)
+        + dot(localOffset, coefficient), TWO_PI)) * phaseBandLimit(coefficient);
 }
 
 vec2 normalizedOr(vec2 direction, vec2 fallbackDirection) {
@@ -111,43 +99,58 @@ vec2 normalizedOr(vec2 direction, vec2 fallbackDirection) {
     return directionLength > 0.000001 ? direction / directionLength : fallbackDirection;
 }
 
+float phaseStableDirectionalWeight(vec2 carrier, vec2 driver, float influence) {
+    float alignment = max(0.0, dot(carrier, driver));
+    return mix(1.0, 0.58 + alignment * 0.84, clamp(influence, 0.0, 1.0));
+}
+
 vec3 proceduralWorldNormal(vec2 current, float sea) {
-    vec2 wind = normalize(WindDirection + vec2(0.0001, 0.0));
-    vec2 crossWind = vec2(-wind.y, wind.x);
-    vec2 diagonal = normalize(wind * 0.73 + crossWind * 0.61);
+    vec2 wind = normalizedOr(regionalWindDirection, DETAIL_PRIMARY_DIRECTION);
+    float currentStrength = clamp(length(current) / 1.5, 0.0, 1.0);
+    vec2 currentDirection = normalizedOr(current, wind);
+    vec2 driver = normalizedOr(mix(wind, currentDirection, currentStrength), wind);
+    float directionalInfluence = max(regionalSpectrumState.z, currentStrength);
+    float primaryWeight = phaseStableDirectionalWeight(
+        DETAIL_PRIMARY_DIRECTION, driver, directionalInfluence);
+    float crossWeight = phaseStableDirectionalWeight(
+        DETAIL_CROSS_DIRECTION, driver, directionalInfluence);
+    float diagonalWeight = phaseStableDirectionalWeight(
+        DETAIL_DIAGONAL_DIRECTION, driver, directionalInfluence);
+    float glassWeight = phaseStableDirectionalWeight(
+        DETAIL_GLASS_DIRECTION, driver, directionalInfluence);
     float quality = clamp(OpticalQuality.x, 0.0, 3.0);
     if (quality < 0.5) {
-        float lowRipple = sin(animatedStablePhase(wind * 1.37, current,
-            SurfaceAnimationPhases0.z));
-        vec2 lowGradient = wind * lowRipple * 0.014;
+        float lowRipple = sin(animatedStablePhase(
+            DETAIL_PRIMARY_DIRECTION * 1.37, SurfaceAnimationPhases0.z));
+        vec2 lowGradient = DETAIL_PRIMARY_DIRECTION * lowRipple * 0.014 * primaryWeight;
         return normalize(vec3(lowGradient.x, 1.0, lowGradient.y));
     }
-    // Low-frequency domain warping prevents the small normal layers from
-    // resolving into a repeating checkerboard. Canonical current is folded
-    // into phase velocity so it remains visible without rebuilding geometry.
+    // Static world-space domain warping breaks repetition without cyclically
+    // accelerating the temporal phases at a stationary camera.
     vec2 warp = vec2(
-        sin(animatedStablePhase(
-            vec2(0.071, 0.113), current, SurfaceAnimationPhases0.x)),
-        cos(animatedStablePhase(
-            vec2(-0.097, 0.059), current, SurfaceAnimationPhases0.y))
-    ) * (0.42 + sea * 0.48);
-    float longRipple = stableWaveLayer(warp, current, wind,
+        sin(stableWorldPhase(vec2(0.071, 0.113)) + 1.37),
+        cos(stableWorldPhase(vec2(-0.097, 0.059)) - 0.91)
+    ) * 0.66;
+    float detailEnergy = 0.78 + sea * 0.44;
+    float longRipple = stableWaveLayer(warp, DETAIL_PRIMARY_DIRECTION,
         1.37, SurfaceAnimationPhases0.z);
-    float crossRipple = stableWaveLayer(warp, current, crossWind,
+    float crossRipple = stableWaveLayer(warp, DETAIL_CROSS_DIRECTION,
         2.73, SurfaceAnimationPhases0.w);
-    vec2 gradient = wind * longRipple * 0.016
-        + crossWind * crossRipple * 0.012;
+    vec2 gradient = (DETAIL_PRIMARY_DIRECTION * longRipple * 0.016 * primaryWeight
+        + DETAIL_CROSS_DIRECTION * crossRipple * 0.012 * crossWeight) * detailEnergy;
     if (quality >= 2.0) {
-        float capillary = stableWaveLayer(warp, current, diagonal,
+        float capillary = stableWaveLayer(warp, DETAIL_DIAGONAL_DIRECTION,
             6.91, SurfaceAnimationPhases1.x);
-        gradient += wind * capillary * 0.008 + diagonal * capillary * 0.007;
+        gradient += (DETAIL_PRIMARY_DIRECTION * capillary * 0.008 * primaryWeight
+            + DETAIL_DIAGONAL_DIRECTION * capillary * 0.007 * diagonalWeight)
+            * detailEnergy;
     }
     if (quality >= 3.0) {
-        vec2 glassDirection = normalize(wind * 0.58 - crossWind * 0.81);
         float glassFrequency = 13.73;
-        float glassRipple = stableWaveLayer(warp, current, glassDirection,
+        float glassRipple = stableWaveLayer(warp, DETAIL_GLASS_DIRECTION,
             glassFrequency, SurfaceAnimationPhases1.y);
-        gradient += diagonal * glassRipple * 0.005;
+        gradient += DETAIL_GLASS_DIRECTION * glassRipple * 0.005 * glassWeight
+            * detailEnergy;
     }
     return normalize(vec3(gradient.x, 1.0, gradient.y));
 }
@@ -316,7 +319,7 @@ void main() {
         discard;
     }
 
-    float sea = clamp(SeaState, 0.0, 1.0);
+    float sea = clamp(regionalSeaState, 0.0, 1.0);
     float frozen = clamp(Weather.w, 0.0, 1.0);
     vec3 baseWorldNormal = normalize(worldNormal);
     vec3 microWorldNormal = proceduralWorldNormal(localCurrent, sea);
@@ -477,28 +480,25 @@ void main() {
     float slope = clamp(1.0 - combinedWorldNormal.y, 0.0, 1.0);
     float slopeFoam = smoothstep(0.025, 0.14 + sea * 0.04, slope);
     float currentSpeed = length(localCurrent);
-    vec2 foamDirection = normalizedOr(localCurrent,
-        normalizedOr(WindDirection, vec2(1.0, 0.0)));
     float shallowWater = 1.0 - clamp(depthFactor, 0.0, 1.0);
     // Shore proximity is a deterministic client snapshot-boundary/depth
-    // approximation. SpectrumState.w is the synchronized server breaking cue;
+    // approximation. regionalSpectrumState.w is the synchronized server breaking cue;
     // this does not claim to synchronize the separate shallow-water grid.
     float shoreBreaker = shoreFactor * shallowWater * 0.12;
     float currentShear = 0.0;
     if (shoreFactor > 0.001 && OpticalQuality.x >= 1.0) {
         float breakerPhase = 0.5 + 0.5 * sin(
-            stableWorldPhase(foamDirection * (1.65 + currentSpeed * 0.35))
+            stableWorldPhase(SHORE_BREAK_DIRECTION * 1.82)
             - SurfaceAnimationPhases1.z
-            - (currentSpeed > 0.001 ? stableTimePhase(currentSpeed * 2.4) : 0.0)
         );
         shoreBreaker = shoreFactor
-            * (0.22 + SpectrumState.w * 0.78)
+            * (0.22 + regionalSpectrumState.w * 0.78)
             * smoothstep(0.34, 0.82, breakerPhase + shallowWater * 0.28);
         if (OpticalQuality.x >= 2.0 && currentSpeed > 0.001) {
             currentShear = shoreFactor
                 * clamp(currentSpeed / 1.6, 0.0, 1.0)
                 * smoothstep(0.48, 0.92, 0.5 + 0.5 * sin(
-                    stableWorldPhase(vec2(-foamDirection.y, foamDirection.x) * 3.4)
+                    stableWorldPhase(SHORE_SHEAR_DIRECTION * 3.4)
                     + SurfaceAnimationPhases1.w
                 ));
         }

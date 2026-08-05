@@ -19,6 +19,9 @@ uniform float SeaState;
 uniform vec2 WindDirection;
 uniform float WindSpeed;
 uniform vec4 SpectrumState;
+uniform float RegionalSeaStateEnabled;
+uniform mat4 RegionalSeaStateCorners;
+uniform mat4 RegionalSpectrumCorners;
 uniform vec4 Weather;
 uniform float TideOffset;
 uniform float GpuWaveStrength;
@@ -82,6 +85,9 @@ out float depthFactor;
 out float disturbanceStrength;
 out vec3 celestialDirection;
 out float celestialDaylight;
+out float regionalSeaState;
+out vec2 regionalWindDirection;
+out vec4 regionalSpectrumState;
 
 vec2 normalizedOr(vec2 direction, vec2 fallbackDirection) {
     float directionLength = length(direction);
@@ -91,6 +97,30 @@ vec2 normalizedOr(vec2 direction, vec2 fallbackDirection) {
 const float TWO_PI = 6.28318530718;
 const float PHASE_CHUNK_SPAN = 16.0;
 const float PHASE_COARSE_CHUNKS = 1024.0;
+// Material carriers stay fixed in world space. Wind/current change their
+// energy and output direction, never the coefficients that own phase.
+const vec2 MATERIAL_PRIMARY_DIRECTION = vec2(0.857493, 0.514496);
+const vec2 MATERIAL_CURRENT_CARRIER = vec2(0.853282, 0.521450);
+
+vec4 bilinearCornerState(mat4 corners, vec2 blend) {
+    vec4 north = mix(corners[0], corners[3], blend.x);
+    vec4 south = mix(corners[1], corners[2], blend.x);
+    return mix(north, south, blend.y);
+}
+
+// Snapshot chunks share exact world-space corner samples. Bilinear evaluation
+// therefore returns identical displacement/material state on both copies of a
+// chunk edge while keeping camera motion out of the environmental field.
+void resolveRegionalOceanState(vec2 localXZ, out vec4 state, out vec4 spectrum) {
+    if (RegionalSeaStateEnabled < 0.5) {
+        state = vec4(SeaState, WindDirection, WindSpeed);
+        spectrum = SpectrumState;
+        return;
+    }
+    vec2 blend = clamp(localXZ / PHASE_CHUNK_SPAN, vec2(0.0), vec2(1.0));
+    state = bilinearCornerState(RegionalSeaStateCorners, blend);
+    spectrum = bilinearCornerState(RegionalSpectrumCorners, blend);
+}
 
 // Java uploads the exact long game tick as seven base-1024 digits. Rebuilding
 // only a periodic phase here keeps animation smooth after float seconds would
@@ -169,6 +199,7 @@ float displayChannel(float channelByte) {
 
 void accumulateWave(vec2 localXZ, vec4 parameters, vec4 shape,
                     float spectrumBlend, float bodyWeight, vec2 flowDirection,
+                    vec2 regionalWind, vec4 regionalSpectrum,
                     inout float height, inout vec2 horizontalDisplacement,
                     inout vec3 tangentXDelta, inout vec3 tangentZDelta) {
     // Disabled quality-tier components and absent body blends avoid all
@@ -178,11 +209,13 @@ void accumulateWave(vec2 localXZ, vec4 parameters, vec4 shape,
     }
     vec2 baseDirection = normalizedOr(parameters.xy, vec2(1.0, 0.0));
     baseDirection = flowRelativeDirection(baseDirection, flowDirection);
-    vec2 wind = normalizedOr(WindDirection, vec2(1.0, 0.0));
-    float directionBlend = SpectrumState.z * (0.35 + shape.w * 0.65) * spectrumBlend;
-    vec2 direction = normalizedOr(mix(baseDirection, wind, directionBlend), baseDirection);
-    float spectrumEnergy = mix(SpectrumState.x, SpectrumState.y, shape.w);
-    float energy = mix(1.0, spectrumEnergy, spectrumBlend);
+    vec2 wind = normalizedOr(regionalWind, vec2(1.0, 0.0));
+    vec2 direction = baseDirection;
+    float spectrumEnergy = mix(regionalSpectrum.x, regionalSpectrum.y, shape.w);
+    float windAlignment = max(0.0, dot(direction, wind));
+    float alignedEnergy = 0.55 + windAlignment * 0.90;
+    float directionalEnergy = mix(1.0, alignedEnergy, regionalSpectrum.z);
+    float energy = mix(1.0, spectrumEnergy * directionalEnergy, spectrumBlend);
     float amplitude = shape.x * energy * bodyWeight;
     float phase = stableLinearPhase(localXZ, parameters.z * direction) + shape.y;
     float sine = sin(phase);
@@ -244,9 +277,16 @@ void accumulateImpulse(vec2 localXZ, vec4 impulse, vec4 shape,
 }
 
 void main() {
-    float sea = clamp(SeaState, 0.0, 1.0);
     vec2 localXZ = Position.xz;
-    vec2 worldXZ = localXZ + ChunkOrigin;
+    vec4 frameSeaState;
+    vec4 frameSpectrum;
+    resolveRegionalOceanState(localXZ, frameSeaState, frameSpectrum);
+    float sea = clamp(frameSeaState.x, 0.0, 1.0);
+    vec2 frameWind = normalizedOr(frameSeaState.yz, vec2(1.0, 0.0));
+    float frameWindSpeed = max(0.0, frameSeaState.w);
+    regionalSeaState = sea;
+    regionalWindDirection = frameWind;
+    regionalSpectrumState = frameSpectrum;
     vec4 encodedColor = floor(Color * 255.0 + 0.5);
     localCurrent = vec2(
         decodeSignedPayload(encodedColor.r),
@@ -269,28 +309,40 @@ void main() {
     vec3 tangentXDelta = vec3(0.0);
     vec3 tangentZDelta = vec3(0.0);
     accumulateWave(localXZ, OceanWaveParam0, OceanWaveShape0, 1.0, bodyBlend.x, vec2(0.0),
+        frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     accumulateWave(localXZ, OceanWaveParam1, OceanWaveShape1, 1.0, bodyBlend.x, vec2(0.0),
+        frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     accumulateWave(localXZ, OceanWaveParam2, OceanWaveShape2, 1.0, bodyBlend.x, vec2(0.0),
+        frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     accumulateWave(localXZ, OceanWaveParam3, OceanWaveShape3, 1.0, bodyBlend.x, vec2(0.0),
+        frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     accumulateWave(localXZ, RiverWaveParam0, RiverWaveShape0, 0.0, bodyBlend.y, localCurrent,
+        frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     accumulateWave(localXZ, RiverWaveParam1, RiverWaveShape1, 0.0, bodyBlend.y, localCurrent,
+        frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     accumulateWave(localXZ, RiverWaveParam2, RiverWaveShape2, 0.0, bodyBlend.y, localCurrent,
+        frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     accumulateWave(localXZ, RiverWaveParam3, RiverWaveShape3, 0.0, bodyBlend.y, localCurrent,
+        frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     accumulateWave(localXZ, PondWaveParam0, PondWaveShape0, 0.0, bodyBlend.z, vec2(0.0),
+        frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     accumulateWave(localXZ, PondWaveParam1, PondWaveShape1, 0.0, bodyBlend.z, vec2(0.0),
+        frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     accumulateWave(localXZ, PondWaveParam2, PondWaveShape2, 0.0, bodyBlend.z, vec2(0.0),
+        frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     accumulateWave(localXZ, PondWaveParam3, PondWaveShape3, 0.0, bodyBlend.z, vec2(0.0),
+        frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
     float impulseHeight = 0.0;
     vec2 impulseGradient = vec2(0.0);
@@ -366,7 +418,9 @@ void main() {
     viewPosition = view.xyz;
     viewNormal = normalize(mat3(ModelViewMat) * combinedNormal);
     worldNormal = combinedNormal;
-    phaseLocalXZ = displacedPosition.xz;
+    // Material detail is parameterized on the undisturbed world plane. Sea
+    // energy can move geometry without dragging the normal phase underneath it.
+    phaseLocalXZ = localXZ;
     phaseChunkIndex = ChunkOrigin / PHASE_CHUNK_SPAN;
 
     float celestialAngle = DayTime * 6.28318530718;
@@ -375,14 +429,17 @@ void main() {
     vec3 activeLightDirection = celestialDaylight > 0.5 ? sunDirection : -sunDirection;
     celestialDirection = normalize(mat3(ModelViewMat) * activeLightDirection);
     vertexDistance = length(view.xyz);
-    vec2 wind = normalize(WindDirection + vec2(0.0001, 0.0));
-    float windPhase = stableLinearPhase(localXZ, wind * 0.16)
-        + stableTimePhase(0.24 + WindSpeed * 0.055);
-    vec2 windRipple = wind * sin(windPhase) * (0.0015 + sea * 0.0035);
-    vec2 currentDirection = normalizedOr(localCurrent, wind);
+    vec2 wind = normalizedOr(frameWind, MATERIAL_PRIMARY_DIRECTION);
+    float windEnergy = clamp(frameWindSpeed / 20.0, 0.0, 1.0);
+    float windAlignment = 0.5 + 0.5 * dot(MATERIAL_PRIMARY_DIRECTION, wind);
+    float windPhase = stableLinearPhase(localXZ, MATERIAL_PRIMARY_DIRECTION * 0.16)
+        + stableTimePhase(0.62);
+    vec2 windRipple = MATERIAL_PRIMARY_DIRECTION * sin(windPhase)
+        * (0.0015 + sea * 0.0035)
+        * mix(0.72, 1.18, windAlignment * (0.55 + windEnergy * 0.45));
     vec2 currentRipple = normalizedOr(localCurrent, vec2(0.0))
-        * sin(stableLinearPhase(localXZ, currentDirection * 0.55)
-            - stableTimePhase(0.7 + length(localCurrent) * 1.4))
+        * sin(stableLinearPhase(localXZ, MATERIAL_CURRENT_CARRIER * 0.55)
+            - stableTimePhase(0.92))
         * min(0.0045, length(localCurrent) * 0.0025);
     texCoord0 = UV0 + windRipple + vec2(
         sin(stableTimePhase(0.35) + stableLinearPhase(localXZ, vec2(0.0, 0.18))),

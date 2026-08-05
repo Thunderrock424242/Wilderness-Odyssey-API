@@ -15,9 +15,9 @@ import net.minecraft.world.level.Level;
  */
 public final class OceanSeaState {
 
-    private static final float TWO_PI = (float) (Math.PI * 2.0);
-    private static final float WIND_TURN_PERIOD_TICKS = 96_000.0f;
-    private static final float GUST_PERIOD_TICKS = 420.0f;
+    private static final long WIND_TURN_PERIOD_TICKS = 96_000L;
+    private static final long GUST_PERIOD_TICKS = 420L;
+    private static final long DAY_PERIOD_TICKS = 24_000L;
 
     /** Calm fallback used before a multiplayer snapshot arrives. */
     public static final Sample CALM = new Sample(
@@ -87,21 +87,26 @@ public final class OceanSeaState {
 
     /** Samples synchronized vanilla/external weather when localized authority is inactive. */
     public static Sample vanillaFallback(Level level, float partialTick) {
-        float rain = clamp01(level.getRainLevel(partialTick));
-        float thunder = clamp01(level.getThunderLevel(partialTick));
-        float time = level.getGameTime() + partialTick;
+        float framePartialTick = finiteClamp(partialTick, 0.0f, 1.0f, 0.0f);
+        float rain = clamp01(level.getRainLevel(framePartialTick));
+        float thunder = clamp01(level.getThunderLevel(framePartialTick));
+        long gameTime = level.getGameTime();
         int dimensionHash = level.dimension().location().hashCode();
-        float phase = ((dimensionHash & 0xFFFF) / 65_535.0f) * TWO_PI;
+        double dimensionPhase = ((dimensionHash & 0xFFFF) / 65_535.0) * Math.PI * 2.0;
 
-        float gust = 0.5f + 0.5f * (float) Math.sin(time * TWO_PI / GUST_PERIOD_TICKS + phase * 1.7f);
+        double gustPhase = OceanFallbackAnimationClock.periodicPhase(
+                gameTime, framePartialTick, GUST_PERIOD_TICKS);
+        float gust = 0.5f + 0.5f * (float) Math.sin(gustPhase + dimensionPhase * 1.7);
         float weatherEnergy = clamp01(rain * 0.55f + thunder * 0.70f);
         float seaStrength = clamp01(0.14f + weatherEnergy * (0.68f + gust * 0.18f));
 
         // Wind direction changes over several Minecraft days. Short gusts alter
         // energy, not heading, avoiding visually noisy direction reversals.
-        float windAngle = phase
-                + time * TWO_PI / WIND_TURN_PERIOD_TICKS
-                + (float) Math.sin(time * TWO_PI / 24_000.0f + phase) * 0.22f;
+        double windAngle = dimensionPhase
+                + OceanFallbackAnimationClock.periodicPhase(
+                        gameTime, framePartialTick, WIND_TURN_PERIOD_TICKS)
+                + Math.sin(OceanFallbackAnimationClock.periodicPhase(
+                        gameTime, framePartialTick, DAY_PERIOD_TICKS) + dimensionPhase) * 0.22;
         float windX = (float) Math.cos(windAngle);
         float windZ = (float) Math.sin(windAngle);
         float windSpeed = 2.0f + seaStrength * 13.0f;
@@ -142,7 +147,7 @@ public final class OceanSeaState {
         if (level instanceof ServerLevel serverLevel) {
             return OceanSeaStateField.sampleAt(serverLevel, worldX, worldZ, partialTick);
         }
-        return ClientOceanSeaState.sampleAt(level, worldX, worldZ);
+        return ClientOceanSeaState.sampleAt(level, worldX, worldZ, partialTick);
     }
 
     /** Complete bounded state shared by rendering, physics, and networking. */
