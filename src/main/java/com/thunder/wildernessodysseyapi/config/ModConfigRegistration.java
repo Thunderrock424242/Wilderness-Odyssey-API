@@ -20,7 +20,6 @@ import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryConfig;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryConfig;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryConfig;
 import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
-import com.thunder.wildernessodysseyapi.truedarkness.config.TrueDarknessConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
@@ -61,8 +60,6 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-donations-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DebugOverlayConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-debug-overlay-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, TrueDarknessConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-true-darkness-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, WaterRenderingConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-water-rendering-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, WeatherRenderingConfig.CONFIG_SPEC,
