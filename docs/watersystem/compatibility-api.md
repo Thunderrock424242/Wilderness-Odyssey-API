@@ -19,6 +19,7 @@ watersystem/water/
 |   `-- create/   Create-local water recognition
 |-- config/       core and independently switchable adapter flags
 |-- entity/       custom water physics consumers
+|-- hydrology/    watersheds, aquifers, rain bodies, and reversible ownership
 |-- render/       client rendering consumers
 |-- sph/          bounded mobile local water
 `-- volume/       canonical storage and large-body authority
@@ -32,10 +33,12 @@ or NeoForge fluid constants. `WaterAccess#getWaterUnits` exposes visible,
 authority-owned volume for transaction adapters; hidden displacement reservoirs
 deliberately return zero through this public read.
 
-API version 3 also exposes `getWatershedConditions` for canonical basin-scale
+API version 4 also exposes `getWatershedConditions` for canonical basin-scale
 state and `getLocalWatershedFlow` for the compact four-by-four tributary cell at
 a position. Both are read-only metadata over the same authority. Consumers
-must not treat level offset, discharge, debris, or confluence fields as a second
+may read recharge, aquifer storage, baseflow, the estimated water table, and
+dynamic pond/wetland/spring classification from `WatershedConditions`. They
+must not treat groundwater, level offset, discharge, debris, or confluence fields as a second
 physical-volume store.
 
 Queries intended for render loops or entity ticks should retain a `WaterSample`

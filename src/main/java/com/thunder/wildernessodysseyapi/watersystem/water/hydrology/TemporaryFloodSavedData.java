@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Persists exact positions owned by localized temporary flooding.
+ * Persists exact positions owned by reversible watershed surface water.
  *
  * <p>This ledger never implies that water exists by itself. A position is
  * removable only while both this entry and the canonical temporary-flood flag
@@ -32,16 +32,18 @@ import java.util.Map;
 public final class TemporaryFloodSavedData extends SavedData {
 
     private static final String DATA_NAME = ModConstants.MOD_ID + "_temporary_floodwater";
-    private static final int DATA_VERSION = 2;
+    private static final int DATA_VERSION = 3;
     private static final int HARD_MAX_ENTRIES = 65_536;
     private static final String VERSION_KEY = "version";
     private static final String POSITIONS = "positions";
     private static final String BASINS = "basins";
     private static final String PLACED_TICKS = "placed_ticks";
     private static final String ORIGINAL_STATES = "original_states";
+    private static final String KINDS = "kinds";
 
     private final LinkedHashMap<Long, FloodEntry> entries = new LinkedHashMap<>();
     private final Map<Long, Integer> chunkCounts = new HashMap<>();
+    private final Map<Long, int[]> chunkKindCounts = new HashMap<>();
 
     /** Returns the dimension-owned exact temporary-flood ledger. */
     public static TemporaryFloodSavedData get(ServerLevel level) {
@@ -61,6 +63,7 @@ public final class TemporaryFloodSavedData extends SavedData {
         long[] basins = tag.getLongArray(BASINS);
         long[] placedTicks = tag.getLongArray(PLACED_TICKS);
         ListTag originals = tag.getList(ORIGINAL_STATES, Tag.TAG_COMPOUND);
+        byte[] kinds = tag.getByteArray(KINDS);
         int count = Math.min(positions.length, Math.min(basins.length, placedTicks.length));
         for (int index = 0; index < count && data.entries.size() < HARD_MAX_ENTRIES; index++) {
             CompoundTag originalTag = version >= 2 && index < originals.size()
@@ -75,7 +78,10 @@ public final class TemporaryFloodSavedData extends SavedData {
             data.put(positions[index], new FloodEntry(
                     basins[index],
                     Math.max(0L, placedTicks[index]),
-                    original
+                    original,
+                    version >= 3 && index < kinds.length
+                            ? SurfaceWaterKind.fromId(Byte.toUnsignedInt(kinds[index]))
+                            : SurfaceWaterKind.FLOOD
             ));
         }
         return data;
@@ -87,6 +93,7 @@ public final class TemporaryFloodSavedData extends SavedData {
         long[] basins = new long[entries.size()];
         long[] placedTicks = new long[entries.size()];
         ListTag originals = new ListTag();
+        byte[] kinds = new byte[entries.size()];
         int index = 0;
         for (Map.Entry<Long, FloodEntry> entry : entries.entrySet()) {
             positions[index] = entry.getKey();
@@ -95,6 +102,7 @@ public final class TemporaryFloodSavedData extends SavedData {
             originals.add(entry.getValue().originalState == null
                     ? new CompoundTag()
                     : NbtUtils.writeBlockState(entry.getValue().originalState));
+            kinds[index] = (byte) entry.getValue().kind.ordinal();
             index++;
         }
         tag.putInt(VERSION_KEY, DATA_VERSION);
@@ -102,6 +110,7 @@ public final class TemporaryFloodSavedData extends SavedData {
         tag.putLongArray(BASINS, basins);
         tag.putLongArray(PLACED_TICKS, placedTicks);
         tag.put(ORIGINAL_STATES, originals);
+        tag.putByteArray(KINDS, kinds);
         return tag;
     }
 
@@ -112,7 +121,8 @@ public final class TemporaryFloodSavedData extends SavedData {
                 basinId,
                 gameTime,
                 maximumEntries,
-                null
+                null,
+                SurfaceWaterKind.FLOOD
         );
     }
 
@@ -124,6 +134,25 @@ public final class TemporaryFloodSavedData extends SavedData {
             int maximumEntries,
             BlockState originalState
     ) {
+        return record(
+                position,
+                basinId,
+                gameTime,
+                maximumEntries,
+                originalState,
+                SurfaceWaterKind.FLOOD
+        );
+    }
+
+    /** Records one exact reversible surface-water cell and its ownership kind. */
+    public boolean record(
+            BlockPos position,
+            long basinId,
+            long gameTime,
+            int maximumEntries,
+            BlockState originalState,
+            SurfaceWaterKind kind
+    ) {
         if (position == null
                 || entries.containsKey(position.asLong())
                 || entries.size() >= Math.max(1, maximumEntries)) {
@@ -132,7 +161,10 @@ public final class TemporaryFloodSavedData extends SavedData {
         put(position.asLong(), new FloodEntry(
                 basinId,
                 Math.max(0L, gameTime),
-                originalState
+                originalState,
+                kind == null || kind == SurfaceWaterKind.NONE
+                        ? SurfaceWaterKind.FLOOD
+                        : kind
         ));
         setDirty();
         return true;
@@ -144,7 +176,7 @@ public final class TemporaryFloodSavedData extends SavedData {
         if (removed == null) {
             return false;
         }
-        decrementChunkCount(chunkKey(packedPosition));
+        decrementChunkCount(chunkKey(packedPosition), removed.kind);
         setDirty();
         return true;
     }
@@ -175,6 +207,43 @@ public final class TemporaryFloodSavedData extends SavedData {
         return chunkCounts.getOrDefault(chunkKey, 0);
     }
 
+    /** Returns the exact tracked count for one ownership kind in a chunk. */
+    public int countInChunk(long chunkKey, SurfaceWaterKind kind) {
+        if (kind == null) {
+            return 0;
+        }
+        int[] counts = chunkKindCounts.get(chunkKey);
+        return counts == null ? 0 : counts[kind.ordinal()];
+    }
+
+    /** Returns all pond, wetland, and spring cells tracked in a chunk. */
+    public int standingWaterCountInChunk(long chunkKey) {
+        int[] counts = chunkKindCounts.get(chunkKey);
+        if (counts == null) {
+            return 0;
+        }
+        return counts[SurfaceWaterKind.RAIN_POND.ordinal()]
+                + counts[SurfaceWaterKind.WETLAND.ordinal()]
+                + counts[SurfaceWaterKind.SPRING.ordinal()];
+    }
+
+    /** Returns the strongest synchronized standing-water classification in a chunk. */
+    public SurfaceWaterKind dominantStandingKind(long chunkKey) {
+        int[] counts = chunkKindCounts.get(chunkKey);
+        if (counts == null) {
+            return SurfaceWaterKind.NONE;
+        }
+        if (counts[SurfaceWaterKind.SPRING.ordinal()] > 0) {
+            return SurfaceWaterKind.SPRING;
+        }
+        if (counts[SurfaceWaterKind.RAIN_POND.ordinal()] > 0) {
+            return SurfaceWaterKind.RAIN_POND;
+        }
+        return counts[SurfaceWaterKind.WETLAND.ordinal()] > 0
+                ? SurfaceWaterKind.WETLAND
+                : SurfaceWaterKind.NONE;
+    }
+
     /** Returns the total exact flood ledger size. */
     public int size() {
         return entries.size();
@@ -184,6 +253,27 @@ public final class TemporaryFloodSavedData extends SavedData {
     public BlockState originalState(long packedPosition) {
         FloodEntry entry = entries.get(packedPosition);
         return entry == null ? null : entry.originalState;
+    }
+
+    /** Returns the ownership category for one tracked position. */
+    public SurfaceWaterKind kind(long packedPosition) {
+        FloodEntry entry = entries.get(packedPosition);
+        return entry == null ? SurfaceWaterKind.NONE : entry.kind;
+    }
+
+    /** Returns the server tick on which one tracked position was placed. */
+    public long placedTick(long packedPosition) {
+        FloodEntry entry = entries.get(packedPosition);
+        return entry == null ? 0L : entry.placedTick;
+    }
+
+    /** Returns the standing-water kind at an exact position, if one is tracked. */
+    public SurfaceWaterKind standingKindAt(BlockPos position) {
+        if (position == null) {
+            return SurfaceWaterKind.NONE;
+        }
+        SurfaceWaterKind kind = kind(position.asLong());
+        return kind.standingWater() ? kind : SurfaceWaterKind.NONE;
     }
 
     /** Pure recession gate used by runtime code and preservation tests. */
@@ -199,11 +289,27 @@ public final class TemporaryFloodSavedData extends SavedData {
 
     private void put(long position, FloodEntry entry) {
         entries.put(position, entry);
-        chunkCounts.merge(chunkKey(position), 1, Integer::sum);
+        long chunkKey = chunkKey(position);
+        chunkCounts.merge(chunkKey, 1, Integer::sum);
+        int[] counts = chunkKindCounts.computeIfAbsent(
+                chunkKey,
+                ignored -> new int[SurfaceWaterKind.values().length]
+        );
+        counts[entry.kind.ordinal()]++;
     }
 
-    private void decrementChunkCount(long chunkKey) {
+    private void decrementChunkCount(long chunkKey, SurfaceWaterKind kind) {
         chunkCounts.computeIfPresent(chunkKey, (ignored, count) -> count <= 1 ? null : count - 1);
+        chunkKindCounts.computeIfPresent(chunkKey, (ignored, counts) -> {
+            int index = kind == null ? SurfaceWaterKind.FLOOD.ordinal() : kind.ordinal();
+            counts[index] = Math.max(0, counts[index] - 1);
+            for (int count : counts) {
+                if (count > 0) {
+                    return counts;
+                }
+            }
+            return null;
+        });
     }
 
     private static long chunkKey(long packedPosition) {
@@ -211,6 +317,11 @@ public final class TemporaryFloodSavedData extends SavedData {
         return ChunkPos.asLong(position.getX() >> 4, position.getZ() >> 4);
     }
 
-    private record FloodEntry(long basinId, long placedTick, BlockState originalState) {
+    private record FloodEntry(
+            long basinId,
+            long placedTick,
+            BlockState originalState,
+            SurfaceWaterKind kind
+    ) {
     }
 }

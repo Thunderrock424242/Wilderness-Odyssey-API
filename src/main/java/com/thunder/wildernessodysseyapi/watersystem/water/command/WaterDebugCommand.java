@@ -156,11 +156,18 @@ public final class WaterDebugCommand {
                 + ", saturation=" + format(conditions.soilSaturation())
                 + ", runoff=" + format(conditions.storedRunoff())
                 + ", discharge=" + format(conditions.riverDischarge())), false);
+        source.sendSuccess(() -> Component.literal("  groundwaterRecharge="
+                + format(conditions.groundwaterRecharge())
+                + ", aquiferStorage=" + format(conditions.aquiferStorage())
+                + ", baseflow=" + format(conditions.groundwaterDischarge())
+                + ", waterTableY=" + conditions.estimatedWaterTableElevation()
+                + ", nearSurface=" + conditions.groundwaterNearSurface()), false);
         source.sendSuccess(() -> Component.literal("  levelOffset=" + format(conditions.waterLevelOffset())
                 + ", floodRisk=" + format(conditions.floodRisk())
                 + ", threshold=" + format(conditions.floodThreshold())
                 + ", flooding=" + conditions.flooding()
-                + ", temporaryCells=" + conditions.activeTemporaryFloodCells()), false);
+                + ", floodCells=" + conditions.activeTemporaryFloodCells()
+                + ", pondWetlandSpringCells=" + conditions.activeSurfaceWaterCells()), false);
         source.sendSuccess(() -> Component.literal("  current=" + format(conditions.currentX())
                 + ", " + format(conditions.currentZ())
                 + " (strength=" + format(conditions.currentStrength()) + ")"

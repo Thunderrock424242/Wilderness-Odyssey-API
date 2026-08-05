@@ -30,6 +30,8 @@ class WatershedRegionSyncPayloadTest {
                 0.88f,
                 20L
         );
+        state.setActiveSurfaceWaterCells(3);
+        state.setDynamicWaterFeature(WaterFeature.POND);
         WatershedRegionSyncPayload original = new WatershedRegionSyncPayload(
                 true,
                 List.of(new WatershedRegionSyncPayload.ChunkSnapshot(-3, 8, state.packed()))
@@ -49,6 +51,7 @@ class WatershedRegionSyncPayloadTest {
                     state.packed().drainageDirectionBits(),
                     decoded.chunks().getFirst().packed().drainageDirectionBits()
             );
+            assertEquals(3, decoded.chunks().getFirst().packed().activeSurfaceWaterCells());
         } finally {
             buffer.release();
         }

@@ -55,6 +55,10 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_WATERSHED_SIMULATION;
     public static final ModConfigSpec.DoubleValue WATERSHED_RAINFALL_ACCUMULATION_RATE;
     public static final ModConfigSpec.DoubleValue WATERSHED_SNOWMELT_RATE;
+    public static final ModConfigSpec.BooleanValue ENABLE_WATERSHED_GROUNDWATER;
+    public static final ModConfigSpec.DoubleValue WATERSHED_GROUNDWATER_RECHARGE_RATE;
+    public static final ModConfigSpec.DoubleValue WATERSHED_GROUNDWATER_SEEPAGE_RATE;
+    public static final ModConfigSpec.DoubleValue WATERSHED_SPRING_THRESHOLD;
     public static final ModConfigSpec.DoubleValue WATERSHED_DRAINAGE_RATE;
     public static final ModConfigSpec.DoubleValue WATERSHED_MAX_WATER_LEVEL_OFFSET;
     public static final ModConfigSpec.BooleanValue ENABLE_LOCALIZED_FLOODING;
@@ -66,6 +70,11 @@ public final class WaterSimulationConfig {
     public static final ModConfigSpec.IntValue WATERSHED_CHUNKS_PER_TICK;
     public static final ModConfigSpec.IntValue WATERSHED_MAX_SAVED_CHUNKS;
     public static final ModConfigSpec.IntValue WATERSHED_MAX_TEMPORARY_FLOOD_CELLS;
+    public static final ModConfigSpec.BooleanValue ENABLE_RAIN_FED_SURFACE_WATER;
+    public static final ModConfigSpec.DoubleValue WATERSHED_POND_FORMATION_THRESHOLD;
+    public static final ModConfigSpec.DoubleValue WATERSHED_WETLAND_FORMATION_THRESHOLD;
+    public static final ModConfigSpec.IntValue SURFACE_WATER_MAX_PLACEMENTS_PER_TICK;
+    public static final ModConfigSpec.IntValue SURFACE_WATER_MINIMUM_LIFETIME_TICKS;
     public static final ModConfigSpec.BooleanValue ENABLE_WATERSHED_SEDIMENT_EFFECTS;
     public static final ModConfigSpec.BooleanValue ENABLE_WATERSHED_DEBRIS_EFFECTS;
     public static final ModConfigSpec.BooleanValue WATERSHED_DEBUG_LOGGING;
@@ -215,6 +224,18 @@ public final class WaterSimulationConfig {
         WATERSHED_SNOWMELT_RATE = builder
                 .comment("Normalized stored snowpack routed as delayed runoff during one warm watershed pass.")
                 .defineInRange("snowmeltRate", 0.035, 0.0, 0.5);
+        ENABLE_WATERSHED_GROUNDWATER = builder
+                .comment("Enable persistent chunk-scale aquifer recharge, storage, seepage, springs, and dry-weather river baseflow.")
+                .define("groundwaterEnabled", true);
+        WATERSHED_GROUNDWATER_RECHARGE_RATE = builder
+                .comment("Fraction of infiltrating rain and snowmelt retained as delayed aquifer recharge per watershed pass.")
+                .defineInRange("groundwaterRechargeRate", 0.32, 0.0, 1.0);
+        WATERSHED_GROUNDWATER_SEEPAGE_RATE = builder
+                .comment("Slow normalized aquifer seepage and baseflow rate per watershed pass.")
+                .defineInRange("groundwaterSeepageRate", 0.018, 0.001, 0.20);
+        WATERSHED_SPRING_THRESHOLD = builder
+                .comment("Normalized aquifer storage at which a high water table may feed a spring in safe loaded terrain.")
+                .defineInRange("springThreshold", 0.78, 0.45, 1.0);
         WATERSHED_DRAINAGE_RATE = builder
                 .comment("Normalized per-pass soil drainage, runoff decay, and dry-weather evaporation rate.")
                 .defineInRange("drainageRate", 0.025, 0.001, 0.25);
@@ -246,8 +267,23 @@ public final class WaterSimulationConfig {
                 .comment("Maximum compact watershed cells retained per dimension save.")
                 .defineInRange("maximumSavedChunks", 32768, 1024, 65536);
         WATERSHED_MAX_TEMPORARY_FLOOD_CELLS = builder
-                .comment("Maximum exact temporary flood positions retained per dimension.")
+                .comment("Maximum exact reversible flood, pond, wetland, and spring positions retained per dimension.")
                 .defineInRange("maximumTemporaryFloodCells", 8192, 128, 65536);
+        ENABLE_RAIN_FED_SURFACE_WATER = builder
+                .comment("Allow sustained rain, snowmelt, and high groundwater to create reversible ponds, wetlands, and springs in safe terrain depressions.")
+                .define("rainFedSurfaceWaterEnabled", true);
+        WATERSHED_POND_FORMATION_THRESHOLD = builder
+                .comment("Normalized sustained ponding pressure required before a closed loaded depression fills.")
+                .defineInRange("pondFormationThreshold", 0.68, 0.35, 1.0);
+        WATERSHED_WETLAND_FORMATION_THRESHOLD = builder
+                .comment("Normalized soil and water-table wetness required for shallow temporary wetland water.")
+                .defineInRange("wetlandFormationThreshold", 0.58, 0.30, 1.0);
+        SURFACE_WATER_MAX_PLACEMENTS_PER_TICK = builder
+                .comment("Global per-dimension cap on reversible rain-pond, wetland, and spring placements per server tick.")
+                .defineInRange("surfaceWaterMaximumPlacementsPerTick", 1, 0, 16);
+        SURFACE_WATER_MINIMUM_LIFETIME_TICKS = builder
+                .comment("Minimum lifetime of owned pond, wetland, and spring cells before dry-weather recession may remove them.")
+                .defineInRange("surfaceWaterMinimumLifetimeTicks", 1200, 100, 24000);
         ENABLE_WATERSHED_SEDIMENT_EFFECTS = builder
                 .comment("Let runoff and floods raise synchronized sediment/turbidity metadata.")
                 .define("sedimentEffects", true);
@@ -483,6 +519,26 @@ public final class WaterSimulationConfig {
         return WATERSHED_SNOWMELT_RATE.get().floatValue();
     }
 
+    /** Returns whether persistent aquifer recharge and baseflow are active. */
+    public static boolean watershedGroundwaterEnabled() {
+        return watershedSimulationEnabled() && ENABLE_WATERSHED_GROUNDWATER.get();
+    }
+
+    /** Returns the fraction of infiltrating water retained as recharge. */
+    public static float watershedGroundwaterRechargeRate() {
+        return WATERSHED_GROUNDWATER_RECHARGE_RATE.get().floatValue();
+    }
+
+    /** Returns the slow aquifer seepage and baseflow rate. */
+    public static float watershedGroundwaterSeepageRate() {
+        return WATERSHED_GROUNDWATER_SEEPAGE_RATE.get().floatValue();
+    }
+
+    /** Returns the aquifer-storage threshold for natural spring formation. */
+    public static float watershedSpringThreshold() {
+        return WATERSHED_SPRING_THRESHOLD.get().floatValue();
+    }
+
     /** Returns normalized soil/runoff drainage applied by one pass. */
     public static float watershedDrainageRate() {
         return WATERSHED_DRAINAGE_RATE.get().floatValue();
@@ -538,6 +594,38 @@ public final class WaterSimulationConfig {
     /** Returns the exact temporary-flood ledger budget. */
     public static int watershedMaxTemporaryFloodCells() {
         return WATERSHED_MAX_TEMPORARY_FLOOD_CELLS.get();
+    }
+
+    /** Returns the shared exact reversible-surface-water ledger budget. */
+    public static int watershedMaxTransientWaterCells() {
+        return WATERSHED_MAX_TEMPORARY_FLOOD_CELLS.get();
+    }
+
+    /** Returns whether loaded terrain may form reversible ponds, wetlands, and springs. */
+    public static boolean rainFedSurfaceWaterEnabled() {
+        return watershedSimulationEnabled()
+                && ENABLE_RAIN_FED_SURFACE_WATER.get()
+                && SURFACE_WATER_MAX_PLACEMENTS_PER_TICK.get() > 0;
+    }
+
+    /** Returns the sustained ponding-pressure threshold. */
+    public static float watershedPondFormationThreshold() {
+        return WATERSHED_POND_FORMATION_THRESHOLD.get().floatValue();
+    }
+
+    /** Returns the shallow-groundwater wetland threshold. */
+    public static float watershedWetlandFormationThreshold() {
+        return WATERSHED_WETLAND_FORMATION_THRESHOLD.get().floatValue();
+    }
+
+    /** Returns the per-dimension rain-fed surface-water placement budget. */
+    public static int surfaceWaterMaximumPlacementsPerTick() {
+        return rainFedSurfaceWaterEnabled() ? SURFACE_WATER_MAX_PLACEMENTS_PER_TICK.get() : 0;
+    }
+
+    /** Returns the minimum age before standing surface water may recede. */
+    public static int surfaceWaterMinimumLifetimeTicks() {
+        return SURFACE_WATER_MINIMUM_LIFETIME_TICKS.get();
     }
 
     /** Returns whether sediment/clarity state should respond to runoff. */

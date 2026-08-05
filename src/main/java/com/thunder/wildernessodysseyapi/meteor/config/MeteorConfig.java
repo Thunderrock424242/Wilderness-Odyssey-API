@@ -2,12 +2,20 @@ package com.thunder.wildernessodysseyapi.meteor.config;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-public class MeteorConfig {
+/**
+ * Configures natural meteor frequency, impact size, and player-facing warnings.
+ *
+ * <p>Natural scheduling is server-owned. Operator commands continue to work
+ * when natural events are disabled so pack maintainers can test impacts without
+ * waiting for the rare-event timer.</p>
+ */
+public final class MeteorConfig {
 
     public static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
     public static final ModConfigSpec SPEC;
 
     // Event spawning
+    public static final ModConfigSpec.BooleanValue NATURAL_EVENTS_ENABLED;
     public static final ModConfigSpec.IntValue EVENT_CHECK_INTERVAL_TICKS;
     public static final ModConfigSpec.IntValue EVENT_CHANCE_PER_CHECK;   // 1-in-N chance
     public static final ModConfigSpec.IntValue MIN_METEORS;
@@ -31,13 +39,17 @@ public class MeteorConfig {
     static {
         BUILDER.comment("Meteor Impact Weather Event Configuration").push("meteor_event");
 
+        NATURAL_EVENTS_ENABLED = BUILDER
+                .comment("Allow rare natural meteor showers in the Overworld. Manual meteor commands remain available when disabled.")
+                .define("enableNaturalMeteorEvents", true);
+
         EVENT_CHECK_INTERVAL_TICKS = BUILDER
-                .comment("How often (in ticks) the game checks whether to start a meteor event. 20 ticks = 1 second.")
-                .defineInRange("eventCheckIntervalTicks", 72000, 200, 720000); // default: every hour
+                .comment("How often, in ticks of player-active Overworld time, the game checks whether to start a meteor event. 72000 ticks is one hour.")
+                .defineInRange("eventCheckIntervalTicks", 72_000, 200, 720_000);
 
         EVENT_CHANCE_PER_CHECK = BUILDER
-                .comment("1-in-N chance of a meteor event occurring each check interval.")
-                .defineInRange("eventChancePerCheck", 3, 1, 1000);
+                .comment("1-in-N chance of a meteor event each check. The default 1-in-168 hourly roll averages one event per seven days of continuous player-active Overworld time.")
+                .defineInRange("eventChancePerCheck", 168, 1, 100_000);
 
         MIN_METEORS = BUILDER
                 .comment("Minimum number of meteors per event.")
@@ -98,6 +110,9 @@ public class MeteorConfig {
         BUILDER.pop();
 
         SPEC = BUILDER.build();
+    }
+
+    private MeteorConfig() {
     }
 
     public enum DestructionLevel {

@@ -374,8 +374,33 @@ public final class CanonicalWater {
             float velocityX,
             float velocityZ
     ) {
+        return placeTemporarySurfaceWater(
+                level,
+                pos,
+                WaterVolumeChunk.UNITS_PER_BLOCK,
+                velocityX,
+                velocityZ
+        );
+    }
+
+    /**
+     * Places one separately owned reversible surface-water cell.
+     *
+     * <p>Full cells represent ponds, springs, and floods; shallow partial cells
+     * represent saturated wetlands. Every amount uses the same exact ownership
+     * flag and namespaced physical projection, so recession cannot affect
+     * generated or player water.</p>
+     */
+    public static boolean placeTemporarySurfaceWater(
+            ServerLevel level,
+            BlockPos pos,
+            int volumeUnits,
+            float velocityX,
+            float velocityZ
+    ) {
         if (level == null
                 || pos == null
+                || volumeUnits <= 0
                 || !level.hasChunkAt(pos)
                 || getTracked(level, pos) != null
                 || WildernessWaterAuthority.generatedSpanAt(level, pos) != null
@@ -383,7 +408,7 @@ public final class CanonicalWater {
             return false;
         }
         WaterVolumeChunk.WaterCell floodCell = new WaterVolumeChunk.WaterCell(
-                WaterVolumeChunk.UNITS_PER_BLOCK,
+                Math.min(WaterVolumeChunk.UNITS_PER_BLOCK, volumeUnits),
                 velocityX,
                 0.0f,
                 velocityZ,

@@ -1,8 +1,8 @@
 package com.thunder.wildernessodysseyapi.entity;
 
+import com.thunder.wildernessodysseyapi.anomaly.AnomalyDimensionRules;
 import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
 import com.thunder.wildernessodysseyapi.core.ModEntities;
-import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -120,7 +120,8 @@ public class RiftMawEntity extends Monster {
             return;
         }
 
-        if (!RiftfallSystem.stage().isActiveDanger()) {
+        if (level() instanceof ServerLevel serverLevel
+                && !AnomalyDimensionRules.permitsRiftPresence(serverLevel)) {
             discard();
             return;
         }

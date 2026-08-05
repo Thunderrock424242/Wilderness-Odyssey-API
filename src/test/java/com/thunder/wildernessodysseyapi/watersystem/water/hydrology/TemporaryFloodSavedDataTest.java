@@ -44,12 +44,29 @@ class TemporaryFloodSavedDataTest {
     }
 
     @Test
-    void versionTwoLedgerIncludesAnOriginalStatePaletteEntry() {
+    void legacyLedgerIncludesAnOriginalStatePaletteEntry() {
         TemporaryFloodSavedData data = new TemporaryFloodSavedData();
         BlockPos position = new BlockPos(4, 65, 9);
 
         assertTrue(data.record(position, 9L, 30L, 16));
         assertEquals(1, data.save(new CompoundTag(), null)
                 .getList("original_states", net.minecraft.nbt.Tag.TAG_COMPOUND).size());
+    }
+
+    @Test
+    void versionThreeLedgerPreservesStandingWaterKindAndCounts() {
+        TemporaryFloodSavedData data = new TemporaryFloodSavedData();
+        BlockPos pond = new BlockPos(20, 63, -2);
+
+        assertTrue(data.record(
+                pond, 9L, 30L, 16, null, SurfaceWaterKind.RAIN_POND
+        ));
+        CompoundTag encoded = data.save(new CompoundTag(), null);
+        TemporaryFloodSavedData decoded = TemporaryFloodSavedData.load(encoded, null);
+        long chunkKey = ChunkPos.asLong(1, -1);
+
+        assertEquals(SurfaceWaterKind.RAIN_POND, decoded.kind(pond.asLong()));
+        assertEquals(1, decoded.standingWaterCountInChunk(chunkKey));
+        assertEquals(SurfaceWaterKind.RAIN_POND, decoded.dominantStandingKind(chunkKey));
     }
 }

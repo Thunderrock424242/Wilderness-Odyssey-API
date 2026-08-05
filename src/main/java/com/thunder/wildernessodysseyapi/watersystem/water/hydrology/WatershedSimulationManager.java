@@ -51,6 +51,8 @@ public final class WatershedSimulationManager {
         int initialized = 0;
         int processed = 0;
         int placements = 0;
+        int floodPlacements = 0;
+        int standingWaterPlacements = 0;
 
         if (WaterSimulationConfig.watershedSimulationEnabled()) {
             long gameTime = level.getGameTime();
@@ -60,6 +62,7 @@ public final class WatershedSimulationManager {
             }
 
             int placementBudget = WaterSimulationConfig.maximumFloodPlacementsPerTick();
+            int standingWaterBudget = WaterSimulationConfig.surfaceWaterMaximumPlacementsPerTick();
             int processBudget = WaterSimulationConfig.watershedChunksPerTick();
             boolean weatherEnabled = WaterSimulationConfig.weatherWaterCouplingEnabled()
                     && WeatherConfig.dimensionEnabled(level.dimension());
@@ -98,7 +101,11 @@ public final class WatershedSimulationManager {
                                 downstream.state != null,
                                 WaterSimulationConfig.watershedSedimentEffectsEnabled(),
                                 WaterSimulationConfig.watershedDebrisEffectsEnabled(),
-                                WaterSimulationConfig.watershedSnowmeltRate()
+                                WaterSimulationConfig.watershedSnowmeltRate(),
+                                WaterSimulationConfig.watershedGroundwaterEnabled(),
+                                WaterSimulationConfig.watershedGroundwaterRechargeRate(),
+                                WaterSimulationConfig.watershedGroundwaterSeepageRate(),
+                                WaterSimulationConfig.watershedSpringThreshold()
                         )
                 );
                 boolean changed = state.apply(
@@ -112,14 +119,28 @@ public final class WatershedSimulationManager {
                 if (changed) {
                     data.markChanged();
                 }
-                if (placementBudget > placements && WaterSimulationConfig.localizedFloodingEnabled()) {
-                    placements += TemporaryFloodManager.expand(
+                if (placementBudget > floodPlacements && WaterSimulationConfig.localizedFloodingEnabled()) {
+                    int added = TemporaryFloodManager.expand(
                             level,
                             data,
                             chunkKey,
                             state,
-                            placementBudget - placements
+                            placementBudget - floodPlacements
                     );
+                    floodPlacements += added;
+                    placements += added;
+                }
+                if (standingWaterBudget > standingWaterPlacements
+                        && WaterSimulationConfig.rainFedSurfaceWaterEnabled()) {
+                    int added = RainwaterBodyManager.expand(
+                            level,
+                            data,
+                            chunkKey,
+                            state,
+                            standingWaterBudget - standingWaterPlacements
+                    );
+                    standingWaterPlacements += added;
+                    placements += added;
                 }
                 processed++;
             }

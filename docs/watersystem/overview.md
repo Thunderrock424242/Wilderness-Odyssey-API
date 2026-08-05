@@ -168,7 +168,7 @@ This is a two-way connection rather than a second weather or water authority:
 Wilderness water bodies -> moisture/thermal context -> atmosphere simulation
 atmosphere query -> regional sea state -> waves, shore behavior, immersion
 atmosphere query -> persistent finite-body ledger -> WaterAccess transfers
-atmosphere query -> packed watershed cells -> dynamic river conditions/flood budgets
+atmosphere query -> packed watershed cells -> runoff, aquifers, baseflow, ponds/flood budgets
 ```
 
 Rain and hail can add conserved volume to finite Wilderness lakes and rivers.
@@ -180,14 +180,17 @@ transfers are player-bounded, rate-limited, deduplicated by chunk, and never
 force an unloaded chunk to load.
 
 The default watershed phase supersedes the older probe ledger with compact
-chunk conditions for rainfall memory, saturation, runoff, downstream discharge,
+chunk conditions for rainfall memory, saturation, runoff, aquifer recharge and
+storage, downstream/baseflow discharge,
 bounded river/lake offsets, sediment, clarity, current, debris, and localized
-flood risk. It retains runoff when a cached downstream chunk is unavailable and
+flood risk. Real closed depressions can form reversible rain ponds, shallow
+wetlands, or aquifer-fed springs under independent placement limits. It retains
+runoff when a cached downstream chunk is unavailable and
 never loads that neighbor. Exact temporary overflow uses separately flagged
 canonical sparse cells plus an exact-position recession ledger; permanent or
 player-placed water cannot pass that two-key removal gate. See
 [`watersheds-and-flooding.md`](watersheds-and-flooding.md) for the model,
-budgets, safety tags, configuration, and phase-one basin limitation.
+budgets, safety tags, configuration, and loaded-only validation boundaries.
 
 Freezing also respects water ownership. Vanilla or externally tagged water may
 still be replaced by frosted ice, but Wilderness-owned water is not directly

@@ -17,6 +17,9 @@ public record WatershedConditions(
         float soilSaturation,
         float recentRainfall,
         float recentSnowmelt,
+        float groundwaterRecharge,
+        float aquiferStorage,
+        float groundwaterDischarge,
         float storedRunoff,
         float riverDischarge,
         float waterLevelOffset,
@@ -24,6 +27,7 @@ public record WatershedConditions(
         float floodThreshold,
         boolean flooding,
         int activeTemporaryFloodCells,
+        int activeSurfaceWaterCells,
         float sediment,
         float clarity,
         float currentX,
@@ -31,6 +35,39 @@ public record WatershedConditions(
         float debris,
         WaterFeature waterFeature
 ) {
+
+    /** Retains the version-three construction shape for optional integrations. */
+    public WatershedConditions(
+            long basinId,
+            int averageTerrainElevation,
+            DrainageDirection downstreamDirection,
+            float drainageAccumulation,
+            float soilSaturation,
+            float recentRainfall,
+            float recentSnowmelt,
+            float storedRunoff,
+            float riverDischarge,
+            float waterLevelOffset,
+            float floodRisk,
+            float floodThreshold,
+            boolean flooding,
+            int activeTemporaryFloodCells,
+            float sediment,
+            float clarity,
+            float currentX,
+            float currentZ,
+            float debris,
+            WaterFeature waterFeature
+    ) {
+        this(
+                basinId, averageTerrainElevation, downstreamDirection, drainageAccumulation,
+                soilSaturation, recentRainfall, recentSnowmelt,
+                0.0f, 0.0f, 0.0f, storedRunoff, riverDischarge,
+                waterLevelOffset, floodRisk, floodThreshold, flooding,
+                activeTemporaryFloodCells, activeTemporaryFloodCells,
+                sediment, clarity, currentX, currentZ, debris, waterFeature
+        );
+    }
 
     /** Retains the version-two construction shape for optional integrations. */
     public WatershedConditions(
@@ -56,8 +93,10 @@ public record WatershedConditions(
     ) {
         this(
                 basinId, averageTerrainElevation, downstreamDirection, drainageAccumulation,
-                soilSaturation, recentRainfall, 0.0f, storedRunoff, riverDischarge,
+                soilSaturation, recentRainfall, 0.0f,
+                0.0f, 0.0f, 0.0f, storedRunoff, riverDischarge,
                 waterLevelOffset, floodRisk, floodThreshold, flooding, activeTemporaryFloodCells,
+                activeTemporaryFloodCells,
                 sediment, clarity, currentX, currentZ, debris, waterFeature
         );
     }
@@ -75,8 +114,12 @@ public record WatershedConditions(
             0.0f,
             0.0f,
             0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
             1.0f,
             false,
+            0,
             0,
             0.0f,
             1.0f,
@@ -94,12 +137,16 @@ public record WatershedConditions(
         soilSaturation = unit(soilSaturation);
         recentRainfall = unit(recentRainfall);
         recentSnowmelt = unit(recentSnowmelt);
+        groundwaterRecharge = unit(groundwaterRecharge);
+        aquiferStorage = unit(aquiferStorage);
+        groundwaterDischarge = unit(groundwaterDischarge);
         storedRunoff = unit(storedRunoff);
         riverDischarge = unit(riverDischarge);
         waterLevelOffset = finiteOrZero(waterLevelOffset);
         floodRisk = unit(floodRisk);
         floodThreshold = unit(floodThreshold);
         activeTemporaryFloodCells = Math.max(0, activeTemporaryFloodCells);
+        activeSurfaceWaterCells = Math.max(0, activeSurfaceWaterCells);
         sediment = unit(sediment);
         clarity = unit(clarity);
         currentX = finiteOrZero(currentX);
@@ -126,6 +173,9 @@ public record WatershedConditions(
                 soilSaturation,
                 recentRainfall,
                 recentSnowmelt,
+                groundwaterRecharge,
+                aquiferStorage,
+                groundwaterDischarge,
                 storedRunoff,
                 riverDischarge,
                 waterLevelOffset,
@@ -133,6 +183,7 @@ public record WatershedConditions(
                 floodThreshold,
                 flooding,
                 activeTemporaryFloodCells,
+                activeSurfaceWaterCells,
                 sediment,
                 clarity,
                 currentX,
@@ -145,6 +196,21 @@ public record WatershedConditions(
     /** Returns whether this chunk has generated surface water worth simulating. */
     public boolean hasSurfaceWater() {
         return waterFeature != WaterFeature.NONE && waterFeature != WaterFeature.AQUIFER;
+    }
+
+    /** Returns a normalized water-table height derived from storage and saturated soil. */
+    public float normalizedWaterTable() {
+        return unit(aquiferStorage * 0.85f + soilSaturation * 0.15f);
+    }
+
+    /** Estimates the groundwater table relative to average terrain, up to 32 blocks deep. */
+    public int estimatedWaterTableElevation() {
+        return averageTerrainElevation - Math.round((1.0f - normalizedWaterTable()) * 32.0f);
+    }
+
+    /** Returns whether groundwater is high enough to support wetlands or springs. */
+    public boolean groundwaterNearSurface() {
+        return normalizedWaterTable() >= 0.72f;
     }
 
     private static float unit(float value) {
@@ -210,6 +276,7 @@ public record WatershedConditions(
         LAKE,
         WETLAND,
         COASTAL,
-        AQUIFER
+        AQUIFER,
+        POND
     }
 }

@@ -53,6 +53,25 @@ public final class WatershedSimulationModel {
                 + snowmeltGenerated * 0.36f
                 - evaporation * 0.22f);
 
+        // Groundwater retains a slow memory of wet seasons. Recharge is
+        // delayed relative to runoff, while discharge becomes dry-weather
+        // baseflow or high-water-table spring pressure.
+        GroundwaterModel.Result groundwater = GroundwaterModel.advance(
+                new GroundwaterModel.Input(
+                        previous.groundwaterRecharge(),
+                        previous.aquiferStorage(),
+                        precipitation * rainfallRate,
+                        snowmeltGenerated,
+                        soilSaturation,
+                        previous.drainageAccumulation(),
+                        input.groundwaterRechargeRate,
+                        input.groundwaterSeepageRate,
+                        input.groundwaterSpringThreshold,
+                        previous.hasSurfaceWater() || input.downstreamAvailable,
+                        input.groundwaterEnabled
+                )
+        );
+
         float accumulation = unit(previous.drainageAccumulation());
         float runoffGenerated = precipitation
                 * rainfallRate
@@ -63,6 +82,7 @@ public final class WatershedSimulationModel {
         float storedBeforeRouting = unit(previous.storedRunoff()
                 * (1.0f - drainageRate * 0.22f)
                 + runoffGenerated
+                + groundwater.discharge()
                 + unit(input.incomingRunoff));
         float routeFraction = previous.downstreamDirection() == DrainageDirection.SINK
                 ? 0.0f
@@ -77,6 +97,7 @@ public final class WatershedSimulationModel {
                         + storedRunoff * 0.52f
                         + recentRainfall * 0.18f
                         + soilSaturation * 0.16f
+                        + groundwater.discharge() * 0.34f
         );
         float dischargeResponse = dischargeTarget > previous.riverDischarge() ? 0.24f : 0.075f;
         float riverDischarge = approach(previous.riverDischarge(), dischargeTarget, dischargeResponse);
@@ -141,7 +162,10 @@ public final class WatershedSimulationModel {
                 currentZ,
                 debris,
                 downstreamTransfer,
-                recentSnowmelt
+                recentSnowmelt,
+                groundwater.recharge(),
+                groundwater.storage(),
+                groundwater.discharge()
         );
     }
 
@@ -154,6 +178,7 @@ public final class WatershedSimulationModel {
             case STREAM -> 0.72f;
             case RIVER -> 1.0f;
             case LAKE -> 0.82f;
+            case POND -> 0.76f;
             case WETLAND -> 0.68f;
             case COASTAL, AQUIFER, NONE -> 0.0f;
         };
@@ -164,6 +189,7 @@ public final class WatershedSimulationModel {
             case STREAM -> 0.08f;
             case RIVER -> 0.12f;
             case WETLAND -> 0.015f;
+            case POND -> 0.006f;
             case LAKE, COASTAL, AQUIFER, NONE -> 0.0f;
         };
     }
@@ -174,6 +200,7 @@ public final class WatershedSimulationModel {
             case RIVER -> 1.18f;
             case WETLAND -> 0.18f;
             case LAKE -> 0.12f;
+            case POND -> 0.06f;
             case COASTAL, AQUIFER, NONE -> 0.0f;
         };
     }
@@ -208,8 +235,35 @@ public final class WatershedSimulationModel {
             boolean downstreamAvailable,
             boolean sedimentEffects,
             boolean debrisEffects,
-            float snowmeltRate
+            float snowmeltRate,
+            boolean groundwaterEnabled,
+            float groundwaterRechargeRate,
+            float groundwaterSeepageRate,
+            float groundwaterSpringThreshold
     ) {
+        /** Retains the version-three construction shape without groundwater controls. */
+        public Input(
+                WatershedConditions previous,
+                WeatherSample weather,
+                float incomingRunoff,
+                float rainfallAccumulationRate,
+                float drainageRate,
+                float maximumWaterLevelOffset,
+                float floodThreshold,
+                boolean weatherEnabled,
+                boolean downstreamAvailable,
+                boolean sedimentEffects,
+                boolean debrisEffects,
+                float snowmeltRate
+        ) {
+            this(
+                    previous, weather, incomingRunoff, rainfallAccumulationRate, drainageRate,
+                    maximumWaterLevelOffset, floodThreshold, weatherEnabled, downstreamAvailable,
+                    sedimentEffects, debrisEffects, snowmeltRate,
+                    true, 0.32f, 0.018f, 0.78f
+            );
+        }
+
         /** Retains the version-one pure-model construction shape. */
         public Input(
                 WatershedConditions previous,
@@ -227,7 +281,8 @@ public final class WatershedSimulationModel {
             this(
                     previous, weather, incomingRunoff, rainfallAccumulationRate, drainageRate,
                     maximumWaterLevelOffset, floodThreshold, weatherEnabled, downstreamAvailable,
-                    sedimentEffects, debrisEffects, 0.035f
+                    sedimentEffects, debrisEffects, 0.035f,
+                    true, 0.32f, 0.018f, 0.78f
             );
         }
     }
@@ -247,8 +302,36 @@ public final class WatershedSimulationModel {
             float currentZ,
             float debris,
             float downstreamTransfer,
-            float recentSnowmelt
+            float recentSnowmelt,
+            float groundwaterRecharge,
+            float aquiferStorage,
+            float groundwaterDischarge
     ) {
+        /** Retains the version-three result shape without groundwater fields. */
+        public Result(
+                float soilSaturation,
+                float recentRainfall,
+                float storedRunoff,
+                float riverDischarge,
+                float waterLevelOffset,
+                float floodRisk,
+                boolean flooding,
+                float sediment,
+                float clarity,
+                float currentX,
+                float currentZ,
+                float debris,
+                float downstreamTransfer,
+                float recentSnowmelt
+        ) {
+            this(
+                    soilSaturation, recentRainfall, storedRunoff, riverDischarge,
+                    waterLevelOffset, floodRisk, flooding, sediment, clarity,
+                    currentX, currentZ, debris, downstreamTransfer, recentSnowmelt,
+                    0.0f, 0.0f, 0.0f
+            );
+        }
+
         /** Retains the version-one result shape for tests and optional adapters. */
         public Result(
                 float soilSaturation,
@@ -268,7 +351,8 @@ public final class WatershedSimulationModel {
             this(
                     soilSaturation, recentRainfall, storedRunoff, riverDischarge,
                     waterLevelOffset, floodRisk, flooding, sediment, clarity,
-                    currentX, currentZ, debris, downstreamTransfer, 0.0f
+                    currentX, currentZ, debris, downstreamTransfer, 0.0f,
+                    0.0f, 0.0f, 0.0f
             );
         }
     }

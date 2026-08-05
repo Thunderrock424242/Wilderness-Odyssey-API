@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.hydrology;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -72,6 +73,56 @@ public final class WatershedFloodGameTests {
         helper.assertTrue(
                 level.getBlockState(position).is(Blocks.STONE) && ledger.size() == 0,
                 "Flood recession overwrote a player replacement or retained a stale claim"
+        );
+        helper.succeed();
+    }
+
+    /** A shallow wetland cell remains canonical, owned, and exactly reversible. */
+    @GameTest(template = "empty")
+    public static void shallowWetlandUsesPartialCanonicalVolume(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos position = helper.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(position.below(), Blocks.DIRT.defaultBlockState(), 3);
+        level.setBlock(position, Blocks.SHORT_GRASS.defaultBlockState(), 3);
+        BlockState original = level.getBlockState(position);
+        int shallowVolume = WaterVolumeChunk.UNITS_PER_BLOCK / 2;
+
+        helper.assertTrue(
+                CanonicalWater.placeTemporarySurfaceWater(
+                        level, position, shallowVolume, 0.0f, 0.0f
+                ),
+                "Regression fixture could not place shallow canonical wetland water"
+        );
+        TemporaryFloodSavedData ledger = TemporaryFloodSavedData.get(level);
+        helper.assertTrue(
+                ledger.record(
+                        position,
+                        93L,
+                        level.getGameTime(),
+                        16,
+                        original,
+                        SurfaceWaterKind.WETLAND
+                ),
+                "Regression fixture could not record the wetland ownership kind"
+        );
+        var tracked = CanonicalWater.getTracked(level, position);
+        helper.assertTrue(
+                tracked != null
+                        && tracked.volumeUnits() == shallowVolume
+                        && tracked.temporaryFlood()
+                        && ledger.kind(position.asLong()) == SurfaceWaterKind.WETLAND,
+                "Wetland did not retain partial canonical volume and exact ownership"
+        );
+
+        helper.assertTrue(
+                CanonicalWater.removeTemporaryFlood(level, position),
+                "Owned shallow wetland water could not be removed"
+        );
+        TemporaryFloodManager.restoreOriginalState(level, position, original);
+        ledger.forget(position.asLong());
+        helper.assertTrue(
+                level.getBlockState(position).is(Blocks.SHORT_GRASS),
+                "Wetland recession did not restore displaced vegetation"
         );
         helper.succeed();
     }

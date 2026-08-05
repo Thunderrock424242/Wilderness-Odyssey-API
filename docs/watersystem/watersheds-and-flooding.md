@@ -1,4 +1,4 @@
-# Watersheds, Dynamic Rivers, and Localized Flooding
+# Watersheds, Groundwater, Rain Ponds, and Localized Flooding
 
 The watershed system adds believable chunk-scale hydrology without
 replacing Wilderness water's generated spans, sparse canonical authority, or
@@ -33,10 +33,11 @@ The immutable `WatershedConditions` API exposes:
 | --- | --- |
 | Terrain | canonical basin ID, average elevation, eight-way downstream direction, drainage accumulation, 4 by 4 tributary cells |
 | Rain/runoff | recent rainfall, recent snowmelt, soil saturation, stored runoff, downstream discharge |
-| Surface | water-level offset, flood risk/threshold/state, active temporary cells |
+| Groundwater | recharge, aquifer storage, delayed baseflow, normalized/estimated water table |
+| Surface | water-level offset, flood risk/threshold/state, flood cells, reversible pond/wetland/spring cells |
 | Appearance | sediment, clarity, floating-debris intensity |
 | Movement | current X/Z and current strength |
-| Classification | stream, river, lake, wetland, coastal, aquifer, or none |
+| Classification | stream, river, lake, pond, wetland, coastal, aquifer, or none |
 
 Normalized fields use unsigned 16-bit quantization. Surface offset and current
 components use bounded signed 16-bit quantization. No per-block watershed array
@@ -83,9 +84,11 @@ The pure model:
 5. retains runoff when the cached downstream chunk is unavailable;
 6. transfers a bounded share when the downstream chunk is already loaded;
 7. approaches river discharge more quickly during buildup than decay;
-8. derives gradual water-level, flood-risk, sediment, clarity, current, and
+8. infiltrates a terrain-dependent fraction into persistent aquifer storage;
+9. releases slow seepage as dry-weather baseflow or high-water-table spring pressure;
+10. derives gradual water-level, flood-risk, sediment, clarity, current, and
    debris targets; and
-9. decays rainfall, snowmelt memory, and saturation safely when localized weather is disabled.
+11. decays rainfall, snowmelt memory, saturation, and groundwater recharge safely when weather clears.
 
 No neighbor is force-loaded. Outgoing runoff remains stored until a valid
 loaded downstream state exists. Oceans stay level-neutral in this phase; local
@@ -95,10 +98,58 @@ The former probe-based `WeatherHydrologyManager` remains as the compatibility
 fallback only when watershed simulation is disabled. Both managers are never
 active together, preventing duplicate rain credits.
 
+## Aquifers and groundwater
+
+`GroundwaterModel` uses the three remaining 16-bit words in the packed climate
+state. Every initialized chunk can retain normalized recharge, aquifer storage,
+and aquifer discharge without creating underground entities or block-by-block
+cave scans. `WatershedTerrainInitializer` seeds a conservative water table from
+low-relief retention, drainage, nearby surface water, and covered generated
+`AQUIFER` spans when present.
+
+Rain and thaw first affect soil and surface runoff. The infiltrating share then
+recharges the aquifer. Storage loses a small deep-seepage amount and, where a
+loaded downstream or surface outlet exists, releases delayed baseflow. This lets
+rivers continue flowing after rain memory decays. A sufficiently full aquifer
+can also create spring pressure in a safe local sink.
+
+`WatershedConditions` exposes `groundwaterRecharge`, `aquiferStorage`,
+`groundwaterDischarge`, `normalizedWaterTable()`,
+`estimatedWaterTableElevation()`, and `groundwaterNearSurface()`. The water
+table is an intentionally coarse chunk estimate, not a claim that every cave at
+that Y coordinate contains physical water.
+
+## Rain ponds, wetlands, and springs
+
+`RainwaterBodyManager` may create physical surface water only when all relevant
+chunks are already loaded and the shared per-dimension placement budget has
+room. It walks the persisted 16 by 16 cursor, uses the compact local drainage
+cell, and samples an eight-point terrain rim three blocks from the candidate.
+
+- A new rain pond requires sustained ponding pressure, a local drainage sink,
+  and a closed depression at least one block below its lowest sampled rim.
+- Wetlands require saturated soil and a shallow water table. They use a
+  half-block canonical volume rather than a full source cell.
+- Springs require high aquifer storage, a near-surface water table, measurable
+  baseflow, and a safe sink or depression.
+- Existing owned bodies may grow contiguously into adjacent safe cells, but the
+  manager never performs vanilla-style uncontrolled fluid spread.
+
+The same canonical water and exact-state ledger used by floods owns these
+cells. `SurfaceWaterKind` distinguishes `FLOOD`, `RAIN_POND`, `WETLAND`, and
+`SPRING`. The chunk publishes a reversible dynamic `POND`, `WETLAND`, or
+`STREAM` feature without losing its immutable generated-water classification.
+
+Rain, thaw, aquifer storage, and ordinary finite-body evaporation determine
+whether a body remains. A configurable minimum lifetime prevents flicker after
+one dry pass. Later recession removes a bounded number of exact owned cells,
+shrinking edges over time and restoring displaced vegetation only when the
+position is still safe. Player or other-mod replacements always win.
+
 ## Dynamic surface and current behavior
 
 `WaterAccess#getWatershedConditions` and `getLocalWatershedFlow` are the stable
-public queries. The API version is 3. `WildernessWaterAuthority` and
+public queries. The API version is 4. `WildernessWaterAuthority` and
 `HybridWaterBodyModel` add the synchronized watershed offset and local-cell
 current to the same generated surface, wave, tide, canonical current, and
 local-disturbance calculation already used by gameplay.
@@ -152,11 +203,12 @@ more conservative than the metadata surface.
 - the target has no block entity; and
 - no valid structure start bounding box contains the target.
 
-The default replaceable tag is empty, so ordinary flooding places only into
-air. Packs may opt simple vegetation in. Version-two flood ledger entries store
+The default replaceable tag is empty, so ordinary temporary surface water places only into
+air. Packs may opt simple vegetation in. Version-three ledger entries store
 the exact replaced block state and restore it after successful canonical
-recession when it can still survive at the position. Legacy entries migrate
-with air as their safe original-state fallback. Player builds are not a
+recession when it can still survive at the position, plus the owning surface
+kind. Version-one and version-two entries migrate as ordinary floodwater, with
+air as their safe original-state fallback. Player builds are not a
 supported replaceable target.
 
 Placement passes through `CanonicalWater.placeTemporaryFlood`, which creates a
@@ -186,6 +238,10 @@ Settings live under `water_simulation.watersheds`:
 | `enabled` | `true` | Enables compact watershed simulation. |
 | `rainfallAccumulationRate` | `0.045` | Rain memory added by a maximum-intensity pass. |
 | `snowmeltRate` | `0.035` | Stored snowpack routed as delayed warm-weather runoff. |
+| `groundwaterEnabled` | `true` | Enables persistent recharge, aquifer storage, seepage, springs, and baseflow. |
+| `groundwaterRechargeRate` | `0.32` | Infiltrating water retained as aquifer recharge. |
+| `groundwaterSeepageRate` | `0.018` | Slow storage loss and connected baseflow rate. |
+| `springThreshold` | `0.78` | Aquifer storage required for natural spring formation. |
 | `drainageRate` | `0.025` | Soil/runoff drainage and dry-weather decay. |
 | `maximumWaterLevelOffset` | `0.45` | Absolute metadata surface offset in blocks. |
 | `floodingEnabled` | `true` | Allows exact temporary overflow. |
@@ -196,7 +252,12 @@ Settings live under `water_simulation.watersheds`:
 | `updateIntervalTicks` | `40` | Queue refresh cadence. |
 | `chunksPerTick` | `6` | Time-sliced chunk update cap. |
 | `maximumSavedChunks` | `32768` | Packed per-dimension state budget. |
-| `maximumTemporaryFloodCells` | `8192` | Exact flood-position ledger cap. |
+| `maximumTemporaryFloodCells` | `8192` | Shared exact flood/pond/wetland/spring ledger cap. |
+| `rainFedSurfaceWaterEnabled` | `true` | Enables safe depression ponds, wetlands, and springs. |
+| `pondFormationThreshold` | `0.68` | Sustained ponding pressure required to fill a closed depression. |
+| `wetlandFormationThreshold` | `0.58` | Soil/water-table wetness required for shallow wetland water. |
+| `surfaceWaterMaximumPlacementsPerTick` | `1` | Global standing-water placement cap per dimension. |
+| `surfaceWaterMinimumLifetimeTicks` | `1200` | Minimum owned-body lifetime before dry recession. |
 | `sedimentEffects` | `true` | Enables runoff sediment/clarity response. |
 | `debrisEffects` | `true` | Enables debris metadata/particle hook. |
 | `debugLogging` | `false` | Emits infrequent bounded queue summaries. |
@@ -206,34 +267,42 @@ Settings live under `water_simulation.watersheds`:
 Use `/wowater watershed` for the command source's current chunk or
 `/wowater watershed <x> <y> <z>` for another loaded position. It reports basin,
 terrain, chunk/local direction, contributing cells, confluence, rainfall,
-snowmelt, saturation, runoff, discharge, level offset,
-flood threshold/state, temporary cells, sediment, clarity, current, debris,
+snowmelt, saturation, runoff, discharge, groundwater recharge/storage/baseflow,
+estimated water table, level offset, flood threshold/state, flood and
+standing-water cells, sediment, clarity, current, debris,
 queue length, processed/initialized counts, mutations, and elapsed microseconds.
 
 Automated tests cover chunk and local direction selection, confluence
 accumulation, basin alias persistence, rainfall/snowmelt accumulation and decay,
+aquifer recharge/storage/baseflow, depression and pond/wetland/spring rules,
 downstream availability, flood activation, drought recession, weather-disabled
-fallback, packed save/reload, original-state flood ownership, network bounds
+fallback, packed save/reload/migration, per-kind original-state ownership, network bounds
 and round trips, river sound cadence, and sediment tint alpha preservation.
 
 For an in-game pass:
 
 1. create a new world so rivers contain generated Wilderness metadata;
 2. run `/wowater watershed` beside a river;
-3. use `/weather thunder` and observe rainfall, snowmelt after a thaw, saturation, runoff, discharge,
-   current, sediment, and level offset increase over multiple passes;
-4. confirm overflow expands by only a few loaded adjacent cells per tick;
-5. place or replace water independently and confirm recession does not remove it;
-6. run `/weather clear` and observe gradual discharge/level decay and exact
-   temporary-flood recession; and
-7. repeat after save/reload and on a dedicated server.
+3. use `/weather thunder` and observe rainfall, snowmelt after a thaw,
+   saturation, recharge, aquifer storage, runoff, discharge, current, sediment,
+   and level offset increase over multiple passes;
+4. inspect low local sinks after sustained rain and confirm ponds form only in
+   closed depressions, wetlands remain shallow, and high aquifers can feed springs;
+5. confirm overflow and standing-water growth obey their independent small
+   per-dimension placement caps;
+6. place or replace a tracked surface cell independently and confirm recession
+   does not remove the replacement;
+7. run `/weather clear` and observe rain memory decay, delayed river baseflow,
+   then gradual pond/wetland edge recession and exact vegetation restoration; and
+8. repeat after save/reload and on a dedicated server.
 
 ## Remaining live validation
 
 The implementation remains deliberately loaded-only and metadata-driven.
 Client runtime validation should still cover visual blending at chunk-cell and
 basin boundaries, boat handling through a confluence, sound balance beside a
-storm river, vegetation restoration after save/reload, and mixed-mod ecosystem
+storm river, pond placement across real biome terrain, shallow wetland visuals,
+vegetation restoration after save/reload, and mixed-mod ecosystem
 navigation. Offsets above the configured conservative range still do not create
 custom block collision shapes; the shipped default remains below one block and
 uses the shared animated immersion/buoyancy boundary.

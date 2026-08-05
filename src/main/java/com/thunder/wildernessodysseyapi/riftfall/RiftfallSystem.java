@@ -36,12 +36,27 @@ public final class RiftfallSystem {
 
     private RiftfallSystem() {}
 
+    /**
+     * Returns an aggregate stage for legacy callers that do not own a level.
+     * New gameplay code should use {@link #stage(ServerLevel)} so separate
+     * dimensions cannot leak Riftfall state into one another.
+     */
+    @Deprecated(forRemoval = false)
     public static RiftfallStage stage() {
         return states.values().stream()
                 .map(state -> state.stage)
                 .filter(stage -> stage != RiftfallStage.CLEAR)
                 .findFirst()
                 .orElse(RiftfallStage.CLEAR);
+    }
+
+    /** Returns the Riftfall stage owned by one server dimension. */
+    public static RiftfallStage stage(ServerLevel level) {
+        if (!canRunIn(level)) {
+            return RiftfallStage.CLEAR;
+        }
+        RiftfallState state = states.get(level.dimension());
+        return state == null ? RiftfallStage.CLEAR : state.stage;
     }
 
     public static float getExposure(ServerPlayer player) {

@@ -25,7 +25,7 @@ import java.util.Map;
 public final class WatershedSavedData extends SavedData {
 
     private static final String DATA_NAME = ModConstants.MOD_ID + "_watersheds";
-    private static final int DATA_VERSION = 2;
+    private static final int DATA_VERSION = 3;
     private static final int HARD_MAX_ENTRIES = 65_536;
 
     private static final String VERSION_KEY = "version";
@@ -43,6 +43,7 @@ public final class WatershedSavedData extends SavedData {
     private static final String UPDATED = "updated";
     private static final String FLOOD_CURSORS = "flood_cursors";
     private static final String ACTIVE_FLOOD_CELLS = "active_flood_cells";
+    private static final String ACTIVE_SURFACE_WATER_CELLS = "active_surface_water_cells";
 
     private final LinkedHashMap<Long, WatershedChunkState> states =
             new LinkedHashMap<>(256, 0.75f, true);
@@ -77,6 +78,7 @@ public final class WatershedSavedData extends SavedData {
         long[] updated = tag.getLongArray(UPDATED);
         int[] cursors = tag.getIntArray(FLOOD_CURSORS);
         int[] activeFlood = tag.getIntArray(ACTIVE_FLOOD_CELLS);
+        int[] activeSurfaceWater = tag.getIntArray(ACTIVE_SURFACE_WATER_CELLS);
         int count = minimumLength(
                 keys.length,
                 basins.length,
@@ -97,7 +99,7 @@ public final class WatershedSavedData extends SavedData {
                     hydrology[index],
                     environment[index],
                     flow[index],
-                    version >= 2 && index < climate.length ? climate[index] : 0L,
+                    migratedClimate(version, index < climate.length ? climate[index] : 0L),
                     version >= 2 && index < drainageDirections.length
                             ? drainageDirections[index]
                             : migratedGrid(terrain[index]).directionBits(),
@@ -108,7 +110,10 @@ public final class WatershedSavedData extends SavedData {
                     revisions[index],
                     updated[index],
                     cursors[index],
-                    activeFlood[index]
+                    activeFlood[index],
+                    version >= 3 && index < activeSurfaceWater.length
+                            ? activeSurfaceWater[index]
+                            : 0
             );
             data.states.put(keys[index], WatershedChunkState.fromPacked(packed));
         }
@@ -132,6 +137,7 @@ public final class WatershedSavedData extends SavedData {
         long[] updated = new long[count];
         int[] cursors = new int[count];
         int[] activeFlood = new int[count];
+        int[] activeSurfaceWater = new int[count];
         int index = 0;
         for (Map.Entry<Long, WatershedChunkState> entry : states.entrySet()) {
             WatershedChunkState.Packed packed = entry.getValue().packed();
@@ -149,6 +155,7 @@ public final class WatershedSavedData extends SavedData {
             updated[index] = packed.lastUpdatedTick();
             cursors[index] = packed.floodCursor();
             activeFlood[index] = packed.activeFloodCells();
+            activeSurfaceWater[index] = packed.activeSurfaceWaterCells();
             index++;
         }
         tag.putInt(VERSION_KEY, DATA_VERSION);
@@ -166,6 +173,7 @@ public final class WatershedSavedData extends SavedData {
         tag.putLongArray(UPDATED, updated);
         tag.putIntArray(FLOOD_CURSORS, cursors);
         tag.putIntArray(ACTIVE_FLOOD_CELLS, activeFlood);
+        tag.putIntArray(ACTIVE_SURFACE_WATER_CELLS, activeSurfaceWater);
         return tag;
     }
 
@@ -241,5 +249,16 @@ public final class WatershedSavedData extends SavedData {
     private static WatershedDrainageGrid migratedGrid(long terrainBits) {
         int directionId = (int) ((terrainBits >>> 16) & 0xFL);
         return WatershedDrainageGrid.uniform(WatershedConditions.DrainageDirection.fromId(directionId));
+    }
+
+    private static long migratedClimate(int version, long climateBits) {
+        if (version >= 3) {
+            return climateBits;
+        }
+        // Version two persisted snowmelt in word zero and left the remaining
+        // climate words empty. Seed a modest water table so upgraded worlds do
+        // not begin with hydrologically impossible globally empty aquifers.
+        int initialStorage = Math.round(0.12f * 0xFFFF);
+        return climateBits | (long) initialStorage << 32;
     }
 }

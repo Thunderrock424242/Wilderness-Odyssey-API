@@ -10,6 +10,7 @@ import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileMan
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapConfig;
 import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapServerConfig;
+import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationRelayConfig;
 import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
@@ -84,6 +85,8 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-feedback-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, RiftfallConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-riftfall-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, MeteorConfig.SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-meteors-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TemporalRiftConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-temporal-rift-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, CodexMapServerConfig.CONFIG_SPEC,
