@@ -254,27 +254,33 @@ public final class ClientWaterImmersion {
     }
 
     private static float vertexContinuity(ClientLevel level, int vertexX, int vertexZ) {
-        int count = 0;
-        for (int offsetZ = -1; offsetZ <= 0; offsetZ++) {
-            for (int offsetX = -1; offsetX <= 0; offsetX++) {
-                int columnX = vertexX + offsetX;
-                int columnZ = vertexZ + offsetZ;
-                ClientWaterChunkSnapshot snapshot = ClientWaterSnapshotStore.getAtBlock(
-                        level,
-                        columnX,
-                        columnZ
-                );
-                if (snapshot == null) {
-                    continue;
+        // Mirror the mesh's exact boundary anchor and one-row inland ramp so
+        // camera immersion and surface effects cannot follow a crest that the
+        // GPU deliberately flattened against land or an unloaded frontier.
+        return WaterChunkMeshCache.displacementContinuityAt(
+                vertexX,
+                vertexZ,
+                (columnX, columnZ) -> {
+                    ClientWaterChunkSnapshot snapshot = ClientWaterSnapshotStore.getAtBlock(
+                            level,
+                            columnX,
+                            columnZ
+                    );
+                    if (snapshot == null) {
+                        return false;
+                    }
+                    ClientWaterChunkSnapshot.Column column = snapshot.column(
+                            columnX & 15,
+                            columnZ & 15
+                    );
+                    return column.wet() && WaterChunkMeshCache.usesCustomSurface(
+                            level,
+                            columnX,
+                            columnZ,
+                            column
+                    );
                 }
-                ClientWaterChunkSnapshot.Column column = snapshot.column(columnX & 15, columnZ & 15);
-                if (column.wet() && WaterChunkMeshCache.usesCustomSurface(
-                        level, columnX, columnZ, column)) {
-                    count++;
-                }
-            }
-        }
-        return Math.max(0.18f, count * 0.25f);
+        );
     }
 
     static float interpolateQuadContinuity(

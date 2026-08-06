@@ -9,6 +9,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
+import com.thunder.wildernessodysseyapi.weather.client.precipitation.PrecipitationImpactModel.ImpactSurface;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -19,11 +20,11 @@ import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
@@ -87,6 +88,7 @@ public final class LocalizedPrecipitationRenderer {
     private static long lastDistantBuildTick = Long.MIN_VALUE;
     private static WeatherRenderingConfig.Settings cachedSettings;
     private static int rainSoundTime;
+    private static long lastVisiblePrecipitationTick = Long.MIN_VALUE;
     private static Diagnostics diagnostics = Diagnostics.INACTIVE;
 
     private LocalizedPrecipitationRenderer() {
@@ -118,7 +120,7 @@ public final class LocalizedPrecipitationRenderer {
         WeatherRenderingConfig.Settings settings = WeatherRenderingConfig.settings();
         int nearRadius = Minecraft.useFancyGraphics() ? FANCY_NEAR_RADIUS : FAST_NEAR_RADIUS;
         renderColumnCount = 0;
-        collectNearColumns(level, camX, camY, camZ, nearRadius);
+        collectNearColumns(level, camX, camY, camZ, nearRadius, settings);
         if (settings.distantRainShafts()) {
             rebuildDistantShaftsIfNeeded(
                     level,
@@ -138,8 +140,10 @@ public final class LocalizedPrecipitationRenderer {
 
         int rainColumns = countColumns(RAIN);
         int snowColumns = countColumns(SNOW);
-        if (rainColumns > 0 || snowColumns > 0) {
+        int hailColumns = countColumns(HAIL);
+        if (rainColumns > 0 || snowColumns > 0 || hailColumns > 0) {
             drawColumns(level, ticks, partialTick, lightTexture, camX, camY, camZ, settings);
+            lastVisiblePrecipitationTick = level.getGameTime();
         }
         int distantColumns = countStyledColumns(DISTANT);
         diagnostics = new Diagnostics(
@@ -151,7 +155,7 @@ public final class LocalizedPrecipitationRenderer {
     }
 
     /**
-     * Spawns localized splash particles and rain sounds from sampled columns.
+     * Spawns subtle localized impacts and rain sounds from visible sampled columns.
      */
     public static void tick(ClientLevel level, int ticks, Camera camera) {
         if (level == null || camera == null) {
@@ -160,6 +164,16 @@ public final class LocalizedPrecipitationRenderer {
         }
         prepareLevel(level);
         Minecraft minecraft = Minecraft.getInstance();
+        WeatherRenderingConfig.Settings settings = WeatherRenderingConfig.settings();
+        long elapsedSinceVisible = level.getGameTime() >= lastVisiblePrecipitationTick
+                ? level.getGameTime() - lastVisiblePrecipitationTick
+                : Long.MAX_VALUE;
+        // The impact path follows the actual precipitation mesh. This prevents
+        // ground splashes from advertising rain that failed to draw.
+        if (elapsedSinceVisible > 2L) {
+            rainSoundTime = 0;
+            return;
+        }
         RandomSource random = RandomSource.create((long) ticks * 312987231L);
         LevelReader levelReader = level;
         BlockPos cameraPos = BlockPos.containing(camera.getPosition());
@@ -169,6 +183,7 @@ public final class LocalizedPrecipitationRenderer {
         if (particleStatus == ParticleStatus.DECREASED) {
             attempts /= 2;
         }
+        double particleFactor = particleStatus == ParticleStatus.DECREASED ? 0.5 : 1.0;
 
         for (int attempt = 0; attempt < attempts; attempt++) {
             int offsetX = random.nextInt(21) - 10;
@@ -189,6 +204,14 @@ public final class LocalizedPrecipitationRenderer {
                     || random.nextDouble() > intensity) {
                 continue;
             }
+            if (!PrecipitationVisualModel.shouldRenderNearColumn(
+                    blockX,
+                    blockZ,
+                    intensity,
+                    settings.precipitationStreakDensity()
+            )) {
+                continue;
+            }
 
             BlockPos surfacePos = levelReader.getHeightmapPos(
                     Heightmap.Types.MOTION_BLOCKING,
@@ -198,6 +221,7 @@ public final class LocalizedPrecipitationRenderer {
             if (surfacePos.getY() <= levelReader.getMinBuildHeight()
                     || surfacePos.getY() > cameraPos.getY() + 10
                     || surfacePos.getY() < cameraPos.getY() - 10
+                    || !level.canSeeSky(surfacePos)
                     || (surfaceType != PrecipitationType.RAIN
                     && surfaceType != PrecipitationType.HAIL)) {
                 continue;
@@ -216,22 +240,44 @@ public final class LocalizedPrecipitationRenderer {
             double collisionHeight = shape.max(Direction.Axis.Y, localX, localZ);
             double fluidHeight = fluidState.getHeight(levelReader, soundPos);
             double particleHeight = Math.max(collisionHeight, fluidHeight);
-            ParticleOptions particle = surfaceType == PrecipitationType.HAIL
-                    ? ParticleTypes.SNOWFLAKE
-                    : !fluidState.is(FluidTags.LAVA)
-                    && !blockState.is(Blocks.MAGMA_BLOCK)
-                    && !CampfireBlock.isLitCampfire(blockState)
-                    ? ParticleTypes.RAIN
-                    : ParticleTypes.SMOKE;
-            level.addParticle(
-                    particle,
-                    soundPos.getX() + localX,
-                    soundPos.getY() + particleHeight,
-                    soundPos.getZ() + localZ,
-                    0.0,
-                    0.0,
-                    0.0
+            boolean hotSurface = fluidState.is(FluidTags.LAVA)
+                    || blockState.is(Blocks.MAGMA_BLOCK)
+                    || CampfireBlock.isLitCampfire(blockState);
+            if (hotSurface) {
+                level.addParticle(
+                        ParticleTypes.SMOKE,
+                        soundPos.getX() + localX,
+                        soundPos.getY() + particleHeight,
+                        soundPos.getZ() + localZ,
+                        0.0,
+                        0.0,
+                        0.0
+                );
+                continue;
+            }
+
+            double impactChance = PrecipitationImpactModel.spawnProbability(
+                    intensity,
+                    settings.precipitationImpactDensity(),
+                    particleFactor
             );
+            if (random.nextDouble() <= impactChance) {
+                ImpactSurface impactSurface = surfaceType == PrecipitationType.HAIL
+                        ? ImpactSurface.HAIL
+                        : fluidState.is(FluidTags.WATER)
+                        ? ImpactSurface.WATER
+                        : blockState.is(BlockTags.LEAVES)
+                        ? ImpactSurface.LEAF
+                        : ImpactSurface.HARD;
+                WeatherImpactRenderer.spawn(
+                        level,
+                        soundPos.getX() + localX,
+                        soundPos.getY() + particleHeight,
+                        soundPos.getZ() + localZ,
+                        impactSurface,
+                        (float) intensity
+                );
+            }
         }
 
         if (soundPos != null && random.nextInt(3) < rainSoundTime++) {
@@ -268,6 +314,7 @@ public final class LocalizedPrecipitationRenderer {
     /** Clears render-only caches when a dimension effect owns weather geometry. */
     public static void clearRenderState() {
         renderColumnCount = 0;
+        lastVisiblePrecipitationTick = Long.MIN_VALUE;
         clearDistantCache();
         diagnostics = Diagnostics.INACTIVE;
     }
@@ -297,7 +344,8 @@ public final class LocalizedPrecipitationRenderer {
             double camX,
             double camY,
             double camZ,
-            int radius
+            int radius,
+            WeatherRenderingConfig.Settings settings
     ) {
         int cameraX = Mth.floor(camX);
         int cameraY = Mth.floor(camY);
@@ -317,6 +365,14 @@ public final class LocalizedPrecipitationRenderer {
                 if (intensity <= PrecipitationVisualModel.PRECIPITATION_EPSILON) {
                     continue;
                 }
+                if (!PrecipitationVisualModel.shouldRenderNearColumn(
+                        blockX,
+                        blockZ,
+                        intensity,
+                        settings.precipitationStreakDensity()
+                )) {
+                    continue;
+                }
                 PrecipitationType type = ClientWeatherCoordinator.precipitationTypeAt(level, queryPos);
                 if (type == PrecipitationType.NONE) {
                     continue;
@@ -331,7 +387,10 @@ public final class LocalizedPrecipitationRenderer {
                 double distance = Math.hypot(blockX + 0.5 - camX, blockZ + 0.5 - camZ);
                 boolean snow = type == PrecipitationType.SNOW;
                 boolean hail = type == PrecipitationType.HAIL;
-                float alpha = PrecipitationVisualModel.nearAlpha(intensity, distance, radius, snow);
+                float alpha = PrecipitationVisualModel.scaledAlpha(
+                        PrecipitationVisualModel.nearAlpha(intensity, distance, radius, snow),
+                        settings.precipitationOpacity()
+                );
                 if (alpha <= 0.001F) {
                     continue;
                 }
@@ -463,6 +522,10 @@ public final class LocalizedPrecipitationRenderer {
                     nearRadius,
                     farRadius
             );
+            alpha = PrecipitationVisualModel.scaledAlpha(
+                    alpha,
+                    WeatherRenderingConfig.settings().precipitationOpacity()
+            );
             if (alpha <= 0.001F) {
                 continue;
             }
@@ -516,18 +579,21 @@ public final class LocalizedPrecipitationRenderer {
         lightTexture.turnOnLightLayer();
         RenderSystem.disableCull();
         RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
         RenderSystem.enableDepthTest();
-        RenderSystem.depthMask(Minecraft.useShaderTransparency());
+        RenderSystem.depthMask(false);
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         RenderSystem.setShader(GameRenderer::getParticleShader);
         try {
             drawBatch(level, ticks, partialTick, camX, camY, camZ, settings, RAIN, RAIN_LOCATION);
             drawBatch(level, ticks, partialTick, camX, camY, camZ, settings, SNOW, SNOW_LOCATION);
             drawBatch(level, ticks, partialTick, camX, camY, camZ, settings, HAIL, SNOW_LOCATION);
         } finally {
+            RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+            RenderSystem.defaultBlendFunc();
+            RenderSystem.depthMask(true);
             RenderSystem.enableCull();
             RenderSystem.disableBlend();
-            // Match vanilla's postcondition: the enclosing LevelRenderer pass
-            // restores depth writes after AFTER_WEATHER and the world border.
             lightTexture.turnOffLightLayer();
         }
     }
@@ -565,7 +631,11 @@ public final class LocalizedPrecipitationRenderer {
             double length = Math.hypot(deltaX, deltaZ);
             double halfWidth = RENDER_STYLE[index] == DISTANT
                     ? Math.min(3.0, settings.distantRainSpacingBlocks() * 0.34)
-                    : 0.5;
+                    : 0.28 + PrecipitationVisualModel.columnNoise(
+                            blockX,
+                            blockZ,
+                            0x94D049BB133111EBL
+                    ) * 0.18;
             double sideX = length <= 1.0E-6 ? halfWidth : -deltaZ / length * halfWidth;
             double sideZ = length <= 1.0E-6 ? 0.0 : deltaX / length * halfWidth;
             float x0 = (float) (blockX - camX - sideX + 0.5);

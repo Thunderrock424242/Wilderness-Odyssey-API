@@ -122,8 +122,12 @@ consistent at chunk borders.
 
 The coordinator performs section/chunk frustum culling, stable translucent
 ordering, batched submission, and an atomic fallback-to-custom ownership
-handoff. It never draws into missing snapshot chunks; loaded frontiers fade into
-fog/environment reflection instead of exposing unloaded terrain.
+handoff. Suppression intent is visible before section work is scheduled, while
+the uploaded custom group remains hidden until vanilla, Sodium, or legacy
+Embeddium acknowledges that every affected section uploaded the matching
+generation. Partial, stale, cancelled, and pre-intent builds fail safe to the
+baked fallback. It never draws into missing snapshot chunks; loaded frontiers
+fade into fog/environment reflection instead of exposing unloaded terrain.
 
 Both Wilderness source and flowing fluids use Minecraft's translucent render
 type. Baked fluid tops remain the fallback until a replacement chunk mesh is
@@ -140,7 +144,9 @@ screen-space reflections at higher quality tiers.
 Continuous Gerstner displacement and surface-normal distortion run on the GPU
 over cached topology. World-space wave inputs, synchronized tides, sea state,
 and body blend weights make neighboring chunks evaluate the same boundary
-vertices. `WaterSurfaceEquation` mirrors the visible surface calculation for
+vertices. Wet/dry, covered, and unloaded boundary vertices are exact motion
+anchors; the first inland row eases to half displacement and the second restores
+full motion. `WaterSurfaceEquation` mirrors the visible surface calculation for
 `ClientWaterImmersion`, while `UnderwaterOpticsModel` smooths near-plane entry
 and exit transitions.
 
@@ -151,6 +157,11 @@ surface without rebuilding chunk meshes. Depth and wet-boundary metadata drive
 shallow-water foam and breaking cues. That shoreline cue is a deterministic
 client snapshot approximation; the separate server shoreline grid is not
 networked to the renderer.
+
+The stock block-atlas coordinate is never animated and atlas alpha never owns
+surface coverage. Its RGB is retained only for the no-scene-capture fallback;
+normal motion remains procedural and world-aligned. This prevents transparent
+sprite padding from creating repeating block-shaped holes during waves.
 
 ## Local weather and the water cycle
 

@@ -12,8 +12,6 @@ uniform sampler2D Sampler2;
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
 uniform vec2 ChunkOrigin;
-uniform vec4 TimeFrameLow;
-uniform vec3 TimeFrameHigh;
 uniform float DayTime;
 uniform float SeaState;
 uniform vec2 WindDirection;
@@ -87,6 +85,7 @@ out vec3 celestialDirection;
 out float celestialDaylight;
 out float regionalSeaState;
 out vec2 regionalWindDirection;
+out float regionalWindSpeed;
 out vec4 regionalSpectrumState;
 
 vec2 normalizedOr(vec2 direction, vec2 fallbackDirection) {
@@ -97,11 +96,6 @@ vec2 normalizedOr(vec2 direction, vec2 fallbackDirection) {
 const float TWO_PI = 6.28318530718;
 const float PHASE_CHUNK_SPAN = 16.0;
 const float PHASE_COARSE_CHUNKS = 1024.0;
-// Material carriers stay fixed in world space. Wind/current change their
-// energy and output direction, never the coefficients that own phase.
-const vec2 MATERIAL_PRIMARY_DIRECTION = vec2(0.857493, 0.514496);
-const vec2 MATERIAL_CURRENT_CARRIER = vec2(0.853282, 0.521450);
-
 vec4 bilinearCornerState(mat4 corners, vec2 blend) {
     vec4 north = mix(corners[0], corners[3], blend.x);
     vec4 south = mix(corners[1], corners[2], blend.x);
@@ -122,29 +116,9 @@ void resolveRegionalOceanState(vec2 localXZ, out vec4 state, out vec4 spectrum) 
     spectrum = bilinearCornerState(RegionalSpectrumCorners, blend);
 }
 
-// Java uploads the exact long game tick as seven base-1024 digits. Rebuilding
-// only a periodic phase here keeps animation smooth after float seconds would
-// have stopped representing individual ticks.
-float stableTimePhase(float radiansPerSecond) {
-    float phaseStep = mod(radiansPerSecond / 20.0, TWO_PI);
-    float phase = mod(TimeFrameLow.x * phaseStep, TWO_PI);
-    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
-    phase = mod(phase + TimeFrameLow.y * phaseStep, TWO_PI);
-    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
-    phase = mod(phase + TimeFrameLow.z * phaseStep, TWO_PI);
-    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
-    phase = mod(phase + TimeFrameLow.w * phaseStep, TWO_PI);
-    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
-    phase = mod(phase + TimeFrameHigh.x * phaseStep, TWO_PI);
-    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
-    phase = mod(phase + TimeFrameHigh.y * phaseStep, TWO_PI);
-    phaseStep = mod(phaseStep * 1024.0, TWO_PI);
-    return mod(phase + TimeFrameHigh.z * phaseStep, TWO_PI);
-}
-
 // Evaluates a linear world-space phase without first adding a fractional local
 // vertex to a multi-million-block world coordinate. Splitting the integral
-// chunk origin preserves sub-block waves and texture motion near the world edge.
+// chunk origin preserves sub-block waves near the world edge.
 float stableLinearPhase(vec2 localXZ, vec2 coefficient) {
     // Canonicalize boundary vertices before any phase math. A west-chunk
     // vertex at local x=16 then has the exact same operands as the east-chunk
@@ -283,9 +257,9 @@ void main() {
     resolveRegionalOceanState(localXZ, frameSeaState, frameSpectrum);
     float sea = clamp(frameSeaState.x, 0.0, 1.0);
     vec2 frameWind = normalizedOr(frameSeaState.yz, vec2(1.0, 0.0));
-    float frameWindSpeed = max(0.0, frameSeaState.w);
     regionalSeaState = sea;
     regionalWindDirection = frameWind;
+    regionalWindSpeed = max(0.0, frameSeaState.w);
     regionalSpectrumState = frameSpectrum;
     vec4 encodedColor = floor(Color * 255.0 + 0.5);
     localCurrent = vec2(
@@ -429,22 +403,11 @@ void main() {
     vec3 activeLightDirection = celestialDaylight > 0.5 ? sunDirection : -sunDirection;
     celestialDirection = normalize(mat3(ModelViewMat) * activeLightDirection);
     vertexDistance = length(view.xyz);
-    vec2 wind = normalizedOr(frameWind, MATERIAL_PRIMARY_DIRECTION);
-    float windEnergy = clamp(frameWindSpeed / 20.0, 0.0, 1.0);
-    float windAlignment = 0.5 + 0.5 * dot(MATERIAL_PRIMARY_DIRECTION, wind);
-    float windPhase = stableLinearPhase(localXZ, MATERIAL_PRIMARY_DIRECTION * 0.16)
-        + stableTimePhase(0.62);
-    vec2 windRipple = MATERIAL_PRIMARY_DIRECTION * sin(windPhase)
-        * (0.0015 + sea * 0.0035)
-        * mix(0.72, 1.18, windAlignment * (0.55 + windEnergy * 0.45));
-    vec2 currentRipple = normalizedOr(localCurrent, vec2(0.0))
-        * sin(stableLinearPhase(localXZ, MATERIAL_CURRENT_CARRIER * 0.55)
-            - stableTimePhase(0.92))
-        * min(0.0045, length(localCurrent) * 0.0025);
-    texCoord0 = UV0 + windRipple + vec2(
-        sin(stableTimePhase(0.35) + stableLinearPhase(localXZ, vec2(0.0, 0.18))),
-        cos(stableTimePhase(0.27) + stableLinearPhase(localXZ, vec2(0.16, 0.0)))
-    ) * 0.0035 + currentRipple;
+    // The BLOCK format and stock fallback path still receive their ordinary
+    // atlas coordinate. Surface motion belongs to world-space geometry and
+    // procedural normals; offsetting atlas UVs can cross a sprite boundary and
+    // turn transparent padding into block-shaped gaps.
+    texCoord0 = UV0;
     lightColor = minecraft_sample_lightmap(Sampler2, UV2).rgb;
     gl_Position = ProjMat * view;
 }

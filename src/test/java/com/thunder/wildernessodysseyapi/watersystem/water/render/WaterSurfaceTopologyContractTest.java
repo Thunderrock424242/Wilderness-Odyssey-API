@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -68,6 +69,46 @@ class WaterSurfaceTopologyContractTest {
 
         assertTrue(group.ownsSurface(localX, localZ));
         assertFalse(group.ownsSurface(localX + 1, localZ));
+    }
+
+    @Test
+    void shorelineContinuityAnchorsBoundaryAndRestoresWavesInland() {
+        WaterChunkMeshCache.ColumnEligibility straightShore = (worldX, worldZ) -> worldX >= 0;
+
+        float boundary = WaterChunkMeshCache.displacementContinuityAt(0, 8, straightShore);
+        float firstInteriorRow = WaterChunkMeshCache.displacementContinuityAt(1, 8, straightShore);
+        float secondInteriorRow = WaterChunkMeshCache.displacementContinuityAt(2, 8, straightShore);
+
+        assertEquals(WaterChunkMeshCache.BOUNDARY_DISPLACEMENT_CONTINUITY, boundary);
+        assertEquals(WaterChunkMeshCache.SHORE_RAMP_DISPLACEMENT_CONTINUITY, firstInteriorRow);
+        assertEquals(WaterChunkMeshCache.OPEN_WATER_DISPLACEMENT_CONTINUITY, secondInteriorRow);
+        assertEquals(0.0f, WaterSurfaceEquation.surfaceContinuityFactor(boundary), 0.0f,
+                "Boundary payload must suppress waves, horizontal chop, wakes, and tide exactly");
+        assertEquals(0.5f, WaterSurfaceEquation.surfaceContinuityFactor(firstInteriorRow), 1.0e-6f);
+        assertEquals(1.0f, WaterSurfaceEquation.surfaceContinuityFactor(secondInteriorRow), 0.0f);
+    }
+
+    @Test
+    void missingSnapshotFrontierUsesTheSameWorldVertexAnchorFromEitherChunk() {
+        WaterChunkMeshCache.ColumnEligibility loadedWater = (worldX, worldZ) ->
+                worldX >= 0 && worldX < 16 && worldZ >= 0 && worldZ < 16;
+
+        float eastFrontier = WaterChunkMeshCache.displacementContinuityAt(16, 7, loadedWater);
+        float southEastCorner = WaterChunkMeshCache.displacementContinuityAt(16, 16, loadedWater);
+
+        assertEquals(WaterChunkMeshCache.BOUNDARY_DISPLACEMENT_CONTINUITY, eastFrontier);
+        assertEquals(WaterChunkMeshCache.BOUNDARY_DISPLACEMENT_CONTINUITY, southEastCorner);
+    }
+
+    @Test
+    void diagonalDryColumnAnchorsTheSharedCorner() {
+        WaterChunkMeshCache.ColumnEligibility diagonalShore = (worldX, worldZ) ->
+                worldX != -1 || worldZ != -1;
+
+        assertEquals(
+                WaterChunkMeshCache.BOUNDARY_DISPLACEMENT_CONTINUITY,
+                WaterChunkMeshCache.displacementContinuityAt(0, 0, diagonalShore)
+        );
     }
 
     private static ClientWaterChunkSnapshot.Column exposedOcean() {

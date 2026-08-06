@@ -27,6 +27,8 @@ class WaterSurfaceShaderContractTest {
         assertTrue(descriptor.contains("\"name\": \"ImpulseChunkIndex\""));
         assertTrue(descriptor.contains("\"name\": \"ImpulsePosition7\""));
         assertTrue(descriptor.contains("\"name\": \"ImpulseShape7\""));
+        assertFalse(descriptor.contains("\"name\": \"TimeFrameLow\""));
+        assertFalse(descriptor.contains("\"name\": \"TimeFrameHigh\""));
     }
 
     @Test
@@ -42,6 +44,30 @@ class WaterSurfaceShaderContractTest {
         assertTrue(vertex.contains("vertexColor = vec4("));
         assertTrue(fragment.contains("in vec2 localCurrent;"));
         assertFalse(fragment.contains("decodeSignedPayload"));
+    }
+
+    @Test
+    void blockAtlasCannotCreateOrAnimateSurfaceCoverage() throws IOException {
+        String vertex = readResource(
+                "assets/wildernessodysseyapi/shaders/core/gerstner_water.vsh");
+        String fragment = readResource(
+                "assets/wildernessodysseyapi/shaders/core/gerstner_water.fsh");
+
+        assertTrue(vertex.contains("texCoord0 = UV0;"),
+                "The stock fallback interface must receive the unmodified block UV");
+        assertTrue(vertex.indexOf("texCoord0 = UV0;") == vertex.lastIndexOf("texCoord0 ="),
+                "The block UV must have one exact passthrough assignment and no animated replacement");
+        assertFalse(vertex.contains("texCoord0 = UV0 +"),
+                "World-space water animation must never offset block-atlas UVs");
+        assertFalse(fragment.contains("waterTexture.a"),
+                "Atlas alpha must not decide whether custom water geometry exists");
+        assertFalse(fragment.contains("texture(Sampler0, texCoord0).a"),
+                "Direct atlas-alpha coverage tests can reopen block-shaped holes");
+        assertTrue(fragment.contains("texture(Sampler0, texCoord0).rgb"),
+                "The no-capture path should retain stock water-texture color compatibility");
+        assertTrue(fragment.indexOf("texture(Sampler0, texCoord0).rgb")
+                        == fragment.lastIndexOf("texture(Sampler0"),
+                "Sampler0 may only provide RGB to the safe no-capture fallback");
     }
 
     @Test
@@ -75,6 +101,9 @@ class WaterSurfaceShaderContractTest {
         assertTrue(fragment.contains("flat in vec2 phaseChunkIndex"));
         assertTrue(fragment.contains("in float regionalSeaState;"));
         assertTrue(fragment.contains("in vec2 regionalWindDirection;"));
+        assertTrue(vertex.contains("regionalWindSpeed = max(0.0, frameSeaState.w);"));
+        assertTrue(fragment.contains("in float regionalWindSpeed;"));
+        assertTrue(fragment.contains("float windDetailScale = mix(0.88, 1.14, windEnergy);"));
         assertTrue(fragment.contains("in vec4 regionalSpectrumState;"));
         assertFalse(fragment.contains("uniform float SeaState;"));
         assertFalse(fragment.contains("uniform vec2 WindDirection;"));
@@ -89,6 +118,9 @@ class WaterSurfaceShaderContractTest {
         assertFalse(fragment.contains("currentAdvectionPhase"));
         assertFalse(vertex.contains("stableTimePhase(0.24 + WindSpeed"));
         assertFalse(vertex.contains("stableTimePhase(0.7 + length(localCurrent)"));
+        assertFalse(vertex.contains("stableTimePhase"));
+        assertFalse(vertex.contains("TimeFrameLow"));
+        assertFalse(vertex.contains("TimeFrameHigh"));
         assertFalse(fragment.contains("dot(worldPosition.xz"));
         assertTrue(fragment.contains("float shoreBreaker = shoreFactor"));
         assertTrue(fragment.contains("float impulseFoam = disturbanceStrength"));

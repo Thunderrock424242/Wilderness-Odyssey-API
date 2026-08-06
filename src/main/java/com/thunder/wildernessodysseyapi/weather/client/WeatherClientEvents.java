@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudLightingModel;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.LocalizedCloudRenderer;
 import com.thunder.wildernessodysseyapi.weather.client.precipitation.LocalizedPrecipitationRenderer;
+import com.thunder.wildernessodysseyapi.weather.client.precipitation.WeatherImpactRenderer;
 import com.thunder.wildernessodysseyapi.weather.client.surface.WeatherSurfaceRenderer;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import net.minecraft.client.CloudStatus;
@@ -53,6 +54,7 @@ public final class WeatherClientEvents {
         }
         if (!ClientWeatherCoordinator.controls(minecraft.level)) {
             LocalizedPrecipitationRenderer.clear();
+            WeatherImpactRenderer.clear();
             WeatherSurfaceRenderer.clear();
         }
     }
@@ -62,6 +64,7 @@ public final class WeatherClientEvents {
     public static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
         LocalizedCloudRenderer.clear();
         LocalizedPrecipitationRenderer.clear();
+        WeatherImpactRenderer.clear();
         WeatherSurfaceRenderer.clear();
         ClientWeatherCoordinator.clearAll();
     }
@@ -71,6 +74,7 @@ public final class WeatherClientEvents {
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         LocalizedCloudRenderer.clear();
         LocalizedPrecipitationRenderer.clear();
+        WeatherImpactRenderer.clear();
         WeatherSurfaceRenderer.clear();
         ClientWeatherCoordinator.clearAll();
     }
@@ -81,6 +85,7 @@ public final class WeatherClientEvents {
         if (event.getLevel() instanceof ClientLevel clientLevel) {
             LocalizedCloudRenderer.clear();
             LocalizedPrecipitationRenderer.clear();
+            WeatherImpactRenderer.clear();
             WeatherSurfaceRenderer.clear();
             ClientWeatherCoordinator.clearLevel(clientLevel);
         }
@@ -90,6 +95,7 @@ public final class WeatherClientEvents {
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         WeatherSurfaceRenderer.render(event);
+        WeatherImpactRenderer.render(event);
     }
 
     /** Blends humid precipitation haze into vanilla's air fog color. */
@@ -280,11 +286,12 @@ public final class WeatherClientEvents {
                 ),
                 String.format(
                         Locale.ROOT,
-                        "Precip mesh %s | %d near | %d shafts | %d vertices",
+                        "Precip mesh %s | %d near | %d shafts | %d vertices | %d impacts",
                         precipitation.active() ? "active" : "inactive",
                         precipitation.nearColumns(),
                         precipitation.distantShafts(),
-                        precipitation.vertices()
+                        precipitation.vertices(),
+                        WeatherImpactRenderer.activeImpactCount()
                 )
         );
     }

@@ -25,6 +25,10 @@ class WildernessMixinConfigPluginTest {
                 PACKAGE + "SodiumFluidRenderMixin", ignored -> false));
         assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
                 PACKAGE + "SodiumBlockOcclusionCacheMixin", ignored -> false));
+        assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
+                PACKAGE + "SodiumChunkMeshingHandoffMixin", ignored -> false));
+        assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
+                PACKAGE + "SodiumSectionUploadHandoffMixin", ignored -> false));
     }
 
     @Test
@@ -38,6 +42,10 @@ class WildernessMixinConfigPluginTest {
         assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
                 PACKAGE + "SodiumBlockOcclusionCacheMixin", ignored -> true));
         assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
+                PACKAGE + "SodiumChunkMeshingHandoffMixin", ignored -> true));
+        assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
+                PACKAGE + "SodiumSectionUploadHandoffMixin", ignored -> true));
+        assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
                 PACKAGE + "BoatRenderMixin", ignored -> false));
     }
 
@@ -45,7 +53,13 @@ class WildernessMixinConfigPluginTest {
     void embeddiumMixinIsOnlyParsedWhenItsLegacyTargetExists() {
         assertEquals(List.of(), WildernessMixinConfigPlugin.discoverOptionalMixins(ignored -> false));
         assertEquals(
-                List.of("EmbeddiumWaterRenderMixin"),
+                List.of(
+                        "EmbeddiumWaterRenderMixin",
+                        "EmbeddiumRenderSectionCoordinatesMixin",
+                        "EmbeddiumChunkBuildOutputHandoffMixin",
+                        "EmbeddiumChunkMeshingHandoffMixin",
+                        "EmbeddiumSectionUploadHandoffMixin"
+                ),
                 WildernessMixinConfigPlugin.discoverOptionalMixins(name -> name.equals(
                         "org.embeddedt.embeddium.impl.render.chunk.compile.pipeline.FluidRenderer"))
         );

@@ -20,6 +20,13 @@ public final class WildernessMixinConfigPlugin implements IMixinConfigPlugin {
 
     private static final String MIXIN_PACKAGE = "com.thunder.wildernessodysseyapi.mixin.";
     private static final String EMBEDDIUM_MIXIN = "EmbeddiumWaterRenderMixin";
+    private static final List<String> EMBEDDIUM_MIXINS = List.of(
+            EMBEDDIUM_MIXIN,
+            "EmbeddiumRenderSectionCoordinatesMixin",
+            "EmbeddiumChunkBuildOutputHandoffMixin",
+            "EmbeddiumChunkMeshingHandoffMixin",
+            "EmbeddiumSectionUploadHandoffMixin"
+    );
     private static final String EMBEDDIUM_TARGET =
             "org.embeddedt.embeddium.impl.render.chunk.compile.pipeline.FluidRenderer";
 
@@ -55,10 +62,26 @@ public final class WildernessMixinConfigPlugin implements IMixinConfigPlugin {
                     "net.coderbot.iris.block_rendering.BlockRenderingSettings";
             case MIXIN_PACKAGE + "EmbeddiumWaterRenderMixin" ->
                     EMBEDDIUM_TARGET;
+            case MIXIN_PACKAGE + "EmbeddiumRenderSectionCoordinatesMixin" ->
+                    "org.embeddedt.embeddium.impl.render.chunk.RenderSection";
+            case MIXIN_PACKAGE + "EmbeddiumChunkBuildOutputHandoffMixin" ->
+                    "org.embeddedt.embeddium.impl.render.chunk.compile.ChunkBuildOutput";
+            case MIXIN_PACKAGE + "EmbeddiumChunkMeshingHandoffMixin" ->
+                    "org.embeddedt.embeddium.impl.render.chunk.compile.tasks.ChunkBuilderMeshingTask";
+            case MIXIN_PACKAGE + "EmbeddiumSectionUploadHandoffMixin" ->
+                    "org.embeddedt.embeddium.impl.render.chunk.RenderSectionManager";
             case MIXIN_PACKAGE + "SodiumFluidRenderMixin" ->
                     "net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.DefaultFluidRenderer";
             case MIXIN_PACKAGE + "SodiumBlockOcclusionCacheMixin" ->
                     "net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.BlockOcclusionCache";
+            case MIXIN_PACKAGE + "SodiumRenderSectionCoordinatesMixin" ->
+                    "net.caffeinemc.mods.sodium.client.render.chunk.RenderSection";
+            case MIXIN_PACKAGE + "SodiumChunkBuildOutputHandoffMixin" ->
+                    "net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildOutput";
+            case MIXIN_PACKAGE + "SodiumChunkMeshingHandoffMixin" ->
+                    "net.caffeinemc.mods.sodium.client.render.chunk.compile.tasks.ChunkBuilderMeshingTask";
+            case MIXIN_PACKAGE + "SodiumSectionUploadHandoffMixin" ->
+                    "net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager";
             default -> null;
         };
     }
@@ -92,7 +115,7 @@ public final class WildernessMixinConfigPlugin implements IMixinConfigPlugin {
      */
     static List<String> discoverOptionalMixins(Predicate<String> classExists) {
         return classExists.test(EMBEDDIUM_TARGET)
-                ? List.of(EMBEDDIUM_MIXIN)
+                ? EMBEDDIUM_MIXINS
                 : List.of();
     }
 

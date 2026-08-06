@@ -13,6 +13,8 @@ public final class WeatherRenderingConfig {
     public static final ModConfigSpec CONFIG_SPEC;
     public static final ModConfigSpec.BooleanValue ENABLE_LOCALIZED_CLOUDS;
     public static final ModConfigSpec.BooleanValue ENABLE_VOLUMETRIC_CLOUDS;
+    public static final ModConfigSpec.BooleanValue ENABLE_RAYMARCHED_CLOUDS;
+    public static final ModConfigSpec.IntValue RAYMARCH_STEPS;
     public static final ModConfigSpec.IntValue RENDER_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue REBUILD_INTERVAL_TICKS;
     public static final ModConfigSpec.DoubleValue WIND_DETAIL_SPEED_BLOCKS_PER_SECOND;
@@ -26,6 +28,10 @@ public final class WeatherRenderingConfig {
     public static final ModConfigSpec.IntValue DISTANT_RAIN_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue DISTANT_RAIN_SPACING_BLOCKS;
     public static final ModConfigSpec.IntValue MAXIMUM_DISTANT_RAIN_SHAFTS;
+    public static final ModConfigSpec.DoubleValue PRECIPITATION_STREAK_DENSITY;
+    public static final ModConfigSpec.DoubleValue PRECIPITATION_OPACITY;
+    public static final ModConfigSpec.DoubleValue PRECIPITATION_IMPACT_DENSITY;
+    public static final ModConfigSpec.IntValue MAXIMUM_PRECIPITATION_IMPACTS;
     public static final ModConfigSpec.BooleanValue ENABLE_DISTANT_CLOUD_LAYER;
     public static final ModConfigSpec.IntValue DISTANT_CLOUD_DISTANCE_BLOCKS;
     public static final ModConfigSpec.IntValue DISTANT_CLOUD_SPACING_BLOCKS;
@@ -38,6 +44,8 @@ public final class WeatherRenderingConfig {
     private static final Settings DEFAULTS = new Settings(
             true,
             true,
+            true,
+            24,
             384,
             5,
             6.0,
@@ -51,6 +59,10 @@ public final class WeatherRenderingConfig {
             96,
             6,
             768,
+            0.82,
+            0.78,
+            0.32,
+            256,
             true,
             1_024,
             48,
@@ -72,6 +84,12 @@ public final class WeatherRenderingConfig {
         ENABLE_VOLUMETRIC_CLOUDS = builder
                 .comment("Render soft multi-layer 3D cloud columns when Fancy clouds and the custom shader are available.")
                 .define("volumetricClouds", true);
+        ENABLE_RAYMARCHED_CLOUDS = builder
+                .comment("Use the high-quality density-raymarch cloud tier. Falls back safely when unavailable or a shader pack is active.")
+                .define("raymarchedClouds", true);
+        RAYMARCH_STEPS = builder
+                .comment("Maximum samples through each raymarched cloud volume. Higher values improve shape quality at a significant GPU cost.")
+                .defineInRange("raymarchSteps", 24, 16, 64);
         RENDER_DISTANCE_BLOCKS = builder
                 .comment("Horizontal radius of localized cloud geometry in blocks.")
                 .defineInRange("renderDistanceBlocks", 384, 96, 512);
@@ -130,6 +148,18 @@ public final class WeatherRenderingConfig {
         MAXIMUM_DISTANT_RAIN_SHAFTS = builder
                 .comment("Hard cap on loaded distant rain columns sampled during one cache rebuild.")
                 .defineInRange("maximumDistantRainShafts", 768, 64, 2_048);
+        PRECIPITATION_STREAK_DENSITY = builder
+                .comment("Fraction of nearby rain and snow columns drawn. Lower values create finer, less curtain-like precipitation.")
+                .defineInRange("streakDensity", 0.82, 0.10, 1.0);
+        PRECIPITATION_OPACITY = builder
+                .comment("Opacity multiplier for localized rain, snow, hail, and distant precipitation.")
+                .defineInRange("opacity", 0.78, 0.15, 1.25);
+        PRECIPITATION_IMPACT_DENSITY = builder
+                .comment("Frequency of subtle procedural water rings and hard-surface impacts. Set to zero to disable them.")
+                .defineInRange("impactDensity", 0.32, 0.0, 1.0);
+        MAXIMUM_PRECIPITATION_IMPACTS = builder
+                .comment("Hard cap on simultaneously animated precipitation impacts.")
+                .defineInRange("maximumImpacts", 256, 32, 1_024);
         builder.pop();
 
         builder.comment("Cosmetic wet-ground and puddle overlays.")
@@ -160,6 +190,8 @@ public final class WeatherRenderingConfig {
         activeSettings = new Settings(
                 ENABLE_LOCALIZED_CLOUDS.get(),
                 ENABLE_VOLUMETRIC_CLOUDS.get(),
+                ENABLE_RAYMARCHED_CLOUDS.get(),
+                RAYMARCH_STEPS.get(),
                 RENDER_DISTANCE_BLOCKS.get(),
                 REBUILD_INTERVAL_TICKS.get(),
                 WIND_DETAIL_SPEED_BLOCKS_PER_SECOND.get(),
@@ -173,6 +205,10 @@ public final class WeatherRenderingConfig {
                 DISTANT_RAIN_DISTANCE_BLOCKS.get(),
                 DISTANT_RAIN_SPACING_BLOCKS.get(),
                 MAXIMUM_DISTANT_RAIN_SHAFTS.get(),
+                PRECIPITATION_STREAK_DENSITY.get(),
+                PRECIPITATION_OPACITY.get(),
+                PRECIPITATION_IMPACT_DENSITY.get(),
+                MAXIMUM_PRECIPITATION_IMPACTS.get(),
                 ENABLE_DISTANT_CLOUD_LAYER.get(),
                 DISTANT_CLOUD_DISTANCE_BLOCKS.get(),
                 DISTANT_CLOUD_SPACING_BLOCKS.get(),
@@ -188,6 +224,8 @@ public final class WeatherRenderingConfig {
     public record Settings(
             boolean enabled,
             boolean volumetricClouds,
+            boolean raymarchedClouds,
+            int raymarchSteps,
             int renderDistanceBlocks,
             int rebuildIntervalTicks,
             double windDetailSpeedBlocksPerSecond,
@@ -201,6 +239,10 @@ public final class WeatherRenderingConfig {
             int distantRainDistanceBlocks,
             int distantRainSpacingBlocks,
             int maximumDistantRainShafts,
+            double precipitationStreakDensity,
+            double precipitationOpacity,
+            double precipitationImpactDensity,
+            int maximumPrecipitationImpacts,
             boolean distantCloudLayer,
             int distantCloudDistanceBlocks,
             int distantCloudSpacingBlocks,
@@ -228,11 +270,12 @@ public final class WeatherRenderingConfig {
                 int distantRainSpacingBlocks,
                 int maximumDistantRainShafts
         ) {
-            this(enabled, volumetricClouds, renderDistanceBlocks, rebuildIntervalTicks,
+            this(enabled, volumetricClouds, false, 32, renderDistanceBlocks, rebuildIntervalTicks,
                     windDetailSpeedBlocksPerSecond, maximumCloudTiles, opacityMultiplier,
                     volumetricLayerCount, volumetricDetailStrength, distantRainShafts,
                     windDrivenPrecipitation, precipitationWindSlantBlocks,
                     distantRainDistanceBlocks, distantRainSpacingBlocks, maximumDistantRainShafts,
+                    0.82, 0.78, 0.32, 256,
                     true, 1_024, 48, 512, 0.55, true, 24, 256);
         }
 
@@ -252,6 +295,8 @@ public final class WeatherRenderingConfig {
             this(
                     enabled,
                     true,
+                    false,
+                    32,
                     renderDistanceBlocks,
                     rebuildIntervalTicks,
                     windDetailSpeedBlocksPerSecond,
@@ -265,6 +310,10 @@ public final class WeatherRenderingConfig {
                     distantRainDistanceBlocks,
                     distantRainSpacingBlocks,
                     maximumDistantRainShafts,
+                    0.82,
+                    0.78,
+                    0.32,
+                    256,
                     true,
                     1_024,
                     48,
@@ -278,6 +327,7 @@ public final class WeatherRenderingConfig {
 
         public Settings {
             renderDistanceBlocks = clamp(renderDistanceBlocks, 96, 512);
+            raymarchSteps = clamp(raymarchSteps, 16, 64);
             rebuildIntervalTicks = clamp(rebuildIntervalTicks, 2, 40);
             windDetailSpeedBlocksPerSecond = clamp(windDetailSpeedBlocksPerSecond, 0.0, 24.0);
             maximumCloudTiles = clamp(maximumCloudTiles, 256, 8192);
@@ -288,6 +338,10 @@ public final class WeatherRenderingConfig {
             distantRainDistanceBlocks = clamp(distantRainDistanceBlocks, 32, 192);
             distantRainSpacingBlocks = clamp(distantRainSpacingBlocks, 4, 16);
             maximumDistantRainShafts = clamp(maximumDistantRainShafts, 64, 2_048);
+            precipitationStreakDensity = clamp(precipitationStreakDensity, 0.10, 1.0);
+            precipitationOpacity = clamp(precipitationOpacity, 0.15, 1.25);
+            precipitationImpactDensity = clamp(precipitationImpactDensity, 0.0, 1.0);
+            maximumPrecipitationImpacts = clamp(maximumPrecipitationImpacts, 32, 1_024);
             distantCloudDistanceBlocks = clamp(distantCloudDistanceBlocks, 384, 2_048);
             distantCloudSpacingBlocks = clamp(distantCloudSpacingBlocks, 24, 96);
             maximumDistantCloudTiles = clamp(maximumDistantCloudTiles, 64, 2_048);

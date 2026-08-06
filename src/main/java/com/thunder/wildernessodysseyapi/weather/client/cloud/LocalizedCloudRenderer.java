@@ -52,6 +52,7 @@ public final class LocalizedCloudRenderer {
     private static double windDetailOffsetZ;
     private static double builtWindDetailOffsetX;
     private static double builtWindDetailOffsetZ;
+    private static boolean builtRaymarched;
     private static boolean builtVolumetric;
     private static boolean builtMorphologyPotential;
     private static boolean builtTransitionComplete;
@@ -139,7 +140,29 @@ public final class LocalizedCloudRenderer {
                 builtOriginTileZ * (double) CloudCoverageModel.CLOUD_TILE_SIZE - camZ
         );
         cloudBuffer.bind();
-        if (builtVolumetric) {
+        if (builtRaymarched) {
+            RaymarchedCloudShaders.updateUniforms(
+                    (float) (renderTicks / 20.0),
+                    windDetailOffsetX,
+                    windDetailOffsetZ,
+                    builtOriginTileX,
+                    builtOriginTileZ,
+                    camX,
+                    camY,
+                    camZ,
+                    cloudHeight,
+                    level.getSunAngle(partialTick),
+                    settings
+            );
+            RenderType renderType = RaymarchedCloudRenderTypes.raymarchedClouds();
+            renderType.setupRenderState();
+            cloudBuffer.drawWithShader(
+                    poseStack.last().pose(),
+                    projectionMatrix,
+                    RenderSystem.getShader()
+            );
+            renderType.clearRenderState();
+        } else if (builtVolumetric) {
             VolumetricCloudShaders.updateUniforms(
                     (float) (renderTicks / 20.0),
                     windDetailOffsetX,
@@ -206,6 +229,7 @@ public final class LocalizedCloudRenderer {
         windDetailOffsetZ = 0.0;
         builtWindDetailOffsetX = 0.0;
         builtWindDetailOffsetZ = 0.0;
+        builtRaymarched = false;
         builtVolumetric = false;
         builtMorphologyPotential = false;
         builtTransitionComplete = false;
@@ -359,10 +383,23 @@ public final class LocalizedCloudRenderer {
                 VertexFormat.Mode.QUADS,
                 DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL
         );
+        boolean raymarched = cloudStatus == CloudStatus.FANCY
+                && RaymarchedCloudShaders.shouldUse(settings);
         boolean volumetric = cloudStatus == CloudStatus.FANCY
+                && !raymarched
                 && VolumetricCloudShaders.shouldUse(settings);
         int vertices;
-        if (volumetric) {
+        if (raymarched) {
+            vertices = emitRaymarchedClouds(
+                    builder,
+                    profiles,
+                    darkness,
+                    opacity,
+                    diameter,
+                    radius,
+                    baseColor
+            );
+        } else if (volumetric) {
             vertices = emitVolumetricClouds(
                     builder,
                     fields,
@@ -391,6 +428,7 @@ public final class LocalizedCloudRenderer {
                 originTileZ,
                 radius * CloudCoverageModel.CLOUD_TILE_SIZE,
                 baseColor,
+                raymarched,
                 volumetric
         );
         vertices += distant.vertices();
@@ -412,6 +450,7 @@ public final class LocalizedCloudRenderer {
         lastBuildTick = ticks;
         builtWindDetailOffsetX = windDetailOffsetX;
         builtWindDetailOffsetZ = windDetailOffsetZ;
+        builtRaymarched = raymarched;
         builtVolumetric = volumetric;
         builtMorphologyPotential = morphologyPotential;
         builtTransitionComplete = state.interpolationProgress() >= 0.999;
@@ -422,10 +461,115 @@ public final class LocalizedCloudRenderer {
                 visibleTiles == 0 ? 0.0 : coverageSum / visibleTiles,
                 windDetailOffsetX,
                 windDetailOffsetZ,
-                volumetric ? "volume" : cloudStatus == CloudStatus.FANCY ? "voxel" : "fast",
-                volumetric ? settings.volumetricLayerCount() : 1,
+                raymarched ? "raymarch" : volumetric ? "volume" : cloudStatus == CloudStatus.FANCY ? "voxel" : "fast",
+                raymarched ? settings.raymarchSteps() : volumetric ? settings.volumetricLayerCount() : 1,
                 dominantCloudType(cloudTypeWeights).displayName()
         );
+    }
+
+    /** Emits only the upper and lower shells; the fragment shader integrates the interior density. */
+    private static int emitRaymarchedClouds(
+            BufferBuilder builder,
+            CloudLayerProfile[] profiles,
+            float[] darkness,
+            float[] opacity,
+            int diameter,
+            int radius,
+            Vec3 baseColor
+    ) {
+        int vertices = 0;
+        float noiseScale = VolumetricCloudShaders.worldNoiseScale();
+        for (int gridZ = 0; gridZ < diameter; gridZ++) {
+            for (int gridX = 0; gridX < diameter; gridX++) {
+                int cell = index(gridX, gridZ, diameter);
+                CloudLayerProfile profile = profiles[cell];
+                if (profile == null) {
+                    continue;
+                }
+
+                // A small overlap closes floating-point cracks between adjacent
+                // slabs. Depth writing makes the overlap single-layered.
+                float overlap = 0.28F;
+                float x0 = (gridX - radius) * CloudCoverageModel.CLOUD_TILE_SIZE - overlap;
+                float z0 = (gridZ - radius) * CloudCoverageModel.CLOUD_TILE_SIZE - overlap;
+                float x1 = (gridX - radius + 1) * CloudCoverageModel.CLOUD_TILE_SIZE + overlap;
+                float z1 = (gridZ - radius + 1) * CloudCoverageModel.CLOUD_TILE_SIZE + overlap;
+                float storm = darkness[cell];
+                for (CloudLayerProfile.BandProfile band : profile.bands()) {
+                    if (!band.visible()) {
+                        continue;
+                    }
+                    float base = (float) band.baseOffsetBlocks();
+                    float depth = (float) Math.min(127.5, band.depthBlocks());
+                    float top = base + depth;
+                    float alpha00 = cornerBandOpacity(
+                            profiles, opacity, diameter, gridX, gridZ, band.band()
+                    );
+                    float alpha10 = cornerBandOpacity(
+                            profiles, opacity, diameter, gridX + 1, gridZ, band.band()
+                    );
+                    float alpha11 = cornerBandOpacity(
+                            profiles, opacity, diameter, gridX + 1, gridZ + 1, band.band()
+                    );
+                    float alpha01 = cornerBandOpacity(
+                            profiles, opacity, diameter, gridX, gridZ + 1, band.band()
+                    );
+                    float bottomLight = Math.max(0.34F, 0.72F - storm * 0.32F);
+                    float topLight = Math.max(0.54F, 0.96F - storm * 0.20F);
+
+                    raymarchedVertex(builder, x0, base, z1, x0 * noiseScale, z1 * noiseScale,
+                            baseColor, bottomLight, alpha01, -depth, storm, band);
+                    raymarchedVertex(builder, x1, base, z1, x1 * noiseScale, z1 * noiseScale,
+                            baseColor, bottomLight, alpha11, -depth, storm, band);
+                    raymarchedVertex(builder, x1, base, z0, x1 * noiseScale, z0 * noiseScale,
+                            baseColor, bottomLight, alpha10, -depth, storm, band);
+                    raymarchedVertex(builder, x0, base, z0, x0 * noiseScale, z0 * noiseScale,
+                            baseColor, bottomLight, alpha00, -depth, storm, band);
+
+                    raymarchedVertex(builder, x0, top, z0, x0 * noiseScale, z0 * noiseScale,
+                            baseColor, topLight, alpha00, depth, storm, band);
+                    raymarchedVertex(builder, x1, top, z0, x1 * noiseScale, z0 * noiseScale,
+                            baseColor, topLight, alpha10, depth, storm, band);
+                    raymarchedVertex(builder, x1, top, z1, x1 * noiseScale, z1 * noiseScale,
+                            baseColor, topLight, alpha11, depth, storm, band);
+                    raymarchedVertex(builder, x0, top, z1, x0 * noiseScale, z1 * noiseScale,
+                            baseColor, topLight, alpha01, depth, storm, band);
+                    vertices += 8;
+                }
+            }
+        }
+        return vertices;
+    }
+
+    /** Averages the four cells sharing one corner so density has no tile-sized steps. */
+    private static float cornerBandOpacity(
+            CloudLayerProfile[] profiles,
+            float[] opacity,
+            int diameter,
+            int cornerX,
+            int cornerZ,
+            CloudLayerProfile.CloudBand targetBand
+    ) {
+        double sum = 0.0;
+        int samples = 0;
+        for (int z = cornerZ - 1; z <= cornerZ; z++) {
+            for (int x = cornerX - 1; x <= cornerX; x++) {
+                if (x < 0 || z < 0 || x >= diameter || z >= diameter) {
+                    continue;
+                }
+                samples++;
+                int cell = index(x, z, diameter);
+                CloudLayerProfile profile = profiles[cell];
+                if (profile == null) {
+                    continue;
+                }
+                CloudLayerProfile.BandProfile band = profile.bands().get(targetBand.ordinal());
+                if (band.visible()) {
+                    sum += Math.min(0.985, opacity[cell] * band.density());
+                }
+            }
+        }
+        return samples == 0 ? 0.0F : (float) (sum / samples);
     }
 
     private static int emitVolumetricClouds(
@@ -508,6 +652,7 @@ public final class LocalizedCloudRenderer {
             int originTileZ,
             int nearDistance,
             Vec3 baseColor,
+            boolean raymarched,
             boolean volumetric
     ) {
         if (!settings.distantCloudLayer()) {
@@ -553,7 +698,25 @@ public final class LocalizedCloudRenderer {
                 float alpha = (float) Math.min(0.70,
                         CloudCoverageModel.opacity(field, settings.opacityMultiplier()) * (0.30 + storm * 0.34));
                 float light = Math.max(0.28F, 0.84F - storm * 0.48F);
-                if (volumetric) {
+                if (raymarched) {
+                    raymarchedVertex(builder, x0, base, z1, x0 * noiseScale, z1 * noiseScale,
+                            baseColor, light, alpha, -depth, storm, band);
+                    raymarchedVertex(builder, x1, base, z1, x1 * noiseScale, z1 * noiseScale,
+                            baseColor, light, alpha, -depth, storm, band);
+                    raymarchedVertex(builder, x1, base, z0, x1 * noiseScale, z0 * noiseScale,
+                            baseColor, light, alpha, -depth, storm, band);
+                    raymarchedVertex(builder, x0, base, z0, x0 * noiseScale, z0 * noiseScale,
+                            baseColor, light, alpha, -depth, storm, band);
+                    raymarchedVertex(builder, x0, top, z0, x0 * noiseScale, z0 * noiseScale,
+                            baseColor, Math.min(1.0F, light + 0.12F), alpha, depth, storm, band);
+                    raymarchedVertex(builder, x1, top, z0, x1 * noiseScale, z0 * noiseScale,
+                            baseColor, Math.min(1.0F, light + 0.12F), alpha, depth, storm, band);
+                    raymarchedVertex(builder, x1, top, z1, x1 * noiseScale, z1 * noiseScale,
+                            baseColor, Math.min(1.0F, light + 0.12F), alpha, depth, storm, band);
+                    raymarchedVertex(builder, x0, top, z1, x0 * noiseScale, z1 * noiseScale,
+                            baseColor, Math.min(1.0F, light + 0.12F), alpha, depth, storm, band);
+                    vertices += 8;
+                } else if (volumetric) {
                     float sliceAlpha = (float) CloudColumnModel.sliceOpacity(alpha, 2);
                     for (int layer = 0; layer < 2; layer++) {
                         float layerAmount = 0.30F + layer * 0.48F;
@@ -589,6 +752,33 @@ public final class LocalizedCloudRenderer {
             }
         }
         return new DistantCloudResult(tiles, vertices, coverageSum);
+    }
+
+    private static void raymarchedVertex(
+            BufferBuilder builder,
+            float x,
+            float y,
+            float z,
+            float noiseX,
+            float noiseZ,
+            Vec3 baseColor,
+            float light,
+            float alpha,
+            float signedDepth,
+            float storm,
+            CloudLayerProfile.BandProfile band
+    ) {
+        float encodedDepth = Math.copySign(Math.min(1.0F, Math.abs(signedDepth) / 128.0F), signedDepth);
+        float packedShape = (shapeCode(band.shape()) + 0.10F + unit(storm) * 0.80F) / 4.0F;
+        builder.addVertex(x, y, z)
+                .setUv(noiseX, noiseZ)
+                .setColor(
+                        unit((float) baseColor.x * light),
+                        unit((float) baseColor.y * light),
+                        unit((float) baseColor.z * light),
+                        unit(alpha)
+                )
+                .setNormal(encodedDepth, unit((float) band.density()), unit(packedShape));
     }
 
     private static void volumetricVertex(

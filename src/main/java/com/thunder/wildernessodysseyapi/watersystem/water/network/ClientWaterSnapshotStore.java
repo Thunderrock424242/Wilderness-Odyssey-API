@@ -257,10 +257,16 @@ public final class ClientWaterSnapshotStore {
         offerDirty(key);
         int chunkX = (int) key;
         int chunkZ = (int) (key >>> 32);
-        offerLoadedNeighbor(ChunkPos.asLong(chunkX - 1, chunkZ));
-        offerLoadedNeighbor(ChunkPos.asLong(chunkX + 1, chunkZ));
-        offerLoadedNeighbor(ChunkPos.asLong(chunkX, chunkZ - 1));
-        offerLoadedNeighbor(ChunkPos.asLong(chunkX, chunkZ + 1));
+        // Surface vertices inspect a one-column topology halo. Include diagonal
+        // chunks so a newly loaded corner cannot leave its neighbor anchored to
+        // the former missing-snapshot frontier.
+        for (int offsetZ = -1; offsetZ <= 1; offsetZ++) {
+            for (int offsetX = -1; offsetX <= 1; offsetX++) {
+                if (offsetX != 0 || offsetZ != 0) {
+                    offerLoadedNeighbor(ChunkPos.asLong(chunkX + offsetX, chunkZ + offsetZ));
+                }
+            }
+        }
     }
 
     private static void offerLoadedNeighbor(long key) {

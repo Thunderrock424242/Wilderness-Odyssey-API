@@ -22,9 +22,11 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import org.joml.Matrix4f;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 
 /**
  * Sole coordinator for Wilderness translucent surface geometry.
@@ -39,7 +41,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class WaterRenderCoordinator {
 
     private static final WaterChunkMeshCache MESHES = new WaterChunkMeshCache();
-    private static final Map<Long, Ownership> OWNERSHIP = new ConcurrentHashMap<>();
+    private static final WaterSurfaceHandoff HANDOFFS = new WaterSurfaceHandoff();
+    private static final ThreadLocal<WaterHandoffReceipt> COMPLETED_COMPILATION = new ThreadLocal<>();
     private static final Long2ObjectOpenHashMap<OceanSeaState.Sample> REGIONAL_SEA_CORNERS =
             new Long2ObjectOpenHashMap<>(256);
     private static boolean externalPackOwnedLastFrame;
@@ -98,7 +101,10 @@ public final class WaterRenderCoordinator {
         rebuildDirtyGroups(level, event);
         var camera = event.getCamera().getPosition();
         List<WaterChunkMeshCache.MeshGroup> visible = MESHES.visibleGroups(
-                event.getFrustum(), camera.x, camera.y, camera.z);
+                        event.getFrustum(), camera.x, camera.y, camera.z)
+                .stream()
+                .filter(group -> HANDOFFS.customVisible(group.chunkKey()))
+                .toList();
         int totalGroups = MESHES.size();
         int vertices = 0;
         int triangles = 0;
@@ -154,7 +160,14 @@ public final class WaterRenderCoordinator {
         );
     }
 
-    /** Returns true only after a replacement mesh is uploaded and published. */
+    /**
+     * Returns whether a section compiler must omit the baked top at this cell.
+     *
+     * <p>Pending intent is visible before the section is dirtied, but only a
+     * compiler observing the current generation may omit the top. The existing
+     * fallback remains visible until an acknowledged upload promotes the custom
+     * mesh.</p>
+     */
     public static boolean ownsBakedTop(BlockPos pos) {
         if (WaterShaders.externalShaderPackOwnsWater()) {
             return false;
@@ -165,7 +178,7 @@ public final class WaterRenderCoordinator {
             return false;
         }
         long key = ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4);
-        if (OWNERSHIP.get(key) != Ownership.CUSTOM_OWNED) {
+        if (!HANDOFFS.suppressionRequested(key)) {
             return false;
         }
         ClientWaterChunkSnapshot snapshot = ClientWaterSnapshotStore.get(
@@ -174,9 +187,46 @@ public final class WaterRenderCoordinator {
             return false;
         }
         ClientWaterChunkSnapshot.Column column = snapshot.column(pos.getX() & 15, pos.getZ() & 15);
-        return column.wet()
+        boolean owned = column.wet()
                 && MESHES.ownsSurface(key, pos.getX() & 15, pos.getZ() & 15)
                 && column.surfaceBlockY() == pos.getY();
+        if (!owned) {
+            return false;
+        }
+        int columnIndex = (pos.getX() & 15) | ((pos.getZ() & 15) << 4);
+        return HANDOFFS.shouldSuppressTop(SectionPos.asLong(pos), columnIndex);
+    }
+
+    /** Starts one exact renderer-section compilation observation. */
+    public static void beginSectionCompilation(long sectionKey) {
+        COMPLETED_COMPILATION.remove();
+        HANDOFFS.beginCompilation(sectionKey);
+    }
+
+    /** Finishes one renderer-section compilation and returns its exact receipt. */
+    public static WaterHandoffReceipt finishSectionCompilation(long sectionKey) {
+        return HANDOFFS.finishCompilation(sectionKey);
+    }
+
+    /** Stages a vanilla compile receipt for the immediately-created compiled section object. */
+    public static void stageCompletedCompilation(WaterHandoffReceipt receipt) {
+        if (receipt != null && receipt.valid()) {
+            COMPLETED_COMPILATION.set(receipt);
+        } else {
+            COMPLETED_COMPILATION.remove();
+        }
+    }
+
+    /** Takes and clears the receipt staged by the current vanilla compiler thread. */
+    public static WaterHandoffReceipt takeCompletedCompilation() {
+        WaterHandoffReceipt receipt = COMPLETED_COMPILATION.get();
+        COMPLETED_COMPILATION.remove();
+        return receipt == null ? WaterHandoffReceipt.NONE : receipt;
+    }
+
+    /** Acknowledges that the exact suppression build reached renderer-owned GPU storage. */
+    public static void acknowledgeSectionUpload(WaterHandoffReceipt receipt) {
+        HANDOFFS.acknowledgeUpload(receipt);
     }
 
     /** Releases mesh state on client level teardown. */
@@ -211,33 +261,43 @@ public final class WaterRenderCoordinator {
                 return;
             }
             boolean replacingPublishedMesh = MESHES.hasGroup(key)
-                    && OWNERSHIP.get(key) == Ownership.CUSTOM_OWNED;
-            if (!replacingPublishedMesh) {
-                OWNERSHIP.put(key, Ownership.FALLBACK);
-            }
+                    && HANDOFFS.customVisible(key);
+            Set<Long> previouslyTrackedSections = HANDOFFS.trackedSections(key);
             int chunkX = (int) (long) key;
             int chunkZ = (int) ((long) key >>> 32);
             ClientWaterChunkSnapshot snapshot = ClientWaterSnapshotStore.get(level, chunkX, chunkZ);
             if (snapshot == null) {
                 MESHES.remove(key);
-                OWNERSHIP.remove(key);
+                HANDOFFS.remove(key);
                 continue;
             }
             WaterChunkMeshCache.MeshGroup group = MESHES.rebuild(level, snapshot);
             WaterRenderDiagnostics.recordMeshRebuild();
             if (group.empty()) {
-                OWNERSHIP.remove(key);
+                HANDOFFS.remove(key);
                 // A previously owned surface may have become dry or covered;
                 // request the baked fallback immediately so no hole remains.
-                markSurfaceSectionsDirty(event, snapshot);
+                markSurfaceSectionsDirty(event, union(
+                        previouslyTrackedSections,
+                        surfaceSectionKeys(snapshot)
+                ));
                 continue;
             }
-            markSurfaceSectionsDirty(event, snapshot);
-            // Public chunk compilation hooks cannot acknowledge exactly when
-            // every fallback top has disappeared. Publishing custom ownership
-            // after upload guarantees no missing surface; the requested section
-            // rebuild limits the handoff to a bounded overlap window.
-            OWNERSHIP.put(key, Ownership.CUSTOM_OWNED);
+            Map<Long, WaterSurfaceHandoff.SectionMask> suppressionSections =
+                    suppressionSections(snapshot, group);
+            if (replacingPublishedMesh) {
+                // An ordinary custom-to-custom update keeps the established
+                // custom owner visible while refreshed fallback buffers compile.
+                HANDOFFS.keepCustomVisible(key, suppressionSections);
+            } else {
+                // Publish intent before scheduling section work. Compiler
+                // workers therefore cannot bake a pre-intent fallback result.
+                HANDOFFS.beginSuppression(key, suppressionSections);
+            }
+            markSurfaceSectionsDirty(event, union(
+                    previouslyTrackedSections,
+                    suppressionSections.keySet()
+            ));
         }
     }
 
@@ -341,29 +401,73 @@ public final class WaterRenderCoordinator {
 
     private static void markSurfaceSectionsDirty(
             RenderLevelStageEvent event,
-            ClientWaterChunkSnapshot snapshot
+            Set<Long> sectionKeys
     ) {
-        boolean[] sections = new boolean[64];
-        int minimumSection = -32;
+        for (long sectionKey : sectionKeys) {
+            event.getLevelRenderer().setSectionDirty(
+                    SectionPos.x(sectionKey),
+                    SectionPos.y(sectionKey),
+                    SectionPos.z(sectionKey)
+            );
+        }
+    }
+
+    private static Map<Long, WaterSurfaceHandoff.SectionMask> suppressionSections(
+            ClientWaterChunkSnapshot snapshot,
+            WaterChunkMeshCache.MeshGroup group
+    ) {
+        Map<Long, long[]> mutable = new HashMap<>();
+        for (int localZ = 0; localZ < 16; localZ++) {
+            for (int localX = 0; localX < 16; localX++) {
+                if (!group.ownsSurface(localX, localZ)) {
+                    continue;
+                }
+                ClientWaterChunkSnapshot.Column column = snapshot.column(localX, localZ);
+                long sectionKey = SectionPos.asLong(
+                        snapshot.chunkX(),
+                        SectionPos.blockToSectionCoord(column.surfaceBlockY()),
+                        snapshot.chunkZ()
+                );
+                long[] mask = mutable.computeIfAbsent(sectionKey, ignored -> new long[4]);
+                int columnIndex = localX | (localZ << 4);
+                mask[columnIndex >>> 6] |= 1L << (columnIndex & 63);
+            }
+        }
+        Map<Long, WaterSurfaceHandoff.SectionMask> immutable = new HashMap<>();
+        mutable.forEach((sectionKey, mask) -> immutable.put(
+                sectionKey,
+                new WaterSurfaceHandoff.SectionMask(mask[0], mask[1], mask[2], mask[3])
+        ));
+        return Map.copyOf(immutable);
+    }
+
+    private static Set<Long> surfaceSectionKeys(ClientWaterChunkSnapshot snapshot) {
+        Set<Long> sections = new HashSet<>();
         for (int localZ = 0; localZ < 16; localZ++) {
             for (int localX = 0; localX < 16; localX++) {
                 ClientWaterChunkSnapshot.Column column = snapshot.column(localX, localZ);
-                if (!column.wet()) {
-                    continue;
-                }
-                int sectionY = SectionPos.blockToSectionCoord(column.surfaceBlockY());
-                int index = sectionY - minimumSection;
-                if (index >= 0 && index < sections.length && !sections[index]) {
-                    sections[index] = true;
-                    event.getLevelRenderer().setSectionDirty(snapshot.chunkX(), sectionY, snapshot.chunkZ());
+                if (column.wet()) {
+                    sections.add(SectionPos.asLong(
+                            snapshot.chunkX(),
+                            SectionPos.blockToSectionCoord(column.surfaceBlockY()),
+                            snapshot.chunkZ()
+                    ));
                 }
             }
         }
+        return Set.copyOf(sections);
+    }
+
+    private static Set<Long> union(Set<Long> first, Set<Long> second) {
+        Set<Long> union = new HashSet<>(first);
+        union.addAll(second);
+        return union;
     }
 
     private static void clear() {
         MESHES.clear();
-        OWNERSHIP.clear();
+        HANDOFFS.clear();
+        COMPLETED_COMPILATION.remove();
         REGIONAL_SEA_CORNERS.clear();
         WaterSurfaceDisplacement.clear();
         RippleRenderer.clear();
@@ -376,10 +480,5 @@ public final class WaterRenderCoordinator {
         FluidRenderer.onRenderLevel(event);
         RippleRenderer.onRenderLevel(event);
         minecraft.renderBuffers().bufferSource().endBatch(RenderType.translucent());
-    }
-
-    private enum Ownership {
-        FALLBACK,
-        CUSTOM_OWNED
     }
 }

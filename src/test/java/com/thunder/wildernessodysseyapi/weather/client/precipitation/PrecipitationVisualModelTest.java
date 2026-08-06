@@ -51,4 +51,20 @@ class PrecipitationVisualModelTest {
         assertEquals(first, repeated, 0.0);
         assertTrue(first >= 0.0 && first < 1.0);
     }
+
+    @Test
+    void nearColumnSelectionIsStableAndDensityBounded() {
+        boolean first = PrecipitationVisualModel.shouldRenderNearColumn(14, -22, 0.7, 0.8);
+        boolean repeated = PrecipitationVisualModel.shouldRenderNearColumn(14, -22, 0.7, 0.8);
+
+        assertEquals(first, repeated);
+        assertTrue(PrecipitationVisualModel.shouldRenderNearColumn(14, -22, 1.0, 1.0));
+    }
+
+    @Test
+    void opacityScalingNeverLeaksInvalidAlpha() {
+        assertEquals(0.5F, PrecipitationVisualModel.scaledAlpha(0.5F, 1.0), 1.0E-6F);
+        assertEquals(1.0F, PrecipitationVisualModel.scaledAlpha(0.8F, 4.0), 1.0E-6F);
+        assertEquals(0.0F, PrecipitationVisualModel.scaledAlpha(0.8F, Double.NaN), 1.0E-6F);
+    }
 }

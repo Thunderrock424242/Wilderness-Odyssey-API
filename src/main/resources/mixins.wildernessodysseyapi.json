@@ -66,10 +66,17 @@
     "RenderChunkRegionAccessor",
     "RenderSystemGpuDiagnosticsMixin",
     "SimpleTextureGpuProfilerMixin",
+    "SodiumChunkBuildOutputHandoffMixin",
+    "SodiumChunkMeshingHandoffMixin",
     "SodiumBlockOcclusionCacheMixin",
     "SodiumFluidRenderMixin",
+    "SodiumRenderSectionCoordinatesMixin",
+    "SodiumSectionUploadHandoffMixin",
     "StructureBlockRendererMixin",
     "TaggedWaterFaceCullingMixin",
-    "TextureAtlasGpuProfilerMixin"
+    "TextureAtlasGpuProfilerMixin",
+    "VanillaCompiledSectionHandoffMixin",
+    "VanillaSectionCompilerHandoffMixin",
+    "VanillaSectionUploadHandoffMixin"
   ]
 }
