@@ -39,6 +39,7 @@ in float depthFactor;
 in float disturbanceStrength;
 in float regionalSeaState;
 in vec2 regionalWindDirection;
+in float regionalWindSpeed;
 in vec4 regionalSpectrumState;
 
 out vec4 fragColor;
@@ -106,6 +107,8 @@ float phaseStableDirectionalWeight(vec2 carrier, vec2 driver, float influence) {
 
 vec3 proceduralWorldNormal(vec2 current, float sea) {
     vec2 wind = normalizedOr(regionalWindDirection, DETAIL_PRIMARY_DIRECTION);
+    float windEnergy = clamp(regionalWindSpeed / 20.0, 0.0, 1.0);
+    float windDetailScale = mix(0.88, 1.14, windEnergy);
     float currentStrength = clamp(length(current) / 1.5, 0.0, 1.0);
     vec2 currentDirection = normalizedOr(current, wind);
     vec2 driver = normalizedOr(mix(wind, currentDirection, currentStrength), wind);
@@ -122,7 +125,8 @@ vec3 proceduralWorldNormal(vec2 current, float sea) {
     if (quality < 0.5) {
         float lowRipple = sin(animatedStablePhase(
             DETAIL_PRIMARY_DIRECTION * 1.37, SurfaceAnimationPhases0.z));
-        vec2 lowGradient = DETAIL_PRIMARY_DIRECTION * lowRipple * 0.014 * primaryWeight;
+        vec2 lowGradient = DETAIL_PRIMARY_DIRECTION * lowRipple * 0.014
+            * primaryWeight * windDetailScale;
         return normalize(vec3(lowGradient.x, 1.0, lowGradient.y));
     }
     // Static world-space domain warping breaks repetition without cyclically
@@ -131,7 +135,7 @@ vec3 proceduralWorldNormal(vec2 current, float sea) {
         sin(stableWorldPhase(vec2(0.071, 0.113)) + 1.37),
         cos(stableWorldPhase(vec2(-0.097, 0.059)) - 0.91)
     ) * 0.66;
-    float detailEnergy = 0.78 + sea * 0.44;
+    float detailEnergy = (0.78 + sea * 0.44) * windDetailScale;
     float longRipple = stableWaveLayer(warp, DETAIL_PRIMARY_DIRECTION,
         1.37, SurfaceAnimationPhases0.z);
     float crossRipple = stableWaveLayer(warp, DETAIL_CROSS_DIRECTION,
@@ -314,11 +318,6 @@ vec4 traceScreenReflection(vec3 origin, vec3 direction, int stepCount, float max
 }
 
 void main() {
-    vec4 waterTexture = texture(Sampler0, texCoord0);
-    if (waterTexture.a < 0.03) {
-        discard;
-    }
-
     float sea = clamp(regionalSeaState, 0.0, 1.0);
     float frozen = clamp(Weather.w, 0.0, 1.0);
     vec3 baseWorldNormal = normalize(worldNormal);
@@ -571,9 +570,12 @@ void main() {
         fragColor = vec4(completedColor, 1.0);
     } else {
         // Resource reloads and unsupported scene capture still retain a safe
-        // conventional translucent path instead of sampling invalid textures.
+        // conventional translucent path. The stock water sprite may color this
+        // fallback, but its alpha never owns custom-surface geometry coverage.
+        vec3 fallbackTexture = texture(Sampler0, texCoord0).rgb * vertexColor.rgb;
         vec3 fallbackEnvironment = environmentReflection(reflectedRay, fresnel, sea);
         vec3 fallbackColor = mix(fallbackEnvironment, color, loadedFrontier);
+        fallbackColor = mix(fallbackTexture, fallbackColor, loadedFrontier);
         fallbackColor = mix(fallbackColor, FogColor.rgb, fogFactor);
         fallbackAlpha *= mix(0.18, 1.0, loadedFrontier);
         fragColor = vec4(fallbackColor, fallbackAlpha);

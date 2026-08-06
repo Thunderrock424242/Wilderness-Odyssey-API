@@ -11,6 +11,7 @@ import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockE
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterShaders;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.VolumetricCloudShaders;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.RaymarchedCloudShaders;
 import net.minecraft.client.renderer.BiomeColors;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
@@ -115,6 +116,13 @@ public class ClientSetup {
             // Enhanced water optics are optional. Keeping registration failure
             // non-fatal preserves the standard translucent fallback path.
             ModConstants.LOGGER.warn("Unable to load built-in water shader; using compatibility rendering", exception);
+        }
+
+        try {
+            RaymarchedCloudShaders.register(event);
+        } catch (IOException exception) {
+            // Raymarching is a quality tier, never a startup requirement.
+            ModConstants.LOGGER.warn("Unable to load raymarched cloud shader; using layered cloud fallback", exception);
         }
 
         try {
