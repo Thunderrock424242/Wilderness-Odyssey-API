@@ -15,6 +15,8 @@ class WeatherRenderingConfigTest {
 
         assertTrue(defaults.enabled());
         assertTrue(defaults.volumetricClouds());
+        assertTrue(defaults.raymarchedClouds());
+        assertEquals(24, defaults.raymarchSteps());
         assertEquals(384, defaults.renderDistanceBlocks());
         assertEquals(5, defaults.rebuildIntervalTicks());
         assertEquals(6.0, defaults.windDetailSpeedBlocksPerSecond(), 1.0E-12);
@@ -28,6 +30,10 @@ class WeatherRenderingConfigTest {
         assertEquals(96, defaults.distantRainDistanceBlocks());
         assertEquals(6, defaults.distantRainSpacingBlocks());
         assertEquals(768, defaults.maximumDistantRainShafts());
+        assertEquals(0.82, defaults.precipitationStreakDensity(), 1.0E-12);
+        assertEquals(0.78, defaults.precipitationOpacity(), 1.0E-12);
+        assertEquals(0.32, defaults.precipitationImpactDensity(), 1.0E-12);
+        assertEquals(256, defaults.maximumPrecipitationImpacts());
         assertTrue(defaults.distantCloudLayer());
         assertEquals(1_024, defaults.distantCloudDistanceBlocks());
         assertEquals(48, defaults.distantCloudSpacingBlocks());
@@ -89,5 +95,24 @@ class WeatherRenderingConfigTest {
         assertEquals(192, settings.distantRainDistanceBlocks());
         assertEquals(16, settings.distantRainSpacingBlocks());
         assertEquals(2_048, settings.maximumDistantRainShafts());
+    }
+
+    @Test
+    void advancedCloudAndImpactControlsAreDefensivelyBounded() {
+        WeatherRenderingConfig.Settings settings = new WeatherRenderingConfig.Settings(
+                true, true, true, Integer.MAX_VALUE,
+                384, 5, 6.0, 4_096, 1.0, 8, 0.65,
+                true, true, 10.0, 96, 6, 768,
+                Double.NaN, 99.0, -4.0, Integer.MAX_VALUE,
+                true, 1_024, 48, 512, 0.55,
+                true, 24, 256
+        );
+
+        assertTrue(settings.raymarchedClouds());
+        assertEquals(64, settings.raymarchSteps());
+        assertEquals(0.10, settings.precipitationStreakDensity(), 1.0E-12);
+        assertEquals(1.25, settings.precipitationOpacity(), 1.0E-12);
+        assertEquals(0.0, settings.precipitationImpactDensity(), 1.0E-12);
+        assertEquals(1_024, settings.maximumPrecipitationImpacts());
     }
 }

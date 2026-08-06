@@ -15,12 +15,12 @@ cloud volumes with standard cloud genera, multi-altitude decks, persistent
 moving storm/front identities, forecasting, surface accumulation, typed
 hazards, rare campfire-ember wildfires, and compatibility fallbacks.
 
-The system does not provide a projected per-block shadow map or unconstrained
-destructive storms. Severe block damage is a conservative foliage-only option
-and is disabled by default. Cloud shadows remain a camera-local approximation.
-Its volumetric quality tier is a bounded translucent-slice approximation,
-not a fluid simulation or compute-shader raymarch. Those boundaries are
-intentional and are listed under
+The system does not provide a projected per-block shadow map, a fluid dynamics
+simulation, or unconstrained destructive storms. Severe block damage is a
+conservative foliage-only option and is disabled by default. Cloud shadows
+remain a camera-local approximation. Fancy clouds now offer a bounded
+fragment-shader density raymarch, with layered and solid compatibility tiers
+when that program is unavailable. Those boundaries are intentional and are listed under
 [Known limitations](#known-limitations-and-compatibility).
 
 ## Weather V3 additions
@@ -67,8 +67,8 @@ flowchart LR
     K --> L["WeatherRegionSyncPayload"]
     L --> M["Immutable WeatherSnapshot"]
     M --> N["ClientWeatherCoordinator"]
-    N --> O["Wind-driven rain/snow, distant shafts, sound, F3, and water shader inputs"]
-    N --> P["CloudFieldSample, layered volume/voxel renderer, cloud-bank fog, and lighting"]
+    N --> O["Wind-driven rain/snow, synchronized surface impacts, distant shafts, sound, F3, and water shader inputs"]
+    N --> P["CloudFieldSample, density-raymarch/layered/voxel renderer, cloud-bank fog, and lighting"]
 ```
 
 The principal ownership boundaries are:
@@ -591,9 +591,14 @@ overriding `ClientLevel` weather getters:
   hooks inside `renderSnowAndRain` and `tickRain`. Dimension-specific renderers
   run first; `LocalizedPrecipitationRenderer` replaces only vanilla's fallback.
    Every near rain/snow column receives its own intensity and type, so a dry
-   camera no longer hides a neighboring rain edge. Splash particles and sounds
-   use the same per-column field. Quads lean with synchronized surface wind;
-   snow receives more horizontal drag than rain.
+   camera no longer hides a neighboring rain edge. The renderer owns its blend,
+   shader-color, light-map, and depth-write state explicitly, including under
+   Sodium. Surface sounds and impacts use the same per-column field. Impacts
+   are spawned only after the precipitation mesh rendered recently, so a failed
+   or absent rain pass cannot leave splash-only weather. Muted procedural rings
+   replace Minecraft's bright white rain and hail particles on water, leaves,
+   and solid ground. Quads lean with synchronized surface wind; snow receives
+   more horizontal drag than rain.
 - `ClientLevelLocalizedWeatherMixin` redirects rain/thunder reads only inside
   sky darkness, sky color, and cloud color calculations. It uses localized
   sky-darkening and thunder contributions.
@@ -626,16 +631,20 @@ horizontal footprint:
 
 - the horizontal grid is made from `12 x 12` block cloud voxels, matching
   vanilla's cloud scale;
-- **Fancy + volumetric enabled** derives clear sky plus the ten standard cloud
+- **Fancy + raymarched enabled** derives clear sky plus the ten standard cloud
   genera: cirrus, cirrostratus, cirrocumulus, altostratus, altocumulus,
   stratus, stratocumulus, cumulus, nimbostratus, and cumulonimbus. A tile may
   blend low, middle, high, and convective decks; cumulonimbus therefore grows a
   deep tower plus a wind-shear-weighted anvil instead of merely becoming a
   thicker flat cloud;
-- each active deck receives up to the configured translucent slice count and
-  uses world-stable procedural 3D noise. Wispy, layered, cellular, and
-  convective morphologies have distinct horizontal scales, vertical profiles,
-  daylight edging, and storm-darkened bases;
+- the raymarched tier draws only the camera-facing upper or lower cloud shell
+  and integrates world-stable procedural density through the synchronized
+  depth. Shared corner opacity and small depth-tested overlaps remove the
+  visible `12 x 12` ceiling seams. Wispy, layered, cellular, and convective
+  morphologies retain distinct scales, vertical profiles, daylight response,
+  and storm-darkened bases;
+- if raymarching is disabled or unavailable, **Fancy + volumetric enabled**
+  uses the bounded translucent-slice tier;
 - if the custom shader is unavailable, fails to link, is disabled, or an
   Iris/Oculus shader pack is active, **Fancy** falls back to the existing solid
   voxel masses with exposed top, bottom, and sides;
@@ -696,7 +705,9 @@ synchronized atmospheric footprint.
 | Config path under `localized_clouds` | Default | Allowed range or behavior |
 | --- | ---: | --- |
 | `enabled` | `true` | Replaces the vanilla global sheet only while a localized snapshot controls the dimension. |
-| `volumetricClouds` | `true` | Uses the layered procedural 3D tier for Fancy clouds when compatible. |
+| `raymarchedClouds` | `true` | Uses bounded density integration for Fancy clouds when the built-in shader owns the pass. |
+| `raymarchSteps` | `24` | `16..64`; samples through each visible cloud volume. Reduce this first if cloud GPU cost is too high. |
+| `volumetricClouds` | `true` | Uses the layered procedural 3D fallback for Fancy clouds when raymarching is disabled or unavailable. |
 | `renderDistanceBlocks` | `384` | `96..512`; horizontal radius sampled for cloud geometry. |
 | `rebuildIntervalTicks` | `5` | `2..40`; minimum interval while blending or wind detail is moving. |
 | `windDetailSpeedBlocksPerSecond` | `6.0` | `0..24`; visual morphology speed at full normalized wind. It does not move the authoritative envelope. |
@@ -713,6 +724,10 @@ synchronized atmospheric footprint.
 | `distantRainDistanceBlocks` | `96` | `32..192`; requested horizontal curtain radius. |
 | `distantRainSpacingBlocks` | `6` | `4..16`; world-lattice spacing, where larger values reduce work. |
 | `maximumDistantRainShafts` | `768` | `64..2048`; hard cap that also bounds the effective symmetric radius. |
+| `streakDensity` | `0.82` | `0.10..1`; stable world-column fraction used for finer, less curtain-like precipitation. |
+| `opacity` | `0.78` | `0.15..1.25`; visual precipitation opacity without changing gameplay intensity. |
+| `impactDensity` | `0.32` | `0..1`; probability scale for restrained procedural surface impacts. |
+| `maximumImpacts` | `256` | `32..1024`; hard cap on simultaneously animated rain and hail impacts. |
 
 Minecraft's normal Clouds option still selects Off, Fast, or Fancy. Off skips
 the cloud render call entirely; the client config does not force clouds back

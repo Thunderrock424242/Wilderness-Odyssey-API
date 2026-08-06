@@ -133,6 +133,12 @@ stable half-block grid so GPU-displaced silhouettes remain smooth without a
 per-frame CPU rebuild. Continuous Gerstner and tide displacement happens in
 the vertex shader, including horizontal crest motion and analytic tangents,
 with displacement tapered at dry or unloaded boundaries.
+The four columns touching a shoreline vertex now form an exact world-space
+anchor: if any one is dry, covered, or missing, the shader applies no Gerstner
+motion, horizontal chop, wake impulse, or tide offset at that edge. The first
+interior row eases to half strength and the second returns to full motion. The
+same calculation is used by camera immersion, and diagonal snapshot arrivals
+invalidate the halo on both neighboring meshes.
 Rebuild work uses a deduplicated chunk-key queue and a bounded streaming burst,
 preventing repeated neighbor entries from leaving a distant flat fallback ring.
 
@@ -144,12 +150,19 @@ interpolation. A capped set of the eight nearest tick-aged impacts and wakes is
 uploaded as uniforms, deforming heights and normals without rebuilding the
 cached mesh.
 
-Fallback fluid tops remain visible while a group is absent or rebuilding. Once
-the custom vertex buffer is uploaded, the coordinator requests the affected
-terrain sections to rebuild and publishes custom ownership. The baked-fluid
-mixin suppresses only a top that has both custom ownership and a matching wet
-snapshot column. Internal fluid faces, unloaded chunks, and unsupported buried
-surfaces keep the standard translucent fluid path.
+Fallback fluid tops remain visible while the first replacement group is absent
+or rebuilding. Once the custom vertex buffer is uploaded, the coordinator
+publishes a generation-tagged suppression intent before requesting the affected
+terrain sections to rebuild, but keeps that custom group hidden. Vanilla,
+Sodium, and legacy Embeddium section compilers attach a receipt only when the
+exact build observed every expected owned top; the receipt is acknowledged only
+after that build reaches renderer-owned GPU storage. The custom group becomes
+visible after every affected section acknowledges the same generation. Stale,
+cancelled, partial, or pre-intent builds keep the baked fallback instead of
+opening a transient hole. The baked-fluid mixin still suppresses only a top
+whose uploaded custom mesh and matching wet snapshot own that column. Internal
+fluid faces, unloaded chunks, and unsupported buried surfaces keep the standard
+translucent fluid path.
 
 When an Iris or Oculus shader pack is active, the external shader path owns Wilderness
 water through the ordinary tagged custom-fluid geometry. A narrow optional
@@ -188,6 +201,12 @@ The core water shader uses those textures for:
 - biome/body tint, daylight, rain, thunder, sea state, tide, and Gerstner input;
 - canonical-current advection, depth/boundary shore breaking, and wake foam; and
 - unloaded-frontier fading into fog/environment reflection.
+
+The terrain-atlas UV is passed through unchanged. It is sampled only for RGB in
+the no-scene-capture fallback; atlas alpha never decides whether custom water
+geometry exists. Wave and current animation stay in world-space displacement
+and procedural normals, so motion cannot wander into transparent sprite padding
+and cut a repeating block grid out of the surface.
 
 Invalid depth and unavailable scene textures fail to the environment path
 instead of producing halos or framebuffer feedback. Shallow face-on water

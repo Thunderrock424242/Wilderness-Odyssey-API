@@ -216,7 +216,6 @@ public final class WaterShaders {
 
         long frameGameTime = Math.max(0L, gameTime);
         float framePartialTick = WaterAnimationClock.clampPartialTick(partialTick);
-        uploadStableTime(oceanShader, frameGameTime, framePartialTick);
         uploadSurfaceAnimationPhases(
                 oceanShader,
                 frameGameTime,
@@ -650,29 +649,6 @@ public final class WaterShaders {
         return (levelKey * 0x9E37_79B9L)
                 ^ (gameTime << 32)
                 ^ (Float.floatToRawIntBits(partialTick) & 0xFFFF_FFFFL);
-    }
-
-    // Encodes the exact long tick as base-1024 digits. Shader phase functions
-    // reduce each digit before accumulation, so animation retains partial-tick
-    // motion without multiplying a huge imprecise float time.
-    private static void uploadStableTime(
-            ShaderInstance shader,
-            long gameTime,
-            float partialTick
-    ) {
-        long ticks = Math.max(0L, gameTime);
-        float fraction = Math.max(0.0f, Math.min(1.0f, partialTick));
-        shader.safeGetUniform("TimeFrameLow").set(
-                (ticks & 1023L) + fraction,
-                (float) ((ticks >>> 10) & 1023L),
-                (float) ((ticks >>> 20) & 1023L),
-                (float) ((ticks >>> 30) & 1023L)
-        );
-        shader.safeGetUniform("TimeFrameHigh").set(
-                (float) ((ticks >>> 40) & 1023L),
-                (float) ((ticks >>> 50) & 1023L),
-                (float) ((ticks >>> 60) & 7L)
-        );
     }
 
     // Fullscreen underwater work consumes pre-reduced phases. Performing the

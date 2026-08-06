@@ -23,6 +23,26 @@ public final class PrecipitationVisualModel {
         return unit((float) (Math.max(0.0, radial) * intensity));
     }
 
+    /**
+     * Selects a stable subset of world columns so rainfall reads as individual
+     * streaks instead of an opaque wall while the player moves.
+     */
+    public static boolean shouldRenderNearColumn(
+            int blockX,
+            int blockZ,
+            double intensity,
+            double configuredDensity
+    ) {
+        double weatherAmount = Math.sqrt(unit(intensity));
+        double density = unit(configuredDensity) * (0.38 + weatherAmount * 0.62);
+        return columnNoise(blockX, blockZ, 0xD1B54A32D192ED03L) < density;
+    }
+
+    /** Applies the client opacity preference without allowing invalid alpha. */
+    public static float scaledAlpha(float alpha, double opacityMultiplier) {
+        return unit((float) (alpha * Math.max(0.0, finiteOrZero(opacityMultiplier))));
+    }
+
     /** Fades sparse distant curtains before the storm-fog far plane. */
     public static float distantAlpha(
             double intensity,
@@ -106,6 +126,10 @@ public final class PrecipitationVisualModel {
 
     private static float unit(float value) {
         return Math.max(0.0F, Math.min(1.0F, Float.isFinite(value) ? value : 0.0F));
+    }
+
+    private static double unit(double value) {
+        return Math.max(0.0, Math.min(1.0, Double.isFinite(value) ? value : 0.0));
     }
 
     private static double finiteOrZero(double value) {

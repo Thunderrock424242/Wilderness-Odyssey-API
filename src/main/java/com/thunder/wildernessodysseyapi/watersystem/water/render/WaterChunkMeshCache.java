@@ -43,6 +43,14 @@ public final class WaterChunkMeshCache {
 
     private static final int BYTES_PER_VERTEX = DefaultVertexFormat.BLOCK.getVertexSize();
     private static final int FULL_BRIGHT = LightTexture.pack(15, 15);
+    // The shader maps this value through smoothstep(0.18, 0.92), so the
+    // boundary payload produces exactly zero displacement while retaining a
+    // non-zero normal vector from which it can recover the water-body blend.
+    static final float BOUNDARY_DISPLACEMENT_CONTINUITY = 0.10f;
+    static final float SHORE_RAMP_DISPLACEMENT_CONTINUITY = 0.55f;
+    static final float OPEN_WATER_DISPLACEMENT_CONTINUITY = 1.0f;
+
+    private static final TopologyColumn DRY_TOPOLOGY_COLUMN = new TopologyColumn(null);
 
     private final Map<Long, MeshGroup> groups = new ConcurrentHashMap<>();
 
@@ -111,19 +119,30 @@ public final class WaterChunkMeshCache {
         int chunkMinX = snapshot.chunkX() << 4;
         int chunkMinZ = snapshot.chunkZ() << 4;
         Map<Long, Boolean> liveSurfaceEligibility = new HashMap<>(324);
+        Map<Long, TopologyColumn> topologyColumns = new HashMap<>(400);
+        Map<Long, VertexSample> vertexSamples = new HashMap<>(324);
         long[] ownedSurfaceMask = new long[4];
         int wetColumns = 0;
         int firstSurfaceY = 0;
         for (int localZ = 0; localZ < 16; localZ++) {
             for (int localX = 0; localX < 16; localX++) {
                 ClientWaterChunkSnapshot.Column column = snapshot.column(localX, localZ);
-                if (column.wet() && usesCustomSurface(
+                int worldX = chunkMinX + localX;
+                int worldZ = chunkMinZ + localZ;
+                boolean eligible = column.wet() && usesCustomSurface(
                         level,
-                        chunkMinX + localX,
-                        chunkMinZ + localZ,
+                        worldX,
+                        worldZ,
                         column,
                         liveSurfaceEligibility
-                )) {
+                );
+                // Seed the complete local chunk before sampling the one-block
+                // halo. Every vertex in this build therefore observes one
+                // immutable eligibility decision for each local column.
+                topologyColumns.put(columnKey(worldX, worldZ), eligible
+                        ? new TopologyColumn(column)
+                        : DRY_TOPOLOGY_COLUMN);
+                if (eligible) {
                     int columnIndex = localX | (localZ << 4);
                     ownedSurfaceMask[columnIndex >>> 6] |= 1L << (columnIndex & 63);
                     if (wetColumns++ == 0) {
@@ -151,21 +170,18 @@ public final class WaterChunkMeshCache {
             BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
             for (int localZ = 0; localZ < 16; localZ++) {
                 for (int localX = 0; localX < 16; localX++) {
-                    ClientWaterChunkSnapshot.Column column = snapshot.column(localX, localZ);
-                    if (!column.wet() || !usesCustomSurface(
-                            level,
-                            chunkMinX + localX,
-                            chunkMinZ + localZ,
-                            column,
-                            liveSurfaceEligibility
-                    )) {
+                    int worldX = chunkMinX + localX;
+                    int worldZ = chunkMinZ + localZ;
+                    TopologyColumn topologyColumn = topologyColumns.get(columnKey(worldX, worldZ));
+                    if (topologyColumn == null || !topologyColumn.eligible()) {
                         continue;
                     }
+                    ClientWaterChunkSnapshot.Column column = topologyColumn.column();
                     minimumY = Math.min(minimumY, column.floorY());
                     maximumY = Math.max(maximumY, column.surfaceBlockY());
-                    emitColumn(level, snapshot, builder, sprite, chunkMinX + localX,
-                            chunkMinZ + localZ, column, subdivisions, chunkMinX, chunkMinZ,
-                            liveSurfaceEligibility);
+                    emitColumn(level, builder, sprite, worldX, worldZ, column,
+                            subdivisions, chunkMinX, chunkMinZ, liveSurfaceEligibility,
+                            topologyColumns, vertexSamples);
                 }
             }
             MeshData mesh = builder.buildOrThrow();
@@ -201,7 +217,6 @@ public final class WaterChunkMeshCache {
 
     private static void emitColumn(
             ClientLevel level,
-            ClientWaterChunkSnapshot snapshot,
             BufferBuilder builder,
             TextureAtlasSprite sprite,
             int worldX,
@@ -210,16 +225,22 @@ public final class WaterChunkMeshCache {
             int subdivisions,
             int chunkMinX,
             int chunkMinZ,
-            Map<Long, Boolean> liveSurfaceEligibility
+            Map<Long, Boolean> liveSurfaceEligibility,
+            Map<Long, TopologyColumn> topologyColumns,
+            Map<Long, VertexSample> vertexSamples
     ) {
         VertexSample northWest = sampleVertex(
-                level, worldX, worldZ, column, liveSurfaceEligibility);
+                level, worldX, worldZ, column, liveSurfaceEligibility,
+                topologyColumns, vertexSamples);
         VertexSample southWest = sampleVertex(
-                level, worldX, worldZ + 1, column, liveSurfaceEligibility);
+                level, worldX, worldZ + 1, column, liveSurfaceEligibility,
+                topologyColumns, vertexSamples);
         VertexSample southEast = sampleVertex(
-                level, worldX + 1, worldZ + 1, column, liveSurfaceEligibility);
+                level, worldX + 1, worldZ + 1, column, liveSurfaceEligibility,
+                topologyColumns, vertexSamples);
         VertexSample northEast = sampleVertex(
-                level, worldX + 1, worldZ, column, liveSurfaceEligibility);
+                level, worldX + 1, worldZ, column, liveSurfaceEligibility,
+                topologyColumns, vertexSamples);
         float u0 = sprite.getU0();
         float u1 = sprite.getU1();
         float v0 = sprite.getV0();
@@ -265,8 +286,15 @@ public final class WaterChunkMeshCache {
             int worldVertexX,
             int worldVertexZ,
             ClientWaterChunkSnapshot.Column fallback,
-            Map<Long, Boolean> liveSurfaceEligibility
+            Map<Long, Boolean> liveSurfaceEligibility,
+            Map<Long, TopologyColumn> topologyColumns,
+            Map<Long, VertexSample> vertexSamples
     ) {
+        long vertexKey = columnKey(worldVertexX, worldVertexZ);
+        VertexSample cached = vertexSamples.get(vertexKey);
+        if (cached != null) {
+            return cached;
+        }
         float height = 0.0f;
         float ocean = 0.0f;
         float river = 0.0f;
@@ -284,20 +312,17 @@ public final class WaterChunkMeshCache {
             for (int offsetX = -1; offsetX <= 0; offsetX++) {
                 int columnX = worldVertexX + offsetX;
                 int columnZ = worldVertexZ + offsetZ;
-                ClientWaterChunkSnapshot neighbor = ClientWaterSnapshotStore.getAtBlock(level, columnX, columnZ);
-                if (neighbor == null) {
-                    continue;
-                }
-                ClientWaterChunkSnapshot.Column column = neighbor.column(columnX & 15, columnZ & 15);
-                if (!column.wet() || !usesCustomSurface(
+                TopologyColumn topologyColumn = resolveTopologyColumn(
                         level,
                         columnX,
                         columnZ,
-                        column,
-                        liveSurfaceEligibility
-                )) {
+                        liveSurfaceEligibility,
+                        topologyColumns
+                );
+                if (!topologyColumn.eligible()) {
                     continue;
                 }
+                ClientWaterChunkSnapshot.Column column = topologyColumn.column();
                 WatershedConditions conditions = WatershedServices.conditions(
                         level,
                         new BlockPos(columnX, column.surfaceBlockY(), columnZ)
@@ -357,16 +382,109 @@ public final class WaterChunkMeshCache {
         // client mesh. This deterministic approximation uses only immutable
         // snapshot topology and depth, so it cannot invent mutable authority
         // state or trigger per-frame world scans.
-        float topologyShore = 1.0f - Math.min(1.0f, count * 0.25f);
+        float displacementContinuity = displacementContinuityAt(
+                worldVertexX,
+                worldVertexZ,
+                (columnX, columnZ) -> resolveTopologyColumn(
+                        level,
+                        columnX,
+                        columnZ,
+                        liveSurfaceEligibility,
+                        topologyColumns
+                ).eligible()
+        );
+        float topologyShore = topologyShoreFactor(displacementContinuity);
         float shallowShore = 1.0f - smoothStep(0.35f, 4.5f, averagedDepth);
         float shoreFactor = Math.max(topologyShore, shallowShore);
         int color = opticalColor(ocean, river, lake,
                 tintRed * inverse, tintGreen * inverse, tintBlue * inverse,
                 averagedDepth, count < 4);
         color = applySedimentColor(color, sediment * inverse, clarity * inverse);
-        return new VertexSample(height * inverse, ocean, river, lake,
-                Math.max(0.18f, count * 0.25f), color,
+        VertexSample result = new VertexSample(height * inverse, ocean, river, lake,
+                displacementContinuity, color,
                 velocityX * inverse, velocityZ * inverse, shoreFactor, averagedDepth);
+        vertexSamples.put(vertexKey, result);
+        return result;
+    }
+
+    /**
+     * Resolves one canonical world column for the duration of a mesh build.
+     *
+     * <p>Missing snapshots and physically covered/dry columns intentionally
+     * resolve to the same dry sentinel. The one-column halo therefore anchors
+     * streaming frontiers exactly like a real shoreline until the neighbor
+     * snapshot arrives and invalidates both meshes.</p>
+     */
+    private static TopologyColumn resolveTopologyColumn(
+            ClientLevel level,
+            int worldX,
+            int worldZ,
+            Map<Long, Boolean> liveSurfaceEligibility,
+            Map<Long, TopologyColumn> topologyColumns
+    ) {
+        long key = columnKey(worldX, worldZ);
+        TopologyColumn cached = topologyColumns.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        ClientWaterChunkSnapshot snapshot = ClientWaterSnapshotStore.getAtBlock(level, worldX, worldZ);
+        if (snapshot == null) {
+            topologyColumns.put(key, DRY_TOPOLOGY_COLUMN);
+            return DRY_TOPOLOGY_COLUMN;
+        }
+        ClientWaterChunkSnapshot.Column column = snapshot.column(worldX & 15, worldZ & 15);
+        TopologyColumn resolved = column.wet() && usesCustomSurface(
+                level,
+                worldX,
+                worldZ,
+                column,
+                liveSurfaceEligibility
+        ) ? new TopologyColumn(column) : DRY_TOPOLOGY_COLUMN;
+        topologyColumns.put(key, resolved);
+        return resolved;
+    }
+
+    /**
+     * Returns the deterministic displacement payload for one world vertex.
+     *
+     * <p>The four touching columns define the exact wet/dry boundary. A second
+     * one-column ring supplies the smooth inland transition. The result depends
+     * only on world-column eligibility, never on the chunk or surface quad that
+     * requested it, so duplicate vertices on chunk edges remain bit-identical.</p>
+     */
+    static float displacementContinuityAt(
+            int worldVertexX,
+            int worldVertexZ,
+            ColumnEligibility eligibility
+    ) {
+        for (int offsetZ = -1; offsetZ <= 0; offsetZ++) {
+            for (int offsetX = -1; offsetX <= 0; offsetX++) {
+                if (!eligibility.test(worldVertexX + offsetX, worldVertexZ + offsetZ)) {
+                    return BOUNDARY_DISPLACEMENT_CONTINUITY;
+                }
+            }
+        }
+        for (int offsetZ = -2; offsetZ <= 1; offsetZ++) {
+            for (int offsetX = -2; offsetX <= 1; offsetX++) {
+                boolean touchingColumn = offsetX >= -1 && offsetX <= 0
+                        && offsetZ >= -1 && offsetZ <= 0;
+                if (!touchingColumn
+                        && !eligibility.test(worldVertexX + offsetX, worldVertexZ + offsetZ)) {
+                    return SHORE_RAMP_DISPLACEMENT_CONTINUITY;
+                }
+            }
+        }
+        return OPEN_WATER_DISPLACEMENT_CONTINUITY;
+    }
+
+    private static float topologyShoreFactor(float displacementContinuity) {
+        if (displacementContinuity <= BOUNDARY_DISPLACEMENT_CONTINUITY) {
+            return 1.0f;
+        }
+        if (displacementContinuity < OPEN_WATER_DISPLACEMENT_CONTINUITY) {
+            return 0.5f;
+        }
+        return 0.0f;
     }
 
     /** Applies bounded brown sediment absorption to one packed RGB surface tint. */
@@ -591,6 +709,21 @@ public final class WaterChunkMeshCache {
 
     private static long chunkKey(int chunkX, int chunkZ) {
         return ((long) chunkX & 0xFFFFFFFFL) | (((long) chunkZ & 0xFFFFFFFFL) << 32);
+    }
+
+    private static long columnKey(int worldX, int worldZ) {
+        return ((long) worldX & 0xFFFFFFFFL) | (((long) worldZ & 0xFFFFFFFFL) << 32);
+    }
+
+    @FunctionalInterface
+    interface ColumnEligibility {
+        boolean test(int worldX, int worldZ);
+    }
+
+    private record TopologyColumn(ClientWaterChunkSnapshot.Column column) {
+        private boolean eligible() {
+            return column != null;
+        }
     }
 
     private record VertexSample(
