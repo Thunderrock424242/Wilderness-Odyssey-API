@@ -36,3 +36,17 @@ If bunker edges still look abrupt, increase blend radius first, then max depth.
 ## 4) What code now does automatically for the starter bunker
 
 When the starter bunker is placed, the placer now also runs a dedicated perimeter pass that blends surface blocks in a short ring (3 blocks wide) around the bunker footprint. This helps the top floor visually merge with surrounding terrain instead of ending in a hard border.
+
+The generated ocean island is also landscaped as an overgrown jungle ruin:
+
+- The raised bunker platform uses grass and dirt instead of exposed dirt across the whole island.
+- The sloped perimeter remains sandstone and sand so the jungle ends in a readable beach.
+- Seeded ground patches, jungle trees, hanging vines, bamboo, mossy boulders, and undergrowth make repeated loads of the same world deterministic.
+- A protected clearing and a worn path on the bunker's negative-Z/front side keep the door and player approach accessible.
+
+Pack authors can tune or disable this pass in `serverconfig/wildernessodysseyapi-server.toml`:
+
+- `starterIslandJungleEnabled = true`
+- `starterIslandJungleDensity = 0.65`
+
+These changes apply when the starter bunker is first generated. Existing worlds whose starter bunker has already been placed are intentionally not redecorated.

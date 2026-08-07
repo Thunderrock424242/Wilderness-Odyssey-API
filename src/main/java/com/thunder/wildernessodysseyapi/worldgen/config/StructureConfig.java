@@ -36,6 +36,10 @@ public final class StructureConfig {
     public static final ModConfigSpec.BooleanValue PREVENT_STARTER_STRUCTURE_HOSTILES;
     /** Debug toggle to skip starter bunker placement and keep vanilla spawn selection. */
     public static final ModConfigSpec.BooleanValue DEBUG_DISABLE_STARTER_BUNKER;
+    /** Decorate the generated starter island as an overgrown jungle ruin. */
+    public static final ModConfigSpec.BooleanValue STARTER_ISLAND_JUNGLE_ENABLED;
+    /** Relative tree and undergrowth density used by the starter island decorator. */
+    public static final ModConfigSpec.DoubleValue STARTER_ISLAND_JUNGLE_DENSITY;
     /** Horizontal radius where hostile mobs may not spawn around the placed starter bunker */
     public static final ModConfigSpec.IntValue STARTER_STRUCTURE_SPAWN_DENY_RADIUS;
     /** Vertical half-height where hostile mobs may not spawn around the placed starter bunker */
@@ -94,6 +98,16 @@ public final class StructureConfig {
                         "If true, the starter bunker will not be placed and vanilla spawn selection will run instead."
                 )
                 .define("debugDisableStarterBunker", false);
+        STARTER_ISLAND_JUNGLE_ENABLED = BUILDER.comment(
+                        "When true, the starter bunker island receives deterministic jungle trees, bamboo,"
+                                + " undergrowth, mossy rocks, and an entrance path after placement."
+                )
+                .define("starterIslandJungleEnabled", true);
+        STARTER_ISLAND_JUNGLE_DENSITY = BUILDER.comment(
+                        "Controls starter island tree and undergrowth density. 0 disables vegetation while 1"
+                                + " produces the intended full jungle density."
+                )
+                .defineInRange("starterIslandJungleDensity", 0.65D, 0.0D, 1.0D);
         STARTER_STRUCTURE_SPAWN_DENY_RADIUS = BUILDER.comment(
                         "Horizontal radius (in blocks) around the starter bunker where hostile mob spawns are denied."
                 )

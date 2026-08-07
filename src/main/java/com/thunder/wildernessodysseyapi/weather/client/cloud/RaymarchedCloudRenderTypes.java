@@ -22,7 +22,9 @@ public final class RaymarchedCloudRenderTypes extends RenderStateShard {
                     .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
                     .setDepthTestState(LEQUAL_DEPTH_TEST)
                     .setCullState(NO_CULL)
-                    .setWriteMaskState(COLOR_DEPTH_WRITE)
+                    // Each altitude band raymarches the same bounded carrier;
+                    // preserving depth lets the translucent bands accumulate.
+                    .setWriteMaskState(COLOR_WRITE)
                     .setOutputState(TRANSLUCENT_TARGET)
                     .createCompositeState(false)
     );

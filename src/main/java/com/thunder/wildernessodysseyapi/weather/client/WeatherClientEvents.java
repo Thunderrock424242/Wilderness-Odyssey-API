@@ -268,7 +268,7 @@ public final class WeatherClientEvents {
                 ),
                 String.format(
                         Locale.ROOT,
-                        "Cloud mesh %s %s/%d | %s | %d tiles | %d vertices | coverage %.3f",
+                        "Cloud render %s %s/%d | %s | %d samples | %d vertices | coverage %.3f",
                         clouds.active() ? "active" : "inactive",
                         clouds.mode(),
                         clouds.layers(),
@@ -276,6 +276,17 @@ public final class WeatherClientEvents {
                         clouds.visibleTiles(),
                         clouds.vertices(),
                         clouds.averageCoverage()
+                ),
+                String.format(
+                        Locale.ROOT,
+                        "Cloud field %dx%d @ %d blocks | light %d | blend %.0f%% | bands 0x%X | distant %s",
+                        clouds.fieldWidth(),
+                        clouds.fieldHeight(),
+                        clouds.fieldSpacing(),
+                        clouds.lightingSteps(),
+                        clouds.fieldBlend() * 100.0,
+                        clouds.bandMask(),
+                        clouds.distantField() ? "on" : "off"
                 ),
                 String.format(
                         Locale.ROOT,

@@ -86,8 +86,17 @@ public final class SpawnBunkerPlacer {
      */
     public static NBTStructurePlacer.PlacementResult placeBunker(ServerLevel level, BlockPos anchor) {
         Vec3i bunkerSize = BUNKER_PLACER.peekSize(level);
-        prepareStarterIsland(level, anchor, bunkerSize);
-        return BUNKER_PLACER.placeAnchored(level, anchor);
+        StarterIslandLayout island = prepareStarterIsland(level, anchor, bunkerSize);
+        NBTStructurePlacer.PlacementResult result = BUNKER_PLACER.placeAnchored(level, anchor);
+        if (result != null) {
+            StarterIslandJungleDecorator.decorate(
+                    level,
+                    island.centerX(),
+                    island.centerZ(),
+                    island.flatRadius(),
+                    result.bounds());
+        }
+        return result;
     }
 
     static BlockPos resolveAnchor(ServerLevel level) {
@@ -210,7 +219,7 @@ public final class SpawnBunkerPlacer {
         return BlockPos.containing(result.bounds().getCenter());
     }
 
-    private static void prepareStarterIsland(ServerLevel level, BlockPos anchor, Vec3i bunkerSize) {
+    private static StarterIslandLayout prepareStarterIsland(ServerLevel level, BlockPos anchor, Vec3i bunkerSize) {
         BlockPos origin = getPlacementOrigin(level, anchor);
         int sizeX = Math.max(1, bunkerSize.getX());
         int sizeZ = Math.max(1, bunkerSize.getZ());
@@ -257,6 +266,7 @@ public final class SpawnBunkerPlacer {
                 }
             }
         }
+        return new StarterIslandLayout(centerX, centerZ, flatRadius);
     }
 
     private static int resolveIslandTopY(double distance,
@@ -273,27 +283,27 @@ public final class SpawnBunkerPlacer {
         return Math.max(seaLevel - 2, islandTopY - drop);
     }
 
-    private static BlockState selectIslandBlock(double distance,
-                                                int flatRadius,
-                                                int shoreRadius,
-                                                int targetTopY,
-                                                int y,
-                                                int seaLevel) {
+    static BlockState selectIslandBlock(double distance,
+                                        int flatRadius,
+                                        int shoreRadius,
+                                        int targetTopY,
+                                        int y,
+                                        int seaLevel) {
         if (y == targetTopY) {
-            // The block below was written by this same column pass, so select the equivalent top material
-            // directly instead of allocating a position and reading the block back from the level.
-            if (distance >= flatRadius || targetTopY <= seaLevel) {
-                return Blocks.SANDSTONE.defaultBlockState();
-            }
-            if (targetTopY > seaLevel && distance < shoreRadius - 4) {
-                return Blocks.DIRT.defaultBlockState();
-            }
-            return (targetTopY <= seaLevel || distance >= shoreRadius - 4)
+            // Keep the raised platform alive with grass while the sloped perimeter becomes a sandy beach.
+            // The old dirt top never spread before the initial screenshot and left the whole island brown.
+            boolean beach = targetTopY <= seaLevel
+                    || distance >= shoreRadius - 4
+                    || (distance > flatRadius && targetTopY <= seaLevel + 1);
+            return beach
                     ? Blocks.SAND.defaultBlockState()
                     : Blocks.GRASS_BLOCK.defaultBlockState();
         }
         if (y >= targetTopY - 3) {
-            return (distance >= flatRadius || targetTopY <= seaLevel)
+            boolean beachFoundation = targetTopY <= seaLevel
+                    || distance >= shoreRadius - 4
+                    || (distance > flatRadius && targetTopY <= seaLevel + 1);
+            return beachFoundation
                     ? Blocks.SANDSTONE.defaultBlockState()
                     : Blocks.DIRT.defaultBlockState();
         }
@@ -303,6 +313,9 @@ public final class SpawnBunkerPlacer {
     private static BlockPos getPlacementOrigin(ServerLevel level, BlockPos surface) {
         BlockPos levelingOffset = BUNKER_PLACER.peekLevelingOffset(level);
         return levelingOffset == null ? surface : surface.subtract(levelingOffset);
+    }
+
+    private record StarterIslandLayout(int centerX, int centerZ, int flatRadius) {
     }
 
 }

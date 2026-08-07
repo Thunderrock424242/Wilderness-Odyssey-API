@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.RegisterShadersEvent;
 import org.lwjgl.opengl.GL20;
 
@@ -59,41 +60,79 @@ public final class RaymarchedCloudShaders {
                 && !WaterShaders.externalShaderPackOwnsWater();
     }
 
-    /** Updates camera-relative ray entry, motion, lighting, and sample-count uniforms. */
+    /** Updates continuous-field mappings, camera-relative rays, motion, and lighting uniforms. */
     public static void updateUniforms(
             float timeSeconds,
             double windOffsetX,
             double windOffsetZ,
-            int originTileX,
-            int originTileZ,
+            int renderCenterX,
+            int renderCenterZ,
             double cameraX,
             double cameraY,
             double cameraZ,
             float cloudHeight,
             float sunAngle,
-            WeatherRenderingConfig.Settings settings
+            Vec3 baseColor,
+            WeatherRenderingConfig.Settings settings,
+            ContinuousCloudFieldAtlas.State atlas
     ) {
-        if (cloudShader == null) {
+        if (cloudShader == null || atlas == null || !atlas.active()) {
             return;
         }
-        float tileSize = CloudCoverageModel.CLOUD_TILE_SIZE;
-        float noiseScale = VolumetricCloudShaders.worldNoiseScale();
+        CloudFieldAtlasModel.Layout previous = atlas.previousLayout();
+        CloudFieldAtlasModel.Layout current = atlas.currentLayout();
+        ContinuousCloudFieldAtlas.bindSamplers(cloudShader);
         cloudShader.safeGetUniform("GameTime").set(timeSeconds);
-        cloudShader.safeGetUniform("WorldOrigin").set(
-                originTileX * tileSize * noiseScale,
-                originTileZ * tileSize * noiseScale
-        );
+        cloudShader.safeGetUniform("RenderOrigin").set((float) renderCenterX, (float) renderCenterZ);
         cloudShader.safeGetUniform("WindOffset").set(
-                (float) windOffsetX * noiseScale,
-                (float) windOffsetZ * noiseScale
+                (float) windOffsetX,
+                (float) windOffsetZ
         );
         cloudShader.safeGetUniform("CameraPosition").set(
-                (float) (cameraX - originTileX * tileSize),
+                (float) (cameraX - renderCenterX),
                 (float) (cameraY - cloudHeight - CLOUD_BASE_OFFSET),
-                (float) (cameraZ - originTileZ * tileSize)
+                (float) (cameraZ - renderCenterZ)
         );
+        cloudShader.safeGetUniform("PreviousNearField").set(
+                (float) previous.nearOriginBlockX(),
+                (float) previous.nearOriginBlockZ(),
+                (float) previous.nearSpacingBlocks(),
+                (float) previous.nearDimension()
+        );
+        cloudShader.safeGetUniform("CurrentNearField").set(
+                (float) current.nearOriginBlockX(),
+                (float) current.nearOriginBlockZ(),
+                (float) current.nearSpacingBlocks(),
+                (float) current.nearDimension()
+        );
+        cloudShader.safeGetUniform("PreviousDistantField").set(
+                (float) previous.distantOriginBlockX(),
+                (float) previous.distantOriginBlockZ(),
+                (float) previous.distantSpacingBlocks(),
+                (float) previous.distantDimension()
+        );
+        cloudShader.safeGetUniform("CurrentDistantField").set(
+                (float) current.distantOriginBlockX(),
+                (float) current.distantOriginBlockZ(),
+                (float) current.distantSpacingBlocks(),
+                (float) current.distantDimension()
+        );
+        cloudShader.safeGetUniform("FieldTextureSize").set(
+                (float) current.atlasWidth(),
+                (float) current.atlasHeight()
+        );
+        cloudShader.safeGetUniform("FieldBlend").set(atlas.blend());
+        cloudShader.safeGetUniform("NearRadius").set((float) current.nearRadiusBlocks());
+        cloudShader.safeGetUniform("DistantRadius").set((float) current.distantRadiusBlocks());
         cloudShader.safeGetUniform("DetailStrength").set((float) settings.volumetricDetailStrength());
         cloudShader.safeGetUniform("RaymarchSteps").set(settings.raymarchSteps());
+        cloudShader.safeGetUniform("LightingSteps").set(current.quality().lightingSteps());
+        Vec3 color = baseColor == null ? new Vec3(1.0, 1.0, 1.0) : baseColor;
+        cloudShader.safeGetUniform("CloudColor").set(
+                (float) color.x,
+                (float) color.y,
+                (float) color.z
+        );
         cloudShader.safeGetUniform("SunDirection").set(
                 (float) Math.cos(sunAngle),
                 (float) Math.sin(sunAngle),
