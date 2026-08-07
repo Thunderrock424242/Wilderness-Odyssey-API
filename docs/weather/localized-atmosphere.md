@@ -629,20 +629,27 @@ or a dimension without a cloud height, rendering falls back safely.
 The renderer provides a quality ladder while keeping the authoritative
 horizontal footprint:
 
-- the horizontal grid is made from `12 x 12` block cloud voxels, matching
-  vanilla's cloud scale;
+- the primary Fancy tier samples a world-snapped continuous field at 12, 6, or
+  4 block spacing. Bilinear GPU sampling removes sample-cell edges, and a
+  double buffer blends both weather updates and field recenters instead of
+  popping to the new field;
 - **Fancy + raymarched enabled** derives clear sky plus the ten standard cloud
   genera: cirrus, cirrostratus, cirrocumulus, altostratus, altocumulus,
   stratus, stratocumulus, cumulus, nimbostratus, and cumulonimbus. A tile may
   blend low, middle, high, and convective decks; cumulonimbus therefore grows a
   deep tower plus a wind-shear-weighted anvil instead of merely becoming a
   thicker flat cloud;
-- the raymarched tier draws only the camera-facing upper or lower cloud shell
-  and integrates world-stable procedural density through the synchronized
-  depth. Shared corner opacity and small depth-tested overlaps remove the
-  visible `12 x 12` ceiling seams. Wispy, layered, cellular, and convective
-  morphologies retain distinct scales, vertical profiles, daylight response,
-  and storm-darkened bases;
+- the raymarched tier uses one bounded carrier volume for every low, middle,
+  high, and convective band rather than one shell per weather tile. The shader
+  reconstructs rounded world-scale silhouettes, fine erosion, and vertical
+  density from continuous coverage/base/depth/storm data. A second atlas plane
+  stores one-hot wispy, layered, cellular, and convective weights, allowing
+  cloud families to blend spatially without losing their distinct scales and profiles;
+  bounded secondary samples toward the sun add self-shadowed interiors,
+  forward scattering, daylight response, and storm-darkened bases;
+- the same atlas contains a coarser distant field. Near and distant volumes
+  cross-fade radially, so horizon silhouettes and storm fronts do not appear as
+  detached flat patches or pop when the detailed radius is crossed;
 - if raymarching is disabled or unavailable, **Fancy + volumetric enabled**
   uses the bounded translucent-slice tier;
 - if the custom shader is unavailable, fails to link, is disabled, or an
@@ -665,13 +672,16 @@ and opacity. High, middle, and low cloud placement remains derived rather than
 saved, so older weather saves and version-2 packets need no migration.
 
 The broad cloud envelope remains anchored to its authoritative world-space
-weather field. Cloud-altitude wind advances only deterministic small-scale morphology,
-using continuous unwrapped motion and long lattice coordinates so a long client
-session cannot snap at a periodic wrap boundary. Cloud edges visibly evolve
-without allowing the whole mass to drift away from the rainy area that owns it.
-Geometry is cached in one client VBO and rebuilt only for a new weather
-sequence, camera cloud-tile movement, quality/config changes, temporal blending,
-or sufficient wind-detail movement.
+weather field. Cloud-altitude wind advances only deterministic small-scale
+morphology. The wind target is damped before it is integrated, render gaps are
+clamped, and the shader has no second horizontal time drift, so changing wind,
+pausing, or uneven frame delivery cannot produce a visible jump. Continuous
+unwrapped offsets and long world coordinates avoid periodic wrap snaps during a
+long client session. Weather and atlas updates blend independently from that
+motion, so the cloud evolves without drifting away from the rainy area that
+owns it. The raymarched carrier VBO is rebuilt only when its near/distant bounds
+change; ordinary camera motion and weather blending update textures and
+uniforms instead of rebuilding visible geometry.
 
 Rain also remains visible beyond vanilla's ten-block near-weather radius.
 Loaded columns on a world-snapped six-block lattice produce sparse vertical
@@ -690,8 +700,9 @@ The F3 overlay adds atmosphere, cloud-optics, and precipitation-mesh lines with
 cell, sequence, synchronized cell count, blend progress, temperature, dew
 point, humidity, pressure, surface/cloud wind, vertical motion, cloud depth,
 dominant cloud genus, storm stage, precipitation, thunder, fog, render
-mode/layer count, visible tile
-count, vertex count, and average coverage. Server activity state
+mode/step count, quality preset, field dimensions and spacing, lighting budget,
+atlas blend, active altitude bands, distant-field state, visible sample count,
+carrier/fallback vertex count, and average coverage. Server activity state
 remains available through `/wilderness weather cell` and `dump` rather than
 adding activity metadata to every client cell.
 
@@ -706,15 +717,20 @@ synchronized atmospheric footprint.
 | --- | ---: | --- |
 | `enabled` | `true` | Replaces the vanilla global sheet only while a localized snapshot controls the dimension. |
 | `raymarchedClouds` | `true` | Uses bounded density integration for Fancy clouds when the built-in shader owns the pass. |
-| `raymarchSteps` | `24` | `16..64`; samples through each visible cloud volume. Reduce this first if cloud GPU cost is too high. |
+| `raymarchSteps` | `24` | `16..64`; primary samples and coordinated preset selector. `16` uses Performance (12-block field, 2 light samples), `17..32` uses Balanced (6-block field, 4 light samples), and `33..64` uses Cinematic (4-block field, 6 light samples). |
 | `volumetricClouds` | `true` | Uses the layered procedural 3D fallback for Fancy clouds when raymarching is disabled or unavailable. |
-| `renderDistanceBlocks` | `384` | `96..512`; horizontal radius sampled for cloud geometry. |
-| `rebuildIntervalTicks` | `5` | `2..40`; minimum interval while blending or wind detail is moving. |
+| `renderDistanceBlocks` | `384` | `96..512`; detailed continuous-field radius. |
+| `rebuildIntervalTicks` | `5` | `2..40`; atlas refresh cadence while synchronized weather snapshots are blending. Each refresh is itself temporally blended. |
 | `windDetailSpeedBlocksPerSecond` | `6.0` | `0..24`; visual morphology speed at full normalized wind. It does not move the authoritative envelope. |
-| `maximumCloudTiles` | `4096` | `256..8192`; hard cap on sampled `12 x 12` tiles per rebuild. |
+| `maximumCloudTiles` | `4096` | `256..8192`; hard cap retained by the volumetric, voxel, and Fast compatibility meshes. The raymarched tier is bounded by its quality preset and render radius. |
 | `opacityMultiplier` | `1.0` | `0.25..1.25`; visual alpha only, without changing cloud occupancy or precipitation. |
 | `volumetricLayerCount` | `8` | `4..20`; more slices improve vertical smoothness but increase fill rate and vertex count. |
 | `volumetricDetailStrength` | `0.65` | `0..1`; procedural erosion/detail strength. |
+| `distantCloudLayer` | `true` | Adds the coarse atlas field and four distant carrier bands with a radial near/distant cross-fade. |
+| `distantCloudDistanceBlocks` | `1024` | `384..2048`; radius of horizon cloud and storm-front silhouettes. |
+| `distantCloudSpacingBlocks` | `48` | `24..96`; requested distant atlas spacing. The active preset may raise it to at least four near-field samples. |
+| `maximumDistantCloudTiles` | `512` | `64..2048`; hard patch cap retained by compatibility meshes; the continuous atlas is bounded by distant radius and spacing. |
+| `cloudShadowStrength` | `0.55` | `0..1`; strength of approximate local sunlight darkening beneath broad clouds. |
 
 | Config path under `localized_precipitation` | Default | Allowed range or behavior |
 | --- | ---: | --- |

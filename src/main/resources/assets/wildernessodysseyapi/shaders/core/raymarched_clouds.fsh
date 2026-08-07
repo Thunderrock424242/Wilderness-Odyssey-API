@@ -1,12 +1,24 @@
 #version 150
 
+uniform sampler2D CloudFieldPrevious;
+uniform sampler2D CloudFieldCurrent;
 uniform vec4 ColorModulator;
 uniform float GameTime;
-uniform vec2 WorldOrigin;
+uniform vec2 RenderOrigin;
 uniform vec2 WindOffset;
 uniform vec3 CameraPosition;
+uniform vec4 PreviousNearField;
+uniform vec4 CurrentNearField;
+uniform vec4 PreviousDistantField;
+uniform vec4 CurrentDistantField;
+uniform vec2 FieldTextureSize;
+uniform float FieldBlend;
+uniform float NearRadius;
+uniform float DistantRadius;
 uniform float DetailStrength;
 uniform int RaymarchSteps;
+uniform int LightingSteps;
+uniform vec3 CloudColor;
 uniform vec3 SunDirection;
 
 in vec3 surfacePosition;
@@ -15,6 +27,12 @@ in vec4 vertexColor;
 in vec3 volumeData;
 
 out vec4 fragColor;
+
+const float MINIMUM_BASE = -16.0;
+const float BASE_RANGE = 176.0;
+const float MAXIMUM_DEPTH = 128.0;
+const float VOLUME_BOTTOM = -16.0;
+const float VOLUME_TOP = 288.0;
 
 float hash13(vec3 point) {
     point = fract(point * 0.1031);
@@ -41,83 +59,264 @@ float valueNoise(vec3 point) {
     return mix(mix(x00, x10, local.y), mix(x01, x11, local.y), local.z);
 }
 
-float cloudNoise(vec3 point) {
-    float result = valueNoise(point) * 0.56;
-    result += valueNoise(point * 2.03 + 11.7) * 0.29;
-    result += valueNoise(point * 4.07 - 7.2) * 0.15;
+float cellularNoise(vec3 point) {
+    vec2 cell = floor(point.xz);
+    vec2 local = fract(point.xz);
+    float distanceToCell = 1.0;
+    for (int z = -1; z <= 1; z++) {
+        for (int x = -1; x <= 1; x++) {
+            vec2 neighbor = vec2(float(x), float(z));
+            vec3 seed = vec3(cell + neighbor, floor(point.y));
+            vec2 feature = neighbor + vec2(
+                    hash13(seed + 3.1),
+                    hash13(seed + 17.7)
+            );
+            float verticalOffset = abs(fract(point.y + hash13(seed + 29.4)) - 0.5) * 0.45;
+            distanceToCell = min(distanceToCell, length(vec3(feature - local, verticalOffset)));
+        }
+    }
+    return 1.0 - clamp(distanceToCell, 0.0, 1.0);
+}
+
+float fractalNoise(vec3 point) {
+    float result = valueNoise(point) * 0.52;
+    result += valueNoise(point * 2.03 + 11.7) * 0.28;
+    result += valueNoise(point * 4.07 - 7.2) * 0.14;
+    result += cellularNoise(point * 1.48 + 5.3) * 0.06;
     return result;
 }
 
-float densityAt(vec3 point, float base, float depth, float coverage, float morphology) {
-    float vertical = clamp((point.y - base) / max(depth, 0.01), 0.0, 1.0);
-    float rounded = pow(max(0.0, sin(vertical * 3.14159265)),
-            mix(0.24, 0.48, step(0.5, morphology)));
-    vec2 world = point.xz * (1.0 / 64.0) + WorldOrigin + WindOffset;
-    world += vec2(GameTime * 0.006, GameTime * 0.002);
-    vec2 shaped = world;
-    shaped = mix(shaped, vec2(world.x * 0.34 + world.y * 0.08, world.y * 2.45),
-            1.0 - step(0.5, morphology));
-    shaped = mix(shaped, world * 0.68,
-            step(0.5, morphology) * (1.0 - step(1.5, morphology)));
-    shaped = mix(shaped, world * 1.16,
-            step(1.5, morphology) * (1.0 - step(2.5, morphology)));
-    shaped = mix(shaped, world * (0.86 + vertical * 0.48), step(2.5, morphology));
-    float detail = cloudNoise(vec3(shaped * 1.30,
-            vertical * mix(3.2, 6.4, step(1.5, morphology)) - GameTime * 0.004));
-    detail = mix(0.60, detail, clamp(DetailStrength, 0.0, 1.0));
-    float threshold = 0.71 - coverage * 0.34 + (1.0 - rounded) * 0.27;
-    return smoothstep(threshold - 0.085, threshold + 0.085, detail);
+vec4 sampleAtlas(
+        sampler2D fieldTexture,
+        vec2 worldXZ,
+        vec4 fieldInfo,
+        bool distant,
+        int band,
+        bool morphologyPlane
+) {
+    float dimension = fieldInfo.w;
+    if (dimension < 1.0) {
+        return vec4(0.0);
+    }
+    vec2 grid = (worldXZ - fieldInfo.xy) / fieldInfo.z;
+    if (grid.x < -0.5 || grid.y < -0.5
+            || grid.x > dimension - 0.5 || grid.y > dimension - 0.5) {
+        return vec4(0.0);
+    }
+    float nearRows = CurrentNearField.w * 4.0;
+    float fieldRows = nearRows + CurrentDistantField.w * 4.0;
+    float rowBase = distant ? nearRows + float(band) * dimension : float(band) * dimension;
+    if (morphologyPlane) {
+        rowBase += fieldRows;
+    }
+    vec2 uv = vec2(
+            (grid.x + 0.5) / FieldTextureSize.x,
+            (rowBase + grid.y + 0.5) / FieldTextureSize.y
+    );
+    return texture(fieldTexture, uv);
+}
+
+vec4 sampleField(vec2 worldXZ, bool distant, int band) {
+    vec4 previousInfo = distant ? PreviousDistantField : PreviousNearField;
+    vec4 currentInfo = distant ? CurrentDistantField : CurrentNearField;
+    vec4 previous = sampleAtlas(
+            CloudFieldPrevious, worldXZ, previousInfo, distant, band, false
+    );
+    vec4 current = sampleAtlas(
+            CloudFieldCurrent, worldXZ, currentInfo, distant, band, false
+    );
+    return mix(previous, current, clamp(FieldBlend, 0.0, 1.0));
+}
+
+vec4 sampleMorphology(vec2 worldXZ, bool distant, int band) {
+    vec4 previousInfo = distant ? PreviousDistantField : PreviousNearField;
+    vec4 currentInfo = distant ? CurrentDistantField : CurrentNearField;
+    vec4 previous = sampleAtlas(
+            CloudFieldPrevious, worldXZ, previousInfo, distant, band, true
+    );
+    vec4 current = sampleAtlas(
+            CloudFieldCurrent, worldXZ, currentInfo, distant, band, true
+    );
+    return mix(previous, current, clamp(FieldBlend, 0.0, 1.0));
+}
+
+vec2 intersectBox(vec3 origin, vec3 direction, vec3 boundsMinimum, vec3 boundsMaximum) {
+    vec3 safeSign = sign(direction);
+    safeSign.x = abs(direction.x) > 0.00001 ? safeSign.x : 1.0;
+    safeSign.y = abs(direction.y) > 0.00001 ? safeSign.y : 1.0;
+    safeSign.z = abs(direction.z) > 0.00001 ? safeSign.z : 1.0;
+    vec3 inverseDirection = safeSign / max(abs(direction), vec3(0.00001));
+    vec3 nearPlane = (boundsMinimum - origin) * inverseDirection;
+    vec3 farPlane = (boundsMaximum - origin) * inverseDirection;
+    vec3 minimumPlane = min(nearPlane, farPlane);
+    vec3 maximumPlane = max(nearPlane, farPlane);
+    float entry = max(max(minimumPlane.x, minimumPlane.y), minimumPlane.z);
+    float exit = min(min(maximumPlane.x, maximumPlane.y), maximumPlane.z);
+    return vec2(entry, exit);
+}
+
+float verticalProfile(float vertical, float wispy, float layered, float cellular, float tower) {
+    float sineProfile = max(0.0, sin(clamp(vertical, 0.0, 1.0) * 3.14159265));
+    float wispyShape = pow(sineProfile, 0.18);
+    float sheetShape = smoothstep(0.01, 0.12, vertical)
+            * (1.0 - smoothstep(0.86, 0.99, vertical));
+    float cellularShape = pow(sineProfile, 0.44);
+    float towerShape = pow(sineProfile, 0.28) * (0.82 + vertical * 0.24);
+    return wispyShape * wispy + sheetShape * layered
+            + cellularShape * cellular + towerShape * tower;
+}
+
+float densityAt(vec3 localPoint, bool distant, int band, out float stormAmount) {
+    vec2 worldXZ = localPoint.xz + RenderOrigin;
+    vec4 field = sampleField(worldXZ, distant, band);
+    float coverage = clamp(field.r, 0.0, 1.0);
+    float base = field.g * BASE_RANGE + MINIMUM_BASE;
+    float depth = max(1.0, field.b * MAXIMUM_DEPTH);
+    stormAmount = field.a;
+    if (coverage < 0.004) {
+        return 0.0;
+    }
+
+    float cameraDistance = length(localPoint.xz - CameraPosition.xz);
+    float nearFade = 1.0 - smoothstep(NearRadius - 72.0, NearRadius, cameraDistance);
+    float distantFade = smoothstep(NearRadius - 96.0, NearRadius + 72.0, cameraDistance)
+            * (1.0 - smoothstep(DistantRadius - 160.0, DistantRadius, cameraDistance));
+    float fieldFade = distant ? distantFade : nearFade;
+    if (fieldFade < 0.001) {
+        return 0.0;
+    }
+
+    float vertical = (localPoint.y - base) / depth;
+    if (vertical <= 0.0 || vertical >= 1.0) {
+        return 0.0;
+    }
+    vec4 morphology = sampleMorphology(worldXZ, distant, band);
+    float wispy = morphology.r;
+    float layered = morphology.g;
+    float cellular = morphology.b;
+    float tower = morphology.a;
+    float weightSum = wispy + layered + cellular + tower;
+    if (weightSum < 0.001) {
+        wispy = smoothstep(46.0, 78.0, base) * (1.0 - smoothstep(30.0, 64.0, depth));
+        tower = smoothstep(28.0, 72.0, depth);
+        layered = (1.0 - tower) * (1.0 - wispy) * smoothstep(0.48, 0.82, coverage);
+        cellular = max(0.0, 1.0 - wispy - tower - layered);
+        weightSum = wispy + layered + cellular + tower;
+    }
+    weightSum = max(0.001, weightSum);
+    wispy /= weightSum;
+    tower /= weightSum;
+    layered /= weightSum;
+    cellular /= weightSum;
+
+    vec2 windWorld = (worldXZ + WindOffset) / 64.0;
+    vec2 wispyWorld = vec2(windWorld.x * 0.32 + windWorld.y * 0.10, windWorld.y * 2.65);
+    vec2 layeredWorld = windWorld * 0.58;
+    vec2 cellularWorld = windWorld * 1.08;
+    vec2 towerWorld = windWorld * (0.76 + vertical * 0.62);
+    vec2 shapedWorld = wispyWorld * wispy + layeredWorld * layered
+            + cellularWorld * cellular + towerWorld * tower;
+
+    // A slow world-scale mask rounds the outer silhouette independently from
+    // the finer erosion, removing atlas-cell-shaped edges.
+    float broadShape = valueNoise(vec3(worldXZ / 210.0, float(band) * 1.7));
+    float mediumShape = fractalNoise(vec3(shapedWorld * 0.88,
+            vertical * (3.2 + tower * 3.8) - GameTime * 0.006));
+    float fineShape = fractalNoise(vec3(shapedWorld * 1.92 + 13.0,
+            vertical * 7.4 + GameTime * 0.003));
+    float detail = mix(mediumShape, mediumShape * 0.76 + fineShape * 0.24,
+            clamp(DetailStrength, 0.0, 1.0));
+    float shape = verticalProfile(vertical, wispy, layered, cellular, tower);
+    float threshold = 0.73 - coverage * 0.36
+            + (1.0 - shape) * 0.26
+            + (0.52 - broadShape) * 0.18;
+    float edgeWidth = mix(0.12, 0.075, clamp(DetailStrength, 0.0, 1.0));
+    float density = smoothstep(threshold - edgeWidth, threshold + edgeWidth, detail);
+
+    return density * coverage * fieldFade;
+}
+
+float lightTransmittance(vec3 point, bool distant, int band, vec3 sunDirection) {
+    float opticalDepth = 0.0;
+    float storm = 0.0;
+    float stepLength = distant ? 18.0 : 12.0;
+    for (int index = 0; index < 6; index++) {
+        if (index >= LightingSteps) {
+            break;
+        }
+        vec3 samplePoint = point + sunDirection * stepLength * (float(index) + 1.0);
+        opticalDepth += densityAt(samplePoint, distant, band, storm) * 0.23;
+    }
+    return exp(-opticalDepth);
 }
 
 void main() {
-    float signedDepth = volumeData.x;
-    float depth = max(1.0, abs(signedDepth) * 128.0);
-    bool topFace = signedDepth > 0.0;
-    float base = topFace ? surfacePosition.y - depth : surfacePosition.y;
-    float middle = base + depth * 0.5;
-
-    // Only the camera-facing shell starts a ray. This removes the visible
-    // stack of internal horizontal planes that the former volume path exposed.
-    if ((CameraPosition.y < middle && topFace)
-            || (CameraPosition.y >= middle && !topFace)) {
+    int fieldLayer = int(floor(clamp(vertexColor.a, 0.0, 0.9999) * 8.0));
+    bool distant = fieldLayer >= 4;
+    int band = distant ? fieldLayer - 4 : fieldLayer;
+    float horizontalRadius = distant ? DistantRadius : NearRadius;
+    vec3 boundsMinimum = vec3(-horizontalRadius, VOLUME_BOTTOM, -horizontalRadius);
+    vec3 boundsMaximum = vec3(horizontalRadius, VOLUME_TOP, horizontalRadius);
+    vec3 rayDirection = normalize(surfacePosition - CameraPosition);
+    vec2 intersection = intersectBox(CameraPosition, rayDirection, boundsMinimum, boundsMaximum);
+    if (intersection.y <= max(intersection.x, 0.0)) {
         discard;
     }
 
-    float coverage = clamp(vertexColor.a, 0.0, 1.0);
-    float packedShape = min(clamp(volumeData.z, 0.0, 1.0) * 4.0, 3.999);
-    float morphology = floor(packedShape);
-    float storm = clamp((fract(packedShape) - 0.10) / 0.80, 0.0, 1.0);
-    vec3 rayDirection = normalize(surfacePosition - CameraPosition);
-    float stepLength = depth / float(max(RaymarchSteps, 1))
-            / max(abs(rayDirection.y), 0.24);
+    bool cameraInside = all(greaterThanEqual(CameraPosition, boundsMinimum))
+            && all(lessThanEqual(CameraPosition, boundsMaximum));
+    float carrierDistance = cameraInside ? intersection.y : max(intersection.x, 0.0);
+    float surfaceDistance = length(surfacePosition - CameraPosition);
+    float carrierTolerance = max(1.25, carrierDistance * 0.0015);
+    if (abs(surfaceDistance - carrierDistance) > carrierTolerance) {
+        discard;
+    }
+
+    float entry = max(intersection.x, 0.0);
+    float exit = intersection.y;
+    float rayLength = max(0.0, exit - entry);
+    float stepLength = rayLength / float(max(RaymarchSteps, 1));
     float transmittance = 1.0;
     float accumulated = 0.0;
     float lightAccumulation = 0.0;
+    float stormAccumulation = 0.0;
+    float cachedSunlight = 1.0;
+    vec3 sun = normalize(SunDirection);
     for (int sampleIndex = 0; sampleIndex < 64; sampleIndex++) {
         if (sampleIndex >= RaymarchSteps || transmittance < 0.025) {
             break;
         }
-        vec3 point = surfacePosition + rayDirection * stepLength * (float(sampleIndex) + 0.5);
-        float vertical = (point.y - base) / depth;
-        if (vertical < 0.0 || vertical > 1.0) {
-            break;
+        vec3 point = CameraPosition + rayDirection
+                * (entry + stepLength * (float(sampleIndex) + 0.5));
+        float storm = 0.0;
+        float density = densityAt(point, distant, band, storm);
+        if (density <= 0.001) {
+            continue;
         }
-        float density = densityAt(point, base, depth, coverage, morphology);
-        float sampleAlpha = density * (0.075 + coverage * 0.095);
+        float sampleAlpha = density * (distant ? 0.105 : 0.135);
         float contribution = transmittance * sampleAlpha;
+        // Reuse one bounded sunlight probe for four neighboring primary
+        // samples. This preserves self-shadowing without multiplying the
+        // default ray budget by every lighting step.
+        if (sampleIndex % 4 == 0) {
+            cachedSunlight = lightTransmittance(point, distant, band, sun);
+        }
         accumulated += contribution;
-        lightAccumulation += contribution * (0.64 + vertical * 0.36);
+        lightAccumulation += contribution * cachedSunlight;
+        stormAccumulation += contribution * storm;
         transmittance *= 1.0 - sampleAlpha;
     }
-    accumulated = min(accumulated, coverage * 0.98);
-    if (accumulated < 0.018) {
+    if (accumulated < 0.012) {
         discard;
     }
 
     float meanLight = lightAccumulation / max(accumulated, 0.001);
-    float daylight = 0.68 + max(0.0, normalize(SunDirection).y) * 0.25;
-    vec3 color = vertexColor.rgb * daylight * meanLight;
-    color += vec3(0.07, 0.075, 0.085) * (1.0 - storm) * (1.0 - transmittance);
-    color *= 1.0 - storm * 0.28;
-    fragColor = vec4(color, accumulated) * ColorModulator;
+    float meanStorm = stormAccumulation / max(accumulated, 0.001);
+    float forwardScatter = pow(max(0.0, dot(rayDirection, sun)), 8.0) * (1.0 - meanStorm);
+    float daylight = 0.62 + max(0.0, sun.y) * 0.28;
+    vec3 color = CloudColor * daylight * (0.48 + meanLight * 0.52);
+    color += vec3(0.13, 0.14, 0.16) * forwardScatter * (1.0 - transmittance);
+    color *= 1.0 - meanStorm * 0.30;
+    float distanceFade = distant ? 0.84 : 1.0;
+    fragColor = vec4(color, min(0.985, accumulated * distanceFade)) * ColorModulator;
 }
