@@ -3,6 +3,7 @@
 ## 1) Feature Pillars
 
 - **Vanilla-first compatibility:** Riftfall is an overlay state that can only exist while Minecraft rain/thunder is active.
+- **Echo-only anomaly:** Riftfall gameplay and purple storm effects can only activate in The Echo dimension.
 - **Rare + cinematic:** Most storms stay normal; some escalate into Riftfall with clear warnings.
 - **Danger without default griefing:** Exposure, mobs, and corruption are threatening, but player builds are protected by default.
 - **Configurable difficulty:** Pack authors can tune rarity, lethality, corruption scope, and meteor damage.

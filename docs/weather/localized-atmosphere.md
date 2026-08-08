@@ -590,7 +590,7 @@ overriding `ClientLevel` weather getters:
 - `LevelRendererLocalizedWeatherMixin` wraps the dimension weather ownership
   hooks inside `renderSnowAndRain` and `tickRain`. Dimension-specific renderers
   run first; `LocalizedPrecipitationRenderer` replaces only vanilla's fallback.
-   Every near rain/snow column receives its own intensity and type, so a dry
+   Every near rain/snow/hail column receives its own intensity and type, so a dry
    camera no longer hides a neighboring rain edge. The renderer owns its blend,
    shader-color, light-map, and depth-write state explicitly, including under
    Sodium. Surface sounds and impacts use the same per-column field. Impacts
@@ -598,7 +598,9 @@ overriding `ClientLevel` weather getters:
    or absent rain pass cannot leave splash-only weather. Muted procedural rings
    replace Minecraft's bright white rain and hail particles on water, leaves,
    and solid ground. Quads lean with synchronized surface wind; snow receives
-   more horizontal drag than rain.
+   more horizontal drag, fewer texture repeats, and restrained lighting. Hail
+   uses small fast-falling geometry pellets instead of reusing the bright snow
+   texture across an entire precipitation column.
 - `ClientLevelLocalizedWeatherMixin` redirects rain/thunder reads only inside
   sky darkness, sky color, and cloud color calculations. It uses localized
   sky-darkening and thunder contributions.
@@ -639,8 +641,11 @@ horizontal footprint:
   blend low, middle, high, and convective decks; cumulonimbus therefore grows a
   deep tower plus a wind-shear-weighted anvil instead of merely becoming a
   thicker flat cloud;
-- the raymarched tier uses one bounded carrier volume for every low, middle,
-  high, and convective band rather than one shell per weather tile. The shader
+- the raymarched tier uses a separate, tightly bounded altitude slab for every
+  low, middle, high, and convective band rather than one full-height shell per
+  weather tile. Stable stratified jitter breaks up coherent slices without
+  temporal shimmer, and Beer-Lambert extinction keeps opacity tied to physical
+  sample distance rather than the chosen ray count or carrier face. The shader
   reconstructs rounded world-scale silhouettes, fine erosion, and vertical
   density from continuous coverage/base/depth/storm data. A second atlas plane
   stores one-hot wispy, layered, cellular, and convective weights, allowing
@@ -884,11 +889,22 @@ All weather commands require permission level 2:
 /wilderness weather set storm_energy <0..1>
 /wilderness weather force rain
 /wilderness weather force snow
+/wilderness weather force hail
+/wilderness weather force cloud <type>
 /wilderness weather clear
 /wilderness weather wildfire risk
 /wilderness weather wildfire ignite
 /wilderness weather dump
 ```
+
+`force cloud` offers tab-completable literals for `clear`, `cirrus`,
+`cirrostratus`, `cirrocumulus`, `altostratus`, `altocumulus`, `stratus`,
+`stratocumulus`, `cumulus`, `nimbostratus`, and `cumulonimbus`. The command
+sets classifier-safe continuous atmosphere fields across the local `3 x 3`
+cell area; it does not send a client-only cloud label. Nimbostratus and
+cumulonimbus include natural precipitation, using snow below the normal
+temperature threshold and rain otherwise. `/wilderness weather clear` resets
+the local test area.
 
 Vanilla remains responsible for parsing, permissions, duration defaults,
 global weather flags, and command feedback. After vanilla commits a clear,
@@ -1007,11 +1023,11 @@ Additional limits and compatibility boundaries:
   physics, not entities and not a full multi-layer fluid solver;
 - distant precipitation is a sparse vanilla-texture rain lattice and there are
   no distant snow curtains;
-- volumetric clouds are layered transparent geometry with procedural density,
-  not compute-shader raymarching, a vertical fluid grid, self-shadow volumes,
-  or separately simulated ice crystals. Cloud genera and altitude decks are
+- the highest built-in cloud tier is a bounded fragment-shader density
+  raymarch, not a compute-shader fluid simulation, vertical fluid grid, or
+  separately simulated ice-crystal volume. Cloud genera and altitude decks are
   physically informed classifications of the synchronized column, and high
-  layer counts can become fill-rate heavy;
+  ray counts can become fill-rate heavy;
 - overhead and sun-path optical cover feed Minecraft's camera-local
   sky/lightmap and fog. This approximates broad moving cloud shadows but is not
   a projected terrain shadow map and does not mutate server lighting;
@@ -1080,7 +1096,13 @@ explicitly changes them; changing size resets atmospheric state.
    sparse rain curtains connect the distant cloud footprint to loaded terrain
    and fade into storm fog rather than ending at ten blocks.
 3. **Verify functional cloud coverage and quality modes.** In Video Settings,
-   set Clouds to **Fancy**, then run `/wilderness weather force rain`. Confirm
+   set Clouds to **Fancy**, then use tab completion after
+   `/wilderness weather force cloud` to cycle through every cloud genus. Wait
+   for snapshot and atlas blending after each command and confirm the F3 cloud
+   label matches the requested type. In particular, compare `cirrus`,
+   `stratus`, `cumulus`, `nimbostratus`, and `cumulonimbus` to exercise wispy,
+   layered, cellular, precipitating, and deep-convective shapes. Then run
+   `/wilderness weather force rain`. Confirm
    the F3 `Cloud mesh active volume/8` line reports nonzero tiles and vertices.
    Look up
    throughout the raining area and confirm every raining column is under cloud,
@@ -1255,9 +1277,9 @@ visual depth without creating another weather authority:
    should fade into distance fog, use a strict draw budget, remain outside the
    local particle volume, and disappear when Wilderness does not own weather
    rendering in the dimension.
-4. **Optional true raymarched clouds and projected terrain shadows.** Add an
-   opt-in high/ultra renderer that raymarches the same synchronized cloud field
-   used by the current cloud tiers. Project cloud transmittance into a
+4. **Projected terrain shadows.** The opt-in raymarched renderer now consumes
+   the same synchronized cloud field as the compatibility tiers. The remaining
+   step is to project cloud transmittance into a
    low-resolution, temporally filtered terrain-shadow texture instead of
    changing server light levels. Keep the existing volumetric/fallback renderer
    for unsupported GPUs, shader packs, external weather owners, and lower

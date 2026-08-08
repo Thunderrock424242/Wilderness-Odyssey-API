@@ -107,7 +107,7 @@ public final class StructureConfig {
                         "Controls starter island tree and undergrowth density. 0 disables vegetation while 1"
                                 + " produces the intended full jungle density."
                 )
-                .defineInRange("starterIslandJungleDensity", 0.65D, 0.0D, 1.0D);
+                .defineInRange("starterIslandJungleDensity", 0.75D, 0.0D, 1.0D);
         STARTER_STRUCTURE_SPAWN_DENY_RADIUS = BUILDER.comment(
                         "Horizontal radius (in blocks) around the starter bunker where hostile mob spawns are denied."
                 )

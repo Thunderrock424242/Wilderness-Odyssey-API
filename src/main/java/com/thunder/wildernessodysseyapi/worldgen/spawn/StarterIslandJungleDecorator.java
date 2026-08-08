@@ -63,7 +63,7 @@ public final class StarterIslandJungleDecorator {
     static int targetTreeCount(int flatRadius, double density) {
         int usableRadius = Math.max(0, flatRadius - TREE_EDGE_MARGIN);
         double area = Math.PI * usableRadius * usableRadius;
-        return Math.max(0, Math.min(96, (int) Math.round((area / 260.0D) * density)));
+        return Math.max(0, Math.min(160, (int) Math.round((area / 220.0D) * density)));
     }
 
     static boolean isProtectedPosition(int x,

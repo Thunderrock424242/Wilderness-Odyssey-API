@@ -26,6 +26,11 @@ class StarterIslandJungleDecoratorTest {
     @Test
     void densityCanDisableTreesAndCapsLargeIslands() {
         assertEquals(0, StarterIslandJungleDecorator.targetTreeCount(80, 0.0D));
-        assertEquals(96, StarterIslandJungleDecorator.targetTreeCount(400, 1.0D));
+        assertEquals(160, StarterIslandJungleDecorator.targetTreeCount(400, 1.0D));
+    }
+
+    @Test
+    void defaultDensityProducesAFullJungleCanopyOnTheStarterIsland() {
+        assertTrue(StarterIslandJungleDecorator.targetTreeCount(121, 0.75D) >= 140);
     }
 }

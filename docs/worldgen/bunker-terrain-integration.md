@@ -41,12 +41,14 @@ The generated ocean island is also landscaped as an overgrown jungle ruin:
 
 - The raised bunker platform uses grass and dirt instead of exposed dirt across the whole island.
 - The sloped perimeter remains sandstone and sand so the jungle ends in a readable beach.
-- Seeded ground patches, jungle trees, hanging vines, bamboo, mossy boulders, and undergrowth make repeated loads of the same world deterministic.
-- A protected clearing and a worn path on the bunker's negative-Z/front side keep the door and player approach accessible.
+- Broad terrain hummocks, seeded ground patches, mossy boulders, and fallen logs break up the flat platform.
+- Jungle trees, shrubs, hanging vines, bamboo, and undergrowth share randomized grove centers, producing dense pockets and irregular clearings instead of an even perimeter ring.
+- The bunker NBT contains a 157 x 76 x 182 underground facility. The landscape scan protects only its above-ground shell, allowing vegetation over the buried footprint while keeping trunks out of the visible entrance and roof.
+- A protected clearing and a worn path on the above-ground shell's negative-Z/front side keep the door and player approach accessible.
 
 Pack authors can tune or disable this pass in `serverconfig/wildernessodysseyapi-server.toml`:
 
 - `starterIslandJungleEnabled = true`
-- `starterIslandJungleDensity = 0.65`
+- `starterIslandJungleDensity = 0.75`
 
 These changes apply when the starter bunker is first generated. Existing worlds whose starter bunker has already been placed are intentionally not redecorated.

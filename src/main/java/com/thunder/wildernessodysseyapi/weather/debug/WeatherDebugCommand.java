@@ -2,7 +2,9 @@ package com.thunder.wildernessodysseyapi.weather.debug;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereView;
+import com.thunder.wildernessodysseyapi.weather.api.CloudType;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherForecast;
@@ -68,7 +70,8 @@ public final class WeatherDebugCommand {
                                                 context.getSource(), PrecipitationType.SNOW)))
                                 .then(Commands.literal("hail")
                                         .executes(context -> force(
-                                                context.getSource(), PrecipitationType.HAIL))))
+                                                context.getSource(), PrecipitationType.HAIL)))
+                                .then(cloudTypes()))
                         .then(Commands.literal("clear")
                                 .executes(context -> clear(context.getSource())))
                         .then(Commands.literal("dump")
@@ -88,6 +91,16 @@ public final class WeatherDebugCommand {
                                 field,
                                 DoubleArgumentType.getDouble(context, "value")
                         )));
+    }
+
+    /** Builds literal children so every supported genus appears in tab completion. */
+    private static LiteralArgumentBuilder<CommandSourceStack> cloudTypes() {
+        LiteralArgumentBuilder<CommandSourceStack> cloud = Commands.literal("cloud");
+        for (CloudType type : CloudType.values()) {
+            cloud.then(Commands.literal(type.name().toLowerCase(Locale.ROOT))
+                    .executes(context -> forceCloud(context.getSource(), type)));
+        }
+        return cloud;
     }
 
     private static int sample(CommandSourceStack source) {
@@ -289,6 +302,23 @@ public final class WeatherDebugCommand {
         return changed;
     }
 
+    private static int forceCloud(CommandSourceStack source, CloudType type) {
+        int changed = WeatherAuthority.get().forceCloudType(
+                source.getLevel(),
+                BlockPos.containing(source.getPosition()),
+                type
+        );
+        if (changed == 0) {
+            source.sendFailure(Component.literal("Localized weather is disabled in this dimension."));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal(
+                "Forced the " + type.displayName() + " cloud preset across " + changed
+                        + " atmosphere cells. Use '/wilderness weather clear' to reset it."
+        ), true);
+        return changed;
+    }
+
     private static int clear(CommandSourceStack source) {
         int changed = WeatherAuthority.get().clearLocalWeather(
                 source.getLevel(),
@@ -299,7 +329,7 @@ public final class WeatherDebugCommand {
             return 0;
         }
         source.sendSuccess(() -> Component.literal(
-                "Cleared local precipitation across " + changed + " atmosphere cells."
+                "Cleared local weather across " + changed + " atmosphere cells."
         ), true);
         return changed;
     }

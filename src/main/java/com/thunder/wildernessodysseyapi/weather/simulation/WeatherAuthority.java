@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.weather.simulation;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereView;
+import com.thunder.wildernessodysseyapi.weather.api.CloudType;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherQuery;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherForecast;
@@ -285,7 +286,7 @@ public final class WeatherAuthority implements WeatherQuery {
         return forceContext(context, next, level.getGameTime());
     }
 
-    /** Forces localized rain or snow in the 3 by 3 cells around an operator. */
+    /** Forces localized rain, snow, or hail in the 3 by 3 cells around an operator. */
     public int forcePrecipitation(ServerLevel level, BlockPos position, PrecipitationType type) {
         if (type == null || type == PrecipitationType.NONE || !WeatherConfig.dimensionEnabled(level.dimension())) {
             return 0;
@@ -328,7 +329,43 @@ public final class WeatherAuthority implements WeatherQuery {
         return changed;
     }
 
-    /** Clears precipitation and storm energy from the local 3 by 3 cell area. */
+    /**
+     * Forces one derived cloud genus in the 3 by 3 cells around an operator.
+     *
+     * <p>The synchronized atmospheric fields remain authoritative. Clients
+     * derive the requested type through the normal classifier and render it
+     * through the normal continuous cloud atlas.</p>
+     */
+    public int forceCloudType(ServerLevel level, BlockPos position, CloudType type) {
+        if (type == null || !WeatherConfig.dimensionEnabled(level.dimension())) {
+            return 0;
+        }
+        WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
+        AtmosphereSavedData data = data(level, scheduling);
+        AtmosphereCellKey center = AtmosphereCellKey.fromBlock(
+                position.getX(),
+                position.getZ(),
+                scheduling.cellSize()
+        );
+        int changed = 0;
+        for (int offsetX = -1; offsetX <= 1; offsetX++) {
+            for (int offsetZ = -1; offsetZ <= 1; offsetZ++) {
+                AtmosphereCellKey key = new AtmosphereCellKey(center.x() + offsetX, center.z() + offsetZ);
+                AtmosphereView view = ensureCell(level, data, key, scheduling);
+                WeatherSample forced = CloudDebugPreset.apply(type, view.sample());
+                if (data.grid().force(key, forced, level.getGameTime())) {
+                    changed++;
+                }
+            }
+        }
+        if (changed > 0) {
+            data.markChanged();
+            WeatherSnapshotManager.markLevelDirty(level.dimension());
+        }
+        return changed;
+    }
+
+    /** Clears cloud moisture, precipitation, and storm energy from the local 3 by 3 cell area. */
     public int clearLocalWeather(ServerLevel level, BlockPos position) {
         if (!WeatherConfig.dimensionEnabled(level.dimension())) {
             return 0;
