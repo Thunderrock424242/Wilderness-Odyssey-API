@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.weather.client.cloud;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies named cloud genera create the expected altitude decks. */
@@ -29,6 +30,7 @@ class CloudLayerProfileTest {
         assertTrue(profile.low().visible());
         assertTrue(profile.middle().visible());
         assertFalse(profile.convective().visible());
+        assertEquals(profile.low().baseOffsetBlocks(), profile.lowestVisibleBaseOffsetBlocks());
     }
 
     @Test

@@ -136,6 +136,22 @@ public record CloudLayerProfile(
         return result;
     }
 
+    /**
+     * Returns the lowest physical base among visible decks.
+     *
+     * <p>Precipitation originates here rather than at the dominant optical
+     * deck, which may be a higher anvil or middle-level overcast layer.</p>
+     */
+    public double lowestVisibleBaseOffsetBlocks() {
+        double lowest = Double.POSITIVE_INFINITY;
+        for (BandProfile candidate : bands()) {
+            if (candidate.visible()) {
+                lowest = Math.min(lowest, candidate.baseOffsetBlocks());
+            }
+        }
+        return Double.isFinite(lowest) ? lowest : Double.NaN;
+    }
+
     /** Returns a normalized union-like visibility signal across every deck. */
     public double visibleCoverage() {
         double clear = 1.0;

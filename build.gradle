@@ -16,7 +16,7 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = "4.1.1"
+version = "4.2.0"
 group = "com.thunder.wildernessodysseyapi"
 
 base {

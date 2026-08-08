@@ -33,7 +33,6 @@ import java.util.Map;
  */
 public final class LocalizedCloudRenderer {
 
-    private static final double CLOUD_BASE_OFFSET = 0.33;
     private static final float CLOUD_U = 17.5F / 256.0F;
     private static final float CLOUD_V = 0.5F / 256.0F;
 
@@ -169,7 +168,7 @@ public final class LocalizedCloudRenderer {
         poseStack.mulPose(frustumMatrix);
         poseStack.translate(
                 builtOriginTileX * (double) CloudCoverageModel.CLOUD_TILE_SIZE - camX,
-                cloudHeight - camY + CLOUD_BASE_OFFSET,
+                CloudAltitudeModel.dimensionBaseY(cloudHeight) - camY,
                 builtOriginTileZ * (double) CloudCoverageModel.CLOUD_TILE_SIZE - camZ
         );
         cloudBuffer.bind();
@@ -277,7 +276,7 @@ public final class LocalizedCloudRenderer {
         poseStack.mulPose(frustumMatrix);
         poseStack.translate(
                 layout.centerBlockX() - camX,
-                cloudHeight - camY + CLOUD_BASE_OFFSET,
+                CloudAltitudeModel.dimensionBaseY(cloudHeight) - camY,
                 layout.centerBlockZ() - camZ
         );
         continuousCloudBuffer.bind();

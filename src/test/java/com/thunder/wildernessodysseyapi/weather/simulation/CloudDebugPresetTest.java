@@ -33,11 +33,11 @@ class CloudDebugPresetTest {
     }
 
     @Test
-    void precipitatingCloudPresetsRespectTheLocalTemperature() {
+    void cloudShapePresetsUseRainAndLeaveExplicitSnowToTheSnowCommand() {
         WeatherSample cold = CloudDebugPreset.apply(CloudType.NIMBOSTRATUS, baseline(-5.0));
         WeatherSample warm = CloudDebugPreset.apply(CloudType.CUMULONIMBUS, baseline(18.0));
 
-        assertEquals(PrecipitationType.SNOW, cold.precipitationType());
+        assertEquals(PrecipitationType.RAIN, cold.precipitationType());
         assertEquals(PrecipitationType.RAIN, warm.precipitationType());
         assertTrue(cold.precipitationIntensity() > 0.0);
         assertTrue(warm.precipitationIntensity() > cold.precipitationIntensity());

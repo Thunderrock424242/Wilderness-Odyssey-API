@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.client.precipitation;
 
+import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
+
 /**
  * Pure quality, opacity, and deterministic-motion rules for precipitation.
  *
@@ -41,6 +43,12 @@ public final class PrecipitationVisualModel {
     /** Applies the client opacity preference without allowing invalid alpha. */
     public static float scaledAlpha(float alpha, double opacityMultiplier) {
         return unit((float) (alpha * Math.max(0.0, finiteOrZero(opacityMultiplier))));
+    }
+
+    /** Returns whether the camera-local phase may use Minecraft's rain ambience. */
+    public static boolean usesRainSound(PrecipitationType type, double intensity) {
+        return (type == PrecipitationType.RAIN || type == PrecipitationType.HAIL)
+                && intensity > PRECIPITATION_EPSILON;
     }
 
     /** Uses fewer vertical texture repeats so snow reads as flakes instead of a white wall. */

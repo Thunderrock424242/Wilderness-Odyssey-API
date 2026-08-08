@@ -60,6 +60,17 @@ class VanillaWeatherCommandAdapterTest {
     }
 
     @Test
+    void coldOrdinaryBiomeCommandRainDoesNotBecomeSnowOutsideWinter() {
+        WeatherSample cold = VanillaWeatherCommandAdapter.apply(
+                sample(-4.0),
+                VanillaWeatherCommandAdapter.State.RAIN,
+                false
+        );
+
+        assertEquals(PrecipitationType.RAIN, cold.precipitationType());
+    }
+
+    @Test
     void thunderProducesLightningEligibleLocalizedWeather() {
         WeatherSample thunder = VanillaWeatherCommandAdapter.apply(
                 sample(18.0),
