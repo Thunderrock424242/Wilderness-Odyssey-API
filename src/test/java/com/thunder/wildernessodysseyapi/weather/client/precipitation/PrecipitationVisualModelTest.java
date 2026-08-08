@@ -1,8 +1,10 @@
 package com.thunder.wildernessodysseyapi.weather.client.precipitation;
 
+import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PrecipitationVisualModelTest {
@@ -66,6 +68,14 @@ class PrecipitationVisualModelTest {
         assertEquals(0.5F, PrecipitationVisualModel.scaledAlpha(0.5F, 1.0), 1.0E-6F);
         assertEquals(1.0F, PrecipitationVisualModel.scaledAlpha(0.8F, 4.0), 1.0E-6F);
         assertEquals(0.0F, PrecipitationVisualModel.scaledAlpha(0.8F, Double.NaN), 1.0E-6F);
+    }
+
+    @Test
+    void rainAmbienceNeverPlaysForCameraLocalSnow() {
+        assertTrue(PrecipitationVisualModel.usesRainSound(PrecipitationType.RAIN, 0.8));
+        assertTrue(PrecipitationVisualModel.usesRainSound(PrecipitationType.HAIL, 0.8));
+        assertFalse(PrecipitationVisualModel.usesRainSound(PrecipitationType.SNOW, 0.8));
+        assertFalse(PrecipitationVisualModel.usesRainSound(PrecipitationType.RAIN, 0.0));
     }
 
     @Test

@@ -24,7 +24,7 @@ public final class ModConstants {
      * @deprecated use {@link #currentVersion()} so the value comes from generated NeoForge metadata
      */
     @Deprecated(forRemoval = false)
-    public static final String VERSION = "4.1.1";
+    public static final String VERSION = "4.2.0";
 
     /**
      * Returns the release version generated from the top-level {@code build.gradle} project version.

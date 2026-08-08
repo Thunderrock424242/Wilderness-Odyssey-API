@@ -27,8 +27,6 @@ final class CloudDebugPreset {
         Signals signals = signals(type);
         PrecipitationType precipitationType = signals.precipitation() <= 0.0
                 ? PrecipitationType.NONE
-                : old.temperature() <= WeatherSample.SNOW_MAX_TEMPERATURE
-                ? PrecipitationType.SNOW
                 : PrecipitationType.RAIN;
         return new WeatherSample(
                 old.temperature(),

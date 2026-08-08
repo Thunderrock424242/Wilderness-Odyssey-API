@@ -9,6 +9,8 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudAltitudeModel;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import com.thunder.wildernessodysseyapi.weather.client.precipitation.PrecipitationImpactModel.ImpactSurface;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import net.minecraft.client.Camera;
@@ -121,7 +123,7 @@ public final class LocalizedPrecipitationRenderer {
         WeatherRenderingConfig.Settings settings = WeatherRenderingConfig.settings();
         int nearRadius = Minecraft.useFancyGraphics() ? FANCY_NEAR_RADIUS : FAST_NEAR_RADIUS;
         renderColumnCount = 0;
-        collectNearColumns(level, camX, camY, camZ, nearRadius, settings);
+        collectNearColumns(level, camX, camY, camZ, cloudHeight, nearRadius, settings);
         if (settings.distantRainShafts()) {
             rebuildDistantShaftsIfNeeded(
                     level,
@@ -182,6 +184,16 @@ public final class LocalizedPrecipitationRenderer {
         RandomSource random = RandomSource.create((long) ticks * 312987231L);
         LevelReader levelReader = level;
         BlockPos cameraPos = BlockPos.containing(camera.getPosition());
+        PrecipitationType cameraType = ClientWeatherCoordinator.precipitationTypeAt(level, cameraPos);
+        double cameraIntensity = ClientWeatherCoordinator.visualPrecipitationIntensityAt(
+                level,
+                cameraPos.getX() + 0.5,
+                cameraPos.getZ() + 0.5
+        );
+        boolean usesRainSound = PrecipitationVisualModel.usesRainSound(cameraType, cameraIntensity);
+        if (!usesRainSound) {
+            rainSoundTime = 0;
+        }
         BlockPos soundPos = null;
         ParticleStatus particleStatus = minecraft.options.particles().get();
         int attempts = Minecraft.useFancyGraphics() ? 100 : 50;
@@ -285,7 +297,7 @@ public final class LocalizedPrecipitationRenderer {
             }
         }
 
-        if (soundPos != null && random.nextInt(3) < rainSoundTime++) {
+        if (usesRainSound && soundPos != null && random.nextInt(3) < rainSoundTime++) {
             rainSoundTime = 0;
             if (soundPos.getY() > cameraPos.getY() + 1
                     && levelReader.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, cameraPos).getY()
@@ -349,6 +361,7 @@ public final class LocalizedPrecipitationRenderer {
             double camX,
             double camY,
             double camZ,
+            float cloudHeight,
             int radius,
             WeatherRenderingConfig.Settings settings
     ) {
@@ -385,8 +398,16 @@ public final class LocalizedPrecipitationRenderer {
 
                 int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING, blockX, blockZ);
                 int bottomY = Math.max(cameraY - radius, surfaceY);
-                int topY = Math.max(cameraY + radius, surfaceY);
-                if (bottomY == topY) {
+                CloudFieldSample cloudField = ClientWeatherCoordinator.cloudFieldAt(
+                        level,
+                        blockX + 0.5,
+                        blockZ + 0.5
+                );
+                int topY = CloudAltitudeModel.precipitationTopY(
+                        Math.max(cameraY + radius, surfaceY),
+                        CloudAltitudeModel.precipitationBaseY(cloudHeight, cloudField)
+                );
+                if (bottomY >= topY) {
                     continue;
                 }
                 double distance = Math.hypot(blockX + 0.5 - camX, blockZ + 0.5 - camZ);
@@ -484,8 +505,19 @@ public final class LocalizedPrecipitationRenderer {
                 }
 
                 int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING, blockX, blockZ);
-                int topY = Math.max(surfaceY + 16, roundedCloudHeight);
-                topY = Math.min(topY, level.getMaxBuildHeight() - 1);
+                CloudFieldSample cloudField = ClientWeatherCoordinator.cloudFieldAt(
+                        level,
+                        blockX + 0.5,
+                        blockZ + 0.5
+                );
+                int desiredTopY = Math.min(
+                        Math.max(surfaceY + 16, roundedCloudHeight),
+                        level.getMaxBuildHeight() - 1
+                );
+                int topY = CloudAltitudeModel.precipitationTopY(
+                        desiredTopY,
+                        CloudAltitudeModel.precipitationBaseY(cloudHeight, cloudField)
+                );
                 if (topY <= surfaceY) {
                     continue;
                 }

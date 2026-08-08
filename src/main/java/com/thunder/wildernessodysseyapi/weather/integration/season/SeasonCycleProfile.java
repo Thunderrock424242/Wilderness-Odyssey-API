@@ -39,6 +39,9 @@ public final class SeasonCycleProfile {
         // Wildfire season is narrowest around the warmest part of the year.
         // Actual ignition still requires independently simulated extreme drought.
         double fireSeasonFactor = unit((temperatureWave - 0.35) / 0.65);
+        // Snow eligibility is deliberately narrower than generic cold weather,
+        // preventing autumn or spring cold snaps from whitening ordinary biomes.
+        double snowSeasonFactor = unit((-temperatureWave - 0.35) / 0.65);
 
         return new SeasonalWeatherInfluence.SeasonalOffset(
                 temperatureWave * controls.temperatureAmplitudeCelsius(),
@@ -46,6 +49,7 @@ public final class SeasonCycleProfile {
                 (warmConvection - coldStability) * controls.storminessAmplitude(),
                 1.0 + temperatureWave * 0.18,
                 fireSeasonFactor,
+                snowSeasonFactor,
                 true
         );
     }
@@ -75,6 +79,7 @@ public final class SeasonCycleProfile {
                     controls.storminessAmplitude() * 0.85 * intensity,
                     0.92,
                     0.0,
+                    0.0,
                     true
             );
         }
@@ -84,6 +89,7 @@ public final class SeasonCycleProfile {
                 -controls.storminessAmplitude() * 0.55 * intensity,
                 1.16,
                 intensity,
+                0.0,
                 true
         );
     }

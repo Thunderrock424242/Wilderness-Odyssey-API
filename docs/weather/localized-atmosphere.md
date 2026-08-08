@@ -902,9 +902,9 @@ All weather commands require permission level 2:
 `stratocumulus`, `cumulus`, `nimbostratus`, and `cumulonimbus`. The command
 sets classifier-safe continuous atmosphere fields across the local `3 x 3`
 cell area; it does not send a client-only cloud label. Nimbostratus and
-cumulonimbus include natural precipitation, using snow below the normal
-temperature threshold and rain otherwise. `/wilderness weather clear` resets
-the local test area.
+cumulonimbus include rain so cloud-shape testing cannot accidentally introduce
+out-of-season snow. Use `force snow` when testing snow. The
+`/wilderness weather clear` command resets the local test area.
 
 Vanilla remains responsible for parsing, permissions, duration defaults,
 global weather flags, and command feedback. After vanilla commits a clear,
@@ -913,8 +913,10 @@ retained and currently player-relevant Overworld cell. Cells that become
 player-relevant during the command receive the same state before their next
 snapshot. Autonomous atmospheric evolution pauses for the vanilla duration;
 rain and thunder clear when that duration expires, then normal simulation
-resumes. Vanilla rain becomes snow in atmospheric cells below the normal snow
-temperature threshold.
+resumes. Vanilla rain becomes snow only when wet-bulb temperature is below the
+normal snow threshold and the cell is in either a permanently cold biome or an
+Ecliptic/Serene temperate winter. A cold snap alone cannot turn an ordinary
+non-winter biome's rain into snow.
 
 The `/wilderness weather` commands remain localized diagnostics and testing
 controls. `sample` reports the interpolated sample at the command source.
@@ -1082,8 +1084,10 @@ explicitly changes them; changing size resets atmospheric state.
 2. **Verify vanilla command integration.** Run `/weather rain 20s`; confirm
    rain quads, particles, precipitation sounds, sky darkening, air fog, and
    cloud cover around every Overworld player. Move into a newly relevant cell
-   during the duration and confirm it receives the same rain. In a cold
-   atmospheric cell, confirm the command produces snow instead. Run
+   during the duration and confirm it receives the same rain. In a cold biome
+   or an Ecliptic/Serene temperate winter, confirm freezing wet-bulb air
+   produces snow instead. Confirm an ordinary non-winter biome remains rain
+   through a short cold snap. Run
    `/weather thunder 20s` and confirm the local sample becomes
    lightning-eligible. Run `/weather clear` and confirm precipitation stops
    after synchronization and client blending. Then run
@@ -1092,9 +1096,13 @@ explicitly changes them; changing size resets atmospheric state.
    `/wilderness weather force snow`; confirm snow replaces rain. Run
    `/wilderness weather clear` and confirm both stop after synchronization and
    blending. Walk across the forced-cell edge and confirm nearby rainy columns
-   remain visible while the camera itself is still dry. From a hill, confirm
+   remain visible while the camera itself is still dry. After switching to
+   `force snow`, confirm the camera-local rain ambience stops even if a nearby
+   blended cell still contains rain. From a hill, confirm
    sparse rain curtains connect the distant cloud footprint to loaded terrain
-   and fade into storm fog rather than ending at ten blocks.
+   and fade into storm fog rather than ending at ten blocks. Fly above the
+   storm deck and look down; both nearby streaks and distant shafts must stop at
+   the lowest visible cloud base and never continue into clear air above it.
 3. **Verify functional cloud coverage and quality modes.** In Video Settings,
    set Clouds to **Fancy**, then use tab completion after
    `/wilderness weather force cloud` to cycle through every cloud genus. Wait

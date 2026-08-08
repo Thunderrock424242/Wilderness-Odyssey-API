@@ -53,8 +53,14 @@ public final class WeatherPhenomenaModel {
                 + oceanStorm * 0.020 * rate, -1.0, 1.0);
         double precipitation = weather.precipitationIntensity();
         PrecipitationType type = weather.precipitationType();
-        if (lakeEffect >= 0.28 && temperature <= WeatherSample.SNOW_MAX_TEMPERATURE) {
-            precipitation = unit(Math.max(precipitation, lakeEffect * 0.62));
+        double lakePrecipitation = unit(Math.max(precipitation, lakeEffect * 0.62));
+        if (lakeEffect >= 0.28 && PrecipitationPhaseModel.classify(
+                lakePrecipitation,
+                temperature,
+                humidity,
+                inputs
+        ) == PrecipitationType.SNOW) {
+            precipitation = lakePrecipitation;
             type = PrecipitationType.SNOW;
         }
 

@@ -225,15 +225,12 @@ public final class AtmosphereSimulationEngine {
         cloudWater = unit(cloudWater - precipitationLoss);
         vapor = Math.max(0.0, vapor - precipitationLoss * vaporCapacity * 0.15);
         humidity = AtmosphericThermodynamics.relativeHumidity(temperature, vapor);
-        double wetBulbTemperature = AtmosphericThermodynamics.wetBulbTemperature(
+        PrecipitationType precipitationType = PrecipitationPhaseModel.classify(
+                precipitationIntensity,
                 temperature,
-                humidity
+                humidity,
+                inputs
         );
-        PrecipitationType precipitationType = precipitationIntensity <= 0.001
-                ? PrecipitationType.NONE
-                : wetBulbTemperature <= WeatherSample.SNOW_MAX_TEMPERATURE
-                        ? PrecipitationType.SNOW
-                        : PrecipitationType.RAIN;
 
         double cloudDepthTarget = unit(
                 cloudWater * 0.38

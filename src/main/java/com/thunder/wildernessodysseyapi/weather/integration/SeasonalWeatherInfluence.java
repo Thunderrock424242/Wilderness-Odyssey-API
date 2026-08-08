@@ -26,6 +26,7 @@ public interface SeasonalWeatherInfluence {
      * @param storminess convective development shift
      * @param evaporationMultiplier seasonal surface evaporation multiplier
      * @param fireSeasonFactor normalized temperate-summer or tropical-dry-season strength
+     * @param snowSeasonFactor normalized temperate-winter snowfall eligibility
      * @param calendarAvailable whether an external calendar supplied a real season phase
      */
     record SeasonalOffset(
@@ -34,9 +35,32 @@ public interface SeasonalWeatherInfluence {
             double storminess,
             double evaporationMultiplier,
             double fireSeasonFactor,
+            double snowSeasonFactor,
             boolean calendarAvailable
     ) {
-        public static final SeasonalOffset NONE = new SeasonalOffset(0.0, 0.0, 0.0, 1.0, 0.0, false);
+        public static final SeasonalOffset NONE = new SeasonalOffset(
+                0.0, 0.0, 0.0, 1.0, 0.0, 0.0, false
+        );
+
+        /** Retains the pre-snow-season construction shape for optional adapters. */
+        public SeasonalOffset(
+                double temperatureCelsius,
+                double humidity,
+                double storminess,
+                double evaporationMultiplier,
+                double fireSeasonFactor,
+                boolean calendarAvailable
+        ) {
+            this(
+                    temperatureCelsius,
+                    humidity,
+                    storminess,
+                    evaporationMultiplier,
+                    fireSeasonFactor,
+                    0.0,
+                    calendarAvailable
+            );
+        }
 
         /** Retains the original construction shape for API callers without fire-season metadata. */
         public SeasonalOffset(
@@ -45,7 +69,7 @@ public interface SeasonalWeatherInfluence {
                 double storminess,
                 double evaporationMultiplier
         ) {
-            this(temperatureCelsius, humidity, storminess, evaporationMultiplier, 0.0, false);
+            this(temperatureCelsius, humidity, storminess, evaporationMultiplier, 0.0, 0.0, false);
         }
 
         public SeasonalOffset {
@@ -59,6 +83,8 @@ public interface SeasonalWeatherInfluence {
                     ? Math.max(0.25, Math.min(2.0, evaporationMultiplier)) : 1.0;
             fireSeasonFactor = Double.isFinite(fireSeasonFactor)
                     ? Math.max(0.0, Math.min(1.0, fireSeasonFactor)) : 0.0;
+            snowSeasonFactor = Double.isFinite(snowSeasonFactor)
+                    ? Math.max(0.0, Math.min(1.0, snowSeasonFactor)) : 0.0;
         }
     }
 }

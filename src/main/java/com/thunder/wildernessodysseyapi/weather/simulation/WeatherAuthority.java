@@ -789,7 +789,18 @@ public final class WeatherAuthority implements WeatherQuery {
                 continue;
             }
 
-            WeatherSample next = VanillaWeatherCommandAdapter.apply(view.sample(), state);
+            boolean snowClimateEligible = state != VanillaWeatherCommandAdapter.State.CLEAR
+                    && PrecipitationPhaseModel.supportsNaturalSnow(runtime.inputSampler.sample(
+                            level,
+                            key,
+                            scheduling.cellSize(),
+                            scheduling.environmentResampleIntervalTicks()
+                    ));
+            WeatherSample next = VanillaWeatherCommandAdapter.apply(
+                    view.sample(),
+                    state,
+                    snowClimateEligible
+            );
             if (!view.sample().equals(next) && data.grid().force(key, next, gameTime)) {
                 changed++;
             }
