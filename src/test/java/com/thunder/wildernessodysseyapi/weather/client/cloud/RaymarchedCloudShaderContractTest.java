@@ -43,8 +43,13 @@ class RaymarchedCloudShaderContractTest {
         assertTrue(fragment.contains("for (int index = 0; index < 6; index++)"));
         assertTrue(fragment.contains("index >= LightingSteps"));
         assertTrue(fragment.contains("worldXZ + WindOffset"));
+        assertTrue(fragment.contains("vec2 bandBounds(int band)"));
+        assertTrue(fragment.contains("stableRayJitter(gl_FragCoord.xy, band, distant)"));
+        assertTrue(fragment.contains("float sampleAlpha = 1.0 - exp(-density * stepLength * extinction)"));
         assertTrue(fragment.contains("transmittance *= 1.0 - sampleAlpha"));
         assertTrue(fragment.contains("densityAt(point, distant, band, storm)"));
+        assertFalse(fragment.contains("density * (distant ? 0.105 : 0.135)"));
+        assertFalse(fragment.contains("VOLUME_TOP"));
         assertFalse(fragment.contains("CameraPosition.y < middle && topFace"));
         assertFalse(fragment.contains("worldXZ + vec2(GameTime"));
     }

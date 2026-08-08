@@ -31,8 +31,6 @@ out vec4 fragColor;
 const float MINIMUM_BASE = -16.0;
 const float BASE_RANGE = 176.0;
 const float MAXIMUM_DEPTH = 128.0;
-const float VOLUME_BOTTOM = -16.0;
-const float VOLUME_TOP = 288.0;
 
 float hash13(vec3 point) {
     point = fract(point * 0.1031);
@@ -155,6 +153,32 @@ vec2 intersectBox(vec3 origin, vec3 direction, vec3 boundsMinimum, vec3 boundsMa
     return vec2(entry, exit);
 }
 
+// These padded slabs match CloudFieldAtlasModel. Limiting each genus band to
+// its plausible altitude keeps the primary samples close enough together to
+// resolve the underside instead of exposing slices through a 304-block box.
+vec2 bandBounds(int band) {
+    if (band == 0) {
+        return vec2(-16.0, 48.0);
+    }
+    if (band == 1) {
+        return vec2(16.0, 96.0);
+    }
+    if (band == 2) {
+        return vec2(56.0, 160.0);
+    }
+    return vec2(-16.0, 144.0);
+}
+
+// Interleaved gradient noise is deterministic in screen space. It breaks up
+// coherent ray slices without changing every frame and making clouds shimmer.
+float stableRayJitter(vec2 pixel, int band, bool distant) {
+    vec2 offset = vec2(float(band) * 19.19, distant ? 47.73 : 0.0);
+    return fract(52.9829189 * fract(dot(
+            floor(pixel) + offset,
+            vec2(0.06711056, 0.00583715)
+    )));
+}
+
 float verticalProfile(float vertical, float wispy, float layered, float cellular, float tower) {
     float sineProfile = max(0.0, sin(clamp(vertical, 0.0, 1.0) * 3.14159265));
     float wispyShape = pow(sineProfile, 0.18);
@@ -255,8 +279,9 @@ void main() {
     bool distant = fieldLayer >= 4;
     int band = distant ? fieldLayer - 4 : fieldLayer;
     float horizontalRadius = distant ? DistantRadius : NearRadius;
-    vec3 boundsMinimum = vec3(-horizontalRadius, VOLUME_BOTTOM, -horizontalRadius);
-    vec3 boundsMaximum = vec3(horizontalRadius, VOLUME_TOP, horizontalRadius);
+    vec2 verticalBounds = bandBounds(band);
+    vec3 boundsMinimum = vec3(-horizontalRadius, verticalBounds.x, -horizontalRadius);
+    vec3 boundsMaximum = vec3(horizontalRadius, verticalBounds.y, horizontalRadius);
     vec3 rayDirection = normalize(surfacePosition - CameraPosition);
     vec2 intersection = intersectBox(CameraPosition, rayDirection, boundsMinimum, boundsMaximum);
     if (intersection.y <= max(intersection.x, 0.0)) {
@@ -275,7 +300,14 @@ void main() {
     float entry = max(intersection.x, 0.0);
     float exit = intersection.y;
     float rayLength = max(0.0, exit - entry);
-    float stepLength = rayLength / float(max(RaymarchSteps, 1));
+    // Keep nearby samples on a stable physical interval whenever the bounded
+    // quality budget permits it. Only long, grazing rays widen their spacing.
+    float minimumStepLength = distant ? 8.0 : 4.0;
+    float stepLength = max(
+            minimumStepLength,
+            rayLength / float(max(RaymarchSteps, 1))
+    );
+    float jitter = 0.325 + stableRayJitter(gl_FragCoord.xy, band, distant) * 0.35;
     float transmittance = 1.0;
     float accumulated = 0.0;
     float lightAccumulation = 0.0;
@@ -286,14 +318,20 @@ void main() {
         if (sampleIndex >= RaymarchSteps || transmittance < 0.025) {
             break;
         }
-        vec3 point = CameraPosition + rayDirection
-                * (entry + stepLength * (float(sampleIndex) + 0.5));
+        float sampleDistance = entry + stepLength * (float(sampleIndex) + jitter);
+        if (sampleDistance >= exit) {
+            break;
+        }
+        vec3 point = CameraPosition + rayDirection * sampleDistance;
         float storm = 0.0;
         float density = densityAt(point, distant, band, storm);
         if (density <= 0.001) {
             continue;
         }
-        float sampleAlpha = density * (distant ? 0.105 : 0.135);
+        // Beer-Lambert extinction makes opacity depend on world distance, not
+        // on the configured sample count or the carrier face hit by this ray.
+        float extinction = distant ? 0.020 : 0.035;
+        float sampleAlpha = 1.0 - exp(-density * stepLength * extinction);
         float contribution = transmittance * sampleAlpha;
         // Reuse one bounded sunlight probe for four neighboring primary
         // samples. This preserves self-shadowing without multiplying the

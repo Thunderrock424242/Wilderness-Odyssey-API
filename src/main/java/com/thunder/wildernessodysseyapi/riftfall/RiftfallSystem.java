@@ -5,7 +5,6 @@ import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
 import com.thunder.wildernessodysseyapi.entity.RiftboundWraithEntity;
 import com.thunder.wildernessodysseyapi.entity.RiftListenerEntity;
-import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftDimensions;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherQuery;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherServices;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
@@ -64,7 +63,7 @@ public final class RiftfallSystem {
     }
 
     public static boolean canRunIn(ServerLevel level) {
-        return level.dimension().equals(Level.OVERWORLD) || level.dimension().equals(TemporalRiftDimensions.THE_ECHO_KEY);
+        return RiftfallDimensionRules.isEligible(level.dimension());
     }
 
     public static void tick(ServerLevel level) {

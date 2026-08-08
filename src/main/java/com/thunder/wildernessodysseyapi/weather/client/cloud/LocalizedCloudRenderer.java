@@ -342,10 +342,11 @@ public final class LocalizedCloudRenderer {
         continuousDistantField = layout.hasDistantField();
     }
 
-    /** Emits the six faces that let the fragment program intersect one bounded field. */
+    /** Emits the six faces that let the fragment program intersect one altitude band. */
     private static void emitContinuousCarrierBox(BufferBuilder builder, float radius, int fieldLayer) {
-        float minimumY = CloudFieldAtlasModel.MINIMUM_BASE_OFFSET;
-        float maximumY = CloudFieldAtlasModel.VOLUME_TOP;
+        int band = fieldLayer % CloudFieldAtlasModel.BAND_COUNT;
+        float minimumY = CloudFieldAtlasModel.bandMinimumOffset(band);
+        float maximumY = CloudFieldAtlasModel.bandMaximumOffset(band);
         float encodedLayer = (fieldLayer + 0.5F) / 8.0F;
 
         continuousVertex(builder, -radius, minimumY, radius, encodedLayer, 0.0F, -1.0F, 0.0F);

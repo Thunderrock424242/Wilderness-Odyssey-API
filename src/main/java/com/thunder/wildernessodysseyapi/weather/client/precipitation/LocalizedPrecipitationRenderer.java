@@ -39,10 +39,11 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 /**
  * Renders and ticks server-authored precipitation through Minecraft's weather pipeline.
  *
- * <p>Near columns retain vanilla rain and snow textures, animation, light, and
- * render state, but each column reads its own atmospheric intensity. A bounded
- * loaded-only lattice adds distant rain curtains without scanning terrain or
- * forcing chunks outside the player's view.</p>
+ * <p>Near columns retain restrained vanilla rain and snow textures, while hail
+ * uses small geometry pellets instead of repeating the bright snow texture.
+ * Each column reads its own atmospheric intensity. A bounded loaded-only
+ * lattice adds distant precipitation without scanning terrain or forcing
+ * chunks outside the player's view.</p>
  */
 public final class LocalizedPrecipitationRenderer {
 
@@ -150,7 +151,11 @@ public final class LocalizedPrecipitationRenderer {
                 true,
                 renderColumnCount - distantColumns,
                 distantColumns,
-                renderColumnCount * 4
+                (rainColumns + snowColumns) * 4
+                        + countColumns(HAIL, NEAR)
+                        * PrecipitationVisualModel.hailPelletCount(false) * 4
+                        + countColumns(HAIL, DISTANT)
+                        * PrecipitationVisualModel.hailPelletCount(true) * 4
         );
     }
 
@@ -587,7 +592,8 @@ public final class LocalizedPrecipitationRenderer {
         try {
             drawBatch(level, ticks, partialTick, camX, camY, camZ, settings, RAIN, RAIN_LOCATION);
             drawBatch(level, ticks, partialTick, camX, camY, camZ, settings, SNOW, SNOW_LOCATION);
-            drawBatch(level, ticks, partialTick, camX, camY, camZ, settings, HAIL, SNOW_LOCATION);
+            RenderSystem.setShader(GameRenderer::getPositionColorShader);
+            drawHailBatch(level, ticks, partialTick, camX, camY, camZ, settings);
         } finally {
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
             RenderSystem.defaultBlendFunc();
@@ -664,7 +670,7 @@ public final class LocalizedPrecipitationRenderer {
             lightPos.set(blockX, RENDER_LIGHT_Y[index], blockZ);
             int light = LevelRenderer.getLightColor(level, lightPos);
 
-            if (type == RAIN || type == HAIL) {
+            if (type == RAIN) {
                 emitRainQuad(
                         builder,
                         blockX,
@@ -702,6 +708,106 @@ public final class LocalizedPrecipitationRenderer {
                         RENDER_ALPHA[index],
                         light
                 );
+            }
+        }
+        BufferUploader.drawWithShader(builder.buildOrThrow());
+    }
+
+    /** Draws fast, muted hail pellets without reusing Minecraft's snowflake texture. */
+    private static void drawHailBatch(
+            ClientLevel level,
+            int ticks,
+            float partialTick,
+            double camX,
+            double camY,
+            double camZ,
+            WeatherRenderingConfig.Settings settings
+    ) {
+        if (countColumns(HAIL) == 0) {
+            return;
+        }
+        BufferBuilder builder = Tesselator.getInstance().begin(
+                VertexFormat.Mode.QUADS,
+                DefaultVertexFormat.POSITION_COLOR
+        );
+        double renderTicks = ticks + partialTick;
+        WeatherSample localWeather = ClientWeatherCoordinator.localSample(level);
+        for (int index = 0; index < renderColumnCount; index++) {
+            if (RENDER_TYPE[index] != HAIL) {
+                continue;
+            }
+            int blockX = RENDER_X[index];
+            int blockZ = RENDER_Z[index];
+            float top = (float) (RENDER_TOP_Y[index] - camY);
+            float bottom = (float) (RENDER_BOTTOM_Y[index] - camY);
+            float topOffsetX = settings.windDrivenPrecipitation()
+                    ? PrecipitationVisualModel.topWindOffset(
+                            localWeather.wind().x(),
+                            top - bottom,
+                            settings.precipitationWindSlantBlocks(),
+                            false
+                    )
+                    : 0.0F;
+            float topOffsetZ = settings.windDrivenPrecipitation()
+                    ? PrecipitationVisualModel.topWindOffset(
+                            localWeather.wind().z(),
+                            top - bottom,
+                            settings.precipitationWindSlantBlocks(),
+                            false
+                    )
+                    : 0.0F;
+            boolean distant = RENDER_STYLE[index] == DISTANT;
+            int pelletCount = PrecipitationVisualModel.hailPelletCount(distant);
+            double spread = distant
+                    ? Math.min(1.5, settings.distantRainSpacingBlocks() * 0.12)
+                    : 0.42;
+            float alpha = PrecipitationVisualModel.hailAlpha(RENDER_ALPHA[index], distant);
+            for (int pellet = 0; pellet < pelletCount; pellet++) {
+                float progress = PrecipitationVisualModel.hailPelletProgress(
+                        blockX,
+                        blockZ,
+                        pellet,
+                        renderTicks
+                );
+                float heightFraction = 1.0F - progress;
+                long scatterSalt = 0xD6E8FEB86659FD93L
+                        + (long) pellet * 0x9E3779B97F4A7C15L;
+                double scatterX = (PrecipitationVisualModel.columnNoise(
+                        blockX,
+                        blockZ,
+                        scatterSalt
+                ) * 2.0 - 1.0) * spread;
+                double scatterZ = (PrecipitationVisualModel.columnNoise(
+                        blockX,
+                        blockZ,
+                        scatterSalt ^ 0xA5A3564E27F8862FL
+                ) * 2.0 - 1.0) * spread;
+                float centerX = (float) (blockX + 0.5 + scatterX - camX)
+                        + topOffsetX * heightFraction;
+                float centerY = bottom + (top - bottom) * heightFraction;
+                float centerZ = (float) (blockZ + 0.5 + scatterZ - camZ)
+                        + topOffsetZ * heightFraction;
+                double horizontalDistance = Math.hypot(centerX, centerZ);
+                float size = PrecipitationVisualModel.hailPelletSize(
+                        blockX,
+                        blockZ,
+                        pellet,
+                        distant
+                );
+                float sideX = horizontalDistance <= 1.0E-6
+                        ? size
+                        : (float) (-centerZ / horizontalDistance * size);
+                float sideZ = horizontalDistance <= 1.0E-6
+                        ? 0.0F
+                        : (float) (centerX / horizontalDistance * size);
+                builder.addVertex(centerX, centerY + size, centerZ)
+                        .setColor(0.72F, 0.82F, 0.88F, alpha);
+                builder.addVertex(centerX + sideX, centerY, centerZ + sideZ)
+                        .setColor(0.72F, 0.82F, 0.88F, alpha);
+                builder.addVertex(centerX, centerY - size, centerZ)
+                        .setColor(0.66F, 0.76F, 0.83F, alpha);
+                builder.addVertex(centerX - sideX, centerY, centerZ - sideZ)
+                        .setColor(0.66F, 0.76F, 0.83F, alpha);
             }
         }
         BufferUploader.drawWithShader(builder.buildOrThrow());
@@ -784,24 +890,24 @@ public final class LocalizedPrecipitationRenderer {
                         + renderTicks * 0.001
                         * (PrecipitationVisualModel.columnNoise(blockX, blockZ, 0x452821E638D01377L) * 2.0 - 1.0)
         );
-        int sky = light >> 16 & 65535;
-        int block = light & 65535;
-        int snowLight = ((sky * 3 + 240) / 4) << 16 | (block * 3 + 240) / 4;
+        float textureScale = PrecipitationVisualModel.snowTextureVerticalScale();
+        float snowAlpha = PrecipitationVisualModel.snowAlpha(alpha);
+        int snowLight = PrecipitationVisualModel.softenedSnowLight(light);
         builder.addVertex(x0 + topOffsetX, top, z0 + topOffsetZ)
-                .setUv(uOffset, bottomWorldY * 0.25F + scroll + vOffset)
-                .setColor(1.0F, 1.0F, 1.0F, alpha)
+                .setUv(uOffset, bottomWorldY * textureScale + scroll + vOffset)
+                .setColor(0.94F, 0.97F, 1.0F, snowAlpha)
                 .setLight(snowLight);
         builder.addVertex(x1 + topOffsetX, top, z1 + topOffsetZ)
-                .setUv(1.0F + uOffset, bottomWorldY * 0.25F + scroll + vOffset)
-                .setColor(1.0F, 1.0F, 1.0F, alpha)
+                .setUv(1.0F + uOffset, bottomWorldY * textureScale + scroll + vOffset)
+                .setColor(0.94F, 0.97F, 1.0F, snowAlpha)
                 .setLight(snowLight);
         builder.addVertex(x1, bottom, z1)
-                .setUv(1.0F + uOffset, topWorldY * 0.25F + scroll + vOffset)
-                .setColor(1.0F, 1.0F, 1.0F, alpha)
+                .setUv(1.0F + uOffset, topWorldY * textureScale + scroll + vOffset)
+                .setColor(0.94F, 0.97F, 1.0F, snowAlpha)
                 .setLight(snowLight);
         builder.addVertex(x0, bottom, z0)
-                .setUv(uOffset, topWorldY * 0.25F + scroll + vOffset)
-                .setColor(1.0F, 1.0F, 1.0F, alpha)
+                .setUv(uOffset, topWorldY * textureScale + scroll + vOffset)
+                .setColor(0.94F, 0.97F, 1.0F, snowAlpha)
                 .setLight(snowLight);
     }
 
@@ -809,6 +915,16 @@ public final class LocalizedPrecipitationRenderer {
         int count = 0;
         for (int index = 0; index < renderColumnCount; index++) {
             if (RENDER_TYPE[index] == type) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static int countColumns(byte type, byte style) {
+        int count = 0;
+        for (int index = 0; index < renderColumnCount; index++) {
+            if (RENDER_TYPE[index] == type && RENDER_STYLE[index] == style) {
                 count++;
             }
         }

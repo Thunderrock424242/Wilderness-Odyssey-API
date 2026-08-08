@@ -11,6 +11,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CloudFieldAtlasModelTest {
 
     @Test
+    void altitudeBandsUseTightPaddedCarrierBounds() {
+        assertEquals(-16.0F, CloudFieldAtlasModel.bandMinimumOffset(0));
+        assertEquals(48.0F, CloudFieldAtlasModel.bandMaximumOffset(0));
+        assertEquals(16.0F, CloudFieldAtlasModel.bandMinimumOffset(1));
+        assertEquals(96.0F, CloudFieldAtlasModel.bandMaximumOffset(1));
+        assertEquals(56.0F, CloudFieldAtlasModel.bandMinimumOffset(2));
+        assertEquals(160.0F, CloudFieldAtlasModel.bandMaximumOffset(2));
+        assertEquals(-16.0F, CloudFieldAtlasModel.bandMinimumOffset(3));
+        assertEquals(144.0F, CloudFieldAtlasModel.bandMaximumOffset(3));
+    }
+
+    @Test
     void raymarchStepsSelectCoordinatedQualityFamilies() {
         assertEquals(
                 CloudFieldAtlasModel.QualityPreset.PERFORMANCE,

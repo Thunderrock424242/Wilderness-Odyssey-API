@@ -16,7 +16,7 @@ import java.util.List;
 
 /** Places spaced jungle trees, bamboo clusters, hanging vines, and low undergrowth on the starter island. */
 final class StarterIslandVegetationDecorator {
-    private static final int MIN_TREE_SPACING = 6;
+    private static final int MIN_TREE_SPACING = 5;
     private static final Direction[] HORIZONTAL_DIRECTIONS = {
             Direction.NORTH,
             Direction.SOUTH,
@@ -31,23 +31,28 @@ final class StarterIslandVegetationDecorator {
                          RandomSource random,
                          StarterIslandJungleDecorator.DecorationArea area,
                          double density) {
-        // The minimum-spacing check makes the island dense without turning the bunker clearing into an opaque wall.
-        placeJungleTrees(level, random, area, density);
-        placeBambooClusters(level, random, area, density);
-        scatterUndergrowth(level, random, area, density);
+        List<Grove> groves = createGroves(random, area, density);
+
+        // Most vegetation samples the same grove centers, producing dense pockets and irregular open sightlines.
+        placeJungleTrees(level, random, area, groves, density);
+        placeBambooClusters(level, random, area, groves, density);
+        scatterJungleShrubs(level, random, area, groves, density);
+        scatterUndergrowth(level, random, area, groves, density);
     }
 
     private static void placeJungleTrees(ServerLevel level,
                                          RandomSource random,
                                          StarterIslandJungleDecorator.DecorationArea area,
+                                         List<Grove> groves,
                                          double density) {
         int target = StarterIslandJungleDecorator.targetTreeCount(area.flatRadius(), density);
         int usableRadius = area.flatRadius() - StarterIslandJungleDecorator.TREE_EDGE_MARGIN;
         List<BlockPos> roots = new ArrayList<>(target);
 
         for (int attempt = 0; attempt < target * 24 && roots.size() < target; attempt++) {
-            int x = StarterIslandJungleDecorator.randomCoordinate(random, area.centerX(), usableRadius);
-            int z = StarterIslandJungleDecorator.randomCoordinate(random, area.centerZ(), usableRadius);
+            HorizontalPoint candidate = samplePosition(random, area, groves, 0.86F);
+            int x = candidate.x();
+            int z = candidate.z();
             if (!StarterIslandJungleDecorator.insideCircle(x, z, area.centerX(), area.centerZ(), usableRadius)
                     || StarterIslandJungleDecorator.isProtectedPosition(
                             x,
@@ -61,7 +66,7 @@ final class StarterIslandVegetationDecorator {
 
             int surfaceY = StarterIslandJungleDecorator.surfaceY(level, x, z);
             BlockPos root = new BlockPos(x, surfaceY + 1, z);
-            int height = 6 + random.nextInt(5);
+            int height = 5 + random.nextInt(9);
             if (!StarterIslandJungleDecorator.isPlantableGround(level.getBlockState(root.below()))
                     || !canPlaceTree(level, root, height)) {
                 continue;
@@ -91,10 +96,11 @@ final class StarterIslandVegetationDecorator {
             }
         }
 
-        BlockState jungleLeaves = Blocks.JUNGLE_LEAVES.defaultBlockState()
-                .setValue(LeavesBlock.PERSISTENT, true);
-        int canopyBaseY = root.getY() + height - 3;
-        int[] radii = {2, 3, 2, 1};
+        BlockState jungleLeaves = persistentJungleLeaves();
+        int[] radii = height >= 11
+                ? new int[]{3, 4, 3, 2, 1}
+                : new int[]{2, 3, 2, 1};
+        int canopyBaseY = root.getY() + height - radii.length + 1;
         for (int layer = 0; layer < radii.length; layer++) {
             placeCanopyLayer(level, random, root, canopyBaseY + layer, radii[layer], jungleLeaves);
         }
@@ -164,13 +170,13 @@ final class StarterIslandVegetationDecorator {
     private static void placeBambooClusters(ServerLevel level,
                                             RandomSource random,
                                             StarterIslandJungleDecorator.DecorationArea area,
+                                            List<Grove> groves,
                                             double density) {
-        int clusters = Math.max(2, (int) Math.round(area.flatRadius() * density / 11.0D));
+        int clusters = Math.max(4, (int) Math.round(area.flatRadius() * density / 7.0D));
         for (int attempt = 0, placed = 0; attempt < clusters * 16 && placed < clusters; attempt++) {
-            int clusterX = StarterIslandJungleDecorator.randomCoordinate(
-                    random, area.centerX(), area.flatRadius() - StarterIslandJungleDecorator.TREE_EDGE_MARGIN);
-            int clusterZ = StarterIslandJungleDecorator.randomCoordinate(
-                    random, area.centerZ(), area.flatRadius() - StarterIslandJungleDecorator.TREE_EDGE_MARGIN);
+            HorizontalPoint candidate = samplePosition(random, area, groves, 0.90F);
+            int clusterX = candidate.x();
+            int clusterZ = candidate.z();
             if (!StarterIslandJungleDecorator.insideCircle(
                     clusterX,
                     clusterZ,
@@ -219,15 +225,68 @@ final class StarterIslandVegetationDecorator {
         return placedStem;
     }
 
+    private static void scatterJungleShrubs(ServerLevel level,
+                                            RandomSource random,
+                                            StarterIslandJungleDecorator.DecorationArea area,
+                                            List<Grove> groves,
+                                            double density) {
+        int target = Math.max(12, (int) Math.round(area.flatRadius() * density * 0.48D));
+        int usableRadius = area.flatRadius() - StarterIslandJungleDecorator.TREE_EDGE_MARGIN;
+        for (int attempt = 0, placed = 0; attempt < target * 12 && placed < target; attempt++) {
+            HorizontalPoint candidate = samplePosition(random, area, groves, 0.82F);
+            int x = candidate.x();
+            int z = candidate.z();
+            if (!StarterIslandJungleDecorator.insideCircle(x, z, area.centerX(), area.centerZ(), usableRadius)
+                    || StarterIslandJungleDecorator.isProtectedPosition(
+                            x,
+                            z,
+                            area.bunkerBounds(),
+                            StarterIslandJungleDecorator.GROUND_CLEARING,
+                            true)) {
+                continue;
+            }
+
+            int surfaceY = StarterIslandJungleDecorator.surfaceY(level, x, z);
+            BlockPos root = new BlockPos(x, surfaceY + 1, z);
+            int trunkHeight = 1 + random.nextInt(2);
+            if (!StarterIslandJungleDecorator.isPlantableGround(level.getBlockState(root.below()))
+                    || !hasReplaceableColumn(level, root, trunkHeight + 2)) {
+                continue;
+            }
+
+            placeShrub(level, random, root, trunkHeight);
+            placed++;
+        }
+    }
+
+    private static void placeShrub(ServerLevel level,
+                                   RandomSource random,
+                                   BlockPos root,
+                                   int trunkHeight) {
+        for (int y = 0; y < trunkHeight; y++) {
+            level.setBlock(
+                    root.above(y),
+                    Blocks.JUNGLE_LOG.defaultBlockState(),
+                    StarterIslandJungleDecorator.BLOCK_UPDATE_FLAGS);
+        }
+
+        BlockState leaves = persistentJungleLeaves();
+        int canopyY = root.getY() + trunkHeight - 1;
+        placeCanopyLayer(level, random, root, canopyY, 2, leaves);
+        placeCanopyLayer(level, random, root, canopyY + 1, 1, leaves);
+    }
+
     private static void scatterUndergrowth(ServerLevel level,
                                            RandomSource random,
                                            StarterIslandJungleDecorator.DecorationArea area,
+                                           List<Grove> groves,
                                            double density) {
-        int attempts = (int) Math.round(area.flatRadius() * 7.0D * density);
+        int attempts = (int) Math.round(area.flatRadius() * 18.0D * density);
         int usableRadius = area.flatRadius() - 3;
         for (int attempt = 0; attempt < attempts; attempt++) {
-            int x = StarterIslandJungleDecorator.randomCoordinate(random, area.centerX(), usableRadius);
-            int z = StarterIslandJungleDecorator.randomCoordinate(random, area.centerZ(), usableRadius);
+            HorizontalPoint candidate = samplePosition(random, area, groves, 0.74F);
+            int x = candidate.x();
+            int z = candidate.z();
             if (!StarterIslandJungleDecorator.insideCircle(x, z, area.centerX(), area.centerZ(), usableRadius)
                     || StarterIslandJungleDecorator.isProtectedPosition(
                             x,
@@ -240,6 +299,51 @@ final class StarterIslandVegetationDecorator {
 
             placeUndergrowth(level, random, x, z);
         }
+    }
+
+    private static List<Grove> createGroves(RandomSource random,
+                                            StarterIslandJungleDecorator.DecorationArea area,
+                                            double density) {
+        int target = Math.max(7, (int) Math.round(area.flatRadius() * density / 7.5D));
+        int usableRadius = area.flatRadius() - StarterIslandJungleDecorator.TREE_EDGE_MARGIN - 4;
+        List<Grove> groves = new ArrayList<>(target);
+        for (int attempt = 0; attempt < target * 16 && groves.size() < target; attempt++) {
+            int x = StarterIslandJungleDecorator.randomCoordinate(random, area.centerX(), usableRadius);
+            int z = StarterIslandJungleDecorator.randomCoordinate(random, area.centerZ(), usableRadius);
+            if (!StarterIslandJungleDecorator.insideCircle(x, z, area.centerX(), area.centerZ(), usableRadius)
+                    || StarterIslandJungleDecorator.isProtectedPosition(
+                            x,
+                            z,
+                            area.bunkerBounds(),
+                            StarterIslandJungleDecorator.TREE_CLEARING + 2,
+                            true)) {
+                continue;
+            }
+            groves.add(new Grove(x, z, 10 + random.nextInt(12)));
+        }
+        return List.copyOf(groves);
+    }
+
+    private static HorizontalPoint samplePosition(RandomSource random,
+                                                  StarterIslandJungleDecorator.DecorationArea area,
+                                                  List<Grove> groves,
+                                                  float groveChance) {
+        if (!groves.isEmpty() && random.nextFloat() < groveChance) {
+            Grove grove = groves.get(random.nextInt(groves.size()));
+            int diameter = grove.radius() * 2 + 1;
+            int dx = (random.nextInt(diameter) + random.nextInt(diameter)) / 2 - grove.radius();
+            int dz = (random.nextInt(diameter) + random.nextInt(diameter)) / 2 - grove.radius();
+            return new HorizontalPoint(grove.x() + dx, grove.z() + dz);
+        }
+
+        int usableRadius = area.flatRadius() - StarterIslandJungleDecorator.TREE_EDGE_MARGIN;
+        return new HorizontalPoint(
+                StarterIslandJungleDecorator.randomCoordinate(random, area.centerX(), usableRadius),
+                StarterIslandJungleDecorator.randomCoordinate(random, area.centerZ(), usableRadius));
+    }
+
+    private static BlockState persistentJungleLeaves() {
+        return Blocks.JUNGLE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
     }
 
     private static void placeUndergrowth(ServerLevel level, RandomSource random, int x, int z) {
@@ -291,5 +395,11 @@ final class StarterIslandVegetationDecorator {
             }
         }
         return false;
+    }
+
+    private record Grove(int x, int z, int radius) {
+    }
+
+    private record HorizontalPoint(int x, int z) {
     }
 }

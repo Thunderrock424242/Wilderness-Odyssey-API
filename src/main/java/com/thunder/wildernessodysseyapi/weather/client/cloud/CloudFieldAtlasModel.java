@@ -16,9 +16,20 @@ public final class CloudFieldAtlasModel {
     public static final float MINIMUM_BASE_OFFSET = -16.0F;
     public static final float MAXIMUM_BASE_OFFSET = 160.0F;
     public static final float MAXIMUM_DEPTH = 128.0F;
-    public static final float VOLUME_TOP = MAXIMUM_BASE_OFFSET + MAXIMUM_DEPTH;
+    private static final float[] BAND_MINIMUM_OFFSETS = {-16.0F, 16.0F, 56.0F, -16.0F};
+    private static final float[] BAND_MAXIMUM_OFFSETS = {48.0F, 96.0F, 160.0F, 144.0F};
 
     private CloudFieldAtlasModel() {
+    }
+
+    /** Returns the padded lower carrier bound for one low-to-high cloud band. */
+    public static float bandMinimumOffset(int band) {
+        return BAND_MINIMUM_OFFSETS[clamp(band, 0, BAND_COUNT - 1)];
+    }
+
+    /** Returns the padded upper carrier bound for one low-to-high cloud band. */
+    public static float bandMaximumOffset(int band) {
+        return BAND_MAXIMUM_OFFSETS[clamp(band, 0, BAND_COUNT - 1)];
     }
 
     /** Selects a coordinated field-resolution and lighting budget from the primary step count. */

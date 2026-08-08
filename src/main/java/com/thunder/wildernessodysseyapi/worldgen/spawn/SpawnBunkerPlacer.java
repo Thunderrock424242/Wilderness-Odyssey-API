@@ -19,6 +19,7 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -89,11 +90,16 @@ public final class SpawnBunkerPlacer {
         StarterIslandLayout island = prepareStarterIsland(level, anchor, bunkerSize);
         NBTStructurePlacer.PlacementResult result = BUNKER_PLACER.placeAnchored(level, anchor);
         if (result != null) {
+            AABB surfaceBounds = StarterBunkerSurfaceLocator.find(level, result.bounds(), anchor);
             StarterIslandJungleDecorator.decorate(
                     level,
                     island.centerX(),
                     island.centerZ(),
                     island.flatRadius(),
+                    surfaceBounds);
+            ModConstants.LOGGER.info(
+                    "Landscaped starter island around above-ground bunker footprint {} instead of full template bounds {}.",
+                    surfaceBounds,
                     result.bounds());
         }
         return result;

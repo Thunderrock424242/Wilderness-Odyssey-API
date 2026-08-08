@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.riftfall.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.riftfall.RiftfallDimensionRules;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationIntensity;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
@@ -55,6 +56,9 @@ public final class RiftfallClientEffects {
     }
 
     private static boolean isRiftfallVisualActive(Level level) {
+        if (!RiftfallDimensionRules.isEligible(level.dimension())) {
+            return false;
+        }
         if (level instanceof net.minecraft.client.multiplayer.ClientLevel clientLevel
                 && ClientWeatherCoordinator.controls(clientLevel)) {
             WeatherSample sample = ClientWeatherCoordinator.localSample(clientLevel);

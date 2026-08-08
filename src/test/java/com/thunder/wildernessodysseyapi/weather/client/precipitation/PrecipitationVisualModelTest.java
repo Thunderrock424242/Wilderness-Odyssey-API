@@ -67,4 +67,24 @@ class PrecipitationVisualModelTest {
         assertEquals(1.0F, PrecipitationVisualModel.scaledAlpha(0.8F, 4.0), 1.0E-6F);
         assertEquals(0.0F, PrecipitationVisualModel.scaledAlpha(0.8F, Double.NaN), 1.0E-6F);
     }
+
+    @Test
+    void snowUsesSparseMutedTexturePresentation() {
+        assertEquals(1.0F / 12.0F, PrecipitationVisualModel.snowTextureVerticalScale(), 1.0E-6F);
+        assertEquals(0.68F, PrecipitationVisualModel.snowAlpha(1.0F), 1.0E-6F);
+        assertTrue(PrecipitationVisualModel.softenedSnowLight(0) < 0x00F000F0);
+    }
+
+    @Test
+    void hailPelletsAreStableBoundedAndSparserAtDistance() {
+        float first = PrecipitationVisualModel.hailPelletProgress(14, -22, 2, 81.5);
+        float repeated = PrecipitationVisualModel.hailPelletProgress(14, -22, 2, 81.5);
+
+        assertEquals(first, repeated, 0.0F);
+        assertTrue(first >= 0.0F && first < 1.0F);
+        assertEquals(5, PrecipitationVisualModel.hailPelletCount(false));
+        assertEquals(2, PrecipitationVisualModel.hailPelletCount(true));
+        assertTrue(PrecipitationVisualModel.hailAlpha(1.0F, true)
+                < PrecipitationVisualModel.hailAlpha(1.0F, false));
+    }
 }
