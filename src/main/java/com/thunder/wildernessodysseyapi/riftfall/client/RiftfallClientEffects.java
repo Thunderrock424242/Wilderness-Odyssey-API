@@ -56,15 +56,19 @@ public final class RiftfallClientEffects {
     }
 
     private static boolean isRiftfallVisualActive(Level level) {
-        if (!RiftfallDimensionRules.isEligible(level.dimension())) {
-            return false;
-        }
         if (level instanceof net.minecraft.client.multiplayer.ClientLevel clientLevel
                 && ClientWeatherCoordinator.controls(clientLevel)) {
             WeatherSample sample = ClientWeatherCoordinator.localSample(clientLevel);
-            return PrecipitationIntensity.isFunctional(sample.precipitationIntensity())
-                    && sample.thunderIntensity() >= 0.35;
+            return RiftfallDimensionRules.permitsStormVisuals(
+                    level.dimension(),
+                    PrecipitationIntensity.isFunctional(sample.precipitationIntensity()),
+                    sample.thunderIntensity() >= 0.35
+            );
         }
-        return level.isRaining() && level.isThundering();
+        return RiftfallDimensionRules.permitsStormVisuals(
+                level.dimension(),
+                level.isRaining(),
+                level.isThundering()
+        );
     }
 }

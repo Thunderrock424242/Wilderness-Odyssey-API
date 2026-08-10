@@ -51,6 +51,8 @@
   "key.wildernessodysseyapi.cloak_toggle": "Toggle Cloak",
   "key.wildernessodysseyapi.debug_previous_page": "Previous Debug Page",
   "key.wildernessodysseyapi.debug_next_page": "Next Debug Page",
+  "key.wildernessodysseyapi.debug_scroll_up": "Scroll Debug Page Up",
+  "key.wildernessodysseyapi.debug_scroll_down": "Scroll Debug Page Down",
   "effect.wildernessodysseyapi.cryo_shakes": "Cryo Shakes",
   "effect.wildernessodysseyapi.echo_hypoxia": "Echo Hypoxia",
   "effect.wildernessodysseyapi.desynced": "Desynced",

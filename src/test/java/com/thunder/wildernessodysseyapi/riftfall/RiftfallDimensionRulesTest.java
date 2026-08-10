@@ -18,4 +18,24 @@ class RiftfallDimensionRulesTest {
         assertFalse(RiftfallDimensionRules.isEligible(TemporalRiftDimensions.THE_BEFORE_KEY));
         assertFalse(RiftfallDimensionRules.isEligible(AnomalyDimensions.ANOMALY_DIMENSION_KEY));
     }
+
+    @Test
+    void purpleStormVisualsRequireEchoPrecipitationAndThunder() {
+        assertTrue(RiftfallDimensionRules.permitsStormVisuals(
+                TemporalRiftDimensions.THE_ECHO_KEY,
+                true,
+                true
+        ));
+        assertFalse(RiftfallDimensionRules.permitsStormVisuals(Level.OVERWORLD, true, true));
+        assertFalse(RiftfallDimensionRules.permitsStormVisuals(
+                TemporalRiftDimensions.THE_ECHO_KEY,
+                false,
+                true
+        ));
+        assertFalse(RiftfallDimensionRules.permitsStormVisuals(
+                TemporalRiftDimensions.THE_ECHO_KEY,
+                true,
+                false
+        ));
+    }
 }

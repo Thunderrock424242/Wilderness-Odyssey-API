@@ -197,7 +197,7 @@ public class MeteorEntity extends Entity {
         );
 
         // Persist dynamically-created impact sites so the existing radiation,
-        // map marker, story, and impact-site systems can discover this crater.
+        // Radiation, story, and impact-site systems can discover this crater.
         MeteorSavedData.get(level).addMeteor(impactPos, craterRadius);
 
         discard();

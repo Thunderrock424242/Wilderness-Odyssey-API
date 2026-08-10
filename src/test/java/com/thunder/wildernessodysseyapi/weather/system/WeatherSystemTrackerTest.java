@@ -50,4 +50,36 @@ class WeatherSystemTrackerTest {
         assertEquals(1, tracker.systems().size());
         assertTrue(tracker.systems().getFirst().intensity() > 0.8);
     }
+
+    @Test
+    void severePromotionRemainsFormingUntilTheNextObservation() {
+        WeatherSystemTracker tracker = new WeatherSystemTracker();
+        WeatherSystemTracker.TrackingSettings settings = WeatherSystemTracker.TrackingSettings.DEFAULT;
+        var ordinary = new WeatherSystemTracker.Observation(
+                WeatherSystemType.STORM,
+                0.0,
+                0.0,
+                320.0,
+                0.72,
+                WindVector.ZERO,
+                0.72
+        );
+        var tornado = new WeatherSystemTracker.Observation(
+                WeatherSystemType.TORNADO,
+                0.0,
+                0.0,
+                320.0,
+                0.82,
+                WindVector.ZERO,
+                0.90
+        );
+
+        tracker.update(List.of(ordinary), 60L, 60, settings);
+        tracker.update(List.of(tornado), 120L, 60, settings);
+        assertEquals(WeatherSystemType.TORNADO, tracker.systems().getFirst().type());
+        assertEquals(WeatherSystemStage.FORMING, tracker.systems().getFirst().stage());
+
+        tracker.update(List.of(tornado), 180L, 60, settings);
+        assertEquals(WeatherSystemStage.MATURE, tracker.systems().getFirst().stage());
+    }
 }

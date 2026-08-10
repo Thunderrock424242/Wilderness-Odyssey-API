@@ -35,13 +35,17 @@ public final class WildernessDebugOverlay {
     private static final int ERROR_COLOR = 0xFFEF7777;
     private static final int UNAVAILABLE_COLOR = 0xFF7E8A92;
 
-    /** Renders one page and automatically flows its rows into available columns. */
-    public void render(
+    /**
+     * Renders one page, flows its visible rows into columns, and returns the
+     * scroll offset clamped to the current content and screen capacity.
+     */
+    public int render(
             GuiGraphics graphics,
             DebugPage page,
             int pageIndex,
             int pageCount,
-            List<DebugSection> sections
+            List<DebugSection> sections,
+            int requestedScrollOffset
     ) {
         Minecraft minecraft = Minecraft.getInstance();
         Font font = minecraft.font;
@@ -58,11 +62,8 @@ public final class WildernessDebugOverlay {
         int maxColumns = Math.max(1, Math.min(3,
                 (panelWidth - PADDING * 2 + COLUMN_GAP) / (MIN_COLUMN_WIDTH + COLUMN_GAP)));
         int capacity = maxRows * maxColumns;
-        if (lines.size() > capacity) {
-            int omitted = lines.size() - capacity + 1;
-            lines = new ArrayList<>(lines.subList(0, Math.max(0, capacity - 1)));
-            lines.add(RenderLine.raw("… " + omitted + " more lines; increase window size or lower GUI scale", DebugValue.Tone.UNAVAILABLE));
-        }
+        DebugViewport viewport = DebugViewport.calculate(requestedScrollOffset, lines.size(), capacity);
+        lines = new ArrayList<>(lines.subList(viewport.offset(), viewport.endExclusive()));
 
         int usedColumns = Math.max(1, Math.min(maxColumns, (lines.size() + maxRows - 1) / maxRows));
         // Columns fill top-to-bottom, so every non-final column uses maxRows.
@@ -101,15 +102,48 @@ public final class WildernessDebugOverlay {
         }
 
         if (hints) {
-            int footerY = panelY + panelHeight - FOOTER_HEIGHT + 3;
-            String previous = "F3 + " + DebugKeyMappings.PREVIOUS_PAGE.getTranslatedKeyMessage().getString() + "  ← Previous";
-            String next = "Next →  F3 + " + DebugKeyMappings.NEXT_PAGE.getTranslatedKeyMessage().getString();
+            renderFooter(graphics, font, panelX, panelY, panelWidth, panelHeight, viewport);
+        }
+        return viewport.offset();
+    }
+
+    private static void renderFooter(
+            GuiGraphics graphics,
+            Font font,
+            int panelX,
+            int panelY,
+            int panelWidth,
+            int panelHeight,
+            DebugViewport viewport
+    ) {
+        int footerY = panelY + panelHeight - FOOTER_HEIGHT + 3;
+        String previous = DebugKeyMappings.PREVIOUS_PAGE.getTranslatedKeyMessage().getString() + "  ← Previous";
+        String next = "Next →  " + DebugKeyMappings.NEXT_PAGE.getTranslatedKeyMessage().getString();
+
+        if (!viewport.scrollable()) {
             previous = clip(font, previous, Math.max(20, panelWidth / 2 - PADDING));
             next = clip(font, next, Math.max(20, panelWidth / 2 - PADDING));
             graphics.drawString(font, previous, panelX + PADDING, footerY, UNAVAILABLE_COLOR, true);
             graphics.drawString(font, next,
                     panelX + panelWidth - PADDING - font.width(next), footerY, UNAVAILABLE_COLOR, true);
+            return;
         }
+
+        int sideWidth = Math.max(20, panelWidth / 4 - PADDING);
+        int centerWidth = Math.max(20, panelWidth / 2 - PADDING * 2);
+        String scroll = DebugKeyMappings.SCROLL_UP.getTranslatedKeyMessage().getString()
+                + " / " + DebugKeyMappings.SCROLL_DOWN.getTranslatedKeyMessage().getString()
+                + "  " + viewport.firstVisibleLine() + "-" + viewport.lastVisibleLine()
+                + "/" + viewport.totalLines();
+        previous = clip(font, previous, sideWidth);
+        next = clip(font, next, sideWidth);
+        scroll = clip(font, scroll, centerWidth);
+
+        graphics.drawString(font, previous, panelX + PADDING, footerY, UNAVAILABLE_COLOR, true);
+        graphics.drawString(font, scroll,
+                panelX + (panelWidth - font.width(scroll)) / 2, footerY, UNAVAILABLE_COLOR, true);
+        graphics.drawString(font, next,
+                panelX + panelWidth - PADDING - font.width(next), footerY, UNAVAILABLE_COLOR, true);
     }
 
     private static void renderColumn(

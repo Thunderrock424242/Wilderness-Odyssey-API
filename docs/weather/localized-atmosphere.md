@@ -42,9 +42,11 @@ when that program is unavailable. Those boundaries are intentional and are liste
 - Lake-effect snow, ocean-fed storms, drought, heat waves, dense fog, hail, and
   blizzards are continuous derived phenomena rather than random presets. Hail
   has its own synchronized precipitation type and rendering path.
-- Tornado and cyclone identities are optional. They use bounded particles and
-  entity wind; block damage remains off by default and, when explicitly
-  enabled with mob griefing, is restricted to a tiny foliage/plant budget.
+- Tornado and cyclone identities are optional. Established severe identities
+  use bounded particles and can move players and other living entities; normal
+  thunderstorms, fronts, and newly forming severe candidates apply no physical
+  wind. Block damage remains off by default and, when explicitly enabled with
+  mob griefing, is restricted to a tiny foliage/plant budget.
 - A coarse distant cloud tier extends the visible horizon and gives organized
   storms darker vertical silhouettes. Sun-path cloud sampling adds approximate
   broad shadowing beneath large systems.
@@ -618,6 +620,11 @@ base/top transitions. If Blindness, Darkness, or another renderer already
 supplies a shorter far plane, local weather preserves that denser fog instead
 of lengthening it. The Wilderness built-in ocean shader also receives local
 rain/thunder uniforms at the camera when snapshots are active.
+
+Riftfall's purple sky, cloud, fog, and particle treatment is dimension-owned:
+it is permitted only in The Echo during active precipitation and thunder.
+Ordinary localized or vanilla-driven thunderstorms retain Minecraft's neutral
+storm palette in every other dimension.
 
 ### Localized cloud rendering
 
@@ -1249,8 +1256,10 @@ explicitly changes them; changing size resets atmospheric state.
     hail and confirm its faster icy precipitation visual still counts as wet
     rain for exposure and precipitation hooks.
 23. **Verify severe safety.** Leave `severe.blockDamageEnabled=false`, develop
-    or instrument a tornado/cyclone identity, and confirm particles/entity wind
-    occur without block changes. Explicitly enable damage in a disposable test
+    or instrument a tornado/cyclone identity, and confirm no physical wind is
+    applied while it is `FORMING`. After another severe observation promotes it,
+    confirm particles and bounded player/entity wind occur without block changes.
+    Explicitly enable damage in a disposable test
     world with mob griefing on and confirm the bounded pass affects only sparse
     exposed leaves/plants. Restore the default afterward.
 24. **Verify survival integrations.** Test Cold Sweat alone outdoors, under a

@@ -81,6 +81,11 @@ public final class WeatherSystemTracker {
                 double previousIntensity = system.intensity();
                 double intensity = approach(previousIntensity, observation.intensity(), 0.44);
                 WeatherSystemStage stage = lifecycle(previousIntensity, intensity);
+                if (!system.type().severe() && observation.type().severe()) {
+                    // A newly promoted severe identity must be observed again
+                    // before entity wind begins, avoiding one-sample touchdown.
+                    stage = WeatherSystemStage.FORMING;
+                }
                 next.add(new TrackedWeatherSystem(
                         system.id(),
                         observation.type(),

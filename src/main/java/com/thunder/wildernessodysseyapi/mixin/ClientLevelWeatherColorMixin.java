@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
+import com.thunder.wildernessodysseyapi.riftfall.RiftfallDimensionRules;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftDimensions;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationIntensity;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
@@ -11,53 +12,67 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(ClientLevel.class)
 /**
- * Client-level mixin that tints world colors during Riftfall weather effects.
+ * Tints The Echo's base sky and adds purple color only during Riftfall weather.
+ *
+ * <p>A return injection is required because Minecraft exposes sky and cloud
+ * colors as calculated values rather than through a dedicated color event.</p>
  */
+@Mixin(ClientLevel.class)
 public class ClientLevelWeatherColorMixin {
 
     @Inject(method = "getSkyColor", at = @At("RETURN"), cancellable = true)
     private void wildernessodysseyapi$tintSkyColor(Vec3 cameraPos, float partialTick, CallbackInfoReturnable<Vec3> cir) {
         ClientLevel level = (ClientLevel) (Object) this;
+        Vec3 result = cir.getReturnValue();
+        boolean changed = false;
         if (isEcho(level)) {
-            cir.setReturnValue(blend(cir.getReturnValue(), new Vec3(0.02D, 0.025D, 0.04D), 0.9D));
-            return;
+            result = blend(result, new Vec3(0.02D, 0.025D, 0.04D), 0.9D);
+            changed = true;
         }
 
-        if (!shouldApplyRiftfallTint(level)) {
-            return;
+        if (shouldApplyRiftfallTint(level)) {
+            result = blend(result, new Vec3(0.50D, 0.22D, 0.70D), 0.65D);
+            changed = true;
         }
-
-        Vec3 original = cir.getReturnValue();
-        Vec3 tint = new Vec3(0.50D, 0.22D, 0.70D);
-        cir.setReturnValue(blend(original, tint, 0.65D));
+        if (changed) {
+            cir.setReturnValue(result);
+        }
     }
 
     @Inject(method = "getCloudColor", at = @At("RETURN"), cancellable = true)
     private void wildernessodysseyapi$tintCloudColor(float partialTick, CallbackInfoReturnable<Vec3> cir) {
         ClientLevel level = (ClientLevel) (Object) this;
+        Vec3 result = cir.getReturnValue();
+        boolean changed = false;
         if (isEcho(level)) {
-            cir.setReturnValue(blend(cir.getReturnValue(), new Vec3(0.035D, 0.035D, 0.055D), 0.85D));
-            return;
+            result = blend(result, new Vec3(0.035D, 0.035D, 0.055D), 0.85D);
+            changed = true;
         }
 
-        if (!shouldApplyRiftfallTint(level)) {
-            return;
+        if (shouldApplyRiftfallTint(level)) {
+            result = blend(result, new Vec3(0.58D, 0.26D, 0.79D), 0.75D);
+            changed = true;
         }
-
-        Vec3 original = cir.getReturnValue();
-        Vec3 tint = new Vec3(0.58D, 0.26D, 0.79D);
-        cir.setReturnValue(blend(original, tint, 0.75D));
+        if (changed) {
+            cir.setReturnValue(result);
+        }
     }
 
     private static boolean shouldApplyRiftfallTint(ClientLevel level) {
         if (ClientWeatherCoordinator.controls(level)) {
             WeatherSample sample = ClientWeatherCoordinator.localSample(level);
-            return PrecipitationIntensity.isFunctional(sample.precipitationIntensity())
-                    && sample.thunderIntensity() >= 0.35;
+            return RiftfallDimensionRules.permitsStormVisuals(
+                    level.dimension(),
+                    PrecipitationIntensity.isFunctional(sample.precipitationIntensity()),
+                    sample.thunderIntensity() >= 0.35
+            );
         }
-        return level.isRaining() && level.isThundering();
+        return RiftfallDimensionRules.permitsStormVisuals(
+                level.dimension(),
+                level.isRaining(),
+                level.isThundering()
+        );
     }
 
     private static boolean isEcho(ClientLevel level) {

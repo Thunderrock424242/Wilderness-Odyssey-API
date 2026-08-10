@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.debugoverlay.client;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import net.minecraft.client.Minecraft;
@@ -44,8 +43,9 @@ public final class WildernessDebugClientEvents {
     }
 
     /**
-     * Handles only the configured F3 chords after vanilla keyboard processing.
-     * The event is non-cancellable, so every vanilla F3 combination remains intact.
+     * Changes pages or scrolls content on a configured key press while F3 is visible.
+     * A normal gameplay screen check prevents the page controls from acting in
+     * menus, chat, inventories, or any other screen that owns arrow-key input.
      */
     @SubscribeEvent
     public static void onKeyInput(InputEvent.Key event) {
@@ -57,15 +57,15 @@ public final class WildernessDebugClientEvents {
         if (minecraft.screen != null || !minecraft.getDebugOverlay().showDebugScreen()) {
             return;
         }
-        long window = minecraft.getWindow().getWindow();
-        if (!InputConstants.isKeyDown(window, GLFW.GLFW_KEY_F3)) {
-            return;
-        }
 
-        if (DebugKeyMappings.PREVIOUS_PAGE.matches(event.getKey(), event.getScanCode())) {
-            WildernessDebugManager.get().previousPage();
-        } else if (DebugKeyMappings.NEXT_PAGE.matches(event.getKey(), event.getScanCode())) {
-            WildernessDebugManager.get().nextPage();
+        switch (DebugKeyMappings.navigationActionFor(event.getKey(), event.getScanCode())) {
+            case PREVIOUS -> WildernessDebugManager.get().previousPage();
+            case NEXT -> WildernessDebugManager.get().nextPage();
+            case SCROLL_UP -> WildernessDebugManager.get().scrollUp();
+            case SCROLL_DOWN -> WildernessDebugManager.get().scrollDown();
+            case NONE -> {
+                // The normal input system retains ownership of every other key.
+            }
         }
     }
 }

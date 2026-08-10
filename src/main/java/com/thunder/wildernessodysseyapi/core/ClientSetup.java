@@ -53,7 +53,7 @@ public class ClientSetup {
     public static void onClientSetup(FMLClientSetupEvent event) {
         DebugPageRegistry.bootstrapDefaults();
         ModConstants.LOGGER.info("[Wilderness Debug HUD] Custom debug overlay registered");
-        ModConstants.LOGGER.info("[Wilderness Debug HUD] NeoForge DebugText interception active");
+        ModConstants.LOGGER.info("[Wilderness Debug HUD] Visible-overlay arrow paging and scrolling active");
         ModConstants.LOGGER.info("[Wilderness Debug HUD] Registered {} debug pages", DebugPageRegistry.size());
 
         event.enqueueWork(() -> {

@@ -73,6 +73,14 @@ public final class SevereWeatherScheduler {
         int limit = Math.min(32, entities.size());
         for (int index = 0; index < limit; index++) {
             LivingEntity entity = entities.get(index);
+            // A severe identity must persist beyond its forming sample before
+            // it can physically move players or other living entities.
+            if (!SevereWeatherWindPolicy.canApplyEntityWind(
+                    system.type(),
+                    system.stage()
+            )) {
+                continue;
+            }
             double dx = entity.getX() - system.centerX();
             double dz = entity.getZ() - system.centerZ();
             double distance = Math.max(1.0, Math.hypot(dx, dz));

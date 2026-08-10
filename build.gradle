@@ -182,9 +182,6 @@ repositories {
         url "https://cursemaven.com"
     }
     maven {
-        url "https://repo.bluecolored.de/releases"
-    }
-    maven {
         // Sodium publishes loader-specific developer artifacts here. Restrict
         // the repository so unrelated dependencies keep their normal source.
         name = "CaffeineMC"
@@ -258,7 +255,6 @@ dependencies {
     implementation "curse.maven:selene-499980:8261785"
     implementation "curse.maven:supplementaries-412082:8244187"
     implementation "curse.maven:multipart-machines-cooking-885587:5686941"
-    implementation "curse.maven:bluemap-406463:6239407"
     localRuntime("net.caffeinemc:sodium-neoforge-mod:${sodiumVersion}") {
         transitive = false
     }
@@ -277,7 +273,6 @@ dependencies {
         }
     }
     compileOnly "curse.maven:spark-361579:6225208"
-    compileOnly "de.bluecolored:bluemap-api:${bluemap_api_version}"
     localRuntime "curse.maven:spark-361579:6225208"
     // Bundle third-party libraries into the final mod jar (Jar-in-Jar) to avoid missing-class errors at runtime.
     jarJar(implementation('com.squareup.okhttp3:okhttp:4.12.0'))
