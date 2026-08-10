@@ -28,6 +28,7 @@ public final class WildernessDebugManager {
     private final WildernessDebugOverlay overlay = new WildernessDebugOverlay();
     private final Set<ResourceLocation> loggedProviderFailures = new HashSet<>();
     private int selectedPage;
+    private int scrollOffset;
     private boolean wasVisible;
     private boolean loggedRenderFailure;
 
@@ -43,8 +44,11 @@ public final class WildernessDebugManager {
     public void syncVisibility(Minecraft minecraft) {
         boolean visible = DebugOverlayConfig.ENABLE_CUSTOM_DEBUG_HUD.get()
                 && minecraft.getDebugOverlay().showDebugScreen();
-        if (visible && !wasVisible && !DebugOverlayConfig.REMEMBER_LAST_DEBUG_PAGE.get()) {
-            selectedPage = 0;
+        if (visible && !wasVisible) {
+            scrollOffset = 0;
+            if (!DebugOverlayConfig.REMEMBER_LAST_DEBUG_PAGE.get()) {
+                selectedPage = 0;
+            }
         }
         wasVisible = visible;
     }
@@ -57,6 +61,16 @@ public final class WildernessDebugManager {
     /** Selects the next registered page with wraparound. */
     public void nextPage() {
         movePage(1);
+    }
+
+    /** Scrolls the active page up by one flattened display row. */
+    public void scrollUp() {
+        moveScroll(-1);
+    }
+
+    /** Scrolls the active page down by one flattened display row. */
+    public void scrollDown() {
+        moveScroll(1);
     }
 
     /** Returns the zero-based selected page index for diagnostics and tests. */
@@ -96,7 +110,9 @@ public final class WildernessDebugManager {
         }
 
         try {
-            overlay.render(graphics, page, selectedPage, pages.size(), sections);
+            scrollOffset = overlay.render(
+                    graphics, page, selectedPage, pages.size(), sections, scrollOffset
+            );
             return true;
         } catch (RuntimeException exception) {
             if (!loggedRenderFailure) {
@@ -111,6 +127,11 @@ public final class WildernessDebugManager {
         int pageCount = DebugPageRegistry.size();
         if (pageCount > 0) {
             selectedPage = Math.floorMod(selectedPage + delta, pageCount);
+            scrollOffset = 0;
         }
+    }
+
+    private void moveScroll(int delta) {
+        scrollOffset = Math.max(0, scrollOffset + delta);
     }
 }

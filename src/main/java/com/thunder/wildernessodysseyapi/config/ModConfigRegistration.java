@@ -8,8 +8,6 @@ import com.thunder.wildernessodysseyapi.ecosystem.EcosystemEvents;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileManager;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
-import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapConfig;
-import com.thunder.wildernessodysseyapi.lorebook.map.CodexMapServerConfig;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationRelayConfig;
@@ -64,8 +62,6 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-water-rendering-client.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, WeatherRenderingConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-weather-rendering-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, CodexMapConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-codex-map-client.toml");
 
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
@@ -86,8 +82,6 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-meteors-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TemporalRiftConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-temporal-rift-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, CodexMapServerConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-codex-map-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, WaterSimulationConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-water-simulation-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, WeatherConfig.CONFIG_SPEC,

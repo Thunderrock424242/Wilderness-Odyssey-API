@@ -10,14 +10,12 @@ import java.util.List;
 public final class GeneralDebugDataProvider implements DebugDataProvider {
     private final WorldDebugDataProvider world = new WorldDebugDataProvider();
     private final TargetDebugDataProvider target = new TargetDebugDataProvider();
-    private final PerformanceDebugDataProvider performance = new PerformanceDebugDataProvider();
 
     @Override
     public List<DebugSection> collect(DebugContext context) {
-        List<DebugSection> sections = new ArrayList<>(3);
+        List<DebugSection> sections = new ArrayList<>(2);
         sections.addAll(world.summary(context));
         sections.addAll(target.summary(context));
-        sections.addAll(performance.summary(context));
         return List.copyOf(sections);
     }
 }

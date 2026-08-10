@@ -10,10 +10,11 @@ import net.minecraft.world.level.storage.loot.predicates.LootItemRandomChanceCon
 import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.LootTableLoadEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
- * Forge event hooks that inject lore books into chest loot and keep a player's
+ * NeoForge event hooks that inject lore books into chest loot and keep a player's
  * discovered-book state in sync as they play.
  */
 public class LoreBookEvents {
@@ -51,6 +52,17 @@ public class LoreBookEvents {
         }
         if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer player) {
             LoreBookManager.scanInventory(player);
+        }
+    }
+
+    /**
+     * Keeps personal writing and lore discovery when Minecraft replaces a
+     * player entity after death or an End return.
+     */
+    @SubscribeEvent
+    public static void onPlayerClone(PlayerEvent.Clone event) {
+        if (!event.getEntity().level().isClientSide()) {
+            LoreBookManager.copyPlayerData(event.getOriginal(), event.getEntity());
         }
     }
 }

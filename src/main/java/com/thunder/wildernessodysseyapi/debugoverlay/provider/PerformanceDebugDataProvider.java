@@ -45,11 +45,6 @@ public final class PerformanceDebugDataProvider implements DebugDataProvider {
         return List.of(frame, memory, worldLoad);
     }
 
-    /** Returns the compact FPS/frame-time section used by the General page. */
-    public List<DebugSection> summary(DebugContext context) {
-        return List.of(frameSection(context.minecraft()));
-    }
-
     private static DebugSection frameSection(Minecraft minecraft) {
         int fps = minecraft.getFps();
         double frameMillis = minecraft.getFrameTimeNs() / 1_000_000.0D;

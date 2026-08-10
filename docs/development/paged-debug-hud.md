@@ -4,7 +4,7 @@
 
 The paged HUD replaces only the visual text presentation of Minecraft's normal F3 overlay. Minecraft still owns whether debugging is enabled, every vanilla F3 shortcut, debug charts, frame/tick/ping sample loggers, block and fluid ray picks, and the underlying debug values.
 
-The default page is deliberately small. Detailed world, performance, rendering, system, network, and target information lives on dedicated pages, while `VANILLA RAW` preserves the original line collections as an escape hatch.
+The default page is deliberately small and contains only compact World and Target sections. Performance information lives entirely on its dedicated page so General fits at larger GUI scales. Detailed world, rendering, system, network, and target information lives on their dedicated pages, while `VANILLA RAW` preserves the original line collections as an escape hatch.
 
 ## Minecraft 1.21.1 interception
 
@@ -24,7 +24,7 @@ If the custom renderer throws a runtime exception, the handler does not clear th
 
 `DebugScreenOverlayAccessor` is the only debug-HUD mixin. It exposes the private `DebugScreenOverlay.block` and `DebugScreenOverlay.liquid` fields through two `@Accessor` methods. The target provider reads the ray results vanilla already calculated instead of performing two more ray casts.
 
-There is no render-cancelling mixin and no page, formatting, or provider logic in the accessor. The mixin configuration has `defaultRequire: 1`, so a mapping change to either field fails loudly during development.
+There is no render-cancelling or keyboard mixin and no page, formatting, or provider logic in the accessor. The mixin configuration has `defaultRequire: 1`, so a mapping change to either field fails loudly during development.
 
 ## Architecture
 
@@ -33,8 +33,9 @@ There is no render-cancelling mixin and no page, formatting, or provider logic i
 - `DebugPageRegistry` owns ordered page registration. Its built-ins are General, World, Performance, Rendering, System, Network/Server, Target Details, and Vanilla Raw.
 - `ProviderDebugPage` calls only the active page's provider and caches its result for a page-specific interval.
 - Provider classes under `debugoverlay/provider` read client-safe Minecraft state. They do not perform disk or network IO.
-- `WildernessDebugManager` owns the selected index but never toggles Minecraft's debug state.
-- `WildernessDebugOverlay` draws the responsive panel with `GuiGraphics` and Minecraft's font. It flows rows across up to three columns and truncates overflow safely on very small screens.
+- `WildernessDebugManager` owns the selected index and active-page scroll offset but never toggles Minecraft's debug state. Changing pages or reopening F3 resets the viewport to the top.
+- `WildernessDebugOverlay` draws the responsive panel with `GuiGraphics` and Minecraft's font. It flows visible rows across up to three columns and clamps the requested viewport against the capacity calculated from the current window and GUI scale.
+- `DebugViewport` is the tested line-window model used to expose overflow instead of discarding it.
 - `DebugPageContributorRegistry` lets optional renderer integrations append sections without hard dependencies. Contributor failures become an unavailable row instead of breaking F3.
 
 The existing Wilderness GPU-profiler, water-render, and localized-weather diagnostic lines moved from the old unbounded vanilla right column to the cached Rendering page. Their information remains available without calculating those subsystem diagnostics on unrelated pages.
@@ -66,12 +67,16 @@ Do not load optional-mod classes until the integration has verified that the mod
 
 The default controls are:
 
-- F3 + Left Arrow: previous page
-- F3 + Right Arrow: next page
+- Left Arrow: previous page
+- Right Arrow: next page
+- Up Arrow: scroll the current page up one row
+- Down Arrow: scroll the current page down one row
 
-Both arrow keys are registered as normal configurable key mappings. Page handling requires F3 to be held and the debug overlay to be visible.
+All four arrow keys are registered as normal configurable key mappings. A single press changes the page or viewport only while the F3 debug overlay is visible and no menu, chat, inventory, or other screen is open. F3 does not need to be held. Up and Down have no visible effect when all of the active page's lines already fit.
 
-Minecraft 1.21.1's `KeyboardHandler.handleDebugKeys(int)` was checked directly. It uses `1`, `2`, `3`, `A`, `B`, `C`, `D`, `G`, `H`, `I`, `L`, `N`, `P`, `Q`, `S`, `T`, and `F4`; Left Arrow (GLFW 263) and Right Arrow (GLFW 262) are unused. The NeoForge `InputEvent.Key` used by the HUD is non-cancellable and fires after vanilla processing, so the existing combinations keep their normal code paths. Players can create a conflict by manually rebinding a page key to a vanilla F3 shortcut key.
+NeoForge's non-cancellable `InputEvent.Key` reports the press after normal keyboard processing. The handler ignores releases, repeats, hidden debug overlays, and open screens, then recognizes only the configured page and scroll controls. The default arrow keys are not Minecraft movement controls. Players who rebind a debug control to a gameplay key may trigger both actions while the debug overlay is visible.
+
+When a page exceeds the calculated multi-column capacity, the center footer displays the first and last visible line plus the total line count. Each Up or Down press shifts that flattened line window by one row. The offset is clamped again every frame so resizing the window, changing GUI scale, or receiving a different number of live diagnostic rows cannot leave the page beyond its valid content.
 
 ## Configuration and compatibility fallback
 
@@ -92,7 +97,7 @@ Set `enableCustomDebugHud=false` and reload/restart the client to leave the even
 - A distinct server light value is not synchronized to the client. It is labeled unavailable.
 - Remote server MSPT and server chunks are not invented or queried. They remain unavailable unless vanilla has supplied a usable client-side sample or a future optional server integration contributes them.
 - Integrated-server MSPT uses the public smoothed tick time. Integrated-server chunk objects are not read from the render thread; detailed vanilla server chunk lines remain available on `VANILLA RAW`.
-- Long raw output can exceed a tiny window. The renderer shows how many lines were omitted and displays more as the window grows or GUI scale is lowered.
+- Long raw output can exceed a tiny window. The renderer retains every line and exposes the overflow through Up/Down scrolling; the footer shows the current visible range whenever scrolling is needed.
 
 ## Manual verification
 
@@ -103,4 +108,4 @@ $env:JAVA_HOME='C:\Program Files\Java\jdk-21.0.10'
 .\gradlew.bat runClient --no-daemon --console=plain
 ```
 
-Verify F3 open/close, both page controls, F3+1/2/3 charts, every letter shortcut listed above, target changes across blocks/fluids/entities, Overworld/Nether/End, several GUI scales, small window/fullscreen, disconnect/reconnect, and the disabled-config vanilla fallback. Multiplayer values should remain safe when the remote server does not have Wilderness Odyssey installed.
+Verify F3 open/close, Left/Right paging without holding F3, Up/Down scrolling on an overflowing page, F3+1/2/3 charts, vanilla F3 letter shortcuts, target changes across blocks/fluids/entities, Overworld/Nether/End, several GUI scales, small window/fullscreen, disconnect/reconnect, and the disabled-config vanilla fallback. Confirm that scrolling stops cleanly at both ends, resets at page changes and F3 reopen, disappears when resized content fits, and does not react after F3 is closed. Multiplayer values should remain safe when the remote server does not have Wilderness Odyssey installed.

@@ -10,6 +10,7 @@ import net.minecraft.nbt.StringTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.Filterable;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
@@ -21,10 +22,18 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * Owns server-side lore journal discovery and personal Codex journal data.
+ *
+ * <p>Lore ids and personal writing live in player persistent data. The client
+ * receives read-only lore unlocks plus the editable journal snapshot through
+ * explicit payloads instead of mutating authoritative state locally.</p>
+ */
 public final class LoreBookManager {
     public static final String LORE_ID_TAG = ModConstants.MOD_ID + ":lore_id";
     private static final String ROOT_TAG = ModConstants.MOD_ID + "_lore_books";
     private static final String COLLECTED_TAG = "collected";
+    private static final String JOURNAL_TAG = "journal";
     private static final String LAST_SCAN_TAG = "last_scan";
     private static final long SCAN_INTERVAL_TICKS = TickTokAPI.toTicksFromSeconds(2L);
 
@@ -70,12 +79,14 @@ public final class LoreBookManager {
             }
         }
 
-        // Save the new book to the player's NBT
+        // Persist discovery before notifying the client so a reconnect cannot
+        // expose an unlock that the server has not recorded.
         list.add(StringTag.valueOf(id));
         root.put(COLLECTED_TAG, list);
         player.getPersistentData().put(ROOT_TAG, root);
 
-        // THE FIX: Send the packet to the client so the GUI updates instantly!
+        // Push the new id immediately so an already-open Codex updates without
+        // waiting for the player to use the item again.
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, new SyncLoreBookPayload(id));
     }
 
@@ -87,6 +98,29 @@ public final class LoreBookManager {
             collected.add(list.getString(i));
         }
         return collected;
+    }
+
+    /**
+     * Returns the player's normalized personal journal text.
+     *
+     * @param player player who owns the journal
+     * @return journal contents, or an empty string when none have been written
+     */
+    public static String getJournalText(ServerPlayer player) {
+        CompoundTag root = player.getPersistentData().getCompound(ROOT_TAG);
+        return CodexJournalText.sanitize(root.getString(JOURNAL_TAG));
+    }
+
+    /**
+     * Validates and persists a complete personal journal snapshot.
+     *
+     * @param player player who owns the journal
+     * @param text untrusted journal text received from the client
+     */
+    public static void saveJournalText(ServerPlayer player, String text) {
+        CompoundTag root = player.getPersistentData().getCompound(ROOT_TAG);
+        root.putString(JOURNAL_TAG, CodexJournalText.sanitize(text));
+        player.getPersistentData().put(ROOT_TAG, root);
     }
 
     public static ItemStack createBookStack(LoreBookConfig.LoreBookEntry entry) {
@@ -141,6 +175,15 @@ public final class LoreBookManager {
     private static void scanStacks(List<ItemStack> stacks, ServerPlayer player) {
         for (ItemStack stack : stacks) {
             loreIdFrom(stack).ifPresent(id -> markCollected(player, id));
+        }
+    }
+
+    // Player entities are replaced after death or End return, so copy the
+    // Codex root explicitly to keep both writing and discovered lore journals.
+    static void copyPlayerData(Player original, Player replacement) {
+        CompoundTag originalRoot = original.getPersistentData().getCompound(ROOT_TAG);
+        if (!originalRoot.isEmpty()) {
+            replacement.getPersistentData().put(ROOT_TAG, originalRoot.copy());
         }
     }
 }
