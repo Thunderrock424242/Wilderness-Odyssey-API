@@ -33,3 +33,4 @@ repo
 .env
 /logs/debug.log
 /logs/latest.log
+/logs/
