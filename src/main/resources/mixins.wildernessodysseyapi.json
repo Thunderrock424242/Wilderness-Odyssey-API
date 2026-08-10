@@ -60,7 +60,7 @@
     "ClientLevelLocalizedRainMixin",
     "ClientLevelLocalizedWeatherMixin",
     "ClientLevelWeatherColorMixin",
-    "DebugScreenOverlayMixin",
+    "DebugScreenOverlayAccessor",
     "GerstnerWaveRenderMixin",
     "GlStateManagerGpuProfilerMixin",
     "IrisWaterMaterialBridgeMixin",
