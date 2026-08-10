@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.core;
 
+import com.thunder.wildernessodysseyapi.debugoverlay.DebugPageRegistry;
 import com.thunder.wildernessodysseyapi.entity.client.RiftListenerRenderer;
 import com.thunder.wildernessodysseyapi.entity.client.RiftMawRenderer;
 import com.thunder.wildernessodysseyapi.entity.client.RiftbornRenderer;
@@ -50,6 +51,11 @@ public class ClientSetup {
      */
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
+        DebugPageRegistry.bootstrapDefaults();
+        ModConstants.LOGGER.info("[Wilderness Debug HUD] Custom debug overlay registered");
+        ModConstants.LOGGER.info("[Wilderness Debug HUD] NeoForge DebugText interception active");
+        ModConstants.LOGGER.info("[Wilderness Debug HUD] Registered {} debug pages", DebugPageRegistry.size());
+
         event.enqueueWork(() -> {
             ItemBlockRenderTypes.setRenderLayer(
                     WildernessFluidRegistry.WILDERNESS_WATER.get(),

@@ -49,6 +49,8 @@
   "key.categories.wildernessodysseyapi": "Wilderness Odyssey API",
   "key.wildernessodysseyapi.hold_breath": "Hold Breath",
   "key.wildernessodysseyapi.cloak_toggle": "Toggle Cloak",
+  "key.wildernessodysseyapi.debug_previous_page": "Previous Debug Page",
+  "key.wildernessodysseyapi.debug_next_page": "Next Debug Page",
   "effect.wildernessodysseyapi.cryo_shakes": "Cryo Shakes",
   "effect.wildernessodysseyapi.echo_hypoxia": "Echo Hypoxia",
   "effect.wildernessodysseyapi.desynced": "Desynced",
