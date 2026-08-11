@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Strict JSON parser for StructureGen Blueprint Format v1.
@@ -31,13 +32,23 @@ public final class BlueprintParser {
 
     private static final Set<String> ROOT_FIELDS = Set.of(
             "formatVersion", "name", "dataVersion", "size", "metadata", "markers",
-            "blocks", "entities", "rawRootSnbt", "sourcePalettes", "unsupportedFields"
+            "blocks", "entities", "rawRootSnbt", "contentPolicy", "materials",
+            "sourcePalettes", "unsupportedFields"
     );
     private static final Set<String> BLOCK_FIELDS = Set.of(
             "pos", "block", "properties", "blockEntitySnbt", "markers", "rawEntrySnbt",
-            "sourcePaletteIndex"
+            "sourcePaletteIndex", "usageIntent", "requiredSystem"
     );
     private static final Set<String> ENTITY_FIELDS = Set.of("pos", "blockPos", "nbtSnbt", "rawEntrySnbt");
+    private static final Set<String> CONTENT_POLICY_FIELDS = Set.of(
+            "allowInstalledModBlocks", "preferredDecorativeMods", "requiredMods", "enabledFunctionalSystems"
+    );
+    private static final Set<String> MATERIAL_FIELDS = Set.of(
+            "intent", "requiredSystem", "preferred", "fallbacks"
+    );
+    private static final Set<String> MATERIAL_CANDIDATE_FIELDS = Set.of(
+            "block", "properties", "requiresMod"
+    );
 
     /** Reads and parses one UTF-8 blueprint file without producing any output files. */
     public StructureGenResult<BlueprintDocument> parse(Path source) {
@@ -74,6 +85,12 @@ public final class BlueprintParser {
         List<BlueprintBlock> blocks = parseBlocks(root.get("blocks"), source, diagnostics);
         List<BlueprintEntity> entities = parseEntities(root.get("entities"), source, diagnostics);
         String rawRootSnbt = optionalString(root, "rawRootSnbt", "$", source, diagnostics);
+        BlueprintContentPolicy contentPolicy = parseContentPolicy(
+                root.get("contentPolicy"), source, diagnostics
+        );
+        Map<String, BlueprintMaterialDefinition> materials = parseMaterials(
+                root.get("materials"), source, diagnostics
+        );
 
         if (hasErrors(diagnostics)) {
             return new StructureGenResult<>(null, diagnostics);
@@ -88,9 +105,168 @@ public final class BlueprintParser {
                 markers,
                 blocks,
                 entities,
-                rawRootSnbt
+                rawRootSnbt,
+                contentPolicy,
+                materials
         );
         return new StructureGenResult<>(document, diagnostics);
+    }
+
+    // Content policy remains optional so every existing concrete-only Blueprint keeps its behavior.
+    private BlueprintContentPolicy parseContentPolicy(
+            JsonElement element,
+            Path source,
+            List<StructureDiagnostic> diagnostics
+    ) {
+        if (element == null || element.isJsonNull()) {
+            return BlueprintContentPolicy.defaults();
+        }
+        if (!element.isJsonObject()) {
+            error(diagnostics, source, "contentPolicy", "Must be an object when present.");
+            return BlueprintContentPolicy.defaults();
+        }
+
+        JsonObject object = element.getAsJsonObject();
+        validateKnownFields(object, CONTENT_POLICY_FIELDS, "contentPolicy", source, diagnostics);
+        boolean allowInstalledModBlocks = optionalBoolean(
+                object,
+                "allowInstalledModBlocks",
+                "contentPolicy",
+                true,
+                source,
+                diagnostics
+        );
+        List<String> preferredDecorativeMods = parseStringList(
+                object.get("preferredDecorativeMods"),
+                "contentPolicy.preferredDecorativeMods",
+                source,
+                diagnostics,
+                true
+        );
+        List<String> requiredMods = parseStringList(
+                object.get("requiredMods"),
+                "contentPolicy.requiredMods",
+                source,
+                diagnostics,
+                true
+        );
+        List<String> enabledFunctionalSystems = parseStringList(
+                object.get("enabledFunctionalSystems"),
+                "contentPolicy.enabledFunctionalSystems",
+                source,
+                diagnostics,
+                true
+        );
+        return new BlueprintContentPolicy(
+                allowInstalledModBlocks,
+                preferredDecorativeMods,
+                requiredMods,
+                enabledFunctionalSystems
+        );
+    }
+
+    // Material keys are sorted in the parsed document so later resolution never depends on JSON object order.
+    private Map<String, BlueprintMaterialDefinition> parseMaterials(
+            JsonElement element,
+            Path source,
+            List<StructureDiagnostic> diagnostics
+    ) {
+        Map<String, BlueprintMaterialDefinition> materials = new TreeMap<>();
+        if (element == null || element.isJsonNull()) {
+            return materials;
+        }
+        if (!element.isJsonObject()) {
+            error(diagnostics, source, "materials", "Must be an object when present.");
+            return materials;
+        }
+
+        element.getAsJsonObject().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> {
+                    String location = "materials." + entry.getKey();
+                    BlueprintMaterialDefinition definition = parseMaterialDefinition(
+                            entry.getValue(), location, source, diagnostics
+                    );
+                    if (definition != null) {
+                        materials.put(entry.getKey(), definition);
+                    }
+                });
+        return materials;
+    }
+
+    private BlueprintMaterialDefinition parseMaterialDefinition(
+            JsonElement element,
+            String location,
+            Path source,
+            List<StructureDiagnostic> diagnostics
+    ) {
+        if (!element.isJsonObject()) {
+            error(diagnostics, source, location, "Material definition must be an object.");
+            return null;
+        }
+        JsonObject object = element.getAsJsonObject();
+        validateKnownFields(object, MATERIAL_FIELDS, location, source, diagnostics);
+        String intent = optionalString(object, "intent", location, source, diagnostics);
+        if (intent == null) {
+            intent = BlueprintMaterialDefinition.DEFAULT_INTENT;
+        }
+        String requiredSystem = optionalString(object, "requiredSystem", location, source, diagnostics);
+        List<BlueprintMaterialCandidate> preferred = parseMaterialCandidates(
+                object.get("preferred"), location + ".preferred", source, diagnostics
+        );
+        List<BlueprintMaterialCandidate> fallbacks = parseMaterialCandidates(
+                object.get("fallbacks"), location + ".fallbacks", source, diagnostics
+        );
+        return new BlueprintMaterialDefinition(intent, requiredSystem, preferred, fallbacks);
+    }
+
+    private List<BlueprintMaterialCandidate> parseMaterialCandidates(
+            JsonElement element,
+            String location,
+            Path source,
+            List<StructureDiagnostic> diagnostics
+    ) {
+        List<BlueprintMaterialCandidate> candidates = new ArrayList<>();
+        if (element == null || element.isJsonNull()) {
+            return candidates;
+        }
+        if (!element.isJsonArray()) {
+            error(diagnostics, source, location, "Must be an array of material candidate objects.");
+            return candidates;
+        }
+
+        JsonArray array = element.getAsJsonArray();
+        for (int index = 0; index < array.size(); index++) {
+            String candidateLocation = location + "[" + index + "]";
+            JsonElement candidateElement = array.get(index);
+            if (!candidateElement.isJsonObject()) {
+                error(diagnostics, source, candidateLocation, "Material candidate must be an object.");
+                continue;
+            }
+            JsonObject candidate = candidateElement.getAsJsonObject();
+            validateKnownFields(
+                    candidate,
+                    MATERIAL_CANDIDATE_FIELDS,
+                    candidateLocation,
+                    source,
+                    diagnostics
+            );
+            String blockId = requiredString(candidate, "block", candidateLocation, source, diagnostics);
+            Map<String, String> properties = parseStringMap(
+                    candidate.get("properties"),
+                    candidateLocation + ".properties",
+                    source,
+                    diagnostics,
+                    true
+            );
+            String requiresMod = optionalString(
+                    candidate, "requiresMod", candidateLocation, source, diagnostics
+            );
+            if (blockId != null) {
+                candidates.add(new BlueprintMaterialCandidate(blockId, properties, requiresMod));
+            }
+        }
+        return candidates;
     }
 
     // Parse each block independently so one malformed entry does not hide later diagnostics.
@@ -124,13 +300,16 @@ public final class BlueprintParser {
                     object.get("properties"), location + ".properties", source, diagnostics, true
             );
             String blockEntitySnbt = optionalString(object, "blockEntitySnbt", location, source, diagnostics);
+            String usageIntent = optionalString(object, "usageIntent", location, source, diagnostics);
+            String requiredSystem = optionalString(object, "requiredSystem", location, source, diagnostics);
             List<String> markers = parseStringList(
                     object.get("markers"), location + ".markers", source, diagnostics, true
             );
             String rawEntrySnbt = optionalString(object, "rawEntrySnbt", location, source, diagnostics);
             if (position != null && blockId != null) {
                 blocks.add(new BlueprintBlock(
-                        position, blockId, properties, blockEntitySnbt, markers, rawEntrySnbt
+                        position, blockId, properties, blockEntitySnbt, markers, rawEntrySnbt,
+                        usageIntent, requiredSystem
                 ));
             }
         }
@@ -335,6 +514,25 @@ public final class BlueprintParser {
             error(diagnostics, source, location + "." + field, "Must be an integer.");
         }
         return value;
+    }
+
+    private boolean optionalBoolean(
+            JsonObject object,
+            String field,
+            String location,
+            boolean defaultValue,
+            Path source,
+            List<StructureDiagnostic> diagnostics
+    ) {
+        if (!object.has(field) || object.get(field).isJsonNull()) {
+            return defaultValue;
+        }
+        JsonElement value = object.get(field);
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean()) {
+            error(diagnostics, source, location + "." + field, "Must be a boolean.");
+            return defaultValue;
+        }
+        return value.getAsBoolean();
     }
 
     private Integer exactInt(JsonElement element) {

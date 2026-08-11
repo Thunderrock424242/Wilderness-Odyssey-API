@@ -84,6 +84,11 @@ neoForge {
 
             // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
             programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+            // Datagen fully registers dependency mods without starting a world. Capture that
+            // authoritative registry for the separate offline StructureGen compiler.
+            systemProperty 'wildernessodysseyapi.structuregen.catalogOutput', layout.buildDirectory.file(
+                    'generated/structuregen/catalog/available-content.json'
+            ).get().asFile.absolutePath
         }
 
         // applies to all the run configs above
@@ -133,6 +138,10 @@ sourceSets.main.resources {
 // Reuse the existing empty GameTest template under the mod namespace so the
 // generated-water integration tests are included in the normal mod-scoped run.
 tasks.named('processResources') {
+    // Minecraft datagen stores provider hashes beneath its output root. Those
+    // local cache records are build bookkeeping, not mod resources.
+    exclude '.cache/**'
+
     from('src/main/resources/data/minecraft/structures/empty.nbt') {
         // 1.21 resource-pack structures use the singular `structure` folder;
         // `structures` is reserved for generated world-save output.
@@ -255,13 +264,16 @@ dependencies {
     implementation "curse.maven:selene-499980:8261785"
     implementation "curse.maven:supplementaries-412082:8244187"
     implementation "curse.maven:multipart-machines-cooking-885587:5686941"
-    localRuntime("net.caffeinemc:sodium-neoforge-mod:${sodiumVersion}") {
+    // Sodium and its flattened Fabric API support modules are client-only.
+    // Keeping them on the client's per-run classpath prevents datagen/server
+    // launches from applying Sodium render mixins without its client service.
+    clientAdditionalRuntimeClasspath("net.caffeinemc:sodium-neoforge-mod:${sodiumVersion}") {
         transitive = false
     }
-    localRuntime "org.sinytra.forgified-fabric-api:fabric-api-base:0.4.42+d1308ded19"
-    localRuntime "org.sinytra.forgified-fabric-api:fabric-renderer-api-v1:3.4.1+9125b6dc19"
-    localRuntime "org.sinytra.forgified-fabric-api:fabric-rendering-data-attachment-v1:0.3.48+73761d2e19"
-    localRuntime "org.sinytra.forgified-fabric-api:fabric-block-view-api-v2:1.0.10+9afaaf8c19"
+    clientAdditionalRuntimeClasspath "org.sinytra.forgified-fabric-api:fabric-api-base:0.4.42+d1308ded19"
+    clientAdditionalRuntimeClasspath "org.sinytra.forgified-fabric-api:fabric-renderer-api-v1:3.4.1+9125b6dc19"
+    clientAdditionalRuntimeClasspath "org.sinytra.forgified-fabric-api:fabric-rendering-data-attachment-v1:0.3.48+73761d2e19"
+    clientAdditionalRuntimeClasspath "org.sinytra.forgified-fabric-api:fabric-block-view-api-v2:1.0.10+9afaaf8c19"
     sodiumService("net.caffeinemc:sodium-neoforge:${sodiumVersion}") {
         transitive = false
     }
@@ -344,6 +356,65 @@ def structureGenClasspath = files(sourceSets.main.output.classesDirs) + configur
 def structureGenMainClass = 'com.thunder.wildernessodysseyapi.structuregen.cli.StructureGenCli'
 def structureGenBlueprintRoot = layout.projectDirectory.dir('src/main/structure_blueprints')
 def structureGenReportRoot = layout.buildDirectory.dir('reports/structuregen')
+def structureGenCatalogFile = layout.buildDirectory.file('generated/structuregen/catalog/available-content.json')
+
+// A registry snapshot is safe only for the exact source/dependency environment
+// that produced it. Hash project registry inputs, common runtime artifacts, and
+// local run/mods content without relying on guessed namespace ownership.
+def structureGenProjectFingerprintFiles = files(
+        fileTree('src/main/java') { include '**/*.java' },
+        fileTree('src/main/resources') { include '**/*' },
+        fileTree('src/main/templates') { include '**/*' },
+        file('build.gradle'),
+        file('settings.gradle'),
+        file('gradle.properties')
+)
+def structureGenRuntimeFingerprintFiles = files(
+        configurations.runtimeClasspath,
+        fileTree('run/mods') { include '**/*.jar' }
+)
+def structureGenHashFile = { File source ->
+    def digest = java.security.MessageDigest.getInstance('SHA-256')
+    source.withInputStream { stream ->
+        byte[] buffer = new byte[8192]
+        int count
+        while ((count = stream.read(buffer)) >= 0) {
+            if (count > 0) {
+                digest.update(buffer, 0, count)
+            }
+        }
+    }
+    java.util.HexFormat.of().formatHex(digest.digest())
+}
+def structureGenCatalogFingerprint = providers.provider {
+    def entries = []
+    structureGenProjectFingerprintFiles.files
+            .findAll { it.isFile() }
+            .each { source ->
+                def relativePath = project.relativePath(source).replace('\\', '/')
+                entries.add("project:${relativePath}:${structureGenHashFile(source)}")
+            }
+    structureGenRuntimeFingerprintFiles.files
+            .findAll { it.isFile() }
+            .each { artifact ->
+                entries.add("runtime:${artifact.name}:${structureGenHashFile(artifact)}")
+            }
+    def digest = java.security.MessageDigest.getInstance('SHA-256')
+    entries.sort().each { entry ->
+        digest.update(entry.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+        digest.update((byte) 10)
+    }
+    java.util.HexFormat.of().formatHex(digest.digest())
+}
+
+// ModDevGradle's run model accepts Provider-backed map entries, so the
+// fingerprint is resolved only when the real data launch is prepared.
+neoForge.runs.named('data') {
+    systemProperties.put(
+            'wildernessodysseyapi.structuregen.catalogFingerprint',
+            structureGenCatalogFingerprint
+    )
+}
 
 def generateStructures = tasks.register('generateStructures', JavaExec) {
     group = 'structure generation'
@@ -353,6 +424,14 @@ def generateStructures = tasks.register('generateStructures', JavaExec) {
     mainClass.set(structureGenMainClass)
     maxHeapSize = '4g'
     inputs.dir structureGenBlueprintRoot
+    // The full-registry snapshot is optional so vanilla-only generation still
+    // works before runData; when present, its exact contents invalidate output.
+    inputs.files(fileTree(layout.buildDirectory.dir('generated/structuregen/catalog')) {
+        include 'available-content.json'
+    })
+    inputs.files structureGenProjectFingerprintFiles
+    inputs.files structureGenRuntimeFingerprintFiles
+    inputs.property 'catalogEnvironmentFingerprint', structureGenCatalogFingerprint
     // Existing packaged structure sources are collision inputs. A new manual
     // resource must invalidate generation even when no blueprint changed.
     inputs.files(
@@ -372,7 +451,10 @@ def generateStructures = tasks.register('generateStructures', JavaExec) {
                 'generate',
                 '--project-dir', layout.projectDirectory.asFile.absolutePath,
                 '--blueprints', structureGenBlueprintRoot.asFile.absolutePath,
-                '--output-resources', structureGenResourceRoot.get().asFile.absolutePath
+                '--output-resources', structureGenResourceRoot.get().asFile.absolutePath,
+                '--catalog', structureGenCatalogFile.get().asFile.absolutePath,
+                '--catalog-fingerprint', structureGenCatalogFingerprint.get(),
+                '--reports', structureGenReportRoot.get().asFile.absolutePath
         ])
     }
 }
@@ -452,10 +534,21 @@ tasks.register('compareStructures', JavaExec) {
     }
 }
 
+// A direct runData invocation must be able to create the registry snapshot from
+// a clean checkout before mod-aware blueprints can validate against it. Keep
+// that catalog-refresh invocation single-purpose; every normal resource,
+// packaging, and development invocation retains the generation gate below.
+def requestedTaskNames = gradle.startParameter.taskNames.collect { taskPath ->
+    taskPath.tokenize(':').last()
+}
+def refreshingStructureGenCatalog = requestedTaskNames == ['runData']
+
 // Every packaged or development resource set is regenerated from validated
 // blueprints, preventing stale generated NBT from entering a release artifact.
 tasks.named('processResources') {
-    dependsOn generateStructures
+    if (!refreshingStructureGenCatalog) {
+        dependsOn generateStructures
+    }
 }
 
 publishing {

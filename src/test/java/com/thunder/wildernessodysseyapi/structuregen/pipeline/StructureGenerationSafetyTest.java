@@ -2,10 +2,13 @@ package com.thunder.wildernessodysseyapi.structuregen.pipeline;
 
 import com.thunder.wildernessodysseyapi.structuregen.blueprint.BlueprintBlock;
 import com.thunder.wildernessodysseyapi.structuregen.blueprint.BlueprintDocument;
+import com.thunder.wildernessodysseyapi.structuregen.content.ContentManifestStatus;
+import com.thunder.wildernessodysseyapi.structuregen.content.StructureContentManifest;
 import com.thunder.wildernessodysseyapi.structuregen.diagnostic.StructureGenResult;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureModel;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructurePosition;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureSize;
+import com.thunder.wildernessodysseyapi.structuregen.nbt.MinecraftStructureNbtReader;
 import com.thunder.wildernessodysseyapi.structuregen.validation.BlockStateResolver;
 import com.thunder.wildernessodysseyapi.structuregen.validation.BlueprintValidator;
 import org.junit.jupiter.api.Test;
@@ -21,6 +24,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -151,6 +155,47 @@ class StructureGenerationSafetyTest {
     }
 
     @Test
+    void safeOutputPreservesPartialManifestWithoutUpgradingItsTrustStatus() throws IOException {
+        Path projectRoot = tempDirectory.resolve("partial-manifest-project");
+        StructureGenPaths paths = paths(projectRoot);
+        StructureGenResult<StructureModel> validation = validator().validate(blueprint("partial_manifest_output"));
+        assertFalse(validation.hasErrors(), () -> "Unexpected validation errors: " + validation.diagnostics());
+        StructureModel validated = validation.value();
+        assertNotNull(validated);
+        StructureContentManifest partialManifest = new StructureContentManifest(
+                StructureContentManifest.CURRENT_SCHEMA_VERSION,
+                true,
+                List.of("decorations"),
+                List.of("required_platform"),
+                List.of(),
+                List.of(),
+                ContentManifestStatus.PARTIAL
+        );
+        StructureModel partialModel = new StructureModel(
+                validated.name(),
+                validated.size(),
+                validated.blocks(),
+                validated.entities(),
+                validated.dataVersion(),
+                validated.metadata(),
+                validated.markers(),
+                validated.sourcePalettes(),
+                validated.rawRootSnbt(),
+                validated.unsupportedFields(),
+                partialManifest
+        );
+
+        GeneratedStructure generated = new SafeStructureOutput(paths).writeVerified(partialModel);
+        StructureModel reread = new MinecraftStructureNbtReader().read(generated.output());
+
+        assertTrue(generated.verification().semanticallyMatches());
+        assertEquals(partialManifest, reread.contentManifest());
+        assertEquals(ContentManifestStatus.PARTIAL, reread.contentManifest().provenanceStatus());
+        assertEquals(List.of("decorations"), reread.contentManifest().preferredDecorativeMods());
+        assertEquals(List.of("required_platform"), reread.contentManifest().requiredMods());
+    }
+
+    @Test
     void removesObsoleteOutputAfterCurrentBatchSucceedsWithoutTouchingNewManualResource() throws IOException {
         Path projectRoot = tempDirectory.resolve("obsolete-output-project");
         StructureGenPaths paths = paths(projectRoot);
@@ -182,6 +227,38 @@ class StructureGenerationSafetyTest {
         assertTrue(Files.isRegularFile(retainedOutput));
         assertFalse(Files.exists(obsoleteOutput));
         assertArrayEquals(manualBytes, Files.readAllBytes(manualResource));
+    }
+
+    @Test
+    void removesNestedAndLegacyPluralNbtWithoutDeletingOtherGeneratedResources() throws IOException {
+        Path projectRoot = tempDirectory.resolve("nested-obsolete-output-project");
+        StructureGenPaths paths = paths(projectRoot);
+        Path retainedBlueprint = paths.blueprintRoot().resolve("retained.json");
+        Files.writeString(retainedBlueprint, oneBlockBlueprint("retained"), StandardCharsets.UTF_8);
+
+        Path nestedStale = paths.generatedStructureRoot().resolve("old/nested_stale.nbt");
+        Path legacyStale = paths.outputResourceRoot().resolve(
+                "data/wildernessodysseyapi/structures/legacy_stale.nbt"
+        );
+        Path unrelatedGeneratedResource = paths.outputResourceRoot().resolve(
+                "data/wildernessodysseyapi/worldgen/retained.json"
+        );
+        Files.createDirectories(nestedStale.getParent());
+        Files.createDirectories(legacyStale.getParent());
+        Files.createDirectories(unrelatedGeneratedResource.getParent());
+        Files.writeString(nestedStale, "stale nested nbt", StandardCharsets.UTF_8);
+        Files.writeString(legacyStale, "stale plural nbt", StandardCharsets.UTF_8);
+        byte[] unrelatedBytes = "unrelated generated data".getBytes(StandardCharsets.UTF_8);
+        Files.write(unrelatedGeneratedResource, unrelatedBytes);
+
+        StructureGenerationResult result = new StructureGenerationPipeline(paths, validator(), ignored -> {
+        }).generate();
+
+        assertTrue(result.successful(), () -> "Unexpected diagnostics: " + result.diagnostics());
+        assertTrue(Files.isRegularFile(paths.generatedStructure("retained")));
+        assertFalse(Files.exists(nestedStale));
+        assertFalse(Files.exists(legacyStale));
+        assertArrayEquals(unrelatedBytes, Files.readAllBytes(unrelatedGeneratedResource));
     }
 
     private StructureGenPaths paths(Path projectRoot) throws IOException {

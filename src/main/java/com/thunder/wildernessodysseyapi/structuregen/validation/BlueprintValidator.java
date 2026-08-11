@@ -5,6 +5,12 @@ import com.thunder.wildernessodysseyapi.structuregen.StructureGenConstants;
 import com.thunder.wildernessodysseyapi.structuregen.blueprint.BlueprintBlock;
 import com.thunder.wildernessodysseyapi.structuregen.blueprint.BlueprintDocument;
 import com.thunder.wildernessodysseyapi.structuregen.blueprint.BlueprintEntity;
+import com.thunder.wildernessodysseyapi.structuregen.content.MaterialResolution;
+import com.thunder.wildernessodysseyapi.structuregen.content.ResolvedMaterial;
+import com.thunder.wildernessodysseyapi.structuregen.content.SemanticMaterialResolver;
+import com.thunder.wildernessodysseyapi.structuregen.content.StructureBlockCatalog;
+import com.thunder.wildernessodysseyapi.structuregen.content.StructureFunctionalBlockPolicy;
+import com.thunder.wildernessodysseyapi.structuregen.content.StructureContentManifest;
 import com.thunder.wildernessodysseyapi.structuregen.diagnostic.DiagnosticSeverity;
 import com.thunder.wildernessodysseyapi.structuregen.diagnostic.StructureDiagnostic;
 import com.thunder.wildernessodysseyapi.structuregen.diagnostic.StructureGenResult;
@@ -26,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
@@ -45,10 +52,21 @@ public final class BlueprintValidator {
     private static final Set<String> ENTITY_ENTRY_FIELDS = Set.of("pos", "blockPos", "nbt");
 
     private final BlockStateResolver blockStateResolver;
+    private final StructureBlockCatalog contentCatalog;
 
     /** Creates a validator with the supplied registry boundary. */
     public BlueprintValidator(BlockStateResolver blockStateResolver) {
         this.blockStateResolver = blockStateResolver;
+        this.contentCatalog = null;
+    }
+
+    /** Creates a validator with a fail-closed, mod-aware content catalog. */
+    public BlueprintValidator(StructureBlockCatalog contentCatalog) {
+        this.contentCatalog = contentCatalog;
+        this.blockStateResolver = (blockId, properties) -> {
+            StructureBlockCatalog.Validation validation = contentCatalog.validate(blockId, properties);
+            return new BlockStateResolver.Resolution(validation.errors(), List.of());
+        };
     }
 
     /** Validates every field and produces an internal model only when no errors remain. */
@@ -62,7 +80,12 @@ public final class BlueprintValidator {
         validateSize(blueprint.size(), source, diagnostics);
         validateMarkers(blueprint.markers(), source, "markers", diagnostics);
 
-        List<StructureBlock> blocks = validateBlocks(blueprint, diagnostics);
+        MaterialResolution materialResolution = resolveMaterials(blueprint, diagnostics);
+        Map<String, ResolvedMaterial> resolvedMaterials = materialResolution == null
+                ? Map.of()
+                : materialResolution.materials();
+
+        List<StructureBlock> blocks = validateBlocks(blueprint, resolvedMaterials, diagnostics);
         List<StructureEntity> entities = validateEntities(blueprint, diagnostics);
         validateRawRootSnbt(blueprint.rawRootSnbt(), source, diagnostics);
 
@@ -82,7 +105,10 @@ public final class BlueprintValidator {
                 blueprint.markers(),
                 List.of(),
                 blueprint.rawRootSnbt(),
-                List.of()
+                List.of(),
+                materialResolution == null
+                        ? manifestWithoutSelections(blueprint)
+                        : materialResolution.manifest()
         );
         return new StructureGenResult<>(model, diagnostics);
     }
@@ -137,6 +163,7 @@ public final class BlueprintValidator {
 
     private List<StructureBlock> validateBlocks(
             BlueprintDocument blueprint,
+            Map<String, ResolvedMaterial> resolvedMaterials,
             List<StructureDiagnostic> diagnostics
     ) {
         List<StructureBlock> blocks = new ArrayList<>();
@@ -162,7 +189,9 @@ public final class BlueprintValidator {
                         "Block at " + block.position().display() + " lies outside structure bounds "
                                 + blueprint.size().display() + ".");
             }
-            validateBlockId(block, blueprint.source(), location, diagnostics);
+            StructureBlockState resolvedState = resolveBlockState(
+                    block, blueprint, resolvedMaterials, location, diagnostics
+            );
             validateSnbt(block.blockEntitySnbt(), blueprint.source(), location + ".blockEntitySnbt", diagnostics);
             validateRawEntrySnbt(
                     block.rawEntrySnbt(), BLOCK_ENTRY_FIELDS, blueprint.source(),
@@ -171,7 +200,7 @@ public final class BlueprintValidator {
             validateMarkers(block.markers(), blueprint.source(), location + ".markers", diagnostics);
             blocks.add(new StructureBlock(
                     block.position(),
-                    new StructureBlockState(block.blockId(), block.properties()),
+                    resolvedState,
                     block.blockEntitySnbt(),
                     block.markers(),
                     block.rawEntrySnbt(),
@@ -181,22 +210,173 @@ public final class BlueprintValidator {
         return blocks;
     }
 
-    private void validateBlockId(
+    private StructureBlockState resolveBlockState(
             BlueprintBlock block,
-            Path source,
+            BlueprintDocument blueprint,
+            Map<String, ResolvedMaterial> resolvedMaterials,
             String location,
             List<StructureDiagnostic> diagnostics
     ) {
         String blockId = block.blockId();
+        Path source = blueprint.source();
+        if (blockId.startsWith("$")) {
+            String role = blockId.substring(1);
+            ResolvedMaterial resolved = resolvedMaterials.get(role);
+            if (block.usageIntent() != null) {
+                error(diagnostics, source, location + ".usageIntent",
+                        "A semantic material reference inherits intent from its material definition.");
+            }
+            if (block.requiredSystem() != null) {
+                error(diagnostics, source, location + ".requiredSystem",
+                        "A semantic material reference inherits its required system from its material definition.");
+            }
+            if (!block.properties().isEmpty()) {
+                error(diagnostics, source, location + ".properties",
+                        "A semantic material reference uses the complete candidate state and may not add properties.");
+            }
+            if (block.blockEntitySnbt() != null) {
+                error(diagnostics, source, location + ".blockEntitySnbt",
+                        "A semantic material reference may not attach block-entity data; use an explicit block when requested.");
+            }
+            if (resolved == null) {
+                error(diagnostics, source, location + ".block",
+                        "Semantic material '" + blockId + "' did not resolve to a valid catalog state.");
+                return new StructureBlockState("minecraft:air", Map.of());
+            }
+            return new StructureBlockState(resolved.selectedBlock(), resolved.properties());
+        }
+
         ResourceLocation parsed = ResourceLocation.tryParse(blockId);
         if (parsed == null || !blockId.contains(":") || !parsed.toString().equals(blockId)) {
             error(diagnostics, source, location + ".block",
                     "Invalid Minecraft resource location '" + blockId + "'; use an explicit lowercase namespace such as minecraft:stone.");
-            return;
+            return new StructureBlockState("minecraft:air", Map.of());
         }
+        if (!blueprint.contentPolicy().allowInstalledModBlocks()
+                && !Set.of("minecraft", "wildernessodysseyapi").contains(parsed.getNamespace())) {
+            error(diagnostics, source, location + ".block",
+                    "Third-party block '" + blockId
+                            + "' is not allowed when contentPolicy.allowInstalledModBlocks is false.");
+        }
+        validateLiteralUsage(block, blueprint, parsed, location, diagnostics);
         BlockStateResolver.Resolution resolution = blockStateResolver.validate(blockId, block.properties());
         resolution.errors().forEach(message -> error(diagnostics, source, location + ".properties", message));
         resolution.warnings().forEach(message -> warning(diagnostics, source, location + ".properties", message));
+        return new StructureBlockState(blockId, block.properties());
+    }
+
+    /**
+     * Enforces the literal-block opt-in boundary without guessing which installed blocks are safe.
+     *
+     * <p>Vanilla literals retain their original Blueprint v1 compatibility. Third-party literals
+     * must classify their use, and every functional literal must name a system that the Blueprint
+     * explicitly enabled. Known Wilderness Odyssey gameplay blocks additionally use the maintained
+     * first-party policy so they cannot be mislabeled as decorative.</p>
+     */
+    private void validateLiteralUsage(
+            BlueprintBlock block,
+            BlueprintDocument blueprint,
+            ResourceLocation blockId,
+            String location,
+            List<StructureDiagnostic> diagnostics
+    ) {
+        String intent = block.usageIntent();
+        StructureBlockCatalog.ContentFamily family = contentCatalog == null
+                ? familyFromNamespace(blockId.getNamespace())
+                : contentCatalog.family(blockId);
+
+        if (intent != null && !Set.of("decorative", "functional").contains(intent)) {
+            error(diagnostics, blueprint.source(), location + ".usageIntent",
+                    "Literal block usageIntent must be either 'decorative' or 'functional'.");
+        }
+        if (family == StructureBlockCatalog.ContentFamily.THIRD_PARTY && intent == null) {
+            error(diagnostics, blueprint.source(), location + ".usageIntent",
+                    "A direct third-party block requires an explicit decorative or functional usageIntent; "
+                            + "prefer a semantic material role for automatic mod selection.");
+        }
+
+        StructureFunctionalBlockPolicy.requiredSystem(blockId).ifPresent(requiredSystem -> {
+            if (!"functional".equals(intent)) {
+                error(diagnostics, blueprint.source(), location + ".usageIntent",
+                        "Wilderness Odyssey gameplay block '" + blockId
+                                + "' requires functional usageIntent and system '" + requiredSystem + "'.");
+            } else if (!requiredSystem.equals(block.requiredSystem())) {
+                error(diagnostics, blueprint.source(), location + ".requiredSystem",
+                        "Wilderness Odyssey gameplay block '" + blockId
+                                + "' requires system '" + requiredSystem + "'.");
+            }
+        });
+
+        if ("functional".equals(intent)) {
+            if (!validResourceId(block.requiredSystem())) {
+                error(diagnostics, blueprint.source(), location + ".requiredSystem",
+                        "A functional literal block requires an explicit namespaced system ID.");
+            } else if (!blueprint.contentPolicy().enabledFunctionalSystems().contains(block.requiredSystem())) {
+                error(diagnostics, blueprint.source(), location + ".requiredSystem",
+                        "Functional system '" + block.requiredSystem() + "' was not explicitly enabled in "
+                                + "contentPolicy.enabledFunctionalSystems.");
+            }
+        } else if (block.requiredSystem() != null) {
+            error(diagnostics, blueprint.source(), location + ".requiredSystem",
+                    "Only a functional literal block may declare requiredSystem.");
+        }
+
+        if (block.blockEntitySnbt() != null
+                && family != StructureBlockCatalog.ContentFamily.VANILLA
+                && !"functional".equals(intent)) {
+            error(diagnostics, blueprint.source(), location + ".usageIntent",
+                    "A non-vanilla literal carrying blockEntitySnbt must declare functional usageIntent "
+                            + "and an explicitly enabled requiredSystem.");
+        }
+    }
+
+    private StructureBlockCatalog.ContentFamily familyFromNamespace(String namespace) {
+        if ("minecraft".equals(namespace)) {
+            return StructureBlockCatalog.ContentFamily.VANILLA;
+        }
+        if ("wildernessodysseyapi".equals(namespace)) {
+            return StructureBlockCatalog.ContentFamily.WILDERNESS_ODYSSEY;
+        }
+        return StructureBlockCatalog.ContentFamily.THIRD_PARTY;
+    }
+
+    private boolean validResourceId(String value) {
+        if (value == null || !value.contains(":")) {
+            return false;
+        }
+        ResourceLocation parsed = ResourceLocation.tryParse(value);
+        return parsed != null && parsed.toString().equals(value);
+    }
+
+    private MaterialResolution resolveMaterials(
+            BlueprintDocument blueprint,
+            List<StructureDiagnostic> diagnostics
+    ) {
+        boolean requiresCatalog = !blueprint.materials().isEmpty()
+                || !blueprint.contentPolicy().requiredMods().isEmpty()
+                || !blueprint.contentPolicy().preferredDecorativeMods().isEmpty()
+                || !blueprint.contentPolicy().enabledFunctionalSystems().isEmpty();
+        if (contentCatalog == null) {
+            if (requiresCatalog) {
+                error(diagnostics, blueprint.source(), "contentPolicy",
+                        "This Blueprint uses mod-aware content fields, but no verified StructureBlockCatalog was supplied.");
+            }
+            return null;
+        }
+        StructureGenResult<MaterialResolution> resolution = new SemanticMaterialResolver(contentCatalog)
+                .resolve(blueprint);
+        diagnostics.addAll(resolution.diagnostics());
+        return resolution.value();
+    }
+
+    private StructureContentManifest manifestWithoutSelections(BlueprintDocument blueprint) {
+        return new StructureContentManifest(
+                blueprint.contentPolicy().allowInstalledModBlocks(),
+                blueprint.contentPolicy().preferredDecorativeMods(),
+                blueprint.contentPolicy().requiredMods(),
+                blueprint.contentPolicy().enabledFunctionalSystems(),
+                List.of()
+        );
     }
 
     private List<StructureEntity> validateEntities(
@@ -314,7 +494,7 @@ public final class BlueprintValidator {
             error(diagnostics, source, "rawRootSnbt.structuregen", "Must be a compound tag when present.");
             return;
         }
-        for (String canonical : List.of("formatVersion", "name", "markers")) {
+        for (String canonical : List.of("formatVersion", "name", "markers", "contentManifest")) {
             if (structureGen.contains(canonical)) {
                 error(diagnostics, source, "rawRootSnbt.structuregen." + canonical,
                         "This field is owned by the canonical Blueprint fields and may not be repeated in raw SNBT.");

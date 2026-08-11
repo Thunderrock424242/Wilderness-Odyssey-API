@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 
 /**
@@ -24,7 +25,9 @@ public record BlueprintDocument(
         List<String> markers,
         List<BlueprintBlock> blocks,
         List<BlueprintEntity> entities,
-        String rawRootSnbt
+        String rawRootSnbt,
+        BlueprintContentPolicy contentPolicy,
+        Map<String, BlueprintMaterialDefinition> materials
 ) {
 
     public BlueprintDocument {
@@ -32,5 +35,40 @@ public record BlueprintDocument(
         markers = List.copyOf(markers);
         blocks = List.copyOf(blocks);
         entities = List.copyOf(entities);
+        contentPolicy = Objects.requireNonNull(contentPolicy, "contentPolicy");
+        materials = Collections.unmodifiableMap(new TreeMap<>(materials));
+    }
+
+    /**
+     * Creates a document using the original Blueprint v1 fields and default content policy.
+     *
+     * <p>This overload keeps existing concrete-only Blueprint callers source-compatible.</p>
+     */
+    public BlueprintDocument(
+            Path source,
+            int formatVersion,
+            String name,
+            StructureSize size,
+            Integer dataVersion,
+            Map<String, String> metadata,
+            List<String> markers,
+            List<BlueprintBlock> blocks,
+            List<BlueprintEntity> entities,
+            String rawRootSnbt
+    ) {
+        this(
+                source,
+                formatVersion,
+                name,
+                size,
+                dataVersion,
+                metadata,
+                markers,
+                blocks,
+                entities,
+                rawRootSnbt,
+                BlueprintContentPolicy.defaults(),
+                Map.of()
+        );
     }
 }

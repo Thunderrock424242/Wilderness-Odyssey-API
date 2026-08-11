@@ -23,6 +23,7 @@ public final class StructureGenPaths {
     private final Path blueprintRoot;
     private final Path outputResourceRoot;
     private final Path generatedStructureRoot;
+    private final Path legacyGeneratedStructureRoot;
     private final Path handAuthoredResourceRoot;
     private final List<Path> packagedResourceRoots;
 
@@ -36,6 +37,11 @@ public final class StructureGenPaths {
                 .resolve(StructureGenConstants.NAMESPACE)
                 .resolve("structure")
                 .normalize();
+        this.legacyGeneratedStructureRoot = this.outputResourceRoot
+                .resolve("data")
+                .resolve(StructureGenConstants.NAMESPACE)
+                .resolve("structures")
+                .normalize();
         this.handAuthoredResourceRoot = this.projectRoot.resolve("src/main/resources").normalize();
         this.packagedResourceRoots = List.of(
                 this.handAuthoredResourceRoot,
@@ -48,6 +54,8 @@ public final class StructureGenPaths {
                 "Generated resource directory");
         requireContained(this.outputResourceRoot, this.generatedStructureRoot,
                 "Generated structure directory");
+        requireContained(this.outputResourceRoot, this.legacyGeneratedStructureRoot,
+                "Legacy generated structure directory");
         if (this.outputResourceRoot.startsWith(this.handAuthoredResourceRoot)
                 || this.handAuthoredResourceRoot.startsWith(this.outputResourceRoot)) {
             throw new IllegalArgumentException("Generated resources must not overlap hand-authored resources: "
@@ -69,6 +77,14 @@ public final class StructureGenPaths {
 
     public Path generatedStructureRoot() {
         return generatedStructureRoot;
+    }
+
+    /**
+     * Returns every StructureGen-owned structure directory included by the generated
+     * resource source set, including the historical plural directory.
+     */
+    public List<Path> generatedStructureRoots() {
+        return List.of(generatedStructureRoot, legacyGeneratedStructureRoot);
     }
 
     /**

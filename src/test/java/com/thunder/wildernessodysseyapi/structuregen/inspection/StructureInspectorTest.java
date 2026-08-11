@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.structuregen.inspection;
 
+import com.thunder.wildernessodysseyapi.structuregen.content.ContentManifestStatus;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureBlock;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureBlockState;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureEntity;
@@ -83,6 +84,52 @@ class StructureInspectorTest {
         assertTrue(report.palettes().getFirst().entries().stream().anyMatch(entry ->
                 entry.block().equals("minecraft:oak_stairs")
                         && entry.properties().equals(Map.of("facing", "south"))));
+    }
+
+    @Test
+    void reportsConcreteBlockTypesAndRecordsByNamespace() {
+        StructureModel model = new StructureModel(
+                "namespace_fixture",
+                new StructureSize(7, 1, 1),
+                List.of(
+                        block(0, 0, 0, "minecraft:stone", Map.of(), null),
+                        block(1, 0, 0, "minecraft:stone", Map.of(), null),
+                        block(2, 0, 0, "minecraft:dirt", Map.of(), null),
+                        block(3, 0, 0, "wildernessodysseyapi:cryo_tube", Map.of(), null),
+                        block(4, 0, 0, "create:fluid_pipe", Map.of(), null),
+                        block(5, 0, 0, "create:fluid_pipe", Map.of(), null),
+                        block(6, 0, 0, "create:copycat_panel", Map.of(), null)
+                ),
+                List.of(),
+                3955,
+                Map.of(),
+                List.of(),
+                List.of(),
+                null,
+                List.of()
+        );
+
+        StructureInspectionReport report = new StructureInspector().inspect(
+                tempDirectory.resolve("namespace-fixture.nbt"), model
+        );
+
+        assertEquals(List.of("minecraft", "wildernessodysseyapi", "create"),
+                report.namespaceUsage().keySet().stream().toList());
+        assertEquals(new StructureInspectionReport.NamespaceUsage(2, 3L),
+                report.namespaceUsage().get("minecraft"));
+        assertEquals(new StructureInspectionReport.NamespaceUsage(1, 1L),
+                report.namespaceUsage().get("wildernessodysseyapi"));
+        assertEquals(new StructureInspectionReport.NamespaceUsage(2, 3L),
+                report.namespaceUsage().get("create"));
+        assertEquals(ContentManifestStatus.ABSENT, report.contentManifestStatus());
+        assertEquals(List.of("create"), report.externalNamespacesUsed());
+
+        String textReport = new StructureReportWriter().formatText(report);
+        assertTrue(textReport.contains("minecraft: 2 block types / 3 records"));
+        assertTrue(textReport.contains("wildernessodysseyapi: 1 block type / 1 record"));
+        assertTrue(textReport.contains("create: 2 block types / 3 records"));
+        assertTrue(textReport.contains("Content manifest status: absent (no StructureGen content manifest)"));
+        assertTrue(textReport.contains("External namespaces used:\n    - create"));
     }
 
     private StructureBlock block(

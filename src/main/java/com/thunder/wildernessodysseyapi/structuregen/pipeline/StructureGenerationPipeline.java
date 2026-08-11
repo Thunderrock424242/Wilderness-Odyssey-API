@@ -135,49 +135,100 @@ public final class StructureGenerationPipeline {
         return new StructureGenerationResult(blueprintFiles.size(), validated.size(), generated, diagnostics);
     }
 
-    // The generated resource directory is persistent between builds. Remove
-    // only safe-name NBT files no longer owned by a current, successful blueprint
-    // so renamed/deleted blueprints cannot remain packaged or shadow manual data.
+    // The generated resource directory is persistent between builds. Inventory
+    // every StructureGen-owned structure tree before deleting any obsolete NBT
+    // so renamed, nested, or legacy-plural outputs cannot remain packaged.
     private void reconcileObsoleteGeneratedStructures(
             List<GeneratedStructure> generated,
             List<StructureDiagnostic> diagnostics
     ) {
-        Path generatedRoot = paths.generatedStructureRoot();
-        if (!Files.isDirectory(generatedRoot, LinkOption.NOFOLLOW_LINKS)) {
-            return;
-        }
         Set<Path> activeOutputs = new HashSet<>();
         generated.forEach(result -> activeOutputs.add(result.output().toAbsolutePath().normalize()));
 
-        try (Stream<Path> entries = Files.list(generatedRoot)) {
-            for (Path candidate : entries.sorted().toList()) {
-                Path normalized = candidate.toAbsolutePath().normalize();
-                String fileName = normalized.getFileName().toString();
-                if (!fileName.endsWith(".nbt") || activeOutputs.contains(normalized)) {
-                    continue;
-                }
-                String structureName = fileName.substring(0, fileName.length() - ".nbt".length());
-                Path ownedTarget;
-                try {
-                    ownedTarget = paths.generatedStructure(structureName);
-                } catch (IllegalArgumentException exception) {
-                    throw new IOException("Refusing to reconcile unsafe generated NBT name: " + normalized, exception);
-                }
-                if (!normalized.equals(ownedTarget)
-                        || Files.isSymbolicLink(normalized)
-                        || !Files.isRegularFile(normalized, LinkOption.NOFOLLOW_LINKS)) {
-                    throw new IOException("Refusing to reconcile non-regular generated NBT: " + normalized);
-                }
-                Files.delete(normalized);
+        try {
+            List<Path> obsoleteOutputs = new ArrayList<>();
+            for (Path generatedRoot : paths.generatedStructureRoots()) {
+                obsoleteOutputs.addAll(findObsoleteGeneratedStructures(generatedRoot, activeOutputs));
+            }
+
+            // Deletion starts only after every owned tree has passed containment,
+            // type, and symbolic-link validation.
+            for (Path obsoleteOutput : obsoleteOutputs.stream().sorted().toList()) {
+                Files.delete(obsoleteOutput);
+                Path normalized = obsoleteOutput.toAbsolutePath().normalize();
                 logger.accept("[StructureGen] Removed obsolete generated structure: " + normalized);
             }
         } catch (IOException exception) {
             diagnostics.add(new StructureDiagnostic(
                     DiagnosticSeverity.ERROR,
-                    generatedRoot,
+                    paths.outputResourceRoot(),
                     "output cleanup",
                     exception.getMessage()
             ));
+        }
+    }
+
+    private List<Path> findObsoleteGeneratedStructures(
+            Path generatedRoot,
+            Set<Path> activeOutputs
+    ) throws IOException {
+        Path normalizedRoot = generatedRoot.toAbsolutePath().normalize();
+        requireSafeOwnedRoot(normalizedRoot);
+        if (!Files.exists(normalizedRoot, LinkOption.NOFOLLOW_LINKS)) {
+            return List.of();
+        }
+        if (!Files.isDirectory(normalizedRoot, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException("Refusing non-directory generated structure root: " + normalizedRoot);
+        }
+
+        List<Path> obsoleteOutputs = new ArrayList<>();
+        try (Stream<Path> entries = Files.walk(normalizedRoot)) {
+            for (Path candidate : entries.sorted().toList()) {
+                Path normalized = candidate.toAbsolutePath().normalize();
+                if (!normalized.startsWith(normalizedRoot)) {
+                    throw new IOException("Generated structure entry escapes owned root "
+                            + normalizedRoot + ": " + normalized);
+                }
+                if (Files.isSymbolicLink(candidate)) {
+                    throw new IOException("Refusing symbolic link in generated structure tree: " + normalized);
+                }
+                if (Files.isDirectory(candidate, LinkOption.NOFOLLOW_LINKS)) {
+                    continue;
+                }
+
+                String fileName = normalized.getFileName().toString();
+                if (!fileName.endsWith(".nbt")) {
+                    continue;
+                }
+                if (!Files.isRegularFile(candidate, LinkOption.NOFOLLOW_LINKS)) {
+                    throw new IOException("Refusing non-regular generated NBT: " + normalized);
+                }
+                if (!activeOutputs.contains(normalized)) {
+                    obsoleteOutputs.add(normalized);
+                }
+            }
+        }
+        return obsoleteOutputs;
+    }
+
+    private void requireSafeOwnedRoot(Path generatedRoot) throws IOException {
+        Path buildRoot = paths.projectRoot().resolve("build").toAbsolutePath().normalize();
+        Path outputRoot = paths.outputResourceRoot().toAbsolutePath().normalize();
+        if (!outputRoot.startsWith(buildRoot) || !generatedRoot.startsWith(outputRoot)) {
+            throw new IOException("Generated structure root escapes the output resource root: " + generatedRoot);
+        }
+
+        // Start at build/ rather than the deeper output root so an ancestor
+        // junction or symbolic link cannot redirect cleanup outside the checkout.
+        Path current = buildRoot;
+        if (Files.exists(current, LinkOption.NOFOLLOW_LINKS) && Files.isSymbolicLink(current)) {
+            throw new IOException("Refusing symbolic-link generated output root: " + current);
+        }
+        for (Path segment : buildRoot.relativize(generatedRoot)) {
+            current = current.resolve(segment);
+            if (Files.exists(current, LinkOption.NOFOLLOW_LINKS) && Files.isSymbolicLink(current)) {
+                throw new IOException("Refusing symbolic-link generated structure directory: " + current);
+            }
         }
     }
 

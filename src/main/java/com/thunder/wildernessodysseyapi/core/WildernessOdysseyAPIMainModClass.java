@@ -13,6 +13,7 @@ import com.thunder.wildernessodysseyapi.meteor.event.MeteorImpactEvent;
 import com.thunder.wildernessodysseyapi.network.ModPayloads;
 import com.thunder.wildernessodysseyapi.radiation.RadiationTickHandler;
 import com.thunder.wildernessodysseyapi.server.ServerLifecycleEvents;
+import com.thunder.wildernessodysseyapi.structuregen.content.StructureBlockCatalogSnapshotProvider;
 import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryReporter;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryReporter;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueProcessor;
@@ -65,6 +66,7 @@ public final class WildernessOdysseyAPIMainModClass {
         modEventBus.addListener(ModConfigRegistration::onConfigLoaded);
         modEventBus.addListener(ModConfigRegistration::onConfigReloaded);
         modEventBus.addListener(this::addCreativeTabEntries);
+        modEventBus.addListener(StructureBlockCatalogSnapshotProvider::onGatherData);
 
         ModRegistries.register(modEventBus);
         ModConfigRegistration.register(container);

@@ -3,6 +3,9 @@ package com.thunder.wildernessodysseyapi.structuregen.cli;
 import com.thunder.wildernessodysseyapi.structuregen.blueprint.BlueprintExporter;
 import com.thunder.wildernessodysseyapi.structuregen.comparison.StructureComparator;
 import com.thunder.wildernessodysseyapi.structuregen.comparison.StructureComparisonReport;
+import com.thunder.wildernessodysseyapi.structuregen.content.JsonSnapshotStructureBlockCatalog;
+import com.thunder.wildernessodysseyapi.structuregen.content.StructureBlockCatalog;
+import com.thunder.wildernessodysseyapi.structuregen.content.VanillaStructureBlockCatalog;
 import com.thunder.wildernessodysseyapi.structuregen.diagnostic.DiagnosticSeverity;
 import com.thunder.wildernessodysseyapi.structuregen.diagnostic.StructureDiagnostic;
 import com.thunder.wildernessodysseyapi.structuregen.inspection.StructureInspectionReport;
@@ -15,7 +18,6 @@ import com.thunder.wildernessodysseyapi.structuregen.pipeline.StructureGenPaths;
 import com.thunder.wildernessodysseyapi.structuregen.pipeline.StructureGenerationPipeline;
 import com.thunder.wildernessodysseyapi.structuregen.pipeline.StructureGenerationResult;
 import com.thunder.wildernessodysseyapi.structuregen.validation.BlueprintValidator;
-import com.thunder.wildernessodysseyapi.structuregen.validation.MinecraftBlockStateResolver;
 import net.minecraft.SharedConstants;
 
 import java.io.IOException;
@@ -64,17 +66,30 @@ public final class StructureGenCli {
 
     // Generation has the strictest path boundary because it publishes packaged binary resources.
     private static int generate(CliArguments arguments) throws IOException {
-        arguments.requireOnly(Set.of("project-dir", "blueprints", "output-resources"));
-        Path projectRoot = Path.of(arguments.require("project-dir"));
+        arguments.requireOnly(Set.of(
+                "project-dir", "blueprints", "output-resources", "catalog", "catalog-fingerprint", "reports"
+        ));
+        Path projectRoot = Path.of(arguments.require("project-dir")).toAbsolutePath().normalize();
         StructureGenPaths paths = new StructureGenPaths(
                 projectRoot,
                 Path.of(arguments.require("blueprints")),
                 Path.of(arguments.require("output-resources"))
         );
-        BlueprintValidator validator = new BlueprintValidator(new MinecraftBlockStateResolver());
+        String catalogFingerprint = JsonSnapshotStructureBlockCatalog.requireEnvironmentFingerprint(
+                arguments.require("catalog-fingerprint")
+        );
+        StructureBlockCatalog catalog = loadContentCatalog(
+                projectRoot,
+                arguments.optional("catalog"),
+                catalogFingerprint
+        );
+        BlueprintValidator validator = new BlueprintValidator(catalog);
         StructureGenerationPipeline pipeline = new StructureGenerationPipeline(paths, validator, System.out::println);
         StructureGenerationResult result = pipeline.generate();
         result.diagnostics().forEach(StructureGenCli::printDiagnostic);
+        if (result.successful() && arguments.optional("reports") != null) {
+            writeGenerationReports(result, arguments.optional("reports"));
+        }
 
         System.out.println();
         System.out.println("## StructureGen");
@@ -85,6 +100,63 @@ public final class StructureGenCli {
         System.out.printf(Locale.ROOT, "Warnings:         %d%n", result.warningCount());
         System.out.printf(Locale.ROOT, "Errors:           %d%n", result.errorCount());
         return result.successful() ? 0 : 1;
+    }
+
+    private static void writeGenerationReports(
+            StructureGenerationResult result,
+            String reportsOption
+    ) throws IOException {
+        Path reportRoot = requireReportOwned(Path.of(reportsOption), "Generation report directory");
+        StructureInspector inspector = new StructureInspector();
+        StructureReportWriter writer = new StructureReportWriter();
+        for (var generated : result.generated()) {
+            StructureInspectionReport report = inspector.inspect(generated.output(), generated.model());
+            StructureReportWriter.ReportPaths paths = writer.write(report, reportRoot, safeBaseName(generated.name()));
+            System.out.println("[StructureGen] Content report: " + paths.text());
+        }
+    }
+
+    static StructureBlockCatalog loadContentCatalog(
+            Path projectRoot,
+            String catalogOption,
+            String expectedFingerprint
+    ) throws IOException {
+        String validatedFingerprint = JsonSnapshotStructureBlockCatalog.requireEnvironmentFingerprint(
+                expectedFingerprint
+        );
+        Path normalizedProjectRoot = projectRoot.toAbsolutePath().normalize();
+        Path expectedCatalogRoot = normalizedProjectRoot.resolve("build/generated/structuregen/catalog").normalize();
+        Path catalogPath = catalogOption == null
+                ? expectedCatalogRoot.resolve("available-content.json")
+                : Path.of(catalogOption).toAbsolutePath().normalize();
+        if (!catalogPath.startsWith(expectedCatalogRoot)) {
+            throw new IllegalArgumentException("StructureGen catalog must stay beneath "
+                    + expectedCatalogRoot + ": " + catalogPath);
+        }
+        rejectSymbolicLinksInPath(catalogPath, "StructureGen catalog snapshot");
+        var snapshot = JsonSnapshotStructureBlockCatalog.loadOptional(catalogPath);
+        if (snapshot.isPresent()) {
+            JsonSnapshotStructureBlockCatalog catalog = snapshot.get();
+            if (!catalog.environmentFingerprint().equals(validatedFingerprint)) {
+                System.out.println("[StructureGen] WARNING Content catalog fingerprint does not match the current "
+                        + "dependency environment.");
+                System.out.println("[StructureGen] WARNING Expected " + validatedFingerprint + " but snapshot contains "
+                        + catalog.environmentFingerprint() + ". Modded catalog content will not be used.");
+                return vanillaCatalogFallback();
+            }
+            System.out.println("[StructureGen] Loaded verified content catalog: " + catalogPath);
+            System.out.println("[StructureGen] Catalog contains " + catalog.installedMods().size()
+                    + " mods and " + catalog.blocks().size() + " registered blocks.");
+            return catalog;
+        }
+        System.out.println("[StructureGen] WARNING No full mod-registry snapshot exists at " + catalogPath + ".");
+        System.out.println("[StructureGen] WARNING Modded semantic candidates are unavailable; verified vanilla "
+                + "fallbacks remain enabled. Run the Gradle data task to refresh the catalog.");
+        return vanillaCatalogFallback();
+    }
+
+    private static StructureBlockCatalog vanillaCatalogFallback() {
+        return new VanillaStructureBlockCatalog();
     }
 
     // Inspection writes only build-owned reports and never rewrites the selected NBT input.
@@ -211,6 +283,22 @@ public final class StructureGenCli {
             throw new IOException("Refusing symbolic-link build directory: " + current);
         }
         for (Path segment : normalizedRoot.relativize(normalizedTarget)) {
+            current = current.resolve(segment);
+            if (Files.isSymbolicLink(current)) {
+                throw new IOException("Refusing symbolic-link " + description.toLowerCase(Locale.ROOT)
+                        + ": " + current);
+            }
+        }
+    }
+
+    // Catalog and report paths may not traverse links that redirect a lexically safe path elsewhere.
+    private static void rejectSymbolicLinksInPath(Path target, String description) throws IOException {
+        Path normalizedTarget = target.toAbsolutePath().normalize();
+        Path current = normalizedTarget.getRoot();
+        if (current == null) {
+            throw new IOException(description + " must be an absolute path: " + target);
+        }
+        for (Path segment : normalizedTarget) {
             current = current.resolve(segment);
             if (Files.isSymbolicLink(current)) {
                 throw new IOException("Refusing symbolic-link " + description.toLowerCase(Locale.ROOT)
