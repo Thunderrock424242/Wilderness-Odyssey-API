@@ -73,7 +73,7 @@ public final class SafeStructureOutput {
             }
             SafeFilePublisher.publish(temporary, destination);
             published = true;
-            return new GeneratedStructure(model.name(), destination, verification);
+            return new GeneratedStructure(model.name(), destination, verification, model);
         } finally {
             if (!published) {
                 Files.deleteIfExists(temporary);

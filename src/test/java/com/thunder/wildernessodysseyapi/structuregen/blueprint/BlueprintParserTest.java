@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -41,6 +42,8 @@ class BlueprintParserTest {
                       "block": "minecraft:oak_stairs",
                       "properties": {"facing": "north", "half": "bottom"},
                       "blockEntitySnbt": "{CustomName:'fixture'}",
+                      "usageIntent": "functional",
+                      "requiredSystem": "minecraft:container",
                       "markers": ["seat"]
                     }
                   ],
@@ -68,8 +71,71 @@ class BlueprintParserTest {
         assertEquals("minecraft:oak_stairs", blueprint.blocks().getFirst().blockId());
         assertEquals(Map.of("facing", "north", "half", "bottom"),
                 blueprint.blocks().getFirst().properties());
+        assertEquals("functional", blueprint.blocks().getFirst().usageIntent());
+        assertEquals("minecraft:container", blueprint.blocks().getFirst().requiredSystem());
         assertEquals(1, blueprint.entities().size());
         assertEquals("{structuregen_fixture:1b}", blueprint.rawRootSnbt());
+        assertEquals(BlueprintContentPolicy.defaults(), blueprint.contentPolicy());
+        assertTrue(blueprint.materials().isEmpty());
+    }
+
+    @Test
+    void parsesContentPolicyAndSemanticMaterialsInDeterministicOrder() {
+        Path source = tempDirectory.resolve("mod-aware.json");
+        StructureGenResult<BlueprintDocument> result = parser.parse("""
+                {
+                  "formatVersion": 1,
+                  "name": "mod_aware",
+                  "size": [1, 1, 1],
+                  "contentPolicy": {
+                    "allowInstalledModBlocks": false,
+                    "preferredDecorativeMods": ["supplementaries", "create"],
+                    "requiredMods": ["create"],
+                    "enabledFunctionalSystems": ["create:kinetics"]
+                  },
+                  "materials": {
+                    "z_detail": {
+                      "intent": "decorative",
+                      "preferred": [{"block": "minecraft:chain"}]
+                    },
+                    "industrial_detail": {
+                      "requiredSystem": "create:kinetics",
+                      "preferred": [
+                        {
+                          "block": "create:fluid_pipe",
+                          "requiresMod": "create",
+                          "properties": {"waterlogged": "false", "axis": "x"}
+                        }
+                      ],
+                      "fallbacks": [{"block": "minecraft:iron_bars"}]
+                    }
+                  },
+                  "blocks": [
+                    {"pos": [0, 0, 0], "block": "$industrial_detail"}
+                  ]
+                }
+                """, source);
+
+        assertFalse(result.hasErrors());
+        BlueprintDocument blueprint = result.value();
+        assertNotNull(blueprint);
+        assertFalse(blueprint.contentPolicy().allowInstalledModBlocks());
+        assertEquals(List.of("supplementaries", "create"),
+                blueprint.contentPolicy().preferredDecorativeMods());
+        assertEquals(List.of("create"), blueprint.contentPolicy().requiredMods());
+        assertEquals(List.of("create:kinetics"), blueprint.contentPolicy().enabledFunctionalSystems());
+        assertEquals(List.of("industrial_detail", "z_detail"),
+                List.copyOf(blueprint.materials().keySet()));
+
+        BlueprintMaterialDefinition industrial = blueprint.materials().get("industrial_detail");
+        assertEquals(BlueprintMaterialDefinition.DEFAULT_INTENT, industrial.intent());
+        assertEquals("create:kinetics", industrial.requiredSystem());
+        assertEquals("create:fluid_pipe", industrial.preferred().getFirst().blockId());
+        assertEquals("create", industrial.preferred().getFirst().requiresMod());
+        assertEquals(Map.of("axis", "x", "waterlogged", "false"),
+                industrial.preferred().getFirst().properties());
+        assertEquals("minecraft:iron_bars", industrial.fallbacks().getFirst().blockId());
+        assertEquals("$industrial_detail", blueprint.blocks().getFirst().blockId());
     }
 
     @Test
@@ -143,6 +209,48 @@ class BlueprintParserTest {
         assertDiagnostic(result, "$.metdata", "Unknown Blueprint v1 field");
         assertDiagnostic(result, "metadata.numeric", "Must be a string");
         assertDiagnostic(result, "blocks[0].propeties", "Unknown Blueprint v1 field");
+    }
+
+    @Test
+    void rejectsMalformedAndUnknownNestedContentFields() {
+        Path source = tempDirectory.resolve("bad-content.json");
+        StructureGenResult<BlueprintDocument> result = parser.parse("""
+                {
+                  "formatVersion": 1,
+                  "name": "bad_content",
+                  "size": [1, 1, 1],
+                  "contentPolicy": {
+                    "allowInstalledModBlocks": "yes",
+                    "preferredDecorativeMods": "create",
+                    "surprise": true
+                  },
+                  "materials": {
+                    "industrial_detail": {
+                      "intent": 7,
+                      "unexpected": [],
+                      "preferred": [
+                        {"properties": {"axis": 3}, "extra": true},
+                        "create:fluid_pipe"
+                      ],
+                      "fallbacks": {}
+                    }
+                  },
+                  "blocks": [{"pos": [0, 0, 0], "block": "$industrial_detail"}]
+                }
+                """, source);
+
+        assertTrue(result.hasErrors());
+        assertNull(result.value());
+        assertDiagnostic(result, "contentPolicy.surprise", "Unknown Blueprint v1 field");
+        assertDiagnostic(result, "contentPolicy.allowInstalledModBlocks", "Must be a boolean");
+        assertDiagnostic(result, "contentPolicy.preferredDecorativeMods", "array of strings");
+        assertDiagnostic(result, "materials.industrial_detail.unexpected", "Unknown Blueprint v1 field");
+        assertDiagnostic(result, "materials.industrial_detail.intent", "Must be a string");
+        assertDiagnostic(result, "materials.industrial_detail.preferred[0].extra", "Unknown Blueprint v1 field");
+        assertDiagnostic(result, "materials.industrial_detail.preferred[0].block", "Required field is missing");
+        assertDiagnostic(result, "materials.industrial_detail.preferred[0].properties.axis", "Must be a string");
+        assertDiagnostic(result, "materials.industrial_detail.preferred[1]", "must be an object");
+        assertDiagnostic(result, "materials.industrial_detail.fallbacks", "array of material candidate objects");
     }
 
     @Test

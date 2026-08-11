@@ -30,7 +30,8 @@ public final class StructureComparator {
         boolean dimensionsMatch = Objects.equals(expected.size(), actual.size());
         boolean dataVersionsMatch = expected.dataVersion() == actual.dataVersion();
         boolean metadataMatches = Objects.equals(expected.metadata(), actual.metadata())
-                && Objects.equals(expected.markers(), actual.markers());
+                && Objects.equals(expected.markers(), actual.markers())
+                && Objects.equals(expected.contentManifest(), actual.contentManifest());
         boolean palettesMatch = palettesEqual(expected.sourcePalettes(), actual.sourcePalettes());
         boolean rawRootMatches = rawNbtEqual(expected.rawRootSnbt(), actual.rawRootSnbt());
 
@@ -46,7 +47,7 @@ public final class StructureComparator {
                     + ", actual " + actual.dataVersion() + ".");
         }
         if (!metadataMatches) {
-            addDetail(details, "StructureGen metadata or markers differ.");
+            addDetail(details, "StructureGen metadata, markers, or content manifest differ.");
         }
         if (!palettesMatch) {
             addDetail(details, "Imported source palettes differ.");

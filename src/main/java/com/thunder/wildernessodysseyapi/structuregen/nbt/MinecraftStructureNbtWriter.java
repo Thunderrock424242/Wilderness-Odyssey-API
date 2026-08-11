@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.structuregen.nbt;
 
 import com.thunder.wildernessodysseyapi.structuregen.StructureGenConstants;
+import com.thunder.wildernessodysseyapi.structuregen.content.ContentManifestStatus;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureBlock;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureBlockState;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureEntity;
@@ -263,6 +264,11 @@ public final class MinecraftStructureNbtWriter {
         model.metadata().forEach(metadata::putString);
         tag.put("metadata", metadata);
         tag.put("markers", StructureNbtSupport.stringList(model.markers()));
+        if (model.contentManifest().provenanceStatus() == ContentManifestStatus.ABSENT) {
+            tag.remove("contentManifest");
+        } else {
+            tag.put("contentManifest", ContentManifestNbtCodec.write(model.contentManifest()));
+        }
 
         RawBlockMarkers rawBlockMarkers = readRawBlockMarkers(tag);
         Set<StructurePosition> modelPositions = new HashSet<>();
@@ -299,6 +305,7 @@ public final class MinecraftStructureNbtWriter {
         requireRawType(tag, "metadata", Tag.TAG_COMPOUND);
         requireRawType(tag, "markers", Tag.TAG_LIST);
         requireRawType(tag, "blockMarkers", Tag.TAG_LIST);
+        requireRawType(tag, "contentManifest", Tag.TAG_COMPOUND);
         if (tag.get("markers") instanceof ListTag markers
                 && !markers.isEmpty()
                 && markers.getElementType() != Tag.TAG_STRING) {

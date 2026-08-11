@@ -15,7 +15,8 @@ import java.util.Map;
  * Validates vanilla block IDs and state properties against the bootstrapped 1.21.1 registry.
  *
  * <p>A standalone Gradle task does not run the Wilderness Odyssey mod-loading lifecycle. Unknown
- * non-vanilla namespaces therefore produce an explicit warning instead of being replaced with air.</p>
+ * namespaced IDs therefore fail closed; mod-aware authoring must use a verified registry snapshot
+ * through {@code StructureBlockCatalog}.</p>
  */
 public final class MinecraftBlockStateResolver implements BlockStateResolver {
 
@@ -50,28 +51,17 @@ public final class MinecraftBlockStateResolver implements BlockStateResolver {
             ResourceLocation id = ResourceLocation.tryParse(blockId);
             String message = "The offline Minecraft registry is unavailable (" + registryUnavailableReason
                     + "); block existence and state properties for '" + blockId + "' were not verified.";
-            if (id != null && "minecraft".equals(id.getNamespace())) {
-                // Vanilla authoring must fail closed: otherwise a misspelled
-                // block can be compiled after the strongest validation stage.
-                return new Resolution(List.of(message), List.of());
-            }
-            return new Resolution(
-                    List.of(),
-                    List.of(message)
-            );
+            return new Resolution(List.of(message), List.of());
         }
         ResourceLocation id = ResourceLocation.tryParse(blockId);
         if (id == null) {
             return new Resolution(List.of("Invalid Minecraft resource location '" + blockId + "'."), List.of());
         }
         if (!BuiltInRegistries.BLOCK.containsKey(id)) {
-            if ("minecraft".equals(id.getNamespace())) {
-                return new Resolution(List.of("No registered vanilla block exists with ID '" + blockId + "'."), List.of());
-            }
             return new Resolution(
-                    List.of(),
-                    List.of("Block '" + blockId + "' is not available in the offline built-in registry; "
-                            + "its modded state properties could not be verified.")
+                    List.of("Block '" + blockId + "' is not available in the offline built-in registry. "
+                            + "Generate and use a verified StructureGen content catalog for modded authoring."),
+                    List.of()
             );
         }
 

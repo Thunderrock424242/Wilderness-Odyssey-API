@@ -11,9 +11,11 @@ import net.minecraft.nbt.TagParser;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -57,6 +59,10 @@ public final class StructureInspector {
                 model.entities().stream().map(StructureEntity::entityNbtSnbt), "<missing-id>"
         );
         Map<String, Long> categories = new StructureCategoryClassifier().classify(blockCounts);
+        Map<String, StructureInspectionReport.NamespaceUsage> namespaceUsage = namespaceUsage(blockCounts);
+        List<String> externalNamespacesUsed = namespaceUsage.keySet().stream()
+                .filter(namespace -> !Set.of("minecraft", "wildernessodysseyapi", "<unknown>").contains(namespace))
+                .toList();
 
         return new StructureInspectionReport(
                 file.toAbsolutePath().normalize().toString(),
@@ -76,12 +82,61 @@ public final class StructureInspector {
                 model.entities().size(),
                 model.unsupportedFields(),
                 frequencies,
+                namespaceUsage,
+                model.contentManifest().provenanceStatus(),
+                model.contentManifest().schemaVersion(),
+                model.contentManifest().allowInstalledModBlocks(),
+                model.contentManifest().requiredMods(),
+                externalNamespacesUsed,
+                model.contentManifest().enabledFunctionalSystems(),
+                model.contentManifest().resolvedMaterials(),
                 palettes,
                 vertical,
                 categories,
                 blockEntityTypes,
                 entityTypes
         );
+    }
+
+    // Namespace totals describe the concrete content that the NBT actually
+    // references. They do not infer mod IDs because a mod may own more than
+    // one resource namespace, or share a namespace through an API.
+    private Map<String, StructureInspectionReport.NamespaceUsage> namespaceUsage(
+            Map<String, Long> blockCounts
+    ) {
+        Map<String, Set<String>> blockTypes = new TreeMap<>();
+        Map<String, Long> blockRecords = new TreeMap<>();
+        for (Map.Entry<String, Long> entry : blockCounts.entrySet()) {
+            String namespace = namespace(entry.getKey());
+            blockTypes.computeIfAbsent(namespace, ignored -> new HashSet<>()).add(entry.getKey());
+            blockRecords.merge(namespace, entry.getValue(), Long::sum);
+        }
+
+        List<String> namespaces = blockRecords.keySet().stream()
+                .sorted(Comparator.comparingInt(this::namespaceRank).thenComparing(Function.identity()))
+                .toList();
+        Map<String, StructureInspectionReport.NamespaceUsage> result = new LinkedHashMap<>();
+        for (String namespace : namespaces) {
+            result.put(namespace, new StructureInspectionReport.NamespaceUsage(
+                    blockTypes.get(namespace).size(), blockRecords.get(namespace)
+            ));
+        }
+        return result;
+    }
+
+    private String namespace(String blockId) {
+        int separator = blockId.indexOf(':');
+        return separator > 0 ? blockId.substring(0, separator) : "<unknown>";
+    }
+
+    private int namespaceRank(String namespace) {
+        if ("minecraft".equals(namespace)) {
+            return 0;
+        }
+        if ("wildernessodysseyapi".equals(namespace)) {
+            return 1;
+        }
+        return 2;
     }
 
     private List<List<StructureBlockState>> derivePrimaryPalette(StructureModel model) {

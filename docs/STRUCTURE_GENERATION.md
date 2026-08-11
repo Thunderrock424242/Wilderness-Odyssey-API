@@ -62,17 +62,21 @@ Every blueprint is a JSON object with the following top-level fields.
 | `blocks` | Yes | Array | Explicit block records. At least one block is required. |
 | `entities` | No | Array | Loss-aware entity records, primarily emitted by NBT export. See the import/export extension notes below. |
 | `rawRootSnbt` | No | String | Typed compound SNBT containing unknown root tags that must survive a supported model/NBT round trip. |
+| `contentPolicy` | No | Object | Installed-content policy, explicit required mod IDs, and functional-system opt-ins. Defaults preserve ordinary vanilla blueprints. |
+| `materials` | No | Object | Named semantic material roles with deterministic preferred-candidate and fallback chains. |
 
 A block record supports these fields.
 
 | Field | Required | Type | Meaning |
 | --- | --- | --- | --- |
 | `pos` | Yes | Three integers | Local `[x, y, z]` position. Coordinates start at zero and must lie inside `size`. |
-| `block` | Yes | String | Minecraft resource location, for example `minecraft:stone_bricks`. |
-| `properties` | No | Object | String-to-string block-state properties, validated against the selected block when registry data is available. |
-| `blockEntitySnbt` | No | String | Loss-preserving SNBT compound for optional block-entity data. |
+| `block` | Yes | String | Concrete Minecraft resource location, such as `minecraft:stone_bricks`, or a declared semantic material reference such as `$industrial_detail`. |
+| `properties` | No | Object | String-to-string block-state properties for a concrete literal. A semantic reference takes its properties from the selected material candidate. |
+| `blockEntitySnbt` | No | String | Loss-preserving SNBT compound for optional block-entity data. Semantic references cannot add per-position block-entity data. |
 | `markers` | No | String array | StructureGen labels attached to this block record. |
 | `rawEntrySnbt` | No | String | Typed compound SNBT containing unknown fields from an imported block-list entry. |
+| `usageIntent` | No | String | Literal-block classification: `decorative` or `functional`. Required for direct third-party literals; omitted for semantic references. |
+| `requiredSystem` | No | String | Namespaced functional-system token for a functional literal. It must also be explicitly enabled by `contentPolicy.enabledFunctionalSystems`. |
 
 The `name` is intentionally narrow in v1. It must match `[a-z0-9][a-z0-9_-]{0,63}`. Namespaces, dots, slashes, absolute paths, drive prefixes, `.` segments, and `..` segments are not accepted. The compiler always owns the `wildernessodysseyapi` namespace and confines output beneath the generated structure directory. The name `bunker` is reserved for the read-only fixture.
 
@@ -121,7 +125,111 @@ Entity entries use `pos` (three finite doubles), `blockPos` (three in-bounds int
 
 The exporter also writes `sourcePalettes`, per-block `sourcePaletteIndex`, and `unsupportedFields` when it reads information that the authoring schema cannot model directly. These fields make the JSON an honest reference artifact, but they are deliberately **export-only in v1**: the parser emits explicit warnings and regenerates blocks from their declared primary `block` and `properties`. Alternate palettes and unknown palette-entry tags therefore do not survive an exported-JSON-to-NBT pass. Unknown root, block-entry, entity-entry, block-entity, and entity payload compounds are importable through their typed SNBT fields.
 
+When an NBT carries a complete, verified StructureGen content manifest, export preserves its `contentPolicy`, but it writes the already selected concrete blocks. An exported file therefore does not reconstruct the original semantic preference/fallback chains; keep the authored Blueprint as the source of truth for those chains. A partial/corrupt manifest is never trusted as author intent. Arbitrary imported modded blocks also remain unclassified: the exporter omits `usageIntent`, so a developer must review and classify them before the JSON can be generated again.
+
 Unknown Blueprint field names are errors rather than being silently ignored. This catches misspelled properties in the JSON schema itself before generation.
+
+## Mod-aware content policy
+
+Blueprint v1 can describe optional installed-mod decoration without making a blueprint depend on a hardcoded mod list. Mod awareness is resolved during validation, before the canonical model is allowed to reach the NBT writer. The writer therefore sees only concrete block IDs and states that the selected content catalog has confirmed.
+
+Two optional root fields control this behavior:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `contentPolicy` | Object | Controls installed-mod use and explicit functional opt-ins. When omitted, installed decorative blocks are allowed. |
+| `materials` | Object | Defines named semantic material roles and deterministic preference/fallback chains. |
+
+`contentPolicy` supports these fields:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `allowInstalledModBlocks` | `true` | Allows validated third-party blocks to satisfy semantic decorative roles. `false` confines automatic selection to Minecraft and Wilderness Odyssey content. |
+| `preferredDecorativeMods` | `[]` | Ordered mod IDs to prefer when more than one valid decorative candidate can satisfy a role. Preference never bypasses block or state validation. |
+| `requiredMods` | `[]` | Mod IDs the structure explicitly requires. A missing required mod is an error; StructureGen does not silently substitute different functionality. |
+| `enabledFunctionalSystems` | `[]` | Explicit system tokens authorized by the structure request. Merely detecting a mod never adds an entry or activates that mod's gameplay systems. |
+
+Each member of `materials` is a semantic role. A role supports:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `intent` | `"decorative"` | `"decorative"` permits visual selection. Functional intent must be explicit. |
+| `requiredSystem` | Omitted | Functional-system token that must also be present in `enabledFunctionalSystems`. |
+| `preferred` | `[]` | Ordered installed-content candidates considered before fallbacks. |
+| `fallbacks` | `[]` | Ordered safe alternatives, normally ending with a vanilla block. |
+
+A candidate has a required `block` resource ID, an optional string-to-string `properties` object, and an optional `requiresMod` gate. `requiresMod` is useful when the registering mod ID differs from the block's resource namespace: the candidate is skipped when that declared mod is unavailable, and `preferredDecorativeMods` can order it accurately. It is an author-declared availability gate, not proof that the mod owns the namespace. Properties belong to the individual candidate because two fallback blocks may expose entirely different state definitions. A block record refers to a role by putting `$<role>` in its existing `block` field.
+
+Concrete block records may additionally declare `usageIntent` and `requiredSystem`. Existing vanilla records remain compatible without either field. A direct third-party literal must explicitly use `"usageIntent": "decorative"` or `"functional"`; a functional literal must name a namespaced `requiredSystem` that also appears in `contentPolicy.enabledFunctionalSystems`. Any non-vanilla literal carrying `blockEntitySnbt` must take that functional path. Semantic `$role` references inherit intent and system authorization from their material definition and may not repeat these literal-only fields.
+
+```json
+{
+  "formatVersion": 1,
+  "name": "industrial_detail_example",
+  "size": [1, 1, 1],
+  "contentPolicy": {
+    "allowInstalledModBlocks": true,
+    "preferredDecorativeMods": ["create"],
+    "requiredMods": [],
+    "enabledFunctionalSystems": []
+  },
+  "materials": {
+    "industrial_detail": {
+      "intent": "decorative",
+      "preferred": [
+        {"block": "create:industrial_iron_block", "requiresMod": "create"}
+      ],
+      "fallbacks": [
+        {"block": "minecraft:iron_block"}
+      ]
+    }
+  },
+  "blocks": [
+    {"pos": [0, 0, 0], "block": "$industrial_detail"}
+  ]
+}
+```
+
+The example does not declare that Create is universally available. `create:industrial_iron_block` is eligible only when the selected environment catalog contains that exact block and validates its selected state. Otherwise the role resolves to `minecraft:iron_block`. Do not copy a candidate ID from documentation, another modpack, or an older mod version without refreshing and checking the catalog.
+
+Candidate selection is deterministic. Explicit `requiresMod` affinity, policy preference, and each declared candidate order are used instead of registry iteration order. When `requiresMod` is absent, exact namespace/mod-ID equality may be used only as an ordering affinity if that mod ID is installed; it is never reported as authoritative ownership. The same blueprint and the same catalog must produce the same concrete selections.
+
+### Available-content catalog and registry snapshot
+
+The JavaExec generation command is deliberately offline and does not run NeoForge's complete mod-loading and registry-event lifecycle. A dependency JAR appearing on the classpath is not proof that a particular mod ID, block ID, or state schema is registered. StructureGen must never infer availability from a filename, a dependency declaration, or a hardcoded list of popular mods.
+
+Run the full data-generation environment as its own invocation to refresh the deterministic registry snapshot:
+
+```powershell
+.\gradlew.bat runData
+```
+
+The direct `runData` invocation intentionally refreshes the catalog before generated structures are required, so a clean checkout or a blueprint that requires modded content cannot deadlock the task graph. Run `generateStructures` as the next, separate invocation. The data run constructs the configured mods and fires their registry events without opening a Minecraft world. It publishes the snapshot selected through internal StructureGen system properties at:
+
+```text
+build/generated/structuregen/catalog/available-content.json
+```
+
+Catalog schema 2 contains a deterministic environment fingerprint, sorted detected mod IDs and versions, and sorted registered blocks with valid property names, values, and default properties. The Gradle fingerprint covers registry-affecting project sources/resources, resolved common runtime artifacts, and local `run/mods` JARs. It deliberately has no timestamp, making an unchanged environment byte-for-byte deterministic. Data-generation `.cache` bookkeeping is ignored and excluded from packaged resources. Treat the catalog as generated build evidence; do not hand-edit it into agreement with a blueprint.
+
+Offline generation may trust only:
+
+- Minecraft registry content currently bootstrapped in-process; or
+- a successfully parsed full-registry snapshot whose environment fingerprint exactly matches the current Gradle source/dependency environment.
+
+Malformed, schema-mismatched, duplicate, internally invalid, or symbolic-link catalog inputs are rejected. A well-formed but stale fingerprint is not authorized: StructureGen warns, discards all modded catalog claims, and falls back to its verified vanilla catalog. Unknown concrete block IDs and invalid property names or values therefore fail closed. If no current full-registry snapshot is available, a missing optional mod candidate may fall through to a registry-confirmed vanilla fallback, but an unresolved literal block, a role with no valid candidate, or an explicitly required mod must fail generation.
+
+Refresh the snapshot after changing Minecraft/NeoForge, adding or removing a mod, changing a mod version, changing registry-affecting project code/resources, or changing registered blocks/states. The fingerprint prevents an old snapshot from silently authorizing removed content, but only `runData` can capture the new registry. `generateStructures` does not start a world or dynamically install/load missing mods.
+
+### Decorative content versus gameplay systems
+
+Third-party content may be selected automatically only when it genuinely serves a visual role such as architecture, furniture, props, lighting, storage, or restrained industrial detailing. Core architecture should normally remain vanilla or theme-driven, with a small coherent set of modded accents rather than one unrelated block from every installed mod.
+
+Installed content never constitutes permission to create a functional system. In particular, StructureGen must not automatically build powered Create networks, moving contraptions, processing lines, or another mod's gameplay loop. A material or literal block with functional intent must name its `requiredSystem`, and that token must be explicitly present in `enabledFunctionalSystems`. Direct third-party literals cannot remain unclassified, which keeps automatic decorative selection on the semantic-material path.
+
+Wilderness Odyssey special systems remain opt-in under the same rule. Keycard access, facility power, progression, quests, custom interactive machinery, special block entities, and custom gameplay devices are never enabled merely because their blocks are registered. The maintained first-party guard currently requires exact system tokens for known gameplay blocks: `anomaly_gateway` uses `wildernessodysseyapi:anomaly`; `cryo_tube` uses `wildernessodysseyapi:cryo_spawn`; rift cores/time capsules use `wildernessodysseyapi:temporal_rift`; and `wilderness_water_block` uses `wildernessodysseyapi:canonical_water`. A decorative semantic role skips these blocks and may use its safe fallback instead.
+
+Registry tags, mod-provided tags, manually configured StructureGen roles, and simple namespace/path suggestions may help populate future theme metadata. Inferred categories remain suggestions. Name-based inspection categories do not prove that a block is decorative-safe, and an arrangement of individually valid blocks can still become functional through adjacency. StructureGen enforces explicit declarations and known first-party rules; Codex and reviewers must still verify that a decorative arrangement does not accidentally form a powered multi-block network.
 
 ## Creating a structure
 
@@ -129,14 +237,16 @@ Unknown Blueprint field names are errors rather than being silently ignored. Thi
 2. Choose a unique simple lowercase `name`.
 3. Set `size` before adding blocks.
 4. Add block records using local coordinates from `[0, 0, 0]` through `[sizeX - 1, sizeY - 1, sizeZ - 1]`.
-5. Use full resource locations for block IDs.
-6. Include every state property needed to reproduce an oriented or otherwise stateful block.
+5. Prefer a declared `$semantic_role` with a validated fallback chain for optional mod content. If a direct third-party literal is necessary, give it an explicit `usageIntent`.
+6. Include every state property needed to reproduce an oriented or otherwise stateful candidate.
 7. Add explicit `minecraft:air` only where placement must intentionally clear a block.
-8. Run validation and generation before attempting to load the structure in Minecraft.
+8. For functional literals or roles, add the exact `requiredSystem` to `enabledFunctionalSystems`; never use required-mod detection as functional permission.
+9. Refresh the available-content snapshot before using newly added or updated mod content.
+10. Run validation and generation before attempting to load the structure in Minecraft.
 
 Blueprints are untrusted input. StructureGen rejects malformed JSON, unsupported format versions, invalid sizes, invalid names, out-of-bounds or duplicate coordinates, malformed resource locations, invalid block states where registry validation is available, malformed block-entity SNBT, unsafe paths, and collisions with hand-authored structures.
 
-The standalone task bootstraps Minecraft's built-in registry, so vanilla block IDs and properties are checked exactly. If that bootstrap is unavailable, `minecraft:` blocks fail validation rather than compiling with weakened checks. Modded namespaces that are not present in the standalone built-in registry are retained with an explicit warning; their property schemas still require validation in the full mod environment.
+The standalone task bootstraps Minecraft's built-in registry, so vanilla block IDs and properties are checked exactly. If that bootstrap is unavailable, `minecraft:` blocks fail validation rather than compiling with weakened checks. Authored modded IDs are accepted only through a current loaded registry or a valid full-registry snapshot; StructureGen no longer treats an unknown modded namespace as safe merely because its resource-location syntax is valid.
 
 ## Generating structures
 
@@ -170,6 +280,8 @@ Run the separate 4 GB read-only bunker fixture regression with:
 
 These tasks use the project's Minecraft/NeoForge libraries but do not start a Minecraft world or load the full mod set.
 
+The build workflow runs catalog refresh, focused StructureGen verification, and packaging as three separate Gradle invocations in that order. Keeping `runData` separate is required because an exact direct catalog-refresh invocation intentionally bypasses generated-structure resource gating; the later verification and build invocations restore that gate and consume the current snapshot.
+
 ## Inspecting structures
 
 Run the inspector with no property to inspect the authoritative bunker fixture:
@@ -202,9 +314,39 @@ Both overrides can be combined:
 .\gradlew.bat inspectStructure -PstructureFile="C:\path\to\structure.nbt" -PpaletteIndex=27
 ```
 
-The inspector reports values read from the selected file, including DataVersion, dimensions, bounding volume, stored block records, explicit air, non-air occupancy, palette entries, block-state variants, block entities, entities, frequently used blocks, vertical distribution, inferred material categories, and unknown or unsupported tags. It writes machine-readable and text reports under `build/reports/structuregen/` when reporting is enabled.
+The inspector reports values read from the selected file, including DataVersion, dimensions, bounding volume, stored block records, explicit air, non-air occupancy, palette entries, block-state variants, block entities, entities, frequently used blocks, concrete block usage by resource namespace, vertical distribution, inferred material categories, and unknown or unsupported tags. It writes machine-readable and text reports under `build/reports/structuregen/` when reporting is enabled.
 
 Inspection numbers are deliberately not copied into this guide. The task output and generated reports are the authoritative results for the exact NBT being inspected.
+
+### Mod and namespace reporting
+
+Every inspection report groups the concrete block references actually stored in the structure by namespace. Each namespace receives two independent totals:
+
+- unique block types, such as `create:industrial_iron_block` counting once; and
+- stored block records, such as 200 placed industrial-iron blocks counting 200 times.
+
+`minecraft` and `wildernessodysseyapi` are reported separately from sorted external namespaces. A namespace is not automatically treated as a mod ID: one mod can own multiple namespaces, and APIs may share content boundaries. The current catalog/reporting model records registry namespaces separately from loaded mod IDs; a future schema may add distinct authoritative owner IDs where NeoForge exposes them reliably.
+
+For a generated structure with a verified content manifest, reporting additionally lists explicitly required mod IDs, enabled functional systems, resolved semantic roles, rejected candidates, and whether each role had a fallback. Manifest status is `verified`, `partial`, or `absent`; partial values are labeled incomplete rather than being silently defaulted to "none." When inspecting arbitrary third-party NBT that carries no StructureGen manifest, policy facts are **unknown**, not `false`; the inspector still reports concrete external namespaces accurately. Resource namespaces are never subtracted merely because the same spelling appears in `requiredMods`.
+
+Example summary shape:
+
+```text
+Block usage by namespace (unique types / stored records):
+  minecraft: 31 block types / 1842 records
+  wildernessodysseyapi: 2 block types / 14 records
+  create: 6 block types / 73 records
+
+Content manifest status: verified (schemaVersion 1)
+External namespaces used:
+  create
+Required external mod IDs:
+  (none)
+Semantic material resolutions:
+  industrial_detail -> create:industrial_iron_block [decorative, preferred, fallback available: yes]
+```
+
+The first section is derived directly from the final concrete structure. The dependency and fallback sections come from validated generation provenance and must not be reconstructed from block-name heuristics.
 
 The implemented export task reads the bunker by default and writes a reference JSON beneath the report directory:
 
@@ -256,7 +398,7 @@ StructureGen is restricted to project-controlled source, generated-output, and r
 - Existing symbolic links anywhere between `build/` and the destination are rejected so lexical containment cannot redirect a write outside the checkout.
 - Blueprint names cannot contain path separators or traversal segments.
 - A generated name that collides with a hand-authored singular/plural structure, the re-namespaced `empty` GameTest fixture, or another blueprint in the same batch is rejected.
-- After a complete batch succeeds, obsolete safe-name `.nbt` files from deleted or renamed blueprints are removed from StructureGen's build-owned output directory so stale resources cannot remain packaged or shadow later hand-authored structures. Failed batches do not perform this reconciliation.
+- After a complete batch succeeds, obsolete `.nbt` files are removed recursively from StructureGen's build-owned singular and historical plural structure-output trees, so renamed, nested, or legacy generated resources cannot remain packaged or shadow later hand-authored structures. Other generated resource types are untouched, and failed batches do not perform this reconciliation.
 - Existing generated output is replaced only after the new temporary file passes verification.
 - StructureGen never writes into `run/` worlds, Minecraft saves, `.minecraft`, or an external Minecraft installation.
 - The pipeline does not modify structure spawning, placement, biome generation, world generation, or jigsaw pools.
@@ -312,9 +454,33 @@ Blueprint v1 permits one block record per coordinate. Remove or merge the duplic
 
 Use a full block ID such as `minecraft:oak_stairs`. Property names and values must match Minecraft 1.21.1. For example, stairs use `facing`, `half`, `shape`, and `waterlogged`.
 
+### Required mod is unavailable
+
+Refresh the full-registry snapshot with `.\gradlew.bat runData` and confirm that the exact mod ID appears in its `mods` array. If the mod is intentionally optional, remove it from `requiredMods` and supply a valid fallback for every semantic role that prefers its blocks. Do not make required functionality silently decorative or vanilla.
+
+### Optional mod candidate did not resolve
+
+Check the candidate's exact block ID and properties against `build/generated/structuregen/catalog/available-content.json`. Mod updates can rename blocks or change state properties. An unavailable optional candidate is safe only when the role resolves to another registered candidate; otherwise generation fails.
+
+### Catalog fingerprint is stale
+
+Run `.\gradlew.bat runData` as a separate invocation, then run `.\gradlew.bat generateStructures`. StructureGen refuses modded claims from a catalog produced by different project sources, common runtime artifacts, or local `run/mods` content. Do not edit the fingerprint or catalog by hand.
+
+### Installed mod blocks are disabled
+
+When `allowInstalledModBlocks` is `false`, semantic roles skip third-party candidates and use approved Minecraft or Wilderness Odyssey fallbacks. A literal third-party reference is not silently rewritten because no fallback intent is available; use a semantic role if the blueprint must work in both configurations.
+
+### Third-party literal has no usageIntent
+
+Prefer a semantic role with a fallback for automatically selected decoration. If the concrete block is intentional, add `"usageIntent": "decorative"`. For functional use, declare `"usageIntent": "functional"`, add an exact namespaced `requiredSystem`, and include the same token in `contentPolicy.enabledFunctionalSystems`.
+
+### Functional system was not enabled
+
+Installed or required mods do not authorize gameplay. Add the exact system token only when the structure request explicitly calls for that functional integration. Do not relabel functional machinery as decorative to bypass validation; known Wilderness Odyssey gameplay blocks are independently guarded.
+
 ### Malformed blockEntitySnbt
 
-The value must be a JSON string containing one valid SNBT compound. Check both JSON escaping and SNBT types/suffixes.
+The value must be a JSON string containing one valid SNBT compound. Check both JSON escaping and SNBT types/suffixes. Non-vanilla literal block-entity data also requires functional usage intent and an explicitly enabled system because StructureGen cannot prove an arbitrary third-party payload is decoration-only.
 
 ### Hand-authored structure collision
 
@@ -340,6 +506,11 @@ Blueprint Format v1 is a safe block-by-block foundation, not a procedural struct
 - The exporter describes multiple palettes and source indices for inspection, but v1 import does not reconstruct them; the parser warns and uses the primary block/state declarations. Weighted-palette authoring is unsupported.
 - There is no rotation, mirroring, biome material substitution, randomized palette, or seeded variation.
 - There is no connectivity, pathfinding, structural-support, or automatic lighting proof.
+- Mod-aware resolution is build-environment-specific. The generated NBT stores the selected concrete block IDs, so an already-built JAR cannot switch to a fallback when its runtime mod set changes. Regenerate resources for each target mod environment; future runtime/worldgen phases need conditional variants or runtime resolution for one artifact to adapt dynamically.
+- The registry snapshot is an explicit capture, not live dependency introspection. Its deterministic fingerprint prevents reuse after the tracked source/dependency environment changes, but offline generation still cannot discover new registrations until `runData` captures them.
+- Automatic selection is intentionally conservative. Semantic roles, explicit literal intent, exact functional tokens, and maintained first-party rules enforce author intent; no static tool can prove that an arbitrary arrangement of third-party mechanical blocks is topologically inert.
+- A Blueprint exported from arbitrary NBT cannot recover original fallback chains or per-position functional intent. Unclassified modded literals intentionally require developer review before re-import; when any functional system was enabled, the exporter conservatively declines to infer decorative intent from a matching resolved state elsewhere in the structure.
+- Blueprint v1 resolves declared semantic material chains but does not perform complicated AI classification of every block in an installed modpack.
 - Existing NBT may contain alternate palettes, unknown palette fields, malformed extension fields, or entity semantics that Blueprint v1 cannot re-import completely. The reader preserves supported raw compounds where practical and reports every unsupported path; StructureGen does not claim a lossless bunker JSON round trip.
 - Semantic equality is the target. Compressed NBT bytes, compound ordering, and palette index ordering may differ.
 - Safe staging, semantic re-read, replacement, and rollback apply to each generated structure. A multi-blueprint invocation validates and preflights the complete batch first, but publication is not a single filesystem transaction: if a later file encounters an unexpected I/O failure, an earlier verified file may already have been published.
@@ -359,3 +530,17 @@ Phase 2 should begin only after the first milestone's reader, validator, compile
 8. Add Codex-assisted blueprint authoring after the deterministic offline pipeline is proven.
 
 Natural-language generation, external AI APIs, procedural facilities, automatic spawning, and world-generation changes remain outside the first milestone.
+
+### Mod-aware content rule across the existing roadmap
+
+This rule extends the roadmap above; it does not remove, replace, reorder, or redefine its phases.
+
+- **Phase 2:** Modules, themes, deterministic transforms, and composition may use compatible installed blocks through semantic roles and validated fallback chains.
+- **Phase 3:** Third-party gameplay integrations still require explicit functional intent. Detecting a mod or using its decorative blocks never opts a structure into its power, automation, movement, processing, quest, or progression systems.
+- **Phase 4:** World-generation structures may contain optional modded decoration only when dependency and fallback behavior is safe for the target runtime. A prebuilt concrete NBT cannot provide a runtime fallback by itself.
+- **Phase 5:** Advanced facilities may use broader mod-aware visual palettes while retaining a coherent theme, restrained dependency footprint, and separate opt-in for Wilderness Odyssey special systems.
+- **Phase 6:** A future Structure Director should inspect the authoritative available-content catalog before proposing a design and should prefer core vanilla/theme architecture with selective modded detail.
+- **Phase 7:** Developer tools should display concrete namespaces, explicitly declared mod dependencies, semantic selections, rejected candidates, and fallback status; where NeoForge later exposes reliable registration ownership, they should add supplying-mod IDs without inferring them from namespaces.
+- **Phase 8:** Quality tooling should detect unnecessary external dependencies, excessive namespace count, palette complexity, incoherent decoration, and accidental functional-system use.
+
+Across every phase, a referenced concrete block state must exist in the selected registry/catalog. Missing optional content uses an explicitly declared valid fallback; missing required content fails clearly. No phase may restore warning-only compilation of unknown modded IDs.

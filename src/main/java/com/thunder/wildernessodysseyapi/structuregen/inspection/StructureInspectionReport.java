@@ -1,11 +1,14 @@
 package com.thunder.wildernessodysseyapi.structuregen.inspection;
 
+import com.thunder.wildernessodysseyapi.structuregen.content.ContentManifestStatus;
+import com.thunder.wildernessodysseyapi.structuregen.content.ResolvedMaterial;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureSize;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /** Complete serializable inspection and statistical analysis of one structure template. */
 public record StructureInspectionReport(
@@ -26,6 +29,14 @@ public record StructureInspectionReport(
         int entityCount,
         List<String> unknownOrUnsupportedTags,
         List<BlockFrequency> blockFrequencies,
+        Map<String, NamespaceUsage> namespaceUsage,
+        ContentManifestStatus contentManifestStatus,
+        int contentManifestSchemaVersion,
+        boolean allowInstalledModBlocks,
+        List<String> requiredMods,
+        List<String> externalNamespacesUsed,
+        List<String> enabledFunctionalSystems,
+        List<ResolvedMaterial> resolvedMaterials,
         List<PaletteReport> palettes,
         List<VerticalLayer> verticalDistribution,
         Map<String, Long> categoryCounts,
@@ -36,6 +47,12 @@ public record StructureInspectionReport(
     public StructureInspectionReport {
         unknownOrUnsupportedTags = List.copyOf(unknownOrUnsupportedTags);
         blockFrequencies = List.copyOf(blockFrequencies);
+        namespaceUsage = Collections.unmodifiableMap(new LinkedHashMap<>(namespaceUsage));
+        contentManifestStatus = Objects.requireNonNull(contentManifestStatus, "contentManifestStatus");
+        requiredMods = List.copyOf(requiredMods);
+        externalNamespacesUsed = List.copyOf(externalNamespacesUsed);
+        enabledFunctionalSystems = List.copyOf(enabledFunctionalSystems);
+        resolvedMaterials = List.copyOf(resolvedMaterials);
         palettes = List.copyOf(palettes);
         verticalDistribution = List.copyOf(verticalDistribution);
         categoryCounts = Collections.unmodifiableMap(new LinkedHashMap<>(categoryCounts));
@@ -45,6 +62,10 @@ public record StructureInspectionReport(
 
     /** Frequency for one block ID, including explicitly stored air. */
     public record BlockFrequency(String block, long count) {
+    }
+
+    /** Unique block types and stored block records supplied by one resource namespace. */
+    public record NamespaceUsage(int blockTypes, long blockRecords) {
     }
 
     /** Full state entries for one source palette. */

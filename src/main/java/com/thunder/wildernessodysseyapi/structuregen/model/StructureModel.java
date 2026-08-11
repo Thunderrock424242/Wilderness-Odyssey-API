@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.structuregen.model;
 
+import com.thunder.wildernessodysseyapi.structuregen.content.StructureContentManifest;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -25,6 +27,7 @@ public final class StructureModel {
     private final List<List<StructureBlockState>> sourcePalettes;
     private final String rawRootSnbt;
     private final List<String> unsupportedFields;
+    private final StructureContentManifest contentManifest;
 
     /** Creates a fully described canonical structure model. */
     public StructureModel(
@@ -39,6 +42,26 @@ public final class StructureModel {
             String rawRootSnbt,
             List<String> unsupportedFields
     ) {
+        this(
+                name, size, blocks, entities, dataVersion, metadata, markers, sourcePalettes,
+                rawRootSnbt, unsupportedFields, StructureContentManifest.defaults()
+        );
+    }
+
+    /** Creates a canonical structure model with mod-aware content provenance. */
+    public StructureModel(
+            String name,
+            StructureSize size,
+            List<StructureBlock> blocks,
+            List<StructureEntity> entities,
+            int dataVersion,
+            Map<String, String> metadata,
+            List<String> markers,
+            List<List<StructureBlockState>> sourcePalettes,
+            String rawRootSnbt,
+            List<String> unsupportedFields,
+            StructureContentManifest contentManifest
+    ) {
         this.name = name;
         this.size = size;
         this.blocks = List.copyOf(blocks);
@@ -51,6 +74,9 @@ public final class StructureModel {
         this.sourcePalettes = List.copyOf(palettes);
         this.rawRootSnbt = rawRootSnbt;
         this.unsupportedFields = List.copyOf(unsupportedFields);
+        this.contentManifest = contentManifest == null
+                ? StructureContentManifest.defaults()
+                : contentManifest;
     }
 
     public String name() {
@@ -91,5 +117,10 @@ public final class StructureModel {
 
     public List<String> unsupportedFields() {
         return unsupportedFields;
+    }
+
+    /** Returns the policy and semantic-material choices used to author this concrete model. */
+    public StructureContentManifest contentManifest() {
+        return contentManifest;
     }
 }

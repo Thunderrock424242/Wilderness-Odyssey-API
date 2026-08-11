@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.structuregen.inspection;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.thunder.wildernessodysseyapi.structuregen.content.ContentManifestStatus;
 import com.thunder.wildernessodysseyapi.structuregen.pipeline.SafeFilePublisher;
 
 import java.io.IOException;
@@ -67,11 +68,59 @@ public final class StructureReportWriter {
         output.append("Block entities: ").append(report.blockEntityCount()).append('\n');
         output.append("Entities: ").append(report.entityCount()).append("\n\n");
 
-        output.append("Unknown or unsupported tags:\n");
+        output.append("Block usage by namespace (unique types / stored records):\n");
+        if (report.namespaceUsage().isEmpty()) {
+            output.append("  (none)\n");
+        } else {
+            report.namespaceUsage().forEach((namespace, usage) -> output.append("  ")
+                    .append(namespace).append(": ")
+                    .append(usage.blockTypes())
+                    .append(usage.blockTypes() == 1 ? " block type / " : " block types / ")
+                    .append(usage.blockRecords())
+                    .append(usage.blockRecords() == 1L ? " record\n" : " records\n"));
+        }
+
+        output.append("\nUnknown or unsupported tags:\n");
         if (report.unknownOrUnsupportedTags().isEmpty()) {
             output.append("  (none)\n");
         } else {
             report.unknownOrUnsupportedTags().forEach(tag -> output.append("  - ").append(tag).append('\n'));
+        }
+
+        output.append("\nContent policy and dependencies:\n");
+        if (report.contentManifestStatus() == ContentManifestStatus.ABSENT) {
+            output.append("  Content manifest status: absent (no StructureGen content manifest)\n");
+        } else if (report.contentManifestStatus() == ContentManifestStatus.PARTIAL) {
+            output.append("  Content manifest status: partial (schemaVersion ")
+                    .append(report.contentManifestSchemaVersion())
+                    .append("; values below may be incomplete)\n");
+        } else {
+            output.append("  Content manifest status: verified (schemaVersion ")
+                    .append(report.contentManifestSchemaVersion()).append(")\n");
+        }
+        output.append("  External namespaces used:\n");
+        appendStrings(output, report.externalNamespacesUsed());
+        if (report.contentManifestStatus() != ContentManifestStatus.ABSENT) {
+            output.append("  Installed mod blocks allowed: ")
+                    .append(report.allowInstalledModBlocks() ? "yes" : "no").append('\n');
+            output.append("  Required external mod IDs:\n");
+            appendStrings(output, report.requiredMods());
+            output.append("  Explicitly enabled functional systems:\n");
+            appendStrings(output, report.enabledFunctionalSystems());
+            output.append("  Semantic material resolutions:\n");
+            if (report.resolvedMaterials().isEmpty()) {
+                output.append("    (none)\n");
+            } else {
+                report.resolvedMaterials().forEach(material -> {
+                    output.append("    ").append(material.role()).append(" -> ")
+                            .append(material.selectedBlock()).append(" [")
+                            .append(material.intent()).append(", ").append(material.source())
+                            .append(", fallback available: ")
+                            .append(material.fallbackAvailable() ? "yes" : "no").append("]\n");
+                    material.rejectedCandidates().forEach(rejected -> output.append("      skipped ")
+                            .append(rejected.blockId()).append(": ").append(rejected.reason()).append('\n'));
+                });
+            }
         }
 
         output.append("\nMost common blocks:\n");
@@ -136,6 +185,14 @@ public final class StructureReportWriter {
             return;
         }
         counts.forEach((name, count) -> output.append("  ").append(name).append(": ").append(count).append('\n'));
+    }
+
+    private void appendStrings(StringBuilder output, java.util.List<String> values) {
+        if (values.isEmpty()) {
+            output.append("    (none)\n");
+            return;
+        }
+        values.forEach(value -> output.append("    - ").append(value).append('\n'));
     }
 
     private void requireContained(Path root, Path target) {

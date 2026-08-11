@@ -22,5 +22,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
 
+      - name: Refresh StructureGen content catalog
+        run: ./gradlew runData
+
+      - name: Run focused StructureGen tests
+        run: ./gradlew structureGenTest
+
       - name: Build with Gradle
         run: ./gradlew build

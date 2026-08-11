@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.structuregen.nbt;
 
 import com.thunder.wildernessodysseyapi.structuregen.StructureGenConstants;
+import com.thunder.wildernessodysseyapi.structuregen.content.StructureContentManifest;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureBlock;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureBlockState;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureEntity;
@@ -49,7 +50,7 @@ public final class MinecraftStructureNbtReader {
     private static final Set<String> BLOCK_FIELDS = Set.of("pos", "state", "nbt");
     private static final Set<String> ENTITY_FIELDS = Set.of("pos", "blockPos", "nbt");
     private static final Set<String> STRUCTUREGEN_FIELDS = Set.of(
-            "formatVersion", "name", "metadata", "markers", "blockMarkers"
+            "formatVersion", "name", "metadata", "markers", "blockMarkers", "contentManifest"
     );
 
     /** Reads one structure, deriving its model name from the NBT filename. */
@@ -105,7 +106,8 @@ public final class MinecraftStructureNbtReader {
                 structureGen.markers(),
                 palettes,
                 rawRootSnbt(root, blockMarkers.keySet()),
-                List.copyOf(unsupported)
+                List.copyOf(unsupported),
+                structureGen.contentManifest()
         );
     }
 
@@ -357,7 +359,19 @@ public final class MinecraftStructureNbtReader {
 
         List<String> markers = readOptionalStringList(tag, "markers", "structuregen.markers", unsupported);
         Map<StructurePosition, List<String>> blockMarkers = readBlockMarkers(tag, unsupported);
-        return new StructureGenData(name, metadata, markers, blockMarkers);
+        StructureContentManifest contentManifest = readContentManifest(tag, unsupported);
+        return new StructureGenData(name, metadata, markers, blockMarkers, contentManifest);
+    }
+
+    private StructureContentManifest readContentManifest(CompoundTag structureGen, Set<String> unsupported) {
+        if (!structureGen.contains("contentManifest")) {
+            return StructureContentManifest.defaults();
+        }
+        if (!structureGen.contains("contentManifest", Tag.TAG_COMPOUND)) {
+            unsupported.add("structuregen.contentManifest");
+            return StructureContentManifest.partialDefaults();
+        }
+        return ContentManifestNbtCodec.read(structureGen.getCompound("contentManifest"), unsupported);
     }
 
     private Map<StructurePosition, List<String>> readBlockMarkers(
@@ -428,6 +442,7 @@ public final class MinecraftStructureNbtReader {
         copyMalformedKnownField(structureGen, unknown, "formatVersion", Tag.TAG_ANY_NUMERIC);
         copyMalformedKnownField(structureGen, unknown, "name", Tag.TAG_STRING);
         copyMalformedKnownField(structureGen, unknown, "markers", Tag.TAG_LIST);
+        copyMalformedKnownField(structureGen, unknown, "contentManifest", Tag.TAG_COMPOUND);
         Tag structureMarkers = structureGen.get("markers");
         if (structureMarkers instanceof ListTag markerValues
                 && !markerValues.isEmpty()
@@ -628,10 +643,13 @@ public final class MinecraftStructureNbtReader {
             String name,
             Map<String, String> metadata,
             List<String> markers,
-            Map<StructurePosition, List<String>> blockMarkers
+            Map<StructurePosition, List<String>> blockMarkers,
+            StructureContentManifest contentManifest
     ) {
         private static StructureGenData empty() {
-            return new StructureGenData(null, Map.of(), List.of(), Map.of());
+            return new StructureGenData(
+                    null, Map.of(), List.of(), Map.of(), StructureContentManifest.defaults()
+            );
         }
     }
 }

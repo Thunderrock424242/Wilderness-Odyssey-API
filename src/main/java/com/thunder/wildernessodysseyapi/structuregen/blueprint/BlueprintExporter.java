@@ -4,6 +4,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.stream.JsonWriter;
 import com.thunder.wildernessodysseyapi.structuregen.StructureGenConstants;
+import com.thunder.wildernessodysseyapi.structuregen.content.ContentManifestStatus;
+import com.thunder.wildernessodysseyapi.structuregen.content.ResolvedMaterial;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureBlock;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureBlockState;
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureEntity;
@@ -91,10 +93,27 @@ public final class BlueprintExporter {
             json.name("markers");
             writeStringArray(json, model.markers());
         }
+        if (model.contentManifest().provenanceStatus() == ContentManifestStatus.VERIFIED) {
+            json.name("contentPolicy").beginObject();
+            json.name("allowInstalledModBlocks").value(model.contentManifest().allowInstalledModBlocks());
+            if (!model.contentManifest().preferredDecorativeMods().isEmpty()) {
+                json.name("preferredDecorativeMods");
+                writeStringArray(json, model.contentManifest().preferredDecorativeMods());
+            }
+            if (!model.contentManifest().requiredMods().isEmpty()) {
+                json.name("requiredMods");
+                writeStringArray(json, model.contentManifest().requiredMods());
+            }
+            if (!model.contentManifest().enabledFunctionalSystems().isEmpty()) {
+                json.name("enabledFunctionalSystems");
+                writeStringArray(json, model.contentManifest().enabledFunctionalSystems());
+            }
+            json.endObject();
+        }
 
         json.name("blocks").beginArray();
         for (StructureBlock block : model.blocks()) {
-            writeBlock(json, block);
+            writeBlock(json, model, block);
         }
         json.endArray();
 
@@ -129,7 +148,7 @@ public final class BlueprintExporter {
         json.endObject();
     }
 
-    private void writeBlock(JsonWriter json, StructureBlock block) throws IOException {
+    private void writeBlock(JsonWriter json, StructureModel model, StructureBlock block) throws IOException {
         json.beginObject();
         json.name("pos");
         writePosition(json, block.position());
@@ -137,6 +156,9 @@ public final class BlueprintExporter {
         if (!block.state().properties().isEmpty()) {
             json.name("properties");
             writeStringMap(json, block.state().properties());
+        }
+        if (hasVerifiedDecorativeSelection(model, block)) {
+            json.name("usageIntent").value("decorative");
         }
         if (block.blockEntitySnbt() != null) {
             json.name("blockEntitySnbt").value(block.blockEntitySnbt());
@@ -152,6 +174,23 @@ public final class BlueprintExporter {
             json.name("sourcePaletteIndex").value(block.sourcePaletteIndex());
         }
         json.endObject();
+    }
+
+    // A concrete imported block has no per-position author intent. Only an exact state selected
+    // by a recorded decorative role in a structure with no enabled functional systems is safe to
+    // classify. Otherwise the same state could be functional elsewhere, so re-import must ask the
+    // author instead of inventing decorative intent.
+    private boolean hasVerifiedDecorativeSelection(StructureModel model, StructureBlock block) {
+        if (model.contentManifest().provenanceStatus() != ContentManifestStatus.VERIFIED
+                || !model.contentManifest().enabledFunctionalSystems().isEmpty()) {
+            return false;
+        }
+        List<ResolvedMaterial> matching = model.contentManifest().resolvedMaterials().stream()
+                .filter(material -> material.selectedBlock().equals(block.state().blockId()))
+                .filter(material -> material.properties().equals(block.state().properties()))
+                .toList();
+        return !matching.isEmpty()
+                && matching.stream().allMatch(material -> "decorative".equals(material.intent()));
     }
 
     private void writeEntity(JsonWriter json, StructureEntity entity) throws IOException {
