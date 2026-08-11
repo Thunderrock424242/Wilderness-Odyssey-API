@@ -11,7 +11,7 @@ class WaterPhysicsProfileTest {
 
     @Test
     void builtInProfilesAndApiVersionArePublished() {
-        assertEquals(1, WaterServices.apiVersion());
+        assertEquals(4, WaterServices.apiVersion());
         assertTrue(WaterPhysicsProfileRegistry.registeredIds().stream()
                 .anyMatch(id -> id.getPath().equals("vanilla_boat")));
         assertTrue(WaterPhysicsProfileRegistry.BOAT.rigidWatercraft());
