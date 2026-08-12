@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.cloak.item.BreathingMaskItem;
 import com.thunder.wildernessodysseyapi.cloak.item.InhalerItem;
 import com.thunder.wildernessodysseyapi.lorebook.item.FieldCodexItem;
+import com.thunder.wildernessodysseyapi.developmentstudio.item.StudioDeveloperToolItem;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -38,6 +39,11 @@ public class ModItems {
     public static final DeferredItem<Item> FIELD_CODEX = ITEMS.register(
             "field_codex",
             () -> new FieldCodexItem(new Item.Properties().stacksTo(1).rarity(Rarity.UNCOMMON))
+    );
+    /** Server-authorized block and entity inspection tool for Development Studio worlds. */
+    public static final DeferredItem<Item> STUDIO_DEVELOPER_TOOL = ITEMS.register(
+            "studio_developer_tool",
+            () -> new StudioDeveloperToolItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC))
     );
 
     public static final DeferredItem<Item> RIFTBOUND_WRAITH_SPAWN_EGG = ITEMS.register(
