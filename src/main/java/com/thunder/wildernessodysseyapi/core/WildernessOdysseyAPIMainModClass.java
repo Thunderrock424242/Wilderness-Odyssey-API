@@ -6,6 +6,10 @@ import com.thunder.wildernessodysseyapi.command.ModCommands;
 import com.thunder.wildernessodysseyapi.config.ModConfigRegistration;
 import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
+import com.thunder.wildernessodysseyapi.developmentstudio.campus.StudioLocationRegistry;
+import com.thunder.wildernessodysseyapi.developmentstudio.data.StudioWorldgenData;
+import com.thunder.wildernessodysseyapi.developmentstudio.inspection.StudioInspectionRegistry;
+import com.thunder.wildernessodysseyapi.developmentstudio.module.StudioModuleRegistry;
 import com.thunder.wildernessodysseyapi.ecosystem.EcosystemEvents;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
@@ -66,6 +70,7 @@ public final class WildernessOdysseyAPIMainModClass {
         modEventBus.addListener(ModConfigRegistration::onConfigLoaded);
         modEventBus.addListener(ModConfigRegistration::onConfigReloaded);
         modEventBus.addListener(this::addCreativeTabEntries);
+        modEventBus.addListener(StudioWorldgenData::onGatherData);
         modEventBus.addListener(StructureBlockCatalogSnapshotProvider::onGatherData);
 
         ModRegistries.register(modEventBus);
@@ -82,6 +87,9 @@ public final class WildernessOdysseyAPIMainModClass {
         event.enqueueWork(() -> {
             VanillaWaterBucketCompatibility.bootstrap();
             BiomeCompatibilityBootstrap.initialize();
+            StudioLocationRegistry.bootstrapDefaults();
+            StudioModuleRegistry.bootstrapDefaults();
+            StudioInspectionRegistry.bootstrapDefaults();
             LOGGER.info("Wilderness Odyssey API setup complete");
         });
         LOGGER.info("Mod pack version: {}", container.getModInfo().getVersion());
@@ -97,6 +105,7 @@ public final class WildernessOdysseyAPIMainModClass {
         event.accept(TemporalRiftBlocks.TIME_CAPSULE.get());
         event.accept(AnomalyBlocks.ANOMALY_GATEWAY.get());
         event.accept(ModItems.FIELD_CODEX.get());
+        event.accept(ModItems.STUDIO_DEVELOPER_TOOL.get());
     }
 
     // The game bus owns live server/world events after mod construction is complete.

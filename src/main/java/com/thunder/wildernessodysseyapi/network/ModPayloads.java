@@ -3,6 +3,12 @@ package com.thunder.wildernessodysseyapi.network;
 import com.thunder.wildernessodysseyapi.cloak.item.CloakState;
 import com.thunder.wildernessodysseyapi.cloak.item.CloakTickHandler;
 import com.thunder.wildernessodysseyapi.cloak.network.CloakInputPayload;
+import com.thunder.wildernessodysseyapi.developmentstudio.StudioServerService;
+import com.thunder.wildernessodysseyapi.developmentstudio.client.StudioClientState;
+import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioPayload;
+import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioRequestPayload;
+import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioBookmarkActionPayload;
+import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioLocationTeleportPayload;
 import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookManager;
 import com.thunder.wildernessodysseyapi.lorebook.network.OpenCodexPayload;
@@ -32,7 +38,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModPayloads {
 
-    private static final String NETWORK_VERSION = "13";
+    private static final String NETWORK_VERSION = "14";
 
     private ModPayloads() {
     }
@@ -73,6 +79,29 @@ public final class ModPayloads {
                         LoreBookManager.saveJournalText(serverPlayer, payload.text());
                     }
                 }));
+
+        // Studio payloads are requests only. Every handler rechecks world scope,
+        // player authority, registered ids, and bounded server-owned state.
+        registrar.playToServer(OpenStudioRequestPayload.TYPE, OpenStudioRequestPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer serverPlayer) {
+                        StudioServerService.open(serverPlayer);
+                    }
+                }));
+        registrar.playToServer(StudioBookmarkActionPayload.TYPE, StudioBookmarkActionPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer serverPlayer) {
+                        StudioServerService.handleBookmarkAction(serverPlayer, payload);
+                    }
+                }));
+        registrar.playToServer(StudioLocationTeleportPayload.TYPE, StudioLocationTeleportPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer serverPlayer) {
+                        StudioServerService.teleportToCampusLocation(serverPlayer, payload.locationId());
+                    }
+                }));
+        registrar.playToClient(OpenStudioPayload.TYPE, OpenStudioPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> StudioClientState.accept(payload)));
 
         registrar.playToClient(
                 SphSimulationSnapshotPayload.TYPE,
