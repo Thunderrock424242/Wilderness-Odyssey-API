@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.developmentstudio.client.screen.StudioScreen;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioRequestPayload;
+import com.thunder.wildernessodysseyapi.developmentstudio.debug.client.StudioDebugRendererRegistry;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -20,6 +21,7 @@ public final class StudioClientEvents {
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
+        StudioDebugRendererRegistry.bootstrapDefaults();
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player != null && minecraft.screen == null && StudioKeyMappings.OPEN_STUDIO.consumeClick()) {
             PacketDistributor.sendToServer(new OpenStudioRequestPayload());
@@ -42,5 +44,6 @@ public final class StudioClientEvents {
     @SubscribeEvent
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         StudioClientState.clear();
+        StudioDebugRendererRegistry.disableAll();
     }
 }

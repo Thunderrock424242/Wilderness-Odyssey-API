@@ -4,12 +4,15 @@ import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.developmentstudio.inspection.StudioInspection;
 import com.thunder.wildernessodysseyapi.developmentstudio.inspection.StudioInspectionLine;
 import com.thunder.wildernessodysseyapi.developmentstudio.inspection.StudioInspectionProvider;
+import com.thunder.wildernessodysseyapi.core.ModAttachments;
+import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileManager;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -53,6 +56,23 @@ public final class EntityStudioInspectionProvider implements StudioInspectionPro
                     : BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()) + " " + target.getUUID()));
             lines.add(new StudioInspectionLine("Navigation", mob.getNavigation().isDone() ? "idle" : "active"));
             lines.add(new StudioInspectionLine("No AI", Boolean.toString(mob.isNoAi())));
+        }
+        if (entity instanceof PathfinderMob animal) {
+            SpeciesBehaviorProfileManager.profileFor(animal).ifPresent(profile -> {
+                lines.add(new StudioInspectionLine("Ecosystem profile", profile.id().toString()));
+                animal.getExistingData(ModAttachments.ANIMAL_NEEDS).ifPresentOrElse(needs -> {
+                    lines.add(new StudioInspectionLine("Ecosystem behavior", needs.behavior().toString()));
+                    lines.add(new StudioInspectionLine("Ecosystem needs", String.format(
+                            Locale.ROOT,
+                            "thirst=%.3f hunger=%.3f rest=%.3f social=%.3f safety=%.3f",
+                            needs.thirst(), needs.hunger(), needs.rest(), needs.social(), needs.safetyConcern()
+                    )));
+                    lines.add(new StudioInspectionLine("Behavior target", needs.behaviorTarget() == null
+                            ? "none" : needs.behaviorTarget().toShortString()));
+                }, () -> lines.add(new StudioInspectionLine(
+                        "Ecosystem state", "profile loaded; needs attachment not initialized"
+                )));
+            });
         }
         return new StudioInspection(ID, "Entity Inspector", lines);
     }

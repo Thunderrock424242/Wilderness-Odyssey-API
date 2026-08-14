@@ -33,9 +33,8 @@ public final class StudioLocationRegistry {
 
         // Reserved ids keep later campus expansions compatible without pretending
         // that their gameplay systems or finished buildings already exist.
-        register(location("weather_lab", "Weather Lab (Reserved)", new BlockPos(10, 1, -18), false));
-        register(location("ecosystem_lab", "Ecosystem Lab (Reserved)", new BlockPos(-18, 1, 10), false));
-        register(location("worldgen_lab", "Worldgen Lab (Reserved)", new BlockPos(38, 1, 10), false));
+        // Phase 3 environment modules share the bounded outdoor/water pads until
+        // the campus receives dedicated buildings in the polish phase.
         register(location("lighting_lab", "Lighting Lab (Reserved)", new BlockPos(10, 1, 38), false));
         register(location("power_lab", "Power Lab (Reserved)", new BlockPos(-18, 1, -18), false));
         register(location("security_lab", "Security Lab (Reserved)", new BlockPos(38, 1, -18), false));

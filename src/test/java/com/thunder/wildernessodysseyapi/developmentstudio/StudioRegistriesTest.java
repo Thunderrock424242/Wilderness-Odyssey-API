@@ -13,13 +13,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class StudioRegistriesTest {
 
     @Test
-    void phaseOneModulesExposeImplementedAndDeferredStates() {
+    void phaseTwoModulesExposeImplementedAndDeferredStates() {
         assertEquals(StudioModuleStatus.AVAILABLE,
                 StudioModuleRegistry.get("locations").orElseThrow().status());
         assertEquals(StudioModuleStatus.AVAILABLE,
                 StudioModuleRegistry.get("inspector").orElseThrow().status());
-        assertEquals(StudioModuleStatus.FOUNDATION,
+        assertEquals(StudioModuleStatus.AVAILABLE,
                 StudioModuleRegistry.get("debug").orElseThrow().status());
+        assertEquals(StudioModuleStatus.AVAILABLE,
+                StudioModuleRegistry.get("structures").orElseThrow().status());
+        assertEquals(StudioModuleStatus.AVAILABLE,
+                StudioModuleRegistry.get("entities").orElseThrow().status());
+        assertEquals(StudioModuleStatus.AVAILABLE,
+                StudioModuleRegistry.get("water").orElseThrow().status());
+        assertEquals(StudioModuleStatus.AVAILABLE,
+                StudioModuleRegistry.get("ecosystem").orElseThrow().status());
+        assertEquals(StudioModuleStatus.AVAILABLE,
+                StudioModuleRegistry.get("weather").orElseThrow().status());
+        assertEquals(StudioModuleStatus.AVAILABLE,
+                StudioModuleRegistry.get("worldgen").orElseThrow().status());
         assertEquals(StudioModuleStatus.DEFERRED,
                 StudioModuleRegistry.get("power").orElseThrow().status());
     }

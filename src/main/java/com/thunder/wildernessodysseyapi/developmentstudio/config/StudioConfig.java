@@ -7,6 +7,7 @@ public final class StudioConfig {
     public static final ModConfigSpec CONFIG_SPEC;
     public static final ModConfigSpec.BooleanValue ALLOW_IN_NORMAL_WORLDS;
     public static final ModConfigSpec.IntValue MAX_BOOKMARKS;
+    public static final ModConfigSpec.IntValue MAX_ENTITY_LAB_ENTITIES;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -23,6 +24,13 @@ public final class StudioConfig {
                         "Maximum number of persistent Studio bookmarks stored in one world."
                 )
                 .defineInRange("maximumPerWorld", 128, 1, 512);
+        builder.pop();
+
+        builder.push("labs");
+        MAX_ENTITY_LAB_ENTITIES = builder.comment(
+                        "Maximum number of Studio-tagged entities allowed inside the Entity Lab."
+                )
+                .defineInRange("maximumEntityLabEntities", 48, 1, 128);
         builder.pop();
         CONFIG_SPEC = builder.build();
     }

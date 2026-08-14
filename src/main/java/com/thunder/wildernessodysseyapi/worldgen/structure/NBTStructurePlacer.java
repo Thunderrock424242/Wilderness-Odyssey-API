@@ -13,6 +13,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -293,6 +295,73 @@ public class NBTStructurePlacer {
         // local Y offset as burial depth, then immediately undid that clamp to
         // force the marker back to sea level. Honor the caller-owned anchor.
         return new PlacementFoundation(origin, sample.state());
+    }
+
+    /**
+     * Computes the exact transformed template bounds without reading or changing world blocks.
+     *
+     * <p>Development tooling uses this for honest previews and then performs a
+     * separate server-side containment check before allowing placement.</p>
+     */
+    public BoundingBox previewBoundingBox(ServerLevel level,
+                                          BlockPos origin,
+                                          Rotation rotation,
+                                          Mirror mirror) {
+        TemplateData data = load(level);
+        if (data == null || !data.hasStructureBlocks()) {
+            return null;
+        }
+        StructurePlaceSettings settings = transformedSettings(rotation, mirror);
+        return data.template().getBoundingBox(settings, origin);
+    }
+
+    /**
+     * Places a template exactly inside caller-owned bounds with no terrain leveling or blending.
+     *
+     * <p>This narrow method exists for bounded Development Studio labs. Normal
+     * worldgen continues to use the terrain-aware placement paths above.</p>
+     */
+    public PlacementResult placeExact(ServerLevel level,
+                                      BlockPos origin,
+                                      Rotation rotation,
+                                      Mirror mirror,
+                                      BoundingBox allowedBounds) {
+        TemplateData data = load(level);
+        if (data == null || !data.hasStructureBlocks() || allowedBounds == null) {
+            return null;
+        }
+        StructurePlaceSettings settings = transformedSettings(rotation, mirror);
+        BoundingBox placementBox = data.template().getBoundingBox(settings, origin);
+        if (!contains(allowedBounds, placementBox)) {
+            return null;
+        }
+        settings.setKnownShape(true)
+                .setBoundingBox(allowedBounds)
+                .setIgnoreEntities(false);
+        for (StructureProcessor processor : extraProcessors) {
+            settings.addProcessor(processor);
+        }
+        try {
+            boolean placed = data.template().placeInWorld(level, origin, origin, settings, level.random, 2);
+            if (!placed) {
+                return null;
+            }
+            AABB bounds = new AABB(
+                    placementBox.minX(), placementBox.minY(), placementBox.minZ(),
+                    placementBox.maxX() + 1.0D, placementBox.maxY() + 1.0D, placementBox.maxZ() + 1.0D
+            );
+            return new PlacementResult(origin, bounds, List.of(),
+                    LargeStructurePlacementOptimizer.computeChunkSlices(origin, data.size()));
+        } catch (Exception exception) {
+            ChunkErrorReporter.reportChunkError("studio placement", level, new ChunkPos(origin), exception);
+            return null;
+        }
+    }
+
+    /** Drops the cached template so the next preview or placement reloads resources. */
+    public void reload(ServerLevel level) {
+        cachedData = null;
+        level.getStructureManager().remove(id);
     }
 
     public List<BlockPos> getCryoOffsets(ServerLevel level) {
@@ -717,6 +786,18 @@ public class NBTStructurePlacer {
                 }
             }
         }
+    }
+
+    private StructurePlaceSettings transformedSettings(Rotation rotation, Mirror mirror) {
+        return new StructurePlaceSettings()
+                .setRotation(rotation == null ? Rotation.NONE : rotation)
+                .setMirror(mirror == null ? Mirror.NONE : mirror);
+    }
+
+    private boolean contains(BoundingBox outer, BoundingBox inner) {
+        return inner.minX() >= outer.minX() && inner.maxX() <= outer.maxX()
+                && inner.minY() >= outer.minY() && inner.maxY() <= outer.maxY()
+                && inner.minZ() >= outer.minZ() && inner.maxZ() <= outer.maxZ();
     }
 
     /**

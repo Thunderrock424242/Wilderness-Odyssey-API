@@ -70,6 +70,19 @@ class DevelopmentStudioResourcesTest {
         );
     }
 
+    @Test
+    void phaseTwoLabFixtureFitsTheRegisteredStructurePad() throws IOException {
+        JsonObject fixture = readJson(
+                "src/main/structure_blueprints/development_studio_lab_fixture.json"
+        );
+        JsonArray size = fixture.getAsJsonArray("size");
+        assertEquals(5, size.get(0).getAsInt());
+        assertEquals(4, size.get(1).getAsInt());
+        assertEquals(5, size.get(2).getAsInt());
+        assertEquals("development_studio_lab_fixture", fixture.get("name").getAsString());
+        assertFalse(fixture.getAsJsonArray("blocks").isEmpty());
+    }
+
     private static JsonObject readJson(String relativePath) throws IOException {
         Path projectRoot = Path.of(System.getProperty(
                 "wildernessodysseyapi.projectDir",

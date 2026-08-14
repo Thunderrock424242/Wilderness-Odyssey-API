@@ -32,6 +32,37 @@ public final class StudioScreen extends Screen {
     private StudioPage page;
     private final StudioLocationsPage locationsPage = new StudioLocationsPage();
     private final StudioInspectorPage inspectorPage = new StudioInspectorPage();
+    private final StudioStructuresPage structuresPage = new StudioStructuresPage();
+    private final StudioEntitiesPage entitiesPage = new StudioEntitiesPage();
+    private final StudioDebugPage debugPage = new StudioDebugPage();
+    private final StudioEnvironmentPage waterPage = new StudioEnvironmentPage(
+            "water",
+            "Water Debug",
+            com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEnvironmentActionPayload.Action.INSPECT_WATER,
+            "water_lab",
+            "The Water Lab is inspection-only in Phase 3: block snapshots never rewrite custom water attachments."
+    );
+    private final StudioEnvironmentPage ecosystemPage = new StudioEnvironmentPage(
+            "ecosystem",
+            "Ecosystem Inspection",
+            com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEnvironmentActionPayload.Action.INSPECT_ECOSYSTEM,
+            "outdoor_test_area",
+            "Inspection is bounded to 32 blocks. Accelerated stepping remains deferred and never changes the global tick rate."
+    );
+    private final StudioEnvironmentPage weatherPage = new StudioEnvironmentPage(
+            "weather",
+            "Weather Testing",
+            com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEnvironmentActionPayload.Action.INSPECT_WEATHER,
+            "outdoor_test_area",
+            "Controls call the real Weather authority over its existing local 3x3-cell scope; no synthetic severe storm is created."
+    );
+    private final StudioEnvironmentPage worldgenPage = new StudioEnvironmentPage(
+            "worldgen",
+            "Worldgen Lab",
+            com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEnvironmentActionPayload.Action.INSPECT_WORLDGEN,
+            "outdoor_test_area",
+            "Inspection never scans or generates distant chunks; safe terrain discovery remains a later phase."
+    );
     private int contentLeft;
     private int contentTop;
     private int contentWidth;
@@ -163,6 +194,27 @@ public final class StudioScreen extends Screen {
         }
         if ("inspector".equals(modulePath)) {
             return inspectorPage;
+        }
+        if ("structures".equals(modulePath)) {
+            return structuresPage;
+        }
+        if ("entities".equals(modulePath)) {
+            return entitiesPage;
+        }
+        if ("debug".equals(modulePath)) {
+            return debugPage;
+        }
+        if ("water".equals(modulePath)) {
+            return waterPage;
+        }
+        if ("ecosystem".equals(modulePath)) {
+            return ecosystemPage;
+        }
+        if ("weather".equals(modulePath)) {
+            return weatherPage;
+        }
+        if ("worldgen".equals(modulePath)) {
+            return worldgenPage;
         }
         ResourceLocation id = ResourceLocation.fromNamespaceAndPath(
                 com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID,

@@ -6,18 +6,16 @@ Wilderness Odyssey Development Studio is a selectable **World Type** for Minecra
 
 It is not a dimension, superflat map, void world, debug generator, or fake simulation. The active level remains `minecraft:overworld`. Outside the bounded Development Campus, the world follows the same terrain, biome, cave, structure, water, ecosystem, weather, entity, and compatible modded-worldgen paths as a normal Wilderness Odyssey world.
 
-Phase 1 establishes a safe foundation. It deliberately does not simulate power, security, weather cells, ecosystem metrics, or other systems that are not exposed by the current gameplay architecture.
+Phases 1-3 provide the world foundation, controlled Structure and Entity Labs, persisted test regions, optional overlays, and real environment adapters. Facility power, keycard/security, dedicated lighting controls, Aether scenarios, performance presets, and other systems without a proven gameplay owner remain explicitly deferred.
 
 ## Repository and version basis
-
-The implementation targets the repository's current platform:
 
 - Minecraft 1.21.1
 - NeoForge 21.1.248
 - Java 21
 - Mod namespace `wildernessodysseyapi`
 
-Minecraft 1.21.1 represents the Create World "World Type" choices with the data-driven `WorldPreset` registry. The Create World UI reads entries in `#minecraft:normal` and resolves their display names through `generator.<namespace>.<path>` translation keys. Development Studio uses that supported path and does not mix into the world-creation screen.
+Minecraft 1.21.1 represents Create World's World Type choices with the data-driven `WorldPreset` registry. The Create World UI reads entries in `#minecraft:normal` and resolves names through `generator.<namespace>.<path>` translations. Development Studio uses that supported path and does not mix into the world-creation screen.
 
 ## World Type registration
 
@@ -34,31 +32,23 @@ Its resources are:
 - `data/minecraft/tags/worldgen/world_preset/normal.json`
 - translation key `generator.wildernessodysseyapi.development_studio`
 
-The normal world-preset tag makes the entry appear in the ordinary World Type cycle as:
-
-```text
-Wilderness Odyssey Development Studio
-```
-
-Minecraft 1.21.1's built-in World Type selector renders a translated name but does not provide a separate description/tooltip field for arbitrary `WorldPreset` records. The Studio's purpose and status are therefore explained by the in-world Studio interface and this document.
+The normal world-preset tag exposes **Wilderness Odyssey Development Studio** in the ordinary World Type cycle. Minecraft 1.21.1's selector supports a translated preset name but no separate arbitrary-preset description field, so the in-world screen and this document explain its purpose.
 
 ## Natural generation contract
 
 The preset's Overworld uses:
 
-- level stem: `minecraft:overworld`
-- chunk generator: `minecraft:noise`
-- biome source: `minecraft:multi_noise`
-- biome-source preset: `minecraft:overworld`
-- noise settings: `wildernessodysseyapi:development_studio`, generated from Minecraft's exact normal Overworld factory
+- level stem `minecraft:overworld`
+- chunk generator `minecraft:noise`
+- biome source `minecraft:multi_noise`
+- biome-source preset `minecraft:overworld`
+- noise settings `wildernessodysseyapi:development_studio`, generated from Minecraft's exact normal Overworld factory
 
 The Nether and End use their standard vanilla stems and generator settings.
 
-This means the Studio preset does not fork Wilderness Odyssey's terrain pipeline. Existing TerraBlender integration, biome modifiers, placed features, structure placement, the custom water attachment/authority pipeline, ecosystem entity controllers, localized weather, mob AI, and compatible mod worldgen see a normal noise-based Overworld and continue through their existing owners.
+The Studio preset does not fork Wilderness Odyssey's terrain pipeline. Existing TerraBlender integration, biome modifiers, features, structures, custom water, ecosystem controllers, localized weather, mob AI, and compatible mod worldgen see a normal noise-based Overworld and continue through their existing owners.
 
-The real dimension type remains `minecraft:overworld`. This is important because Biolith and other compatibility layers use that registry key to recognize an Overworld. An earlier custom-dimension-type marker was rejected during the dedicated Studio-world smoke test and was removed.
-
-Instead, data generation calls Minecraft's own `NoiseGeneratorSettings.overworld(context, false, false)` factory and writes the result under the key `wildernessodysseyapi:development_studio`. The value contains the same normal noise router, surface rules, spawn targets, aquifers, ore veins, sea level, default blocks, and density-function references; only its holder key differs so it can act as a one-time creation marker. It does not create another dimension or another save directory.
+The real dimension type remains `minecraft:overworld`. Data generation calls `NoiseGeneratorSettings.overworld(context, false, false)` and writes the result under the Studio key. The value keeps the normal noise router, surface rules, spawn targets, aquifers, ore veins, sea level, blocks, and density functions; only the holder key differs so it can act as a creation marker. It creates neither a second dimension nor another save directory.
 
 ## Persistent world identity
 
@@ -71,19 +61,21 @@ wildernessodysseyapi_development_studio.dat
 It persists:
 
 - `developmentStudioWorld`
-- Development Campus placement state and template origin
+- campus placement state and exact template origin
 - the world bookmark catalog
+- absolute test-region IDs, dimensions, bounds, types, and reset policies
+- the first validated Structure Lab block baseline
 - a saved-data format version
 
-On the first Overworld load, `StudioWorldAccess` recognizes the vanilla-derived noise-settings holder and writes `developmentStudioWorld = true`. From then on, systems ask `StudioWorldAccess.isDevelopmentStudioWorld(server)`, which reads the persistent world flag. They do not use a dimension ID, teleport destination, name, seed, or generator-class guess.
+On first Overworld load, `StudioWorldAccess` recognizes the vanilla-derived Studio noise-settings holder and writes `developmentStudioWorld = true`. Systems subsequently read the saved flag rather than guessing from a dimension ID, name, seed, or generator class.
 
-Normal worlds do not create Studio saved data merely by loading. Data is created in a normal test world only when an authorized Studio operation is explicitly permitted by server config.
+Saved-data format 2 migrates a format-1 campus by resolving the new region definitions from its already-persisted origin. It never moves or replaces an existing campus during migration. Normal worlds do not create Studio data merely by loading.
 
 ## Access and developer mode
 
-Studio access is server-authoritative. A request is allowed only when both conditions pass:
+Studio access is server-authoritative. Both conditions must pass:
 
-1. The world has the persistent Development Studio flag, or `allowInNormalWorlds` is explicitly enabled in the Development Studio server config.
+1. The world has the persistent Studio flag, or `allowInNormalWorlds` is explicitly enabled in the Studio server config.
 2. The player is the integrated-server owner or has permission level 2.
 
 The server config is generated at:
@@ -92,65 +84,53 @@ The server config is generated at:
 config/wildernessodysseyapi/wildernessodysseyapi-development-studio-server.toml
 ```
 
-`allowInNormalWorlds` defaults to `false`. This provides the planned extension point for an explicitly enabled disposable test world without granting Studio access on production worlds.
-
-Every modifying request rechecks access. The client cannot choose an arbitrary dimension, position, item, entity, block, structure, or region through a packet.
+`allowInNormalWorlds` defaults to `false`. Every request, including read-only refreshes and modifying lab/weather actions, rechecks access.
 
 ## Opening Studio
 
-The primary key is **F8**. It is a configurable key mapping named **Open Development Studio** in Minecraft Controls.
+- Configurable key: **F8**, named **Open Development Studio** in Controls.
+- Command: `/wilderness studio`.
 
-The command entry point is:
-
-```text
-/wilderness studio
-```
-
-F8 sends an empty open request. The server validates the player and world, produces a bounded snapshot, and then asks that client to open the UI. The command follows the same service and access policy.
+Both send an empty/high-level request. The server validates the player and world, produces a bounded snapshot, and asks only that client to open the interface.
 
 ## Modular interface
 
-`StudioScreen` owns navigation and shared layout only. Pages implement `StudioPage`, while categories are registered through `StudioModuleRegistry`.
+`StudioScreen` owns navigation and shared layout. Focused `StudioPage` implementations own individual module presentation, while `StudioModuleRegistry` owns stable module IDs.
 
-Phase 1 categories are:
+Available modules:
 
-- **World** — available; shows persistent world status, seed, campus state, and natural-generation contract.
-- **Locations** — available; manages world bookmarks and campus destinations.
-- **Inspector** — available; displays results produced by the server-owned Developer Tool.
-- **Debug** — foundation; renderer extension registry exists, with no overlays enabled by default.
-- **Structures, Entities, Ecosystem, Weather, Water, Worldgen, Lighting, Power, Security, Aether, Performance, Scenarios** — visible and explicitly deferred.
+- **World** - persistent world status, seed, campus, and natural-generation contract.
+- **Locations** - shared world bookmarks and campus destinations.
+- **Structures** - template selection, rotation/mirror, server-computed previews, exact lab placement, reload, and reset.
+- **Entities** - allowlisted tagged spawning and scoped Entity Lab controls.
+- **Water** - real Water authority, generated spans, bodies, watershed state, and diagnostics.
+- **Ecosystem** - bounded nearby profile/needs inspection and real update-budget state.
+- **Weather** - local atmosphere samples/forecast and bounded clear/rain/snow/hail experiments.
+- **Worldgen** - current loaded chunk, biome, generator, height, and structures-at-position inspection.
+- **Inspector** - server-produced Developer Tool results.
+- **Debug** - independent test-region and structure-preview overlays.
 
-A deferred module does not run a substitute simulation or issue unsafe commands. Later phases can replace its registered metadata/page while retaining the stable module ID.
+Visible but deferred modules are **Lighting, Power, Security, Aether, Performance, and Scenarios**. A deferred module does not run a substitute simulation or issue unsafe commands.
 
 ## Development Campus
 
-The Phase 1 campus is authored as the reviewable StructureGen blueprint:
+The campus is authored as:
 
 ```text
 src/main/structure_blueprints/development_studio_campus.json
 ```
 
-The existing validated StructureGen pipeline compiles it to a standard Minecraft structure template in build output. The structure contains:
+The existing StructureGen pipeline compiles it to standard Minecraft structure NBT. It contains a small hub plus Structure, Water, Entity, and Outdoor pads. These pads are controlled-test locations, not fake subsystem implementations.
 
-- a small Main Studio Hub
-- Structure Lab pad
-- Water Torture Lab pad
-- Entity / Mob Lab pad
-- Outdoor Test Area pad
+`StudioCampusSiteFinder` evaluates a bounded set of positions 40-88 blocks around the real spawn. It samples the complete footprint, rejects fluids and block entities, prefers natural low-slope surfaces, and scores slope before distance. It does not flatten a large area or scan without a bound.
 
-The colored pads are controlled-test placeholders, not fake implementations of later gameplay systems.
+`StudioCampusPlacer` delegates to the existing `NBTStructurePlacer`, terrain-blending, chunk-preparation, and template-loading path. Placement happens once and persists the exact origin. Its lowest-priority spawn hook remains additive to the existing starter-bunker workflow.
 
-`StudioCampusSiteFinder` evaluates a bounded set of positions 40–88 blocks around the real spawn. It samples the complete template footprint, rejects fluids and block entities, prefers natural low-slope Overworld surfaces, and scores slope before distance. It does not scan an unbounded radius or flatten a large region.
+## Campus locations and bookmarks
 
-`StudioCampusPlacer` delegates to the existing `NBTStructurePlacer`, terrain-blending, chunk preparation, and template-loading infrastructure. Placement happens once and persists the exact template origin. An interrupted first creation is retried when a player enters the Studio world.
+`StudioLocationRegistry` stores destinations as stable IDs and template-relative offsets. The server derives absolute coordinates from the saved campus origin.
 
-The current repository also owns an existing starter-bunker spawn workflow. Studio campus placement runs at the lowest spawn-event priority and accepts an already-canceled event so it remains additive to the bunker instead of replacing it.
-
-## Campus locations
-
-`StudioLocationRegistry` stores every destination as a stable ID plus a template-relative offset. No consumer carries scattered absolute coordinates.
-
-Available Phase 1 locations are:
+Current destinations are:
 
 - `wildernessodysseyapi:main_hub`
 - `wildernessodysseyapi:structure_lab`
@@ -158,125 +138,110 @@ Available Phase 1 locations are:
 - `wildernessodysseyapi:entity_lab`
 - `wildernessodysseyapi:outdoor_test_area`
 
-IDs for later labs are reserved but marked unavailable. Teleport requests contain only a registered ID. The server rejects missing/deferred locations and derives the final destination from the persisted campus origin.
+Phase 3 Weather, Ecosystem, and Worldgen pages link to the Outdoor pad rather than claiming dedicated finished buildings exist.
 
-## World bookmarks
-
-Bookmarks belong to the Studio world, not an individual client. A bookmark records:
-
-- UUID
-- name
-- dimension
-- block coordinates
-- yaw and pitch
-- biome at creation time
-- optional notes
-- optional tags
-- server creation time
-
-The seed is already world-level data and is shown in the World module, so it is not duplicated in every bookmark.
-
-The Locations page supports:
-
-- Save Here
-- select/list
-- rename and update notes/tags
-- delete
-- teleport
-
-Names, notes, and tags are sanitized on payload construction and again by saved record construction. Formatting/control characters are removed, length and tag-count limits are enforced, duplicate tags are removed, and packet collection counts are rejected when out of range. The default world maximum is 128 bookmarks and is configurable up to 512.
-
-Bookmark creation ignores client coordinates, dimension, rotation, biome, UUID, and timestamp. The server records those fields from the requesting player. Teleport resolves a stored dimension through the server registry, checks build height and world border, and then performs a server-side cross-dimension teleport.
+Bookmarks are world-shared and store UUID, name, dimension, block position, yaw/pitch, biome, notes, tags, and server creation time. Creation ignores client coordinates, dimension, orientation, biome, UUID, and timestamp. The server supplies those fields. Strings and collection sizes are bounded and sanitized; teleport checks dimension availability, build height, and world border.
 
 ## Developer Tool and Inspector
 
-The **Wilderness Developer Tool** is available in the Tools & Utilities creative tab. It is intentionally not an unrestricted remote inspector:
+The **Wilderness Developer Tool** is available in Tools & Utilities:
 
-- use in air opens the Studio overview;
-- use on a block inspects that server-resolved block;
-- interact with a living entity to inspect that server-resolved entity.
+- use in air opens Studio;
+- use on a block inspects the server-resolved block;
+- interact with a living entity to inspect the server-resolved entity.
 
-The tool first passes the normal Minecraft interaction target to `StudioInspectionRegistry`. The registry selects a compatible `StudioInspectionProvider<T>`, which returns a bounded immutable result.
+`StudioInspectionRegistry` chooses a typed provider and returns bounded immutable rows. Blocks report real registry/state/fluid/block-entity facts. Entities report type, UUID, position, velocity, health, target, navigation, and `NoAI`. Profiled pathfinding mobs additionally report their real ecosystem profile and existing needs state. The inspector does not reflect private goal internals or fabricate AI labels.
 
-The Phase 1 block provider exposes real values:
+## Test regions and reset policy
 
-- registry ID
-- position
-- dimension
-- complete block state
-- fluid state
-- block-entity type and removed state, when present
+`StudioTestRegionRegistry` resolves four small definitions from the persisted campus origin:
 
-The Phase 1 entity provider exposes real values:
+- **Structure Lab** - `BLOCK_SNAPSHOT`, 5x8x5 over the stone-brick pad.
+- **Entity Lab** - `TAGGED_ENTITIES`, 5x7x5 over the red pad.
+- **Water Lab** - `NONE`, inspection-only.
+- **Outdoor Lab** - `NONE`, inspection-only.
 
-- entity type and UUID
-- runtime entity ID
-- position and velocity
-- on-ground state
-- health for living entities
-- target, navigation active/idle state, and `NoAI` state for mobs
+Only the Structure Lab permits block restoration. Before its first placement, the server verifies exact bounds and volume, requires loaded chunks, rejects every vanilla fluid state and `WaterServices`-owned water cell, and captures block states plus optional full block-entity metadata. The baseline is stored once.
 
-The provider does not use fragile reflection to enumerate private goals or fabricate AI labels. Water, ecosystem, security, power, structure, and weather inspection providers are deferred until their actual owners expose safe server-side diagnostics. Water integration must use `WaterServices` or a deliberately added diagnostic API, not internal storage duplication.
+A restore is accepted only when region ID, dimension, min/max bounds, entry count, and reset policy still match. It never manipulates chunk/region files and never claims to restore custom water, ecosystem persistence, or unrelated attachments. Entity reset simply discards Studio-tagged entities still inside the Entity Lab.
+
+## Structure Lab and natural previews
+
+The controlled fixture is:
+
+```text
+src/main/structure_blueprints/development_studio_lab_fixture.json
+```
+
+It is vanilla-only and exactly 5x4x5 so every rotation fits the lab. This internal fixture is the only lab-placeable definition. `test_shelter` and loaded modpack templates are preview-only.
+
+Requests contain a registered template ID, rotation, mirror, and high-level action - never arbitrary bounds or coordinates. Natural **Preview Here** derives an origin eight blocks along the player's look vector. Lab preview/placement derives a centered origin from persisted bounds. `NBTStructurePlacer.placeExact` performs no terrain leveling or blending and refuses a transformed box outside the allowed lab.
+
+The baseline is restored before every lab placement and on Reset. Natural-terrain placement/removal remains intentionally unavailable because a bounding-box preview is safe while general terrain rollback is not.
+
+## Entity Lab
+
+The fixed spawn allowlist contains cow, pig, zombie, and skeleton. Requests are limited to 10 entities and a configurable total lab cap (48 by default). Spawn points are derived inside the saved lab, and every spawn receives `wildernessodysseyapi.studio_test_entity`.
+
+Clear, freeze/unfreeze, and invulnerability actions query the registered lab and affect only entities with that tag. Packets cannot choose arbitrary entity types, positions, targets, NBT, or entity UUIDs.
 
 ## Debug rendering
 
-`StudioDebugRendererRegistry` is the Phase 1 overlay extension point. Each renderer has:
+`StudioDebugRendererRegistry` gives each overlay a stable ID, independent enabled state, render stage, and focused callback. Every renderer defaults off. With none enabled, the level-render event performs one boolean check and returns without collecting data.
 
-- a stable ID
-- an independent enabled state
-- a render stage
-- a focused render callback
+Phase 2 renderers are:
 
-Every renderer defaults off. If no renderer is enabled, the render event performs a single boolean check and returns. No chunk, entity, water, weather, path, or structure data is collected while overlays are disabled.
+- persisted test-region bounds, colored by type;
+- the requesting player's server-computed structure-preview bounds.
 
-No Phase 1 overlay is fabricated. Chunk boundaries, structure bounds, water spans, paths, weather cells, power networks, and campus bounds can be added as focused renderers when their required server/client data path exists.
+Both read only the last authorized Studio snapshot and are disabled on disconnect. They render bounds, not fabricated ghost blocks or inferred world state.
 
-## Test regions, reset, and snapshots
+## Phase 3 environment integrations
 
-Test-region and reset systems are Phase 2 work. The registered campus pads provide stable future locations, but Phase 1 does not expose destructive reset operations.
+All environment inspection uses the server player's current position and returns at most 64 bounded rows.
 
-Region snapshot restoration is deferred. The current water, ecosystem, block-entity, attachment, and chunk persistence systems make blind chunk-file replacement unsafe. No code deletes chunk files, rewrites region files, or claims that a block-only snapshot would restore authoritative subsystem state.
+### Water
 
-## Networking and safety model
+The Water page calls `WaterServices.access()` for ownership, units, surface, depth, current, body metadata, watershed conditions, local flow, and capacity. It reads the current loaded chunk's existing `GENERATED_WATER` attachment without creating one, reporting revision, span count, approximate size, sampled span, and column-top span. It also reports `WatershedSimulationDiagnostics` and `WildernessWaterRules.status`.
 
-Studio's network version is part of the mod's shared payload registration. Client-to-server messages are limited to high-level actions:
+The Water Lab is inspection-only. A block snapshot cannot safely restore canonical water volume or attachments, so Studio does not attempt it.
 
-- request the Studio screen
-- create/update/delete/teleport a bookmark by bounded fields and stored UUID
-- teleport to a registered campus location ID
+### Ecosystem
 
-The client never receives an arbitrary world-edit primitive. Server handlers validate:
+The Ecosystem page inspects at most 128 pathfinding mobs in a 32-block box. It applies the real `SpeciesBehaviorProfileManager`, reports the nearest profiled mob's existing needs attachment when initialized, and exposes the actual `EcosystemServices` update budget. Accelerated simulation is deferred; Studio never changes the global tick rate.
 
-- player type
-- persistent Studio-world flag or explicit normal-test-world config
-- integrated owner or permission level 2
-- action enum
-- bounded strings and collection sizes
-- stored bookmark UUID
-- registered and available campus location
-- target dimension availability
-- target build height and world border
-- per-world bookmark maximum
+### Weather
 
-Inspection targets are obtained from server-side item interactions rather than a client target packet.
+The Weather page samples `WeatherServices.query()` and reports physical fields, derived cloud/storm state, surface memory, atmosphere-cell revision, forecast, and tracked-system count. Clear, rain, snow, and hail call `WeatherAuthority.clearLocalWeather` or `forcePrecipitation`, retaining their existing 3x3-cell scope, persistence, and synchronization. Studio does not manufacture unsupported severe storms, fog, blizzards, or heatwaves.
 
-## Existing architecture integration
+### Worldgen
 
-Phase 1 preserves the current repository owners:
+The Worldgen page reports the current loaded chunk and current block only: seed, chunk/region, status, biome, surface height, sea/build height, generator and biome-source classes, and registered structures valid at the player's position. It never performs a broad synchronous scan or generates distant chunks.
 
-- terrain and biomes: normal noise generator plus existing TerraBlender/Biolith/Lithostitched integration
-- structures: existing template manager, `NBTStructurePlacer`, processors, terrain blending, placement diagnostics, and StructureGen
-- water: existing `WaterServices`, attachments, authority, synchronization, hydrology, SPH, and rendering pipelines
-- ecosystem: existing entity attachments, profile manager, controllers, and `EcosystemServices`
-- weather: existing server `WeatherAuthority`, `WeatherServices`, simulation, sync, and rendering
-- mob AI: vanilla/NeoForge entities plus current ecosystem and Rift entity goals
-- Aether: current chat/fallback story layer only
-- developer diagnostics: existing paged F3 overlay, water/weather debug commands, worldgen scan, placement diagnostics, and verification relay
-- networking: existing NeoForge payload registrar
-- configs: existing validated client/common/server registration path
-- commands: existing `ModCommands` dispatcher composition
+## Networking and safety
 
-The repository does not currently contain a complete facility power network, keycard/security-door system, or dedicated Studio lighting controller. Those modules remain deferred rather than receiving fake replacements.
+The shared payload protocol version is 15. Client-to-server messages expose only:
+
+- open Studio;
+- create/update/delete/teleport a bookmark;
+- teleport to a registered campus ID;
+- preview/place/reset/reload a registered template with rotation/mirror;
+- spawn/control a fixed allowlisted entity in the Entity Lab;
+- inspect one environment owner at the player's current position;
+- request clear/rain/snow/hail through existing Weather authority methods.
+
+Server handlers validate access, enums, string/collection bounds, registered IDs, persisted region ownership/reset policy, exact transformed structure containment, lab-placeable status, fixed entity allowlist, request/total entity caps, tags, containment, and server-owned sample locations. No packet exposes arbitrary world-edit primitives.
+
+## Existing owner boundaries
+
+- Terrain/biomes: normal noise generator and existing compatibility integrations.
+- Structures: template manager, `NBTStructurePlacer`, processors, diagnostics, and StructureGen.
+- Water: `WaterServices`, authority attachments, hydrology, SPH, sync, and rendering.
+- Ecosystem: entity attachments, profile manager, controllers, and `EcosystemServices`.
+- Weather: `WeatherAuthority`, `WeatherServices`, simulation, sync, and rendering.
+- Networking/config/commands: existing NeoForge registrar and repository registration paths.
+
+The repository does not currently expose a complete facility power network, keycard/security-door system, or Studio lighting controller. Those modules remain deferred instead of receiving fake replacements.
 
 ## Build and automated validation
 
@@ -290,64 +255,51 @@ $env:JAVA_HOME='C:\Program Files\Java\jdk-21.0.10'
 .\gradlew.bat build
 ```
 
-`runData` and `generateStructures` are separate invocations by repository design. Refreshing the StructureGen content catalog is useful after changing registry-affecting sources, even though the Phase 1 campus is deliberately vanilla-only.
+`runData` and `generateStructures` are separate repository tasks. Studio tests cover the preset/resources, saved identity/bookmarks/regions/snapshot migration, text sanitation, module states, campus destinations, and controlled-fixture dimensions. StructureGen validates and semantically re-reads all three generated templates.
 
-Automated Phase 1 tests cover:
-
-- data-driven preset structure
-- normal Overworld noise and multi-noise biome delegation
-- generated normal-Overworld noise marker behavior fields
-- Create World normal-preset tag inclusion and display translation
-- saved Studio identity, campus origin, and bookmark round trip
-- text sanitation and tag bounds
-- available/foundation/deferred module states
-- available and reserved campus locations
-- StructureGen blueprint parsing, validation, NBT compilation, and semantic re-read
-
-A dedicated-server smoke test also created a disposable Studio world from the
-`wildernessodysseyapi:development_studio` level preset. The server prepared a
-normal Overworld, TerraBlender and Biolith recognized the Overworld path, and
-the Development Campus placed near spawn. That smoke test does not replace the
-interactive client and reload checks below.
+A prior dedicated-server Phase 1 smoke test created the Studio preset, prepared a normal Overworld, passed TerraBlender/Biolith recognition, and placed the campus. Phases 2-3 still require the live checks below; compilation is not proof of screen, renderer, entity, structure, or localized environment behavior.
 
 ## In-game validation
 
-Automated compilation is not proof of Create World UI, placement, rendering, or reload behavior. Perform this release smoke test:
-
 1. Run `runClient`.
-2. Select **Singleplayer → Create New World → World → World Type**.
+2. Select **Singleplayer -> Create New World -> World -> World Type**.
 3. Confirm **Wilderness Odyssey Development Studio** appears.
-4. Create the world with structures enabled. Creative and cheats are useful but not silently forced.
-5. Confirm the normal starter-bunker workflow still runs if enabled.
-6. Confirm the Development Campus appears only in a limited area near spawn.
-7. Explore beyond it and compare mountains, rivers, oceans, caves, biomes, structures, water, ecosystem behavior, weather, and compatible modded generation with a normal world using the same seed.
+4. Create the world with structures enabled; Creative and cheats are useful but not forced.
+5. Confirm the normal starter-bunker workflow remains additive.
+6. Confirm the campus occupies only a limited natural area near spawn.
+7. Explore beyond it and compare terrain, biomes, caves, structures, water, ecosystems, Weather, and modded generation with a normal same-seed world.
 8. Press F8 and run `/wilderness studio`.
-9. Verify World, Locations, Inspector, and Debug status pages; confirm deferred modules do not modify the world.
-10. Save, rename, retag, teleport to, and delete a bookmark.
-11. Obtain the Wilderness Developer Tool from the creative tab. Inspect a block, block entity, passive mob, and hostile mob.
-12. Teleport to each available campus location.
-13. Quit and reload. Confirm the Studio flag, campus, origin, and bookmarks persist and the campus is not placed twice.
-14. Restart a dedicated development server and repeat command/permission checks with an operator and non-operator.
-15. Create a normal world using the same seed. Confirm Studio access is denied by default, no campus is placed, and natural generation remains unchanged.
+9. Exercise Locations and inspect blocks, block entities, passive mobs, hostile mobs, and a profiled animal.
+10. Preview `test_shelter` eight blocks ahead and enable Structure Preview. Confirm only bounds render.
+11. Preview, rotate/mirror, and place **Studio Lab Fixture** in the Structure Lab. Reset and confirm the stone-brick pad returns.
+12. Spawn Entity Lab cows/zombies; freeze/unfreeze, toggle invulnerability, then Clear. Confirm untagged entities are untouched.
+13. Enable Test Region Bounds and confirm the four campus regions toggle independently from structure preview.
+14. Inspect a natural river/ocean through Water, nearby animals through Ecosystem, current Weather, and a generated chunk through Worldgen.
+15. Use Weather Clear/Rain/Snow/Hail and confirm only the real local atmosphere changes.
+16. Quit/reload and repeat Structure Lab Reset to prove baseline persistence. Confirm campus, bookmarks, and regions are not duplicated.
+17. Restart a dedicated server and repeat operator/non-operator checks.
+18. Create a normal same-seed world. Confirm Studio is denied by default and no campus is placed.
 
 ## Current limitations
 
-- No custom World Type tooltip exists because the 1.21.1 selector exposes only a translated preset name.
-- The campus is a functional Phase 1 hub and four controlled-test pads, not final art.
-- Campus placement samples a bounded candidate set and can decline placement in an exceptionally hostile spawn region; login retry remains safe but uses the same bounds.
-- F8 does not automatically enable cheats, Creative mode, or unrelated gamerules.
-- Bookmarks are world-shared and operator-authorized; per-developer ownership/filtering is not implemented.
-- The Inspector intentionally exposes a conservative subset of entity and block-entity state.
-- Debug renderer architecture exists, but Phase 1 supplies no active overlay.
-- Test regions, reset, structure preview/place/remove, water diagnostics, environmental controls, stress presets, scenarios, and safe snapshots are deferred.
-- Third-party mods that compare the noise-settings holder key instead of the real Overworld dimension key or generator behavior remain a compatibility risk; the bundled Biolith/TerraBlender path is part of the dedicated Studio-world smoke test.
+- The 1.21.1 World Type selector has no custom tooltip field.
+- The campus is functional controlled-test infrastructure, not final art or dedicated Phase 3 buildings.
+- Campus site search is bounded and may decline an exceptionally hostile spawn region.
+- F8 does not enable cheats, Creative, or unrelated gamerules.
+- Bookmarks are world-shared and operator-authorized, not per-developer.
+- Overlays draw bounds only; ghost blocks, intersection heat maps, water spans, paths, and weather cells remain future work.
+- Only the internal fixture may be placed. Natural and modpack templates remain preview-only.
+- Block snapshot restoration is deliberately fluid-free and Structure-Lab-only. General chunk, Water, and ecosystem snapshots are not implemented.
+- The Water Torture Lab is an inspection destination, not yet a reproducible multi-chunk scenario library.
+- Ecosystem stepping, terrain discovery, broad structure location, and controlled nearby chunk generation remain deferred.
+- Weather controls expose only real supported authority actions: clear, rain, snow, and hail.
+- Facility systems, stress presets, scenarios, and Aether event controls remain deferred.
+- Third-party mods that compare the noise-settings holder key instead of actual Overworld dimension/generator behavior remain a compatibility risk.
 
-## Recommended Phase 2
+## Recommended next phase
 
-1. Add a persisted `StudioTestRegion` registry for the four Phase 1 pads, including type and reset-policy metadata.
-2. Implement a Structure Lab service around registered structure templates with bounded rotation/mirror/offset requests and bounding-box preview first.
-3. Add a safe block/entity reset abstraction scoped to registered test regions; do not manipulate chunk files.
-4. Add an Entity Lab controller that tags Studio-spawned test entities and limits freeze/AI/invulnerability/clear operations to those tagged entities within the lab.
-5. Implement independent campus/structure/test-region bounding-box renderers, all default off.
-6. Add GameTests for access denial, bookmark server ownership, location-ID validation, campus one-time placement, and normal-world no-op behavior.
-7. Only after those boundaries are proven, begin Phase 3 with read-only water, ecosystem, weather, and worldgen inspection adapters that use their existing public owners.
+1. Audit real Power, Security, and Lighting owners before exposing any facility controls.
+2. Add dedicated Weather, Ecosystem, and Worldgen campus buildings without changing subsystem authority.
+3. Add server GameTests for access denial, structure containment, tagged-entity scoping, one-time campus placement, and normal-world no-op behavior.
+4. Add a Water-owned reproducible torture-lab/reset API only if it can restore canonical volume and attachments safely.
+5. Add independent bounded water-span and atmosphere-cell overlays using synchronized diagnostic data.
