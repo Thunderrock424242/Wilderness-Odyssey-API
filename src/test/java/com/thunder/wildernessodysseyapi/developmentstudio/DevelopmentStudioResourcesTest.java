@@ -83,6 +83,21 @@ class DevelopmentStudioResourcesTest {
         assertFalse(fixture.getAsJsonArray("blocks").isEmpty());
     }
 
+    @Test
+    void campusBlueprintIsAnOperationalMultiFacilitySite() throws IOException {
+        JsonObject campus = readJson(
+                "src/main/structure_blueprints/development_studio_campus.json"
+        );
+        JsonArray size = campus.getAsJsonArray("size");
+        assertEquals(65, size.get(0).getAsInt());
+        assertEquals(15, size.get(1).getAsInt());
+        assertEquals(65, size.get(2).getAsInt());
+        assertEquals("2", campus.getAsJsonObject("metadata").get("campusVersion").getAsString());
+        assertTrue(campus.getAsJsonArray("blocks").size() > 20_000);
+        assertTrue(campus.getAsJsonArray("markers").asList().stream()
+                .anyMatch(marker -> "campus_v2".equals(marker.getAsString())));
+    }
+
     private static JsonObject readJson(String relativePath) throws IOException {
         Path projectRoot = Path.of(System.getProperty(
                 "wildernessodysseyapi.projectDir",

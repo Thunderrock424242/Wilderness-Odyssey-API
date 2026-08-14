@@ -61,7 +61,7 @@ wildernessodysseyapi_development_studio.dat
 It persists:
 
 - `developmentStudioWorld`
-- campus placement state and exact template origin
+- campus placement state, exact template origin, and layout version
 - the world bookmark catalog
 - absolute test-region IDs, dimensions, bounds, types, and reset policies
 - the first validated Structure Lab block baseline
@@ -69,7 +69,7 @@ It persists:
 
 On first Overworld load, `StudioWorldAccess` recognizes the vanilla-derived Studio noise-settings holder and writes `developmentStudioWorld = true`. Systems subsequently read the saved flag rather than guessing from a dimension ID, name, seed, or generator class.
 
-Saved-data format 2 migrates a format-1 campus by resolving the new region definitions from its already-persisted origin. It never moves or replaces an existing campus during migration. Normal worlds do not create Studio data merely by loading.
+Saved-data format 3 recognizes earlier 21x21 campuses as layout version 1. It does not destructively expand them merely because a world loaded. The World page offers an explicit **Upgrade legacy campus to 65x65 facility** action, explains the footprint, and commits the new origin/version only after placement succeeds. Normal worlds do not create Studio data merely by loading.
 
 ## Access and developer mode
 
@@ -95,7 +95,7 @@ Both send an empty/high-level request. The server validates the player and world
 
 ## Modular interface
 
-`StudioScreen` owns navigation and shared layout. Focused `StudioPage` implementations own individual module presentation, while `StudioModuleRegistry` owns stable module IDs.
+`StudioScreen` owns navigation and shared layout. Its primary navigation is a compact left sidebar containing implemented modules only, leaving the full-height content panel available at ordinary GUI scales. Deferred roadmap entries are summarized instead of consuming a 4x4 button grid. Focused `StudioPage` implementations own individual module presentation, while `StudioModuleRegistry` owns stable module IDs. Locations separates Campus and Regression Bookmarks into two views so bookmark controls do not collide with facility navigation.
 
 Available modules:
 
@@ -120,11 +120,25 @@ The campus is authored as:
 src/main/structure_blueprints/development_studio_campus.json
 ```
 
-The existing StructureGen pipeline compiles it to standard Minecraft structure NBT. It contains a small hub plus Structure, Water, Entity, and Outdoor pads. These pads are controlled-test locations, not fake subsystem implementations.
+The existing StructureGen pipeline compiles it to standard Minecraft structure NBT. Campus layout version 2 is a 65x15x65 bounded research complex with 10,220 occupied blocks and distinct visual identities for:
+
+- the central Operations Hub;
+- the high-bay Structure Hangar;
+- the enclosed Entity Arena and observation booth;
+- the dry three-lane Water Torture Lab;
+- the Ecosystem Greenhouse;
+- the Weather Station and instrument mast;
+- the Worldgen Observatory;
+- the fenced Outdoor Test Range;
+- a sealed Future Systems Wing for the real later-phase owners.
+
+The dry Water channels, sample plinths, greenhouse beds, and reserved systems wing are physical testing infrastructure only. They do not replace or pretend to implement their gameplay systems.
 
 `StudioCampusSiteFinder` evaluates a bounded set of positions 40-88 blocks around the real spawn. It samples the complete footprint, rejects fluids and block entities, prefers natural low-slope surfaces, and scores slope before distance. It does not flatten a large area or scan without a bound.
 
-`StudioCampusPlacer` delegates to the existing `NBTStructurePlacer`, terrain-blending, chunk-preparation, and template-loading path. Placement happens once and persists the exact origin. Its lowest-priority spawn hook remains additive to the existing starter-bunker workflow.
+`StudioCampusPlacer` delegates to the existing `NBTStructurePlacer`, terrain-blending, chunk-preparation, and template-loading path. The template uses elevated floors, perimeter foundations, and service-path supports so a low-slope natural site does not need to become one giant flattened platform. New placement happens once and persists the exact origin and version. Its lowest-priority spawn hook remains additive to the existing starter-bunker workflow.
+
+For a version-1 campus, the explicit upgrade preserves the old hub's world-space center and floor while expanding around it. The operation clears the obsolete Structure Lab baseline, removes only Studio-tagged entities in the old Entity Lab, resolves new test-region bounds, and updates the origin after successful template placement. Facility teleports remain disabled until that upgrade is accepted because version-2 offsets would not be safe against the old scaffold.
 
 ## Campus locations and bookmarks
 
@@ -137,8 +151,11 @@ Current destinations are:
 - `wildernessodysseyapi:water_lab`
 - `wildernessodysseyapi:entity_lab`
 - `wildernessodysseyapi:outdoor_test_area`
+- `wildernessodysseyapi:ecosystem_lab`
+- `wildernessodysseyapi:weather_lab`
+- `wildernessodysseyapi:worldgen_lab`
 
-Phase 3 Weather, Ecosystem, and Worldgen pages link to the Outdoor pad rather than claiming dedicated finished buildings exist.
+Phase 3 Environment pages now link to their matching physical facility. These destinations remain inspection/control surfaces over the real Water, Ecosystem, Weather, and Worldgen owners.
 
 Bookmarks are world-shared and store UUID, name, dimension, block position, yaw/pitch, biome, notes, tags, and server creation time. Creation ignores client coordinates, dimension, orientation, biome, UUID, and timestamp. The server supplies those fields. Strings and collection sizes are bounded and sanitized; teleport checks dimension availability, build height, and world border.
 
@@ -154,12 +171,12 @@ The **Wilderness Developer Tool** is available in Tools & Utilities:
 
 ## Test regions and reset policy
 
-`StudioTestRegionRegistry` resolves four small definitions from the persisted campus origin:
+`StudioTestRegionRegistry` resolves four bounded operational definitions from the persisted campus origin:
 
-- **Structure Lab** - `BLOCK_SNAPSHOT`, 5x8x5 over the stone-brick pad.
-- **Entity Lab** - `TAGGED_ENTITIES`, 5x7x5 over the red pad.
-- **Water Lab** - `NONE`, inspection-only.
-- **Outdoor Lab** - `NONE`, inspection-only.
+- **Structure Lab** - `BLOCK_SNAPSHOT`, 14x7x13 inside the high-bay hangar.
+- **Entity Lab** - `TAGGED_ENTITIES`, 15x5x11 inside the arena.
+- **Water Torture Lab** - `NONE`, 13x7x13 around the dry channels and inspection floor.
+- **Outdoor Test Range** - `NONE`, 15x7x14 inside the fenced range.
 
 Only the Structure Lab permits block restoration. Before its first placement, the server verifies exact bounds and volume, requires loaded chunks, rejects every vanilla fluid state and `WaterServices`-owned water cell, and captures block states plus optional full block-entity metadata. The baseline is stored once.
 
@@ -220,17 +237,18 @@ The Worldgen page reports the current loaded chunk and current block only: seed,
 
 ## Networking and safety
 
-The shared payload protocol version is 15. Client-to-server messages expose only:
+The shared payload protocol version is 16. Client-to-server messages expose only:
 
 - open Studio;
 - create/update/delete/teleport a bookmark;
 - teleport to a registered campus ID;
+- explicitly upgrade a saved legacy campus after the Studio displays its 65x65 footprint warning;
 - preview/place/reset/reload a registered template with rotation/mirror;
 - spawn/control a fixed allowlisted entity in the Entity Lab;
 - inspect one environment owner at the player's current position;
 - request clear/rain/snow/hail through existing Weather authority methods.
 
-Server handlers validate access, enums, string/collection bounds, registered IDs, persisted region ownership/reset policy, exact transformed structure containment, lab-placeable status, fixed entity allowlist, request/total entity caps, tags, containment, and server-owned sample locations. No packet exposes arbitrary world-edit primitives.
+Server handlers validate access, campus version, enums, string/collection bounds, registered IDs, persisted region ownership/reset policy, exact transformed structure containment, lab-placeable status, fixed entity allowlist, request/total entity caps, tags, containment, and server-owned sample locations. No packet exposes arbitrary world-edit primitives or accepts an upgrade origin from the client.
 
 ## Existing owner boundaries
 
@@ -255,7 +273,7 @@ $env:JAVA_HOME='C:\Program Files\Java\jdk-21.0.10'
 .\gradlew.bat build
 ```
 
-`runData` and `generateStructures` are separate repository tasks. Studio tests cover the preset/resources, saved identity/bookmarks/regions/snapshot migration, text sanitation, module states, campus destinations, and controlled-fixture dimensions. StructureGen validates and semantically re-reads all three generated templates.
+`runData` and `generateStructures` are separate repository tasks. Studio tests cover the preset/resources, saved identity/bookmarks/regions/snapshot migration, text sanitation, module states, campus destinations, and controlled-fixture dimensions. StructureGen validates and semantically re-reads all three generated templates. The current campus compiles as 65x15x65 with 21,709 stored records, 11,489 intentional air records, 10,220 occupied blocks, 45 vanilla block types, no block entities, and no entities.
 
 A prior dedicated-server Phase 1 smoke test created the Studio preset, prepared a normal Overworld, passed TerraBlender/Biolith recognition, and placed the campus. Phases 2-3 still require the live checks below; compilation is not proof of screen, renderer, entity, structure, or localized environment behavior.
 
@@ -266,24 +284,25 @@ A prior dedicated-server Phase 1 smoke test created the Studio preset, prepared 
 3. Confirm **Wilderness Odyssey Development Studio** appears.
 4. Create the world with structures enabled; Creative and cheats are useful but not forced.
 5. Confirm the normal starter-bunker workflow remains additive.
-6. Confirm the campus occupies only a limited natural area near spawn.
+6. Confirm the 65x65 campus occupies only a limited natural area near spawn and that its raised foundations meet the selected low-slope terrain without flattening the surrounding wilderness.
 7. Explore beyond it and compare terrain, biomes, caves, structures, water, ecosystems, Weather, and modded generation with a normal same-seed world.
-8. Press F8 and run `/wilderness studio`.
-9. Exercise Locations and inspect blocks, block entities, passive mobs, hostile mobs, and a profiled animal.
+8. Press F8 and run `/wilderness studio`. Confirm implemented modules appear in a left sidebar, deferred modules no longer consume navigation buttons, and the content panel stays fully visible at the configured GUI scale.
+9. Exercise Locations' separate Campus and Regression Bookmarks views, visit all eight operational destinations, and inspect blocks, block entities, passive mobs, hostile mobs, and a profiled animal.
 10. Preview `test_shelter` eight blocks ahead and enable Structure Preview. Confirm only bounds render.
 11. Preview, rotate/mirror, and place **Studio Lab Fixture** in the Structure Lab. Reset and confirm the stone-brick pad returns.
 12. Spawn Entity Lab cows/zombies; freeze/unfreeze, toggle invulnerability, then Clear. Confirm untagged entities are untouched.
 13. Enable Test Region Bounds and confirm the four campus regions toggle independently from structure preview.
 14. Inspect a natural river/ocean through Water, nearby animals through Ecosystem, current Weather, and a generated chunk through Worldgen.
 15. Use Weather Clear/Rain/Snow/Hail and confirm only the real local atmosphere changes.
-16. Quit/reload and repeat Structure Lab Reset to prove baseline persistence. Confirm campus, bookmarks, and regions are not duplicated.
-17. Restart a dedicated server and repeat operator/non-operator checks.
-18. Create a normal same-seed world. Confirm Studio is denied by default and no campus is placed.
+16. For an older Studio save, open World, read the footprint warning, move anything valuable out of the future 65x65 footprint, and approve the campus upgrade. Confirm the hub center remains fixed, the old colored pads are replaced, and facility teleporting becomes available.
+17. Quit/reload and repeat Structure Lab Reset to prove baseline persistence. Confirm campus, bookmarks, regions, and campus upgrades are not duplicated.
+18. Restart a dedicated server and repeat operator/non-operator checks.
+19. Create a normal same-seed world. Confirm Studio is denied by default and no campus is placed.
 
 ## Current limitations
 
 - The 1.21.1 World Type selector has no custom tooltip field.
-- The campus is functional controlled-test infrastructure, not final art or dedicated Phase 3 buildings.
+- A legacy-campus upgrade intentionally replaces the mod-owned 65x65 area around the old hub. It is never automatic; move player-built work outside that footprint before approving it.
 - Campus site search is bounded and may decline an exceptionally hostile spawn region.
 - F8 does not enable cheats, Creative, or unrelated gamerules.
 - Bookmarks are world-shared and operator-authorized, not per-developer.
@@ -299,7 +318,7 @@ A prior dedicated-server Phase 1 smoke test created the Studio preset, prepared 
 ## Recommended next phase
 
 1. Audit real Power, Security, and Lighting owners before exposing any facility controls.
-2. Add dedicated Weather, Ecosystem, and Worldgen campus buildings without changing subsystem authority.
-3. Add server GameTests for access denial, structure containment, tagged-entity scoping, one-time campus placement, and normal-world no-op behavior.
-4. Add a Water-owned reproducible torture-lab/reset API only if it can restore canonical volume and attachments safely.
-5. Add independent bounded water-span and atmosphere-cell overlays using synchronized diagnostic data.
+2. Add server GameTests for access denial, structure containment, tagged-entity scoping, one-time/versioned campus placement, and normal-world no-op behavior.
+3. Add a Water-owned reproducible torture-lab/reset API only if it can restore canonical volume and attachments safely.
+4. Add independent bounded water-span and atmosphere-cell overlays using synchronized diagnostic data.
+5. Add signs, control consoles, and richer facility dressing only through verified vanilla or real subsystem-owned blocks.

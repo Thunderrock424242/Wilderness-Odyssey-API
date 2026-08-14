@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.developmentstudio.client.StudioClientSta
 import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioRequestPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioBookmarkActionPayload;
+import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioCampusUpgradePayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioLocationTeleportPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioStructureActionPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEntityActionPayload;
@@ -44,7 +45,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModPayloads {
 
-    private static final String NETWORK_VERSION = "15";
+    private static final String NETWORK_VERSION = "16";
 
     private ModPayloads() {
     }
@@ -98,6 +99,12 @@ public final class ModPayloads {
                 context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer serverPlayer) {
                         StudioServerService.handleBookmarkAction(serverPlayer, payload);
+                    }
+                }));
+        registrar.playToServer(StudioCampusUpgradePayload.TYPE, StudioCampusUpgradePayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer serverPlayer) {
+                        StudioServerService.handleCampusUpgrade(serverPlayer, payload);
                     }
                 }));
         registrar.playToServer(StudioLocationTeleportPayload.TYPE, StudioLocationTeleportPayload.STREAM_CODEC, (payload, context) ->

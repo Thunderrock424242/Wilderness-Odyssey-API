@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.developmentstudio;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.developmentstudio.bookmark.StudioBookmark;
+import com.thunder.wildernessodysseyapi.developmentstudio.campus.StudioCampusLayout;
 import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioRegionBlockSnapshot;
 import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioTestRegion;
 import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioTestRegionRegistry;
@@ -28,7 +29,7 @@ import java.util.UUID;
  * this data on first load.</p>
  */
 public final class StudioWorldData extends SavedData {
-    public static final int FORMAT_VERSION = 2;
+    public static final int FORMAT_VERSION = 3;
     public static final String DATA_NAME = ModConstants.MOD_ID + "_development_studio";
     public static final SavedData.Factory<StudioWorldData> FACTORY = new SavedData.Factory<>(
             StudioWorldData::new,
@@ -37,6 +38,7 @@ public final class StudioWorldData extends SavedData {
 
     private boolean developmentStudioWorld;
     private boolean campusPlaced;
+    private int campusVersion;
     private BlockPos campusOrigin;
     private final List<StudioBookmark> bookmarks = new ArrayList<>();
     private final List<StudioTestRegion> testRegions = new ArrayList<>();
@@ -70,6 +72,15 @@ public final class StudioWorldData extends SavedData {
 
         data.developmentStudioWorld = tag.getBoolean("development_studio_world");
         data.campusPlaced = tag.getBoolean("campus_placed");
+        data.campusVersion = tag.contains("campus_version", Tag.TAG_INT)
+                ? tag.getInt("campus_version")
+                : (data.campusPlaced ? StudioCampusLayout.LEGACY_VERSION : 0);
+        if (data.campusPlaced && data.campusVersion <= 0) {
+            data.campusVersion = StudioCampusLayout.LEGACY_VERSION;
+        }
+        if (data.campusVersion < 0 || data.campusVersion > StudioCampusLayout.CURRENT_VERSION) {
+            throw new IllegalArgumentException("Unsupported Development Campus version: " + data.campusVersion);
+        }
         if (tag.contains("campus_origin", Tag.TAG_LONG)) {
             data.campusOrigin = BlockPos.of(tag.getLong("campus_origin"));
         }
@@ -104,6 +115,7 @@ public final class StudioWorldData extends SavedData {
         tag.putInt("format_version", FORMAT_VERSION);
         tag.putBoolean("development_studio_world", developmentStudioWorld);
         tag.putBoolean("campus_placed", campusPlaced);
+        tag.putInt("campus_version", campusVersion);
         if (campusOrigin != null) {
             tag.putLong("campus_origin", campusOrigin.asLong());
         }
@@ -140,9 +152,26 @@ public final class StudioWorldData extends SavedData {
         return Optional.ofNullable(campusOrigin);
     }
 
+    public int campusVersion() {
+        return campusVersion;
+    }
+
+    public boolean needsCampusUpgrade() {
+        return isCampusPlaced() && campusVersion < StudioCampusLayout.CURRENT_VERSION;
+    }
+
     /** Records the one-time template placement origin used by registered locations. */
     public void markCampusPlaced(BlockPos origin) {
+        markCampusPlaced(origin, StudioCampusLayout.CURRENT_VERSION);
+    }
+
+    /** Records a successful versioned placement and rebuilds all relative safety bounds. */
+    public void markCampusPlaced(BlockPos origin, int version) {
+        if (version <= 0 || version > StudioCampusLayout.CURRENT_VERSION) {
+            throw new IllegalArgumentException("Invalid Development Campus version: " + version);
+        }
         campusPlaced = true;
+        campusVersion = version;
         campusOrigin = origin == null ? null : origin.immutable();
         testRegions.clear();
         regionSnapshots.clear();

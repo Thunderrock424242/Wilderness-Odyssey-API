@@ -65,6 +65,13 @@ public final class StudioEntityService {
         return taggedEntities(level, region).size();
     }
 
+    /** Removes only Studio-owned tagged entities inside an explicitly supplied persisted region. */
+    public static int discardTaggedEntities(ServerLevel level, StudioTestRegion region) {
+        List<Entity> entities = taggedEntities(level, region);
+        entities.forEach(Entity::discard);
+        return entities.size();
+    }
+
     private static void spawn(ServerPlayer player,
                               ServerLevel level,
                               StudioTestRegion region,

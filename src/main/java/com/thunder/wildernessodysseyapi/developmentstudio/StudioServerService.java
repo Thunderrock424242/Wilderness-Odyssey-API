@@ -3,12 +3,14 @@ package com.thunder.wildernessodysseyapi.developmentstudio;
 import com.thunder.wildernessodysseyapi.developmentstudio.bookmark.StudioBookmark;
 import com.thunder.wildernessodysseyapi.developmentstudio.campus.StudioLocationDefinition;
 import com.thunder.wildernessodysseyapi.developmentstudio.campus.StudioLocationRegistry;
+import com.thunder.wildernessodysseyapi.developmentstudio.campus.StudioCampusPlacer;
 import com.thunder.wildernessodysseyapi.developmentstudio.config.StudioConfig;
 import com.thunder.wildernessodysseyapi.developmentstudio.entity.StudioEntityRegistry;
 import com.thunder.wildernessodysseyapi.developmentstudio.entity.StudioEntityService;
 import com.thunder.wildernessodysseyapi.developmentstudio.inspection.StudioInspection;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioBookmarkActionPayload;
+import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioCampusUpgradePayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioTestRegion;
 import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioTestRegionRegistry;
 import com.thunder.wildernessodysseyapi.developmentstudio.structure.StudioStructureRegistry;
@@ -64,6 +66,24 @@ public final class StudioServerService {
         open(player, "locations", null);
     }
 
+    /** Performs the explicitly requested destructive expansion of a legacy mod-owned campus. */
+    public static void handleCampusUpgrade(ServerPlayer player, StudioCampusUpgradePayload payload) {
+        if (!authorize(player)) {
+            return;
+        }
+        StudioWorldData data = StudioWorldData.getOrCreate(player.getServer());
+        if (!data.needsCampusUpgrade()) {
+            player.displayClientMessage(Component.literal("The Development Campus is already current."), false);
+            open(player, "world", null);
+            return;
+        }
+        boolean upgraded = StudioCampusPlacer.upgradeLegacyCampus(player.getServer().overworld(), data);
+        player.displayClientMessage(Component.literal(upgraded
+                ? "Development Campus upgraded to the 65x65 operational facility."
+                : "Development Campus upgrade failed; its saved origin and version were left unchanged."), false);
+        open(player, "world", null);
+    }
+
     /** Teleports only to a registered, available campus location. */
     public static void teleportToCampusLocation(ServerPlayer player, ResourceLocation locationId) {
         if (!authorize(player)) {
@@ -79,6 +99,12 @@ public final class StudioServerService {
         }
 
         StudioWorldData data = StudioWorldData.getOrCreate(player.getServer());
+        if (data.needsCampusUpgrade()) {
+            player.displayClientMessage(Component.literal(
+                    "Upgrade the legacy Development Campus from the World page before using facility teleports."
+            ), false);
+            return;
+        }
         Optional<BlockPos> campusOrigin = data.campusOrigin();
         if (campusOrigin.isEmpty()) {
             player.displayClientMessage(Component.translatable(
@@ -113,6 +139,7 @@ public final class StudioServerService {
                 data.isDevelopmentStudioWorld(),
                 server.getWorldData().worldGenOptions().seed(),
                 data.campusOrigin().orElse(null),
+                data.campusVersion(),
                 data.bookmarks(),
                 data.testRegions(),
                 StudioStructureRegistry.options(overworld),

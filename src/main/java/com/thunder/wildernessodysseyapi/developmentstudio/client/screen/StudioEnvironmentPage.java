@@ -111,7 +111,7 @@ final class StudioEnvironmentPage implements StudioPage {
         if (campusLocation == null) {
             return;
         }
-        screen.addStudioWidget(Button.builder(Component.literal("Go to Campus Pad"), ignored ->
+        screen.addStudioWidget(Button.builder(Component.literal("Go to Facility"), ignored ->
                 PacketDistributor.sendToServer(new StudioLocationTeleportPayload(campusLocation))
         ).bounds(x, y, width, 20).build());
     }

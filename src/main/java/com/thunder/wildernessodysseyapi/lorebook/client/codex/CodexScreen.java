@@ -17,6 +17,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import static com.thunder.wildernessodysseyapi.lorebook.client.codex.CodexLayout.BOOK_HEIGHT;
+import static com.thunder.wildernessodysseyapi.lorebook.client.codex.CodexLayout.BOOK_WIDTH;
+import static com.thunder.wildernessodysseyapi.lorebook.client.codex.CodexLayout.LEFT_PAGE_X;
+import static com.thunder.wildernessodysseyapi.lorebook.client.codex.CodexLayout.PAGE_HEIGHT;
+import static com.thunder.wildernessodysseyapi.lorebook.client.codex.CodexLayout.PAGE_TOP;
+import static com.thunder.wildernessodysseyapi.lorebook.client.codex.CodexLayout.PAGE_WIDTH;
+import static com.thunder.wildernessodysseyapi.lorebook.client.codex.CodexLayout.RIGHT_PAGE_X;
+import static com.thunder.wildernessodysseyapi.lorebook.client.codex.CodexLayout.TAB_HEIGHT;
+import static com.thunder.wildernessodysseyapi.lorebook.client.codex.CodexLayout.TAB_WIDTH;
+
 /**
  * Presents the Field Codex as a starter guide, writable journal, and lore library.
  *
@@ -25,13 +35,6 @@ import java.util.Locale;
  * server confirms that the player recovered their physical journal.</p>
  */
 public class CodexScreen extends Screen {
-    private static final int BOOK_WIDTH = 404;
-    private static final int BOOK_HEIGHT = 236;
-    private static final int PAGE_WIDTH = 164;
-    private static final int PAGE_HEIGHT = 188;
-    private static final int PAGE_TOP = 34;
-    private static final int LEFT_PAGE_X = 34;
-    private static final int RIGHT_PAGE_X = 207;
     private static final int INK = 0xFF2A2118;
     private static final int FADED_INK = 0xFF6B5644;
     private static final int WARNING_INK = 0xFF7D1E18;
@@ -39,8 +42,6 @@ public class CodexScreen extends Screen {
     private static final int PAPER_DARK = 0xFFD0B787;
     private static final int LEATHER = 0xFF4A251C;
     private static final int LEATHER_DARK = 0xFF24100D;
-    private static final int TAB_WIDTH = 68;
-    private static final int TAB_HEIGHT = 24;
 
     private CodexView selectedView = CodexView.GUIDE;
     private MultiLineEditBox journalEditor;
@@ -89,8 +90,6 @@ public class CodexScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(graphics, mouseX, mouseY, partialTick);
-
         int bookX = bookX();
         int bookY = bookY();
         renderBook(graphics, bookX, bookY);
@@ -112,20 +111,19 @@ public class CodexScreen extends Screen {
         graphics.fill(bookX, bookY, bookX + BOOK_WIDTH, bookY + BOOK_HEIGHT, LEATHER_DARK);
         graphics.fill(bookX + 6, bookY + 6, bookX + BOOK_WIDTH - 6, bookY + BOOK_HEIGHT - 6, LEATHER);
         graphics.fill(bookX + 17, bookY + 20, bookX + BOOK_WIDTH - 17, bookY + BOOK_HEIGHT - 14, 0xFFB38453);
-        graphics.fill(bookX + 24, bookY + 24, bookX + 197, bookY + BOOK_HEIGHT - 18, PAPER_DARK);
-        graphics.fill(bookX + 29, bookY + 29, bookX + 191, bookY + BOOK_HEIGHT - 23, PAPER);
-        graphics.fill(bookX + 213, bookY + 24, bookX + BOOK_WIDTH - 24, bookY + BOOK_HEIGHT - 18, PAPER_DARK);
-        graphics.fill(bookX + 218, bookY + 29, bookX + BOOK_WIDTH - 29, bookY + BOOK_HEIGHT - 23, PAPER);
-        graphics.fill(bookX + 198, bookY + 16, bookX + 206, bookY + BOOK_HEIGHT - 10, 0xFF2E1713);
-        graphics.fill(bookX + 201, bookY + 18, bookX + 203, bookY + BOOK_HEIGHT - 12, 0xFF6D3C2C);
+        graphics.fill(bookX + 24, bookY + 24, bookX + 191, bookY + BOOK_HEIGHT - 18, PAPER_DARK);
+        graphics.fill(bookX + 29, bookY + 29, bookX + 186, bookY + BOOK_HEIGHT - 23, PAPER);
+        graphics.fill(bookX + 197, bookY + 24, bookX + BOOK_WIDTH - 24, bookY + BOOK_HEIGHT - 18, PAPER_DARK);
+        graphics.fill(bookX + 202, bookY + 29, bookX + BOOK_WIDTH - 29, bookY + BOOK_HEIGHT - 23, PAPER);
+        graphics.fill(bookX + 190, bookY + 16, bookX + 198, bookY + BOOK_HEIGHT - 10, 0xFF2E1713);
+        graphics.fill(bookX + 193, bookY + 18, bookX + 195, bookY + BOOK_HEIGHT - 12, 0xFF6D3C2C);
     }
 
     private void renderTabs(GuiGraphics graphics, int bookX, int bookY, int mouseX, int mouseY) {
-        int tabX = bookX + BOOK_WIDTH - 3;
-        int tabY = bookY + 40;
-        drawTab(graphics, "Guide", CodexView.GUIDE, tabX, tabY, mouseX, mouseY);
-        drawTab(graphics, "Journal", CodexView.JOURNAL, tabX, tabY + 31, mouseX, mouseY);
-        drawTab(graphics, "Lore", CodexView.LORE, tabX, tabY + 62, mouseX, mouseY);
+        int tabY = CodexLayout.tabY(bookY);
+        drawTab(graphics, "Guide", CodexView.GUIDE, CodexLayout.tabX(bookX, 0), tabY, mouseX, mouseY);
+        drawTab(graphics, "Journal", CodexView.JOURNAL, CodexLayout.tabX(bookX, 1), tabY, mouseX, mouseY);
+        drawTab(graphics, "Lore", CodexView.LORE, CodexLayout.tabX(bookX, 2), tabY, mouseX, mouseY);
     }
 
     // The guide is deliberately short and always available. It explains only
@@ -138,16 +136,16 @@ public class CodexScreen extends Screen {
 
         renderPageHeading(graphics, leftX, pageY, "FIELD GUIDE", "Your First Day");
         renderGuideParagraphs(graphics, leftX, pageY + 39, List.of(
-                "1. Leave the cryo tube and take stock. You cannot climb back inside after exiting.",
-                "2. Find or reinforce shelter before nightfall. Gather food, wood, stone, and light.",
-                "3. Record shelter coordinates, plans, and discoveries in the Journal tab."
+                "1. Leave the cryo tube and take stock. You cannot climb back inside.",
+                "2. Find shelter before nightfall. Gather food, wood, stone, and light.",
+                "3. Save coordinates, plans, and discoveries in your Journal."
         ));
 
         renderPageHeading(graphics, rightX, pageY, "FIELD GUIDE", "Know the Signs");
         renderGuideParagraphs(graphics, rightX, pageY + 39, List.of(
-                "In the Echo, purple skies and violent storms can signal Riftfall activity. Seek cover until conditions ease.",
-                "Fresh meteor craters can be unstable and irradiated. Observe from a distance before approaching.",
-                "Lore journals can appear in generated chests. Carry one to preserve its pages in the Lore tab."
+                "Purple skies and violent storms in the Echo warn of Riftfall activity. Seek cover.",
+                "Meteor craters may be unstable and irradiated. Keep your distance.",
+                "Find lore journals in generated chests. Carry them to preserve their pages."
         ));
     }
 
@@ -172,7 +170,7 @@ public class CodexScreen extends Screen {
         int color = selected ? 0xFFE0C074 : hover ? 0xFFC79B61 : 0xFF94653D;
         graphics.fill(x, y, x + TAB_WIDTH, y + TAB_HEIGHT, color);
         graphics.fill(x, y + TAB_HEIGHT - 2, x + TAB_WIDTH, y + TAB_HEIGHT, 0x55200012);
-        graphics.drawString(this.font, Component.literal(label), x + 7, y + 8, 0xFF1C100B, false);
+        graphics.drawCenteredString(this.font, Component.literal(label), x + TAB_WIDTH / 2, y + 6, 0xFF1C100B);
     }
 
     private void renderJournal(GuiGraphics graphics, int bookX, int bookY) {
@@ -361,17 +359,19 @@ public class CodexScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int bookX = bookX();
         int bookY = bookY();
-        int tabX = bookX + BOOK_WIDTH - 3;
-        int tabY = bookY + 40;
-        if (button == 0 && isInside((int) mouseX, (int) mouseY, tabX, tabY, TAB_WIDTH, TAB_HEIGHT)) {
+        int tabY = CodexLayout.tabY(bookY);
+        if (button == 0 && isInside((int) mouseX, (int) mouseY,
+                CodexLayout.tabX(bookX, 0), tabY, TAB_WIDTH, TAB_HEIGHT)) {
             selectView(CodexView.GUIDE);
             return true;
         }
-        if (button == 0 && isInside((int) mouseX, (int) mouseY, tabX, tabY + 31, TAB_WIDTH, TAB_HEIGHT)) {
+        if (button == 0 && isInside((int) mouseX, (int) mouseY,
+                CodexLayout.tabX(bookX, 1), tabY, TAB_WIDTH, TAB_HEIGHT)) {
             selectView(CodexView.JOURNAL);
             return true;
         }
-        if (button == 0 && isInside((int) mouseX, (int) mouseY, tabX, tabY + 62, TAB_WIDTH, TAB_HEIGHT)) {
+        if (button == 0 && isInside((int) mouseX, (int) mouseY,
+                CodexLayout.tabX(bookX, 2), tabY, TAB_WIDTH, TAB_HEIGHT)) {
             selectView(CodexView.LORE);
             return true;
         }
@@ -424,11 +424,11 @@ public class CodexScreen extends Screen {
     }
 
     private int bookX() {
-        return Math.max(8, (this.width - BOOK_WIDTH) / 2);
+        return CodexLayout.bookX(this.width);
     }
 
     private int bookY() {
-        return Math.max(8, (this.height - BOOK_HEIGHT) / 2);
+        return CodexLayout.bookY(this.height);
     }
 
     @Override

@@ -37,11 +37,19 @@ class StudioRegistriesTest {
     }
 
     @Test
-    void campusHasUsablePadsAndReservedFutureLocations() {
+    void campusHasOperationalFacilitiesAndReservedFutureLocations() {
         assertTrue(StudioLocationRegistry.values().stream()
                 .anyMatch(location -> "main_hub".equals(location.id().getPath()) && location.available()));
         assertTrue(StudioLocationRegistry.values().stream()
                 .anyMatch(location -> "water_lab".equals(location.id().getPath()) && location.available()));
+        assertTrue(StudioLocationRegistry.values().stream()
+                .anyMatch(location -> "ecosystem_lab".equals(location.id().getPath()) && location.available()));
+        assertTrue(StudioLocationRegistry.values().stream()
+                .anyMatch(location -> "weather_lab".equals(location.id().getPath()) && location.available()));
+        assertTrue(StudioLocationRegistry.values().stream()
+                .anyMatch(location -> "worldgen_lab".equals(location.id().getPath()) && location.available()));
+        assertEquals(8, StudioLocationRegistry.values().stream()
+                .filter(location -> location.available()).count());
         assertTrue(StudioLocationRegistry.values().stream()
                 .anyMatch(location -> "power_lab".equals(location.id().getPath()) && !location.available()));
         assertFalse(StudioLocationRegistry.values().isEmpty());
