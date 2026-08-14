@@ -2,6 +2,9 @@ package com.thunder.wildernessodysseyapi.developmentstudio;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.developmentstudio.bookmark.StudioBookmark;
+import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioRegionBlockSnapshot;
+import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioTestRegion;
+import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioTestRegionRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -11,7 +14,9 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,7 +28,7 @@ import java.util.UUID;
  * this data on first load.</p>
  */
 public final class StudioWorldData extends SavedData {
-    public static final int FORMAT_VERSION = 1;
+    public static final int FORMAT_VERSION = 2;
     public static final String DATA_NAME = ModConstants.MOD_ID + "_development_studio";
     public static final SavedData.Factory<StudioWorldData> FACTORY = new SavedData.Factory<>(
             StudioWorldData::new,
@@ -34,6 +39,9 @@ public final class StudioWorldData extends SavedData {
     private boolean campusPlaced;
     private BlockPos campusOrigin;
     private final List<StudioBookmark> bookmarks = new ArrayList<>();
+    private final List<StudioTestRegion> testRegions = new ArrayList<>();
+    private final Map<net.minecraft.resources.ResourceLocation, StudioRegionBlockSnapshot> regionSnapshots =
+            new LinkedHashMap<>();
 
     /** Creates empty metadata for a normal or explicitly enabled test world. */
     public StudioWorldData() {
@@ -70,10 +78,27 @@ public final class StudioWorldData extends SavedData {
         for (int index = 0; index < bookmarksTag.size(); index++) {
             StudioBookmark.load(bookmarksTag.getCompound(index)).ifPresent(data.bookmarks::add);
         }
+
+        ListTag regionsTag = tag.getList("test_regions", Tag.TAG_COMPOUND);
+        for (int index = 0; index < regionsTag.size(); index++) {
+            StudioTestRegion.load(regionsTag.getCompound(index)).ifPresent(data.testRegions::add);
+        }
+        ListTag snapshotsTag = tag.getList("region_snapshots", Tag.TAG_COMPOUND);
+        for (int index = 0; index < snapshotsTag.size(); index++) {
+            StudioRegionBlockSnapshot.load(snapshotsTag.getCompound(index)).ifPresent(snapshot ->
+                    data.regionSnapshots.put(snapshot.regionId(), snapshot));
+        }
+
+        // Version-one worlds already persisted the exact campus origin. Resolve
+        // the new bounded regions deterministically without moving the campus.
+        if (data.campusOrigin != null && data.testRegions.isEmpty()) {
+            data.testRegions.addAll(StudioTestRegionRegistry.resolve(data.campusOrigin));
+            data.setDirty();
+        }
         return data;
     }
 
-    /** Writes the durable Studio identity, campus state, and bookmark catalog. */
+    /** Writes durable identity, campus, bookmarks, test regions, and safe lab baselines. */
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
         tag.putInt("format_version", FORMAT_VERSION);
@@ -85,6 +110,13 @@ public final class StudioWorldData extends SavedData {
         ListTag bookmarksTag = new ListTag();
         bookmarks.forEach(bookmark -> bookmarksTag.add(bookmark.save()));
         tag.put("bookmarks", bookmarksTag);
+
+        ListTag regionsTag = new ListTag();
+        testRegions.forEach(region -> regionsTag.add(region.save()));
+        tag.put("test_regions", regionsTag);
+        ListTag snapshotsTag = new ListTag();
+        regionSnapshots.values().forEach(snapshot -> snapshotsTag.add(snapshot.save()));
+        tag.put("region_snapshots", snapshotsTag);
         return tag;
     }
 
@@ -112,7 +144,33 @@ public final class StudioWorldData extends SavedData {
     public void markCampusPlaced(BlockPos origin) {
         campusPlaced = true;
         campusOrigin = origin == null ? null : origin.immutable();
+        testRegions.clear();
+        regionSnapshots.clear();
+        if (campusOrigin != null) {
+            testRegions.addAll(StudioTestRegionRegistry.resolve(campusOrigin));
+        }
         setDirty();
+    }
+
+    /** Returns the immutable, persisted catalog of server-authoritative test areas. */
+    public List<StudioTestRegion> testRegions() {
+        return List.copyOf(testRegions);
+    }
+
+    public Optional<StudioTestRegion> testRegion(net.minecraft.resources.ResourceLocation id) {
+        return testRegions.stream().filter(region -> region.id().equals(id)).findFirst();
+    }
+
+    public Optional<StudioRegionBlockSnapshot> regionSnapshot(net.minecraft.resources.ResourceLocation regionId) {
+        return Optional.ofNullable(regionSnapshots.get(regionId));
+    }
+
+    /** Stores the first validated baseline for one registered block-reset region. */
+    public void putRegionSnapshotIfAbsent(StudioRegionBlockSnapshot snapshot) {
+        if (!regionSnapshots.containsKey(snapshot.regionId())) {
+            regionSnapshots.put(snapshot.regionId(), snapshot);
+            setDirty();
+        }
     }
 
     public List<StudioBookmark> bookmarks() {

@@ -9,6 +9,12 @@ import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioPayl
 import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioRequestPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioBookmarkActionPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioLocationTeleportPayload;
+import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioStructureActionPayload;
+import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEntityActionPayload;
+import com.thunder.wildernessodysseyapi.developmentstudio.structure.StudioStructureService;
+import com.thunder.wildernessodysseyapi.developmentstudio.entity.StudioEntityService;
+import com.thunder.wildernessodysseyapi.developmentstudio.environment.StudioEnvironmentService;
+import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEnvironmentActionPayload;
 import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookManager;
 import com.thunder.wildernessodysseyapi.lorebook.network.OpenCodexPayload;
@@ -38,7 +44,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModPayloads {
 
-    private static final String NETWORK_VERSION = "14";
+    private static final String NETWORK_VERSION = "15";
 
     private ModPayloads() {
     }
@@ -98,6 +104,24 @@ public final class ModPayloads {
                 context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer serverPlayer) {
                         StudioServerService.teleportToCampusLocation(serverPlayer, payload.locationId());
+                    }
+                }));
+        registrar.playToServer(StudioStructureActionPayload.TYPE, StudioStructureActionPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer serverPlayer) {
+                        StudioStructureService.handle(serverPlayer, payload);
+                    }
+                }));
+        registrar.playToServer(StudioEntityActionPayload.TYPE, StudioEntityActionPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer serverPlayer) {
+                        StudioEntityService.handle(serverPlayer, payload);
+                    }
+                }));
+        registrar.playToServer(StudioEnvironmentActionPayload.TYPE, StudioEnvironmentActionPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer serverPlayer) {
+                        StudioEnvironmentService.handle(serverPlayer, payload);
                     }
                 }));
         registrar.playToClient(OpenStudioPayload.TYPE, OpenStudioPayload.STREAM_CODEC, (payload, context) ->

@@ -10,6 +10,8 @@ import com.thunder.wildernessodysseyapi.developmentstudio.campus.StudioLocationR
 import com.thunder.wildernessodysseyapi.developmentstudio.data.StudioWorldgenData;
 import com.thunder.wildernessodysseyapi.developmentstudio.inspection.StudioInspectionRegistry;
 import com.thunder.wildernessodysseyapi.developmentstudio.module.StudioModuleRegistry;
+import com.thunder.wildernessodysseyapi.developmentstudio.entity.StudioEntityRegistry;
+import com.thunder.wildernessodysseyapi.developmentstudio.structure.StudioStructureRegistry;
 import com.thunder.wildernessodysseyapi.ecosystem.EcosystemEvents;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
@@ -90,6 +92,8 @@ public final class WildernessOdysseyAPIMainModClass {
             StudioLocationRegistry.bootstrapDefaults();
             StudioModuleRegistry.bootstrapDefaults();
             StudioInspectionRegistry.bootstrapDefaults();
+            StudioEntityRegistry.bootstrapDefaults();
+            StudioStructureRegistry.bootstrapDefaults();
             LOGGER.info("Wilderness Odyssey API setup complete");
         });
         LOGGER.info("Mod pack version: {}", container.getModInfo().getVersion());

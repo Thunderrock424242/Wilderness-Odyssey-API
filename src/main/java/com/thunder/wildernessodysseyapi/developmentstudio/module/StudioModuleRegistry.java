@@ -18,7 +18,7 @@ public final class StudioModuleRegistry {
     private StudioModuleRegistry() {
     }
 
-    /** Registers Phase 1 modules and visible integration points for later phases. */
+    /** Registers implemented Phase 1-3 modules and visible later-phase integration points. */
     public static synchronized void bootstrapDefaults() {
         if (bootstrapped) {
             return;
@@ -27,12 +27,12 @@ public final class StudioModuleRegistry {
 
         register(module("world", StudioModuleStatus.AVAILABLE, "module.world"));
         register(module("locations", StudioModuleStatus.AVAILABLE, "module.locations"));
-        register(module("structures", StudioModuleStatus.DEFERRED, "module.deferred"));
-        register(module("entities", StudioModuleStatus.DEFERRED, "module.deferred"));
-        register(module("ecosystem", StudioModuleStatus.DEFERRED, "module.deferred"));
-        register(module("weather", StudioModuleStatus.DEFERRED, "module.deferred"));
-        register(module("water", StudioModuleStatus.DEFERRED, "module.deferred"));
-        register(module("worldgen", StudioModuleStatus.DEFERRED, "module.deferred"));
+        register(module("structures", StudioModuleStatus.AVAILABLE, "module.structures"));
+        register(module("entities", StudioModuleStatus.AVAILABLE, "module.entities"));
+        register(module("ecosystem", StudioModuleStatus.AVAILABLE, "module.ecosystem"));
+        register(module("weather", StudioModuleStatus.AVAILABLE, "module.weather"));
+        register(module("water", StudioModuleStatus.AVAILABLE, "module.water"));
+        register(module("worldgen", StudioModuleStatus.AVAILABLE, "module.worldgen"));
         register(module("lighting", StudioModuleStatus.DEFERRED, "module.deferred"));
         register(module("power", StudioModuleStatus.DEFERRED, "module.deferred"));
         register(module("security", StudioModuleStatus.DEFERRED, "module.deferred"));
@@ -40,7 +40,7 @@ public final class StudioModuleRegistry {
         register(module("performance", StudioModuleStatus.DEFERRED, "module.deferred"));
         register(module("scenarios", StudioModuleStatus.DEFERRED, "module.deferred"));
         register(module("inspector", StudioModuleStatus.AVAILABLE, "module.inspector"));
-        register(module("debug", StudioModuleStatus.FOUNDATION, "module.debug"));
+        register(module("debug", StudioModuleStatus.AVAILABLE, "module.debug"));
     }
 
     /** Registers one unique module definition. */

@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.developmentstudio;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.developmentstudio.campus.StudioCampusPlacer;
+import com.thunder.wildernessodysseyapi.developmentstudio.structure.StudioStructureService;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
@@ -44,6 +45,14 @@ public final class StudioLifecycleEvents {
         if (event.getEntity() instanceof ServerPlayer player
                 && StudioWorldAccess.isDevelopmentStudioWorld(player.getServer())) {
             StudioCampusPlacer.placeIfNeeded(player.getServer().overworld());
+        }
+    }
+
+    /** Releases ephemeral preview state when the owning connection leaves. */
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            StudioStructureService.clearPreview(player.getUUID());
         }
     }
 }

@@ -4,9 +4,15 @@ import com.thunder.wildernessodysseyapi.developmentstudio.bookmark.StudioBookmar
 import com.thunder.wildernessodysseyapi.developmentstudio.campus.StudioLocationDefinition;
 import com.thunder.wildernessodysseyapi.developmentstudio.campus.StudioLocationRegistry;
 import com.thunder.wildernessodysseyapi.developmentstudio.config.StudioConfig;
+import com.thunder.wildernessodysseyapi.developmentstudio.entity.StudioEntityRegistry;
+import com.thunder.wildernessodysseyapi.developmentstudio.entity.StudioEntityService;
 import com.thunder.wildernessodysseyapi.developmentstudio.inspection.StudioInspection;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioBookmarkActionPayload;
+import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioTestRegion;
+import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioTestRegionRegistry;
+import com.thunder.wildernessodysseyapi.developmentstudio.structure.StudioStructureRegistry;
+import com.thunder.wildernessodysseyapi.developmentstudio.structure.StudioStructureService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -35,6 +41,11 @@ public final class StudioServerService {
     /** Authorizes and opens an inspector result produced from a server-owned target. */
     public static boolean openInspector(ServerPlayer player, StudioInspection inspection) {
         return open(player, "inspector", inspection);
+    }
+
+    /** Reopens one registered module after a server-owned Studio action. */
+    public static boolean openModule(ServerPlayer player, String module, StudioInspection inspection) {
+        return open(player, module, inspection);
     }
 
     /** Handles a bounded bookmark operation after rechecking authorization. */
@@ -92,18 +103,29 @@ public final class StudioServerService {
 
         MinecraftServer server = player.getServer();
         StudioWorldData data = StudioWorldData.getOrCreate(server);
+        ServerLevel overworld = server.overworld();
+        int entityLabCount = data.testRegion(StudioTestRegionRegistry.ENTITY_LAB)
+                .filter(region -> region.dimension().equals(overworld.dimension().location()))
+                .map(region -> StudioEntityService.taggedEntityCount(overworld, region))
+                .orElse(0);
         PacketDistributor.sendToPlayer(player, new OpenStudioPayload(
                 module,
                 data.isDevelopmentStudioWorld(),
                 server.getWorldData().worldGenOptions().seed(),
                 data.campusOrigin().orElse(null),
                 data.bookmarks(),
+                data.testRegions(),
+                StudioStructureRegistry.options(overworld),
+                StudioEntityRegistry.options(),
+                entityLabCount,
+                StudioStructureService.currentPreview(player),
                 inspection
         ));
         return true;
     }
 
-    private static boolean authorize(ServerPlayer player) {
+    /** Applies the shared Studio world/permission policy and explains denial to the caller. */
+    public static boolean authorize(ServerPlayer player) {
         StudioAccessPolicy.Result result = StudioAccessPolicy.evaluate(player);
         if (result == StudioAccessPolicy.Result.ALLOWED) {
             return true;

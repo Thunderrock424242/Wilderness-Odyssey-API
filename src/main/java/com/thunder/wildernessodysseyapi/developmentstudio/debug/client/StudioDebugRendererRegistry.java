@@ -16,6 +16,7 @@ import java.util.Map;
 public final class StudioDebugRendererRegistry {
     private static final Map<ResourceLocation, Entry> RENDERERS = new LinkedHashMap<>();
     private static boolean anyEnabled;
+    private static boolean defaultsRegistered;
 
     private StudioDebugRendererRegistry() {
     }
@@ -27,6 +28,16 @@ public final class StudioDebugRendererRegistry {
         }
     }
 
+    /** Installs concrete Phase 2 overlays once; both remain disabled. */
+    public static synchronized void bootstrapDefaults() {
+        if (defaultsRegistered) {
+            return;
+        }
+        defaultsRegistered = true;
+        register(new StudioRegionBoundsRenderer());
+        register(new StudioStructurePreviewRenderer());
+    }
+
     /** Enables or disables one renderer without changing other overlays. */
     public static synchronized boolean setEnabled(ResourceLocation id, boolean enabled) {
         Entry entry = RENDERERS.get(id);
@@ -36,6 +47,22 @@ public final class StudioDebugRendererRegistry {
         RENDERERS.put(id, new Entry(entry.renderer(), enabled));
         anyEnabled = RENDERERS.values().stream().anyMatch(Entry::enabled);
         return true;
+    }
+
+    public static synchronized boolean toggle(ResourceLocation id) {
+        Entry entry = RENDERERS.get(id);
+        return entry != null && setEnabled(id, !entry.enabled());
+    }
+
+    public static synchronized boolean isEnabled(ResourceLocation id) {
+        Entry entry = RENDERERS.get(id);
+        return entry != null && entry.enabled();
+    }
+
+    /** Disables every server-scoped overlay when the client disconnects. */
+    public static synchronized void disableAll() {
+        RENDERERS.replaceAll((id, entry) -> new Entry(entry.renderer(), false));
+        anyEnabled = false;
     }
 
     public static boolean hasEnabledRenderers() {
