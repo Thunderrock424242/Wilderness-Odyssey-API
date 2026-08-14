@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.developmentstudio.client.screen;
 
 import com.thunder.wildernessodysseyapi.developmentstudio.module.StudioModule;
 import com.thunder.wildernessodysseyapi.developmentstudio.module.StudioModuleRegistry;
+import com.thunder.wildernessodysseyapi.developmentstudio.module.StudioModuleStatus;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioPayload;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -22,10 +23,12 @@ import java.util.List;
  */
 public final class StudioScreen extends Screen {
     private static final int OUTER_MARGIN = 12;
-    private static final int NAV_BUTTON_HEIGHT = 18;
-    private static final int NAV_GAP = 3;
+    private static final int HEADER_HEIGHT = 28;
+    private static final int SIDEBAR_GAP = 6;
+    private static final int NAV_GAP = 2;
     private static final int PANEL_COLOR = 0xED111820;
     private static final int PANEL_BORDER = 0xFF4B7388;
+    private static final int SIDEBAR_COLOR = 0xF017222B;
 
     private OpenStudioPayload snapshot;
     private String selectedModule;
@@ -46,27 +49,32 @@ public final class StudioScreen extends Screen {
             "ecosystem",
             "Ecosystem Inspection",
             com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEnvironmentActionPayload.Action.INSPECT_ECOSYSTEM,
-            "outdoor_test_area",
+            "ecosystem_lab",
             "Inspection is bounded to 32 blocks. Accelerated stepping remains deferred and never changes the global tick rate."
     );
     private final StudioEnvironmentPage weatherPage = new StudioEnvironmentPage(
             "weather",
             "Weather Testing",
             com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEnvironmentActionPayload.Action.INSPECT_WEATHER,
-            "outdoor_test_area",
+            "weather_lab",
             "Controls call the real Weather authority over its existing local 3x3-cell scope; no synthetic severe storm is created."
     );
     private final StudioEnvironmentPage worldgenPage = new StudioEnvironmentPage(
             "worldgen",
             "Worldgen Lab",
             com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEnvironmentActionPayload.Action.INSPECT_WORLDGEN,
-            "outdoor_test_area",
+            "worldgen_lab",
             "Inspection never scans or generates distant chunks; safe terrain discovery remains a later phase."
     );
     private int contentLeft;
     private int contentTop;
     private int contentWidth;
     private int contentHeight;
+    private int navigationLeft;
+    private int navigationTop;
+    private int navigationWidth;
+    private int navigationHeight;
+    private int deferredModuleCount;
 
     public StudioScreen(OpenStudioPayload snapshot) {
         super(Component.translatable("screen.wildernessodysseyapi.studio.title"));
@@ -83,44 +91,68 @@ public final class StudioScreen extends Screen {
 
     @Override
     protected void init() {
-        List<StudioModule> modules = List.copyOf(StudioModuleRegistry.values());
-        int navigationWidth = Math.max(180, this.width - OUTER_MARGIN * 2);
-        int columns = Math.max(2, Math.min(8, navigationWidth / 96));
-        int rows = (modules.size() + columns - 1) / columns;
-        int buttonWidth = Math.max(68, (navigationWidth - (columns - 1) * NAV_GAP) / columns);
-        int navigationLeft = (this.width - (buttonWidth * columns + (columns - 1) * NAV_GAP)) / 2;
-        int navigationTop = 25;
+        List<StudioModule> registered = List.copyOf(StudioModuleRegistry.values());
+        List<StudioModule> modules = registered.stream()
+                .filter(module -> module.status() == StudioModuleStatus.AVAILABLE
+                        || module.id().getPath().equals(selectedModule))
+                .toList();
+        deferredModuleCount = (int) registered.stream()
+                .filter(module -> module.status() == StudioModuleStatus.DEFERRED)
+                .count();
+
+        navigationLeft = OUTER_MARGIN;
+        navigationTop = HEADER_HEIGHT;
+        navigationWidth = Math.max(104, Math.min(136, this.width / 4));
+        navigationHeight = Math.max(80, this.height - navigationTop - OUTER_MARGIN);
+        int navigationLabelHeight = 18;
+        int footerReserve = navigationHeight >= 240 && deferredModuleCount > 0 ? 22 : 6;
+        int availableButtonSpace = navigationHeight - navigationLabelHeight - footerReserve;
+        int buttonHeight = Math.max(14, Math.min(20,
+                (availableButtonSpace - NAV_GAP * Math.max(0, modules.size() - 1)) / Math.max(1, modules.size())));
+        int buttonTop = navigationTop + navigationLabelHeight;
 
         for (int index = 0; index < modules.size(); index++) {
             StudioModule module = modules.get(index);
-            int column = index % columns;
-            int row = index / columns;
             Button button = Button.builder(
                     Component.translatable(module.titleKey()),
                     ignored -> selectModule(module.id().getPath())
             ).bounds(
-                    navigationLeft + column * (buttonWidth + NAV_GAP),
-                    navigationTop + row * (NAV_BUTTON_HEIGHT + NAV_GAP),
-                    buttonWidth,
-                    NAV_BUTTON_HEIGHT
+                    navigationLeft + 4,
+                    buttonTop + index * (buttonHeight + NAV_GAP),
+                    navigationWidth - 8,
+                    buttonHeight
             ).build();
             button.active = !module.id().getPath().equals(selectedModule);
             addRenderableWidget(button);
         }
 
-        contentLeft = OUTER_MARGIN;
-        contentTop = navigationTop + rows * (NAV_BUTTON_HEIGHT + NAV_GAP) + 5;
-        contentWidth = this.width - OUTER_MARGIN * 2;
-        contentHeight = Math.max(80, this.height - contentTop - OUTER_MARGIN);
+        contentLeft = navigationLeft + navigationWidth + SIDEBAR_GAP;
+        contentTop = navigationTop;
+        contentWidth = Math.max(160, this.width - contentLeft - OUTER_MARGIN);
+        contentHeight = navigationHeight;
         page = pageFor(selectedModule);
         page.init(this);
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(graphics, mouseX, mouseY, partialTick);
-        graphics.fill(0, 0, this.width, this.height, 0xD0080D12);
-        graphics.drawCenteredString(this.font, this.title, this.width / 2, 8, 0xFFE7F7FF);
+        // A nearly opaque application surface keeps text and controls crisp even
+        // when the game has an aggressive menu-background blur configured.
+        graphics.fill(0, 0, this.width, this.height, 0xFA080D12);
+        graphics.drawString(this.font, this.title, OUTER_MARGIN, 9, 0xFFE7F7FF, false);
+
+        graphics.fill(navigationLeft - 2, navigationTop - 2,
+                navigationLeft + navigationWidth + 2, navigationTop + navigationHeight + 2, PANEL_BORDER);
+        graphics.fill(navigationLeft, navigationTop,
+                navigationLeft + navigationWidth, navigationTop + navigationHeight, SIDEBAR_COLOR);
+        graphics.drawString(this.font, Component.literal("ACTIVE MODULES"),
+                navigationLeft + 6, navigationTop + 6, 0xFF8ED7FF, false);
+        if (deferredModuleCount > 0 && navigationHeight >= 240) {
+            String roadmap = deferredModuleCount + " future modules reserved";
+            graphics.drawString(this.font, Component.literal(roadmap), navigationLeft + 6,
+                    navigationTop + navigationHeight - 12, 0xFF71838D, false);
+        }
+
         graphics.fill(contentLeft - 2, contentTop - 2,
                 contentLeft + contentWidth + 2, contentTop + contentHeight + 2, PANEL_BORDER);
         graphics.fill(contentLeft, contentTop,

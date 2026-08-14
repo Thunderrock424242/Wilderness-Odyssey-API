@@ -32,6 +32,7 @@ import java.util.UUID;
  * @param developmentStudioWorld whether the persistent world flag is active
  * @param worldSeed active world's seed
  * @param campusOrigin persisted template origin, or {@code null}
+ * @param campusVersion persisted campus layout version, or zero when absent
  * @param bookmarks server-owned world bookmark catalog
  * @param testRegions persisted server-owned lab bounds
  * @param structures allowlisted templates available for previews
@@ -45,6 +46,7 @@ public record OpenStudioPayload(
         boolean developmentStudioWorld,
         long worldSeed,
         BlockPos campusOrigin,
+        int campusVersion,
         List<StudioBookmark> bookmarks,
         List<StudioTestRegion> testRegions,
         List<StudioStructureOption> structures,
@@ -74,6 +76,9 @@ public record OpenStudioPayload(
             initialModule = "world";
         }
         campusOrigin = campusOrigin == null ? null : campusOrigin.immutable();
+        if (campusVersion < 0 || campusVersion > 1_024) {
+            throw new IllegalArgumentException("Invalid Studio campus version: " + campusVersion);
+        }
         bookmarks = bookmarks == null
                 ? List.of()
                 : List.copyOf(bookmarks.subList(0, Math.min(bookmarks.size(), MAX_BOOKMARKS_ON_WIRE)));
@@ -91,6 +96,7 @@ public record OpenStudioPayload(
         if (payload.campusOrigin != null) {
             buffer.writeBlockPos(payload.campusOrigin);
         }
+        buffer.writeVarInt(payload.campusVersion);
 
         buffer.writeVarInt(payload.bookmarks.size());
         payload.bookmarks.forEach(bookmark -> writeBookmark(buffer, bookmark));
@@ -119,6 +125,10 @@ public record OpenStudioPayload(
         boolean developmentStudioWorld = buffer.readBoolean();
         long seed = buffer.readLong();
         BlockPos campusOrigin = buffer.readBoolean() ? buffer.readBlockPos() : null;
+        int campusVersion = buffer.readVarInt();
+        if (campusVersion < 0 || campusVersion > 1_024) {
+            throw new DecoderException("Invalid Studio campus version: " + campusVersion);
+        }
 
         int bookmarkCount = checkedCount(buffer.readVarInt(), MAX_BOOKMARKS_ON_WIRE, "bookmarks");
         List<StudioBookmark> bookmarks = new ArrayList<>(bookmarkCount);
@@ -147,7 +157,7 @@ public record OpenStudioPayload(
         StudioStructurePreview preview = buffer.readBoolean() ? readStructurePreview(buffer) : null;
         StudioInspection inspection = buffer.readBoolean() ? readInspection(buffer) : null;
         return new OpenStudioPayload(
-                initialModule, developmentStudioWorld, seed, campusOrigin, bookmarks,
+                initialModule, developmentStudioWorld, seed, campusOrigin, campusVersion, bookmarks,
                 regions, structures, entityTypes, entityLabEntityCount, preview, inspection
         );
     }

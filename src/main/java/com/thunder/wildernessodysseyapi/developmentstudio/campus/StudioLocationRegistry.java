@@ -18,29 +18,32 @@ public final class StudioLocationRegistry {
     private StudioLocationRegistry() {
     }
 
-    /** Registers the Phase 1 pads and reserves stable ids for future campus labs. */
+    /** Registers operational campus destinations and stable later-phase reservations. */
     public static synchronized void bootstrapDefaults() {
         if (bootstrapped) {
             return;
         }
         bootstrapped = true;
 
-        register(location("main_hub", "Main Studio Hub", new BlockPos(10, 1, 10), true));
-        register(location("structure_lab", "Structure Lab Pad", new BlockPos(3, 1, 10), true));
-        register(location("water_lab", "Water Torture Lab Pad", new BlockPos(17, 1, 10), true));
-        register(location("entity_lab", "Entity / Mob Lab Pad", new BlockPos(10, 1, 3), true));
-        register(location("outdoor_test_area", "Outdoor Test Area", new BlockPos(10, 1, 17), true));
+        register(location("main_hub", "Operations Hub", new BlockPos(32, 5, 27), true));
+        register(location("structure_lab", "Structure Hangar", new BlockPos(17, 5, 32), true));
+        register(location("water_lab", "Water Torture Lab", new BlockPos(48, 5, 32), true));
+        register(location("entity_lab", "Entity Arena", new BlockPos(32, 5, 17), true));
+        register(location("outdoor_test_area", "Outdoor Test Range", new BlockPos(32, 5, 48), true));
+        register(location("ecosystem_lab", "Ecosystem Greenhouse", new BlockPos(16, 5, 11), true));
+        register(location("weather_lab", "Weather Station", new BlockPos(48, 5, 11), true));
+        register(location("worldgen_lab", "Worldgen Observatory", new BlockPos(11, 5, 48), true));
 
         // Reserved ids keep later campus expansions compatible without pretending
         // that their gameplay systems or finished buildings already exist.
-        // Phase 3 environment modules share the bounded outdoor/water pads until
-        // the campus receives dedicated buildings in the polish phase.
-        register(location("lighting_lab", "Lighting Lab (Reserved)", new BlockPos(10, 1, 38), false));
-        register(location("power_lab", "Power Lab (Reserved)", new BlockPos(-18, 1, -18), false));
-        register(location("security_lab", "Security Lab (Reserved)", new BlockPos(38, 1, -18), false));
-        register(location("aether_lab", "Aether / Event Lab (Reserved)", new BlockPos(-18, 1, 38), false));
-        register(location("performance_lab", "Performance Lab (Reserved)", new BlockPos(38, 1, 38), false));
-        register(location("scenario_lab", "Scenario Lab (Reserved)", new BlockPos(10, 1, 58), false));
+        // The southeast systems wing is physically present, but remains sealed
+        // until its real gameplay owners are implemented in later phases.
+        register(location("lighting_lab", "Lighting Lab (Reserved)", new BlockPos(51, 5, 51), false));
+        register(location("power_lab", "Power Lab (Reserved)", new BlockPos(56, 5, 51), false));
+        register(location("security_lab", "Security Lab (Reserved)", new BlockPos(51, 5, 56), false));
+        register(location("aether_lab", "Aether / Event Lab (Reserved)", new BlockPos(56, 5, 56), false));
+        register(location("performance_lab", "Performance Lab (Reserved)", new BlockPos(53, 5, 53), false));
+        register(location("scenario_lab", "Scenario Lab (Reserved)", new BlockPos(53, 5, 58), false));
     }
 
     /** Registers one unique location definition. */

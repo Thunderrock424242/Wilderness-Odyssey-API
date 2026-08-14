@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.developmentstudio.module;
 
-/** Phase 1 implementation status shown honestly by the Studio interface. */
+/** Implementation status shown honestly by the Studio interface and roadmap. */
 public enum StudioModuleStatus {
     AVAILABLE,
     FOUNDATION,

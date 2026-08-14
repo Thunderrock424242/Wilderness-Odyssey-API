@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.developmentstudio;
 
 import com.thunder.wildernessodysseyapi.developmentstudio.bookmark.StudioBookmark;
+import com.thunder.wildernessodysseyapi.developmentstudio.campus.StudioCampusLayout;
 import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioRegionBlockSnapshot;
 import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioTestRegion;
 import com.thunder.wildernessodysseyapi.developmentstudio.region.StudioTestRegionRegistry;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies save/reload persistence for Studio identity, campus, and bookmarks. */
@@ -53,6 +55,7 @@ class StudioWorldDataTest {
 
         assertTrue(decoded.isDevelopmentStudioWorld());
         assertTrue(decoded.isCampusPlaced());
+        assertEquals(StudioCampusLayout.CURRENT_VERSION, decoded.campusVersion());
         assertEquals(campusOrigin, decoded.campusOrigin().orElseThrow());
         assertEquals(4, decoded.testRegions().size());
         assertEquals(1, decoded.regionSnapshot(StudioTestRegionRegistry.STRUCTURE_LAB)
@@ -74,7 +77,23 @@ class StudioWorldDataTest {
         StudioWorldData migrated = StudioWorldData.load(versionOne, null);
 
         assertEquals(4, migrated.testRegions().size());
-        assertEquals(new BlockPos(21, 70, 38), migrated.testRegion(
+        assertTrue(migrated.needsCampusUpgrade());
+        assertEquals(StudioCampusLayout.LEGACY_VERSION, migrated.campusVersion());
+        assertEquals(new BlockPos(25, 74, 56), migrated.testRegion(
                 StudioTestRegionRegistry.STRUCTURE_LAB).orElseThrow().min());
+        assertEquals(new BlockPos(-2, 66, 8), StudioCampusLayout.upgradedOrigin(
+                new BlockPos(20, 70, 30)));
+    }
+
+    @Test
+    void futureCampusLayoutVersionIsRejectedBeforeLocationsCanResolve() {
+        CompoundTag future = new CompoundTag();
+        future.putInt("format_version", StudioWorldData.FORMAT_VERSION);
+        future.putBoolean("development_studio_world", true);
+        future.putBoolean("campus_placed", true);
+        future.putInt("campus_version", StudioCampusLayout.CURRENT_VERSION + 1);
+        future.putLong("campus_origin", BlockPos.ZERO.asLong());
+
+        assertThrows(IllegalArgumentException.class, () -> StudioWorldData.load(future, null));
     }
 }

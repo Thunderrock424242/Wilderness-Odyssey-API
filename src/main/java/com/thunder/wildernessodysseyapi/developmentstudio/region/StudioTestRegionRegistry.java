@@ -7,7 +7,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.List;
 
-/** Defines the small campus-relative regions that Studio tools may operate in. */
+/** Defines bounded operational areas inside the version-two Development Campus. */
 public final class StudioTestRegionRegistry {
     public static final long MAX_REGION_VOLUME = 4_096L;
     public static final ResourceLocation STRUCTURE_LAB = id("structure_lab");
@@ -16,14 +16,14 @@ public final class StudioTestRegionRegistry {
     public static final ResourceLocation OUTDOOR_LAB = id("outdoor_lab");
 
     private static final List<RelativeRegion> DEFAULTS = List.of(
-            new RelativeRegion(STRUCTURE_LAB, "Structure Lab", new BlockPos(1, 0, 8),
-                    new BlockPos(5, 7, 12), StudioTestRegionType.STRUCTURE, StudioResetPolicy.BLOCK_SNAPSHOT),
-            new RelativeRegion(ENTITY_LAB, "Entity Lab", new BlockPos(8, 1, 1),
-                    new BlockPos(12, 7, 5), StudioTestRegionType.ENTITY, StudioResetPolicy.TAGGED_ENTITIES),
-            new RelativeRegion(WATER_LAB, "Water Lab", new BlockPos(15, 0, 8),
-                    new BlockPos(19, 7, 12), StudioTestRegionType.WATER, StudioResetPolicy.NONE),
-            new RelativeRegion(OUTDOOR_LAB, "Outdoor Lab", new BlockPos(8, 0, 15),
-                    new BlockPos(12, 7, 19), StudioTestRegionType.OUTDOOR, StudioResetPolicy.NONE)
+            new RelativeRegion(STRUCTURE_LAB, "Structure Lab", new BlockPos(5, 4, 26),
+                    new BlockPos(18, 10, 38), StudioTestRegionType.STRUCTURE, StudioResetPolicy.BLOCK_SNAPSHOT),
+            new RelativeRegion(ENTITY_LAB, "Entity Lab", new BlockPos(25, 5, 6),
+                    new BlockPos(39, 9, 16), StudioTestRegionType.ENTITY, StudioResetPolicy.TAGGED_ENTITIES),
+            new RelativeRegion(WATER_LAB, "Water Torture Lab", new BlockPos(47, 4, 26),
+                    new BlockPos(59, 10, 38), StudioTestRegionType.WATER, StudioResetPolicy.NONE),
+            new RelativeRegion(OUTDOOR_LAB, "Outdoor Test Range", new BlockPos(25, 4, 47),
+                    new BlockPos(39, 10, 60), StudioTestRegionType.OUTDOOR, StudioResetPolicy.NONE)
     );
 
     private StudioTestRegionRegistry() {

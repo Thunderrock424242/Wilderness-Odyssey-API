@@ -9,7 +9,7 @@ import net.minecraft.resources.ResourceLocation;
  * @param id stable internal location id
  * @param displayName player-facing location label
  * @param offset template-relative feet position
- * @param available whether Phase 1 contains a usable destination at this offset
+ * @param available whether the current campus contains a usable destination at this offset
  */
 public record StudioLocationDefinition(
         ResourceLocation id,
