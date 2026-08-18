@@ -99,7 +99,7 @@ ordering="AFTER"
 side="BOTH"
 
 [[dependencies.wildernessodysseyapi]]
-modId="eclipticseasons"
+modId="homeostaticseasons"
 type="optional"
 versionRange=""
 ordering="AFTER"

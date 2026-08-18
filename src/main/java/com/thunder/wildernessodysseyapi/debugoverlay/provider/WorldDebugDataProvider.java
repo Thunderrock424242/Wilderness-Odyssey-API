@@ -3,6 +3,8 @@ package com.thunder.wildernessodysseyapi.debugoverlay.provider;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugContext;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugSection;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugValue;
+import com.thunder.wildernessodysseyapi.ecosystem.client.EnvironmentalMemoryClientState;
+import com.thunder.wildernessodysseyapi.ecosystem.network.EnvironmentalMemoryDebugPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.DifficultyInstance;
@@ -16,6 +18,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 /** Collects client-safe position, light, chunk, biome, and world state. */
 public final class WorldDebugDataProvider implements DebugDataProvider {
@@ -122,6 +125,33 @@ public final class WorldDebugDataProvider implements DebugDataProvider {
         }
         sections.add(chunkSection.build());
 
+        Optional<EnvironmentalMemoryDebugPayload> memory = EnvironmentalMemoryClientState.current(
+                minecraft.level.dimension().location(), chunkPos);
+        if (memory.isEmpty()) {
+            sections.add(DebugSection.builder("ENVIRONMENTAL MEMORY")
+                    .add("State", DebugValue.unavailable("Enable ecosystem debug commands for server data"))
+                    .build());
+        } else if (!memory.get().present()) {
+            sections.add(DebugSection.builder("ENVIRONMENTAL MEMORY")
+                    .add("Cell", memory.get().chunkX() + " / " + memory.get().chunkZ())
+                    .add("Disturbance", "0.000 (no stored activity)")
+                    .add("Stored cells", memory.get().activeCellCount())
+                    .build());
+        } else {
+            EnvironmentalMemoryDebugPayload snapshot = memory.get();
+            sections.add(DebugSection.builder("ENVIRONMENTAL MEMORY")
+                    .add("Cell", snapshot.chunkX() + " / " + snapshot.chunkZ())
+                    .add("Disturbance", decimal(snapshot.disturbance()))
+                    .add("Player traffic", decimal(snapshot.playerTraffic()))
+                    .add("Combat / fire", decimal(snapshot.combatActivity()) + " / " + decimal(snapshot.fireActivity()))
+                    .add("Last source", snapshot.lastSource())
+                    .add("Source position", snapshot.sourceX() + " / " + snapshot.sourceY() + " / " + snapshot.sourceZ())
+                    .add("Last update", snapshot.lastUpdatedGameTime() + " (" + snapshot.elapsedTicks() + " ticks ago)")
+                    .add("Lazy decay", decimal(snapshot.decayApplied()))
+                    .add("Stored cells", snapshot.activeCellCount())
+                    .build());
+        }
+
         if (chunk != null && !chunk.isEmpty()) {
             DebugSection.Builder heightmaps = DebugSection.builder("CLIENT HEIGHTMAPS");
             for (Heightmap.Types type : Heightmap.Types.values()) {
@@ -141,5 +171,9 @@ public final class WorldDebugDataProvider implements DebugDataProvider {
                 .add("Reduced debug", minecraft.showOnlyReducedInfo() ? DebugValue.warning("Enabled") : DebugValue.normal("Disabled"))
                 .build());
         return List.copyOf(sections);
+    }
+
+    private static String decimal(float value) {
+        return String.format(Locale.ROOT, "%.3f", value);
     }
 }

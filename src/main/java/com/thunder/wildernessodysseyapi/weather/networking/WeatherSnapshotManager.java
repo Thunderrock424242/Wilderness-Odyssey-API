@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.weather.networking;
 
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereView;
+import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphereGrid;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -162,6 +163,7 @@ public final class WeatherSnapshotManager {
                 cellSize,
                 center.x(),
                 center.z(),
+                WeatherConfig.windSettings(),
                 cells
         );
         PacketDistributor.sendToPlayer(player, payload);

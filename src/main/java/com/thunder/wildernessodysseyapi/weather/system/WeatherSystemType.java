@@ -28,6 +28,11 @@ public enum WeatherSystemType {
         return severe;
     }
 
+    /** Returns whether this identity represents a storm rather than an atmospheric front. */
+    public boolean storm() {
+        return family == Family.STORM;
+    }
+
     private enum Family {
         STORM,
         FRONT

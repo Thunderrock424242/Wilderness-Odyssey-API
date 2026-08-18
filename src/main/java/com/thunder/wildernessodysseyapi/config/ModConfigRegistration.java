@@ -8,6 +8,8 @@ import com.thunder.wildernessodysseyapi.developmentstudio.config.StudioConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.EcosystemEvents;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileManager;
+import com.thunder.wildernessodysseyapi.ecosystem.distant.DistantWildlifeManager;
+import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
@@ -19,6 +21,7 @@ import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryConfig;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryConfig;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryConfig;
 import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
+import com.thunder.wildernessodysseyapi.vegetation.config.VegetationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
@@ -91,6 +94,8 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-weather-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, EcosystemConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-ecosystem-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, VegetationConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-vegetation-server.toml");
     }
 
     /** Applies runtime-backed settings after NeoForge loads a config file. */
@@ -118,7 +123,11 @@ public final class ModConfigRegistration {
             SpeciesBehaviorProfileManager.clearConfiguredProfiles();
             var server = ServerLifecycleHooks.getCurrentServer();
             if (server != null) {
-                server.execute(() -> EcosystemEvents.refreshLoadedControllers(server));
+                server.execute(() -> {
+                    EcosystemEvents.refreshLoadedControllers(server);
+                    DistantWildlifeManager.get().markAllPlayersDirty(server);
+                    EcosystemSimulationManager.get().onConfigurationReload(server);
+                });
             }
         }
     }

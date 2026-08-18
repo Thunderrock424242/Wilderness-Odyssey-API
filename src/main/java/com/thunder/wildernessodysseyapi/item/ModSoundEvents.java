@@ -41,6 +41,37 @@ public final class ModSoundEvents {
             () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MOD_ID, "impact_site_music"))
     );
 
+    // Distant-thunder events reuse Minecraft's thunder sample pool through
+    // sounds.json while keeping stable profiles for non-repeating client selection.
+    public static final DeferredHolder<SoundEvent, SoundEvent> DISTANT_THUNDER_LOW_RUMBLE = SOUND_EVENTS.register(
+            "distant_thunder_low_rumble",
+            () -> SoundEvent.createFixedRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(MOD_ID, "distant_thunder_low_rumble"),
+                    32.0F
+            )
+    );
+    public static final DeferredHolder<SoundEvent, SoundEvent> DISTANT_THUNDER_ROLLING = SOUND_EVENTS.register(
+            "distant_thunder_rolling",
+            () -> SoundEvent.createFixedRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(MOD_ID, "distant_thunder_rolling"),
+                    32.0F
+            )
+    );
+    public static final DeferredHolder<SoundEvent, SoundEvent> DISTANT_THUNDER_DEEP_CRACK = SOUND_EVENTS.register(
+            "distant_thunder_deep_crack",
+            () -> SoundEvent.createFixedRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(MOD_ID, "distant_thunder_deep_crack"),
+                    32.0F
+            )
+    );
+    public static final DeferredHolder<SoundEvent, SoundEvent> DISTANT_THUNDER_LONG_RUMBLE = SOUND_EVENTS.register(
+            "distant_thunder_long_rumble",
+            () -> SoundEvent.createFixedRangeEvent(
+                    ResourceLocation.fromNamespaceAndPath(MOD_ID, "distant_thunder_long_rumble"),
+                    32.0F
+            )
+    );
+
     private ModSoundEvents() {
     }
 

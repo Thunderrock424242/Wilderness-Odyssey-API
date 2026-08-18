@@ -1,7 +1,9 @@
 package com.thunder.wildernessodysseyapi.ecosystem.data;
 
 import com.thunder.wildernessodysseyapi.ecosystem.EcosystemTags;
+import com.thunder.wildernessodysseyapi.ecosystem.api.ActivityTime;
 import com.thunder.wildernessodysseyapi.ecosystem.api.AnimalBehaviorTag;
+import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemBehaviorState;
 import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,8 @@ class BehaviorTagProfileFactoryTest {
         assertTrue(profile.prey().enabled());
         assertFalse(profile.predator().enabled());
         assertFalse(profile.drinking().canSwim());
+        assertEquals(ActivityTime.CREPUSCULAR, profile.environment().activeTime());
+        assertTrue(profile.environment().supports(EcosystemBehaviorState.MIGRATE));
         assertEquals(EcosystemTags.PREDATORS_ID, profile.prey().threatTags().getFirst());
     }
 
@@ -97,6 +101,7 @@ class BehaviorTagProfileFactoryTest {
         assertFalse(profile.drinking().enabled());
         assertFalse(profile.shelter().enabled());
         assertTrue(profile.drinking().canSwim());
+        assertFalse(profile.environment().supports(EcosystemBehaviorState.DRINK));
         assertTrue(profile.herd().enabled());
         assertTrue(profile.prey().enabled());
     }

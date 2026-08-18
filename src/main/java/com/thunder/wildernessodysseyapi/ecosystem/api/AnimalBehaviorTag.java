@@ -23,7 +23,10 @@ public enum AnimalBehaviorTag {
     PREY,
     PREDATOR,
     SWIMMER,
+    DIURNAL,
     NOCTURNAL,
+    CREPUSCULAR,
+    FLEXIBLE,
     SHELTER,
     SOLITARY,
     DISABLED;
@@ -56,6 +59,9 @@ public enum AnimalBehaviorTag {
             case "packs" -> "pack";
             case "predators" -> "predator";
             case "swimmers" -> "swimmer";
+            case "day", "daytime" -> "diurnal";
+            case "night", "nighttime" -> "nocturnal";
+            case "dawn_dusk", "twilight" -> "crepuscular";
             case "disable", "excluded", "ignore", "ignored", "off" -> "disabled";
             default -> normalized;
         };

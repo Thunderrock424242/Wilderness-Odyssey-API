@@ -9,7 +9,7 @@ scheduler by default. The implemented phases provide evolving atmospheric cells,
 persistence, regional client synchronization, per-column rain and snow,
 Minecraft-style functional cloud masses and distant rain curtains, overhead
 cloud optics, localized natural lightning, position-aware gameplay rain,
-diagnostics, read-only Wilderness water coupling, optional Ecliptic/Serene
+diagnostics, read-only Wilderness water coupling, optional Homeostatic/Serene
 season input, thermodynamic vapor transport, terrain lift, and layered 3D
 cloud volumes with standard cloud genera, multi-altitude decks, persistent
 moving storm/front identities, forecasting, surface accumulation, typed
@@ -184,13 +184,16 @@ the pure simulation engine.
 - Sky-light dimensions derive daylight continuously from day time. Dimensions
   without sky light use neutral `0.5` daylight. Ultra-warm dimensions add
   `20 C`; non-sky-light ceiling dimensions subtract `2 C`.
-- `SeasonalWeatherInfluence` is an optional read-only adapter. Ecliptic Seasons
-  is selected first when installed; otherwise Serene Seasons is used. If both
-  are present, Ecliptic wins so its Serene API bridge cannot apply one calendar
-  twice. Neither mod is required.
-- Ecliptic's 24 solar terms and day-within-term become a smooth normalized
-  year. Serene's cycle ticks do the same, while Serene tropical biomes use
-  their wet/dry phase.
+- `SeasonalWeatherInfluence` is an optional read-only adapter. Homeostatic
+  Seasons is selected first when installed; otherwise Serene Seasons is used.
+  If both are present, Homeostatic wins so Wilderness consumes one calendar
+  exactly once. Neither mod is required.
+- Homeostatic's 12 ordered sub-seasons become a normalized year. Its configured
+  calendar uses the public sub-season length and remaining ticks for smooth
+  progress. Fixed and real-time calendars expose no compatible total duration,
+  so Wilderness uses the midpoint of their reported sub-season. Serene's cycle
+  ticks produce a smooth year, while Serene tropical biomes use their wet/dry
+  phase.
 - Seasons shift target temperature, humidity, storm development, and
   evaporation. They never replace Wilderness weather state or mutate the
   external calendar. Those continuous shifts also change the derived cloud
@@ -226,10 +229,13 @@ Season balance is server-configurable:
 | `humidityAmplitude` | `0.12` | Maximum relative-humidity shift. |
 | `storminessAmplitude` | `0.18` | Maximum convective-development shift. |
 
-Temperate influence is continuous across season boundaries instead of changing
-weather in four abrupt steps. Warm/wet phases increase convection and warm
-phases increase evaporation; cold/dry phases suppress them. Serene tropical wet
-seasons increase moisture and storm potential, while dry seasons reduce both.
+Temperate influence follows a twelve-part or continuous calendar instead of
+changing weather in four abrupt steps. Homeostatic's configured calendar and
+Serene's temperate cycle progress continuously; Homeostatic fixed/real-time
+calendars remain stable at the reported sub-season midpoint. Warm/wet phases
+increase convection and warm phases increase evaporation; cold/dry phases
+suppress them. Serene tropical wet seasons increase moisture and storm
+potential, while dry seasons reduce both.
 
 ## Cold Sweat and Thirst Was Taken
 
@@ -584,6 +590,53 @@ the authoritative categorical type from a primitive-keyed snapshot map,
 avoiding temporary `WeatherSample` records in vanilla's high-frequency
 precipitation render loop.
 
+### Approaching-storm distant thunder
+
+`DistantThunderSystemSyncPayload` is a separate, compact, one-way summary of
+the existing persistent storm identities. It does not expand the atmospheric
+cell region to six kilometers. On the normal weather synchronization boundary,
+the server samples each tracked storm center through `AtmosphereGrid`'s bounded
+spatial lookup and sends only storm IDs, position/radius, lifecycle, motion,
+organization, and the current authoritative cell's convective fields. Front
+identities are not permitted in this payload. Unchanged summaries send nothing,
+and clients have no server-bound audio or storm-state message.
+
+The client method `canProduceThunderstormAudio` deliberately treats
+precipitation type as only the first gate. A storm must be `RAIN` or `HAIL` and
+must satisfy all of these thresholds:
+
+- persistent system intensity at or above client `minimumStormIntensity`
+  (`0.50` by default);
+- precipitation intensity at least `0.25`;
+- storm energy at least `0.55`;
+- convective instability at least `0.35`; and
+- derived thunder potential at least `0.35`.
+
+That last value is the same precipitation-weighted storm-energy/instability
+signal used by `WeatherSample.lightningEligible()`. Consequently `LIGHT_RAIN`
+cannot qualify, and an ordinary `RAIN` cell with gentle precipitation or weak
+convective energy also cannot qualify. A tracked `STORM` label by itself never
+produces audio. Severe tornado/cyclone identities receive a stronger audio
+classification only after the same cell gates pass.
+
+Every client evaluates at most 64 synchronized storm summaries once per 40
+ticks, caches one best candidate, and applies hysteresis so comparable cells do
+not alternate direction. Distance is measured from the storm's outer radius.
+Volume rises and randomized interval length falls as that edge approaches;
+motion toward the listener is emphasized, while a moving-away storm is quieter
+and is rejected beyond 60 percent of the audible range. The default outer range
+is 6,144 blocks, allowing roughly 2--6 km warning when a real tracked storm
+exists there. Lifecycle also matters: mature cells use full audio strength,
+forming cells are restrained, and weakening cells fade in both volume and
+frequency. Multiple players select independently from their own positions.
+
+Playback uses a short virtual point toward the real storm for stereo direction,
+never an entity. Four non-repeating profiles (low rumble, rolling thunder, deep
+distant crack, and long rumble) reuse Minecraft's thunder sample pool at
+different pitches. When the player's local sample becomes lightning-eligible,
+distant scheduling stops immediately and normal localized lightning entities
+continue to own local thunder, flashes, rods, fire, and gameplay effects.
+
 ## Localized precipitation rendering
 
 Two narrow client mixins integrate with vanilla rendering without globally
@@ -717,6 +770,10 @@ atlas blend, active altitude bands, distant-field state, visible sample count,
 carrier/fallback vertex count, and average coverage. Server activity state
 remains available through `/wilderness weather cell` and `dump` rather than
 adding activity metadata to every client cell.
+Two additional lines expose the selected distant-thunder storm ID and
+classification, edge distance, intensity, approaching/crossing/moving-away
+state, synchronized storm count, next randomized timer, calculated volume,
+last sound profile, and whether local thunder has taken over.
 
 ## Client cloud configuration
 
@@ -756,6 +813,15 @@ synchronized atmospheric footprint.
 | `opacity` | `0.78` | `0.15..1.25`; visual precipitation opacity without changing gameplay intensity. |
 | `impactDensity` | `0.32` | `0..1`; probability scale for restrained procedural surface impacts. |
 | `maximumImpacts` | `256` | `32..1024`; hard cap on simultaneously animated rain and hail impacts. |
+
+| Config path under `distant_thunder` | Default | Allowed range or behavior |
+| --- | ---: | --- |
+| `distantThunderEnabled` | `true` | Enables client-local approaching-storm thunder without changing weather or lightning authority. |
+| `minimumStormIntensity` | `0.50` | `0..1`; additional tracked-system gate. Cell precipitation, energy, instability, and thunder thresholds still apply. |
+| `maximumAudibleDistance` | `6144` | `512..16384`; distance in blocks from the storm's outer radius. |
+| `minimumThunderInterval` | `8` | `2..300` seconds; nearest/strongest storms approach this randomized lower bound. |
+| `maximumThunderInterval` | `75` | `2..600` seconds and never below the minimum; distant/fading storms approach this upper bound. |
+| `volumeMultiplier` | `1.0` | `0..2`; applied after distance, intensity, classification, and motion attenuation. |
 
 Minecraft's normal Clouds option still selects Off, Fast, or Fancy. Off skips
 the cloud render call entirely; the client config does not force clouds back
@@ -851,10 +917,11 @@ and duration into the localized authority.
 
 `WildfireRiskModel` combines the existing drought hazard with air temperature,
 humidity, persistent surface wetness/snowpack, wind, precipitation, and a new
-normalized fire-season signal. Ecliptic and temperate Serene calendars expose a
-narrow midsummer window. Serene tropical dry phases supply the corresponding
-fire season. If no calendar is available, Wilderness does not create another
-calendar; only a stricter exceptional-heat and drought fallback can qualify.
+normalized fire-season signal. Homeostatic and temperate Serene calendars
+expose a narrow midsummer window. Serene tropical dry phases supply the
+corresponding fire season. If no calendar is available, Wilderness does not
+create another calendar; only a stricter exceptional-heat and drought fallback
+can qualify.
 
 The normal eligibility gates are drought at least `0.80`, humidity no more than
 `0.28`, temperature at least `30 C`, surface wetness no more than `0.08`, no
@@ -922,7 +989,7 @@ snapshot. Autonomous atmospheric evolution pauses for the vanilla duration;
 rain and thunder clear when that duration expires, then normal simulation
 resumes. Vanilla rain becomes snow only when wet-bulb temperature is below the
 normal snow threshold and the cell is in either a permanently cold biome or an
-Ecliptic/Serene temperate winter. A cold snap alone cannot turn an ordinary
+Homeostatic/Serene temperate winter. A cold snap alone cannot turn an ordinary
 non-winter biome's rain into snow.
 
 The `/wilderness weather` commands remain localized diagnostics and testing
@@ -1055,7 +1122,7 @@ Additional limits and compatibility boundaries:
 - the renderer samples a known opaque texel in the active cloud texture so a
   rainy voxel cannot contain vanilla texture holes. A resource pack that makes
   that texel transparent can weaken the visible coverage guarantee;
-- Ecliptic and Serene calendars influence climate, but visual snow cover and
+- Homeostatic and Serene calendars influence climate, but visual snow cover and
   crop/foliage season behavior remain owned by those mods. If their documented
   APIs change, the guarded adapter logs once and returns neutral influence;
 - Cold Sweat and Thirst Was Taken adapters intentionally log once and become
@@ -1092,7 +1159,7 @@ explicitly changes them; changing size resets atmospheric state.
    rain quads, particles, precipitation sounds, sky darkening, air fog, and
    cloud cover around every Overworld player. Move into a newly relevant cell
    during the duration and confirm it receives the same rain. In a cold biome
-   or an Ecliptic/Serene temperate winter, confirm freezing wet-bulb air
+   or a Homeostatic/Serene temperate winter, confirm freezing wet-bulb air
    produces snow instead. Confirm an ordinary non-winter biome remains rain
    through a short cold snap. Run
    `/weather thunder 20s` and confirm the local sample becomes
@@ -1160,13 +1227,13 @@ explicitly changes them; changing size resets atmospheric state.
    With an exposed mountain ridge, compare the windward and leeward cells and
    confirm positive vertical motion/cloud depth develops preferentially where
    wind climbs the cached terrain gradient.
-7. **Verify season integration.** Test Ecliptic Seasons alone, Serene Seasons
+7. **Verify season integration.** Test Homeostatic Seasons alone, Serene Seasons
    alone, and then both together. Let at least one 400-tick environment refresh
    pass after changing the calendar. Confirm F3/server samples move smoothly in
    the expected temperature/humidity direction. In Serene tropical biomes,
    confirm wet phases increase humidity/storm potential and dry phases reduce
-   them. With both mods installed, confirm the log selects Ecliptic exactly once
-   and weather does not receive doubled seasonal amplitude.
+   them. With both mods installed, confirm the log selects Homeostatic exactly
+   once and weather does not receive doubled seasonal amplitude.
 8. **Verify restart persistence.** Force weather, record `sample` and `cell`,
    run `/save-all flush`, stop cleanly, restart, and return to the same
    coordinates. Confirm the cell revision/state and weather continuity survive;
@@ -1191,8 +1258,8 @@ explicitly changes them; changing size resets atmospheric state.
     place one lit normal campfire under open sky and a broad ring of leaves four
     to ten blocks away. Run `/wilderness weather wildfire risk` and confirm
     ordinary, wet, rainy, winter, and low-wind conditions are not eligible. Use
-    Ecliptic or Serene to enter midsummer/dry season and create an extreme hot,
-    dry, windy cell; confirm the diagnostic exposes every factor. For a direct
+    Homeostatic or Serene to enter midsummer/dry season and create an extreme
+    hot, dry, windy cell; confirm the diagnostic exposes every factor. For a direct
     world-path check, run `/wilderness weather wildfire ignite` and confirm one
     vanilla fire appears on exposed tagged fuel without loading new chunks.
     Repeat with a soul campfire, roof, local rain, and `doFireTick=false`; each
@@ -1270,13 +1337,24 @@ explicitly changes them; changing size resets atmospheric state.
     conditions add only the configured bounded amount. Install both and confirm
     thermal thirst pressure is not doubled. Disable each integration separately
     and confirm the corresponding mod immediately returns to its own behavior.
+25. **Verify distant thunder qualification and handoff.** With no systems, clear
+    weather, light rain, and gentle normal rain, confirm the two F3 distant-audio
+    lines show no selected storm and no sound plays. Observe or instrument a
+    qualified thunderstorm 2--6 km away moving toward the player; confirm quiet,
+    rare directional rumbles begin before local precipitation. Compare the F3
+    distance, volume, and timer while it approaches, passes, and moves away.
+    Create two candidate storms and confirm only one is selected at a time. Put
+    two clients at different locations and confirm their selected storm and
+    volume differ. Finally enter the lightning-eligible local cell and confirm
+    `local takeover yes`, distant scheduling stops, and normal lightning/thunder
+    remains functional.
 
 ## Weather roadmap
 
 The next phases focus on validation, readable forecasting tools, and optional
 visual depth without creating another weather authority:
 
-1. **Compatibility and performance validation.** Run Ecliptic-only,
+1. **Compatibility and performance validation.** Run Homeostatic-only,
    Serene-only, Cold-Sweat-only, Thirst-only, combined survival/season, and
    external-weather-owner client matrices. Profile multi-dimension/high-player
    workloads and the horizon/surface render tiers before increasing default

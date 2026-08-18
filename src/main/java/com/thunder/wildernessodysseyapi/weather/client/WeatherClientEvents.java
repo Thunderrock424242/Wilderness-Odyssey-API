@@ -2,6 +2,9 @@ package com.thunder.wildernessodysseyapi.weather.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.api.WindManager;
+import com.thunder.wildernessodysseyapi.weather.api.WindSample;
+import com.thunder.wildernessodysseyapi.weather.client.audio.DistantThunderAudioManager;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudLightingModel;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.LocalizedCloudRenderer;
@@ -47,6 +50,7 @@ public final class WeatherClientEvents {
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
+        DistantThunderAudioManager.tick(minecraft);
         if (minecraft.options.getCloudsType() == CloudStatus.OFF
                 || !WeatherRenderingConfig.settings().enabled()
                 || !ClientWeatherCoordinator.controls(minecraft.level)) {
@@ -66,6 +70,7 @@ public final class WeatherClientEvents {
         LocalizedPrecipitationRenderer.clear();
         WeatherImpactRenderer.clear();
         WeatherSurfaceRenderer.clear();
+        DistantThunderAudioManager.clearAll();
         ClientWeatherCoordinator.clearAll();
     }
 
@@ -76,6 +81,7 @@ public final class WeatherClientEvents {
         LocalizedPrecipitationRenderer.clear();
         WeatherImpactRenderer.clear();
         WeatherSurfaceRenderer.clear();
+        DistantThunderAudioManager.clearAll();
         ClientWeatherCoordinator.clearAll();
     }
 
@@ -87,6 +93,7 @@ public final class WeatherClientEvents {
             LocalizedPrecipitationRenderer.clear();
             WeatherImpactRenderer.clear();
             WeatherSurfaceRenderer.clear();
+            DistantThunderAudioManager.clearLevel(clientLevel);
             ClientWeatherCoordinator.clearLevel(clientLevel);
         }
     }
@@ -194,6 +201,7 @@ public final class WeatherClientEvents {
         int cellX = Math.floorDiv(pos.getX(), state.cellSize());
         int cellZ = Math.floorDiv(pos.getZ(), state.cellSize());
         WeatherSample sample = ClientWeatherCoordinator.sampleAt(level, pos);
+        WindSample wind = WindManager.getWind(level, pos);
         float thunder = ClientWeatherCoordinator.thunderContribution(sample);
         CloudFieldSample cloudField = ClientWeatherCoordinator.cloudFieldAt(
                 level,
@@ -211,6 +219,7 @@ public final class WeatherClientEvents {
         LocalizedPrecipitationRenderer.Diagnostics precipitation =
                 LocalizedPrecipitationRenderer.diagnostics();
         WeatherHazardModel.HazardProfile hazards = WeatherHazardModel.evaluate(sample);
+        DistantThunderAudioManager.Diagnostics thunderAudio = DistantThunderAudioManager.diagnostics();
 
         return List.of(
                 String.format(
@@ -247,6 +256,19 @@ public final class WeatherClientEvents {
                         sample.wind().z(),
                         sample.cloudWind().x(),
                         sample.cloudWind().z()
+                ),
+                String.format(
+                        Locale.ROOT,
+                        "Resolved wind %.3f, %.3f, %.3f | %.2f + gust %.2f = %.2f blocks/s | weather %.2f | region %d,%d",
+                        wind.direction().x,
+                        wind.direction().y,
+                        wind.direction().z,
+                        wind.speed(),
+                        wind.gust(),
+                        wind.effectiveSpeed(),
+                        wind.weatherContribution(),
+                        wind.region().x(),
+                        wind.region().z()
                 ),
                 String.format(
                         Locale.ROOT,
@@ -303,7 +325,44 @@ public final class WeatherClientEvents {
                         precipitation.distantShafts(),
                         precipitation.vertices(),
                         WeatherImpactRenderer.activeImpactCount()
-                )
+                ),
+                distantThunderSelectionLine(thunderAudio),
+                distantThunderTimerLine(thunderAudio)
+        );
+    }
+
+    private static String distantThunderSelectionLine(DistantThunderAudioManager.Diagnostics diagnostics) {
+        if (!diagnostics.selected()) {
+            return String.format(
+                    Locale.ROOT,
+                    "Distant thunder: none selected | %d synchronized storms | local takeover %s",
+                    diagnostics.synchronizedStorms(),
+                    diagnostics.localTakeover() ? "yes" : "no"
+            );
+        }
+        return String.format(
+                Locale.ROOT,
+                "Distant thunder #%d %s/%s/%s | %.0f blocks | intensity %.3f | %s",
+                diagnostics.stormId(),
+                diagnostics.type(),
+                diagnostics.stage(),
+                diagnostics.classification(),
+                diagnostics.distanceBlocks(),
+                diagnostics.stormIntensity(),
+                diagnostics.movement()
+        );
+    }
+
+    private static String distantThunderTimerLine(DistantThunderAudioManager.Diagnostics diagnostics) {
+        String timer = diagnostics.nextThunderTicks() < 0
+                ? "--"
+                : String.format(Locale.ROOT, "%.1f s", diagnostics.nextThunderTicks() / 20.0);
+        return String.format(
+                Locale.ROOT,
+                "Distant audio volume %.3f | next %s | last variant %s",
+                diagnostics.calculatedVolume(),
+                timer,
+                diagnostics.lastVariant()
         );
     }
 

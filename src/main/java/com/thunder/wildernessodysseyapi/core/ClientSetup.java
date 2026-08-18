@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.meteor.renderer.MeteorRenderer;
 import com.thunder.wildernessodysseyapi.temporalrift.client.RiftCoreBlockEntityRenderer;
 import com.thunder.wildernessodysseyapi.temporalrift.client.TemporalRiftShaders;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockEntities;
+import com.thunder.wildernessodysseyapi.vegetation.client.ReactiveVegetationClientColors;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterShaders;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.VolumetricCloudShaders;
@@ -25,6 +26,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterShadersEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
@@ -76,6 +78,12 @@ public class ClientSetup {
         event.registerEntityRenderer(ModEntities.RIFT_MAW.get(), RiftMawRenderer::new);
         event.registerEntityRenderer(ModEntities.RIFTBOUND_WRAITH.get(), RiftboundWraithRenderer::new);
         event.registerBlockEntityRenderer(TemporalRiftBlockEntities.RIFT_CORE.get(), RiftCoreBlockEntityRenderer::new);
+    }
+
+    /** Registers visual-only regional drought tinting for vanilla grass-family blocks. */
+    @SubscribeEvent
+    public static void onRegisterBlockColors(RegisterColorHandlersEvent.Block event) {
+        ReactiveVegetationClientColors.register(event);
     }
 
     @SubscribeEvent

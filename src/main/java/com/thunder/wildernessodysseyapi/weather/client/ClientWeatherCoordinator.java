@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.weather.client;
 
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.api.WindSettings;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudLightingModel;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudShadowModel;
@@ -106,7 +107,7 @@ public final class ClientWeatherCoordinator {
             WeatherSnapshot previous = transitionSource(oldState, next, now);
 
             SEQUENCE_WATERMARKS.put(payload.dimension(), payload.sequence());
-            activeState = new State(previous, next, now);
+            activeState = new State(previous, next, now, payload.windSettings());
             return true;
         }
     }
@@ -127,6 +128,12 @@ public final class ClientWeatherCoordinator {
     /** Returns the temporally and spatially interpolated sample at a vector position. */
     public static WeatherSample sampleAt(ClientLevel level, Vec3 pos) {
         return pos == null ? WeatherSample.CLEAR : sampleAt(level, pos.x, pos.z);
+    }
+
+    /** Returns the newest server-authored wind controls for this client level. */
+    public static WindSettings windSettings(ClientLevel level) {
+        State state = matchingState(level);
+        return state == null ? WindSettings.DISABLED : state.windSettings();
     }
 
     /** Returns the support-aware cloud field at a vector position. */
@@ -486,7 +493,16 @@ public final class ClientWeatherCoordinator {
                 : PrecipitationType.RAIN;
     }
 
-    private record State(WeatherSnapshot previous, WeatherSnapshot current, long transitionStartNanos) {
+    private record State(
+            WeatherSnapshot previous,
+            WeatherSnapshot current,
+            long transitionStartNanos,
+            WindSettings windSettings
+    ) {
+        private State {
+            windSettings = windSettings == null ? WindSettings.DISABLED : windSettings;
+        }
+
         double progress(long now) {
             return clamp01((double) (now - transitionStartNanos) / TRANSITION_NANOS);
         }

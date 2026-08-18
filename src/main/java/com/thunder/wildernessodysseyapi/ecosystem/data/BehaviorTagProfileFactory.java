@@ -2,10 +2,13 @@ package com.thunder.wildernessodysseyapi.ecosystem.data;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.ecosystem.EcosystemTags;
+import com.thunder.wildernessodysseyapi.ecosystem.api.ActivityTime;
 import com.thunder.wildernessodysseyapi.ecosystem.api.AnimalBehaviorTag;
+import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemBehaviorState;
 import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
@@ -72,16 +75,24 @@ public final class BehaviorTagProfileFactory {
                 ModConstants.MOD_ID,
                 source + "/" + entityId.getNamespace() + "/" + entityId.getPath()
         );
+        SpeciesBehaviorProfile.Needs needs = needs(archetype, nocturnal);
+        SpeciesBehaviorProfile.Drinking drinking = drinking(archetype, swimmer);
+        SpeciesBehaviorProfile.Shelter shelterSettings = shelter(archetype, shelter);
+        SpeciesBehaviorProfile.Herd herdSettings = herd(archetype, herd, tags);
+        SpeciesBehaviorProfile.Prey preySettings = prey(archetype, prey);
+        SpeciesBehaviorProfile.Predator predatorSettings = predator(archetype, predator, wolf);
         return new SpeciesBehaviorProfile(
                 profileId,
                 Set.of(entityId),
                 Set.of(),
-                needs(archetype, nocturnal),
-                drinking(archetype, swimmer),
-                shelter(archetype, shelter),
-                herd(archetype, herd, tags),
-                prey(archetype, prey),
-                predator(archetype, predator, wolf)
+                needs,
+                drinking,
+                shelterSettings,
+                herdSettings,
+                preySettings,
+                predatorSettings,
+                environment(
+                        archetype, tags, drinking, shelterSettings, herdSettings, preySettings)
         );
     }
 
@@ -188,6 +199,78 @@ public final class BehaviorTagProfileFactory {
         return new SpeciesBehaviorProfile.Predator(
                 enabled, 20, 0.78, 12_000, 4, 20, 1.15, true,
                 wolf ? List.of(EcosystemTags.WOLF_PREY_ID) : List.of(EcosystemTags.PREY_ID));
+    }
+
+    // Broad environmental routines are capability sets, not one hardcoded animal switch.
+    private static SpeciesBehaviorProfile.Environment environment(
+            Archetype archetype,
+            Set<AnimalBehaviorTag> tags,
+            SpeciesBehaviorProfile.Drinking drinking,
+            SpeciesBehaviorProfile.Shelter shelter,
+            SpeciesBehaviorProfile.Herd herd,
+            SpeciesBehaviorProfile.Prey prey
+    ) {
+        ActivityTime activeTime = activityTime(archetype, tags);
+        EnumSet<EcosystemBehaviorState> states = EnumSet.of(
+                EcosystemBehaviorState.IDLE,
+                EcosystemBehaviorState.FORAGE,
+                EcosystemBehaviorState.TRAVEL,
+                EcosystemBehaviorState.REST,
+                EcosystemBehaviorState.SLEEP
+        );
+        if (drinking.enabled()) {
+            states.add(EcosystemBehaviorState.DRINK);
+        }
+        if (shelter.enabled()) {
+            states.add(EcosystemBehaviorState.SEEK_SHELTER);
+        }
+        if (prey.enabled()) {
+            states.add(EcosystemBehaviorState.FLEE);
+        }
+        if (herd.enabled()) {
+            states.add(EcosystemBehaviorState.MIGRATE);
+        }
+        return switch (archetype) {
+            case BIRD -> new SpeciesBehaviorProfile.Environment(
+                    activeTime, -5.0, 31.0, 0.10, 0.34, 0.66, 0.12,
+                    10, 24, 1_100, 90, 220, states);
+            case WOLF -> new SpeciesBehaviorProfile.Environment(
+                    activeTime, -15.0, 28.0, 0.13, 0.55, 0.72, 0.10,
+                    16, 36, 1_200, 120, 260, states);
+            case AQUATIC -> new SpeciesBehaviorProfile.Environment(
+                    activeTime, 2.0, 30.0, 0.0, 0.44, 0.65, 0.10,
+                    14, 32, 900, 100, 220, states);
+            case OMNIVORE -> new SpeciesBehaviorProfile.Environment(
+                    activeTime, -5.0, 29.0, 0.15, 0.38, 0.64, 0.14,
+                    12, 28, 900, 110, 240, states);
+            case HERBIVORE -> new SpeciesBehaviorProfile.Environment(
+                    activeTime, -10.0, 27.0, 0.16, 0.35, 0.62, 0.16,
+                    14, 32, 1_100, 120, 260, states);
+            case GENERIC -> new SpeciesBehaviorProfile.Environment(
+                    activeTime, -10.0, 30.0, 0.12, 0.42, 0.66, 0.15,
+                    12, 24, 900, 100, 220, states);
+        };
+    }
+
+    private static ActivityTime activityTime(Archetype archetype, Set<AnimalBehaviorTag> tags) {
+        if (tags.contains(AnimalBehaviorTag.DIURNAL)) {
+            return ActivityTime.DIURNAL;
+        }
+        if (tags.contains(AnimalBehaviorTag.NOCTURNAL)) {
+            return ActivityTime.NOCTURNAL;
+        }
+        if (tags.contains(AnimalBehaviorTag.CREPUSCULAR)) {
+            return ActivityTime.CREPUSCULAR;
+        }
+        if (tags.contains(AnimalBehaviorTag.FLEXIBLE)) {
+            return ActivityTime.FLEXIBLE;
+        }
+        return switch (archetype) {
+            case HERBIVORE -> ActivityTime.CREPUSCULAR;
+            case BIRD -> ActivityTime.DIURNAL;
+            case WOLF -> ActivityTime.NOCTURNAL;
+            case GENERIC, OMNIVORE, AQUATIC -> ActivityTime.FLEXIBLE;
+        };
     }
 
     private enum Archetype {

@@ -10,6 +10,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies compact persistence keeps major needs while dropping transient AI targets. */
 class AnimalNeedsStateTest {
@@ -41,5 +42,18 @@ class AnimalNeedsStateTest {
         assertNull(restored.threatPosition());
         assertFalse(restored.controllerInstalled());
         assertFalse(serialized.contains("threat"));
+    }
+
+    @Test
+    void simulationOwnedNoAiMarkerSurvivesRestartAndRestoresOriginalValue() {
+        AnimalNeedsState original = new AnimalNeedsState();
+        original.suspendAiForSimulation(false);
+
+        AnimalNeedsState restored = new AnimalNeedsState();
+        restored.deserializeNBT(null, original.serializeNBT(null));
+
+        assertTrue(restored.simulationAiSuspended());
+        assertFalse(restored.resumeAiFromSimulation());
+        assertFalse(restored.simulationAiSuspended());
     }
 }

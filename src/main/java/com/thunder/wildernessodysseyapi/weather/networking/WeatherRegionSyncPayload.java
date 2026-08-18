@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationIntensity;
 import com.thunder.wildernessodysseyapi.weather.api.SurfaceWeatherState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.api.WindSettings;
 import com.thunder.wildernessodysseyapi.weather.api.WindVector;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -35,6 +36,7 @@ import java.util.Set;
  * @param cellSize atmospheric cell width in blocks
  * @param centerCellX center cell X for this region
  * @param centerCellZ center cell Z for this region
+ * @param windSettings captured server controls used for deterministic client wind
  * @param cells immutable full-region or changed-cell snapshots
  */
 public record WeatherRegionSyncPayload(
@@ -46,11 +48,12 @@ public record WeatherRegionSyncPayload(
         int cellSize,
         int centerCellX,
         int centerCellZ,
+        WindSettings windSettings,
         List<CellSnapshot> cells
 ) implements CustomPacketPayload {
 
     /** Current atmospheric snapshot schema understood by server and client. */
-    public static final int DATA_VERSION = 3;
+    public static final int DATA_VERSION = 4;
     /** Descriptive alias used by payload construction and validation code. */
     public static final int CURRENT_DATA_VERSION = DATA_VERSION;
     /** Hard cap for a 17 by 17 region around one player. */
@@ -82,6 +85,7 @@ public record WeatherRegionSyncPayload(
 
     public WeatherRegionSyncPayload {
         dimension = Objects.requireNonNull(dimension, "dimension");
+        windSettings = Objects.requireNonNullElse(windSettings, WindSettings.DEFAULT);
         cells = List.copyOf(Objects.requireNonNull(cells, "cells"));
         validateHeader(dataVersion, sequence, cellSize);
         if (cells.size() > MAX_CELLS) {
@@ -104,6 +108,32 @@ public record WeatherRegionSyncPayload(
         }
     }
 
+    /** Retains the weather-v3 construction shape with default wind controls. */
+    public WeatherRegionSyncPayload(
+            ResourceLocation dimension,
+            int dataVersion,
+            long sequence,
+            boolean enabled,
+            boolean replaceRegion,
+            int cellSize,
+            int centerCellX,
+            int centerCellZ,
+            List<CellSnapshot> cells
+    ) {
+        this(
+                dimension,
+                dataVersion,
+                sequence,
+                enabled,
+                replaceRegion,
+                cellSize,
+                centerCellX,
+                centerCellZ,
+                WindSettings.DEFAULT,
+                cells
+        );
+    }
+
     /** Creates the explicit reset sent when localized weather is disabled. */
     public static WeatherRegionSyncPayload disabled(
             ResourceLocation dimension,
@@ -121,6 +151,7 @@ public record WeatherRegionSyncPayload(
                 cellSize,
                 centerCellX,
                 centerCellZ,
+                WindSettings.DISABLED,
                 List.of()
         );
     }
@@ -174,6 +205,15 @@ public record WeatherRegionSyncPayload(
             buffer.writeByte(quantizeUnit(cell.snowpack, UNSIGNED_BYTE_MAX));
             buffer.writeByte(quantizeUnit(cell.frozenFraction, UNSIGNED_BYTE_MAX));
         }
+
+        // Wind is derived per query, so one captured profile per low-frequency
+        // weather payload replaces any per-tick wind synchronization.
+        buffer.writeBoolean(payload.windSettings.enabled());
+        buffer.writeFloat(payload.windSettings.baseWindStrength());
+        buffer.writeFloat(payload.windSettings.gustFrequency());
+        buffer.writeFloat(payload.windSettings.gustStrength());
+        buffer.writeFloat(payload.windSettings.stormWindMultiplier());
+        buffer.writeFloat(payload.windSettings.maxWindSpeed());
     }
 
     private static WeatherRegionSyncPayload decode(FriendlyByteBuf buffer) {
@@ -270,6 +310,15 @@ public record WeatherRegionSyncPayload(
             ));
         }
 
+        WindSettings windSettings = new WindSettings(
+                buffer.readBoolean(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat()
+        );
+
         return new WeatherRegionSyncPayload(
                 dimension,
                 dataVersion,
@@ -279,6 +328,7 @@ public record WeatherRegionSyncPayload(
                 cellSize,
                 centerCellX,
                 centerCellZ,
+                windSettings,
                 cells
         );
     }

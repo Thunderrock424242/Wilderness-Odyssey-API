@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.weather.networking;
 
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationIntensity;
+import com.thunder.wildernessodysseyapi.weather.api.WindSettings;
 import com.thunder.wildernessodysseyapi.weather.integration.LocalizedPrecipitationPolicy;
 import io.netty.buffer.Unpooled;
 import net.minecraft.network.FriendlyByteBuf;
@@ -26,6 +27,7 @@ class WeatherRegionSyncPayloadTest {
 
     @Test
     void codecRoundTripPreservesHeaderAndQuantizedCellState() {
+        WindSettings windSettings = new WindSettings(true, 3.5F, 4.0F, 6.5F, 2.1F, 30.0F);
         var cell = new WeatherRegionSyncPayload.CellSnapshot(
                 -12,
                 8,
@@ -58,6 +60,7 @@ class WeatherRegionSyncPayloadTest {
                 256,
                 -10,
                 7,
+                windSettings,
                 List.of(cell)
         );
 
@@ -75,6 +78,7 @@ class WeatherRegionSyncPayloadTest {
             assertEquals(256, decoded.cellSize());
             assertEquals(-10, decoded.centerCellX());
             assertEquals(7, decoded.centerCellZ());
+            assertEquals(windSettings, decoded.windSettings());
             assertEquals(-12, decodedCell.cellX());
             assertEquals(8, decodedCell.cellZ());
             assertEquals(42L, decodedCell.revision());

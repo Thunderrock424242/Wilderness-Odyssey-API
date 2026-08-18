@@ -2,6 +2,8 @@ package com.thunder.wildernessodysseyapi.core;
 
 import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
 import com.thunder.wildernessodysseyapi.ecosystem.state.AnimalNeedsState;
+import com.thunder.wildernessodysseyapi.vegetation.network.ReactiveVegetationAttachmentSyncHandler;
+import com.thunder.wildernessodysseyapi.vegetation.state.ReactiveVegetationState;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.GeneratedWaterAttachmentSyncHandler;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
@@ -62,6 +64,18 @@ public final class ModAttachments {
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<AnimalNeedsState>> ANIMAL_NEEDS = ATTACHMENTS.register(
             "animal_needs",
             () -> AttachmentType.serializable(holder -> new AnimalNeedsState()).build()
+    );
+
+    /** Compact persistent regional climate for one loaded vegetation chunk. */
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<ReactiveVegetationState>> REACTIVE_VEGETATION = ATTACHMENTS.register(
+            "reactive_vegetation",
+            () -> AttachmentType.serializable(holder -> {
+                ReactiveVegetationState state = new ReactiveVegetationState();
+                if (holder instanceof ChunkAccess chunk) {
+                    state.setDirtyListener(() -> chunk.setUnsaved(true));
+                }
+                return state;
+            }).sync(ReactiveVegetationAttachmentSyncHandler.INSTANCE).build()
     );
 
     private ModAttachments() {
