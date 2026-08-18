@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.meteor.worldgen;
 
 import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteServices;
 import com.thunder.wildernessodysseyapi.util.SimplexNoise;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -70,7 +71,7 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
 
         // ---- Persist site for radiation system ----
         if (world instanceof ServerLevel serverLevel) {
-            MeteorSavedData.get(serverLevel).addMeteor(center, craterRadius);
+            MeteorSiteServices.recordGeneratedSite(serverLevel, center, craterRadius);
         }
 
         return true;

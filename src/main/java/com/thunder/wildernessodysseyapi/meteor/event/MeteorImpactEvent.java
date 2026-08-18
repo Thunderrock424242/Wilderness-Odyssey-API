@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.meteor.event;
 
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.meteor.entity.MeteorEntity;
+import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -71,36 +72,60 @@ public final class MeteorImpactEvent {
             return;
         }
 
-        spawnMeteorShower(level, -1);
+        requestMeteorShower(level, -1, MeteorSiteSource.NATURAL);
     }
 
     /**
-     * Public entry point used by both the random scheduler and the /weather meteor command.
+     * Public compatibility entry point for command-driven showers.
      *
      * @param level  the server overworld level
      * @param count  exact number of meteors to spawn, or -1 to use the config min/max range
      */
     public static void spawnMeteorShower(ServerLevel level, int count) {
+        requestMeteorShower(level, count, MeteorSiteSource.COMMAND);
+    }
+
+    /**
+     * Requests a source-classified shower and returns how many meteors the level accepted.
+     *
+     * <p>The meteor owner retains count bounds, player safety, landing checks,
+     * crater configuration, and successful-impact persistence.</p>
+     */
+    public static int requestMeteorShower(
+            ServerLevel level,
+            int count,
+            MeteorSiteSource source
+    ) {
         List<ServerPlayer> players = level.players();
-        if (players.isEmpty()) return;
+        if (players.isEmpty()) return 0;
 
         if (count == -1) {
             int minMeteors = MeteorConfig.MIN_METEORS.get();
             int maxMeteors = MeteorConfig.MAX_METEORS.get();
             count = minMeteors + level.random.nextInt(Math.max(1, maxMeteors - minMeteors + 1));
         }
+        count = Math.max(0, Math.min(20, count));
 
         // Resolve crater radius from config
         int craterRadius = resolveCraterRadius(level);
 
         // Spread meteors among players: each meteor picks a random player as its center
+        int spawned = 0;
         for (int i = 0; i < count; i++) {
             ServerPlayer targetPlayer = players.get(level.random.nextInt(players.size()));
-            spawnMeteor(level, targetPlayer, craterRadius);
+            if (spawnMeteor(level, targetPlayer, craterRadius, source)) {
+                spawned++;
+            }
         }
+        return spawned;
     }
 
-    private static void spawnMeteor(ServerLevel level, ServerPlayer nearPlayer, int craterRadius) {
+    private static boolean spawnMeteor(
+            ServerLevel level,
+            ServerPlayer nearPlayer,
+            int craterRadius,
+            MeteorSiteSource source
+    ) {
         int spawnRadius = MeteorConfig.SPAWN_RADIUS.get();
 
         // Try up to 20 times to find a valid landing spot
@@ -138,8 +163,8 @@ public final class MeteorImpactEvent {
 
         Vec3 spawnPos = new Vec3(spawnX, spawnY, spawnZ);
 
-        MeteorEntity meteor = MeteorEntity.create(level, spawnPos, landingPos, craterRadius);
-        level.addFreshEntity(meteor);
+        MeteorEntity meteor = MeteorEntity.create(level, spawnPos, landingPos, craterRadius, source);
+        return level.addFreshEntity(meteor);
     }
 
     // -------------------------------------------------------------------------

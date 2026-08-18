@@ -23,6 +23,10 @@ fragment-shader density raymarch, with layered and solid compatibility tiers
 when that program is unavailable. Those boundaries are intentional and are listed under
 [Known limitations](#known-limitations-and-compatibility).
 
+Cross-system consumers use the read-only regional composition described in
+[Shared world-system integration](../environment/world-system-integration.md);
+that layer never becomes a second atmosphere authority.
+
 ## Weather V3 additions
 
 - `WeatherOwnershipCoordinator` resolves one explicit weather owner. `AUTO`

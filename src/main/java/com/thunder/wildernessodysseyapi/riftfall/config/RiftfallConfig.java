@@ -24,6 +24,8 @@ public class RiftfallConfig {
     private final ModConfigSpec.IntValue endingTicks;
     private final ModConfigSpec.DoubleValue meteorSurgeChance;
     private final ModConfigSpec.IntValue meteorSurgeTicks;
+    private final ModConfigSpec.BooleanValue realMeteorSurges;
+    private final ModConfigSpec.IntValue meteorSurgeMeteorCount;
 
     private final ModConfigSpec.DoubleValue exposureGainPerTick;
     private final ModConfigSpec.DoubleValue exposureDecayShelteredPerTick;
@@ -60,6 +62,12 @@ public class RiftfallConfig {
         endingTicks = builder.defineInRange("endingTicks", 600, 100, 12000);
         meteorSurgeChance = builder.defineInRange("meteorSurgeChance", 0.2D, 0D, 1D);
         meteorSurgeTicks = builder.defineInRange("meteorSurgeTicks", 1800, 100, 12000);
+        realMeteorSurges = builder
+                .comment("Ask the meteor owner to spawn real, persisted impacts when a Riftfall enters METEOR_SURGE.")
+                .define("realMeteorSurges", true);
+        meteorSurgeMeteorCount = builder
+                .comment("Exact number of validated meteor entities requested once per Riftfall meteor surge.")
+                .defineInRange("meteorSurgeMeteorCount", 1, 0, 5);
 
         exposureGainPerTick = builder.defineInRange("exposureGainPerTick", 0.04D, 0D, 5D);
         exposureDecayShelteredPerTick = builder.defineInRange("exposureDecayShelteredPerTick", 0.08D, 0D, 5D);
@@ -95,6 +103,8 @@ public class RiftfallConfig {
     public int endingTicks() { return endingTicks.get(); }
     public double meteorSurgeChance() { return meteorSurgeChance.get(); }
     public int meteorSurgeTicks() { return meteorSurgeTicks.get(); }
+    public boolean realMeteorSurges() { return realMeteorSurges.get(); }
+    public int meteorSurgeMeteorCount() { return meteorSurgeMeteorCount.get(); }
     public double exposureGainPerTick() { return exposureGainPerTick.get(); }
     public double exposureDecayShelteredPerTick() { return exposureDecayShelteredPerTick.get(); }
     public double exposureDecayClearPerTick() { return exposureDecayClearPerTick.get(); }

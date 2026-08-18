@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.vegetation.simulation;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.vegetation.api.ReactiveVegetationServices;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -51,6 +52,7 @@ public final class ReactiveVegetationEvents {
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel() instanceof ServerLevel level) {
             ReactiveVegetationScheduler.clearLevel(level);
+            ReactiveVegetationServices.clearDisturbances(level);
         }
     }
 
@@ -58,5 +60,6 @@ public final class ReactiveVegetationEvents {
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
         ReactiveVegetationScheduler.clearAll();
+        ReactiveVegetationServices.clearAllDisturbances();
     }
 }

@@ -4,6 +4,8 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
+import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteServices;
+import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -74,6 +76,14 @@ public final class MeteorCommand {
         BlockPos impactPos = selectImpactPos(level, source.getPosition(), range, random);
 
         createImpact(level, impactPos, size, random);
+        // Publication follows physical creation so failed commands cannot leave
+        // a phantom radiation, story, or ecosystem site in saved world data.
+        MeteorSiteServices.recordImpact(
+                level,
+                impactPos,
+                size + 2,
+                MeteorSiteSource.COMMAND
+        );
 
         BlockPos finalImpactPos = impactPos;
         source.sendSuccess(() -> Component.literal(String.format(

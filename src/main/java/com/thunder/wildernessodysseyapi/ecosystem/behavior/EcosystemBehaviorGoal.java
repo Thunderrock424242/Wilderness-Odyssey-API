@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.ecosystem.behavior;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
+import com.thunder.wildernessodysseyapi.environment.api.EnvironmentServices;
+import com.thunder.wildernessodysseyapi.environment.api.RegionalEnvironmentSnapshot;
 import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemBehaviorState;
 import com.thunder.wildernessodysseyapi.ecosystem.api.EnvironmentalContext;
 import com.thunder.wildernessodysseyapi.ecosystem.api.FoodAvailabilityService;
@@ -430,7 +432,9 @@ public final class EcosystemBehaviorGoal extends Goal {
             AnimalGroup decisionGroup
     ) {
         int radiusCap = EcosystemConfig.MAXIMUM_SEARCH_RADIUS.get();
-        WeatherSample weather = WeatherServices.query().sample(level, animal.blockPosition());
+        RegionalEnvironmentSnapshot regionalEnvironment = EnvironmentServices.query()
+                .sample(level, animal.blockPosition());
+        WeatherSample weather = regionalEnvironment.weather();
         WeatherReactionDecision weatherReaction = EcosystemServices.stormReactions().assess(
                 animal,
                 profile,
@@ -453,6 +457,10 @@ public final class EcosystemBehaviorGoal extends Goal {
         double foodAvailability = profile.predator().enabled()
                 ? 0.0
                 : EcosystemServices.food().availability(animal, Math.min(radiusCap, 12));
+        if (!profile.predator().enabled()) {
+            foodAvailability *= 0.55
+                    + regionalEnvironment.influence().habitatProductivity() * 0.45;
+        }
         FoodAvailabilityService.PredatorFoodSample prey = profile.predator().enabled()
                 ? EcosystemServices.food().prey(animal, profile, Math.min(radiusCap, profile.predator().huntRadius()))
                 : new FoodAvailabilityService.PredatorFoodSample(java.util.List.of(), Optional.empty());
@@ -483,7 +491,7 @@ public final class EcosystemBehaviorGoal extends Goal {
         );
         needs.setNeeds(updated.thirst(), updated.hunger(), updated.rest(), updated.social(), updated.safetyConcern());
 
-        var watershed = WaterServices.access().getWatershedConditions(level, animal.blockPosition());
+        var watershed = regionalEnvironment.watershed();
         boolean weatherHazard = weather.precipitationIntensity() >= profile.shelter().precipitationThreshold()
                 || weather.thunderIntensity() >= profile.shelter().thunderThreshold()
                 || weather.wind().magnitude() >= profile.shelter().windThreshold()
@@ -492,7 +500,8 @@ public final class EcosystemBehaviorGoal extends Goal {
         boolean groupRequestsWater = decisionGroup != null
                 && decisionGroup.requestedState() == GroupBehavior.SEEK_WATER;
         boolean hotOrDry = weather.temperature() > profile.environment().preferredMaximumTemperatureCelsius()
-                || (weather.humidity() < 0.30 && watershed.soilSaturation() < 0.25f);
+                || (weather.humidity() < 0.30 && watershed.soilSaturation() < 0.25f)
+                || regionalEnvironment.vegetation().droughtLevel() >= 0.72;
         double drinkThreshold = profile.drinking().thirstThreshold()
                 - (hotOrDry ? profile.environment().hotDryDrinkThresholdReduction() : 0.0);
         Optional<EnvironmentalContext.WaterTarget> water = profile.drinking().enabled()
@@ -541,7 +550,8 @@ public final class EcosystemBehaviorGoal extends Goal {
                 threat,
                 herd,
                 preyTarget,
-                disturbance
+                disturbance,
+                regionalEnvironment
         );
     }
 

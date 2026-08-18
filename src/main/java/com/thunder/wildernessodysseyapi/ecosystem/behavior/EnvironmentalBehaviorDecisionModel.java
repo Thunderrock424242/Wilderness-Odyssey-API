@@ -73,6 +73,12 @@ public final class EnvironmentalBehaviorDecisionModel {
                 && environment.supports(EcosystemBehaviorState.TRAVEL)) {
             return new Decision(EcosystemBehaviorState.TRAVEL, "returning toward group center");
         }
+        if (signals.migrationPressure() >= 0.72
+                && signals.groupLeader()
+                && environment.supports(EcosystemBehaviorState.MIGRATE)) {
+            return new Decision(EcosystemBehaviorState.MIGRATE,
+                    "seasonal or regional habitat pressure");
+        }
 
         if (signals.hunger() >= environment.forageHungerThreshold()) {
             if (signals.foodAvailability() >= environment.minimumFoodForForage()
@@ -139,12 +145,45 @@ public final class EnvironmentalBehaviorDecisionModel {
             boolean cold,
             boolean hotOrDry,
             boolean disturbancePresent,
+            double migrationPressure,
             boolean routineActivityPulse,
             double thirst,
             double hunger,
             double rest,
             double foodAvailability
     ) {
+        /** Retains the original signal shape for tests and external decision callers. */
+        public Signals(
+                WildlifeSchedule.Period schedulePeriod,
+                boolean midday,
+                WildlifeWeatherResponse weatherResponse,
+                boolean exposedToSky,
+                boolean waterAvailable,
+                boolean shelterAvailable,
+                boolean threatPresent,
+                boolean regroupNeeded,
+                boolean groupLeader,
+                boolean cold,
+                boolean hotOrDry,
+                boolean disturbancePresent,
+                boolean routineActivityPulse,
+                double thirst,
+                double hunger,
+                double rest,
+                double foodAvailability
+        ) {
+            this(
+                    schedulePeriod, midday, weatherResponse, exposedToSky,
+                    waterAvailable, shelterAvailable, threatPresent, regroupNeeded,
+                    groupLeader, cold, hotOrDry, disturbancePresent, 0.0,
+                    routineActivityPulse, thirst, hunger, rest, foodAvailability
+            );
+        }
+
+        public Signals {
+            migrationPressure = Math.max(0.0, Math.min(1.0,
+                    Double.isFinite(migrationPressure) ? migrationPressure : 0.0));
+        }
     }
 
     /** Selected state and human-readable diagnostic reason. */

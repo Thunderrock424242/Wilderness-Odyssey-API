@@ -1,5 +1,9 @@
 package com.thunder.wildernessodysseyapi.riftfall;
 
+import com.thunder.wildernessodysseyapi.environment.event.WorldDisturbanceService;
+import com.thunder.wildernessodysseyapi.environment.event.WorldDisturbanceType;
+import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteSource;
+import com.thunder.wildernessodysseyapi.meteor.event.MeteorImpactEvent;
 import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
 import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
@@ -8,6 +12,8 @@ import com.thunder.wildernessodysseyapi.entity.RiftListenerEntity;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherQuery;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherServices;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
+import com.thunder.wildernessodysseyapi.vegetation.api.PlantDisturbanceType;
+import com.thunder.wildernessodysseyapi.vegetation.api.ReactiveVegetationServices;
 import net.minecraft.core.BlockPos;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -172,8 +178,31 @@ public final class RiftfallSystem {
         state.stage = nextStage;
         state.stageTicksRemaining = ticks;
 
-        if (nextStage == RiftfallStage.METEOR_SURGE && (level.getGameTime() % 100 == 0)) {
-            spawnMeteorFlavor(level);
+        if (nextStage == RiftfallStage.ACTIVE || nextStage == RiftfallStage.METEOR_SURGE) {
+            for (ServerPlayer player : level.players()) {
+                WorldDisturbanceService.publish(
+                        level,
+                        player.blockPosition(),
+                        WorldDisturbanceType.RIFTFALL,
+                        nextStage == RiftfallStage.METEOR_SURGE ? 0.95 : 0.72,
+                        96,
+                        null,
+                        false
+                );
+            }
+        }
+
+        if (nextStage == RiftfallStage.METEOR_SURGE) {
+            int spawned = RiftfallConfig.CONFIG.realMeteorSurges()
+                    ? MeteorImpactEvent.requestMeteorShower(
+                            level,
+                            RiftfallConfig.CONFIG.meteorSurgeMeteorCount(),
+                            MeteorSiteSource.RIFTFALL
+                    )
+                    : 0;
+            if (spawned == 0) {
+                spawnMeteorFlavor(level);
+            }
         }
     }
 
@@ -242,6 +271,21 @@ public final class RiftfallSystem {
                 );
                 if (!level.canSeeSky(sample)) continue;
                 BlockState state = level.getBlockState(sample);
+                boolean crop = state.getBlock() instanceof CropBlock;
+                boolean plantDamageAllowed = crop
+                        ? RiftfallConfig.CONFIG.allowCropDamage() && level.random.nextFloat() < 0.05F
+                        : level.random.nextFloat() < 0.08F;
+                ReactiveVegetationServices.PlantDisturbanceResult plantResult =
+                        ReactiveVegetationServices.applyDisturbanceAt(
+                                level,
+                                sample,
+                                PlantDisturbanceType.RIFTFALL,
+                                stage == RiftfallStage.METEOR_SURGE ? 1.0 : 0.78,
+                                plantDamageAllowed
+                        );
+                if (plantResult.plant()) {
+                    continue;
+                }
                 BlockState replacement = corrosionReplacement(state, level);
                 if (replacement != null) {
                     level.setBlock(sample, replacement, 3);
@@ -255,10 +299,6 @@ public final class RiftfallSystem {
         if (state.is(Blocks.DIRT) && level.random.nextFloat() < 0.10F) return Blocks.COARSE_DIRT.defaultBlockState();
         if (state.is(Blocks.STONE) && level.random.nextFloat() < 0.08F) return Blocks.COBBLESTONE.defaultBlockState();
         if (state.is(Blocks.COBBLESTONE) && level.random.nextFloat() < 0.08F) return Blocks.MOSSY_COBBLESTONE.defaultBlockState();
-        if (state.is(Blocks.OAK_LEAVES) && level.random.nextFloat() < 0.08F) return Blocks.DEAD_BUSH.defaultBlockState();
-        if (RiftfallConfig.CONFIG.allowCropDamage() && state.getBlock() instanceof CropBlock && level.random.nextFloat() < 0.05F) {
-            return Blocks.DEAD_BUSH.defaultBlockState();
-        }
         return null;
     }
 

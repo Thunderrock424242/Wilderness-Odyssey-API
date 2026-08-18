@@ -130,6 +130,34 @@ class EnvironmentalBehaviorDecisionModelTest {
                 EnvironmentalBehaviorDecisionModel.decide(bird, threat).state());
     }
 
+    @Test
+    void groupLeaderMigratesWhenSharedRegionalPressureIsHigh() {
+        SpeciesBehaviorProfile herbivore = profile("migrating_deer", AnimalBehaviorTag.HERBIVORE);
+        EnvironmentalBehaviorDecisionModel.Signals signals = new EnvironmentalBehaviorDecisionModel.Signals(
+                WildlifeSchedule.Period.ACTIVE,
+                false,
+                WildlifeWeatherResponse.CLEAR,
+                true,
+                true,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                0.85,
+                false,
+                0.0,
+                0.0,
+                0.0,
+                0.80
+        );
+
+        assertEquals(EcosystemBehaviorState.MIGRATE,
+                EnvironmentalBehaviorDecisionModel.decide(herbivore, signals).state());
+    }
+
     private static SpeciesBehaviorProfile profile(String path, AnimalBehaviorTag... tags) {
         return BehaviorTagProfileFactory.create(
                 ResourceLocation.fromNamespaceAndPath("test", path), Set.of(tags));

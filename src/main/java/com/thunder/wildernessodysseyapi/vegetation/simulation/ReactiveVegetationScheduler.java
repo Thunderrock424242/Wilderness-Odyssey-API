@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.vegetation.simulation;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.vegetation.api.ReactiveVegetationServices;
 import com.thunder.wildernessodysseyapi.vegetation.api.VegetationClimateState;
+import com.thunder.wildernessodysseyapi.vegetation.api.VegetationDisturbanceSample;
 import com.thunder.wildernessodysseyapi.vegetation.config.VegetationConfig;
 import com.thunder.wildernessodysseyapi.vegetation.state.ReactiveVegetationState;
 import com.thunder.wildernessodysseyapi.weather.api.SeasonalClimateState;
@@ -137,6 +138,8 @@ public final class ReactiveVegetationScheduler {
                 gameTime
         );
         stored.applyClimate(climate);
+        VegetationDisturbanceSample disturbance = ReactiveVegetationServices.disturbanceAt(
+                level, samplePosition);
 
         int configuredAttempts = VegetationConfig.UPDATES_PER_CHUNK.get();
         int plantsProcessed = 0;
@@ -173,6 +176,24 @@ public final class ReactiveVegetationScheduler {
             }
             if (result.stateChanged()) {
                 blockStateChanges++;
+            }
+            // Regional damage remains stochastic and uses the scheduler's
+            // existing bounded sample budget rather than scanning affected blocks.
+            double disturbanceRoll = ((randomBits >>> 11) * 0x1.0p-53);
+            if (disturbance.active()
+                    && disturbance.blockDamageAllowed()
+                    && disturbanceRoll < disturbance.intensity() * 0.08) {
+                ReactiveVegetationServices.PlantDisturbanceResult damage =
+                        ReactiveVegetationServices.applyDisturbanceAt(
+                                level,
+                                position,
+                                disturbance.type(),
+                                disturbance.intensity(),
+                                true
+                        );
+                if (damage.stateChanged()) {
+                    blockStateChanges++;
+                }
             }
         }
 

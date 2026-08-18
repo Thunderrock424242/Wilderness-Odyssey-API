@@ -16,6 +16,8 @@ import com.thunder.wildernessodysseyapi.ecosystem.client.EnvironmentalMemoryClie
 import com.thunder.wildernessodysseyapi.ecosystem.distant.client.ClientDistantWildlifeState;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.network.DistantWildlifeSyncPayload;
 import com.thunder.wildernessodysseyapi.ecosystem.network.EnvironmentalMemoryDebugPayload;
+import com.thunder.wildernessodysseyapi.environment.client.ClientEnvironmentState;
+import com.thunder.wildernessodysseyapi.environment.network.EnvironmentSyncPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.structure.StudioStructureService;
 import com.thunder.wildernessodysseyapi.developmentstudio.entity.StudioEntityService;
 import com.thunder.wildernessodysseyapi.developmentstudio.environment.StudioEnvironmentService;
@@ -51,7 +53,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModPayloads {
 
-    private static final String NETWORK_VERSION = "19";
+    private static final String NETWORK_VERSION = "20";
 
     private ModPayloads() {
     }
@@ -145,6 +147,15 @@ public final class ModPayloads {
                 EnvironmentalMemoryDebugPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() ->
                         EnvironmentalMemoryClientState.accept(payload))
+        );
+        registrar.playToClient(
+                EnvironmentSyncPayload.TYPE,
+                EnvironmentSyncPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player().level() instanceof net.minecraft.client.multiplayer.ClientLevel level) {
+                        ClientEnvironmentState.accept(level, payload);
+                    }
+                })
         );
 
         registrar.playToClient(
