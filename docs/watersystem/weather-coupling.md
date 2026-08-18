@@ -7,6 +7,11 @@ owner for each kind of state. `WeatherQuery` owns atmospheric sampling,
 changes. No coupling component writes directly into the atmosphere simulation
 or creates an independent water store.
 
+Wildlife, vegetation, meteor, Riftfall, and client ambience consume the same
+public boundaries through
+[Shared world-system integration](../environment/world-system-integration.md).
+That composition layer cannot place or remove water.
+
 ## Data flow and ownership
 
 The existing atmosphere input path samples generated Wilderness water and

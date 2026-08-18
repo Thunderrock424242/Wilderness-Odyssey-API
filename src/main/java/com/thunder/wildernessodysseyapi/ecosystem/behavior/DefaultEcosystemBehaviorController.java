@@ -152,7 +152,7 @@ public final class DefaultEcosystemBehaviorController implements EcosystemBehavi
                 context.gameTime() / Math.max(40L, EcosystemConfig.BEHAVIOR_UPDATE_FREQUENCY.get())
                         + context.animal().getUUID().getLeastSignificantBits(),
                 3L
-        ) == 0L;
+        ) == 0L && context.regionalEnvironment().influence().wildlifeActivity() >= 0.22;
         EnvironmentalBehaviorDecisionModel.Decision decision = EnvironmentalBehaviorDecisionModel.decide(
                 profile,
                 new EnvironmentalBehaviorDecisionModel.Signals(
@@ -168,6 +168,7 @@ public final class DefaultEcosystemBehaviorController implements EcosystemBehavi
                         cold,
                         hotOrDry,
                         context.disturbance().isPresent(),
+                        context.regionalEnvironment().influence().migrationPressure(),
                         routinePulse,
                         needs.thirst(),
                         needs.hunger(),
@@ -216,7 +217,8 @@ public final class DefaultEcosystemBehaviorController implements EcosystemBehavi
                 || context.weather().thunderIntensity() >= shelter.thunderThreshold()
                 || context.weather().wind().magnitude() >= shelter.windThreshold()
                 || context.watershed().flooding()
-                || context.watershed().floodRisk() >= 0.82f;
+                || context.watershed().floodRisk() >= 0.82f
+                || context.regionalEnvironment().influence().shelterPressure() >= 0.72;
     }
 
     private static BlockPos fallbackAway(BlockPos origin, BlockPos threat, int distance) {

@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.ai.story;
 
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookManager;
-import com.thunder.wildernessodysseyapi.meteor.worldgen.MeteorSavedData;
+import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteServices;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -131,17 +131,8 @@ public class AIChatListener {
     }
 
     private static boolean isNearMeteorSite(ServerPlayer player) {
-        BlockPos pos = player.blockPosition();
-        for (MeteorSavedData.MeteorRecord record : MeteorSavedData.get(player.serverLevel()).getMeteors()) {
-            BlockPos center = record.center();
-            long dx = center.getX() - pos.getX();
-            long dz = center.getZ() - pos.getZ();
-            long radius = Math.max(96L, record.craterRadius() + 32L);
-            if (dx * dx + dz * dz <= radius * radius) {
-                return true;
-            }
-        }
-        return false;
+        return MeteorSiteServices.isNearSite(
+                player.serverLevel(), player.blockPosition(), 96);
     }
 
     private static void addContextTag(Set<String> tags, String tag) {

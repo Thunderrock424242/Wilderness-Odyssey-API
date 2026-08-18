@@ -2,6 +2,11 @@
 
 The ecosystem module adds opt-in, server-authoritative environmental decisions to profiled pathfinding mobs. It augments vanilla goals only while an ecosystem action is active; it does not remove or permanently replace vanilla goals.
 
+Weather, water, vegetation, tide, meteor, radiation, and Riftfall conclusions
+now meet at the read-only regional snapshot described in
+[Shared world-system integration](environment/world-system-integration.md).
+The ecosystem remains the behavior and population owner.
+
 ## Architecture
 
 - `EnvironmentalContext` is an immutable snapshot for one decision pass. It carries localized weather, biome and time data, plus optional water, shelter, threat, herd, prey, food, and disturbance results.

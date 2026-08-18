@@ -1,9 +1,10 @@
 package com.thunder.wildernessodysseyapi.meteor.entity;
 
 import com.thunder.wildernessodysseyapi.core.ModEntities;
+import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteServices;
+import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteSource;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.meteor.worldgen.CraterGenerator;
-import com.thunder.wildernessodysseyapi.meteor.worldgen.MeteorSavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -42,6 +43,7 @@ public class MeteorEntity extends Entity {
 
     // Crater radius resolved from config
     private int craterRadius;
+    private MeteorSiteSource siteSource = MeteorSiteSource.UNKNOWN;
 
     // Ticks until we send the "incoming!" warning (counts down)
     private int warningCountdown;
@@ -64,12 +66,24 @@ public class MeteorEntity extends Entity {
      * @param craterRadius resolved crater radius
      */
     public static MeteorEntity create(ServerLevel level, Vec3 startPos, Vec3 targetPos, int craterRadius) {
+        return create(level, startPos, targetPos, craterRadius, MeteorSiteSource.UNKNOWN);
+    }
+
+    /** Creates a meteor whose successful impact retains its requesting system. */
+    public static MeteorEntity create(
+            ServerLevel level,
+            Vec3 startPos,
+            Vec3 targetPos,
+            int craterRadius,
+            MeteorSiteSource source
+    ) {
         MeteorEntity meteor = new MeteorEntity(ModEntities.METEOR.get(), level);
         meteor.setPos(startPos.x, startPos.y, startPos.z);
         meteor.targetX = targetPos.x;
         meteor.targetY = targetPos.y;
         meteor.targetZ = targetPos.z;
         meteor.craterRadius = craterRadius;
+        meteor.siteSource = source == null ? MeteorSiteSource.UNKNOWN : source;
 
         // Velocity vector pointing from spawn to target
         Vec3 dir = targetPos.subtract(startPos).normalize();
@@ -198,7 +212,7 @@ public class MeteorEntity extends Entity {
 
         // Persist dynamically-created impact sites so the existing radiation,
         // Radiation, story, and impact-site systems can discover this crater.
-        MeteorSavedData.get(level).addMeteor(impactPos, craterRadius);
+        MeteorSiteServices.recordImpact(level, impactPos, craterRadius, siteSource);
 
         discard();
     }
@@ -276,6 +290,7 @@ public class MeteorEntity extends Entity {
         craterRadius = tag.getInt("CraterRadius");
         warningSent = tag.getBoolean("WarningSent");
         warningCountdown = tag.getInt("WarningCountdown");
+        siteSource = MeteorSiteSource.fromSerializedName(tag.getString("SiteSource"));
     }
 
     @Override
@@ -286,6 +301,7 @@ public class MeteorEntity extends Entity {
         tag.putInt("CraterRadius", craterRadius);
         tag.putBoolean("WarningSent", warningSent);
         tag.putInt("WarningCountdown", warningCountdown);
+        tag.putString("SiteSource", siteSource.serializedName());
     }
 
     // Meteors don't collide with entities (they fly through the air)

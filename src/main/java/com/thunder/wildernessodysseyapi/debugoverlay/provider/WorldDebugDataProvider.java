@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.debugoverlay.DebugSection;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugValue;
 import com.thunder.wildernessodysseyapi.ecosystem.client.EnvironmentalMemoryClientState;
 import com.thunder.wildernessodysseyapi.ecosystem.network.EnvironmentalMemoryDebugPayload;
+import com.thunder.wildernessodysseyapi.environment.client.ClientEnvironmentState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.DifficultyInstance;
@@ -93,6 +94,29 @@ public final class WorldDebugDataProvider implements DebugDataProvider {
                         minecraft.level.tickRateManager().tickrate(),
                         minecraft.level.tickRateManager().millisecondsPerTick()))
                 .build());
+
+        ClientEnvironmentState.current(minecraft.level).ifPresentOrElse(environment ->
+                        sections.add(DebugSection.builder("SHARED WORLD ENVIRONMENT")
+                                .add("Habitat / water", decimal(environment.habitatProductivity())
+                                        + " / " + decimal(environment.waterAvailability()))
+                                .add("Wildlife / aquatic activity", decimal(environment.wildlifeActivity())
+                                        + " / " + decimal(environment.aquaticActivity()))
+                                .add("Hazard / migration", decimal(environment.overallHazard())
+                                        + " / " + decimal(environment.migrationPressure()))
+                                .add("Vegetation stress / drought", decimal(environment.vegetationStress())
+                                        + " / " + decimal(environment.drought()))
+                                .add("Flooding / coastal", environment.flooding() + " / " + environment.coastal())
+                                .add("Tide offset / rate", String.format(Locale.ROOT, "%.3f / %.4f",
+                                        environment.tideOffset(), environment.tideRate()))
+                                .add("Meteor / radiation", environment.meteorPresent()
+                                        ? environment.meteorX() + " / " + environment.meteorY() + " / "
+                                        + environment.meteorZ() + " | " + decimal(environment.radiation())
+                                        : "none")
+                                .add("Riftfall", environment.riftfallStageValue())
+                                .build()),
+                () -> sections.add(DebugSection.builder("SHARED WORLD ENVIRONMENT")
+                        .add("State", DebugValue.unavailable("Waiting for server summary"))
+                        .build()));
 
         int rawLight = minecraft.level.getChunkSource().getLightEngine().getRawBrightness(pos, 0);
         int skyLight = minecraft.level.getBrightness(LightLayer.SKY, pos);

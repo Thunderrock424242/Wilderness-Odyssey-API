@@ -1,5 +1,9 @@
 package com.thunder.wildernessodysseyapi.weather.severe;
 
+import com.thunder.wildernessodysseyapi.environment.event.WorldDisturbanceService;
+import com.thunder.wildernessodysseyapi.environment.event.WorldDisturbanceType;
+import com.thunder.wildernessodysseyapi.vegetation.api.PlantDisturbanceType;
+import com.thunder.wildernessodysseyapi.vegetation.api.ReactiveVegetationServices;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.system.TrackedWeatherSystem;
 import com.thunder.wildernessodysseyapi.weather.system.WeatherSystemType;
@@ -51,8 +55,21 @@ public final class SevereWeatherScheduler {
                     24, effectRadius * 0.45, 10.0, effectRadius * 0.45, 0.03
             );
             pushEntities(level, system, surfaceY, effectRadius, settings.severeEntityWindStrength());
-            if (settings.severeBlockDamageEnabled()
-                    && level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)) {
+            boolean plantDamageAllowed = settings.severeBlockDamageEnabled()
+                    && level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+            // Long-lived storms publish a sparse regional fact; individual
+            // animals and plants decide their own reaction from that signal.
+            if (Math.floorMod(gameTime + system.id(), 1_200L) == 0L) {
+                WorldDisturbanceService.publish(
+                        level,
+                        new BlockPos(centerColumn.getX(), surfaceY, centerColumn.getZ()),
+                        WorldDisturbanceType.SEVERE_WEATHER,
+                        (int) Math.ceil(effectRadius),
+                        null,
+                        plantDamageAllowed
+                );
+            }
+            if (plantDamageAllowed) {
                 damageOnePlant(level, system, surfaceY, effectRadius, gameTime);
             }
         }
@@ -114,7 +131,13 @@ public final class SevereWeatherScheduler {
         BlockPos target = new BlockPos(x, y, z).below();
         BlockState state = level.getBlockState(target);
         if (state.is(BlockTags.LEAVES) || state.getBlock() instanceof BushBlock) {
-            level.destroyBlock(target, false);
+            ReactiveVegetationServices.applyDisturbanceAt(
+                    level,
+                    target,
+                    PlantDisturbanceType.WIND,
+                    system.intensity(),
+                    true
+            );
         }
     }
 }

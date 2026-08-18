@@ -2,6 +2,10 @@
 
 Reactive Vegetation gives loaded chunks a compact plant-climate state and lets a small, explicit set of plants react to that state. It is designed for NeoForge 1.21.1 and does not turn ordinary plants into block entities or independently ticking objects.
 
+External hazards reach plants through the bounded disturbance handoff described
+in [Shared world-system integration](../environment/world-system-integration.md).
+Reactive Vegetation validates and owns every resulting plant mutation.
+
 ## Ownership and data flow
 
 Localized weather remains authoritative. Vegetation reads it through `WeatherServices.query()` only when a loaded chunk reaches its scheduled update. The optional season integration is sampled through the same weather boundary and reduced to plant-relevant `UNKNOWN`, `GROWING`, `WET`, `DRY`, or `DORMANT` states.

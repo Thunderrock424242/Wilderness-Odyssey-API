@@ -3,12 +3,16 @@ package com.thunder.wildernessodysseyapi.vegetation.api;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.vegetation.client.ClientVegetationClimateStore;
 import com.thunder.wildernessodysseyapi.vegetation.config.VegetationConfig;
+import com.thunder.wildernessodysseyapi.vegetation.simulation.VegetationDisturbanceLedger;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BushBlock;
+import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.tags.BlockTags;
 
 import java.util.Optional;
 
@@ -45,6 +49,68 @@ public final class ReactiveVegetationServices {
         return climateAt(level, position)
                 .map(VegetationClimateState::mushroomOpportunity)
                 .orElse(0.0);
+    }
+
+    /** Records regional plant pressure without granting the publisher block ownership. */
+    public static void recordDisturbance(ServerLevel level, PlantDisturbance disturbance) {
+        VegetationDisturbanceLedger.record(level, disturbance);
+    }
+
+    /** Returns the strongest active regional pressure at a loaded server position. */
+    public static VegetationDisturbanceSample disturbanceAt(ServerLevel level, BlockPos position) {
+        return VegetationDisturbanceLedger.sample(level, position);
+    }
+
+    /**
+     * Lets the vegetation owner apply one already-selected physical disturbance.
+     *
+     * <p>Weather and Riftfall choose the cause and target, but this method owns
+     * the plant classification and final mutation. Non-plant terrain remains
+     * outside this boundary.</p>
+     */
+    public static PlantDisturbanceResult applyDisturbanceAt(
+            ServerLevel level,
+            BlockPos position,
+            PlantDisturbanceType type,
+            double intensity,
+            boolean allowBlockDamage
+    ) {
+        if (level == null || position == null || type == null || !allowBlockDamage) {
+            return PlantDisturbanceResult.NOT_APPLIED;
+        }
+        double boundedIntensity = Math.max(0.0, Math.min(1.0,
+                Double.isFinite(intensity) ? intensity : 0.0));
+        if (boundedIntensity <= 0.0 || !level.hasChunkAt(position)) {
+            return PlantDisturbanceResult.NOT_APPLIED;
+        }
+        BlockState state = level.getBlockState(position);
+        boolean plant = state.is(BlockTags.LEAVES)
+                || state.getBlock() instanceof BushBlock
+                || state.getBlock() instanceof CropBlock
+                || ReactivePlantRegistry.definition(state).isPresent();
+        if (!plant) {
+            return PlantDisturbanceResult.NOT_A_PLANT;
+        }
+        boolean destructive = switch (type) {
+            case WIND -> boundedIntensity >= 0.62;
+            case METEOR, RIFTFALL -> boundedIntensity >= 0.45;
+            case LIGHTNING, FIRE, FLOOD, DROUGHT, RADIATION -> false;
+        };
+        if (!destructive) {
+            return PlantDisturbanceResult.OBSERVED;
+        }
+        boolean changed = level.destroyBlock(position, false);
+        return new PlantDisturbanceResult(true, changed);
+    }
+
+    /** Releases one dimension's ephemeral disturbance ledger. */
+    public static void clearDisturbances(ServerLevel level) {
+        VegetationDisturbanceLedger.clear(level);
+    }
+
+    /** Releases all ephemeral disturbance state during server shutdown. */
+    public static void clearAllDisturbances() {
+        VegetationDisturbanceLedger.clearAll();
     }
 
     /**
@@ -112,5 +178,12 @@ public final class ReactiveVegetationServices {
     public record PlantUpdateResult(boolean registered, boolean stateChanged) {
         private static final PlantUpdateResult NOT_REGISTERED = new PlantUpdateResult(false, false);
         private static final PlantUpdateResult PROCESSED_UNCHANGED = new PlantUpdateResult(true, false);
+    }
+
+    /** Outcome from one vegetation-owned environmental damage request. */
+    public record PlantDisturbanceResult(boolean plant, boolean stateChanged) {
+        private static final PlantDisturbanceResult NOT_APPLIED = new PlantDisturbanceResult(false, false);
+        private static final PlantDisturbanceResult NOT_A_PLANT = new PlantDisturbanceResult(false, false);
+        private static final PlantDisturbanceResult OBSERVED = new PlantDisturbanceResult(true, false);
     }
 }

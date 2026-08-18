@@ -65,6 +65,13 @@ public final class EcosystemConfig {
     public static final ModConfigSpec.DoubleValue COMBAT_DISTURBANCE;
     public static final ModConfigSpec.DoubleValue EXPLOSION_DISTURBANCE;
     public static final ModConfigSpec.DoubleValue FIRE_DISTURBANCE;
+    public static final ModConfigSpec.DoubleValue LIGHTNING_DISTURBANCE;
+    public static final ModConfigSpec.DoubleValue SEVERE_WEATHER_DISTURBANCE;
+    public static final ModConfigSpec.DoubleValue FLOOD_DISTURBANCE;
+    public static final ModConfigSpec.DoubleValue DROUGHT_DISTURBANCE;
+    public static final ModConfigSpec.DoubleValue METEOR_DISTURBANCE;
+    public static final ModConfigSpec.DoubleValue RADIATION_DISTURBANCE;
+    public static final ModConfigSpec.DoubleValue RIFTFALL_DISTURBANCE;
     public static final ModConfigSpec.DoubleValue MAXIMUM_DISTURBANCE;
     public static final ModConfigSpec.DoubleValue DISTURBANCE_CLEANUP_THRESHOLD;
     public static final ModConfigSpec.DoubleValue WILDLIFE_MILD_DISTURBANCE;
@@ -207,6 +214,27 @@ public final class EcosystemConfig {
         FIRE_DISTURBANCE = builder
                 .comment("Disturbance added when a Wilderness weather wildfire successfully ignites.")
                 .defineInRange("fireDisturbance", 0.12, 0.0, 1.0);
+        LIGHTNING_DISTURBANCE = builder
+                .comment("Disturbance added after localized weather successfully spawns real lightning.")
+                .defineInRange("lightningDisturbance", 0.18, 0.0, 1.0);
+        SEVERE_WEATHER_DISTURBANCE = builder
+                .comment("Regional disturbance published by mature tornadoes and cyclones.")
+                .defineInRange("severeWeatherDisturbance", 0.16, 0.0, 1.0);
+        FLOOD_DISTURBANCE = builder
+                .comment("Disturbance added when a player-relevant watershed enters active flooding.")
+                .defineInRange("floodDisturbance", 0.24, 0.0, 1.0);
+        DROUGHT_DISTURBANCE = builder
+                .comment("Regional pressure published when retained vegetation drought becomes severe.")
+                .defineInRange("droughtDisturbance", 0.10, 0.0, 1.0);
+        METEOR_DISTURBANCE = builder
+                .comment("Disturbance added only after a meteor crater is successfully generated and persisted.")
+                .defineInRange("meteorDisturbance", 0.90, 0.0, 1.0);
+        RADIATION_DISTURBANCE = builder
+                .comment("Persistent habitat pressure exposed around active meteor radiation zones.")
+                .defineInRange("radiationDisturbance", 0.30, 0.0, 1.0);
+        RIFTFALL_DISTURBANCE = builder
+                .comment("Disturbance published when a dimension enters an active Riftfall stage.")
+                .defineInRange("riftfallDisturbance", 0.75, 0.0, 1.0);
         MAXIMUM_DISTURBANCE = builder
                 .comment("Maximum normalized value retained for disturbance and activity channels.")
                 .defineInRange("maximumDisturbance", 1.0, 0.05, 1.0);

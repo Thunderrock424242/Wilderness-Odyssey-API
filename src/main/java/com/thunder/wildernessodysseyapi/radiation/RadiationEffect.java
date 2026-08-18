@@ -108,4 +108,14 @@ public class RadiationEffect extends MobEffect {
         if (ratio < 0.75) return 1; // mid zone    — moderate
         return 0;                   // outer fringe — mild
     }
+
+    /** Returns amplifier 0-3 from the shared normalized meteor-site exposure. */
+    public static int getAmplifierForExposure(double exposure) {
+        double bounded = Math.max(0.0, Math.min(1.0,
+                Double.isFinite(exposure) ? exposure : 0.0));
+        if (bounded >= 0.75) return 3;
+        if (bounded >= 0.50) return 2;
+        if (bounded >= 0.25) return 1;
+        return 0;
+    }
 }

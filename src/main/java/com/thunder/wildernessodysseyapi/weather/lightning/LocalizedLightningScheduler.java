@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.lightning;
 
+import com.thunder.wildernessodysseyapi.environment.event.WorldDisturbanceService;
+import com.thunder.wildernessodysseyapi.environment.event.WorldDisturbanceType;
 import com.thunder.wildernessodysseyapi.mixin.ServerLevelLightningAccessor;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherQuery;
@@ -126,6 +128,16 @@ public final class LocalizedLightningScheduler {
         if (!spawnVanillaLightning(level, target)) {
             return false;
         }
+
+        // Publish only after Minecraft accepts the real lightning entity.
+        WorldDisturbanceService.publish(
+                level,
+                target,
+                WorldDisturbanceType.LIGHTNING,
+                48,
+                null,
+                false
+        );
 
         nextDimensionStrikeTick = safeAdd(gameTime, safeSettings.dimensionCooldownTicks());
         rememberCellCooldown(candidate.cellKey(), gameTime, safeSettings.cellCooldownTicks());

@@ -12,9 +12,9 @@ import com.thunder.wildernessodysseyapi.ecosystem.simulation.AbstractEcosystemMo
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemEntitySafety;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationSettings;
+import com.thunder.wildernessodysseyapi.environment.api.EnvironmentServices;
+import com.thunder.wildernessodysseyapi.environment.api.RegionalEnvironmentSnapshot;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
-import com.thunder.wildernessodysseyapi.weather.api.WeatherServices;
-import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -317,9 +317,10 @@ public final class DistantWildlifeManager {
                 continue;
             }
             boolean currentChunkLoaded = isChunkLoaded(level, currentPos);
-            WeatherSample weather = currentChunkLoaded
-                    ? WeatherServices.query().sample(level, currentPos)
-                    : WeatherSample.CLEAR;
+            RegionalEnvironmentSnapshot regionalEnvironment = currentChunkLoaded
+                    ? EnvironmentServices.query().sample(level, currentPos)
+                    : RegionalEnvironmentSnapshot.EMPTY;
+            WeatherSample weather = regionalEnvironment.weather();
             Optional<EnvironmentalContext.Disturbance> disturbance = EcosystemServices.disturbances().nearest(
                     level, currentPos, DISTURBANCE_RADIUS, gameTime
             );
@@ -330,22 +331,17 @@ public final class DistantWildlifeManager {
                             .orElse(0.0)
             );
             if (gameTime - group.populationReferenceGameTime() >= AbstractEcosystemModel.TICKS_PER_DAY) {
-                var watershed = currentChunkLoaded
-                        ? WaterServices.access().getWatershedConditions(level, currentPos)
-                        : null;
+                var watershed = currentChunkLoaded ? regionalEnvironment.watershed() : null;
                 double waterAvailability = watershed == null
                         ? group.waterAvailability()
-                        : Math.max(
-                                watershed.hasSurfaceWater() ? 0.80 : 0.0,
-                                Math.max(watershed.soilSaturation(), watershed.normalizedWaterTable())
-                        );
+                        : regionalEnvironment.influence().waterAvailability();
                 double foodPressure = Math.min(1.0, group.populationEstimate() / 48.0);
-                double foodAvailability = Math.max(0.05, 1.0 - foodPressure * 0.70);
-                double temperatureStress = Math.min(1.0, Math.abs(weather.temperature() - 15.0) / 50.0);
-                double weatherImpact = Math.max(
-                        weather.stormEnergy(),
-                        Math.max(weather.precipitationIntensity(), temperatureStress * 0.5)
+                double foodAvailability = Math.max(
+                        0.05,
+                        (1.0 - foodPressure * 0.70)
+                                * (0.55 + regionalEnvironment.influence().habitatProductivity() * 0.45)
                 );
+                double weatherImpact = regionalEnvironment.influence().overallHazard();
                 DistantWildlifeGroup advanced = group.withLazyPopulationUpdate(
                         new AbstractEcosystemModel.Environment(
                                 foodAvailability,
@@ -370,6 +366,13 @@ public final class DistantWildlifeManager {
                     weather.thunderIntensity(),
                     disturbanceIntensity
             );
+            activityScale *= 0.35
+                    + regionalEnvironment.influence().wildlifeActivity() * 0.65;
+            if (group.form() == DistantWildlifeForm.AQUATIC
+                    && regionalEnvironment.coastal()) {
+                activityScale *= 0.70
+                        + regionalEnvironment.influence().aquaticActivity() * 0.45;
+            }
 
             double directionX = group.directionX();
             double directionZ = group.directionZ();

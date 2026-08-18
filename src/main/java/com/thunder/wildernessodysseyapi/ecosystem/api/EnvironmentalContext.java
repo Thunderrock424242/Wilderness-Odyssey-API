@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.ecosystem.api;
 
+import com.thunder.wildernessodysseyapi.environment.api.RegionalEnvironmentSnapshot;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import net.minecraft.core.BlockPos;
@@ -32,8 +33,37 @@ public record EnvironmentalContext(
         Optional<Threat> threat,
         Optional<HerdCenter> herd,
         Optional<PreyTarget> preyTarget,
-        Optional<Disturbance> disturbance
+        Optional<Disturbance> disturbance,
+        RegionalEnvironmentSnapshot regionalEnvironment
 ) {
+
+    /** Retains the version-two context shape for existing behavior controllers. */
+    public EnvironmentalContext(
+            ServerLevel level,
+            PathfinderMob animal,
+            SpeciesBehaviorProfile profile,
+            long gameTime,
+            long dayTime,
+            ResourceLocation biome,
+            WeatherSample weather,
+            WeatherReactionDecision weatherReaction,
+            WatershedConditions watershed,
+            boolean exposedToSky,
+            double foodAvailability,
+            Optional<WaterTarget> water,
+            Optional<ShelterTarget> shelter,
+            Optional<Threat> threat,
+            Optional<HerdCenter> herd,
+            Optional<PreyTarget> preyTarget,
+            Optional<Disturbance> disturbance
+    ) {
+        this(
+                level, animal, profile, gameTime, dayTime, biome, weather,
+                weatherReaction, watershed, exposedToSky, foodAvailability,
+                water, shelter, threat, herd, preyTarget, disturbance,
+                RegionalEnvironmentSnapshot.EMPTY
+        );
+    }
 
     /** Retains the original context shape for external behavior controllers. */
     public EnvironmentalContext(
@@ -57,13 +87,16 @@ public record EnvironmentalContext(
                 level, animal, profile, gameTime, dayTime, biome, weather,
                 WeatherReactionDecision.NONE,
                 WatershedConditions.NONE, exposedToSky, foodAvailability, water,
-                shelter, threat, herd, preyTarget, disturbance
+                shelter, threat, herd, preyTarget, disturbance,
+                RegionalEnvironmentSnapshot.EMPTY
         );
     }
 
     public EnvironmentalContext {
         weatherReaction = weatherReaction == null ? WeatherReactionDecision.NONE : weatherReaction;
         watershed = watershed == null ? WatershedConditions.NONE : watershed;
+        regionalEnvironment = regionalEnvironment == null
+                ? RegionalEnvironmentSnapshot.EMPTY : regionalEnvironment;
     }
 
     /** Safe dry approach adjacent to a detected water position. */

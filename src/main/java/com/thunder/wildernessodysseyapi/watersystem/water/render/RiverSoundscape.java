@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import com.thunder.wildernessodysseyapi.environment.client.ClientEnvironmentState;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
@@ -58,6 +59,12 @@ public final class RiverSoundscape {
                         conditions.flooding(),
                         rain
                 );
+                float sharedWaterActivity = ClientEnvironmentState.current(level)
+                        .map(environment -> 0.72F
+                                + environment.waterAvailability() * 0.18F
+                                + environment.aquaticActivity() * 0.10F)
+                        .orElse(1.0F);
+                intensity *= sharedWaterActivity;
                 if (best == null || intensity > best.intensity) {
                     best = new Candidate(position, intensity);
                 }

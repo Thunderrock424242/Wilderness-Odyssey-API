@@ -1,8 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.wildfire;
 
-import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
-import com.thunder.wildernessodysseyapi.ecosystem.memory.DisturbanceSource;
-import com.thunder.wildernessodysseyapi.ecosystem.memory.EnvironmentalMemoryManager;
+import com.thunder.wildernessodysseyapi.environment.event.WorldDisturbanceService;
+import com.thunder.wildernessodysseyapi.environment.event.WorldDisturbanceType;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherQuery;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
@@ -385,13 +384,16 @@ public final class WildfireScheduler {
         if (!level.setBlockAndUpdate(ignition, BaseFireBlock.getState(level, ignition))) {
             return false;
         }
-        // Successful weather-owned ignition publishes through the ecosystem API;
-        // fire spread itself remains vanilla-owned and is not scanned or tick-tracked.
-        double disturbance = EcosystemConfig.FIRE_DISTURBANCE.get();
-        if (EcosystemConfig.ENABLED.get() && disturbance > 0.0) {
-            EnvironmentalMemoryManager.addDisturbance(
-                    level, ignition, disturbance, DisturbanceSource.FIRE);
-        }
+        // Successful weather-owned ignition publishes once; vanilla still owns
+        // later fire spread, damage, extinguishing, and the doFireTick rule.
+        WorldDisturbanceService.publish(
+                level,
+                ignition,
+                WorldDisturbanceType.WILDFIRE,
+                64,
+                null,
+                false
+        );
         level.sendParticles(
                 ParticleTypes.SMALL_FLAME,
                 campfire.getX() + 0.5,
