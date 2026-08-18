@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.weather.config;
 
+import com.thunder.wildernessodysseyapi.weather.api.WindSettings;
 import com.thunder.wildernessodysseyapi.weather.simulation.SimulationSettings;
 import com.thunder.wildernessodysseyapi.weather.integration.WeatherOwnershipCoordinator;
 import com.thunder.wildernessodysseyapi.weather.system.WeatherSystemTracker;
@@ -43,6 +44,12 @@ public final class WeatherConfig {
     public static final ModConfigSpec.DoubleValue STORM_FORMATION_THRESHOLD;
     public static final ModConfigSpec.DoubleValue MAXIMUM_PRECIPITATION_INTENSITY;
     public static final ModConfigSpec.DoubleValue RANDOM_VARIATION;
+    public static final ModConfigSpec.BooleanValue WIND_ENABLED;
+    public static final ModConfigSpec.DoubleValue BASE_WIND_STRENGTH;
+    public static final ModConfigSpec.DoubleValue GUST_FREQUENCY;
+    public static final ModConfigSpec.DoubleValue GUST_STRENGTH;
+    public static final ModConfigSpec.DoubleValue STORM_WIND_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue MAX_WIND_SPEED;
     public static final ModConfigSpec.BooleanValue SEASON_INTEGRATION_ENABLED;
     public static final ModConfigSpec.DoubleValue SEASON_TEMPERATURE_AMPLITUDE_CELSIUS;
     public static final ModConfigSpec.DoubleValue SEASON_HUMIDITY_AMPLITUDE;
@@ -178,10 +185,32 @@ public final class WeatherConfig {
                 .defineInRange("randomVariation", 0.04, 0.0, 0.25);
         builder.pop();
 
+        builder.comment("Deterministic regional wind derived from localized atmosphere cells.")
+                .push("wind");
+        WIND_ENABLED = builder
+                .comment("Expose derived regional wind to server gameplay and synchronized client effects.")
+                .define("windEnabled", true);
+        BASE_WIND_STRENGTH = builder
+                .comment("Clear-weather ambient wind speed in blocks per second.")
+                .defineInRange("baseWindStrength", 2.5, 0.0, 64.0);
+        GUST_FREQUENCY = builder
+                .comment("Average coherent regional gust cycles per Minecraft minute (1,200 ticks).")
+                .defineInRange("gustFrequency", 2.0, 0.0, 60.0);
+        GUST_STRENGTH = builder
+                .comment("Maximum additive gust speed in blocks per second before the global speed cap.")
+                .defineInRange("gustStrength", 5.0, 0.0, 64.0);
+        STORM_WIND_MULTIPLIER = builder
+                .comment("Wind amplification reached by maximum localized storm severity.")
+                .defineInRange("stormWindMultiplier", 1.8, 0.0, 4.0);
+        MAX_WIND_SPEED = builder
+                .comment("Hard cap for sustained wind plus gusts in blocks per second.")
+                .defineInRange("maxWindSpeed", 24.0, 0.0, 64.0);
+        builder.pop();
+
         builder.comment("Optional read-only influence from installed season mods.")
                 .push("seasons");
         SEASON_INTEGRATION_ENABLED = builder
-                .comment("Allow Ecliptic Seasons or Serene Seasons to shift atmospheric temperature, humidity, and storm potential.")
+                .comment("Allow Homeostatic Seasons or Serene Seasons to shift atmospheric temperature, humidity, and storm potential.")
                 .define("enabled", true);
         SEASON_TEMPERATURE_AMPLITUDE_CELSIUS = builder
                 .comment("Maximum temperate seasonal temperature shift in degrees Celsius.")
@@ -375,6 +404,22 @@ public final class WeatherConfig {
         }
     }
 
+    /** Returns clamp-safe wind controls for server queries and client snapshots. */
+    public static WindSettings windSettings() {
+        try {
+            return new WindSettings(
+                    WIND_ENABLED.get(),
+                    BASE_WIND_STRENGTH.get().floatValue(),
+                    GUST_FREQUENCY.get().floatValue(),
+                    GUST_STRENGTH.get().floatValue(),
+                    STORM_WIND_MULTIPLIER.get().floatValue(),
+                    MAX_WIND_SPEED.get().floatValue()
+            );
+        } catch (IllegalStateException exception) {
+            return WindSettings.DEFAULT;
+        }
+    }
+
     /** Returns captured scheduling, dimension, and compatibility controls. */
     public static SchedulingSettings scheduling() {
         try {
@@ -435,7 +480,7 @@ public final class WeatherConfig {
         }
     }
 
-    /** Returns bounded controls for optional Ecliptic/Serene season adapters. */
+    /** Returns bounded controls for optional Homeostatic/Serene season adapters. */
     public static SeasonSettings seasons() {
         try {
             return new SeasonSettings(

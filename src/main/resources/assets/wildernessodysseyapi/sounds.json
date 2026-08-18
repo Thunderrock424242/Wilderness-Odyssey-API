@@ -43,5 +43,41 @@
         "stream": true
       }
     ]
+  },
+  "distant_thunder_low_rumble": {
+    "category": "weather",
+    "sounds": [
+      {
+        "name": "minecraft:entity.lightning_bolt.thunder",
+        "type": "event"
+      }
+    ]
+  },
+  "distant_thunder_rolling": {
+    "category": "weather",
+    "sounds": [
+      {
+        "name": "minecraft:entity.lightning_bolt.thunder",
+        "type": "event"
+      }
+    ]
+  },
+  "distant_thunder_deep_crack": {
+    "category": "weather",
+    "sounds": [
+      {
+        "name": "minecraft:entity.lightning_bolt.thunder",
+        "type": "event"
+      }
+    ]
+  },
+  "distant_thunder_long_rumble": {
+    "category": "weather",
+    "sounds": [
+      {
+        "name": "minecraft:entity.lightning_bolt.thunder",
+        "type": "event"
+      }
+    ]
   }
 }

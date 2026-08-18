@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.debugoverlay.DebugPageContributorRegistr
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugSection;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugValue;
 import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuProfiler;
+import com.thunder.wildernessodysseyapi.ecosystem.distant.client.ClientDistantWildlifeState;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderDiagnostics;
 import com.thunder.wildernessodysseyapi.weather.client.WeatherClientEvents;
 import net.minecraft.client.Minecraft;
@@ -70,6 +71,7 @@ public final class RenderingDebugDataProvider implements DebugDataProvider {
         addRawSection(sections, "WILDERNESS GPU PROFILER", GpuProfiler.debugLines());
         addRawSection(sections, "WILDERNESS WATER", WaterRenderDiagnostics.debugLines());
         addRawSection(sections, "WILDERNESS WEATHER", WeatherClientEvents.debugLines());
+        addRawSection(sections, "DISTANT WILDLIFE", ClientDistantWildlifeState.debugLines());
 
         List<DebugSection> contributedSections = DebugPageContributorRegistry.collect(PAGE_ID, context);
         sections.addAll(contributedSections);

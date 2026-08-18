@@ -23,6 +23,7 @@ public record EnvironmentalContext(
         long dayTime,
         ResourceLocation biome,
         WeatherSample weather,
+        WeatherReactionDecision weatherReaction,
         WatershedConditions watershed,
         boolean exposedToSky,
         double foodAvailability,
@@ -54,12 +55,14 @@ public record EnvironmentalContext(
     ) {
         this(
                 level, animal, profile, gameTime, dayTime, biome, weather,
+                WeatherReactionDecision.NONE,
                 WatershedConditions.NONE, exposedToSky, foodAvailability, water,
                 shelter, threat, herd, preyTarget, disturbance
         );
     }
 
     public EnvironmentalContext {
+        weatherReaction = weatherReaction == null ? WeatherReactionDecision.NONE : weatherReaction;
         watershed = watershed == null ? WatershedConditions.NONE : watershed;
     }
 
@@ -96,15 +99,25 @@ public record EnvironmentalContext(
     public record Threat(BlockPos position, java.util.UUID entityId, double distanceSquared, long expiresAt) {
     }
 
-    /** Same-species centroid and group size used for low-priority regrouping. */
-    public record HerdCenter(BlockPos position, int members, double distanceSquared) {
+    /** Same-species centroid, leader, and group size used for shared broad decisions. */
+    public record HerdCenter(
+            BlockPos position,
+            int members,
+            double distanceSquared,
+            java.util.UUID leaderId,
+            boolean leader
+    ) {
+        /** Retains the original group-context construction shape. */
+        public HerdCenter(BlockPos position, int members, double distanceSquared) {
+            this(position, members, distanceSquared, null, true);
+        }
     }
 
     /** Adult prey selected from a population that passed the configured safeguard. */
     public record PreyTarget(java.util.UUID entityId, BlockPos position, int adultPopulation) {
     }
 
-    /** Recent player or animal activity retained in a bounded per-level history. */
+    /** Lazily decayed regional activity selected from persistent environmental memory. */
     public record Disturbance(BlockPos position, java.util.UUID sourceId, double intensity, long createdAt) {
     }
 }

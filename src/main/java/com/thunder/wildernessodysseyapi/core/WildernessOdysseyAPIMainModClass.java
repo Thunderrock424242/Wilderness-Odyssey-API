@@ -13,6 +13,7 @@ import com.thunder.wildernessodysseyapi.developmentstudio.module.StudioModuleReg
 import com.thunder.wildernessodysseyapi.developmentstudio.entity.StudioEntityRegistry;
 import com.thunder.wildernessodysseyapi.developmentstudio.structure.StudioStructureRegistry;
 import com.thunder.wildernessodysseyapi.ecosystem.EcosystemEvents;
+import com.thunder.wildernessodysseyapi.ecosystem.distant.DistantWildlifeServerEvents;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
 import com.thunder.wildernessodysseyapi.meteor.event.MeteorImpactEvent;
@@ -24,6 +25,7 @@ import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryReporter;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryReporter;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueProcessor;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
+import com.thunder.wildernessodysseyapi.vegetation.compat.ReactivePlantDefaults;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideWorldUpdater;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.WaterCompatibilityRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla.VanillaWaterBucketCompatibility;
@@ -94,6 +96,7 @@ public final class WildernessOdysseyAPIMainModClass {
             StudioInspectionRegistry.bootstrapDefaults();
             StudioEntityRegistry.bootstrapDefaults();
             StudioStructureRegistry.bootstrapDefaults();
+            ReactivePlantDefaults.bootstrap();
             LOGGER.info("Wilderness Odyssey API setup complete");
         });
         LOGGER.info("Mod pack version: {}", container.getModInfo().getVersion());
@@ -120,6 +123,7 @@ public final class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(TelemetryQueueProcessor.class);
         NeoForge.EVENT_BUS.register(LoreBookEvents.class);
         NeoForge.EVENT_BUS.register(EcosystemEvents.class);
+        NeoForge.EVENT_BUS.register(DistantWildlifeServerEvents.class);
         NeoForge.EVENT_BUS.register(MeteorImpactEvent.class);
         NeoForge.EVENT_BUS.register(TideWorldUpdater.class);
         NeoForge.EVENT_BUS.register(ModCommands.class);

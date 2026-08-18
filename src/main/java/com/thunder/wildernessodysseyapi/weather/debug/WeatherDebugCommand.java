@@ -8,6 +8,9 @@ import com.thunder.wildernessodysseyapi.weather.api.CloudType;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherForecast;
+import com.thunder.wildernessodysseyapi.weather.api.WeatherThreatForecast;
+import com.thunder.wildernessodysseyapi.weather.api.WindManager;
+import com.thunder.wildernessodysseyapi.weather.api.WindSample;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphereSimulationEngine;
 import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphericFrontModel;
@@ -21,6 +24,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumMap;
 import java.util.List;
@@ -45,6 +49,8 @@ public final class WeatherDebugCommand {
                 .then(Commands.literal("weather")
                         .then(Commands.literal("sample")
                                 .executes(context -> sample(context.getSource())))
+                        .then(Commands.literal("wind")
+                                .executes(context -> wind(context.getSource())))
                         .then(Commands.literal("cell")
                                 .executes(context -> cell(context.getSource())))
                         .then(Commands.literal("forecast")
@@ -138,7 +144,47 @@ public final class WeatherDebugCommand {
                 sample.precipitationType(),
                 sample.precipitationIntensity()
         )), false);
+        sendWind(source, position);
         return 1;
+    }
+
+    private static int wind(CommandSourceStack source) {
+        return sendWind(source, BlockPos.containing(source.getPosition()));
+    }
+
+    private static int sendWind(CommandSourceStack source, BlockPos position) {
+        WindSample wind = WindManager.getWind(source.getLevel(), source.getPosition());
+        Vec3 direction = wind.direction();
+        source.sendSuccess(() -> Component.literal(String.format(
+                Locale.ROOT,
+                "Wind at %d %d %d: %s direction %.3f %.3f %.3f, sustained %.2f blocks/s, gust +%.2f (factor %.3f, phase %.3f), effective %.2f, weather +%.2f, region %d,%d.",
+                position.getX(),
+                position.getY(),
+                position.getZ(),
+                compassDirection(direction),
+                direction.x,
+                direction.y,
+                direction.z,
+                wind.speed(),
+                wind.gust(),
+                wind.gustFactor(),
+                wind.gustPhase(),
+                wind.effectiveSpeed(),
+                wind.weatherContribution(),
+                wind.region().x(),
+                wind.region().z()
+        )), false);
+        return 1;
+    }
+
+    private static String compassDirection(Vec3 direction) {
+        if (direction.horizontalDistanceSqr() <= 1.0E-8D) {
+            return "CALM";
+        }
+        String[] directions = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
+        double angle = Math.atan2(direction.x, -direction.z);
+        int index = Math.floorMod((int) Math.round(angle / (Math.PI / 4.0D)), directions.length);
+        return directions[index];
     }
 
     private static int cell(CommandSourceStack source) {
@@ -167,7 +213,9 @@ public final class WeatherDebugCommand {
 
     private static int forecast(CommandSourceStack source) {
         BlockPos position = BlockPos.containing(source.getPosition());
-        WeatherForecast forecast = WeatherAuthority.get().forecast(source.getLevel(), position);
+        WeatherAuthority authority = WeatherAuthority.get();
+        WeatherForecast forecast = authority.forecast(source.getLevel(), position);
+        WeatherThreatForecast threat = authority.getApproachingWeather(source.getLevel(), position, 7_200);
         String approaching = forecast.approachingSystem() == null
                 ? "no organized system detected"
                 : String.format(
@@ -187,6 +235,21 @@ public final class WeatherDebugCommand {
                 approaching,
                 forecast.confidence() * 100.0
         )), false);
+        String threatSummary = threat.incoming()
+                ? String.format(
+                        Locale.ROOT,
+                        "%s %.0f%% at %.0f blocks, ETA %.1f minutes, source #%d %s/%s, ambient wildlife %.0f%%",
+                        threat.type().name().toLowerCase(Locale.ROOT).replace('_', ' '),
+                        threat.intensity() * 100.0,
+                        threat.distanceBlocks(),
+                        threat.estimatedArrivalTicks() / 1_200.0,
+                        threat.sourceSystemId(),
+                        threat.sourceSystem().name().toLowerCase(Locale.ROOT),
+                        threat.sourceStage().name().toLowerCase(Locale.ROOT),
+                        threat.ambientWildlifeActivityScale() * 100.0
+                )
+                : "none within 6.0 minutes";
+        source.sendSuccess(() -> Component.literal("  Wildlife threat forecast: " + threatSummary), false);
         return 1;
     }
 

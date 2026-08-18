@@ -5,9 +5,11 @@ import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereView;
 import com.thunder.wildernessodysseyapi.weather.api.CloudType;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
+import com.thunder.wildernessodysseyapi.weather.api.SeasonalClimateState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherQuery;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherForecast;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.api.WeatherThreatForecast;
 import com.thunder.wildernessodysseyapi.weather.api.WindVector;
 import com.thunder.wildernessodysseyapi.weather.config.VanillaWeatherCompatibilityMode;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
@@ -17,6 +19,9 @@ import com.thunder.wildernessodysseyapi.weather.integration.season.SeasonalWeath
 import com.thunder.wildernessodysseyapi.weather.integration.survival.SurvivalWeatherIntegrations;
 import com.thunder.wildernessodysseyapi.weather.lightning.LocalizedLightningScheduler;
 import com.thunder.wildernessodysseyapi.weather.forecast.WeatherForecastService;
+import com.thunder.wildernessodysseyapi.weather.forecast.RegionalWeatherThreatCache;
+import com.thunder.wildernessodysseyapi.weather.forecast.WeatherThreatForecastService;
+import com.thunder.wildernessodysseyapi.weather.networking.DistantThunderSnapshotManager;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherRegionSyncPayload;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherSnapshotManager;
 import com.thunder.wildernessodysseyapi.weather.storage.AtmosphereSavedData;
@@ -85,6 +90,7 @@ public final class WeatherAuthority implements WeatherQuery {
                         scheduling.cellSize(),
                         synchronizationRadius(scheduling)
                 );
+                DistantThunderSnapshotManager.syncDisabled(level);
             }
             return;
         }
@@ -131,8 +137,9 @@ public final class WeatherAuthority implements WeatherQuery {
                 WeatherConfig.wildfires()
         );
         WeatherConfig.FeatureSettings features = WeatherConfig.features();
+        List<TrackedWeatherSystem> trackedSystems = systems(level);
         runtime.surfaceWeatheringScheduler.tick(level, gameTime, this, features);
-        runtime.severeWeatherScheduler.tick(level, gameTime, systems(level), features);
+        runtime.severeWeatherScheduler.tick(level, gameTime, trackedSystems, features);
         SurvivalWeatherIntegrations.tick(level, this);
         if (synchronizationDue) {
             WeatherSnapshotManager.syncLevel(
@@ -142,6 +149,7 @@ public final class WeatherAuthority implements WeatherQuery {
                     scheduling.cellSize(),
                     synchronizationRadius(scheduling)
             );
+            DistantThunderSnapshotManager.syncLevel(level, grid, trackedSystems);
         }
     }
 
@@ -151,6 +159,70 @@ public final class WeatherAuthority implements WeatherQuery {
             return WeatherSample.CLEAR;
         }
         return queryGrid(level).sample(position);
+    }
+
+    /** Samples the existing optional season adapter without exposing its implementation. */
+    @Override
+    public SeasonalClimateState seasonalClimateAt(ServerLevel level, BlockPos position) {
+        if (level == null || position == null || !WeatherConfig.dimensionEnabled(level.dimension())) {
+            return SeasonalClimateState.NONE;
+        }
+        WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
+        AtmosphereCellKey key = AtmosphereCellKey.fromBlock(
+                position.getX(),
+                position.getZ(),
+                scheduling.cellSize()
+        );
+        AtmosphereEnvironment environment = runtime(level).inputSampler.sample(
+                level,
+                key,
+                scheduling.cellSize(),
+                scheduling.environmentResampleIntervalTicks()
+        );
+        return new SeasonalClimateState(
+                environment.seasonalTemperatureOffset(),
+                environment.seasonalEvaporationMultiplier(),
+                environment.fireSeasonFactor(),
+                environment.snowSeasonFactor(),
+                environment.seasonCalendarAvailable()
+        );
+    }
+
+    /**
+     * Returns a region-cached projection of the existing moving weather systems.
+     *
+     * <p>The forecast uses the same tracker speed, lifecycle, and dissipation
+     * controls as simulation. It never searches atmosphere cells or creates a
+     * second weather state.</p>
+     */
+    @Override
+    public WeatherThreatForecast getApproachingWeather(
+            ServerLevel level,
+            BlockPos position,
+            int lookAheadTicks
+    ) {
+        if (level == null || position == null || lookAheadTicks <= 0
+                || !WeatherConfig.dimensionEnabled(level.dimension())) {
+            return WeatherThreatForecast.NONE;
+        }
+        WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
+        WeatherConfig.FeatureSettings features = WeatherConfig.features();
+        WeatherSystemTracker.TrackingSettings tracking =
+                features.trackingSettings(scheduling.simulationIntervalTicks());
+        LevelRuntime runtime = runtime(level);
+        return runtime.approachingWeatherCache.query(
+                position,
+                scheduling.cellSize(),
+                lookAheadTicks,
+                level.getGameTime(),
+                regionCenter -> WeatherThreatForecastService.forecast(
+                        regionCenter.getX() + 0.5,
+                        regionCenter.getZ() + 0.5,
+                        lookAheadTicks,
+                        systems(level),
+                        tracking
+                )
+        );
     }
 
     /** Uses the cached primitive grid path for vanilla's frequent rain checks. */
@@ -479,6 +551,7 @@ public final class WeatherAuthority implements WeatherQuery {
             entry.getValue().inputSampler.clear();
             entry.getValue().lightningScheduler.reset();
             entry.getValue().wildfireScheduler.reset();
+            entry.getValue().approachingWeatherCache.clear();
             WeatherSnapshotManager.markLevelDirty(entry.getKey().dimension());
         }
     }
@@ -490,8 +563,10 @@ public final class WeatherAuthority implements WeatherQuery {
             runtime.inputSampler.clear();
             runtime.lightningScheduler.reset();
             runtime.wildfireScheduler.reset();
+            runtime.approachingWeatherCache.clear();
         }
         WeatherSnapshotManager.clearLevel(level.dimension());
+        DistantThunderSnapshotManager.clearLevel(level.dimension());
     }
 
     /** Releases server-process synchronization and sampling state at shutdown. */
@@ -500,19 +575,23 @@ public final class WeatherAuthority implements WeatherQuery {
             runtime.inputSampler.clear();
             runtime.lightningScheduler.reset();
             runtime.wildfireScheduler.reset();
+            runtime.approachingWeatherCache.clear();
         }
         runtimes.clear();
         WeatherSnapshotManager.clear();
+        DistantThunderSnapshotManager.clear();
     }
 
     /** Marks a lifecycle-changing player for a complete next snapshot. */
     public void markPlayerDirty(ServerPlayer player) {
         WeatherSnapshotManager.markPlayerDirty(player);
+        DistantThunderSnapshotManager.markPlayerDirty(player);
     }
 
     /** Forgets synchronization state when a player disconnects. */
     public void forgetPlayer(ServerPlayer player) {
         WeatherSnapshotManager.forgetPlayer(player);
+        DistantThunderSnapshotManager.forgetPlayer(player);
     }
 
     private void simulate(
@@ -624,6 +703,7 @@ public final class WeatherAuthority implements WeatherQuery {
         );
         if (systemsChanged) {
             systemsData.markChanged();
+            runtime.approachingWeatherCache.clear();
         }
         if (changed || removed > 0 || !activeKeys.isEmpty() || !calculated.isEmpty()) {
             data.markChanged();
@@ -1058,6 +1138,7 @@ public final class WeatherAuthority implements WeatherQuery {
         private final WildfireScheduler wildfireScheduler;
         private final SurfaceWeatheringScheduler surfaceWeatheringScheduler = new SurfaceWeatheringScheduler();
         private final SevereWeatherScheduler severeWeatherScheduler = new SevereWeatherScheduler();
+        private final RegionalWeatherThreatCache approachingWeatherCache = new RegionalWeatherThreatCache();
         private final Set<Long> vanillaWeatherAppliedKeys = new HashSet<>();
         private volatile AtmosphereGrid atmosphereGrid;
         private VanillaWeatherCommandAdapter.State vanillaWeatherState;

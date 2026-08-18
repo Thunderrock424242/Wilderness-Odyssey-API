@@ -3,10 +3,10 @@ package com.thunder.wildernessodysseyapi.weather.config;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
- * Defines client-only quality and motion limits for localized weather rendering.
+ * Defines client-only quality, motion, and audio limits for localized weather presentation.
  *
  * <p>The server remains authoritative for atmospheric state. These options
- * change only how much of that synchronized field the client visualizes.</p>
+ * change only how the client visualizes and hears that synchronized field.</p>
  */
 public final class WeatherRenderingConfig {
 
@@ -40,6 +40,12 @@ public final class WeatherRenderingConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_SURFACE_OVERLAYS;
     public static final ModConfigSpec.IntValue SURFACE_OVERLAY_RADIUS_BLOCKS;
     public static final ModConfigSpec.IntValue MAXIMUM_SURFACE_PATCHES;
+    public static final ModConfigSpec.BooleanValue DISTANT_THUNDER_ENABLED;
+    public static final ModConfigSpec.DoubleValue DISTANT_THUNDER_MINIMUM_STORM_INTENSITY;
+    public static final ModConfigSpec.IntValue DISTANT_THUNDER_MAXIMUM_AUDIBLE_DISTANCE;
+    public static final ModConfigSpec.IntValue DISTANT_THUNDER_MINIMUM_INTERVAL;
+    public static final ModConfigSpec.IntValue DISTANT_THUNDER_MAXIMUM_INTERVAL;
+    public static final ModConfigSpec.DoubleValue DISTANT_THUNDER_VOLUME_MULTIPLIER;
 
     private static final Settings DEFAULTS = new Settings(
             true,
@@ -70,7 +76,13 @@ public final class WeatherRenderingConfig {
             0.55,
             true,
             24,
-            256
+            256,
+            true,
+            0.50,
+            6_144,
+            8,
+            75,
+            1.0
     );
     private static volatile Settings activeSettings = DEFAULTS;
 
@@ -162,6 +174,28 @@ public final class WeatherRenderingConfig {
                 .defineInRange("maximumImpacts", 256, 32, 1_024);
         builder.pop();
 
+        builder.comment("Client-side distant thunder from server-authored convective storm systems.")
+                .push("distant_thunder");
+        DISTANT_THUNDER_ENABLED = builder
+                .comment("Hear occasional directional thunder from qualified Wilderness Odyssey storms before local rain arrives.")
+                .define("distantThunderEnabled", true);
+        DISTANT_THUNDER_MINIMUM_STORM_INTENSITY = builder
+                .comment("Minimum persistent storm-system intensity. Rain type alone never satisfies thunder qualification.")
+                .defineInRange("minimumStormIntensity", 0.50, 0.0, 1.0);
+        DISTANT_THUNDER_MAXIMUM_AUDIBLE_DISTANCE = builder
+                .comment("Maximum audible distance from a qualified storm's outer edge, in blocks.")
+                .defineInRange("maximumAudibleDistance", 6_144, 512, 16_384);
+        DISTANT_THUNDER_MINIMUM_INTERVAL = builder
+                .comment("Shortest randomized gap between distant-thunder sounds, in seconds.")
+                .defineInRange("minimumThunderInterval", 8, 2, 300);
+        DISTANT_THUNDER_MAXIMUM_INTERVAL = builder
+                .comment("Longest randomized gap between distant-thunder sounds, in seconds.")
+                .defineInRange("maximumThunderInterval", 75, 2, 600);
+        DISTANT_THUNDER_VOLUME_MULTIPLIER = builder
+                .comment("Client-local volume multiplier applied after distance, intensity, and motion attenuation.")
+                .defineInRange("volumeMultiplier", 1.0, 0.0, 2.0);
+        builder.pop();
+
         builder.comment("Cosmetic wet-ground and puddle overlays.")
                 .push("surface_overlays");
         ENABLE_SURFACE_OVERLAYS = builder
@@ -216,7 +250,13 @@ public final class WeatherRenderingConfig {
                 CLOUD_SHADOW_STRENGTH.get(),
                 ENABLE_SURFACE_OVERLAYS.get(),
                 SURFACE_OVERLAY_RADIUS_BLOCKS.get(),
-                MAXIMUM_SURFACE_PATCHES.get()
+                MAXIMUM_SURFACE_PATCHES.get(),
+                DISTANT_THUNDER_ENABLED.get(),
+                DISTANT_THUNDER_MINIMUM_STORM_INTENSITY.get(),
+                DISTANT_THUNDER_MAXIMUM_AUDIBLE_DISTANCE.get(),
+                DISTANT_THUNDER_MINIMUM_INTERVAL.get(),
+                DISTANT_THUNDER_MAXIMUM_INTERVAL.get(),
+                DISTANT_THUNDER_VOLUME_MULTIPLIER.get()
         );
     }
 
@@ -250,8 +290,62 @@ public final class WeatherRenderingConfig {
             double cloudShadowStrength,
             boolean surfaceOverlays,
             int surfaceOverlayRadiusBlocks,
-            int maximumSurfacePatches
+            int maximumSurfacePatches,
+            boolean distantThunderEnabled,
+            double minimumStormIntensity,
+            int maximumAudibleDistance,
+            int minimumThunderInterval,
+            int maximumThunderInterval,
+            double volumeMultiplier
     ) {
+        /** Preserves the weather-v3 rendering shape for compatibility callers. */
+        public Settings(
+                boolean enabled,
+                boolean volumetricClouds,
+                boolean raymarchedClouds,
+                int raymarchSteps,
+                int renderDistanceBlocks,
+                int rebuildIntervalTicks,
+                double windDetailSpeedBlocksPerSecond,
+                int maximumCloudTiles,
+                double opacityMultiplier,
+                int volumetricLayerCount,
+                double volumetricDetailStrength,
+                boolean distantRainShafts,
+                boolean windDrivenPrecipitation,
+                double precipitationWindSlantBlocks,
+                int distantRainDistanceBlocks,
+                int distantRainSpacingBlocks,
+                int maximumDistantRainShafts,
+                double precipitationStreakDensity,
+                double precipitationOpacity,
+                double precipitationImpactDensity,
+                int maximumPrecipitationImpacts,
+                boolean distantCloudLayer,
+                int distantCloudDistanceBlocks,
+                int distantCloudSpacingBlocks,
+                int maximumDistantCloudTiles,
+                double cloudShadowStrength,
+                boolean surfaceOverlays,
+                int surfaceOverlayRadiusBlocks,
+                int maximumSurfacePatches
+        ) {
+            this(
+                    enabled, volumetricClouds, raymarchedClouds, raymarchSteps,
+                    renderDistanceBlocks, rebuildIntervalTicks, windDetailSpeedBlocksPerSecond,
+                    maximumCloudTiles, opacityMultiplier, volumetricLayerCount,
+                    volumetricDetailStrength, distantRainShafts, windDrivenPrecipitation,
+                    precipitationWindSlantBlocks, distantRainDistanceBlocks,
+                    distantRainSpacingBlocks, maximumDistantRainShafts,
+                    precipitationStreakDensity, precipitationOpacity,
+                    precipitationImpactDensity, maximumPrecipitationImpacts,
+                    distantCloudLayer, distantCloudDistanceBlocks, distantCloudSpacingBlocks,
+                    maximumDistantCloudTiles, cloudShadowStrength, surfaceOverlays,
+                    surfaceOverlayRadiusBlocks, maximumSurfacePatches,
+                    true, 0.50, 6_144, 8, 75, 1.0
+            );
+        }
+
         /** Preserves the weather-v2 settings shape for compatibility callers. */
         public Settings(
                 boolean enabled,
@@ -276,7 +370,7 @@ public final class WeatherRenderingConfig {
                     windDrivenPrecipitation, precipitationWindSlantBlocks,
                     distantRainDistanceBlocks, distantRainSpacingBlocks, maximumDistantRainShafts,
                     0.82, 0.78, 0.32, 256,
-                    true, 1_024, 48, 512, 0.55, true, 24, 256);
+                     true, 1_024, 48, 512, 0.55, true, 24, 256);
         }
 
         /** Preserves the original settings shape for tests and compatibility callers. */
@@ -321,7 +415,13 @@ public final class WeatherRenderingConfig {
                     0.55,
                     true,
                     24,
-                    256
+                    256,
+                    true,
+                    0.50,
+                    6_144,
+                    8,
+                    75,
+                    1.0
             );
         }
 
@@ -348,6 +448,14 @@ public final class WeatherRenderingConfig {
             cloudShadowStrength = clamp(cloudShadowStrength, 0.0, 1.0);
             surfaceOverlayRadiusBlocks = clamp(surfaceOverlayRadiusBlocks, 8, 64);
             maximumSurfacePatches = clamp(maximumSurfacePatches, 32, 1_024);
+            minimumStormIntensity = clamp(minimumStormIntensity, 0.0, 1.0);
+            maximumAudibleDistance = clamp(maximumAudibleDistance, 512, 16_384);
+            minimumThunderInterval = clamp(minimumThunderInterval, 2, 300);
+            maximumThunderInterval = Math.max(
+                    minimumThunderInterval,
+                    clamp(maximumThunderInterval, 2, 600)
+            );
+            volumeMultiplier = clamp(volumeMultiplier, 0.0, 2.0);
         }
 
         private static int clamp(int value, int minimum, int maximum) {

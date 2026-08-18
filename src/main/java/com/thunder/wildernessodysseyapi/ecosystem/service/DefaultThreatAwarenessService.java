@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.ecosystem.api.EnvironmentalContext;
 import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
 import com.thunder.wildernessodysseyapi.ecosystem.api.ThreatAwarenessService;
+import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileManager;
 import com.thunder.wildernessodysseyapi.ecosystem.state.AnimalNeedsState;
 import net.minecraft.core.registries.Registries;
@@ -116,6 +117,12 @@ public final class DefaultThreatAwarenessService implements ThreatAwarenessServi
             int radius
     ) {
         if (!(animal.level() instanceof ServerLevel level) || radius <= 0) {
+            return;
+        }
+        if (EcosystemConfig.GROUP_AI_ENABLED.get()
+                && EcosystemServices.groups().groupFor(animal).isPresent()) {
+            EcosystemServices.groups().reportThreat(
+                    animal, threat, EcosystemConfig.GROUP_FORMATION_RADIUS.get());
             return;
         }
         for (LivingEntity candidate : nearbyEntities.query(

@@ -12,6 +12,10 @@ import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioCampusUp
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioLocationTeleportPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioStructureActionPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEntityActionPayload;
+import com.thunder.wildernessodysseyapi.ecosystem.client.EnvironmentalMemoryClientState;
+import com.thunder.wildernessodysseyapi.ecosystem.distant.client.ClientDistantWildlifeState;
+import com.thunder.wildernessodysseyapi.ecosystem.distant.network.DistantWildlifeSyncPayload;
+import com.thunder.wildernessodysseyapi.ecosystem.network.EnvironmentalMemoryDebugPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.structure.StudioStructureService;
 import com.thunder.wildernessodysseyapi.developmentstudio.entity.StudioEntityService;
 import com.thunder.wildernessodysseyapi.developmentstudio.environment.StudioEnvironmentService;
@@ -32,6 +36,8 @@ import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWatershe
 import com.thunder.wildernessodysseyapi.watersystem.water.network.WatershedRegionSyncPayload;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
+import com.thunder.wildernessodysseyapi.weather.client.audio.DistantThunderAudioManager;
+import com.thunder.wildernessodysseyapi.weather.networking.DistantThunderSystemSyncPayload;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherRegionSyncPayload;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -45,7 +51,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModPayloads {
 
-    private static final String NETWORK_VERSION = "16";
+    private static final String NETWORK_VERSION = "19";
 
     private ModPayloads() {
     }
@@ -135,6 +141,13 @@ public final class ModPayloads {
                 context.enqueueWork(() -> StudioClientState.accept(payload)));
 
         registrar.playToClient(
+                EnvironmentalMemoryDebugPayload.TYPE,
+                EnvironmentalMemoryDebugPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        EnvironmentalMemoryClientState.accept(payload))
+        );
+
+        registrar.playToClient(
                 SphSimulationSnapshotPayload.TYPE,
                 SphSimulationSnapshotPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() ->
@@ -179,6 +192,18 @@ public final class ModPayloads {
                 WeatherRegionSyncPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() ->
                         ClientWeatherCoordinator.accept(payload))
+        );
+        registrar.playToClient(
+                DistantThunderSystemSyncPayload.TYPE,
+                DistantThunderSystemSyncPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        DistantThunderAudioManager.accept(payload))
+        );
+        registrar.playToClient(
+                DistantWildlifeSyncPayload.TYPE,
+                DistantWildlifeSyncPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        ClientDistantWildlifeState.accept(payload))
         );
     }
 }

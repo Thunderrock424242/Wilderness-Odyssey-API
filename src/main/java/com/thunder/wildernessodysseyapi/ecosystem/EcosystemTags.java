@@ -19,6 +19,9 @@ public final class EcosystemTags {
     /** Resource ID for the default wolf prey population tag. */
     public static final ResourceLocation WOLF_PREY_ID = ResourceLocation.fromNamespaceAndPath(
             ModConstants.MOD_ID, "ecosystem/wolf_prey");
+    /** Resource ID for entities whose individual identity must never be abstracted. */
+    public static final ResourceLocation NEVER_ABSTRACT_ID = ResourceLocation.fromNamespaceAndPath(
+            ModConstants.MOD_ID, "ecosystem/never_abstract");
 
     /** Blocks that indicate locally available forage for the initial herbivore model. */
     public static final TagKey<Block> FORAGE_BLOCKS = TagKey.create(
@@ -42,6 +45,16 @@ public final class EcosystemTags {
     public static final TagKey<EntityType<?>> WOLF_PREY = TagKey.create(
             Registries.ENTITY_TYPE,
             WOLF_PREY_ID
+    );
+
+    /**
+     * Data-pack extension point for quest, story, showcase, or otherwise special wildlife.
+     *
+     * <p>Other mods may add their entity types to this tag without a hard dependency.</p>
+     */
+    public static final TagKey<EntityType<?>> NEVER_ABSTRACT = TagKey.create(
+            Registries.ENTITY_TYPE,
+            NEVER_ABSTRACT_ID
     );
 
     private EcosystemTags() {

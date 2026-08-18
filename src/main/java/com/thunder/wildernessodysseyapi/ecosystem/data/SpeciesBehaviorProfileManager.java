@@ -3,7 +3,9 @@ package com.thunder.wildernessodysseyapi.ecosystem.data;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.thunder.wildernessodysseyapi.ecosystem.api.ActivityTime;
 import com.thunder.wildernessodysseyapi.ecosystem.api.AnimalBehaviorTag;
+import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemBehaviorState;
 import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -12,6 +14,7 @@ import net.minecraft.world.entity.PathfinderMob;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -27,8 +30,9 @@ import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
  *
  * <p>Server-config behavior assignments are the primary easy path and override
  * JSON for matching entities. JSON explicit selectors then win over JSON tag
- * selectors. Conservative third-party-animal inference is the final fallback,
- * so automatic compatibility never replaces pack-authored knowledge.</p>
+ * selectors, followed by profiles registered by compatibility modules.
+ * Conservative third-party-animal inference is the final fallback, so
+ * automatic compatibility never replaces pack-authored knowledge.</p>
  */
 public final class SpeciesBehaviorProfileManager {
 
@@ -37,6 +41,7 @@ public final class SpeciesBehaviorProfileManager {
             new ConcurrentHashMap<>();
     private static final Map<ConfiguredProfileKey, SpeciesBehaviorProfile> autoDetectedProfiles =
             new ConcurrentHashMap<>();
+    private static volatile List<SpeciesBehaviorProfile> compatibilityProfiles = List.of();
 
     private SpeciesBehaviorProfileManager() {
     }
@@ -60,6 +65,19 @@ public final class SpeciesBehaviorProfileManager {
             return Optional.of(explicit);
         }
         for (SpeciesBehaviorProfile candidate : snapshot.tagged()) {
+            for (ResourceLocation tagId : candidate.entityTags()) {
+                if (animal.getType().builtInRegistryHolder().is(
+                        net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.ENTITY_TYPE, tagId))) {
+                    return Optional.of(candidate);
+                }
+            }
+        }
+        for (SpeciesBehaviorProfile candidate : compatibilityProfiles) {
+            if (candidate.entities().contains(entityId)) {
+                return Optional.of(candidate);
+            }
+        }
+        for (SpeciesBehaviorProfile candidate : compatibilityProfiles) {
             for (ResourceLocation tagId : candidate.entityTags()) {
                 if (animal.getType().builtInRegistryHolder().is(
                         net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.ENTITY_TYPE, tagId))) {
@@ -103,6 +121,31 @@ public final class SpeciesBehaviorProfileManager {
         return autoDetectedProfiles.values().stream()
                 .sorted(Comparator.comparing(profile -> profile.id().toString()))
                 .toList();
+    }
+
+    /**
+     * Registers a compatibility-module profile after config and data-pack profiles but before inference.
+     *
+     * <p>Call this during common setup. Registration is atomic, survives data-pack
+     * reloads, and rejects duplicate profile IDs instead of silently replacing
+     * another module's ownership.</p>
+     */
+    public static synchronized void registerCompatibilityProfile(SpeciesBehaviorProfile profile) {
+        if (profile.entities().isEmpty() && profile.entityTags().isEmpty()) {
+            throw new IllegalArgumentException("Compatibility profile requires an entity or entity-tag selector");
+        }
+        if (compatibilityProfiles.stream().anyMatch(candidate -> candidate.id().equals(profile.id()))) {
+            throw new IllegalArgumentException("Duplicate ecosystem compatibility profile " + profile.id());
+        }
+        List<SpeciesBehaviorProfile> updated = new ArrayList<>(compatibilityProfiles);
+        updated.add(profile);
+        updated.sort(Comparator.comparing(candidate -> candidate.id().toString()));
+        compatibilityProfiles = List.copyOf(updated);
+    }
+
+    /** Returns profiles registered directly by compatibility modules. */
+    public static List<SpeciesBehaviorProfile> compatibilityProfiles() {
+        return compatibilityProfiles;
     }
 
     /** Clears config-generated and inferred profiles so runtime settings rebuild on next lookup. */
@@ -156,8 +199,9 @@ public final class SpeciesBehaviorProfileManager {
         JsonObject herd = object(root, "herd");
         JsonObject prey = object(root, "prey");
         JsonObject predator = object(root, "predator");
+        JsonObject environment = object(root, "environment");
 
-        return new SpeciesBehaviorProfile(
+        SpeciesBehaviorProfile base = new SpeciesBehaviorProfile(
                 id,
                 Set.copyOf(entities),
                 Set.copyOf(entityTags),
@@ -217,6 +261,38 @@ public final class SpeciesBehaviorProfileManager {
                         List.copyOf(locations(predator.getAsJsonArray("prey_tags"), "predator.prey_tags", id))
                 )
         );
+        SpeciesBehaviorProfile.Environment defaults = base.environment();
+        return new SpeciesBehaviorProfile(
+                base.id(),
+                base.entities(),
+                base.entityTags(),
+                base.needs(),
+                base.drinking(),
+                base.shelter(),
+                base.herd(),
+                base.prey(),
+                base.predator(),
+                new SpeciesBehaviorProfile.Environment(
+                        activityTime(environment, defaults.activeTime(), id),
+                        decimal(environment, "preferred_temperature_min_celsius",
+                                defaults.preferredMinimumTemperatureCelsius(), -80.0, 60.0),
+                        decimal(environment, "preferred_temperature_max_celsius",
+                                defaults.preferredMaximumTemperatureCelsius(), -80.0, 60.0),
+                        decimal(environment, "hot_dry_drink_threshold_reduction",
+                                defaults.hotDryDrinkThresholdReduction(), 0.0, 0.75),
+                        decimal(environment, "forage_hunger_threshold",
+                                defaults.forageHungerThreshold(), 0.0, 1.0),
+                        decimal(environment, "rest_threshold", defaults.restThreshold(), 0.0, 1.0),
+                        decimal(environment, "minimum_food_for_forage",
+                                defaults.minimumFoodForForage(), 0.0, 1.0),
+                        integer(environment, "local_travel_radius", defaults.localTravelRadius(), 4, 32),
+                        integer(environment, "migration_radius", defaults.migrationRadius(), 4, 64),
+                        integer(environment, "schedule_jitter_ticks", defaults.scheduleJitterTicks(), 0, 4_000),
+                        integer(environment, "rest_duration_ticks", defaults.restDurationTicks(), 20, 2_400),
+                        integer(environment, "sleep_duration_ticks", defaults.sleepDurationTicks(), 40, 4_800),
+                        behaviorStates(environment.getAsJsonArray("supported_states"), defaults.supportedStates(), id)
+                )
+        );
     }
 
     private static JsonObject object(JsonObject parent, String name) {
@@ -241,6 +317,46 @@ public final class SpeciesBehaviorProfileManager {
 
     private static boolean bool(JsonObject object, String name, boolean fallback) {
         return object.has(name) ? object.get(name).getAsBoolean() : fallback;
+    }
+
+    private static String text(JsonObject object, String name, String fallback) {
+        return object.has(name) ? object.get(name).getAsString() : fallback;
+    }
+
+    private static ActivityTime activityTime(
+            JsonObject object,
+            ActivityTime fallback,
+            ResourceLocation profileId
+    ) {
+        if (!object.has("active_time")) {
+            return fallback;
+        }
+        String value = text(object, "active_time", fallback.serializedName());
+        ActivityTime parsed = ActivityTime.parse(value, null);
+        if (parsed == null) {
+            throw new IllegalArgumentException(profileId + " has invalid environment.active_time " + value);
+        }
+        return parsed;
+    }
+
+    private static Set<EcosystemBehaviorState> behaviorStates(
+            JsonArray values,
+            Set<EcosystemBehaviorState> fallback,
+            ResourceLocation profileId
+    ) {
+        if (values == null) {
+            return fallback;
+        }
+        EnumSet<EcosystemBehaviorState> states = EnumSet.noneOf(EcosystemBehaviorState.class);
+        for (JsonElement value : values) {
+            try {
+                states.add(EcosystemBehaviorState.valueOf(value.getAsString().trim().toUpperCase(java.util.Locale.ROOT)));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException(
+                        profileId + " has invalid environment.supported_states value " + value);
+            }
+        }
+        return states;
     }
 
     private static int integer(JsonObject object, String name, int fallback, int minimum, int maximum) {

@@ -42,6 +42,12 @@ class WeatherRenderingConfigTest {
         assertTrue(defaults.surfaceOverlays());
         assertEquals(24, defaults.surfaceOverlayRadiusBlocks());
         assertEquals(256, defaults.maximumSurfacePatches());
+        assertTrue(defaults.distantThunderEnabled());
+        assertEquals(0.50, defaults.minimumStormIntensity(), 1.0E-12);
+        assertEquals(6_144, defaults.maximumAudibleDistance());
+        assertEquals(8, defaults.minimumThunderInterval());
+        assertEquals(75, defaults.maximumThunderInterval());
+        assertEquals(1.0, defaults.volumeMultiplier(), 1.0E-12);
     }
 
     @Test
@@ -114,5 +120,26 @@ class WeatherRenderingConfigTest {
         assertEquals(1.25, settings.precipitationOpacity(), 1.0E-12);
         assertEquals(0.0, settings.precipitationImpactDensity(), 1.0E-12);
         assertEquals(1_024, settings.maximumPrecipitationImpacts());
+    }
+
+    @Test
+    void distantThunderControlsAreDefensivelyBoundedAndIntervalsStayOrdered() {
+        WeatherRenderingConfig.Settings settings = new WeatherRenderingConfig.Settings(
+                true, true, true, 24,
+                384, 5, 6.0, 4_096, 1.0, 8, 0.65,
+                true, true, 10.0, 96, 6, 768,
+                0.82, 0.78, 0.32, 256,
+                true, 1_024, 48, 512, 0.55,
+                true, 24, 256,
+                true, Double.NaN, Integer.MAX_VALUE,
+                Integer.MAX_VALUE, Integer.MIN_VALUE, Double.POSITIVE_INFINITY
+        );
+
+        assertTrue(settings.distantThunderEnabled());
+        assertEquals(0.0, settings.minimumStormIntensity(), 1.0E-12);
+        assertEquals(16_384, settings.maximumAudibleDistance());
+        assertEquals(300, settings.minimumThunderInterval());
+        assertEquals(300, settings.maximumThunderInterval());
+        assertEquals(0.0, settings.volumeMultiplier(), 1.0E-12);
     }
 }
