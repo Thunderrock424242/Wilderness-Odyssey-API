@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 /**
  * Central server-owned high-performance data layer for Wilderness Odyssey.
@@ -100,10 +101,15 @@ public final class DataEngine {
     }
 
     /**
-     * SERVER THREAD ONLY. Advances the named pipeline in profile-friendly stages.
+     * SERVER THREAD ONLY. Advances the named pipeline while Minecraft has spare time.
+     *
+     * <p>The allowance is live rather than a snapshot. Every stage and queue
+     * callback yields once Minecraft reserves the rest of the tick for its own
+     * work, including chunk IO and generation completion.</p>
      */
-    public void tick(MinecraftServer server) {
-        if (this.server != server || !config.enabled()) {
+    public void tick(MinecraftServer server, BooleanSupplier serverHasTime) {
+        Objects.requireNonNull(serverHasTime, "Server time allowance is required");
+        if (this.server != server || !config.enabled() || !serverHasTime.getAsBoolean()) {
             return;
         }
         long startedNanos = System.nanoTime();
@@ -111,12 +117,16 @@ public final class DataEngine {
         long currentTick = server.getTickCount();
 
         refreshPlayerInterest(server, currentTick);
+        if (!serverHasTime.getAsBoolean()) {
+            updateMetrics(startedNanos);
+            return;
+        }
         scheduleDueSystems(server, currentTick);
-        processCriticalDirty(server, currentTick);
-        processCriticalQueue();
-        processCriticalCompletedTasks();
-        processBudgetedWork(server, currentTick, deadlineNanos);
-        flushNetworkBatches(server, currentTick, deadlineNanos);
+        processCriticalDirty(server, currentTick, serverHasTime);
+        processCriticalQueue(serverHasTime);
+        processCriticalCompletedTasks(serverHasTime);
+        processBudgetedWork(server, currentTick, deadlineNanos, serverHasTime);
+        flushNetworkBatches(server, currentTick, deadlineNanos, serverHasTime);
         updateMetrics(startedNanos);
     }
 
@@ -314,9 +324,13 @@ public final class DataEngine {
         )));
     }
 
-    private void processCriticalDirty(MinecraftServer server, long currentTick) {
+    private void processCriticalDirty(
+            MinecraftServer server,
+            long currentTick,
+            BooleanSupplier serverHasTime
+    ) {
         DirtyEntry entry;
-        while ((entry = dirtyTracker.pollCritical()) != null) {
+        while (serverHasTime.getAsBoolean() && (entry = dirtyTracker.pollCritical()) != null) {
             if (!enqueueDirtyHandler(server, currentTick, entry)) {
                 dirtyTracker.requeue(entry);
                 break;
@@ -324,22 +338,27 @@ public final class DataEngine {
         }
     }
 
-    private void processCriticalQueue() {
+    private void processCriticalQueue(BooleanSupplier serverHasTime) {
         QueuedUpdate update;
-        while ((update = updateQueue.pollCritical()) != null) {
+        while (serverHasTime.getAsBoolean() && (update = updateQueue.pollCritical()) != null) {
             runUpdate(update);
         }
     }
 
-    private void processCriticalCompletedTasks() {
+    private void processCriticalCompletedTasks(BooleanSupplier serverHasTime) {
         CompletedTaskQueue.CompletedTask task;
-        while ((task = completedTasks.pollCritical()) != null) {
+        while (serverHasTime.getAsBoolean() && (task = completedTasks.pollCritical()) != null) {
             runCompletedTask(task);
         }
     }
 
-    private void processBudgetedWork(MinecraftServer server, long currentTick, long deadlineNanos) {
-        while (System.nanoTime() < deadlineNanos) {
+    private void processBudgetedWork(
+            MinecraftServer server,
+            long currentTick,
+            long deadlineNanos,
+            BooleanSupplier serverHasTime
+    ) {
+        while (serverHasTime.getAsBoolean() && System.nanoTime() < deadlineNanos) {
             boolean progressed = false;
 
             CompletedTaskQueue.CompletedTask completed = completedTasks.pollNonCritical();
@@ -348,7 +367,7 @@ public final class DataEngine {
                 progressed = true;
             }
 
-            if (System.nanoTime() < deadlineNanos) {
+            if (serverHasTime.getAsBoolean() && System.nanoTime() < deadlineNanos) {
                 DirtyEntry dirty = dirtyTracker.pollNonCritical();
                 if (dirty != null) {
                     if (!enqueueDirtyHandler(server, currentTick, dirty)) {
@@ -359,7 +378,7 @@ public final class DataEngine {
                 }
             }
 
-            if (System.nanoTime() < deadlineNanos) {
+            if (serverHasTime.getAsBoolean() && System.nanoTime() < deadlineNanos) {
                 QueuedUpdate update = updateQueue.pollNonCritical();
                 if (update != null) {
                     runUpdate(update);
@@ -373,9 +392,14 @@ public final class DataEngine {
         }
     }
 
-    private void flushNetworkBatches(MinecraftServer server, long currentTick, long deadlineNanos) {
-        if (System.nanoTime() < deadlineNanos) {
-            syncManager.flush(server, currentTick, deadlineNanos);
+    private void flushNetworkBatches(
+            MinecraftServer server,
+            long currentTick,
+            long deadlineNanos,
+            BooleanSupplier serverHasTime
+    ) {
+        if (serverHasTime.getAsBoolean() && System.nanoTime() < deadlineNanos) {
+            syncManager.flush(server, currentTick, deadlineNanos, serverHasTime);
         }
     }
 

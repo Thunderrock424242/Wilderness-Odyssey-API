@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 
 /**
  * Bounded cooperative scheduler for Wilderness Odyssey background work.
@@ -17,6 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * logical server thread. The scheduler never blocks waiting for work.</p>
  */
 public final class BackgroundWorkScheduler implements BackgroundSchedulerControl {
+    private static final BooleanSupplier ALWAYS_HAS_TIME = () -> true;
     private static final long ERROR_LOG_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(10L);
     private static final WorkPriority[] PRIORITIES = WorkPriority.values();
 
@@ -70,15 +72,30 @@ public final class BackgroundWorkScheduler implements BackgroundSchedulerControl
      * Processes a bounded pass using the smaller of local, caller, and external budgets.
      */
     public ProcessingReport process(long currentTick, long callerBudgetNanos) {
-        return processInternal(currentTick, callerBudgetNanos, true);
+        return processInternal(currentTick, callerBudgetNanos, ALWAYS_HAS_TIME, true);
+    }
+
+    /** Testable entry that also observes Minecraft's live spare-time allowance. */
+    ProcessingReport process(
+            long currentTick,
+            long callerBudgetNanos,
+            BooleanSupplier serverHasTime
+    ) {
+        return processInternal(currentTick, callerBudgetNanos, serverHasTime, true);
     }
 
     /** Allocation-free processing entry used by the end-of-tick lifecycle. */
-    void processTick(long currentTick, long callerBudgetNanos) {
-        processInternal(currentTick, callerBudgetNanos, false);
+    void processTick(long currentTick, long callerBudgetNanos, BooleanSupplier serverHasTime) {
+        processInternal(currentTick, callerBudgetNanos, serverHasTime, false);
     }
 
-    private ProcessingReport processInternal(long currentTick, long callerBudgetNanos, boolean createReport) {
+    private ProcessingReport processInternal(
+            long currentTick,
+            long callerBudgetNanos,
+            BooleanSupplier serverHasTime,
+            boolean createReport
+    ) {
+        Objects.requireNonNull(serverHasTime, "Server time allowance is required");
         Settings current = settings;
         if (!current.enabled()) {
             return createReport ? new ProcessingReport(0, 0, queuedTasks.get(), 0L) : null;
@@ -93,9 +110,16 @@ public final class BackgroundWorkScheduler implements BackgroundSchedulerControl
         int deferred = 0;
         int passLimit = Math.min(current.maximumTasksPerPass(), queuedTasks.get());
 
-        while (processed < passLimit) {
+        while (processed < passLimit && serverHasTime.getAsBoolean()) {
             BackgroundTask task = pollNext(control);
             if (task == null) {
+                break;
+            }
+
+            if (!serverHasTime.getAsBoolean()) {
+                queues.get(task.priority()).offerFirst(task);
+                metrics.recordDeferred(task.subsystem());
+                deferred++;
                 break;
             }
 

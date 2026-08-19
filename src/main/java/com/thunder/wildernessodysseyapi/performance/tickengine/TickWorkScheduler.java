@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 
 /**
  * Bounded deferred queue for tick-aware Wilderness Odyssey work.
@@ -17,6 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * mod's entities, block entities, events, random ticks, or scheduled ticks.</p>
  */
 public final class TickWorkScheduler {
+    private static final BooleanSupplier ALWAYS_HAS_TIME = () -> true;
     private static final int FAIRNESS_INTERVAL = 8;
     private static final long ERROR_LOG_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(10L);
     private static final TickPriority[] PRIORITIES = TickPriority.values();
@@ -66,20 +68,37 @@ public final class TickWorkScheduler {
 
     /** Processes permitted work until task or TickBudget limits are reached. */
     public ProcessingReport process(long currentTick, long deadlineNanos, TickPressure pressure) {
-        return processInternal(currentTick, deadlineNanos, pressure, true);
+        return processInternal(currentTick, deadlineNanos, pressure, ALWAYS_HAS_TIME, true);
+    }
+
+    /** Testable entry that also observes Minecraft's live spare-time allowance. */
+    ProcessingReport process(
+            long currentTick,
+            long deadlineNanos,
+            TickPressure pressure,
+            BooleanSupplier serverHasTime
+    ) {
+        return processInternal(currentTick, deadlineNanos, pressure, serverHasTime, true);
     }
 
     /** Allocation-free processing entry used by the Tick Engine lifecycle. */
-    void processTick(long currentTick, long deadlineNanos, TickPressure pressure) {
-        processInternal(currentTick, deadlineNanos, pressure, false);
+    void processTick(
+            long currentTick,
+            long deadlineNanos,
+            TickPressure pressure,
+            BooleanSupplier serverHasTime
+    ) {
+        processInternal(currentTick, deadlineNanos, pressure, serverHasTime, false);
     }
 
     private ProcessingReport processInternal(
             long currentTick,
             long deadlineNanos,
             TickPressure pressure,
+            BooleanSupplier serverHasTime,
             boolean createReport
     ) {
+        Objects.requireNonNull(serverHasTime, "Server time allowance is required");
         Settings current = settings;
         if (!current.enabled()) {
             return createReport ? new ProcessingReport(0, 0, 0, queuedTasks.get()) : null;
@@ -90,12 +109,18 @@ public final class TickWorkScheduler {
         int attempted = 0;
         int passLimit = Math.min(current.maximumTasksPerTick(), queuedTasks.get());
 
-        while (attempted < passLimit) {
+        while (attempted < passLimit && serverHasTime.getAsBoolean()) {
             TickTask task = pollNext(pressure, currentTick, attempted);
             if (task == null) {
                 break;
             }
             attempted++;
+            if (!serverHasTime.getAsBoolean()) {
+                queues.get(task.priority()).offerFirst(task);
+                metrics.recordDeferred(task.subsystem());
+                deferred++;
+                break;
+            }
             if (task.isStale(currentTick)) {
                 release(task);
                 stale++;

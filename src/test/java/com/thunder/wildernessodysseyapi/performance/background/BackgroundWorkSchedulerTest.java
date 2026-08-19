@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -25,6 +26,28 @@ class BackgroundWorkSchedulerTest {
         scheduler.process(1L, Long.MAX_VALUE);
 
         assertEquals(List.of("critical", "gameplay", "idle"), order);
+    }
+
+    @Test
+    void liveServerAllowanceStopsEvenCriticalOptionalTasks() {
+        BackgroundWorkScheduler scheduler = schedulerWithDefaults();
+        AtomicBoolean serverHasTime = new AtomicBoolean(true);
+        AtomicInteger executions = new AtomicInteger();
+        scheduler.submit(BackgroundTask.once("safety", WorkPriority.CRITICAL, 0L, () -> {
+            executions.incrementAndGet();
+            serverHasTime.set(false);
+        }));
+        scheduler.submit(BackgroundTask.once("safety", WorkPriority.CRITICAL, 0L, executions::incrementAndGet));
+
+        BackgroundWorkScheduler.ProcessingReport report = scheduler.process(
+                1L,
+                Long.MAX_VALUE,
+                serverHasTime::get
+        );
+
+        assertEquals(1, executions.get());
+        assertEquals(1, report.processed());
+        assertEquals(1, report.remaining());
     }
 
     @Test

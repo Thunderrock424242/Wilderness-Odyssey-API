@@ -7,7 +7,9 @@ These packages govern only work that Wilderness Odyssey explicitly opts into:
 - `performance/background` owns general deferred work, activity classification, safe snapshot computation, networking batches, analytics/IO batches, and framework metrics.
 - `performance/tickengine` measures server pressure and governs optional WO work through tick budgets, deferred tick tasks, adaptive intervals, and explicit missed-tick policies.
 
-Neither package replaces Minecraft's tick loop. They do not cache world state, add dirty flags, skip vanilla ticks, alter random ticks, change TPS, or throttle arbitrary vanilla/modded entities and block entities. No mixin is used.
+Neither package replaces Minecraft's tick loop. They do not cache world state, add dirty flags, skip vanilla ticks, alter random ticks, change TPS, or throttle arbitrary vanilla/modded entities and block entities. They also do not load, retain, send, unload, ticket, force, or govern generation of Minecraft chunks. No mixin is used.
+
+Every end-of-tick queue observes NeoForge's live `ServerTickEvent.hasTime()` supplier. The scheduler checks it before each optional callback, including callbacks labeled `CRITICAL` or `GAMEPLAY`, and immediately leaves remaining work queued when Minecraft withdraws the allowance. Those priority names order Wilderness-owned work; they never outrank Minecraft's chunk IO or generation completion.
 
 ## Submitting background work
 
@@ -119,7 +121,7 @@ TickEngine.registerSubsystem(new SubsystemPolicy(
 ));
 ```
 
-The final two values define the longest interval required when suspension is forbidden and whether full temporary suspension is safe. The engine includes default registrations for `weather`, `ecosystem`, `water`, `labs`, `aether`, `analytics`, `worldgen`, `structures`, and `network`; these registrations do not automatically change those systems.
+The final two values define the longest interval required when suspension is forbidden and whether full temporary suspension is safe. The engine includes default registrations for `weather`, `ecosystem`, `water`, `labs`, `aether`, `analytics`, and Wilderness-owned `network` work; these registrations do not automatically change those systems. Chunk generation and structure placement are deliberately not registered because their Minecraft-owned lifecycle must never be suspended or delayed by this engine. Optional discovery or analysis must use a separately named subsystem and operate only on caller-provided immutable data or already-loaded state.
 
 WO block entities may use `AdaptiveBlockEntityTicker` around only their expensive custom section. WO entities may use `AdaptiveEntityWork` around optional AI decisions, target analysis, or environment scanning. Never place base ticking, physics, combat, capability safety, or direct player interactions behind these helpers.
 
@@ -131,6 +133,6 @@ WO block entities may use `AdaptiveBlockEntityTicker` around only their expensiv
 
 ## Compatibility and rollout
 
-The only runtime integrations in this implementation are config registration, server start/stop lifecycle, the pre/post tick event bridge, the background-budget bridge, and integrated-server debug presentation. Weather, ecosystem, water, labs, mobs, block entities, and existing payloads retain their current behavior until each owner is migrated and profiled separately.
+The only runtime integrations in this implementation are config registration, server start/stop lifecycle, the pre/post tick event bridge, the background-budget bridge, and integrated-server debug presentation. Weather, ecosystem, water, labs, mobs, block entities, chunks, and existing payloads retain their current behavior until each eligible owner is migrated and profiled separately. An architecture regression test rejects chunk-lifecycle APIs in the optimization packages and rejects optimization-governor dependencies from the worldgen and mixin packages.
 
 For a large-modpack validation pass, profile the Tick Engine's measured full-event MSPT against Spark/Minecraft timing, watch both bounded queue pressures, confirm recovery does not release all deferred work together, and verify direct player actions remain immediate at every pressure level.

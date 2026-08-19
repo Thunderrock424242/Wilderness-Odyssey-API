@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 
 /**
  * Opt-in aggregation channels for Wilderness Odyssey state payloads.
@@ -22,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * synchronization should continue to use its direct packet path.</p>
  */
 public final class NetworkBatcher {
+    private static final BooleanSupplier ALWAYS_HAS_TIME = () -> true;
     private static final int MAX_BATCHES_PER_PASS = 64;
 
     private final ConcurrentHashMap<String, Channel<?>> channels = new ConcurrentHashMap<>();
@@ -116,14 +118,31 @@ public final class NetworkBatcher {
     /** Flushes due channels on the logical server thread while capacity remains. */
     public int flushDue(MinecraftServer server, long currentTick, long deadlineNanos) {
         Objects.requireNonNull(server, "server");
-        return flushDueInternal(server, currentTick, deadlineNanos);
+        return flushDueInternal(server, currentTick, deadlineNanos, ALWAYS_HAS_TIME);
+    }
+
+    /** Flushes only while Minecraft's live spare-time allowance remains. */
+    public int flushDue(
+            MinecraftServer server,
+            long currentTick,
+            long deadlineNanos,
+            BooleanSupplier serverHasTime
+    ) {
+        Objects.requireNonNull(server, "server");
+        return flushDueInternal(server, currentTick, deadlineNanos, serverHasTime);
     }
 
     int flushDue(long currentTick, long deadlineNanos) {
-        return flushDueInternal(null, currentTick, deadlineNanos);
+        return flushDueInternal(null, currentTick, deadlineNanos, ALWAYS_HAS_TIME);
     }
 
-    private int flushDueInternal(MinecraftServer server, long currentTick, long deadlineNanos) {
+    private int flushDueInternal(
+            MinecraftServer server,
+            long currentTick,
+            long deadlineNanos,
+            BooleanSupplier serverHasTime
+    ) {
+        Objects.requireNonNull(serverHasTime, "Server time allowance is required");
         Settings current = settings;
         if (!current.enabled()) {
             return 0;
@@ -131,8 +150,10 @@ public final class NetworkBatcher {
         int flushed = 0;
         for (Channel<?> channel : channels.values()) {
             flushed += flushChannelUnchecked(channel, server, currentTick, deadlineNanos,
-                    MAX_BATCHES_PER_PASS - flushed, current);
-            if (flushed >= MAX_BATCHES_PER_PASS || System.nanoTime() >= deadlineNanos) {
+                    MAX_BATCHES_PER_PASS - flushed, current, serverHasTime);
+            if (flushed >= MAX_BATCHES_PER_PASS
+                    || !serverHasTime.getAsBoolean()
+                    || System.nanoTime() >= deadlineNanos) {
                 break;
             }
         }
@@ -158,9 +179,18 @@ public final class NetworkBatcher {
             long currentTick,
             long deadlineNanos,
             int remainingBatches,
-            Settings settings
+            Settings settings,
+            BooleanSupplier serverHasTime
     ) {
-        return flushChannel((Channel<T>) channel, server, currentTick, deadlineNanos, remainingBatches, settings);
+        return flushChannel(
+                (Channel<T>) channel,
+                server,
+                currentTick,
+                deadlineNanos,
+                remainingBatches,
+                settings,
+                serverHasTime
+        );
     }
 
     private <T> int flushChannel(
@@ -169,11 +199,14 @@ public final class NetworkBatcher {
             long currentTick,
             long deadlineNanos,
             int remainingBatches,
-            Settings settings
+            Settings settings,
+            BooleanSupplier serverHasTime
     ) {
         int flushed = 0;
         for (Map.Entry<UUID, RecipientBatch<T>> entry : channel.recipients.entrySet()) {
-            if (flushed >= remainingBatches || System.nanoTime() >= deadlineNanos) {
+            if (flushed >= remainingBatches
+                    || !serverHasTime.getAsBoolean()
+                    || System.nanoTime() >= deadlineNanos) {
                 break;
             }
             List<T> updates = entry.getValue().drainIfDue(

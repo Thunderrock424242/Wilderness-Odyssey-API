@@ -23,6 +23,6 @@ public final class PerformanceServerEvents {
     /** Runs optional WO queues and closes measurement after existing post-tick handlers. */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onServerTickPost(ServerTickEvent.Post event) {
-        TickEngine.finishServerTick(event.getServer(), event.hasTime());
+        TickEngine.finishServerTick(event.getServer(), event::hasTime);
     }
 }

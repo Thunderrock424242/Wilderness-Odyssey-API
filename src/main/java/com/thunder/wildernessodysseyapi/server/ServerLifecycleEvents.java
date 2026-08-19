@@ -57,17 +57,25 @@ public final class ServerLifecycleEvents {
         }
     }
 
-    /** Drains main-thread work and advances Riftfall once per eligible server tick. */
+    /** Drains optional main-thread work only while Minecraft reports spare tick time. */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         if (!event.hasTime()) {
             return;
         }
 
-        AsyncTaskManager.drainMainThreadQueue(event.getServer());
-        DataEngine.get().tick(event.getServer());
+        // NeoForge's live allowance reserves the remaining tick for Minecraft's
+        // own work, including chunk IO and generation completion, once it expires.
+        AsyncTaskManager.drainMainThreadQueue(event.getServer(), event::hasTime);
+        DataEngine.get().tick(event.getServer(), event::hasTime);
+        if (!event.hasTime()) {
+            return;
+        }
         for (ServerLevel level : event.getServer().getAllLevels()) {
             RiftfallSystem.tick(level);
+            if (!event.hasTime()) {
+                break;
+            }
         }
     }
 
