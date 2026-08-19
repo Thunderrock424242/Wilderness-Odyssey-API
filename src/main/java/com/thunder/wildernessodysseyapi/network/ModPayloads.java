@@ -12,6 +12,7 @@ import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioCampusUp
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioLocationTeleportPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioStructureActionPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEntityActionPayload;
+import com.thunder.wildernessodysseyapi.dataengine.network.DataEnginePayloads;
 import com.thunder.wildernessodysseyapi.ecosystem.client.EnvironmentalMemoryClientState;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.client.ClientDistantWildlifeState;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.network.DistantWildlifeSyncPayload;
@@ -53,7 +54,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModPayloads {
 
-    private static final String NETWORK_VERSION = "20";
+    private static final String NETWORK_VERSION = "21";
 
     private ModPayloads() {
     }
@@ -65,6 +66,7 @@ public final class ModPayloads {
      */
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(NETWORK_VERSION);
+        DataEnginePayloads.register(registrar);
 
         registrar.playToServer(CloakInputPayload.TYPE, CloakInputPayload.STREAM_CODEC, (payload, context) ->
                 context.enqueueWork(() -> {

@@ -3,10 +3,15 @@ package com.thunder.wildernessodysseyapi.server;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileReloadListener;
+import com.thunder.wildernessodysseyapi.dataengine.DataEngine;
 import com.thunder.wildernessodysseyapi.faq.FaqReloadListener;
 import com.thunder.wildernessodysseyapi.gamerules.GameRulesListManager;
 import com.thunder.wildernessodysseyapi.modpack.structure.ModpackStructureRegistry;
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
+import com.thunder.wildernessodysseyapi.performance.background.BackgroundEfficiencyManager;
+import com.thunder.wildernessodysseyapi.performance.background.config.BackgroundEfficiencyConfig;
+import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
+import com.thunder.wildernessodysseyapi.performance.tickengine.config.TickEngineConfig;
 import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.entity.BoatTiltStore;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
@@ -36,6 +41,9 @@ public final class ServerLifecycleEvents {
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
+        BackgroundEfficiencyManager.start(BackgroundEfficiencyConfig.values());
+        TickEngine.start(TickEngineConfig.values(), BackgroundEfficiencyManager.schedulerControl());
+        DataEngine.get().start(event.getServer());
         ServerPropertiesTemplateManager.ensureManagedServerProperties(event.getServer());
         GameRulesListManager.ensureRulesFileExists(event.getServer());
         GameRulesListManager.applyConfiguredRules(event.getServer());
@@ -57,6 +65,7 @@ public final class ServerLifecycleEvents {
         }
 
         AsyncTaskManager.drainMainThreadQueue(event.getServer());
+        DataEngine.get().tick(event.getServer());
         for (ServerLevel level : event.getServer().getAllLevels()) {
             RiftfallSystem.tick(level);
         }
@@ -70,6 +79,9 @@ public final class ServerLifecycleEvents {
             waterManager.capturePersistentLevel(level);
         }
         waterManager.shutdown();
+        TickEngine.shutdown();
+        BackgroundEfficiencyManager.shutdown();
+        DataEngine.get().shutdown();
         AsyncTaskManager.shutdown();
     }
 

@@ -29,8 +29,10 @@ public final class AsyncTaskManager {
     private static final AtomicInteger MAIN_THREAD_BACKLOG = new AtomicInteger();
     private static final AtomicInteger REJECTED = new AtomicInteger();
     private static final AtomicInteger CALLER_RUNS = new AtomicInteger();
+    private static final AtomicLong LAST_DIRECT_REJECTION_WARNING_NANOS = new AtomicLong();
 
     private static final int THREAD_KEEP_ALIVE_SECONDS = 45;
+    private static final long DIRECT_REJECTION_WARNING_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(10);
 
     private static AsyncThreadingConfig.AsyncConfigValues configValues = AsyncThreadingConfig.values();
 
@@ -73,6 +75,7 @@ public final class AsyncTaskManager {
         MAIN_THREAD_BACKLOG.set(0);
         appliedLastTick = 0;
         CALLER_RUNS.set(0);
+        LAST_DIRECT_REJECTION_WARNING_NANOS.set(0L);
         INITIALIZED.set(false);
     }
 
@@ -82,6 +85,52 @@ public final class AsyncTaskManager {
 
     public static CompletableFuture<Boolean> submitIoTask(String label, TaskPayload taskPayload) {
         return submitTask(ioExecutor, label, taskPayload);
+    }
+
+    /**
+     * Non-blockingly submits pure CPU work without a main-thread callback.
+     *
+     * <p>This path is used by bounded services such as the Data Engine. It
+     * offers directly to the existing worker queue so executor saturation can
+     * never invoke the normal caller-runs fallback on the Minecraft thread.
+     * The task must not read or mutate live world/entity state.</p>
+     *
+     * @return {@code true} when the bounded worker queue accepted the task
+     */
+    public static boolean trySubmitCpuWork(String label, Runnable task) {
+        Objects.requireNonNull(label, "Task label is required");
+        Objects.requireNonNull(task, "CPU task is required");
+        ThreadPoolExecutor executor = cpuExecutor;
+        if (!configValues.enabled() || executor == null || !INITIALIZED.get() || executor.isShutdown()) {
+            REJECTED.incrementAndGet();
+            return false;
+        }
+
+        // Core threads may time out while idle. Start them before offering
+        // directly to the queue so accepted work always has a consumer.
+        executor.prestartAllCoreThreads();
+        boolean accepted = executor.getQueue().offer(() -> {
+            try {
+                task.run();
+            } catch (RuntimeException exception) {
+                ModConstants.LOGGER.error("[Async] CPU work '{}' failed", label, exception);
+            }
+        });
+        if (!accepted) {
+            int rejected = REJECTED.incrementAndGet();
+            long nowNanos = System.nanoTime();
+            long previousWarning = LAST_DIRECT_REJECTION_WARNING_NANOS.get();
+            if (nowNanos - previousWarning >= DIRECT_REJECTION_WARNING_INTERVAL_NANOS
+                    && LAST_DIRECT_REJECTION_WARNING_NANOS.compareAndSet(previousWarning, nowNanos)) {
+                ModConstants.LOGGER.warn(
+                        "[Async] CPU work '{}' rejected without caller-thread fallback ({} queued, {} total rejections).",
+                        label,
+                        executor.getQueue().size(),
+                        rejected
+                );
+            }
+        }
+        return accepted;
     }
 
     private static CompletableFuture<Boolean> submitTask(ThreadPoolExecutor executor, String label, TaskPayload taskPayload) {
@@ -185,6 +234,12 @@ public final class AsyncTaskManager {
                 REJECTED.get(),
                 CALLER_RUNS.get()
         );
+    }
+
+    /** Returns the current CPU worker queue length without allocating a diagnostic snapshot. */
+    public static int queuedCpuWorkTasks() {
+        ThreadPoolExecutor executor = cpuExecutor;
+        return executor == null ? 0 : executor.getQueue().size();
     }
 
     private static ThreadPoolExecutor buildExecutor(String prefix, int threads, int queueSize) {

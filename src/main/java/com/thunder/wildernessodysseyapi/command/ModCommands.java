@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.changelog.command.ChangelogCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.developmentstudio.command.StudioCommand;
+import com.thunder.wildernessodysseyapi.dataengine.debug.DataEngineCommand;
 import com.thunder.wildernessodysseyapi.ecosystem.debug.EcosystemDebugCommand;
 import com.thunder.wildernessodysseyapi.faq.FaqCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
@@ -66,5 +67,6 @@ public final class ModCommands {
         EcosystemDebugCommand.register(dispatcher);
         ReactiveVegetationDebugCommand.register(dispatcher);
         StudioCommand.register(dispatcher);
+        DataEngineCommand.register(dispatcher);
     }
 }

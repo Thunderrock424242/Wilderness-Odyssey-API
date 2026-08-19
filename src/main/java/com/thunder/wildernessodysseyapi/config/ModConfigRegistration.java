@@ -3,6 +3,8 @@ package com.thunder.wildernessodysseyapi.config;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
+import com.thunder.wildernessodysseyapi.dataengine.DataEngine;
+import com.thunder.wildernessodysseyapi.dataengine.config.DataEngineConfig;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.developmentstudio.config.StudioConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.EcosystemEvents;
@@ -13,6 +15,10 @@ import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulation
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
+import com.thunder.wildernessodysseyapi.performance.background.BackgroundEfficiencyManager;
+import com.thunder.wildernessodysseyapi.performance.background.config.BackgroundEfficiencyConfig;
+import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
+import com.thunder.wildernessodysseyapi.performance.tickengine.config.TickEngineConfig;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationRelayConfig;
 import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
@@ -69,6 +75,10 @@ public final class ModConfigRegistration {
 
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, BackgroundEfficiencyConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-background-efficiency-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TickEngineConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-tick-engine-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StudioConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-development-studio-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER,
@@ -96,6 +106,8 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-ecosystem-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, VegetationConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-vegetation-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, DataEngineConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + "wildernessodysseyapi-data-engine-server.toml");
     }
 
     /** Applies runtime-backed settings after NeoForge loads a config file. */
@@ -111,6 +123,10 @@ public final class ModConfigRegistration {
     private static void applyRuntimeSettings(ModConfig config) {
         if (config.getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
             AsyncTaskManager.initialize(AsyncThreadingConfig.values());
+        } else if (config.getSpec() == BackgroundEfficiencyConfig.CONFIG_SPEC) {
+            applyOnServerThread(() -> BackgroundEfficiencyManager.reload(BackgroundEfficiencyConfig.values()));
+        } else if (config.getSpec() == TickEngineConfig.CONFIG_SPEC) {
+            applyOnServerThread(() -> TickEngine.reload(TickEngineConfig.values()));
         } else if (config.getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
         } else if (config.getSpec() == WeatherConfig.CONFIG_SPEC) {
@@ -129,6 +145,26 @@ public final class ModConfigRegistration {
                     EcosystemSimulationManager.get().onConfigurationReload(server);
                 });
             }
+        } else if (config.getSpec() == DataEngineConfig.CONFIG_SPEC) {
+            DataEngineConfig.Values values = DataEngineConfig.values();
+            var server = ServerLifecycleHooks.getCurrentServer();
+            if (server == null) {
+                DataEngine.get().reload(values);
+            } else {
+                // Queue/budget state is server-owned even though config events
+                // originate on the mod bus during live reload.
+                server.execute(() -> DataEngine.get().reload(values));
+            }
+        }
+    }
+
+    // A live config reload must not replace worker pools while server-owned result application is running.
+    private static void applyOnServerThread(Runnable action) {
+        var server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) {
+            action.run();
+        } else {
+            server.execute(action);
         }
     }
 }
