@@ -29,7 +29,7 @@ public final class DebugPageRegistry {
     private DebugPageRegistry() {
     }
 
-    /** Registers the eight built-in pages exactly once. */
+    /** Registers the nine built-in pages exactly once. */
     public static synchronized void bootstrapDefaults() {
         if (bootstrapped) {
             return;

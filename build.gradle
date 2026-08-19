@@ -656,6 +656,12 @@ tasks.register('profileChunkWorkload', JavaExec) {
     }
 }
 
+def codexBuildDir = providers.gradleProperty("codexBuildDir")
+
+if (codexBuildDir.isPresent()) {
+    layout.buildDirectory.set(file(codexBuildDir.get()))
+}
+
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.
 idea {
