@@ -78,6 +78,16 @@ public final class WildernessDebugManager {
         return selectedPage;
     }
 
+    /** Returns the selected page id for client-only opt-in integrations. */
+    public ResourceLocation selectedPageId() {
+        List<DebugPage> pages = DebugPageRegistry.pages();
+        if (pages.isEmpty()) {
+            return null;
+        }
+        selectedPage = Math.floorMod(selectedPage, pages.size());
+        return pages.get(selectedPage).id();
+    }
+
     /**
      * Renders the current page and reports whether vanilla text can be cleared.
      * Returning false intentionally leaves vanilla's lists untouched as a fallback.

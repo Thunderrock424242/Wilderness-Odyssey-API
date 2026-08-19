@@ -3,6 +3,8 @@ package com.thunder.wildernessodysseyapi.debugoverlay.provider;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugContext;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugSection;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugValue;
+import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
+import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngineSnapshot;
 import net.minecraft.client.Minecraft;
 
 import java.util.List;
@@ -25,9 +27,10 @@ public final class PerformanceDebugDataProvider implements DebugDataProvider {
                 .add("JVM allocated", formatBytes(allocated))
                 .add("Maximum heap", formatBytes(max))
                 .build();
+        DebugSection tickEngine = tickEngineSection(minecraft);
 
         if (minecraft.level == null) {
-            return List.of(frame, memory, DebugSection.builder("WORLD LOAD")
+            return List.of(frame, memory, tickEngine, DebugSection.builder("WORLD LOAD")
                     .add("State", DebugValue.unavailable("No world loaded"))
                     .build());
         }
@@ -42,7 +45,7 @@ public final class PerformanceDebugDataProvider implements DebugDataProvider {
                 .add("Particles", minecraft.particleEngine.countParticles())
                 .add("Chunk renderer", minecraft.levelRenderer.getSectionStatistics())
                 .build();
-        return List.of(frame, memory, worldLoad);
+        return List.of(frame, memory, tickEngine, worldLoad);
     }
 
     private static DebugSection frameSection(Minecraft minecraft) {
@@ -67,6 +70,33 @@ public final class PerformanceDebugDataProvider implements DebugDataProvider {
             return DebugValue.warning(text);
         }
         return DebugValue.normal(text);
+    }
+
+    private static DebugSection tickEngineSection(Minecraft minecraft) {
+        if (minecraft.getSingleplayerServer() == null) {
+            return DebugSection.builder("WO TICK ENGINE")
+                    .add("State", DebugValue.unavailable("Remote metrics are not synchronized"))
+                    .build();
+        }
+        TickEngineSnapshot snapshot = TickEngine.snapshot();
+        DebugValue pressure = switch (snapshot.pressure()) {
+            case RELAXED -> DebugValue.good(snapshot.pressure());
+            case BUSY, HIGH -> DebugValue.warning(snapshot.pressure());
+            case CRITICAL, OVERLOADED -> DebugValue.error(snapshot.pressure());
+        };
+        return DebugSection.builder("WO TICK ENGINE")
+                .add("State", snapshot.enabled() ? DebugValue.good("Enabled") : DebugValue.unavailable("Disabled"))
+                .add("TPS", String.format(Locale.ROOT, "%.2f", snapshot.tps()))
+                .add("Current MSPT", String.format(Locale.ROOT, "%.2f ms", snapshot.currentMspt()))
+                .add("Short average", String.format(Locale.ROOT, "%.2f ms", snapshot.shortAverageMspt()))
+                .add("Medium average", String.format(Locale.ROOT, "%.2f ms", snapshot.mediumAverageMspt()))
+                .add("Pressure", pressure)
+                .add("WO budget used", String.format(Locale.ROOT, "%.3f / %.3f ms",
+                        snapshot.optionalWorkMillis(), snapshot.optionalBudgetMillis()))
+                .add("Deferred work", snapshot.deferredTasks() + snapshot.backgroundQueuedTasks())
+                .add("Throttled systems", snapshot.throttledSubsystems())
+                .add("Worst WO subsystem", snapshot.worstSubsystem())
+                .build();
     }
 
     static String formatBytes(long bytes) {

@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.debugoverlay.pages.SystemDebugPage;
 import com.thunder.wildernessodysseyapi.debugoverlay.pages.TargetDebugPage;
 import com.thunder.wildernessodysseyapi.debugoverlay.pages.VanillaRawDebugPage;
 import com.thunder.wildernessodysseyapi.debugoverlay.pages.WorldDebugPage;
+import com.thunder.wildernessodysseyapi.dataengine.debug.client.DataEngineDebugPage;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.LinkedHashMap;
@@ -40,6 +41,7 @@ public final class DebugPageRegistry {
         registerInternal(new RenderingDebugPage());
         registerInternal(new SystemDebugPage());
         registerInternal(new NetworkDebugPage());
+        registerInternal(new DataEngineDebugPage());
         registerInternal(new TargetDebugPage());
         registerInternal(new VanillaRawDebugPage());
     }
