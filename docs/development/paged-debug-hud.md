@@ -30,7 +30,7 @@ There is no render-cancelling or keyboard mixin and no page, formatting, or prov
 
 - `DebugPage` defines a page ID, display name, ordered sections, and an optional availability condition.
 - `DebugSection`, `DebugEntry`, and `DebugValue` are the presentation model. `DebugValue` carries semantic normal/good/warning/error/unavailable state without embedding renderer colors in providers.
-- `DebugPageRegistry` owns ordered page registration. Its built-ins are General, World, Performance, Rendering, System, Network/Server, Target Details, and Vanilla Raw.
+- `DebugPageRegistry` owns ordered page registration. Its built-ins are General, World, Performance, Rendering, System, Network/Server, Data Engine, Target Details, and Vanilla Raw.
 - `ProviderDebugPage` calls only the active page's provider and caches its result for a page-specific interval.
 - Provider classes under `debugoverlay/provider` read client-safe Minecraft state. They do not perform disk or network IO.
 - `WildernessDebugManager` owns the selected index and active-page scroll offset but never toggles Minecraft's debug state. Changing pages or reopening F3 resets the viewport to the top.

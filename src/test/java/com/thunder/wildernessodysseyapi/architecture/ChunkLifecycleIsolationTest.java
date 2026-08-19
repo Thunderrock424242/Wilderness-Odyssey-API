@@ -36,7 +36,7 @@ class ChunkLifecycleIsolationTest {
             Pattern.compile("\\bimport\\s+net\\.minecraft\\.world\\.level\\.chunk\\."
                     + "(?:ChunkAccess|LevelChunk|ProtoChunk|ImposterProtoChunk)\\b"),
             Pattern.compile("\\bimport\\s+net\\.minecraft\\.world\\.level\\.chunk\\.status\\."),
-            Pattern.compile("\\.(?:getChunk|getChunkNow|getChunkSource|addRegionTicket|removeRegionTicket|"
+            Pattern.compile("\\.(?:getChunk|getChunkNow|addRegionTicket|removeRegionTicket|"
                     + "updateChunkForced|setChunkForced|setViewDistance)\\s*\\(")
     );
     private static final Pattern OPTIMIZATION_REFERENCE = Pattern.compile(

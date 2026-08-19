@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class DebugPageRegistryTest {
     @Test
-    void registersEightBuiltInPagesInNavigationOrder() {
+    void registersNineBuiltInPagesInNavigationOrder() {
         List<String> ids = DebugPageRegistry.pages().stream()
                 .map(page -> page.id().getPath())
                 .toList();
@@ -22,6 +22,7 @@ class DebugPageRegistryTest {
                 "rendering",
                 "system",
                 "network",
+                "data_engine_debug_metrics",
                 "target",
                 "vanilla_raw"
         ), ids);
@@ -47,6 +48,6 @@ class DebugPageRegistryTest {
         };
 
         assertThrows(IllegalArgumentException.class, () -> DebugPageRegistry.register(duplicate));
-        assertEquals(8, DebugPageRegistry.size());
+        assertEquals(9, DebugPageRegistry.size());
     }
 }
