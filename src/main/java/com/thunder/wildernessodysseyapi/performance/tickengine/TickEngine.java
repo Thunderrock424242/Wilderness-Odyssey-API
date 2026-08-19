@@ -8,6 +8,7 @@ import net.minecraft.server.MinecraftServer;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 /**
  * Additive server-load governor for opt-in Wilderness Odyssey work.
@@ -95,9 +96,9 @@ public final class TickEngine {
     /**
      * Runs budgeted WO work and records the completed tick from the lowest-priority post event.
      */
-    public static void finishServerTick(MinecraftServer server, boolean vanillaHasTime) {
+    public static void finishServerTick(MinecraftServer server, BooleanSupplier serverHasTime) {
         Objects.requireNonNull(server, "server");
-        INSTANCE.finishTick(server, vanillaHasTime);
+        INSTANCE.finishTick(server, Objects.requireNonNull(serverHasTime, "Server time allowance is required"));
     }
 
     /** Registers an opt-in subsystem policy. Existing identical registration is harmless. */
@@ -154,7 +155,7 @@ public final class TickEngine {
         INSTANCE.backgroundControl = null;
     }
 
-    private void finishTick(MinecraftServer server, boolean vanillaHasTime) {
+    private void finishTick(MinecraftServer server, BooleanSupplier serverHasTime) {
         if (!running) {
             return;
         }
@@ -163,21 +164,26 @@ public final class TickEngine {
         TickEngineConfig.Values current = values;
 
         if (!current.enabled()) {
-            long backgroundBudget = vanillaHasTime ? Long.MAX_VALUE : 0L;
-            BackgroundEfficiencyManager.tick(server, server.getTickCount(), backgroundBudget);
+            long backgroundBudget = serverHasTime.getAsBoolean() ? Long.MAX_VALUE : 0L;
+            BackgroundEfficiencyManager.tick(
+                    server,
+                    server.getTickCount(),
+                    backgroundBudget,
+                    serverHasTime
+            );
             monitor.recordTick(nanosToMillis(System.nanoTime() - start));
             return;
         }
 
         TickPressure priorPressure = monitor.pressure();
         TickBudget budget = budgetManager.begin(start, optionalStart, priorPressure, recoveryMultiplier);
-        long effectiveDeadline = vanillaHasTime ? budget.deadlineNanos() : optionalStart;
-        scheduler.processTick(server.getTickCount(), effectiveDeadline, priorPressure);
+        long effectiveDeadline = serverHasTime.getAsBoolean() ? budget.deadlineNanos() : optionalStart;
+        scheduler.processTick(server.getTickCount(), effectiveDeadline, priorPressure, serverHasTime);
 
         long beforeBackground = System.nanoTime();
-        long remaining = vanillaHasTime ? budget.remainingNanos(beforeBackground) : 0L;
+        long remaining = serverHasTime.getAsBoolean() ? budget.remainingNanos(beforeBackground) : 0L;
         applyBackgroundControl(server.getTickCount(), priorPressure);
-        BackgroundEfficiencyManager.tick(server, server.getTickCount(), remaining);
+        BackgroundEfficiencyManager.tick(server, server.getTickCount(), remaining, serverHasTime);
 
         long finished = System.nanoTime();
         budgetManager.finish(finished);
@@ -288,8 +294,6 @@ public final class TickEngine {
         throttle.register(new SubsystemPolicy("labs", "Labs", TickPriority.GAMEPLAY, 20, false));
         throttle.register(new SubsystemPolicy("aether", "Aether", TickPriority.NORMAL, 100, true));
         throttle.register(new SubsystemPolicy("analytics", "Analytics", TickPriority.IDLE, 1200, true));
-        throttle.register(new SubsystemPolicy("worldgen", "World Generation", TickPriority.BACKGROUND, 200, true));
-        throttle.register(new SubsystemPolicy("structures", "Structures", TickPriority.BACKGROUND, 200, true));
         throttle.register(new SubsystemPolicy("network", "Network", TickPriority.GAMEPLAY, 20, false));
     }
 

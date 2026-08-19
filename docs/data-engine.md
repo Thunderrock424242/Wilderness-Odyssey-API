@@ -4,7 +4,7 @@
 
 The Data Engine is a reusable, server-owned efficiency layer for Wilderness Odyssey systems. It reduces how often work is created and how much state is moved before trying to make individual calculations faster.
 
-Minecraft and NeoForge still own the authoritative server tick, worlds, chunks, entities, networking lifecycle, and thread rules. The Data Engine is not a second game tick engine. Its scope is Wilderness-owned scheduling, dirty-state tracking, bounded work queues, final-state coalescing, caching, player interest, delta batching, safe asynchronous calculation, and measurement.
+Minecraft and NeoForge still own the authoritative server tick, worlds, chunks, entities, networking lifecycle, and thread rules. The Data Engine is not a second game tick engine. Its scope is Wilderness-owned scheduling, dirty-state tracking, bounded work queues, final-state coalescing, caching, player interest, delta batching, safe asynchronous calculation, and measurement. It never loads, retains, sends, unloads, tickets, force-loads, or governs generation of Minecraft chunks.
 
 The root service is `DataEngine.get()`. Mutable API calls are server-thread-only unless their Javadoc explicitly says otherwise.
 
@@ -23,7 +23,7 @@ Wilderness state change
         -> NeoForge client payload handler
 ```
 
-Critical individual events bypass the non-critical time budget and batching delay, but they still obey hard capacity and packet-size safety bounds. If even a critical item cannot be accepted, the API returns `false` and logs/rates the backpressure event instead of silently losing it. The authoritative owner should retain its own dirty state or retry safely.
+Critical individual events bypass the Data Engine's non-critical time budget and batching delay, but they never bypass NeoForge's live `ServerTickEvent.hasTime()` allowance. Once Minecraft reserves the remaining tick for its own work, including chunk IO and generation completion, critical Data Engine items stay queued for a later tick. They still obey hard capacity and packet-size safety bounds. If even a critical item cannot be accepted, the API returns `false` and logs/rates the backpressure event instead of silently losing it. The authoritative owner should retain its own dirty state or retry safely.
 
 ## Registering a system
 
@@ -103,7 +103,7 @@ Client systems register an explicit handler with `DataDeltaHandlerRegistry`; the
 
 ## Player interest
 
-`InterestManager` maintains player positions in eight-chunk buckets once per server tick. Region sends query intersecting buckets rather than comparing every world object with every connected player.
+`InterestManager` maintains player positions in eight-chunk coordinate buckets once per eligible server tick. These are ordinary in-memory recipient-index keys: they do not query chunk objects, influence vanilla chunk packets, or create/retain chunk tickets. Region sends query intersecting buckets rather than comparing every world object with every connected player.
 
 ```java
 InterestProfile profile = new InterestProfile(
@@ -215,7 +215,7 @@ The existing paged F3 HUD includes `WO DATA ENGINE`. Only a permission-level 2 p
 ## Lifecycle and failure isolation
 
 - `ServerStartingEvent`: the existing async executor starts first, then Data Engine creates fresh per-server bounded state and registers internal integrations.
-- `ServerTickEvent.Post`: the existing async handoff drains, Data Engine runs its named stages, then existing gameplay systems continue.
+- `ServerTickEvent.Post`: the existing async handoff and Data Engine stages recheck the event's live `hasTime()` allowance before each queued callback or batch. A one-time true snapshot cannot authorize later work after Minecraft reserves the remaining tick.
 - `ServerStoppingEvent`: water persistence/shutdown completes, Data Engine clears queues/caches/player references, then the shared async executor stops.
 - Player disconnects disappear from the interest index on its next refresh.
 - Dimension movement relocates a player between buckets.

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 
 /**
  * Batches Wilderness Odyssey-owned analytics and non-save IO work.
@@ -15,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * bounded {@link AsyncComputeManager} using immutable batch snapshots.</p>
  */
 public final class AnalyticsBatcher {
+    private static final BooleanSupplier ALWAYS_HAS_TIME = () -> true;
     private static final int MAX_CHANNELS_PER_PASS = 16;
 
     private final ConcurrentHashMap<String, Channel<?>> channels = new ConcurrentHashMap<>();
@@ -63,13 +65,26 @@ public final class AnalyticsBatcher {
 
     /** Submits due immutable batches to the bounded worker pool. */
     public int flushDue(long currentTick, AsyncComputeManager asyncManager, long deadlineNanos) {
+        return flushDue(currentTick, asyncManager, deadlineNanos, ALWAYS_HAS_TIME);
+    }
+
+    /** Submits batches only while Minecraft's live spare-time allowance remains. */
+    public int flushDue(
+            long currentTick,
+            AsyncComputeManager asyncManager,
+            long deadlineNanos,
+            BooleanSupplier serverHasTime
+    ) {
+        Objects.requireNonNull(serverHasTime, "Server time allowance is required");
         Settings current = settings;
         if (!current.enabled()) {
             return 0;
         }
         int submitted = 0;
         for (Channel<?> channel : channels.values()) {
-            if (submitted >= MAX_CHANNELS_PER_PASS || System.nanoTime() >= deadlineNanos) {
+            if (submitted >= MAX_CHANNELS_PER_PASS
+                    || !serverHasTime.getAsBoolean()
+                    || System.nanoTime() >= deadlineNanos) {
                 break;
             }
             if (flushChannelUnchecked(channel, currentTick, asyncManager, current)) {

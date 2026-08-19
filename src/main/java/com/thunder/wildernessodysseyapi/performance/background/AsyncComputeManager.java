@@ -13,6 +13,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 
 /**
  * Runs pure calculations on bounded workers and applies results on the server thread.
@@ -23,6 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * on the caller and never blocks a server tick on a future.</p>
  */
 public final class AsyncComputeManager {
+    private static final BooleanSupplier ALWAYS_HAS_TIME = () -> true;
     private static final long FAILURE_LOG_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(10L);
 
     private final BackgroundMetrics metrics;
@@ -141,16 +143,35 @@ public final class AsyncComputeManager {
      */
     public int drainServerThreadResults(MinecraftServer server, int maximumTasks, long deadlineNanos) {
         Objects.requireNonNull(server, "server");
-        return drainResults(server, maximumTasks, deadlineNanos);
+        return drainResults(server, maximumTasks, deadlineNanos, ALWAYS_HAS_TIME);
+    }
+
+    /** Applies results only while Minecraft's live spare-time allowance remains. */
+    public int drainServerThreadResults(
+            MinecraftServer server,
+            int maximumTasks,
+            long deadlineNanos,
+            BooleanSupplier serverHasTime
+    ) {
+        Objects.requireNonNull(server, "server");
+        return drainResults(server, maximumTasks, deadlineNanos, serverHasTime);
     }
 
     int drainResultsForTests(int maximumTasks, long deadlineNanos) {
-        return drainResults(null, maximumTasks, deadlineNanos);
+        return drainResults(null, maximumTasks, deadlineNanos, ALWAYS_HAS_TIME);
     }
 
-    private int drainResults(MinecraftServer server, int maximumTasks, long deadlineNanos) {
+    private int drainResults(
+            MinecraftServer server,
+            int maximumTasks,
+            long deadlineNanos,
+            BooleanSupplier serverHasTime
+    ) {
+        Objects.requireNonNull(serverHasTime, "Server time allowance is required");
         int applied = 0;
-        while (applied < Math.max(0, maximumTasks) && System.nanoTime() < deadlineNanos) {
+        while (applied < Math.max(0, maximumTasks)
+                && serverHasTime.getAsBoolean()
+                && System.nanoTime() < deadlineNanos) {
             ApplyTask<?> task = applyQueue.poll();
             if (task == null) {
                 break;

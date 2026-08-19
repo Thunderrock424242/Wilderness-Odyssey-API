@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 /**
  * SERVER THREAD ONLY. Interest-filtered, coalescing delta batcher.
@@ -151,13 +152,22 @@ public final class DataSyncManager {
     }
 
     /**
-     * Flushes due player batches while the shared monotonic tick deadline has
-     * time remaining. At overload, pending final state remains for a later tick.
+     * Flushes due player batches while both the Data Engine deadline and
+     * Minecraft's live spare-time allowance remain. Pending final state stays
+     * queued when either limit expires.
      */
-    public int flush(MinecraftServer server, long currentTick, long deadlineNanos) {
+    public int flush(
+            MinecraftServer server,
+            long currentTick,
+            long deadlineNanos,
+            BooleanSupplier serverHasTime
+    ) {
+        Objects.requireNonNull(serverHasTime, "Server time allowance is required");
         int batches = 0;
         Iterator<Map.Entry<UUID, PlayerBatchState>> states = pendingByPlayer.entrySet().iterator();
-        while (states.hasNext() && System.nanoTime() < deadlineNanos) {
+        while (states.hasNext()
+                && serverHasTime.getAsBoolean()
+                && System.nanoTime() < deadlineNanos) {
             Map.Entry<UUID, PlayerBatchState> stateEntry = states.next();
             PlayerBatchState state = stateEntry.getValue();
             ServerPlayer player = server.getPlayerList().getPlayer(stateEntry.getKey());
@@ -173,7 +183,9 @@ public final class DataSyncManager {
             if (currentTick - state.firstQueuedTick < config.maxBatchDelayTicks()) {
                 continue;
             }
-            while (!state.entries.isEmpty() && System.nanoTime() < deadlineNanos) {
+            while (!state.entries.isEmpty()
+                    && serverHasTime.getAsBoolean()
+                    && System.nanoTime() < deadlineNanos) {
                 List<DataDelta> entries = takeBatch(state);
                 if (entries.isEmpty()) {
                     break;

@@ -5,6 +5,7 @@ import net.minecraft.server.MinecraftServer;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 /**
  * Stable integration API for Wilderness Odyssey background services.
@@ -86,9 +87,15 @@ public final class BackgroundEfficiencyManager {
      * shares one monotonic deadline so batching cannot silently exceed it before
      * the scheduler runs.</p>
      */
-    public static void tick(MinecraftServer server, long currentTick, long availableBudgetNanos) {
+    public static void tick(
+            MinecraftServer server,
+            long currentTick,
+            long availableBudgetNanos,
+            BooleanSupplier serverHasTime
+    ) {
         Objects.requireNonNull(server, "server");
-        if (!started || !values.enabled()) {
+        Objects.requireNonNull(serverHasTime, "Server time allowance is required");
+        if (!started || !values.enabled() || !serverHasTime.getAsBoolean()) {
             return;
         }
 
@@ -102,12 +109,19 @@ public final class BackgroundEfficiencyManager {
         ASYNC.drainServerThreadResults(
                 server,
                 values.asyncMaximumApplyPerTick(),
-                deadline
+                deadline,
+                serverHasTime
         );
-        NETWORK.flushDue(server, currentTick, deadline);
-        ANALYTICS.flushDue(currentTick, ASYNC, deadline);
+        if (!serverHasTime.getAsBoolean()) {
+            return;
+        }
+        NETWORK.flushDue(server, currentTick, deadline, serverHasTime);
+        if (!serverHasTime.getAsBoolean()) {
+            return;
+        }
+        ANALYTICS.flushDue(currentTick, ASYNC, deadline, serverHasTime);
         long remaining = Math.max(0L, deadline - System.nanoTime());
-        SCHEDULER.processTick(currentTick, remaining);
+        SCHEDULER.processTick(currentTick, remaining, serverHasTime);
     }
 
     /** Stops workers and releases process-scoped queues after the server saves. */

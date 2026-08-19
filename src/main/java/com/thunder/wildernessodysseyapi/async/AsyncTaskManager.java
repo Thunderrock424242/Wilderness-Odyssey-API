@@ -18,11 +18,14 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 
 /**
  * Manages worker threads and safe handoff to the logical server thread.
  */
 public final class AsyncTaskManager {
+
+    private static final BooleanSupplier ALWAYS_HAS_TIME = () -> true;
 
     private static final AtomicBoolean INITIALIZED = new AtomicBoolean(false);
     private static final ConcurrentLinkedQueue<MainThreadTask> MAIN_THREAD_QUEUE = new ConcurrentLinkedQueue<>();
@@ -198,12 +201,24 @@ public final class AsyncTaskManager {
     }
 
     public static void drainMainThreadQueue(MinecraftServer server) {
+        drainMainThreadQueue(server, ALWAYS_HAS_TIME);
+    }
+
+    /**
+     * Applies optional worker results only while Minecraft reports spare tick time.
+     *
+     * <p>The live supplier is checked before every callback so this queue yields
+     * to server-owned chunk IO and generation completion as soon as the server's
+     * allowance expires.</p>
+     */
+    public static void drainMainThreadQueue(MinecraftServer server, BooleanSupplier serverHasTime) {
         if (server == null) {
             return;
         }
+        Objects.requireNonNull(serverHasTime, "Server time allowance is required");
         int maxTasks = Math.max(1, configValues.applyPerTick());
         int processed = 0;
-        while (processed < maxTasks) {
+        while (processed < maxTasks && serverHasTime.getAsBoolean()) {
             MainThreadTask task = MAIN_THREAD_QUEUE.poll();
             if (task == null) {
                 break;

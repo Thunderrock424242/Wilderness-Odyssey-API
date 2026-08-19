@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,6 +41,29 @@ class TickWorkSchedulerTest {
         TickWorkScheduler.ProcessingReport report = scheduler.process(1L, Long.MAX_VALUE, TickPressure.OVERLOADED);
 
         assertEquals(1, executions.get());
+        assertEquals(1, report.remaining());
+    }
+
+    @Test
+    void liveServerAllowanceStopsEvenCriticalOptionalTasks() {
+        TickWorkScheduler scheduler = scheduler();
+        AtomicBoolean serverHasTime = new AtomicBoolean(true);
+        AtomicInteger executions = new AtomicInteger();
+        scheduler.submit(TickTask.once("safety", TickPriority.CRITICAL, 0L, () -> {
+            executions.incrementAndGet();
+            serverHasTime.set(false);
+        }));
+        scheduler.submit(TickTask.once("safety", TickPriority.CRITICAL, 0L, executions::incrementAndGet));
+
+        TickWorkScheduler.ProcessingReport report = scheduler.process(
+                1L,
+                Long.MAX_VALUE,
+                TickPressure.RELAXED,
+                serverHasTime::get
+        );
+
+        assertEquals(1, executions.get());
+        assertEquals(1, report.processed());
         assertEquals(1, report.remaining());
     }
 
