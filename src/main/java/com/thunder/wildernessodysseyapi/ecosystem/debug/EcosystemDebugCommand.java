@@ -90,6 +90,11 @@ public final class EcosystemDebugCommand {
                         + " pendingRegionUpdates=" + simulation.pendingRegionalUpdates()
                         + " ecosystemMicros=" + simulation.updateNanos() / 1_000L
                         + " transitionRate=" + EcosystemConfig.ENTITY_TRANSITION_RATE.get()), false);
+        context.getSource().sendSuccess(() -> Component.literal(
+                "  wildlifeScan tick=" + simulation.wildlifeScanTick()
+                        + " loadedEntities=" + simulation.scannedLoadedEntityCount()
+                        + " profiledWildlife=" + simulation.profiledWildlifeCount()
+                        + " scanMicros=" + simulation.wildlifeScanNanos() / 1_000L), false);
         var groups = EcosystemServices.groups().snapshot(context.getSource().getLevel());
         context.getSource().sendSuccess(() -> Component.literal(
                 "  groupAI=" + onOff(EcosystemConfig.GROUP_AI_ENABLED.get())

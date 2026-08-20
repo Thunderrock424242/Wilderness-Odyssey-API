@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.vegetation.client;
 
 import com.thunder.wildernessodysseyapi.vegetation.api.VegetationClimateState;
+import com.thunder.wildernessodysseyapi.vegetation.network.ReactiveVegetationSyncPayload;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -8,6 +9,7 @@ import net.minecraft.world.level.Level;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,6 +30,9 @@ public final class ClientVegetationClimateStore {
     private static final Map<Long, VegetationClimateState> STATES = new ConcurrentHashMap<>();
     private static final ArrayDeque<Long> DIRTY_CHUNKS = new ArrayDeque<>();
     private static final Set<Long> QUEUED_DIRTY_CHUNKS = new HashSet<>();
+    private static final int MAXIMUM_PENDING_SNAPSHOTS = 4_096;
+    private static final Map<Long, Long> REVISIONS = new LinkedHashMap<>();
+    private static final Map<Long, PendingSnapshot> PENDING = new LinkedHashMap<>();
     private static volatile Level activeLevel;
 
     private ClientVegetationClimateStore() {
@@ -44,8 +49,46 @@ public final class ClientVegetationClimateStore {
         long key = ChunkPos.asLong(chunkX, chunkZ);
         VegetationClimateState next = state == null ? VegetationClimateState.DEFAULT : state;
         VegetationClimateState previous = STATES.put(key, next);
-        if (previous == null || visualSignature(previous) != visualSignature(next)) {
+        if (previous == null || previous.visualSignature() != next.visualSignature()) {
             offerDirty(key);
+        }
+    }
+
+    /**
+     * Accepts only current-dimension, newer payloads and safely defers an early
+     * snapshot until the corresponding client chunk is installed.
+     */
+    public static synchronized AcceptResult accept(Level level, ReactiveVegetationSyncPayload payload) {
+        if (level == null || payload == null
+                || !payload.matchesDimension(level.dimension().location())) {
+            return AcceptResult.WRONG_DIMENSION;
+        }
+        ensureLevel(level);
+        long key = ChunkPos.asLong(payload.chunkX(), payload.chunkZ());
+        Long previousRevision = REVISIONS.get(key);
+        if (!isNewerRevision(previousRevision, payload.revision())) {
+            return AcceptResult.STALE;
+        }
+        REVISIONS.put(key, payload.revision());
+        trimOldest(REVISIONS, MAXIMUM_PENDING_SNAPSHOTS * 2);
+
+        if (level.getChunkSource().getChunkNow(payload.chunkX(), payload.chunkZ()) == null) {
+            PENDING.put(key, new PendingSnapshot(payload.revision(), payload.climateState()));
+            trimOldest(PENDING, MAXIMUM_PENDING_SNAPSHOTS);
+            return AcceptResult.PENDING;
+        }
+        PENDING.remove(key);
+        publish(level, payload.chunkX(), payload.chunkZ(), payload.climateState());
+        return AcceptResult.APPLIED;
+    }
+
+    /** Applies a retained latest snapshot when the client finishes installing its chunk. */
+    public static synchronized void onChunkLoaded(Level level, int chunkX, int chunkZ) {
+        ensureLevel(level);
+        long key = ChunkPos.asLong(chunkX, chunkZ);
+        PendingSnapshot pending = PENDING.remove(key);
+        if (pending != null) {
+            publish(level, chunkX, chunkZ, pending.state());
         }
     }
 
@@ -71,6 +114,7 @@ public final class ClientVegetationClimateStore {
         }
         long key = ChunkPos.asLong(chunkX, chunkZ);
         STATES.remove(key);
+        PENDING.remove(key);
         QUEUED_DIRTY_CHUNKS.remove(key);
     }
 
@@ -96,6 +140,8 @@ public final class ClientVegetationClimateStore {
             STATES.clear();
             DIRTY_CHUNKS.clear();
             QUEUED_DIRTY_CHUNKS.clear();
+            REVISIONS.clear();
+            PENDING.clear();
         }
     }
 
@@ -105,6 +151,8 @@ public final class ClientVegetationClimateStore {
             STATES.clear();
             DIRTY_CHUNKS.clear();
             QUEUED_DIRTY_CHUNKS.clear();
+            REVISIONS.clear();
+            PENDING.clear();
         }
     }
 
@@ -114,15 +162,26 @@ public final class ClientVegetationClimateStore {
         }
     }
 
-    private static int visualSignature(VegetationClimateState state) {
-        int signature = bucket(state.moisture(), 12);
-        signature = signature * 13 + bucket(state.droughtLevel(), 12);
-        signature = signature * 9 + bucket(state.stormIntensity(), 8);
-        return signature * 8 + state.seasonState().ordinal();
+    static boolean isNewerRevision(Long previousRevision, long incomingRevision) {
+        return incomingRevision >= 0L
+                && (previousRevision == null || incomingRevision > previousRevision);
     }
 
-    private static int bucket(double value, int bucketCount) {
-        double unit = Math.max(0.0, Math.min(1.0, Double.isFinite(value) ? value : 0.0));
-        return Math.min(bucketCount - 1, (int) Math.floor(unit * bucketCount));
+    private static <T> void trimOldest(Map<Long, T> values, int maximumSize) {
+        while (values.size() > maximumSize) {
+            Long oldest = values.keySet().iterator().next();
+            values.remove(oldest);
+        }
+    }
+
+    /** Result of validating and applying one server-owned climate snapshot. */
+    public enum AcceptResult {
+        APPLIED,
+        PENDING,
+        STALE,
+        WRONG_DIMENSION
+    }
+
+    private record PendingSnapshot(long revision, VegetationClimateState state) {
     }
 }

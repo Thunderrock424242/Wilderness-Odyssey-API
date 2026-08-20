@@ -16,6 +16,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.HashMap;
@@ -25,10 +26,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-@EventBusSubscriber
 /**
- * Sends occasional partner advertisements to players.
+ * Sends one delayed partner advertisement after an opted-in player logs in.
+ *
+ * <p>Opt-out state is owned by the player's persistent data. The static sets
+ * only cache state for players connected to the active server and are cleared
+ * on logout and server shutdown.</p>
  */
+@EventBusSubscriber
 public class PartnerAdHandler {
     private static long tickCounter = 0;
 
@@ -69,7 +74,7 @@ public class PartnerAdHandler {
                 .append(Component.literal(HOSTING_LINK)
                         .withStyle(style -> style.withColor(TextColor.fromRgb(0x00FF00))
                                 .withUnderlined(true)
-                                .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://billing.kinetichosting.net/aff.php?aff=606"))
+                                .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, HOSTING_LINK))
                         )
                 );
 
@@ -162,7 +167,17 @@ public class PartnerAdHandler {
     }
 
     /**
-     * Broadcast ad hourly to all non-opted-out players.
+     * Releases the session cache as soon as a player disconnects.
+     */
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        UUID uuid = event.getEntity().getUUID();
+        OPTED_OUT.remove(uuid);
+        PENDING_ADS.remove(uuid);
+    }
+
+    /**
+     * Sends each pending player's single delayed login advertisement.
      */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
@@ -200,5 +215,13 @@ public class PartnerAdHandler {
             player.sendSystemMessage(makeAd(player));
             iterator.remove();
         }
+    }
+
+    /** Clears process-wide session state so it cannot leak into the next server. */
+    @SubscribeEvent
+    public static void onServerStopping(ServerStoppingEvent event) {
+        OPTED_OUT.clear();
+        PENDING_ADS.clear();
+        tickCounter = 0L;
     }
 }

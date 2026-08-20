@@ -4,7 +4,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * Carries the player currently pressing Detect so structure block mixins can report useful scan diagnostics.
+ * Carries the player currently submitting a structure-block action so mixins can report bounded-work diagnostics.
  */
 public final class StructureBlockDetectionContext {
     private static final ThreadLocal<ServerPlayer> CURRENT_PLAYER = new ThreadLocal<>();

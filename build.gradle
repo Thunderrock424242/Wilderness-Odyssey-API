@@ -16,8 +16,8 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = "4.2.0"
-group = "com.thunder.wildernessodysseyapi"
+version = project.mod_version
+group = project.mod_group_id
 
 base {
     archivesName = "wildernessodysseyapi"
@@ -28,7 +28,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 neoForge {
     // Specify the version of NeoForge to use.
-    version = "21.1.248"
+    version = project.neo_version
 
     parchment {
         mappingsVersion = project.parchment_mappings_version
@@ -295,26 +295,28 @@ dependencies {
     additionalRuntimeClasspath 'org.yaml:snakeyaml:2.2'
 }
 
-// This block of code expands all declared replace properties in the specified resource targets.
-// A missing property will result in an error. Properties are expanded using ${} Groovy notation.
+// Expand release metadata from gradle.properties so dependency ranges and the
+// packaged mod identity cannot drift away from the versions used by Gradle.
+def generatedModMetadataDir = layout.buildDirectory.dir("generated/sources/modMetadata")
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
     var replaceProperties = [
-            minecraft_version      : "1.21.1",
-            minecraft_version_range: "1.21,1.21.1",
-            neo_version            : "21.1.248",
-            neo_version_range      : "21.1.248,",
-            loader_version_range   : "5.0.3",
-            mod_id                 : "wildernessodysseyapi",
-            mod_name               : "Wilderness Odyssey API",
-            mod_license            : "APR",
-            mod_version            : project.version.toString(),
-            mod_authors            : "thunderrock424242",
-            mod_description        : "a api for my modpack"
+            minecraft_version       : project.property("minecraft_version").toString(),
+            minecraft_version_range : project.property("minecraft_version_range").toString(),
+            neo_version             : project.property("neo_version").toString(),
+            neo_version_range       : project.property("neo_version_range").toString(),
+            loader_version_range    : project.property("loader_version_range").toString(),
+            worldedit_version_range : project.property("worldedit_version_range").toString(),
+            mod_id                  : project.property("mod_id").toString(),
+            mod_name                : project.property("mod_name").toString(),
+            mod_license             : project.property("mod_license").toString(),
+            mod_version             : project.version.toString(),
+            mod_authors             : project.property("mod_authors").toString(),
+            mod_description         : project.property("mod_description").toString()
     ]
     inputs.properties replaceProperties
     expand replaceProperties
     from "src/main/templates"
-    into "build/generated/sources/modMetadata"
+    into generatedModMetadataDir
 }
 // Include the output of "generateModMetadata" as an input directory for the build
 // this works with both building through Gradle and the IDE.
@@ -583,6 +585,17 @@ tasks.withType(Test).configureEach {
     // ModDev launches from build/minecraft-junit, so repository-oriented tests
     // need the checkout root explicitly instead of relying on user.dir.
     systemProperty 'wildernessodysseyapi.projectDir', layout.projectDirectory.asFile.absolutePath
+    doFirst {
+        // Packaging regressions must inspect the exact JAR produced by this
+        // invocation, including isolated -PcodexBuildDir outputs.
+        systemProperty 'wildernessodysseyapi.jarPath', tasks.named('jar').get().archiveFile.get().asFile.absolutePath
+    }
+}
+
+// The release contract test inspects the exact processed artifact rather than
+// source templates, so the ordinary test lifecycle must produce that JAR first.
+tasks.named('test').configure {
+    dependsOn tasks.named('jar')
 }
 
 // junit-fml installs a global LauncherSession listener that boots every mod.
@@ -659,7 +672,10 @@ tasks.register('profileChunkWorkload', JavaExec) {
 def codexBuildDir = providers.gradleProperty("codexBuildDir")
 
 if (codexBuildDir.isPresent()) {
-    layout.buildDirectory.set(file(codexBuildDir.get()))
+    // Some Windows Gradle launchers expose a present-but-empty project
+    // property. Preserve isolation by falling back to the documented default.
+    def requestedBuildDir = codexBuildDir.getOrElse("").trim()
+    layout.buildDirectory.set(file(requestedBuildDir.isEmpty() ? ".codex-build" : requestedBuildDir))
 }
 
 

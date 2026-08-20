@@ -9,11 +9,13 @@ import com.thunder.wildernessodysseyapi.debugoverlay.DebugValue;
 import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Owns page selection and the compatibility-safe render fallback.
@@ -24,6 +26,7 @@ import java.util.Set;
  */
 public final class WildernessDebugManager {
     private static final WildernessDebugManager INSTANCE = new WildernessDebugManager();
+    private static final long LIFECYCLE_LOG_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(5);
 
     private final WildernessDebugOverlay overlay = new WildernessDebugOverlay();
     private final Set<ResourceLocation> loggedProviderFailures = new HashSet<>();
@@ -31,6 +34,7 @@ public final class WildernessDebugManager {
     private int scrollOffset;
     private boolean wasVisible;
     private boolean loggedRenderFailure;
+    private long lastLifecycleLogNanos = Long.MIN_VALUE;
 
     private WildernessDebugManager() {
     }
@@ -43,10 +47,42 @@ public final class WildernessDebugManager {
     /** Tracks F3 open/close transitions without taking ownership of vanilla state. */
     public void syncVisibility(Minecraft minecraft) {
         boolean visible = DebugOverlayConfig.ENABLE_CUSTOM_DEBUG_HUD.get()
+                && minecraft.screen == null
+                && minecraft.level != null
+                && minecraft.player != null
+                && minecraft.getConnection() != null
                 && minecraft.getDebugOverlay().showDebugScreen();
+        synchronizeVisibility(visible, DebugOverlayConfig.REMEMBER_LAST_DEBUG_PAGE.get());
+    }
+
+    /**
+     * Resets transient presentation state before vanilla installs any screen.
+     * This method intentionally has no access to a debug-overlay mutator.
+     */
+    public void onScreenOpening(Screen newScreen, boolean debugVisible) {
+        boolean interrupted = wasVisible || debugVisible;
+        resetTransientState();
+        if (interrupted && newScreen != null && shouldLogLifecycleTransition(System.nanoTime())) {
+            String screenName = newScreen.getClass().getSimpleName();
+            ModConstants.LOGGER.debug(
+                    "[WO Debug HUD] Screen {} opened while the debug overlay was active; reset transient HUD state safely.",
+                    screenName
+            );
+        }
+    }
+
+    /** Clears all client-session state on logout or client-level unload. */
+    public void resetForSession() {
+        resetTransientState();
+        selectedPage = 0;
+        loggedProviderFailures.clear();
+        loggedRenderFailure = false;
+    }
+
+    void synchronizeVisibility(boolean visible, boolean rememberLastPage) {
         if (visible && !wasVisible) {
             scrollOffset = 0;
-            if (!DebugOverlayConfig.REMEMBER_LAST_DEBUG_PAGE.get()) {
+            if (!rememberLastPage) {
                 selectedPage = 0;
             }
         }
@@ -93,6 +129,13 @@ public final class WildernessDebugManager {
      * Returning false intentionally leaves vanilla's lists untouched as a fallback.
      */
     public boolean render(GuiGraphics graphics, List<String> vanillaLeft, List<String> vanillaRight) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen != null
+                || minecraft.level == null
+                || minecraft.player == null
+                || minecraft.getConnection() == null) {
+            return false;
+        }
         List<DebugPage> pages = DebugPageRegistry.pages();
         if (pages.isEmpty()) {
             return false;
@@ -100,7 +143,7 @@ public final class WildernessDebugManager {
         selectedPage = Math.floorMod(selectedPage, pages.size());
         DebugPage page = pages.get(selectedPage);
         DebugContext context = new DebugContext(
-                Minecraft.getInstance(), vanillaLeft, vanillaRight, System.nanoTime()
+                minecraft, vanillaLeft, vanillaRight, System.nanoTime()
         );
 
         List<DebugSection> sections;
@@ -143,5 +186,27 @@ public final class WildernessDebugManager {
 
     private void moveScroll(int delta) {
         scrollOffset = Math.max(0, scrollOffset + delta);
+    }
+
+    int scrollOffset() {
+        return scrollOffset;
+    }
+
+    boolean wasVisible() {
+        return wasVisible;
+    }
+
+    private void resetTransientState() {
+        wasVisible = false;
+        scrollOffset = 0;
+    }
+
+    private boolean shouldLogLifecycleTransition(long nowNanos) {
+        if (lastLifecycleLogNanos != Long.MIN_VALUE
+                && nowNanos - lastLifecycleLogNanos < LIFECYCLE_LOG_INTERVAL_NANOS) {
+            return false;
+        }
+        lastLifecycleLogNanos = nowNanos;
+        return true;
     }
 }

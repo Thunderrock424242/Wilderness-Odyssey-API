@@ -111,9 +111,16 @@ You can replace the placeholder cryo tube files with your own to customize the l
 
 World Generation
 ----------------
-Impact zones are fully data pack driven. The bundled `impact_zone` structure, structure set, and template pool live under `data/wildernessodysseyapi/worldgen/`, and you can drop additional impact zone structures or tweak spacing in a datapack without any Java hooks.
+Meteor impact terrain is data-pack driven through the
+`wildernessodysseyapi:meteor_impact` configured and placed feature. Its
+Overworld injection lives at
+`data/neoforge/biome_modifier/add_meteor_impact.json`, so a datapack can replace
+the placement frequency or biome selection without a Java registration hook.
 
-Multiple impact zones can now exist—add more structure set entries via datapack to control how many spawn and where.
+The legacy `c:impact_site` structure tag and
+`wildernessodysseyapi:has_structure/impact_zone` biome tag remain available as
+compatibility aliases for existing packs. They do not register or generate an
+`impact_zone` structure in the current mod.
 
 Modpack Structure Staging (drop-in NBT)
 -----------------------------------------
@@ -127,12 +134,10 @@ structure by its namespace and path (without the `.nbt` extension) to have it
 placed during world generation. If no data pack override exists, the bundled
 templates under `data/<namespace>/structures/` in the mod resources are used.
 
-For a datapack-only workflow that still keeps the wool height markers you
-mentioned, drop replacement structures under `data/<namespace>/structures/` in your datapack and override the bundled `impact_zone` worldgen JSON.
-
-The meteor impact site looks for the `wildernessodysseyapi:impact_zone`
-template. Drop your finished build at
-`data/wildernessodysseyapi/structures/impact_zone.nbt` or ship additional impact zone structures in another namespace and update the structure set JSON to include them.
+The meteor feature does not currently consume an `impact_zone` structure
+template. A datapack that adds a structure-based impact site must register its
+own structure, structure set, and placement integration; the retained legacy
+tags alone do not create that world-generation route.
 
 Loot tables defined inside the structure templates work the same way as vanilla
 NBT structures. The scanner now reads loot table references directly from the

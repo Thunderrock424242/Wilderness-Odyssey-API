@@ -2,7 +2,6 @@ package com.thunder.wildernessodysseyapi.core;
 
 import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
 import com.thunder.wildernessodysseyapi.ecosystem.state.AnimalNeedsState;
-import com.thunder.wildernessodysseyapi.vegetation.network.ReactiveVegetationAttachmentSyncHandler;
 import com.thunder.wildernessodysseyapi.vegetation.state.ReactiveVegetationState;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.GeneratedWaterAttachmentSyncHandler;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
@@ -66,7 +65,14 @@ public final class ModAttachments {
             () -> AttachmentType.serializable(holder -> new AnimalNeedsState()).build()
     );
 
-    /** Compact persistent regional climate for one loaded vegetation chunk. */
+    /**
+     * Compact persistent regional climate for one loaded vegetation chunk.
+     *
+     * <p>Client state uses the dimension-aware vegetation payload instead of
+     * NeoForge's generic chunk attachment transport. This prevents an update
+     * accepted near an unwatch transition from becoming an unknown-chunk
+     * attachment warning on the client.</p>
+     */
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<ReactiveVegetationState>> REACTIVE_VEGETATION = ATTACHMENTS.register(
             "reactive_vegetation",
             () -> AttachmentType.serializable(holder -> {
@@ -75,7 +81,7 @@ public final class ModAttachments {
                     state.setDirtyListener(() -> chunk.setUnsaved(true));
                 }
                 return state;
-            }).sync(ReactiveVegetationAttachmentSyncHandler.INSTANCE).build()
+            }).build()
     );
 
     private ModAttachments() {

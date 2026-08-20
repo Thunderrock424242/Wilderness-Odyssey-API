@@ -8,13 +8,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Verifies optional renderer mixins are gated independently by class resources. */
+/** Verifies optional integration mixins are gated independently by class resources. */
 class WildernessMixinConfigPluginTest {
 
     private static final String PACKAGE = "com.thunder.wildernessodysseyapi.mixin.";
 
     @Test
     void missingOptionalTargetsAreSkippedWithoutAClassLoad() {
+        assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
+                PACKAGE + "ForwardExtentCopyMixin", ignored -> false));
         assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
                 PACKAGE + "IrisWaterMaterialBridgeMixin", ignored -> false));
         assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
@@ -33,6 +35,9 @@ class WildernessMixinConfigPluginTest {
 
     @Test
     void presentOptionalAndAllNormalMixinsRemainEnabled() {
+        assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
+                PACKAGE + "ForwardExtentCopyMixin",
+                "com.sk89q.worldedit.function.operation.ForwardExtentCopy"::equals));
         assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
                 PACKAGE + "IrisWaterMaterialBridgeMixin", ignored -> true));
         assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(

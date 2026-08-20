@@ -184,6 +184,9 @@ public final class GpuDiagnostics {
 
     /** Called by the RenderSystem mixin immediately after a draw. */
     public static void endDraw() {
+        if (!active) {
+            return;
+        }
         DrawToken token = ACTIVE_DRAW.get();
         if (token == null) {
             return;

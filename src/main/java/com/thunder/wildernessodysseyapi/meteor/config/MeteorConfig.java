@@ -1,6 +1,9 @@
 package com.thunder.wildernessodysseyapi.meteor.config;
 
+import net.minecraft.util.RandomSource;
 import net.neoforged.neoforge.common.ModConfigSpec;
+
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 
 /**
  * Configures natural meteor frequency, impact size, and player-facing warnings.
@@ -10,6 +13,9 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  * waiting for the rare-event timer.</p>
  */
 public final class MeteorConfig {
+
+    private static volatile long lastWarnedMeteorRange = Long.MIN_VALUE;
+    private static volatile long lastWarnedCraterRange = Long.MIN_VALUE;
 
     public static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
     public static final ModConfigSpec SPEC;
@@ -113,6 +119,70 @@ public final class MeteorConfig {
     }
 
     private MeteorConfig() {
+    }
+
+    /**
+     * Returns the configured meteor-count range in ascending order.
+     *
+     * <p>NeoForge validates the individual values but cannot express a relation
+     * between two separate config keys. Reversed values are normalized with a
+     * warning so a live server remains usable without silently collapsing the
+     * random range to one endpoint.</p>
+     */
+    public static InclusiveIntRange meteorCountRange() {
+        int configuredMin = MIN_METEORS.get();
+        int configuredMax = MAX_METEORS.get();
+        if (configuredMin > configuredMax) {
+            long signature = rangeSignature(configuredMin, configuredMax);
+            if (lastWarnedMeteorRange != signature) {
+                lastWarnedMeteorRange = signature;
+                LOGGER.warn("Meteor config minMeteors ({}) exceeds maxMeteors ({}); using the ordered range {}-{}.",
+                        configuredMin, configuredMax, configuredMax, configuredMin);
+            }
+        } else {
+            lastWarnedMeteorRange = Long.MIN_VALUE;
+        }
+        return orderedRange(configuredMin, configuredMax);
+    }
+
+    /** Returns the configured custom crater-radius range in ascending order. */
+    public static InclusiveIntRange customCraterRadiusRange() {
+        int configuredMin = CRATER_RADIUS_MIN.get();
+        int configuredMax = CRATER_RADIUS_MAX.get();
+        if (configuredMin > configuredMax) {
+            long signature = rangeSignature(configuredMin, configuredMax);
+            if (lastWarnedCraterRange != signature) {
+                lastWarnedCraterRange = signature;
+                LOGGER.warn("Meteor config craterRadiusMin ({}) exceeds craterRadiusMax ({}); using the ordered range {}-{}.",
+                        configuredMin, configuredMax, configuredMax, configuredMin);
+            }
+        } else {
+            lastWarnedCraterRange = Long.MIN_VALUE;
+        }
+        return orderedRange(configuredMin, configuredMax);
+    }
+
+    static InclusiveIntRange orderedRange(int first, int second) {
+        return new InclusiveIntRange(Math.min(first, second), Math.max(first, second));
+    }
+
+    private static long rangeSignature(int first, int second) {
+        return ((long) first << 32) ^ (second & 0xFFFF_FFFFL);
+    }
+
+    /** An ordered, inclusive integer range used by meteor count and radius selection. */
+    public record InclusiveIntRange(int min, int max) {
+
+        public InclusiveIntRange {
+            if (min > max) {
+                throw new IllegalArgumentException("min must not exceed max");
+            }
+        }
+
+        /** Selects a uniformly distributed value including both endpoints. */
+        public int randomValue(RandomSource random) {
+            return min + random.nextInt(max - min + 1);
+        }
     }
 
     public enum DestructionLevel {

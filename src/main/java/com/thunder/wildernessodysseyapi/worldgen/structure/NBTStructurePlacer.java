@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.worldgen.structure;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.util.ChunkErrorReporter;
 import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
+import com.thunder.wildernessodysseyapi.worldgen.processor.BlockEntityNbtSanitizingProcessor;
 import com.thunder.wildernessodysseyapi.worldgen.structure.StructurePlacementDebugger.PlacementAttempt;
 import com.thunder.wildernessodysseyapi.worldgen.structure.TerrainReplacerEngine.SurfaceSample;
 import com.thunder.wildernessodysseyapi.mixin.StructureTemplateAccessor;
@@ -65,6 +66,7 @@ public class NBTStructurePlacer {
 
     private final ResourceLocation id;
     private final List<StructureProcessor> extraProcessors;
+    private final StructureProcessor blockEntityNbtSanitizer;
     private final Path externalTemplatePath;
     private TemplateData cachedData;
 
@@ -87,6 +89,7 @@ public class NBTStructurePlacer {
     public NBTStructurePlacer(ResourceLocation id, List<StructureProcessor> extraProcessors, Path externalTemplatePath) {
         this.id = id;
         this.extraProcessors = List.copyOf(extraProcessors);
+        this.blockEntityNbtSanitizer = new BlockEntityNbtSanitizingProcessor(id);
         this.externalTemplatePath = externalTemplatePath;
     }
 
@@ -178,6 +181,9 @@ public class NBTStructurePlacer {
             for (StructureProcessor processor : extraProcessors) {
                 settings.addProcessor(processor);
             }
+            // Validate after every caller-supplied transform so state and NBT
+            // compatibility is checked at the final placement boundary.
+            settings.addProcessor(blockEntityNbtSanitizer);
             boolean placed = data.template().placeInWorld(level, foundation.origin(), foundation.origin(), settings, level.random, 2);
             if (!placed) {
                 StructurePlacementDebugger.markFailure(attempt, "template refused placement");
@@ -341,6 +347,7 @@ public class NBTStructurePlacer {
         for (StructureProcessor processor : extraProcessors) {
             settings.addProcessor(processor);
         }
+        settings.addProcessor(blockEntityNbtSanitizer);
         try {
             boolean placed = data.template().placeInWorld(level, origin, origin, settings, level.random, 2);
             if (!placed) {

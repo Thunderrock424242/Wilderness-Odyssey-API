@@ -21,4 +21,12 @@ class MeteorConfigTest {
                 * MeteorConfig.EVENT_CHANCE_PER_CHECK.getDefault();
         assertTrue(expectedActiveHours >= 24.0D * 7.0D);
     }
+
+    @Test
+    void ordersReversedPairedValuesInsteadOfCollapsingTheRange() {
+        MeteorConfig.InclusiveIntRange range = MeteorConfig.orderedRange(12, 4);
+
+        assertEquals(4, range.min());
+        assertEquals(12, range.max());
+    }
 }

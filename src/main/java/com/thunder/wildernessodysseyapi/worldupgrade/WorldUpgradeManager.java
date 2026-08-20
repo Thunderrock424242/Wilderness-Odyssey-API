@@ -10,6 +10,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.ArrayDeque;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -28,6 +29,7 @@ public final class WorldUpgradeManager {
 
     private static final Queue<ChunkTask> QUEUE = new ArrayDeque<>();
     private static final Set<String> QUEUED_KEYS = new HashSet<>();
+    private static final Map<String, ChunkTask> FAILED_TASKS = new LinkedHashMap<>();
     private static final List<WorldMigration> MIGRATIONS = List.of(new LegacyBlockReplacementMigration());
     private static final Map<Integer, WorldMigration> MIGRATION_CHAIN = MIGRATIONS.stream()
             .collect(Collectors.toMap(WorldMigration::fromVersion, migration -> migration));
@@ -38,18 +40,27 @@ public final class WorldUpgradeManager {
     public static void onServerStarting(MinecraftServer server) {
         QUEUE.clear();
         QUEUED_KEYS.clear();
+        FAILED_TASKS.clear();
 
         WorldUpgradeSavedData state = WorldUpgradeSavedData.get(server);
+        state.advanceTargetVersion(TARGET_VERSION);
         String packVersion = currentVersion();
         if (state.shouldRunForPackVersion(packVersion)) {
             LOGGER.info("Detected modpack version change ({} -> {}). Starting world upgrade queue.",
                     state.getLastPackVersion(), packVersion);
-            state.resetCounters();
-            state.markPackVersionProcessed(packVersion);
-            state.setRunning(true);
-        } else {
-            state.setRunning(false);
+            state.beginPackUpgrade(packVersion);
+        } else if (state.hasPendingPackVersion()) {
+            LOGGER.info("World upgrade for pack version {} is {} and will resume from per-chunk versions.",
+                    state.getPendingPackVersion(),
+                    state.isRunning() ? "running" : "paused");
         }
+    }
+
+    /** Releases process-wide task references when the active server stops. */
+    public static void onServerStopping() {
+        QUEUE.clear();
+        QUEUED_KEYS.clear();
+        FAILED_TASKS.clear();
     }
 
     public static void onChunkLoad(ServerLevel level, LevelChunk chunk) {
@@ -69,12 +80,57 @@ public final class WorldUpgradeManager {
         WorldUpgradeSavedData.get(server).setRunning(false);
     }
 
+    /**
+     * Requeues failures retained by the current server session and clears the
+     * unresolved-failure counter so successful retries can permit completion.
+     *
+     * <p>After a restart, task identities are reconstructed from authoritative
+     * per-chunk versions as chunks load. Clearing the prior counter therefore
+     * acknowledges the old report without marking any chunk as migrated.</p>
+     *
+     * @return number of current-session tasks requeued
+     */
+    public static int retryFailed(MinecraftServer server) {
+        int requeued = 0;
+        for (ChunkTask task : FAILED_TASKS.values()) {
+            if (QUEUED_KEYS.add(task.key())) {
+                QUEUE.offer(task);
+                requeued++;
+            }
+        }
+        FAILED_TASKS.clear();
+        WorldUpgradeSavedData state = WorldUpgradeSavedData.get(server);
+        state.resetFailedChunks();
+        state.setRunning(true);
+        return requeued;
+    }
+
+    /**
+     * Commits a pending pack rollout after every currently queued task
+     * succeeded. Per-chunk versions still protect chunks discovered later.
+     *
+     * @return {@code true} when the pending pack version was committed
+     */
+    public static boolean complete(MinecraftServer server) {
+        WorldUpgradeSavedData state = WorldUpgradeSavedData.get(server);
+        if (!canComplete(state.isRunning(), QUEUE.size(), state.getFailedChunks(), state.hasPendingPackVersion())) {
+            return false;
+        }
+        return state.completePendingPackUpgrade();
+    }
+
+    /** Keeps a paused or unresolved rollout from being advertised as complete. */
+    static boolean canComplete(boolean running, int queuedChunks, long failedChunks, boolean hasPendingVersion) {
+        return running && queuedChunks == 0 && failedChunks == 0 && hasPendingVersion;
+    }
+
     public static WorldUpgradeStatus status(MinecraftServer server) {
         WorldUpgradeSavedData state = WorldUpgradeSavedData.get(server);
         return new WorldUpgradeStatus(
                 state.isRunning(),
                 state.getTargetVersion(),
                 state.getLastPackVersion(),
+                state.getPendingPackVersion(),
                 QUEUE.size(),
                 state.getProcessedChunks(),
                 state.getMigratedChunks(),
@@ -112,6 +168,7 @@ public final class WorldUpgradeManager {
                 migrated = migrateChunk(level, chunk, state.getTargetVersion());
             } catch (Exception exception) {
                 failed = true;
+                FAILED_TASKS.put(task.key(), task);
                 ServerLevel failedLevel = server.getLevel(task.dimension());
                 if (failedLevel != null) {
                     ChunkErrorReporter.reportChunkError("upgrade", failedLevel, task.pos(), exception);
@@ -136,11 +193,14 @@ public final class WorldUpgradeManager {
         while (currentVersion < targetVersion) {
             WorldMigration migration = MIGRATION_CHAIN.get(currentVersion);
             if (migration == null) {
-                LOGGER.warn("No migration found from version {} in chunk {}", currentVersion, chunk.getPos());
-                return migrated;
+                throw new IllegalStateException(
+                        "No migration found from version " + currentVersion + " for chunk " + chunk.getPos()
+                );
             }
             if (!migration.apply(new MigrationContext(level, chunk, chunkData))) {
-                return migrated;
+                throw new IllegalStateException(
+                        "Migration " + migration.id() + " did not complete for chunk " + chunk.getPos()
+                );
             }
             currentVersion = migration.toVersion();
             chunkData.setUpgradeVersion(currentVersion);
@@ -167,7 +227,8 @@ public final class WorldUpgradeManager {
 
     public record WorldUpgradeStatus(boolean running,
                                      int targetVersion,
-                                     String trackedPackVersion,
+                                     String completedPackVersion,
+                                     String pendingPackVersion,
                                      int queuedChunks,
                                      long processedChunks,
                                      long migratedChunks,

@@ -50,6 +50,7 @@ public class AIChatListener {
         AIFallbackResponder.ResponseContext responseContext = new AIFallbackResponder.ResponseContext(buildContextTags(player, worldKey));
         UUID playerId = player.getUUID();
         String playerName = player.getName().getString();
+        var server = player.server;
 
         // Check onboarding first (fast, can be done main thread)
         String onboardingReply = CLIENT.handleOnboarding(playerId, message);
@@ -70,10 +71,24 @@ public class AIChatListener {
             String speaker = (reply.speaker() == null || reply.speaker().isBlank()) ? CLIENT.resolveSpeaker(message) : reply.speaker();
 
             // 2. We return a MainThreadTask. AsyncTaskManager will safely execute this on the main tick.
-            return java.util.Optional.of(server -> {
-                ServerPlayer onlinePlayer = server.getPlayerList().getPlayer(playerId);
+            return java.util.Optional.of(owningServer -> {
+                ServerPlayer onlinePlayer = owningServer.getPlayerList().getPlayer(playerId);
                 if (onlinePlayer != null) {
                     onlinePlayer.sendSystemMessage(Component.literal("[" + speaker + "] " + reply.text()));
+                }
+            });
+        }).thenAccept(accepted -> {
+            if (accepted) {
+                return;
+            }
+            // Rejection/timeout may complete on a worker. Route user feedback
+            // through the server executor and resolve the player by UUID again.
+            server.execute(() -> {
+                ServerPlayer onlinePlayer = server.getPlayerList().getPlayer(playerId);
+                if (onlinePlayer != null) {
+                    onlinePlayer.sendSystemMessage(Component.literal(
+                            "[" + CLIENT.getDisplayName() + "] I'm handling too many requests right now. Try again shortly."
+                    ));
                 }
             });
         });

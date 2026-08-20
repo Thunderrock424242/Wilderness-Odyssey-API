@@ -8,10 +8,14 @@ import net.minecraft.util.RandomSource;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
 
@@ -23,45 +27,78 @@ public class PlayerSpawnHandler {
 
     private static final String CRYO_ASSIGNED_TAG = "wo_cryo_assigned";
     private static final String CRYO_POS_TAG = "wo_cryo_pos";
+    private static final int ASSIGNMENT_RETRY_INTERVAL_TICKS = 20;
 
     private static List<BlockPos> spawnBlocks = Collections.emptyList();
+    private static final Set<UUID> PENDING_ASSIGNMENTS = new HashSet<>();
 
     @SubscribeEvent
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            tryAssignSpawn(player);
+            if (tryAssignSpawn(player)) {
+                PENDING_ASSIGNMENTS.remove(player.getUUID());
+            } else {
+                PENDING_ASSIGNMENTS.add(player.getUUID());
+            }
         }
     }
 
     /**
-     * Retry assignment while waiting for cryo tubes to be discovered.
+     * Retries assignment once per second while waiting for cryo tubes to be discovered.
+     *
+     * <p>Login still performs an immediate attempt. The slower fallback bridges
+     * asynchronous starter-bunker placement without routing every player
+     * through persistent-data and spawn-list checks on every server tick.</p>
      */
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
-        if (event.getEntity() instanceof ServerPlayer player) {
-            tryAssignSpawn(player);
+        if (event.getEntity() instanceof ServerPlayer player
+                && shouldRetryAssignment(PENDING_ASSIGNMENTS.contains(player.getUUID()), player.tickCount)
+                && tryAssignSpawn(player)) {
+            PENDING_ASSIGNMENTS.remove(player.getUUID());
         }
+    }
+
+    static boolean shouldRetryAssignment(boolean pending, int playerTickCount) {
+        return pending && playerTickCount % ASSIGNMENT_RETRY_INTERVAL_TICKS == 0;
     }
 
     public static void setSpawnBlocks(List<BlockPos> blocks) {
         spawnBlocks = blocks == null ? Collections.emptyList() : List.copyOf(blocks);
     }
 
-    private static void tryAssignSpawn(ServerPlayer player) {
+    /** Removes disconnected players from the small pending retry set. */
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        PENDING_ASSIGNMENTS.remove(event.getEntity().getUUID());
+    }
+
+    /** Releases discovery and retry state before another server starts in this process. */
+    @SubscribeEvent
+    public static void onServerStopping(ServerStoppingEvent event) {
+        PENDING_ASSIGNMENTS.clear();
+        spawnBlocks = Collections.emptyList();
+    }
+
+    private static boolean tryAssignSpawn(ServerPlayer player) {
         CompoundTag tag = player.getPersistentData();
 
-        if (tag.getBoolean(CRYO_ASSIGNED_TAG) || spawnBlocks.isEmpty()) {
-            return;
+        if (tag.getBoolean(CRYO_ASSIGNED_TAG)) {
+            return true;
+        }
+        if (spawnBlocks.isEmpty()) {
+            return false;
         }
 
         BlockPos spawnPos = selectSpawn(player, tag);
         if (spawnPos == null) {
-            return;
+            return false;
         }
 
         teleportPlayer(player, spawnPos);
         tag.putBoolean(CRYO_ASSIGNED_TAG, true);
         tag.putLong(CRYO_POS_TAG, spawnPos.asLong());
+        return true;
     }
 
     private static BlockPos selectSpawn(ServerPlayer player, CompoundTag tag) {

@@ -70,12 +70,11 @@ public final class PlayerTelemetryConfig {
                 .define("sparkWebhookUrl", "");
 
         BLOCK_LOGOUT_UNTIL_SPARK_SENT = BUILDER.comment(
-                        "When true, run logout telemetry synchronously so Spark webhook delivery can complete before logout finishes.",
-                        "Use with caution: this can delay logout while network calls complete.")
+                        "Deprecated compatibility setting. Logout telemetry is always asynchronous and never blocks the server thread.")
                 .define("blockLogoutUntilSparkSent", false);
 
         LOGOUT_BLOCK_TIMEOUT_SECONDS = BUILDER.comment(
-                        "Maximum time to wait during blocking logout telemetry execution.")
+                        "Legacy Spark report timeout setting. Worker-side waits are hard-capped at 5 seconds.")
                 .defineInRange("logoutBlockTimeoutSeconds", 15, 1, 120);
 
         SAMPLE_RATE_PERCENT = BUILDER.comment(

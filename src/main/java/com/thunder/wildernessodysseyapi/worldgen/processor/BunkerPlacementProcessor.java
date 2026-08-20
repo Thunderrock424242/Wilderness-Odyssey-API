@@ -36,18 +36,7 @@ public class BunkerPlacementProcessor extends StructureProcessor {
             }
         }
 
-        // A template can retain block-entity NBT after a missing or replaced
-        // modded block resolves to ordinary terrain. Strip that stale payload
-        // before LevelChunk tries to instantiate a DUMMY block entity for air
-        // or stone during placement and later chunk saves.
-        if (shouldStripBlockEntityData(placed.nbt() != null, placed.state().hasBlockEntity())) {
-            return new StructureTemplate.StructureBlockInfo(placed.pos(), placed.state(), null);
-        }
         return placed;
-    }
-
-    static boolean shouldStripBlockEntityData(boolean hasBlockEntityData, boolean blockSupportsBlockEntity) {
-        return hasBlockEntityData && !blockSupportsBlockEntity;
     }
 
     private boolean isBoundary(BlockPos pos, BoundingBox bounds) {

@@ -1,19 +1,27 @@
 package com.thunder.wildernessodysseyapi.meteor.worldgen;
 
-import com.thunder.wildernessodysseyapi.core.ModConstants;
-
 /**
- * NeoForge 1.21 biome injection is done via JSON biome modifier files,
- * but we also wire up the BiomeLoadingEvent here as a fallback/complement.
+ * Legacy entry point retained for integrations compiled against older builds.
  *
- * The primary injection path is the JSON file at:
- *   data/meteormod/neoforge/biome_modifier/add_meteor_impact.json
+ * <p>Meteor biome injection is entirely data-driven through
+ * {@code data/neoforge/biome_modifier/add_meteor_impact.json}. Calling this
+ * compatibility method is intentionally a no-op.</p>
+ *
+ * @deprecated biome modifiers are loaded from data packs and require no Java registration
  */
-public class MeteorBiomeModifier {
+@Deprecated(forRemoval = true)
+public final class MeteorBiomeModifier {
 
+    private MeteorBiomeModifier() {
+    }
+
+    /**
+     * Retains source and binary compatibility with the former registration hook.
+     *
+     * @deprecated no registration call is required for the data-driven feature
+     */
+    @Deprecated(forRemoval = true)
     public static void register() {
-        // JSON biome modifier is the main path (see resources).
-        // Log so we know the class loaded.
-        ModConstants.LOGGER.info("Meteor biome modifier registered (via JSON biome_modifier).");
+        // Intentionally empty: NeoForge discovers the JSON biome modifier.
     }
 }

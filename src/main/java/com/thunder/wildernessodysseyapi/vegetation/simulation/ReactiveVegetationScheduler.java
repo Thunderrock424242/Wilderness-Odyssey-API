@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.vegetation.api.ReactiveVegetationService
 import com.thunder.wildernessodysseyapi.vegetation.api.VegetationClimateState;
 import com.thunder.wildernessodysseyapi.vegetation.api.VegetationDisturbanceSample;
 import com.thunder.wildernessodysseyapi.vegetation.config.VegetationConfig;
+import com.thunder.wildernessodysseyapi.vegetation.network.ReactiveVegetationSyncService;
 import com.thunder.wildernessodysseyapi.vegetation.state.ReactiveVegetationState;
 import com.thunder.wildernessodysseyapi.weather.api.SeasonalClimateState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherQuery;
@@ -199,8 +200,9 @@ public final class ReactiveVegetationScheduler {
 
         long elapsed = System.nanoTime() - started;
         stored.recordProcessing(gameTime, plantsProcessed, elapsed);
-        // Mutable attachments require an explicit compact sync after a regional update.
-        chunk.syncData(ModAttachments.REACTIVE_VEGETATION);
+        // Persistence remains attachment-owned; the client receives only visual
+        // changes through the dimension-aware tracking payload.
+        ReactiveVegetationSyncService.publishIfChanged(level, chunk, previous, climate);
         return new ChunkResult(configuredAttempts, plantsProcessed, blockStateChanges, elapsed);
     }
 

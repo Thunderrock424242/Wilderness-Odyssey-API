@@ -2,13 +2,11 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.sk89q.worldedit.entity.Entity;
 import com.sk89q.worldedit.extent.Extent;
-import com.sk89q.worldedit.function.operation.ForwardExtentCopy;
-import com.sk89q.worldedit.function.operation.Operation;
-import com.sk89q.worldedit.function.operation.RunContext;
 import com.sk89q.worldedit.regions.Region;
 import com.sk89q.worldedit.world.entity.EntityType;
 import net.neoforged.fml.ModList;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,15 +14,21 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Ensures Create contraptions (including Super Glue) are copied when pasting schematics.
+ * Preserves Create contraption entities when WorldEdit copies a matching region.
  *
  * <p>WorldEdit does not copy entities by default for //paste, which causes Create
- * contraptions that rely on Super Glue or moving contraption entities (e.g. rope
- * pulley elevators) to break apart. If Create is present we force entity copying
- * up front, ensuring all Create entities are brought along with the block paste
- * and survive world saves/loads.</p>
+ * contraptions in a selected region to break apart. The mixin first inspects the
+ * selection and enables entity copying only after it finds a Create-owned entity,
+ * leaving ordinary WorldEdit operations and the caller's original option intact.</p>
+ *
+ * <p>WorldEdit is optional, so a pseudo target and the mixin config plugin's
+ * class-resource gate prevent its classes from being resolved when absent.</p>
  */
-@Mixin(ForwardExtentCopy.class)
+@Pseudo
+@Mixin(
+        targets = "com.sk89q.worldedit.function.operation.ForwardExtentCopy",
+        remap = false
+)
 public abstract class ForwardExtentCopyMixin {
 
     private static final String CREATE_NAMESPACE = "create:";
@@ -39,7 +43,7 @@ public abstract class ForwardExtentCopyMixin {
     private boolean wildernessodysseyapi$checkedForCreateGlue;
 
     @Inject(method = "resume", at = @At("HEAD"))
-    private void wildernessodysseyapi$autoCopyCreateGlue(RunContext context, CallbackInfoReturnable<Operation> cir) {
+    private void wildernessodysseyapi$autoCopyCreateGlue(CallbackInfoReturnable<?> callbackInfo) {
         if (wildernessodysseyapi$checkedForCreateGlue || copyingEntities) {
             return;
         }
@@ -48,10 +52,6 @@ public abstract class ForwardExtentCopyMixin {
         if (!ModList.get().isLoaded("create")) {
             return;
         }
-
-        // Always enable entity copying when Create is installed so moving contraptions
-        // (e.g. pulleys) and glue entities persist through pastes and world reloads.
-        setCopyingEntities(true);
 
         if (source == null || region == null) {
             return;
@@ -69,11 +69,16 @@ public abstract class ForwardExtentCopyMixin {
 
                 String id = type.id();
                 if (id != null && id.startsWith(CREATE_NAMESPACE)) {
+                    // Enable copying only for a selection that actually contains a
+                    // Create entity; vanilla mobs and item entities keep WorldEdit's
+                    // original caller-controlled behavior.
+                    setCopyingEntities(true);
                     return;
                 }
             }
         } catch (RuntimeException ignored) {
-            // If the extent cannot enumerate entities, fall back to the user's original choice.
+            // Enumeration is optional compatibility work. Leaving the flag
+            // untouched preserves the user's original WorldEdit choice.
         }
     }
 }

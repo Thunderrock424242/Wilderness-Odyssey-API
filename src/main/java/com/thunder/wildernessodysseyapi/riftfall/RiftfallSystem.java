@@ -17,6 +17,7 @@ import com.thunder.wildernessodysseyapi.vegetation.api.ReactiveVegetationService
 import net.minecraft.core.BlockPos;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
@@ -28,16 +29,27 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.AABB;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.WeakHashMap;
 
+/**
+ * Owns server-side Riftfall phase, exposure, corrosion, and event spawning.
+ *
+ * <p>Mutable state is partitioned by logical server so an integrated client can
+ * leave one world and open another without inheriting the previous world's
+ * phases or player exposure. {@link RiftfallLifecycleEvents} releases entries
+ * promptly when players, levels, and servers leave their owning lifecycle.</p>
+ */
 public final class RiftfallSystem {
     private static final int EXPOSURE_EFFECT_REFRESH_INTERVAL_TICKS = 20;
 
-    private static final Map<net.minecraft.resources.ResourceKey<Level>, RiftfallState> states = new HashMap<>();
-    private static final Map<UUID, Float> playerExposure = new HashMap<>();
+    // Weak server keys provide a final safety net if an abnormal shutdown skips
+    // NeoForge lifecycle events. Values never retain their owning server.
+    private static final Map<MinecraftServer, ServerRiftfallState> SERVER_STATES = new WeakHashMap<>();
 
     private RiftfallSystem() {}
 
@@ -48,7 +60,11 @@ public final class RiftfallSystem {
      */
     @Deprecated(forRemoval = false)
     public static RiftfallStage stage() {
-        return states.values().stream()
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) {
+            return RiftfallStage.CLEAR;
+        }
+        return serverState(server).dimensions.values().stream()
                 .map(state -> state.stage)
                 .filter(stage -> stage != RiftfallStage.CLEAR)
                 .findFirst()
@@ -60,12 +76,13 @@ public final class RiftfallSystem {
         if (!canRunIn(level)) {
             return RiftfallStage.CLEAR;
         }
-        RiftfallState state = states.get(level.dimension());
+        RiftfallState state = serverState(level.getServer()).dimensions.get(level.dimension());
         return state == null ? RiftfallStage.CLEAR : state.stage;
     }
 
+    /** Returns the current server-owned exposure value for a player. */
     public static float getExposure(ServerPlayer player) {
-        return playerExposure.getOrDefault(player.getUUID(), 0F);
+        return serverState(player.getServer()).playerExposure.getOrDefault(player.getUUID(), 0F);
     }
 
     public static boolean canRunIn(ServerLevel level) {
@@ -78,7 +95,7 @@ public final class RiftfallSystem {
         }
 
         if (!RiftfallConfig.CONFIG.enabled()) {
-            resetToClear();
+            resetGameplayState(level.getServer());
             return;
         }
 
@@ -207,6 +224,7 @@ public final class RiftfallSystem {
     }
 
     private static void tickExposure(ServerLevel level, RiftfallStage stage) {
+        Map<UUID, Float> playerExposure = serverState(level.getServer()).playerExposure;
         for (ServerPlayer player : level.players()) {
             float value = getExposure(player);
             boolean exposed = playerCanSeeSky(level, player) && stage.isActiveDanger();
@@ -253,9 +271,60 @@ public final class RiftfallSystem {
         }
     }
 
-    private static void resetToClear() {
-        states.clear();
-        playerExposure.clear();
+    /** Releases all state owned by one server after shutdown or feature disable. */
+    public static void clearServer(MinecraftServer server) {
+        SERVER_STATES.remove(server);
+    }
+
+    private static void resetGameplayState(MinecraftServer server) {
+        ServerRiftfallState state = SERVER_STATES.get(server);
+        if (state != null) {
+            state.dimensions.clear();
+            state.playerExposure.clear();
+        }
+    }
+
+    /** Releases phase state owned by an unloading dimension. */
+    public static void clearLevel(ServerLevel level) {
+        ServerRiftfallState state = SERVER_STATES.get(level.getServer());
+        if (state != null) {
+            state.dimensions.remove(level.dimension());
+            state.entityCounts.remove(level.dimension());
+        }
+    }
+
+    /** Releases non-persistent exposure when a player leaves the server. */
+    public static void clearPlayer(ServerPlayer player) {
+        ServerRiftfallState state = SERVER_STATES.get(player.getServer());
+        if (state != null) {
+            state.playerExposure.remove(player.getUUID());
+        }
+    }
+
+    /** Records one tracked Riftfall entity after it joins a loaded server level. */
+    static void onEntityAdded(ServerLevel level, EntityType<?> type) {
+        if (type == ModEntities.RIFTBORN.get()) {
+            entityCounts(level).riftborn++;
+        } else if (type == ModEntities.RIFT_LISTENER.get()) {
+            entityCounts(level).riftListeners++;
+        } else if (type == ModEntities.RIFTBOUND_WRAITH.get()) {
+            entityCounts(level).riftboundWraiths++;
+        }
+    }
+
+    /** Records one tracked Riftfall entity after it leaves a loaded server level. */
+    static void onEntityRemoved(ServerLevel level, EntityType<?> type) {
+        RiftfallEntityCounts counts = existingEntityCounts(level);
+        if (counts == null) {
+            return;
+        }
+        if (type == ModEntities.RIFTBORN.get()) {
+            counts.riftborn = Math.max(0, counts.riftborn - 1);
+        } else if (type == ModEntities.RIFT_LISTENER.get()) {
+            counts.riftListeners = Math.max(0, counts.riftListeners - 1);
+        } else if (type == ModEntities.RIFTBOUND_WRAITH.get()) {
+            counts.riftboundWraiths = Math.max(0, counts.riftboundWraiths - 1);
+        }
     }
 
     private static void tickCorrosion(ServerLevel level, RiftfallStage stage) {
@@ -307,8 +376,8 @@ public final class RiftfallSystem {
         if ((level.getGameTime() % RiftfallConfig.CONFIG.riftbornSpawnIntervalTicks()) != 0) return;
 
         EntityType<RiftbornEntity> type = ModEntities.RIFTBORN.get();
-        int globalCount = level.getEntities(type, new AABB(-30_000_000, level.getMinBuildHeight(), -30_000_000, 30_000_000, level.getMaxBuildHeight(), 30_000_000), RiftbornEntity::isAlive).size();
-        if (globalCount >= RiftfallConfig.CONFIG.maxRiftbornGlobal()) return;
+        int globalCap = RiftfallConfig.CONFIG.maxRiftbornGlobal();
+        if (entityCounts(level).riftborn >= globalCap) return;
 
         int budget = stage == RiftfallStage.METEOR_SURGE
                 ? RiftfallConfig.CONFIG.riftbornSpawnBudgetSurge()
@@ -346,8 +415,8 @@ public final class RiftfallSystem {
         if (level.random.nextDouble() > chance) return;
 
         EntityType<RiftListenerEntity> type = ModEntities.RIFT_LISTENER.get();
-        int globalCount = level.getEntities(type, new AABB(-30_000_000, level.getMinBuildHeight(), -30_000_000, 30_000_000, level.getMaxBuildHeight(), 30_000_000), RiftListenerEntity::isAlive).size();
-        if (globalCount >= RiftfallConfig.CONFIG.maxRiftListenersGlobal()) return;
+        int globalCap = RiftfallConfig.CONFIG.maxRiftListenersGlobal();
+        if (entityCounts(level).riftListeners >= globalCap) return;
 
         for (ServerPlayer player : level.players()) {
             if (!playerCanSeeSky(level, player)) continue;
@@ -379,8 +448,8 @@ public final class RiftfallSystem {
         if (level.random.nextDouble() > chance) return;
 
         EntityType<RiftboundWraithEntity> type = ModEntities.RIFTBOUND_WRAITH.get();
-        int globalCount = level.getEntities(type, new AABB(-30_000_000, level.getMinBuildHeight(), -30_000_000, 30_000_000, level.getMaxBuildHeight(), 30_000_000), RiftboundWraithEntity::isAlive).size();
-        if (globalCount >= RiftfallConfig.CONFIG.maxRiftboundWraithsGlobal()) return;
+        int globalCap = RiftfallConfig.CONFIG.maxRiftboundWraithsGlobal();
+        if (entityCounts(level).riftboundWraiths >= globalCap) return;
 
         for (ServerPlayer player : level.players()) {
             if (!playerCanSeeSky(level, player)) continue;
@@ -406,6 +475,10 @@ public final class RiftfallSystem {
             double angle = level.random.nextDouble() * Math.PI * 2;
             int x = origin.getX() + (int) Math.round(Math.cos(angle) * radius);
             int z = origin.getZ() + (int) Math.round(Math.sin(angle) * radius);
+            BlockPos column = new BlockPos(x, level.getMinBuildHeight(), z);
+            if (!level.hasChunkAt(column)) {
+                continue;
+            }
             int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
             BlockPos pos = new BlockPos(x, y, z);
             if (level.canSeeSky(pos) && level.getBlockState(pos.below()).isSolid() && level.getBlockState(pos).isAir()) {
@@ -416,7 +489,38 @@ public final class RiftfallSystem {
     }
 
     private static RiftfallState stateFor(ServerLevel level) {
-        return states.computeIfAbsent(level.dimension(), ignored -> new RiftfallState());
+        return serverState(level.getServer()).dimensions.computeIfAbsent(
+                level.dimension(),
+                ignored -> new RiftfallState()
+        );
+    }
+
+    private static RiftfallEntityCounts entityCounts(ServerLevel level) {
+        return serverState(level.getServer()).entityCounts.computeIfAbsent(
+                level.dimension(),
+                ignored -> new RiftfallEntityCounts()
+        );
+    }
+
+    private static RiftfallEntityCounts existingEntityCounts(ServerLevel level) {
+        ServerRiftfallState state = SERVER_STATES.get(level.getServer());
+        return state == null ? null : state.entityCounts.get(level.dimension());
+    }
+
+    private static ServerRiftfallState serverState(MinecraftServer server) {
+        return SERVER_STATES.computeIfAbsent(server, ignored -> new ServerRiftfallState());
+    }
+
+    private static final class ServerRiftfallState {
+        private final Map<net.minecraft.resources.ResourceKey<Level>, RiftfallState> dimensions = new HashMap<>();
+        private final Map<net.minecraft.resources.ResourceKey<Level>, RiftfallEntityCounts> entityCounts = new HashMap<>();
+        private final Map<UUID, Float> playerExposure = new HashMap<>();
+    }
+
+    private static final class RiftfallEntityCounts {
+        private int riftborn;
+        private int riftListeners;
+        private int riftboundWraiths;
     }
 
     private static final class RiftfallState {

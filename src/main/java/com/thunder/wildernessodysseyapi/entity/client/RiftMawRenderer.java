@@ -10,9 +10,10 @@ import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
+/** Renders the large Rift Maw with its entity-specific humanoid texture atlas. */
 public class RiftMawRenderer extends MobRenderer<RiftMawEntity, HumanoidModel<RiftMawEntity>> {
-    private static final ResourceLocation PLACEHOLDER_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "textures/entity/neural_frame.png");
+    private static final ResourceLocation TEXTURE =
+            ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "textures/entity/rift_maw.png");
 
     public RiftMawRenderer(EntityRendererProvider.Context context) {
         super(context, new HumanoidModel<>(context.bakeLayer(ModelLayers.ZOMBIE)), 1.15F);
@@ -20,7 +21,7 @@ public class RiftMawRenderer extends MobRenderer<RiftMawEntity, HumanoidModel<Ri
 
     @Override
     public ResourceLocation getTextureLocation(RiftMawEntity entity) {
-        return PLACEHOLDER_TEXTURE;
+        return TEXTURE;
     }
 
     @Override

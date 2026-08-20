@@ -20,7 +20,7 @@ license="${mod_license}"
 [[mods]] #mandatory
 
 # The modid of the mod
-modId="wildernessodysseyapi" #mandatory
+modId="${mod_id}" #mandatory
 
 # The version number of the mod
 version="${mod_version}" #mandatory
@@ -63,63 +63,84 @@ description='''${mod_description}'''
 #[features.${mod_id}]
 # openGLVersion="[3.2,)"
 
-[[dependencies.wildernessodysseyapi]]
+[[dependencies.${mod_id}]]
+modId="minecraft"
+type="required"
+versionRange="${minecraft_version_range}"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="neoforge"
+type="required"
+versionRange="${neo_version_range}"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
 modId="ticktoklib"
-mandatory=true
+type="required"
 versionRange="[1.4.0,)"
 ordering="NONE"
 side="BOTH"
 
-[[dependencies.wildernessodysseyapi]]
+[[dependencies.${mod_id}]]
 modId="spark"
-mandatory=false
+type="optional"
 versionRange="[1.0.0,)"
 ordering="NONE"
 side="BOTH"
 
-[[dependencies.wildernessodysseyapi]]
+[[dependencies.${mod_id}]]
 modId="curios"
-mandatory=true
+type="required"
 versionRange="[9.2.0,)"
 ordering="NONE"
 side="BOTH"
 
-[[dependencies.wildernessodysseyapi]]
+[[dependencies.${mod_id}]]
 modId="geckolib"
-mandatory=true
+type="required"
 versionRange="[4.8.2,)"
 ordering="AFTER"
 side="BOTH"
 
-[[dependencies.wildernessodysseyapi]]
+[[dependencies.${mod_id}]]
 modId="create"
-mandatory=true
+type="required"
 versionRange="[6.0.10,)"
 ordering="AFTER"
 side="BOTH"
 
-[[dependencies.wildernessodysseyapi]]
+[[dependencies.${mod_id}]]
+modId="worldedit"
+type="optional"
+versionRange="${worldedit_version_range}"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
 modId="homeostaticseasons"
 type="optional"
 versionRange=""
 ordering="AFTER"
 side="BOTH"
 
-[[dependencies.wildernessodysseyapi]]
+[[dependencies.${mod_id}]]
 modId="sereneseasons"
 type="optional"
 versionRange=""
 ordering="AFTER"
 side="BOTH"
 
-[[dependencies.wildernessodysseyapi]]
+[[dependencies.${mod_id}]]
 modId="cold_sweat"
 type="optional"
 versionRange=""
 ordering="AFTER"
 side="BOTH"
 
-[[dependencies.wildernessodysseyapi]]
+[[dependencies.${mod_id}]]
 modId="thirst"
 type="optional"
 versionRange=""

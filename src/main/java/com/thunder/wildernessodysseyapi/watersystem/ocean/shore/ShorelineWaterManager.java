@@ -34,6 +34,7 @@ public final class ShorelineWaterManager {
     private static final int BATHYMETRY_REFRESH_TICKS = 100;
     private static final int REGION_EXPIRY_TICKS = 240;
     private static final int MAX_REGIONS_PER_LEVEL = 18;
+    private static final int MAX_BATHYMETRY_REFRESHES_PER_TICK = 1;
 
     private final Map<ServerLevel, Map<Long, Region>> regionsByLevel = new IdentityHashMap<>();
     private final Map<ServerLevel, Integer> nextRegionByLevel = new IdentityHashMap<>();
@@ -102,8 +103,12 @@ public final class ShorelineWaterManager {
                 cursor,
                 Math.max(0, WaterSimulationConfig.waterBodyUpdatesPerTick())
         );
+        int bathymetryRefreshes = 0;
         for (int index : updateOrder) {
-            activeRegions.get(index).getValue().tick(level, gameTime);
+            Region region = activeRegions.get(index).getValue();
+            if (region.tick(level, gameTime, hasBathymetryRefreshCapacity(bathymetryRefreshes))) {
+                bathymetryRefreshes++;
+            }
         }
         nextRegionByLevel.put(level, Math.floorMod(cursor + updateOrder.length, activeRegions.size()));
     }
@@ -150,6 +155,16 @@ public final class ShorelineWaterManager {
         return order;
     }
 
+    static boolean hasBathymetryRefreshCapacity(int refreshesThisTick) {
+        return Math.max(0, refreshesThisTick) < MAX_BATHYMETRY_REFRESHES_PER_TICK;
+    }
+
+    static boolean isBathymetryRefreshDue(long gameTime, long lastRefreshTick) {
+        return lastRefreshTick == Long.MIN_VALUE
+                || gameTime < lastRefreshTick
+                || gameTime - lastRefreshTick >= BATHYMETRY_REFRESH_TICKS;
+    }
+
     /** Describes one shoreline-grid sample in world units. */
     public record FlowSample(float surfaceOffset, float velocityX, float velocityZ, float depth) {
         private static final FlowSample DRY = new FlowSample(0.0f, 0.0f, 0.0f, 0.0f);
@@ -176,10 +191,25 @@ public final class ShorelineWaterManager {
             this.originZ = regionZ * REGION_SPAN;
         }
 
-        private void tick(ServerLevel level, long gameTime) {
-            if (gameTime - lastBathymetryRefresh >= BATHYMETRY_REFRESH_TICKS) {
+        /**
+         * Advances this region while respecting the manager's level-wide scan budget.
+         *
+         * @return whether this call consumed one bathymetry refresh slot
+         */
+        private boolean tick(ServerLevel level, long gameTime, boolean bathymetryRefreshAllowed) {
+            boolean refreshDue = isBathymetryRefreshDue(gameTime, lastBathymetryRefresh);
+            boolean refreshed = false;
+            if (refreshDue && bathymetryRefreshAllowed) {
                 refreshBathymetry(level);
                 lastBathymetryRefresh = gameTime;
+                refreshed = true;
+            }
+
+            // A new region remains dry until its first bounded scan. Existing
+            // regions may safely use their previous depth grid for a few ticks
+            // while another due region consumes this tick's refresh slot.
+            if (lastBathymetryRefresh == Long.MIN_VALUE) {
+                return refreshed;
             }
 
             float centerX = originX + REGION_SPAN * 0.5f;
@@ -194,6 +224,7 @@ public final class ShorelineWaterManager {
             );
             float boundarySurface = TideSystem.getTideOffset(level) + oceanBoundary.height();
             grid.step(0.05f, boundarySurface);
+            return refreshed;
         }
 
         private void refreshBathymetry(ServerLevel level) {

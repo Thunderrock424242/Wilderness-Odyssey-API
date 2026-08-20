@@ -13,10 +13,13 @@ import com.thunder.wildernessodysseyapi.performance.background.config.Background
 import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
 import com.thunder.wildernessodysseyapi.performance.tickengine.config.TickEngineConfig;
 import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
+import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryReporter;
+import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueue;
 import com.thunder.wildernessodysseyapi.watersystem.water.entity.BoatTiltStore;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.server.level.ServerLevel;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -80,7 +83,7 @@ public final class ServerLifecycleEvents {
     }
 
     /** Persists mobile water and stops runtime services during shutdown. */
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onServerStopping(ServerStoppingEvent event) {
         SPHSimulationManager waterManager = SPHSimulationManager.get();
         for (ServerLevel level : event.getServer().getAllLevels()) {
@@ -91,6 +94,10 @@ public final class ServerLifecycleEvents {
         BackgroundEfficiencyManager.shutdown();
         DataEngine.get().shutdown();
         AsyncTaskManager.shutdown();
+        // Persist the final retry spool only after accepted telemetry workers
+        // have drained or been cancelled, then release process-wide UUID caches.
+        TelemetryQueue.shutdown(event.getServer());
+        PlayerTelemetryReporter.clearCaches();
     }
 
     /** Clears world-derived caches when a level is unloaded to avoid retaining stale state. */
