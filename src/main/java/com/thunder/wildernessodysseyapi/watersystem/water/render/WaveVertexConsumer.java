@@ -3,18 +3,14 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
 /**
- * WaveVertexConsumer
+ * Legacy sine-wave vertex wrapper retained for binary compatibility.
  *
- * A delegating VertexConsumer that intercepts addVertex calls and
- * applies a Y-axis wave displacement to water surface (top-face) vertices.
+ * <p>The built-in renderer no longer constructs this wrapper; it uses the
+ * Gerstner wave and replacement-mesh rendering paths instead.</p>
  *
- * Only vertices whose local Y is near the top of the block (≥ 0.8f) are
- * displaced — this preserves the flat bottom and side faces.
- *
- * Usage:
- *   WaveVertexConsumer wvc = new WaveVertexConsumer(originalConsumer, blockX, blockZ);
- *   // pass wvc wherever the original consumer was used
+ * @deprecated use the active Gerstner wave rendering APIs in the {@code wave} package
  */
+@Deprecated(forRemoval = true)
 public class WaveVertexConsumer implements VertexConsumer {
 
     private final VertexConsumer delegate;

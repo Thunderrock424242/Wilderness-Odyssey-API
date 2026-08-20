@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteSource;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.meteor.event.MeteorImpactEvent;
 import com.thunder.wildernessodysseyapi.weather.integration.VanillaWeatherCommandAdapter;
@@ -114,19 +115,26 @@ public class MixinWeatherCommand {
 
         int resolvedCount;
         if (count == -1) {
-            int min = MeteorConfig.MIN_METEORS.get();
-            int max = MeteorConfig.MAX_METEORS.get();
-            resolvedCount = min + level.random.nextInt(Math.max(1, max - min + 1));
+            resolvedCount = MeteorConfig.meteorCountRange().randomValue(level.random);
         } else {
             resolvedCount = count;
         }
 
-        MeteorImpactEvent.spawnMeteorShower(level, resolvedCount);
+        int acceptedCount = MeteorImpactEvent.requestMeteorShower(
+                level,
+                resolvedCount,
+                MeteorSiteSource.COMMAND
+        );
+        if (acceptedCount == 0) {
+            source.sendFailure(Component.literal(
+                    "The meteor queue is full; wait for the current shower to clear."));
+            return 0;
+        }
 
-        String countStr = resolvedCount == 1 ? "1 meteor" : resolvedCount + " meteors";
+        String countStr = acceptedCount == 1 ? "1 meteor" : acceptedCount + " meteors";
         source.sendSuccess(() -> Component.literal(
                 "§6☄ Meteor shower triggered! (" + countStr + " incoming)"), true);
 
-        return resolvedCount;
+        return acceptedCount;
     }
 }

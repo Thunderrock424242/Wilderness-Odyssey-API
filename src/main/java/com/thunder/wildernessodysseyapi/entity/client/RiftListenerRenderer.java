@@ -9,9 +9,10 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.resources.ResourceLocation;
 
+/** Renders the sensory Rift Listener with its entity-specific humanoid texture atlas. */
 public class RiftListenerRenderer extends MobRenderer<RiftListenerEntity, HumanoidModel<RiftListenerEntity>> {
-    private static final ResourceLocation PLACEHOLDER_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "textures/entity/neural_frame.png");
+    private static final ResourceLocation TEXTURE =
+            ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "textures/entity/rift_listener.png");
 
     public RiftListenerRenderer(EntityRendererProvider.Context context) {
         super(context, new HumanoidModel<>(context.bakeLayer(ModelLayers.ZOMBIE)), 0.55F);
@@ -19,7 +20,7 @@ public class RiftListenerRenderer extends MobRenderer<RiftListenerEntity, Humano
 
     @Override
     public ResourceLocation getTextureLocation(RiftListenerEntity entity) {
-        return PLACEHOLDER_TEXTURE;
+        return TEXTURE;
     }
 
     @Override

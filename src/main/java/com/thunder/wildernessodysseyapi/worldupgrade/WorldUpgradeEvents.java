@@ -6,6 +6,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
@@ -21,6 +22,12 @@ public final class WorldUpgradeEvents {
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         WorldUpgradeManager.onServerStarting(event.getServer());
+    }
+
+    /** Clears in-memory queues after SavedData has retained the durable rollout status. */
+    @SubscribeEvent
+    public static void onServerStopping(ServerStoppingEvent event) {
+        WorldUpgradeManager.onServerStopping();
     }
 
     @SubscribeEvent

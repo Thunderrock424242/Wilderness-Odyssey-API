@@ -122,7 +122,14 @@ public final class ModConfigRegistration {
 
     private static void applyRuntimeSettings(ModConfig config) {
         if (config.getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
-            AsyncTaskManager.initialize(AsyncThreadingConfig.values());
+            // Executor replacement and the shared result queue are runtime-owned.
+            // Initial config loading precedes server ownership, so it must not
+            // create worker pools on the mod-loading thread. ServerStarting
+            // initializes them; only a live server receives a reload.
+            var server = ServerLifecycleHooks.getCurrentServer();
+            if (server != null) {
+                server.execute(() -> AsyncTaskManager.reload(AsyncThreadingConfig.values()));
+            }
         } else if (config.getSpec() == BackgroundEfficiencyConfig.CONFIG_SPEC) {
             applyOnServerThread(() -> BackgroundEfficiencyManager.reload(BackgroundEfficiencyConfig.values()));
         } else if (config.getSpec() == TickEngineConfig.CONFIG_SPEC) {

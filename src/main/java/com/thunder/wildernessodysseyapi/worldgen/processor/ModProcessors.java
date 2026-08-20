@@ -20,6 +20,10 @@ public final class ModProcessors {
     public static final DeferredHolder<StructureProcessorType<?>, StructureProcessorType<BunkerPlacementProcessor>> BUNKER_PLACEMENT =
             PROCESSORS.register("bunker_placement", () -> () -> BunkerPlacementProcessor.CODEC);
 
+    /** Final validator that discards NBT incompatible with a processed block state. */
+    public static final DeferredHolder<StructureProcessorType<?>, StructureProcessorType<BlockEntityNbtSanitizingProcessor>> BLOCK_ENTITY_NBT_SANITIZER =
+            PROCESSORS.register("block_entity_nbt_sanitizer", () -> () -> BlockEntityNbtSanitizingProcessor.CODEC);
+
     private ModProcessors() {
     }
 }

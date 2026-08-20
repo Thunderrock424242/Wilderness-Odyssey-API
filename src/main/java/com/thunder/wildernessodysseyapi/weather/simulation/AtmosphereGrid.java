@@ -11,7 +11,9 @@ import net.minecraft.core.BlockPos;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -81,6 +83,22 @@ public final class AtmosphereGrid {
             result.add(cell.view());
         }
         return List.copyOf(result);
+    }
+
+    /**
+     * Captures one immutable-view generation keyed for neighborhood simulation.
+     *
+     * <p>The returned map is detached from the mutable grid, while each value
+     * is already an immutable record. Building it directly avoids allocating
+     * an intermediate all-cells list on every weather simulation pass.</p>
+     */
+    Map<Long, AtmosphereView> snapshotByPackedKey() {
+        Map<Long, AtmosphereView> result = new HashMap<>(Math.max(16, cells.size() * 2));
+        for (AtmosphereCell cell : cells.values()) {
+            AtmosphereView view = cell.view();
+            result.put(view.key().packed(), view);
+        }
+        return result;
     }
 
     /** Returns existing immutable views inside a bounded square region. */

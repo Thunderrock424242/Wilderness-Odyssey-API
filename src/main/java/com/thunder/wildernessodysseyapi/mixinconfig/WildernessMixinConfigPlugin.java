@@ -9,12 +9,11 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 /**
- * Prevents optional renderer bridges from asking Mixin to resolve absent classes.
+ * Prevents optional integrations from asking Mixin to resolve absent classes.
  *
  * <p>{@code @Pseudo} remains a defensive fallback, while this resource-only
- * check removes harmless ClassNotFound startup warnings on clients that have
- * neither Iris/Oculus, Embeddium, nor Sodium installed. No optional class is
- * initialized during bootstrap.</p>
+ * check skips WorldEdit and renderer bridges when their exact targets are not
+ * installed. No optional class is initialized during bootstrap.</p>
  */
 public final class WildernessMixinConfigPlugin implements IMixinConfigPlugin {
 
@@ -29,6 +28,8 @@ public final class WildernessMixinConfigPlugin implements IMixinConfigPlugin {
     );
     private static final String EMBEDDIUM_TARGET =
             "org.embeddedt.embeddium.impl.render.chunk.compile.pipeline.FluidRenderer";
+    private static final String WORLDEDIT_TARGET =
+            "com.sk89q.worldedit.function.operation.ForwardExtentCopy";
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -56,6 +57,7 @@ public final class WildernessMixinConfigPlugin implements IMixinConfigPlugin {
 
     static String optionalTarget(String mixinClassName) {
         return switch (mixinClassName) {
+            case MIXIN_PACKAGE + "ForwardExtentCopyMixin" -> WORLDEDIT_TARGET;
             case MIXIN_PACKAGE + "IrisWaterMaterialBridgeMixin" ->
                     "net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings";
             case MIXIN_PACKAGE + "LegacyIrisWaterMaterialBridgeMixin" ->

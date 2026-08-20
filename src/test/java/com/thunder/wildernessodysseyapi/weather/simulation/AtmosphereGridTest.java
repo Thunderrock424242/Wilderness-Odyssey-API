@@ -43,6 +43,19 @@ class AtmosphereGridTest {
     }
 
     @Test
+    void packedSnapshotRemainsFrozenWhenAuthorityChanges() {
+        AtmosphereGrid grid = new AtmosphereGrid(100);
+        AtmosphereCellKey key = new AtmosphereCellKey(0, 0);
+        grid.getOrCreate(key, WeatherSample.CLEAR, 0L);
+
+        var previous = grid.snapshotByPackedKey();
+        grid.force(key, rainySample(), 20L);
+
+        assertEquals(WeatherSample.CLEAR, previous.get(key.packed()).sample());
+        assertEquals(rainySample(), grid.view(key).sample());
+    }
+
+    @Test
     void primitivePrecipitationPathUsesCanonicalFunctionalBuckets() {
         AtmosphereGrid grid = new AtmosphereGrid(16);
         grid.getOrCreate(new AtmosphereCellKey(0, 0), sample(15.0, 0.025, PrecipitationType.RAIN), 0L);

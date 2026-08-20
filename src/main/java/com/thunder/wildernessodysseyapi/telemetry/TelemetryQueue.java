@@ -2,7 +2,12 @@ package com.thunder.wildernessodysseyapi.telemetry;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import net.minecraft.server.MinecraftServer;
 
@@ -11,6 +16,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -20,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
@@ -29,21 +36,51 @@ import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
  * stores pending events on disk safely without blocking the main thread.
  */
 public final class TelemetryQueue {
-    private static final Gson GSON = new GsonBuilder().create();
+    private static final Gson GSON = new GsonBuilder()
+            .registerTypeAdapter(Instant.class, new InstantJsonAdapter())
+            .create();
     private static final Map<MinecraftServer, TelemetryQueue> QUEUES = new ConcurrentHashMap<>();
 
     private final Deque<PendingTelemetryPayload> queue = new ArrayDeque<>();
     private final Path spoolPath;
+    private final PersistenceScheduler persistenceScheduler;
+    private final Object persistenceLock = new Object();
+    private final AtomicBoolean persistenceDirty = new AtomicBoolean(false);
+    private final AtomicBoolean persistenceScheduled = new AtomicBoolean(false);
+    private final AtomicBoolean flushInProgress = new AtomicBoolean(false);
+    private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicInteger failedCount = new AtomicInteger();
     private Instant lastSuccess;
 
     private TelemetryQueue(Path spoolPath) {
+        this(spoolPath, task -> AsyncTaskManager.trySubmitIoWork("Telemetry_Persist", task));
+    }
+
+    TelemetryQueue(Path spoolPath, PersistenceScheduler persistenceScheduler) {
         this.spoolPath = spoolPath;
+        this.persistenceScheduler = persistenceScheduler;
         loadFromDisk();
     }
 
     public static TelemetryQueue get(MinecraftServer server) {
         return QUEUES.computeIfAbsent(server, TelemetryQueue::createForServer);
+    }
+
+    /**
+     * Persists and releases the retry queue owned by a stopped server.
+     *
+     * <p>This must run after telemetry producers and the shared async executor
+     * have stopped accepting work. The synchronous final snapshot keeps server
+     * shutdown from losing payloads when no worker remains available.</p>
+     */
+    public static void shutdown(MinecraftServer server) {
+        if (server == null) {
+            return;
+        }
+        TelemetryQueue queue = QUEUES.remove(server);
+        if (queue != null) {
+            queue.close();
+        }
     }
 
     private static TelemetryQueue createForServer(MinecraftServer server) {
@@ -57,21 +94,21 @@ public final class TelemetryQueue {
      * but disk I/O is pushed to a background thread to prevent micro-stutters.
      */
     public void enqueue(PendingTelemetryPayload payload, int maxQueueSize) {
+        if (payload == null || closed.get()) {
+            return;
+        }
         synchronized (this) {
-            if (queue.size() >= maxQueueSize) {
+            if (closed.get()) {
+                return;
+            }
+            int boundedQueueSize = Math.max(1, maxQueueSize);
+            while (queue.size() >= boundedQueueSize) {
                 queue.pollFirst();
                 failedCount.incrementAndGet();
             }
             queue.addLast(payload);
         }
-
-        // THE FIX: Do not write to disk on the main server thread
-        AsyncTaskManager.submitIoTask("Telemetry_Persist", () -> {
-            synchronized (this) {
-                persistAll();
-            }
-            return Optional.empty();
-        });
+        schedulePersistence();
     }
 
     /**
@@ -79,13 +116,12 @@ public final class TelemetryQueue {
      * Network I/O is performed OUTSIDE of the synchronized lock to prevent server freezes.
      */
     public int flush(int maxBatchSize) {
-        List<PendingTelemetryPayload> batch = new ArrayList<>();
+        List<PendingTelemetryPayload> batch;
 
-        // 1. Grab the items quickly and release the lock
+        // Snapshot rather than removing in-flight entries. A concurrent server
+        // shutdown can then persist an at-least-once copy instead of losing work.
         synchronized (this) {
-            while (!queue.isEmpty() && batch.size() < maxBatchSize) {
-                batch.add(queue.pollFirst());
-            }
+            batch = queue.stream().limit(Math.max(1, maxBatchSize)).toList();
         }
 
         if (batch.isEmpty()) {
@@ -93,7 +129,7 @@ public final class TelemetryQueue {
         }
 
         int attempted = 0;
-        boolean changed = false;
+        List<PendingTelemetryPayload> sentPayloads = new ArrayList<>();
         List<PendingTelemetryPayload> failed = new ArrayList<>();
 
         // 2. Perform slow network I/O safely (lock is released, main thread is free!)
@@ -101,25 +137,29 @@ public final class TelemetryQueue {
             attempted++;
             boolean sent = payload.send();
             if (sent) {
-                lastSuccess = Instant.now();
-                changed = true;
+                this.lastSuccess = Instant.now();
+                sentPayloads.add(payload);
             } else {
                 payload.incrementAttempts();
                 failed.add(payload);
-                changed = true;
             }
         }
 
-        // 3. Re-acquire lock to insert failures and save state
+        // Apply only the delivery results. Failed entries remain queue-owned
+        // during I/O, then rotate to the tail so one bad endpoint cannot starve
+        // later payloads.
         synchronized (this) {
+            for (PendingTelemetryPayload payload : sentPayloads) {
+                queue.removeFirstOccurrence(payload);
+            }
             for (PendingTelemetryPayload payload : failed) {
-                queue.addLast(payload);
+                if (queue.removeFirstOccurrence(payload)) {
+                    queue.addLast(payload);
+                }
                 failedCount.incrementAndGet();
             }
-            if (changed) {
-                persistAll();
-            }
         }
+        schedulePersistence();
         return attempted;
     }
 
@@ -142,29 +182,136 @@ public final class TelemetryQueue {
                     queue.addLast(payload);
                 }
             }
-        } catch (IOException ex) {
+        } catch (IOException | RuntimeException ex) {
             LOGGER.warn("[Telemetry] Failed to load telemetry queue: {}", ex.getMessage());
         }
     }
 
-    private void persistAll() {
+    private void schedulePersistence() {
+        persistenceDirty.set(true);
+        if (closed.get() || !persistenceScheduled.compareAndSet(false, true)) {
+            return;
+        }
+        if (!persistenceScheduler.schedule(this::persistScheduledSnapshot)) {
+            // Keep the dirty bit set. A later mutation or the synchronous
+            // lifecycle close will retry without running disk I/O inline.
+            persistenceScheduled.set(false);
+        }
+    }
+
+    private void persistScheduledSnapshot() {
+        boolean persisted = false;
+        try {
+            List<PendingTelemetryPayload> snapshot;
+            synchronized (this) {
+                snapshot = List.copyOf(queue);
+                persistenceDirty.set(false);
+            }
+            persisted = persistSnapshot(snapshot);
+            if (!persisted) {
+                persistenceDirty.set(true);
+            }
+        } finally {
+            persistenceScheduled.set(false);
+            // A mutation that raced the snapshot receives exactly one follow-up
+            // write. Disk failures wait for a later mutation instead of spinning.
+            if (persisted && persistenceDirty.get() && !closed.get()) {
+                schedulePersistence();
+            }
+        }
+    }
+
+    private boolean persistSnapshot(List<PendingTelemetryPayload> snapshot) {
+        synchronized (persistenceLock) {
+            return writeSnapshot(snapshot);
+        }
+    }
+
+    private boolean writeSnapshot(List<PendingTelemetryPayload> snapshot) {
         try {
             Files.createDirectories(spoolPath.getParent());
         } catch (IOException ex) {
             LOGGER.warn("[Telemetry] Failed to create telemetry queue directory: {}", ex.getMessage());
-            return;
+            return false;
         }
-        try (BufferedWriter writer = Files.newBufferedWriter(spoolPath)) {
-            for (PendingTelemetryPayload payload : queue) {
+        Path temporaryPath = spoolPath.resolveSibling(spoolPath.getFileName() + ".tmp");
+        try (BufferedWriter writer = Files.newBufferedWriter(temporaryPath)) {
+            for (PendingTelemetryPayload payload : snapshot) {
                 writer.write(GSON.toJson(payload));
                 writer.newLine();
             }
+            writer.flush();
+        } catch (IOException | RuntimeException ex) {
+            LOGGER.warn("[Telemetry] Failed to write telemetry queue snapshot: {}", ex.getMessage());
+            return false;
+        }
+        try {
+            try {
+                Files.move(temporaryPath, spoolPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException ignored) {
+                Files.move(temporaryPath, spoolPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return true;
         } catch (IOException ex) {
-            LOGGER.warn("[Telemetry] Failed to persist telemetry queue: {}", ex.getMessage());
+            LOGGER.warn("[Telemetry] Failed to publish telemetry queue snapshot: {}", ex.getMessage());
+            return false;
         }
     }
 
-    // The PendingTelemetryPayload and TelemetryQueueStats classes remain exactly the same as your original file
+    private void close() {
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
+        List<PendingTelemetryPayload> snapshot;
+        synchronized (this) {
+            snapshot = List.copyOf(queue);
+        }
+        if (persistSnapshot(snapshot)) {
+            persistenceDirty.set(false);
+        }
+    }
+
+    boolean tryBeginFlush() {
+        return !closed.get() && flushInProgress.compareAndSet(false, true);
+    }
+
+    void finishFlush() {
+        flushInProgress.set(false);
+    }
+
+    @FunctionalInterface
+    interface PersistenceScheduler {
+        boolean schedule(Runnable task);
+    }
+
+    private static final class InstantJsonAdapter implements JsonSerializer<Instant>, JsonDeserializer<Instant> {
+        @Override
+        public com.google.gson.JsonElement serialize(
+                Instant source,
+                java.lang.reflect.Type type,
+                JsonSerializationContext context
+        ) {
+            return source == null ? com.google.gson.JsonNull.INSTANCE : context.serialize(source.toString());
+        }
+
+        @Override
+        public Instant deserialize(
+                com.google.gson.JsonElement json,
+                java.lang.reflect.Type type,
+                JsonDeserializationContext context
+        ) throws JsonParseException {
+            if (json == null || json.isJsonNull()) {
+                return null;
+            }
+            try {
+                return Instant.parse(json.getAsString());
+            } catch (RuntimeException exception) {
+                throw new JsonParseException("Invalid telemetry timestamp", exception);
+            }
+        }
+    }
+
+    /** A retryable telemetry request stored in the server-owned spool. */
     public static final class PendingTelemetryPayload {
         private String type;
         private JsonObject payload;

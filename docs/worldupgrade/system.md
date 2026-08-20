@@ -52,8 +52,8 @@ Run upgrades over multiple ticks to avoid lag spikes:
 
 - bounded tasks per tick
 - priority queue (loaded chunks first)
-- pause/resume support
-- server command controls (`start`, `pause`, `status`, `retry-failed`)
+- durable pause/resume support across server restarts
+- server command controls (`start`, `pause`, `status`, `retry-failed`, `complete`)
 
 ### 4) Diff/Patch Strategy (No Structure Movement)
 
@@ -105,7 +105,13 @@ Expose `/worldupgrade status` for operators.
 2. Server boots and detects outdated world/chunks.
 3. Operators run dry-run report in staging world.
 4. Run migrations in production with bounded TPS impact.
-5. Validate completion report and unresolved mappings.
+5. Resolve every reported failure and run `/worldupgrade retry-failed` to requeue the current session's known failures.
+6. Keep the queue running and validate the empty queue and zero failure count.
+7. Run `/worldupgrade complete` to commit the pending pack version.
+
+`complete` refuses a paused rollout and never disables per-chunk version checks. Chunks discovered later
+still migrate lazily when the queue is running, so an old region cannot be
+mistaken for current data merely because the initial loaded set completed.
 
 ## Failure Handling
 

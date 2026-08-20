@@ -52,8 +52,11 @@ public final class BackgroundEfficiencyConfig {
         BUILDER.pop();
 
         BUILDER.push("async");
-        ASYNC_ENABLED = BUILDER.comment("Allows pure computation over immutable snapshots on bounded worker threads.")
-                .define("enabled", true);
+        ASYNC_ENABLED = BUILDER.comment(
+                        "Allows pure computation over immutable snapshots on bounded worker threads.",
+                        "Disabled by default until a production subsystem explicitly adopts this secondary pool."
+                )
+                .define("enabled", false);
         ASYNC_WORKER_THREADS = BUILDER.comment("CPU worker count; defaults conservatively below the available processor count.")
                 .defineInRange("workerThreads", conservativeWorkers, 1, 16);
         ASYNC_MAX_QUEUED_JOBS = BUILDER.comment("Maximum computations waiting for a worker or server-thread application.")
@@ -178,7 +181,7 @@ public final class BackgroundEfficiencyConfig {
 
     private static Values rawDefaults() {
         int processors = Math.max(1, Runtime.getRuntime().availableProcessors());
-        return new Values(true, 64, 2.0D, 2048, 256, true,
+        return new Values(true, 64, 2.0D, 2048, 256, false,
                 Math.max(1, Math.min(4, processors - 2)), 128, 32, true,
                 true, 32, 5, 4096, true, 64, 100, 4096);
     }

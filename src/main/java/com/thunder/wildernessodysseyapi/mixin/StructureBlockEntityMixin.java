@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
+import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.structureblock.bridge.StructureBlockCornerCacheBridge;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockCornerCache;
@@ -7,6 +8,7 @@ import com.thunder.wildernessodysseyapi.structureblock.StructureBlockDetectionCo
 import com.thunder.wildernessodysseyapi.util.NbtCompressionUtils;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockHostileSpawnContext;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
+import com.thunder.wildernessodysseyapi.structureblock.StructureBlockWorkBudget;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -47,7 +49,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.nio.file.Files;
 
 /**
- * Expands the structure block capture size and automatically snaps the save area to the occupied blocks.
+ * Expands structure-block metadata while bounding automatic detection, save fitting, chunk inspection and NBT work.
+ *
+ * <p>Vanilla exposes no event around its private structure-block bounds and save helpers, so narrow injections are
+ * used to preserve expanded structures without allowing the representable 512-axis limit to become an unbounded
+ * synchronous server operation.</p>
  */
 @Mixin(StructureBlockEntity.class)
 public abstract class StructureBlockEntityMixin extends BlockEntity implements StructureBlockCornerCacheBridge {
@@ -152,7 +158,13 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         int minYBound = Math.max(serverLevel.getMinBuildHeight(), blockPos.getY() - detectionRadius);
         int maxYBound = Math.min(serverLevel.getMaxBuildHeight() - 1, blockPos.getY() + detectionRadius);
 
-        wildernessodysseyapi$warmupChunks(serverLevel, minXBound, maxXBound, minZBound, maxZBound);
+        if (!wildernessodysseyapi$isChunkAreaWithinBudget(minXBound, maxXBound, minZBound, maxZBound)) {
+            wildernessodysseyapi$failDetection(cir, "WO Detect stopped: the search covers "
+                    + StructureBlockWorkBudget.chunkCount(minXBound, maxXBound, minZBound, maxZBound)
+                    + " chunks, above the configured loaded-chunk limit of "
+                    + StructureBlockSettings.getLoadedChunkScanBudget() + ". Reduce the detection radius.");
+            return;
+        }
 
         java.util.List<BlockPos> cornerMarkers = new java.util.ArrayList<>();
         java.util.Set<BlockPos> knownCorners = new java.util.HashSet<>();
@@ -318,6 +330,9 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
                     continue;
                 }
             }
+            if (!wildernessodysseyapi$isChunkLoaded(serverLevel, neighbor)) {
+                continue;
+            }
             BlockState neighborState = serverLevel.getBlockState(neighbor);
             if (!StructureBlockSettings.isStructureContent(neighborState)) {
                 continue;
@@ -406,9 +421,20 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
                 if (next.getY() < minYBound || next.getY() > maxYBound) {
                     continue;
                 }
-                if (!visited.add(next.immutable())) {
+                if (!wildernessodysseyapi$isChunkLoaded(serverLevel, next)) {
                     continue;
                 }
+                BlockPos immutableNext = next.immutable();
+                if (visited.contains(immutableNext)) {
+                    continue;
+                }
+                if (visited.size() >= StructureBlockSettings.getMaxSynchronousScanBlocks()) {
+                    wildernessodysseyapi$failDetection(cir, "WO Detect stopped after inspecting " + visited.size()
+                            + " blocks, at the configured synchronous scan limit. Add matching CORNER markers or"
+                            + " reduce the detection radius.");
+                    return;
+                }
+                visited.add(immutableNext);
                 BlockState state = serverLevel.getBlockState(next);
                 if (!StructureBlockSettings.isStructureContent(state)) {
                     continue;
@@ -524,7 +550,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         wildernessodysseyapi$applyDetectedBounds(serverLevel, blockPos, newStart, newSize, cir);
     }
 
-    @Inject(method = "saveStructure", at = @At("HEAD"))
+    @Inject(method = "saveStructure()Z", at = @At("HEAD"), cancellable = true)
     private void wildernessodysseyapi$autoFitStructure(CallbackInfoReturnable<Boolean> cir) {
         Level level = this.level;
         if (!(level instanceof ServerLevel serverLevel)) {
@@ -538,9 +564,37 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
             return;
         }
 
+        long operationVolume = StructureBlockWorkBudget.volume(this.structureSize);
+        long operationLimit = StructureBlockSettings.getMaxOperationVolume();
+        if (operationVolume > operationLimit) {
+            StructureBlockDetectionContext.send("WO Save blocked: " + operationVolume
+                    + " blocks exceeds the configured operation limit of " + operationLimit
+                    + ". Existing structure data was not changed.");
+            cir.setReturnValue(false);
+            cir.cancel();
+            return;
+        }
+
         BlockPos blockPos = this.getBlockPos();
         BlockPos start = blockPos.offset(this.structurePos);
         BlockPos end = start.offset(this.structureSize.getX() - 1, this.structureSize.getY() - 1, this.structureSize.getZ() - 1);
+        long chunkCount = StructureBlockWorkBudget.chunkCount(start.getX(), end.getX(), start.getZ(), end.getZ());
+        if (chunkCount > StructureBlockSettings.getLoadedChunkScanBudget()) {
+            StructureBlockDetectionContext.send("WO Save: auto-fit skipped because the selection crosses "
+                    + chunkCount + " chunks, above the configured loaded-chunk scan limit. Saving the exact bounds.");
+            return;
+        }
+        if (!wildernessodysseyapi$areChunksLoaded(serverLevel, start, end)) {
+            StructureBlockDetectionContext.send(
+                    "WO Save: auto-fit skipped because part of the selection is not loaded. Saving the exact bounds.");
+            return;
+        }
+        if (operationVolume > StructureBlockSettings.getMaxSynchronousScanBlocks()) {
+            StructureBlockDetectionContext.send("WO Save: auto-fit skipped because " + operationVolume
+                    + " blocks exceeds the synchronous scan limit. Saving the exact bounds.");
+            return;
+        }
+
         String structureNameKey = wildernessodysseyapi$normalizeStructureName(this.getStructureName());
         if (structureNameKey != null
                 && wildernessodysseyapi$hasManualCornerBounds(serverLevel, blockPos, structureNameKey, start, end)) {
@@ -618,6 +672,13 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
     @Unique
     private void wildernessodysseyapi$applyDetectedBounds(ServerLevel serverLevel, BlockPos blockPos, BlockPos newStart,
             BlockPos newSize, CallbackInfoReturnable<Boolean> cir) {
+        long detectedVolume = StructureBlockWorkBudget.volume(newSize);
+        long operationLimit = StructureBlockSettings.getMaxOperationVolume();
+        if (detectedVolume > operationLimit) {
+            wildernessodysseyapi$failDetection(cir, "WO Detect blocked bounds of " + detectedVolume
+                    + " blocks because the configured operation limit is " + operationLimit + ".");
+            return;
+        }
         BlockPos relativePos = newStart.subtract(blockPos);
 
         boolean changed = false;
@@ -667,6 +728,13 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         int maxZ = origin.getZ() + searchRadius;
         int minY = Math.max(serverLevel.getMinBuildHeight(), origin.getY() - searchRadius);
         int maxY = Math.min(serverLevel.getMaxBuildHeight() - 1, origin.getY() + searchRadius);
+
+        if (!wildernessodysseyapi$isChunkAreaWithinBudget(minX, maxX, minZ, maxZ)) {
+            StructureBlockDetectionContext.send("WO Detect debug: the extended CORNER diagnostic was skipped because "
+                    + StructureBlockWorkBudget.chunkCount(minX, maxX, minZ, maxZ)
+                    + " chunks exceeds the loaded-chunk scan limit.");
+            return;
+        }
 
         ServerChunkCache chunkSource = serverLevel.getChunkSource();
         int minChunkX = minX >> 4;
@@ -818,6 +886,13 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
         int minY = Math.max(serverLevel.getMinBuildHeight(), origin.getY() - searchRadius);
         int maxY = Math.min(serverLevel.getMaxBuildHeight() - 1, origin.getY() + searchRadius);
 
+        if (!wildernessodysseyapi$isChunkAreaWithinBudget(minX, maxX, minZ, maxZ)) {
+            StructureBlockDetectionContext.send("WO Detect: cached distant CORNER markers were checked, but the "
+                    + "loaded-chunk fallback was skipped because it covers "
+                    + StructureBlockWorkBudget.chunkCount(minX, maxX, minZ, maxZ) + " chunks.");
+            return;
+        }
+
         wildernessodysseyapi$collectLoadedCornersInBox(serverLevel, origin, structureNameKey, minX, maxX, minY, maxY,
                 minZ, maxZ, cornerMarkers, knownCorners, true);
     }
@@ -826,6 +901,9 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
     private void wildernessodysseyapi$collectLoadedCornersInBox(ServerLevel serverLevel, BlockPos origin,
             String structureNameKey, int minX, int maxX, int minY, int maxY, int minZ, int maxZ,
             java.util.List<BlockPos> cornerMarkers, java.util.Set<BlockPos> knownCorners, boolean allowUnnamedCorners) {
+        if (!wildernessodysseyapi$isChunkAreaWithinBudget(minX, maxX, minZ, maxZ)) {
+            return;
+        }
         ServerChunkCache chunkSource = serverLevel.getChunkSource();
         int minChunkX = minX >> 4;
         int maxChunkX = maxX >> 4;
@@ -900,33 +978,41 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
     }
 
     @Unique
-    private void wildernessodysseyapi$warmupChunks(ServerLevel serverLevel, int minX, int maxX, int minZ, int maxZ) {
-        int budget = StructureBlockSettings.getChunkWarmupBudget();
-        if (budget <= 0) {
-            return;
-        }
+    private static boolean wildernessodysseyapi$isChunkAreaWithinBudget(int minX, int maxX, int minZ, int maxZ) {
+        return StructureBlockWorkBudget.chunkCount(minX, maxX, minZ, maxZ)
+                <= StructureBlockSettings.getLoadedChunkScanBudget();
+    }
 
+    @Unique
+    private static boolean wildernessodysseyapi$isChunkLoaded(ServerLevel serverLevel, BlockPos position) {
+        return serverLevel.getChunkSource().getChunkNow(position.getX() >> 4, position.getZ() >> 4) != null;
+    }
+
+    @Unique
+    private static boolean wildernessodysseyapi$areChunksLoaded(ServerLevel serverLevel, BlockPos start, BlockPos end) {
         ServerChunkCache chunkSource = serverLevel.getChunkSource();
-        int minChunkX = minX >> 4;
-        int maxChunkX = maxX >> 4;
-        int minChunkZ = minZ >> 4;
-        int maxChunkZ = maxZ >> 4;
-        int warmed = 0;
-
+        int minChunkX = Math.min(start.getX(), end.getX()) >> 4;
+        int maxChunkX = Math.max(start.getX(), end.getX()) >> 4;
+        int minChunkZ = Math.min(start.getZ(), end.getZ()) >> 4;
+        int maxChunkZ = Math.max(start.getZ(), end.getZ()) >> 4;
         for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
             for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
-                if (chunkSource.getChunkNow(chunkX, chunkZ) != null) {
-                    continue;
-                }
-                serverLevel.getChunk(chunkX, chunkZ);
-                if (++warmed >= budget) {
-                    return;
+                if (chunkSource.getChunkNow(chunkX, chunkZ) == null) {
+                    return false;
                 }
             }
         }
+        return true;
     }
 
-    @Inject(method = "saveStructure", at = @At("RETURN"))
+    @Unique
+    private static void wildernessodysseyapi$failDetection(CallbackInfoReturnable<Boolean> cir, String message) {
+        StructureBlockDetectionContext.send(message);
+        cir.setReturnValue(false);
+        cir.cancel();
+    }
+
+    @Inject(method = "saveStructure()Z", at = @At("RETURN"))
     private void wildernessodysseyapi$recompressStructureFile(CallbackInfoReturnable<Boolean> cir) {
         if (!cir.getReturnValue()) {
             return;
@@ -957,46 +1043,112 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
             return;
         }
 
-        if (disableHostileSpawns) {
-            wildernessodysseyapi$stripHostileEntities(structurePath);
+        long nbtLimit = StructureBlockSettings.getMaxStructureNbtBytes();
+        try {
+            long fileSize = Files.size(structurePath);
+            if (fileSize > nbtLimit) {
+                StructureBlockDetectionContext.send("WO Save: structure file post-processing was skipped because "
+                        + fileSize + " bytes exceeds the configured NBT limit of " + nbtLimit
+                        + ". The original saved file was preserved.");
+                ModConstants.LOGGER.warn("Skipped structure post-processing for {}: {} bytes exceeds limit {}",
+                        structurePath, fileSize, nbtLimit);
+                return;
+            }
+        } catch (java.io.IOException exception) {
+            ModConstants.LOGGER.warn("Failed checking saved structure size for {}", structurePath, exception);
+            return;
         }
-        if (compressionLevel > 0) {
-            NbtCompressionUtils.rewriteCompressedAsync(structurePath, compressionLevel, com.thunder.wildernessodysseyapi.io.CompressionCodec.VANILLA_GZIP);
+
+        if (disableHostileSpawns) {
+            wildernessodysseyapi$stripHostileEntities(structurePath, compressionLevel, nbtLimit);
+        } else if (compressionLevel > 0) {
+            wildernessodysseyapi$rewriteCompressedAsync(structurePath, compressionLevel, nbtLimit);
         }
     }
 
     @Unique
-    private static void wildernessodysseyapi$stripHostileEntities(java.nio.file.Path structurePath) {
+    private static void wildernessodysseyapi$stripHostileEntities(java.nio.file.Path structurePath,
+            int compressionLevel, long nbtLimit) {
         try {
-            CompoundTag root = NbtIo.readCompressed(structurePath, NbtAccounter.unlimitedHeap());
-            if (root == null || !root.contains("entities", Tag.TAG_LIST)) {
-                return;
-            }
-            ListTag sourceEntities = root.getList("entities", Tag.TAG_COMPOUND);
-            if (sourceEntities.isEmpty()) {
-                return;
-            }
-
-            ListTag filteredEntities = new ListTag();
-            for (int i = 0; i < sourceEntities.size(); i++) {
-                CompoundTag entityEntry = sourceEntities.getCompound(i);
-                CompoundTag entityNbt = entityEntry.getCompound("nbt");
-                String id = entityNbt.getString("id");
-                if (id.isBlank()) {
+            CompoundTag root = NbtIo.readCompressed(structurePath, NbtAccounter.create(nbtLimit));
+            if (root != null && root.contains("entities", Tag.TAG_LIST)) {
+                ListTag sourceEntities = root.getList("entities", Tag.TAG_COMPOUND);
+                ListTag filteredEntities = new ListTag();
+                for (int i = 0; i < sourceEntities.size(); i++) {
+                    CompoundTag entityEntry = sourceEntities.getCompound(i);
+                    CompoundTag entityNbt = entityEntry.getCompound("nbt");
+                    String id = entityNbt.getString("id");
+                    if (id.isBlank()) {
+                        filteredEntities.add(entityEntry.copy());
+                        continue;
+                    }
+                    ResourceLocation entityId = ResourceLocation.tryParse(id);
+                    EntityType<?> entityType = entityId == null ? null
+                            : BuiltInRegistries.ENTITY_TYPE.getOptional(entityId).orElse(null);
+                    if (entityType != null && entityType.getCategory() == MobCategory.MONSTER) {
+                        continue;
+                    }
                     filteredEntities.add(entityEntry.copy());
-                    continue;
                 }
-                EntityType<?> entityType = BuiltInRegistries.ENTITY_TYPE.getOptional(ResourceLocation.tryParse(id)).orElse(null);
-                if (entityType != null && entityType.getCategory() == MobCategory.MONSTER) {
-                    continue;
-                }
-                filteredEntities.add(entityEntry.copy());
+                root.put("entities", filteredEntities);
             }
-
-            root.put("entities", filteredEntities);
-            NbtIo.writeCompressed(root, structurePath);
+            if (root != null) {
+                wildernessodysseyapi$writeStructureAtomically(structurePath, root, compressionLevel);
+            }
         } catch (Exception exception) {
+            StructureBlockDetectionContext.send("WO Save: hostile-entity filtering failed safely; the last complete "
+                    + "structure file was preserved. Check the server log for details.");
             ModConstants.LOGGER.warn("Failed stripping hostile entities from saved structure {}", structurePath, exception);
+        }
+    }
+
+    @Unique
+    private static void wildernessodysseyapi$rewriteCompressedAsync(java.nio.file.Path structurePath,
+            int compressionLevel, long nbtLimit) {
+        boolean submitted = AsyncTaskManager.trySubmitIoWork("structure-block-nbt-recompress", () -> {
+            try {
+                if (Files.size(structurePath) > nbtLimit) {
+                    return;
+                }
+                CompoundTag root = NbtIo.readCompressed(structurePath, NbtAccounter.create(nbtLimit));
+                if (root != null) {
+                    wildernessodysseyapi$writeStructureAtomically(structurePath, root, compressionLevel);
+                }
+            } catch (Exception exception) {
+                ModConstants.LOGGER.warn("Failed bounded recompression of saved structure {}", structurePath,
+                        exception);
+            }
+        });
+        if (!submitted) {
+            ModConstants.LOGGER.warn("Skipped structure recompression for {} because the bounded I/O executor is "
+                    + "unavailable or full", structurePath);
+        }
+    }
+
+    @Unique
+    private static void wildernessodysseyapi$writeStructureAtomically(java.nio.file.Path structurePath,
+            CompoundTag root, int compressionLevel) throws java.io.IOException {
+        java.nio.file.Path parent = structurePath.getParent();
+        if (parent == null) {
+            throw new java.io.IOException("Structure path has no parent: " + structurePath);
+        }
+
+        java.nio.file.Path temporary = Files.createTempFile(parent, structurePath.getFileName().toString(), ".tmp");
+        try {
+            if (compressionLevel > 0) {
+                NbtCompressionUtils.writeCompressed(temporary, root, compressionLevel,
+                        com.thunder.wildernessodysseyapi.io.CompressionCodec.VANILLA_GZIP);
+            } else {
+                NbtIo.writeCompressed(root, temporary);
+            }
+            try {
+                Files.move(temporary, structurePath, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException ignored) {
+                Files.move(temporary, structurePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporary);
         }
     }
 

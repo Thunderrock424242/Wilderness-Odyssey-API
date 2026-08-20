@@ -68,7 +68,22 @@ public record VegetationClimateState(
         return unit(recentRainfall * 0.62 + moisture * 0.48 - droughtLevel * 0.55 - 0.20);
     }
 
+    /**
+     * Returns the coarse signature that controls client tint rebuilds and network updates.
+     * Diagnostic timestamps and processing metrics deliberately do not participate.
+     */
+    public int visualSignature() {
+        int signature = bucket(moisture, 12);
+        signature = signature * 13 + bucket(droughtLevel, 12);
+        signature = signature * 9 + bucket(stormIntensity, 8);
+        return signature * VegetationSeasonState.values().length + seasonState.ordinal();
+    }
+
     private static double unit(double value) {
         return Math.max(0.0, Math.min(1.0, Double.isFinite(value) ? value : 0.0));
+    }
+
+    private static int bucket(double value, int bucketCount) {
+        return Math.min(bucketCount - 1, (int) Math.floor(unit(value) * bucketCount));
     }
 }

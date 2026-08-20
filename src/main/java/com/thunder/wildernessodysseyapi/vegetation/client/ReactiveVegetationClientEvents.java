@@ -26,6 +26,15 @@ public final class ReactiveVegetationClientEvents {
     private ReactiveVegetationClientEvents() {
     }
 
+    /** Promotes a safely retained early climate snapshot after chunk installation. */
+    @SubscribeEvent
+    public static void onChunkLoad(ChunkEvent.Load event) {
+        if (event.getLevel() instanceof ClientLevel level
+                && event.getChunk() instanceof LevelChunk chunk) {
+            ClientVegetationClimateStore.onChunkLoaded(level, chunk.getPos().x, chunk.getPos().z);
+        }
+    }
+
     /** Rebuilds only surface-bearing sections and caps invalidation work per frame. */
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {

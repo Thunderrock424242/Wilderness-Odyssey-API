@@ -41,7 +41,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -616,10 +615,7 @@ public final class WeatherAuthority implements WeatherQuery {
             grid.markActive(key, gameTime);
         }
 
-        Map<Long, AtmosphereView> previous = new HashMap<>(grid.size() * 2);
-        for (AtmosphereView view : grid.views()) {
-            previous.put(view.key().packed(), view);
-        }
+        Map<Long, AtmosphereView> previous = grid.snapshotByPackedKey();
         Set<Long> scheduledKeys = new HashSet<>(activeKeys);
         for (AtmosphereView view : previous.values()) {
             if (AtmosphereActivityPolicy.shouldSimulate(

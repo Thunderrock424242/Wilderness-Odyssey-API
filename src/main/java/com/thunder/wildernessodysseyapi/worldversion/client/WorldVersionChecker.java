@@ -14,6 +14,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -53,6 +54,13 @@ public class WorldVersionChecker {
         } catch (Exception e) {
             LoggerUtil.log(LoggerUtil.ConflictSeverity.ERROR, "Exception in WorldVersionChecker.onServerStarted: " + e.getMessage());
         }
+    }
+
+    /** Clears process-wide world identities when the active server closes. */
+    @SubscribeEvent
+    public static void onServerStopping(ServerStoppingEvent event) {
+        notifiedWorlds.clear();
+        cachedConfigVersion = null;
     }
 
     @SubscribeEvent

@@ -4,16 +4,12 @@ import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.time.Instant;
 
 /**
  * Flushes queued telemetry payloads on a schedule using the background IO thread pool.
  */
 public final class TelemetryQueueProcessor {
-
-    // Prevents overlapping flushes if the network is extremely slow
-    private static final AtomicBoolean IS_FLUSHING = new AtomicBoolean(false);
-
     private TelemetryQueueProcessor() {
     }
 
@@ -24,6 +20,19 @@ public final class TelemetryQueueProcessor {
         }
         TelemetryConfig.TelemetryValues config = TelemetryConfig.values();
         if (!config.enabled()) {
+            clearCachesAfterDisable();
+            return;
+        }
+        PlayerTelemetryConfig.TelemetryConfigValues playerConfig = PlayerTelemetryConfig.values();
+        EventTelemetryConfig.EventTelemetryValues eventConfig = EventTelemetryConfig.values();
+        boolean playerExporterConfigured = playerConfig.enabled()
+                && playerConfig.sheetWebhookUrl() != null
+                && !playerConfig.sheetWebhookUrl().isBlank();
+        boolean eventExporterConfigured = eventConfig.enabled()
+                && eventConfig.webhookUrl() != null
+                && !eventConfig.webhookUrl().isBlank();
+        if (!playerExporterConfigured && !eventExporterConfigured) {
+            clearCachesAfterDisable();
             return;
         }
         int interval = Math.max(1, config.queueFlushIntervalTicks());
@@ -31,19 +40,28 @@ public final class TelemetryQueueProcessor {
             return;
         }
 
-        // THE FIX: Offload the flush to the async IO pool and ensure only one runs at a time
-        if (IS_FLUSHING.compareAndSet(false, true)) {
-            TelemetryQueue queue = TelemetryQueue.get(event.getServer());
-            int batchSize = config.queueFlushBatchSize();
-
-            AsyncTaskManager.submitIoTask("Telemetry_Flush", () -> {
-                try {
-                    queue.flush(batchSize);
-                } finally {
-                    IS_FLUSHING.set(false); // Release the lock so the next interval can run
-                }
-                return java.util.Optional.empty();
-            });
+        if (playerExporterConfigured) {
+            PlayerTelemetryReporter.evictExpiredCaches(playerConfig, Instant.now());
         }
+
+        // Each server-owned queue prevents its own overlapping network flush.
+        TelemetryQueue queue = TelemetryQueue.get(event.getServer());
+        if (!queue.tryBeginFlush()) {
+            return;
+        }
+        int batchSize = config.queueFlushBatchSize();
+        if (!AsyncTaskManager.trySubmitIoWork("Telemetry_Flush", () -> {
+            try {
+                queue.flush(batchSize);
+            } finally {
+                queue.finishFlush();
+            }
+        })) {
+            queue.finishFlush();
+        }
+    }
+
+    private static void clearCachesAfterDisable() {
+        PlayerTelemetryReporter.clearCaches();
     }
 }

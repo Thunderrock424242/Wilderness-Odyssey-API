@@ -99,7 +99,7 @@ public class SPHSimulationManager {
             float impulseY,
             float impulseZ
     ) {
-        runPendingSettleCallbacks();
+        runPendingSettleCallbacks(level);
         removeEmptySimulations();
 
         SPHSimulator existing = findMergeTarget(x, y, z, level, SPHConstants.MERGE_RADIUS);
@@ -173,7 +173,7 @@ public class SPHSimulationManager {
             int lifetimeTicks,
             int maxTransientSimulations
     ) {
-        runPendingSettleCallbacks();
+        runPendingSettleCallbacks(level);
         removeEmptySimulations();
 
         int maxSimulations = Math.max(0, maxTransientSimulations);
@@ -287,7 +287,7 @@ public class SPHSimulationManager {
             return false;
         }
 
-        runPendingSettleCallbacks();
+        runPendingSettleCallbacks(level);
         removeEmptySimulations();
 
         int maxParticlesPerBody = Math.max(1, WaterSimulationConfig.serverSphMaxParticlesPerBody());
@@ -436,11 +436,24 @@ public class SPHSimulationManager {
         settlementRetries.keySet().removeIf(sim -> !active.contains(sim));
     }
 
-    private void runPendingSettleCallbacks() {
+    /**
+     * Applies only settlements owned by the level currently ticking.
+     *
+     * <p>The integrated client and server share this manager singleton. Filtering
+     * before application prevents a client tick from draining a queued
+     * `ServerLevel` mutation that belongs on the server thread.</p>
+     */
+    private void runPendingSettleCallbacks(BlockGetter level) {
+        List<PendingSettlement> deferred = new ArrayList<>();
         PendingSettlement pending;
         while ((pending = pendingSettlements.poll()) != null) {
-            applyPendingSettlement(pending);
+            if (pending.level() == level && canApplySettlement(pending)) {
+                applyPendingSettlement(pending);
+            } else {
+                deferred.add(pending);
+            }
         }
+        pendingSettlements.addAll(deferred);
     }
 
     // Level unload must resolve that level's queued writes before SavedData is
@@ -449,7 +462,7 @@ public class SPHSimulationManager {
         List<PendingSettlement> deferred = new ArrayList<>();
         PendingSettlement pending;
         while ((pending = pendingSettlements.poll()) != null) {
-            if (pending.level() == level) {
+            if (pending.level() == level && canApplySettlement(pending)) {
                 applyPendingSettlement(pending);
             } else {
                 deferred.add(pending);
@@ -464,9 +477,8 @@ public class SPHSimulationManager {
      * @param deltaTime The time elapsed since the last tick.
      */
     public void tickAll(float deltaTime) {
-        // First, safely place blocks on the main thread for any simulations that finished last tick.
-        runPendingSettleCallbacks();
-
+        // This compatibility helper advances physics only. Server-owned
+        // settlements require tickLevel so the owning level/thread is explicit.
         for (SPHSimulator sim : active) {
             sim.tick(deltaTime);
             if (sim.particleCount() == 0 && sim.getCanonicalVolumeUnits() <= 0) {
@@ -477,7 +489,7 @@ public class SPHSimulationManager {
     }
 
     public void tickLevel(BlockGetter level, float deltaTime) {
-        runPendingSettleCallbacks();
+        runPendingSettleCallbacks(level);
         if (!(level instanceof ServerLevel) && !WaterRenderingConfig.localSphEffectsEnabled()) {
             active.removeIf(sim -> sim.getLevel() == level
                     && sim.isTransientSimulation()
@@ -678,6 +690,11 @@ public class SPHSimulationManager {
         } else {
             active.remove(simulator);
         }
+    }
+
+    private static boolean canApplySettlement(PendingSettlement pending) {
+        return !(pending.level() instanceof ServerLevel serverLevel)
+                || serverLevel.getServer().isSameThread();
     }
 
     private static List<SPHParticle> copyParticles(List<SPHParticle> particles) {

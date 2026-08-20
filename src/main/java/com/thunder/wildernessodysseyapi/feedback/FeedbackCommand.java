@@ -16,10 +16,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.Optional;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 
+/** Registers the bounded asynchronous player-feedback command. */
 public final class FeedbackCommand {
     private static final Gson GSON = new GsonBuilder().create();
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
@@ -29,6 +29,7 @@ public final class FeedbackCommand {
     private FeedbackCommand() {
     }
 
+    /** Registers the server command and validates player input before queueing network I/O. */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("feedback")
                 .then(Commands.argument("message", StringArgumentType.greedyString())
@@ -57,18 +58,24 @@ public final class FeedbackCommand {
                                 player.sendSystemMessage(Component.translatable("command.wildernessodysseyapi.feedback.too_long", maxLength));
                                 return 0;
                             }
-                            submitFeedback(player, message, config);
-                            player.sendSystemMessage(Component.translatable("command.wildernessodysseyapi.feedback.sent"));
-                            return 1;
+                            if (submitFeedback(player, message, config)) {
+                                player.sendSystemMessage(Component.translatable("command.wildernessodysseyapi.feedback.sent"));
+                                return 1;
+                            }
+                            player.sendSystemMessage(Component.translatable("command.wildernessodysseyapi.feedback.busy"));
+                            return 0;
                         })));
     }
 
-    private static void submitFeedback(ServerPlayer player, String message, FeedbackConfig.FeedbackConfigValues config) {
-        AsyncTaskManager.submitIoTask("feedback-webhook", () -> {
+    private static boolean submitFeedback(ServerPlayer player, String message,
+                                          FeedbackConfig.FeedbackConfigValues config) {
+        String playerName = player.getGameProfile().getName();
+        String playerUuid = player.getUUID().toString();
+        return AsyncTaskManager.trySubmitIoWork("feedback-webhook", () -> {
             try {
                 JsonObject payload = new JsonObject();
-                String content = "Feedback from **" + player.getGameProfile().getName()
-                        + "** (`" + player.getUUID() + "`):\n" + message;
+                String content = "Feedback from **" + playerName
+                        + "** (`" + playerUuid + "`):\n" + message;
                 payload.addProperty("content", content);
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(config.webhookUrl()))
@@ -83,7 +90,6 @@ public final class FeedbackCommand {
             } catch (Exception ex) {
                 LOGGER.warn("[Feedback] Failed to send feedback: {}", ex.getMessage());
             }
-            return Optional.empty();
         });
     }
 }

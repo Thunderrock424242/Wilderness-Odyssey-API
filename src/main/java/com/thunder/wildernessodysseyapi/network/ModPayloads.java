@@ -29,6 +29,8 @@ import com.thunder.wildernessodysseyapi.lorebook.network.OpenCodexPayload;
 import com.thunder.wildernessodysseyapi.lorebook.network.SaveCodexJournalPayload;
 import com.thunder.wildernessodysseyapi.lorebook.network.SyncCodexJournalPayload;
 import com.thunder.wildernessodysseyapi.lorebook.network.SyncLoreBookPayload;
+import com.thunder.wildernessodysseyapi.vegetation.client.ClientVegetationClimateStore;
+import com.thunder.wildernessodysseyapi.vegetation.network.ReactiveVegetationSyncPayload;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.OceanSeaStatePayload;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.SphLocalEffectPayload;
@@ -67,6 +69,15 @@ public final class ModPayloads {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(NETWORK_VERSION);
         DataEnginePayloads.register(registrar);
+
+        // PayloadRegistrar already marshals play handlers to the main thread.
+        // Handle this dimension-sensitive state immediately so a second queue
+        // hop cannot carry it across a client dimension transition.
+        registrar.playToClient(
+                ReactiveVegetationSyncPayload.TYPE,
+                ReactiveVegetationSyncPayload.STREAM_CODEC,
+                (payload, context) -> ClientVegetationClimateStore.accept(context.player().level(), payload)
+        );
 
         registrar.playToServer(CloakInputPayload.TYPE, CloakInputPayload.STREAM_CODEC, (payload, context) ->
                 context.enqueueWork(() -> {
@@ -160,45 +171,42 @@ public final class ModPayloads {
                 })
         );
 
+        // These coordinate-only water payloads must resolve the active level on
+        // the registrar's existing main-thread handoff. A second enqueue could
+        // otherwise apply an old-dimension packet after a respawn transition.
         registrar.playToClient(
                 SphSimulationSnapshotPayload.TYPE,
                 SphSimulationSnapshotPayload.STREAM_CODEC,
-                (payload, context) -> context.enqueueWork(() ->
-                        SPHSimulationManager.get().applyRemoteSnapshot(
-                                payload.simulationId(),
-                                context.player().level(),
-                                payload.toParticles()
-                        ))
+                (payload, context) -> SPHSimulationManager.get().applyRemoteSnapshot(
+                        payload.simulationId(),
+                        context.player().level(),
+                        payload.toParticles()
+                )
         );
         registrar.playToClient(
                 SphLocalEffectPayload.TYPE,
                 SphLocalEffectPayload.STREAM_CODEC,
-                (payload, context) -> context.enqueueWork(() ->
-                        payload.spawnClientEffect(context.player().level()))
+                (payload, context) -> payload.spawnClientEffect(context.player().level())
         );
         registrar.playToClient(
                 WaterVolumeChunkPayload.TYPE,
                 WaterVolumeChunkPayload.STREAM_CODEC,
-                (payload, context) -> context.enqueueWork(() ->
-                        payload.apply(context.player().level()))
+                (payload, context) -> payload.apply(context.player().level())
         );
         registrar.playToClient(
                 WaterVolumeDeltaPayload.TYPE,
                 WaterVolumeDeltaPayload.STREAM_CODEC,
-                (payload, context) -> context.enqueueWork(() ->
-                        payload.apply(context.player().level()))
+                (payload, context) -> payload.apply(context.player().level())
         );
         registrar.playToClient(
                 OceanSeaStatePayload.TYPE,
                 OceanSeaStatePayload.STREAM_CODEC,
-                (payload, context) -> context.enqueueWork(() ->
-                        ClientOceanSeaState.accept(context.player().level(), payload))
+                (payload, context) -> ClientOceanSeaState.accept(context.player().level(), payload)
         );
         registrar.playToClient(
                 WatershedRegionSyncPayload.TYPE,
                 WatershedRegionSyncPayload.STREAM_CODEC,
-                (payload, context) -> context.enqueueWork(() ->
-                        ClientWatershedSnapshotStore.accept(context.player().level(), payload))
+                (payload, context) -> ClientWatershedSnapshotStore.accept(context.player().level(), payload)
         );
         registrar.playToClient(
                 WeatherRegionSyncPayload.TYPE,

@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.telemetry;
 import com.google.gson.JsonObject;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
@@ -10,7 +11,6 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Optional;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 import static com.thunder.wildernessodysseyapi.core.ModConstants.currentVersion;
@@ -27,7 +27,7 @@ public final class EventTelemetryReporter {
         sendEvent("server_starting", null, event.getServer());
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onServerStopping(ServerStoppingEvent event) {
         sendEvent("server_stopping", null, event.getServer());
     }
@@ -77,17 +77,20 @@ public final class EventTelemetryReporter {
             payload.addProperty("identifiers_hashed", config.hashPlayerIdentifiers());
         }
 
-        AsyncTaskManager.submitIoTask("event-telemetry", () -> {
+        TelemetryQueue queue = TelemetryQueue.get(server);
+        boolean accepted = AsyncTaskManager.trySubmitIoWork("event-telemetry", () -> {
             try {
                 boolean sent = sendPayload(payload, config);
                 if (!sent) {
-                    enqueueFailedPayload(server, payload, config);
+                    enqueueFailedPayload(queue, payload, config);
                 }
             } catch (Exception ex) {
                 LOGGER.warn("[Telemetry] Event telemetry failed: {}", ex.getMessage());
             }
-            return Optional.empty();
         });
+        if (!accepted) {
+            enqueueFailedPayload(queue, payload, config);
+        }
     }
 
     private static boolean sendPayload(JsonObject payload, EventTelemetryConfig.EventTelemetryValues config) {
@@ -109,7 +112,7 @@ public final class EventTelemetryReporter {
         }
     }
 
-    private static void enqueueFailedPayload(net.minecraft.server.MinecraftServer server, JsonObject payload,
+    private static void enqueueFailedPayload(TelemetryQueue queue, JsonObject payload,
                                              EventTelemetryConfig.EventTelemetryValues config) {
         TelemetryConfig.TelemetryValues telemetryConfig = TelemetryConfig.values();
         TelemetryQueue.PendingTelemetryPayload pending = new TelemetryQueue.PendingTelemetryPayload(
@@ -121,6 +124,6 @@ public final class EventTelemetryReporter {
                 Duration.ofMillis(config.retryBaseDelayMs()),
                 Duration.ofMillis(config.retryMaxDelayMs())
         );
-        TelemetryQueue.get(server).enqueue(pending, telemetryConfig.queueMaxSize());
+        queue.enqueue(pending, telemetryConfig.queueMaxSize());
     }
 }

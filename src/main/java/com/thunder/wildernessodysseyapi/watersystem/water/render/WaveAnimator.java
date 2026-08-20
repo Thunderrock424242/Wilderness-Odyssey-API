@@ -1,18 +1,14 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 /**
- * WaveAnimator
+ * Legacy sine-wave sampler retained for binary compatibility.
  *
- * Provides wave height values for any world-space (x, z) position.
- * Uses a combination of two sine waves at different frequencies and
- * directions to produce natural-looking ocean surface motion.
+ * <p>Wilderness Odyssey's renderer now uses the Gerstner wave stack. New
+ * integrations should use {@code GerstnerWaveAnimator} instead.</p>
  *
- * Wave height formula:
- *   h(x, z, t) = A1 * sin(F1*x + F1*z*0.7 + t*S1)
- *              + A2 * sin(F2*x*0.8 - F2*z + t*S2)
- *
- * Tune the constants below to match the visual style you want.
+ * @deprecated use the active Gerstner wave APIs in the {@code wave} package
  */
+@Deprecated(forRemoval = true)
 public class WaveAnimator {
 
     // --- Tuning constants ---

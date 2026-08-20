@@ -15,16 +15,22 @@ public final class StructureBlockSettings {
     private static final int DEFAULT_DETECTION_RADIUS = 64;
     private static final int DEFAULT_CORNER_SEARCH_RADIUS = 512;
     private static final int DEFAULT_NBT_TIMEOUT_MS = 30_000;
-    private static final int DEFAULT_CHUNK_WARMUP_BUDGET = 256;
+    private static final int DEFAULT_LOADED_CHUNK_SCAN_BUDGET = 256;
     private static final int DEFAULT_COMPRESSION_LEVEL = 6;
+    private static final long DEFAULT_MAX_OPERATION_VOLUME = 4_194_304L;
+    private static final int DEFAULT_MAX_SYNCHRONOUS_SCAN_BLOCKS = 1_048_576;
+    private static final long DEFAULT_MAX_STRUCTURE_NBT_BYTES = 16_777_216L;
 
     private static int maxStructureSize = DEFAULT_MAX_STRUCTURE_SIZE;
     private static int maxStructureOffset = DEFAULT_MAX_STRUCTURE_OFFSET;
     private static int defaultDetectionRadius = DEFAULT_DETECTION_RADIUS;
     private static int cornerSearchRadius = DEFAULT_CORNER_SEARCH_RADIUS;
     private static int nbtParseTimeoutMillis = DEFAULT_NBT_TIMEOUT_MS;
-    private static int chunkWarmupBudget = DEFAULT_CHUNK_WARMUP_BUDGET;
+    private static int loadedChunkScanBudget = DEFAULT_LOADED_CHUNK_SCAN_BUDGET;
     private static int structureCompressionLevel = DEFAULT_COMPRESSION_LEVEL;
+    private static long maxOperationVolume = DEFAULT_MAX_OPERATION_VOLUME;
+    private static int maxSynchronousScanBlocks = DEFAULT_MAX_SYNCHRONOUS_SCAN_BLOCKS;
+    private static long maxStructureNbtBytes = DEFAULT_MAX_STRUCTURE_NBT_BYTES;
 
     private StructureBlockSettings() {
     }
@@ -45,8 +51,12 @@ public final class StructureBlockSettings {
         cornerSearchRadius = Math.min(Math.max(0, StructureBlockConfig.CONFIG.cornerSearchRadius()), maxStructureOffset);
 
         nbtParseTimeoutMillis = Mth.clamp(StructureBlockConfig.CONFIG.nbtParseTimeoutMs(), 1_000, 120_000);
-        chunkWarmupBudget = Math.max(0, StructureBlockConfig.CONFIG.chunkWarmupBudget());
+        loadedChunkScanBudget = Mth.clamp(StructureBlockConfig.CONFIG.maxLoadedChunksPerOperation(), 1, 1024);
         structureCompressionLevel = Mth.clamp(StructureBlockConfig.CONFIG.structureCompressionLevel(), 0, 9);
+        maxOperationVolume = Mth.clamp(StructureBlockConfig.CONFIG.maxOperationVolume(), 1L, 16_777_216L);
+        maxSynchronousScanBlocks = Mth.clamp(StructureBlockConfig.CONFIG.maxSynchronousScanBlocks(), 1, 4_194_304);
+        maxStructureNbtBytes = Mth.clamp(StructureBlockConfig.CONFIG.maxStructureNbtBytes(), 1_048_576L,
+                67_108_864L);
     }
 
     /**
@@ -85,10 +95,10 @@ public final class StructureBlockSettings {
     }
 
     /**
-     * @return Maximum number of chunks to proactively load around a structure block before scanning.
+     * @return Maximum number of already-loaded chunks a structure operation may inspect.
      */
-    public static int getChunkWarmupBudget() {
-        return chunkWarmupBudget;
+    public static int getLoadedChunkScanBudget() {
+        return loadedChunkScanBudget;
     }
 
     /**
@@ -96,6 +106,27 @@ public final class StructureBlockSettings {
      */
     public static int getStructureCompressionLevel() {
         return structureCompressionLevel;
+    }
+
+    /**
+     * @return Hard volume budget for a single save, load, or detection request.
+     */
+    public static long getMaxOperationVolume() {
+        return maxOperationVolume;
+    }
+
+    /**
+     * @return Maximum number of block states a synchronous helper scan may inspect.
+     */
+    public static int getMaxSynchronousScanBlocks() {
+        return maxSynchronousScanBlocks;
+    }
+
+    /**
+     * @return Maximum compressed structure file size and decoded NBT accounting quota.
+     */
+    public static long getMaxStructureNbtBytes() {
+        return maxStructureNbtBytes;
     }
 
     /**

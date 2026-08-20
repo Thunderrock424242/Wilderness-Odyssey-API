@@ -216,6 +216,10 @@ public final class EcosystemSimulationManager {
                     previous.abstractPopulationCount(),
                     previous.regionUpdates(),
                     previous.pendingRegionalUpdates(),
+                    previous.wildlifeScanTick(),
+                    previous.scannedLoadedEntityCount(),
+                    previous.profiledWildlifeCount(),
+                    previous.wildlifeScanNanos(),
                     previous.updateNanos() + safeElapsed
             );
         }
@@ -275,7 +279,11 @@ public final class EcosystemSimulationManager {
         }
         int regionUpdates = processCellQueue(level, runtime, settings);
         if (coverageDue) {
-            scanLoadedWildlife(level, runtime, settings);
+            WildlifeScanMetrics scan = scanLoadedWildlife(level, runtime, settings);
+            runtime.lastWildlifeScanTick = gameTime;
+            runtime.lastScannedLoadedEntities = scan.scannedLoadedEntities();
+            runtime.lastProfiledWildlife = scan.profiledWildlife();
+            runtime.lastWildlifeScanNanos = scan.elapsedNanos();
         }
         publishMetrics(level, runtime, gameTime, regionUpdates, System.nanoTime() - started);
     }
@@ -325,18 +333,23 @@ public final class EcosystemSimulationManager {
         return updated;
     }
 
-    private void scanLoadedWildlife(
+    private WildlifeScanMetrics scanLoadedWildlife(
             ServerLevel level,
             LevelRuntime runtime,
             EcosystemSimulationSettings settings
     ) {
+        long startedNanos = System.nanoTime();
+        int scannedLoadedEntities = 0;
+        int profiledWildlife = 0;
         int fullySimulated = 0;
         Set<Long> entityCells = new HashSet<>();
         for (Entity entity : level.getAllEntities()) {
+            scannedLoadedEntities++;
             if (!(entity instanceof PathfinderMob animal)
                     || SpeciesBehaviorProfileManager.profileFor(animal).isEmpty()) {
                 continue;
             }
+            profiledWildlife++;
             EcosystemCellKey key = EcosystemCellKey.fromBlock(animal.blockPosition(), settings.cellSize());
             entityCells.add(key.packed());
             WildlifeSimulationLod simulationLevel = EcosystemZoneClassifier.classifyCell(
@@ -366,6 +379,11 @@ public final class EcosystemSimulationManager {
         for (long key : entityCells) {
             queueLast(runtime, key);
         }
+        return new WildlifeScanMetrics(
+                scannedLoadedEntities,
+                profiledWildlife,
+                Math.max(0L, System.nanoTime() - startedNanos)
+        );
     }
 
     private static void suspendAi(PathfinderMob animal, AnimalNeedsState needs) {
@@ -469,6 +487,10 @@ public final class EcosystemSimulationManager {
                 abstractPopulation,
                 regionUpdates,
                 runtime.cellQueue.size(),
+                runtime.lastWildlifeScanTick,
+                runtime.lastScannedLoadedEntities,
+                runtime.lastProfiledWildlife,
+                runtime.lastWildlifeScanNanos,
                 runtime.entityEvaluationNanos + runtime.externalNanos + Math.max(0L, managerNanos)
         );
     }
@@ -497,6 +519,14 @@ public final class EcosystemSimulationManager {
         return runtimes.computeIfAbsent(level, ignored -> new LevelRuntime());
     }
 
+    /** Measured work from the periodic full loaded-entity ecosystem pass. */
+    private record WildlifeScanMetrics(
+            int scannedLoadedEntities,
+            int profiledWildlife,
+            long elapsedNanos
+    ) {
+    }
+
     /** Isolates the config dependency used by static scheduling helpers. */
     private static final class EcosystemConfigAccess {
         private static boolean distantWildlifeEnabled() {
@@ -516,6 +546,10 @@ public final class EcosystemSimulationManager {
         private long metricsTick = Long.MIN_VALUE;
         private long entityEvaluationNanos;
         private long externalNanos;
+        private long lastWildlifeScanTick;
+        private int lastScannedLoadedEntities;
+        private int lastProfiledWildlife;
+        private long lastWildlifeScanNanos;
         private int lastFullySimulatedEntities;
         private EcosystemSimulationMetrics.Snapshot metrics = EcosystemSimulationMetrics.Snapshot.EMPTY;
 
@@ -523,6 +557,10 @@ public final class EcosystemSimulationManager {
             cells.clear();
             cellQueue.clear();
             queuedCells.clear();
+            lastWildlifeScanTick = 0L;
+            lastScannedLoadedEntities = 0;
+            lastProfiledWildlife = 0;
+            lastWildlifeScanNanos = 0L;
             lastFullySimulatedEntities = 0;
         }
     }

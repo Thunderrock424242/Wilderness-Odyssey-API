@@ -3,14 +3,17 @@ package com.thunder.wildernessodysseyapi.debugoverlay.client;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
-import org.lwjgl.glfw.GLFW;
+import net.neoforged.neoforge.client.event.ScreenEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
 
 /** Client event bridge for the vanilla debug-text hook and page controls. */
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
@@ -43,18 +46,49 @@ public final class WildernessDebugClientEvents {
     }
 
     /**
+     * Cancels only Wilderness Odyssey's transient HUD state before vanilla installs a screen.
+     * The event is deliberately left uncancelled and vanilla F3 state is never changed.
+     */
+    @SubscribeEvent
+    public static void onScreenOpening(ScreenEvent.Opening event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        Screen newScreen = event.getNewScreen();
+        WildernessDebugManager.get().onScreenOpening(
+                newScreen,
+                minecraft.getDebugOverlay().showDebugScreen()
+        );
+    }
+
+    /** Clears page-scroll and failure state when the client connection closes. */
+    @SubscribeEvent
+    public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        WildernessDebugManager.get().resetForSession();
+    }
+
+    /** Clears transient state if a client level unloads without a normal logout event. */
+    @SubscribeEvent
+    public static void onLevelUnload(LevelEvent.Unload event) {
+        if (event.getLevel().isClientSide()) {
+            WildernessDebugManager.get().resetForSession();
+        }
+    }
+
+    /**
      * Changes pages or scrolls content on a configured key press while F3 is visible.
      * A normal gameplay screen check prevents the page controls from acting in
      * menus, chat, inventories, or any other screen that owns arrow-key input.
      */
     @SubscribeEvent
     public static void onKeyInput(InputEvent.Key event) {
-        if (event.getAction() != GLFW.GLFW_PRESS || !DebugOverlayConfig.ENABLE_CUSTOM_DEBUG_HUD.get()) {
-            return;
-        }
-
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.screen != null || !minecraft.getDebugOverlay().showDebugScreen()) {
+        if (!DebugNavigationPolicy.canHandle(
+                event.getAction(),
+                event.getKey(),
+                DebugOverlayConfig.ENABLE_CUSTOM_DEBUG_HUD.get(),
+                minecraft.screen == null,
+                minecraft.level != null && minecraft.player != null && minecraft.getConnection() != null,
+                minecraft.getDebugOverlay().showDebugScreen()
+        )) {
             return;
         }
 
