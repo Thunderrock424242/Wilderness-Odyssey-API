@@ -671,13 +671,6 @@ tasks.register('profileChunkWorkload', JavaExec) {
 
 def codexBuildDir = providers.gradleProperty("codexBuildDir")
 
-if (codexBuildDir.isPresent()) {
-    // Some Windows Gradle launchers expose a present-but-empty project
-    // property. Preserve isolation by falling back to the documented default.
-    def requestedBuildDir = codexBuildDir.getOrElse("").trim()
-    layout.buildDirectory.set(file(requestedBuildDir.isEmpty() ? ".codex-build" : requestedBuildDir))
-}
-
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.
 idea {
