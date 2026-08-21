@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.cloak.item.module;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
+/** Immutable definition supplied by an Echo-mask module integration. */
 public record EchoMaskModule(
         ResourceLocation id,
         Component displayName,

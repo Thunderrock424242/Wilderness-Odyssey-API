@@ -14,6 +14,7 @@ import com.thunder.wildernessodysseyapi.structuregen.inspection.StructureReportW
 import com.thunder.wildernessodysseyapi.structuregen.model.StructureModel;
 import com.thunder.wildernessodysseyapi.structuregen.nbt.MinecraftStructureNbtReader;
 import com.thunder.wildernessodysseyapi.structuregen.pipeline.SafeFilePublisher;
+import com.thunder.wildernessodysseyapi.structuregen.pipeline.StructureGenOwnedPaths;
 import com.thunder.wildernessodysseyapi.structuregen.pipeline.StructureGenPaths;
 import com.thunder.wildernessodysseyapi.structuregen.pipeline.StructureGenerationPipeline;
 import com.thunder.wildernessodysseyapi.structuregen.pipeline.StructureGenerationResult;
@@ -125,10 +126,12 @@ public final class StructureGenCli {
                 expectedFingerprint
         );
         Path normalizedProjectRoot = projectRoot.toAbsolutePath().normalize();
-        Path expectedCatalogRoot = normalizedProjectRoot.resolve("build/generated/structuregen/catalog").normalize();
         Path catalogPath = catalogOption == null
-                ? expectedCatalogRoot.resolve("available-content.json")
+                ? normalizedProjectRoot.resolve("build/generated/structuregen/catalog/available-content.json")
                 : Path.of(catalogOption).toAbsolutePath().normalize();
+        Path buildRoot = StructureGenOwnedPaths.requireBuildRoot(
+                normalizedProjectRoot, catalogPath, "StructureGen catalog");
+        Path expectedCatalogRoot = buildRoot.resolve("generated/structuregen/catalog").normalize();
         if (!catalogPath.startsWith(expectedCatalogRoot)) {
             throw new IllegalArgumentException("StructureGen catalog must stay beneath "
                     + expectedCatalogRoot + ": " + catalogPath);
@@ -258,9 +261,9 @@ public final class StructureGenCli {
 
     private static Path requireReportOwned(Path candidate, String description) throws IOException {
         Path projectRoot = Path.of("").toAbsolutePath().normalize();
-        Path buildRoot = projectRoot.resolve("build").normalize();
-        Path reportRoot = buildRoot.resolve("reports/structuregen").normalize();
         Path normalized = candidate.toAbsolutePath().normalize();
+        Path buildRoot = StructureGenOwnedPaths.requireBuildRoot(projectRoot, normalized, description);
+        Path reportRoot = buildRoot.resolve("reports/structuregen").normalize();
         if (!normalized.startsWith(reportRoot)) {
             throw new IllegalArgumentException(description + " must stay beneath " + reportRoot + ": " + normalized);
         }

@@ -20,19 +20,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ChangelogAnnouncements {
 
     private static final AtomicBoolean announced = new AtomicBoolean(false);
-    private static volatile boolean newWorld = false;
 
-    /**
-     * Detects whether the server world appears new and resets announcement state.
-     */
+    /** Resets process-local delivery state for each dedicated or integrated server lifecycle. */
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
-        MinecraftServer server = event.getServer();
-        Path worldVersionPath = server.getWorldPath(LevelResource.ROOT).resolve("world_version.json");
-        newWorld = !Files.exists(worldVersionPath);
         announced.set(false);
     }
-
     /**
      * Sends the current version changelog to the first logging-in player for a
      * new world, then records that it was shown.
@@ -42,7 +35,7 @@ public class ChangelogAnnouncements {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
-        if (!newWorld || announced.get()) {
+        if (announced.get()) {
             return;
         }
         MinecraftServer server = player.serverLevel().getServer();

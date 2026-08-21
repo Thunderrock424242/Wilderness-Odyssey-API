@@ -12,7 +12,8 @@ import org.jetbrains.annotations.NotNull;
  * World-level persistent state for the upgrade queue.
  */
 public class WorldUpgradeSavedData extends SavedData {
-    private static final int DATA_FORMAT_VERSION = 2;
+    private static final int DATA_FORMAT_VERSION = 3;
+    private static final int PENDING_PACK_VERSION_FORMAT = 2;
     private static final String DATA_NAME = ModConstants.MOD_ID + "_world_upgrade";
     private static final String DATA_FORMAT_KEY = "data_format";
     private static final String TARGET_VERSION_KEY = "target_version";
@@ -22,6 +23,8 @@ public class WorldUpgradeSavedData extends SavedData {
     private static final String FAILED_KEY = "failed_chunks";
     private static final String LAST_PACK_VERSION_KEY = "last_pack_version";
     private static final String PENDING_PACK_VERSION_KEY = "pending_pack_version";
+    private static final String LEGACY_IMPORT_COMPLETE_KEY = "legacy_import_complete";
+    private static final String LEGACY_WORLD_LABEL_KEY = "legacy_world_label";
 
     private int targetVersion = WorldUpgradeManager.TARGET_VERSION;
     private boolean running;
@@ -30,6 +33,8 @@ public class WorldUpgradeSavedData extends SavedData {
     private long failedChunks;
     private String lastPackVersion = "";
     private String pendingPackVersion = "";
+    private boolean legacyImportComplete;
+    private String legacyWorldLabel = "";
 
     public WorldUpgradeSavedData() {
     }
@@ -46,6 +51,8 @@ public class WorldUpgradeSavedData extends SavedData {
         this.failedChunks = tag.getLong(FAILED_KEY);
         this.lastPackVersion = tag.getString(LAST_PACK_VERSION_KEY);
         this.pendingPackVersion = tag.getString(PENDING_PACK_VERSION_KEY);
+        this.legacyImportComplete = tag.getBoolean(LEGACY_IMPORT_COMPLETE_KEY);
+        this.legacyWorldLabel = tag.getString(LEGACY_WORLD_LABEL_KEY);
         if (targetVersion != storedTargetVersion) {
             setDirty();
         }
@@ -53,7 +60,7 @@ public class WorldUpgradeSavedData extends SavedData {
         // Version 1 wrote the pack version before any queued chunk succeeded.
         // Reopen that value as pending so interrupted legacy upgrades resume
         // instead of being treated as complete.
-        if (dataFormat < DATA_FORMAT_VERSION
+        if (dataFormat < PENDING_PACK_VERSION_FORMAT
                 && pendingPackVersion.isBlank()
                 && !lastPackVersion.isBlank()) {
             pendingPackVersion = lastPackVersion;
@@ -132,6 +139,25 @@ public class WorldUpgradeSavedData extends SavedData {
                 && !currentVersion.equals(pendingPackVersion);
     }
 
+    /** Returns whether the deprecated world-root JSON label has been inspected once. */
+    public boolean isLegacyImportComplete() {
+        return legacyImportComplete;
+    }
+
+    /**
+     * Records the old label for diagnostics without treating it as a migration or release version.
+     */
+    public void recordLegacyWorldLabel(String legacyWorldLabel) {
+        this.legacyWorldLabel = legacyWorldLabel == null ? "" : legacyWorldLabel;
+        this.legacyImportComplete = true;
+        setDirty();
+    }
+
+    /** Returns the imported legacy label, which has no authority over migration completion. */
+    public String getLegacyWorldLabel() {
+        return legacyWorldLabel;
+    }
+
     /**
      * Starts a new durable rollout without claiming it has completed.
      *
@@ -199,6 +225,8 @@ public class WorldUpgradeSavedData extends SavedData {
         tag.putLong(FAILED_KEY, failedChunks);
         tag.putString(LAST_PACK_VERSION_KEY, lastPackVersion);
         tag.putString(PENDING_PACK_VERSION_KEY, pendingPackVersion);
+        tag.putBoolean(LEGACY_IMPORT_COMPLETE_KEY, legacyImportComplete);
+        tag.putString(LEGACY_WORLD_LABEL_KEY, legacyWorldLabel);
         return tag;
     }
 }

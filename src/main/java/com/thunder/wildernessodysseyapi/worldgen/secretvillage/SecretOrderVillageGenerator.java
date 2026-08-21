@@ -27,7 +27,8 @@ public final class SecretOrderVillageGenerator {
      */
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
-        if (!(event.getLevel() instanceof ServerLevel level)) {
+        // Only first-generation chunks are eligible. Reloaded chunks may contain player builds.
+        if (!event.isNewChunk() || !(event.getLevel() instanceof ServerLevel level)) {
             return;
         }
         if (!(event.getChunk() instanceof LevelChunk chunk)) {

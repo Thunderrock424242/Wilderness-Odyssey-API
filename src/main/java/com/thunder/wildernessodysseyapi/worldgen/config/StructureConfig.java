@@ -1,12 +1,7 @@
 package com.thunder.wildernessodysseyapi.worldgen.config;
 
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.common.ModConfigSpec;
-import net.neoforged.neoforge.common.ModConfigSpec.BooleanValue;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Defines common structure-placement and point-of-interest settings.
@@ -47,8 +42,6 @@ public final class StructureConfig {
     /** Per-chunk placement chance for Secret Order villages in eligible jungle biomes. */
     public static final ModConfigSpec.DoubleValue SECRET_ORDER_VILLAGE_SPAWN_CHANCE;
 
-    private static final Map<String, BooleanValue> STRUCTURES = new HashMap<>();
-    private static final Map<String, BooleanValue> POIS = new HashMap<>();
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
     static {
@@ -122,58 +115,33 @@ public final class StructureConfig {
                 .defineInRange("secretOrderVillageSpawnChance", 0.001D, 0.0D, 1.0D);
         BUILDER.pop();
 
-        registerAll();
         CONFIG_SPEC = BUILDER.build();
     }
 
     private StructureConfig() {
     }
 
-    private static void registerAll() {
-        // Structures
-        BuiltInRegistries.STRUCTURE_TYPE.entrySet().forEach(entry -> {
-            ResourceLocation id = entry.getKey().location(); // Fixed: use .location()
-            String modId = id.getNamespace();
-            String structureName = id.getPath();
-
-            BUILDER.push(modId);
-            BUILDER.push("structures");
-            STRUCTURES.put(id.toString(), BUILDER.define(structureName, true));
-            BUILDER.pop(2);
-        });
-
-        // POIs
-        BuiltInRegistries.POINT_OF_INTEREST_TYPE.entrySet().forEach(entry -> {
-            ResourceLocation id = entry.getKey().location(); // Fixed: use .location()
-            String modId = id.getNamespace();
-            String poiName = id.getPath();
-
-            BUILDER.push(modId);
-            BUILDER.push("pois");
-            POIS.put(id.toString(), BUILDER.define(poiName, true));
-            BUILDER.pop(2);
-        });
-    }
-
     /**
-     * Checks whether a registered structure type is enabled in the common config.
+     * Compatibility method retained after removal of the non-functional registry-type switches.
      *
      * @param id the structure type resource location
-     * @return {@code true} when no override exists or the override is enabled
+     * @return always {@code true}; use a feature-owned setting or data-pack biome/tag control
+     * @deprecated registry types cannot be safely disabled after registration
      */
+    @Deprecated(forRemoval = false)
     public static boolean isStructureEnabled(ResourceLocation id) {
-        BooleanValue value = STRUCTURES.get(id.toString());
-        return value == null || value.get();
+        return true;
     }
 
     /**
-     * Checks whether a registered point-of-interest type is enabled in the common config.
+     * Compatibility method retained after removal of the non-functional registry-type switches.
      *
      * @param id the point-of-interest type resource location
-     * @return {@code true} when no override exists or the override is enabled
+     * @return always {@code true}; configure the owning feature or data pack instead
+     * @deprecated registry types cannot be safely disabled after registration
      */
+    @Deprecated(forRemoval = false)
     public static boolean isPoiEnabled(ResourceLocation id) {
-        BooleanValue value = POIS.get(id.toString());
-        return value == null || value.get();
+        return true;
     }
 }

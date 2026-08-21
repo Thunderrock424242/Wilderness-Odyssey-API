@@ -8,6 +8,9 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  */
 public class DonationReminderConfig {
     public static final ModConfigSpec.BooleanValue disableReminder;
+    public static final ModConfigSpec.ConfigValue<String> optOutReleaseVersion;
+    /** @deprecated use {@link #optOutReleaseVersion}; retained for source compatibility. */
+    @Deprecated(forRemoval = false)
     public static final ModConfigSpec.ConfigValue<String> optOutWorldVersion;
     public static final DonationReminderConfig INSTANCE;
     public static final ModConfigSpec CONFIG_SPEC;
@@ -15,8 +18,9 @@ public class DonationReminderConfig {
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         disableReminder = builder.comment("Disable donation reminders").define("disableReminder", false);
-        optOutWorldVersion = builder.comment("World version when opt out was last set")
-                .define("optOutWorldVersion", ModConstants.MOD_DEFAULT_WORLD_VERSION);
+        optOutReleaseVersion = builder.comment("Packaged mod release when opt out was last set")
+                .define("optOutReleaseVersion", ModConstants.VERSION);
+        optOutWorldVersion = optOutReleaseVersion;
         CONFIG_SPEC = builder.build();
         INSTANCE = new DonationReminderConfig();
     }
@@ -32,10 +36,10 @@ public class DonationReminderConfig {
     public static void validateVersion() {
         if (!CONFIG_SPEC.isLoaded()) return;
 
-        String currentVersion = ModConstants.MOD_DEFAULT_WORLD_VERSION;
-        if (!optOutWorldVersion.get().equals(currentVersion)) {
+        String currentVersion = ModConstants.currentVersion();
+        if (!optOutReleaseVersion.get().equals(currentVersion)) {
             disableReminder.set(false);
-            optOutWorldVersion.set(currentVersion);
+            optOutReleaseVersion.set(currentVersion);
             save();
         }
     }

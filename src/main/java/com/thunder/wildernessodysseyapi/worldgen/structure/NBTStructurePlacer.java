@@ -30,11 +30,14 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemp
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.tags.BlockTags;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.BitSet;
@@ -50,6 +53,8 @@ import net.neoforged.fml.ModList;
  * Places vanilla structure templates loaded from NBT files and exposes metadata used by the mod.
  */
 public class NBTStructurePlacer {
+    private static final long MAX_COMPRESSED_TEMPLATE_BYTES = 16L * 1024L * 1024L;
+    private static final long MAX_DECODED_NBT_BYTES = 64L * 1024L * 1024L;
     private static final String CRYO_TUBE_NAME = "wildernessodysseyapi:cryo_tube";
     private static final String CREATE_ELEVATOR_PULLEY_NAME = "create:elevator_pulley";
     private static final String LEVELING_MARKER_NAME =
@@ -163,11 +168,14 @@ public class NBTStructurePlacer {
                                                 PlacementFoundation foundation,
                                                 PlacementAttempt attempt) {
         try {
-            LargeStructurePlacementOptimizer.preparePlacement(level, foundation.origin(), data.size());
-            if (LargeStructurePlacementOptimizer.exceedsStructureBlockLimit(data.size())) {
+            if (!LargeStructurePlacementOptimizer.preparePlacement(level, foundation.origin(), data.size())) {
+                StructurePlacementDebugger.markFailure(attempt, "placement chunks unavailable or over budget");
                 ModConstants.LOGGER.warn(
-                        "Structure {} has template size {} and exceeds the supported per-axis span of {}.",
-                        id, data.size(), StructureUtils.STRUCTURE_BLOCK_LIMIT);
+                        "Skipping structure {} at {} because its {} touched chunks are not all loaded or exceed the {} chunk budget.",
+                        id, foundation.origin(),
+                        LargeStructurePlacementOptimizer.countPlacementChunks(foundation.origin(), data.size()),
+                        LargeStructurePlacementOptimizer.MAX_PLACEMENT_CHUNKS);
+                return null;
             }
 
             BoundingBox placementBox = expandPlacementBox(foundation.origin(), data.size(), data.template());
@@ -338,7 +346,8 @@ public class NBTStructurePlacer {
         }
         StructurePlaceSettings settings = transformedSettings(rotation, mirror);
         BoundingBox placementBox = data.template().getBoundingBox(settings, origin);
-        if (!contains(allowedBounds, placementBox)) {
+        if (!contains(allowedBounds, placementBox)
+                || !LargeStructurePlacementOptimizer.preparePlacement(level, origin, data.size())) {
             return null;
         }
         settings.setKnownShape(true)
@@ -382,13 +391,26 @@ public class NBTStructurePlacer {
         }
 
         StructureTemplateManager manager = level.getStructureManager();
-        StructureTemplate template = manager.get(id).orElse(null);
+        // An explicit operator-supplied file owns this request. Do not silently substitute a
+        // bundled template with the same id, and always route external input through our quotas.
+        StructureTemplate template = externalTemplatePath == null
+                ? manager.get(id).orElse(null)
+                : loadDirect(level, manager);
         if (template == null || isTemplateEmpty(template)) {
             manager.remove(id);
-            template = loadDirect(level, manager);
+            template = externalTemplatePath == null ? loadDirect(level, manager) : null;
             if (template == null || isTemplateEmpty(template)) {
                 return null;
             }
+        }
+
+        if (!LargeStructurePlacementOptimizer.isWithinTemplateBudget(template.getSize())) {
+            ModConstants.LOGGER.warn(
+                    "Structure template {} has rejected dimensions {}. Limits are {} blocks per axis and {} total blocks.",
+                    id, template.getSize(), StructureUtils.STRUCTURE_BLOCK_LIMIT,
+                    LargeStructurePlacementOptimizer.MAX_TEMPLATE_VOLUME);
+            manager.remove(id);
+            return null;
         }
 
         List<BlockPos> cryoOffsets = new ArrayList<>();
@@ -420,8 +442,15 @@ public class NBTStructurePlacer {
                 ModConstants.LOGGER.warn("External structure template {} not found for {}.", externalTemplatePath, id);
                 return null;
             }
-            try (var stream = Files.newInputStream(externalTemplatePath)) {
-                CompoundTag tag = NbtIo.readCompressed(stream, NbtAccounter.unlimitedHeap());
+            try {
+                long compressedSize = Files.size(externalTemplatePath);
+                if (compressedSize > MAX_COMPRESSED_TEMPLATE_BYTES) {
+                    ModConstants.LOGGER.warn(
+                            "External structure template {} for {} is {} bytes; the compressed limit is {} bytes.",
+                            externalTemplatePath, id, compressedSize, MAX_COMPRESSED_TEMPLATE_BYTES);
+                    return null;
+                }
+                CompoundTag tag = readBoundedCompressed(Files.newInputStream(externalTemplatePath));
                 return manager.readStructure(tag);
             } catch (Exception e) {
                 ModConstants.LOGGER.warn("Failed to read external structure template {} for {}.", externalTemplatePath, id, e);
@@ -438,8 +467,8 @@ public class NBTStructurePlacer {
             return null;
         }
 
-        try (var stream = resource.get().open()) {
-            CompoundTag tag = NbtIo.readCompressed(stream, NbtAccounter.unlimitedHeap());
+        try {
+            CompoundTag tag = readBoundedCompressed(resource.get().open());
             return manager.readStructure(tag);
         } catch (Exception e) {
             ModConstants.LOGGER.warn("Failed to read structure template {} from resources.", id, e);
@@ -791,6 +820,31 @@ public class NBTStructurePlacer {
                     }
                     clearTerrainBlockWithoutDrops(level, cursor);
                 }
+            }
+        }
+    }
+
+    // Bounds both compressed input and decoded NBT accounting before a template object is created.
+    private CompoundTag readBoundedCompressed(InputStream source) throws Exception {
+        try (source) {
+            byte[] compressed = source.readNBytes((int) MAX_COMPRESSED_TEMPLATE_BYTES + 1);
+            if (compressed.length > MAX_COMPRESSED_TEMPLATE_BYTES) {
+                throw new IllegalArgumentException("compressed structure template exceeds "
+                        + MAX_COMPRESSED_TEMPLATE_BYTES + " bytes");
+            }
+            try (ByteArrayInputStream bounded = new ByteArrayInputStream(compressed)) {
+                CompoundTag tag = NbtIo.readCompressed(bounded, NbtAccounter.create(MAX_DECODED_NBT_BYTES));
+                int blockCount = tag.getList("blocks", Tag.TAG_COMPOUND).size();
+                int entityCount = tag.getList("entities", Tag.TAG_COMPOUND).size();
+                if (!LargeStructurePlacementOptimizer.isWithinContentBudget(blockCount, entityCount)) {
+                    throw new IllegalArgumentException(
+                            "structure template content exceeds placement limits: "
+                                    + blockCount + "/" + LargeStructurePlacementOptimizer.MAX_TEMPLATE_BLOCKS
+                                    + " blocks, "
+                                    + entityCount + "/" + LargeStructurePlacementOptimizer.MAX_TEMPLATE_ENTITIES
+                                    + " entities");
+                }
+                return tag;
             }
         }
     }

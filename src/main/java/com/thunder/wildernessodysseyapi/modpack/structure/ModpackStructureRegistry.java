@@ -7,7 +7,9 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.worldgen.structure.NBTStructurePlacer;
+import net.minecraft.DetectedVersion;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.PackType;
 import net.neoforged.fml.loading.FMLPaths;
 
 import java.io.IOException;
@@ -125,73 +127,76 @@ public final class ModpackStructureRegistry {
         ResourceLocation id = entry.id();
 
         Path datapackRoot = ROOT.resolve("generated_datapack");
+        generateWorldgenScaffold(entry, datapackRoot);
+    }
+
+    // Package-visible for contract tests that generate into a temporary directory.
+    static void generateWorldgenScaffold(Entry entry, Path datapackRoot) throws IOException {
+        Definition def = entry.definition();
+        ResourceLocation id = entry.id();
         Path dataRoot = datapackRoot.resolve("data").resolve(id.getNamespace());
 
-        Path structures = dataRoot.resolve("structures").resolve(id.getPath() + ".nbt");
-        Files.createDirectories(structures.getParent());
-        Files.copy(entry.nbtPath(), structures, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        Path structureTemplate = dataRoot.resolve("structure").resolve(id.getPath() + ".nbt");
+        Files.createDirectories(structureTemplate.getParent());
+        Files.copy(entry.nbtPath(), structureTemplate, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
         Path structureJson = dataRoot.resolve("worldgen/structure").resolve(id.getPath() + ".json");
-        writeJson(structureJson, buildStructureJson(id, def));
-
-        Path structureSetJson = dataRoot.resolve("worldgen/structure_set").resolve(id.getPath() + ".json");
-        writeJson(structureSetJson, buildStructureSetJson(id, def));
-
         ResourceLocation biomeTag = ResourceLocation.tryParse(def.biomeTag);
         if (biomeTag == null) {
             biomeTag = ResourceLocation.fromNamespaceAndPath("minecraft", "is_overworld");
         }
-        Path biomeTagJson = datapackRoot.resolve("data")
-                .resolve(biomeTag.getNamespace())
-                .resolve("tags/worldgen/biome")
-                .resolve(biomeTag.getPath() + ".json");
+        writeJson(structureJson, buildStructureJson(id, def, biomeTag));
 
-        JsonObject biomeTagObj = new JsonObject();
-        biomeTagObj.addProperty("replace", false);
-        JsonArray values = new JsonArray();
-        values.add("minecraft:plains");
-        biomeTagObj.add("values", values);
-        writeJsonIfMissing(biomeTagJson, biomeTagObj);
+        Path templatePoolJson = dataRoot.resolve("worldgen/template_pool")
+                .resolve(id.getPath() + "_pool.json");
+        writeJson(templatePoolJson, buildTemplatePoolJson(id));
 
-        Path hasStructureTagJson = dataRoot.resolve("tags/worldgen/biome/has_structure").resolve(id.getPath() + ".json");
-        JsonObject hasStructureObj = new JsonObject();
-        hasStructureObj.addProperty("replace", false);
-        JsonArray hasValues = new JsonArray();
-        hasValues.add("#" + biomeTag.getNamespace() + ":" + biomeTag.getPath());
-        hasStructureObj.add("values", hasValues);
-        writeJson(hasStructureTagJson, hasStructureObj);
+        Path structureSetJson = dataRoot.resolve("worldgen/structure_set").resolve(id.getPath() + ".json");
+        writeJson(structureSetJson, buildStructureSetJson(id, def));
 
-        writePackMcmetaIfMissing(datapackRoot);
+        // Remove files emitted by the invalid legacy scaffold; this directory is generated output.
+        Files.deleteIfExists(dataRoot.resolve("structures").resolve(id.getPath() + ".nbt"));
+        Files.deleteIfExists(dataRoot.resolve("tags/worldgen/biome/has_structure")
+                .resolve(id.getPath() + ".json"));
+
+        writePackMcmeta(datapackRoot);
     }
 
-    private static JsonObject buildStructureJson(ResourceLocation id, Definition def) {
+    static JsonObject buildStructureJson(ResourceLocation id, Definition def, ResourceLocation biomeTag) {
         JsonObject root = new JsonObject();
         root.addProperty("type", "minecraft:jigsaw");
-        root.addProperty("biomes", "#" + def.biomeTag);
+        root.addProperty("biomes", "#" + biomeTag);
         root.addProperty("step", def.generationStep);
         root.addProperty("terrain_adaptation", def.terrainAdaptation);
-        root.addProperty("start_height", 0);
-
-        JsonObject startPool = new JsonObject();
-        startPool.addProperty("element_type", "minecraft:single_pool_element");
-        startPool.addProperty("location", id.toString());
-        startPool.addProperty("projection", "rigid");
-
-        JsonObject pool = new JsonObject();
-        pool.addProperty("name", id + "_pool");
-        JsonArray elements = new JsonArray();
-        JsonObject weighted = new JsonObject();
-        weighted.add("element", startPool);
-        weighted.addProperty("weight", 1);
-        elements.add(weighted);
-        pool.add("elements", elements);
-        pool.addProperty("fallback", "minecraft:empty");
-
-        root.add("start_pool_inline", pool);
+        root.addProperty("start_pool", id + "_pool");
+        JsonObject startHeight = new JsonObject();
+        startHeight.addProperty("absolute", 0);
+        root.add("start_height", startHeight);
         root.addProperty("size", 1);
         root.addProperty("max_distance_from_center", 80);
         root.addProperty("use_expansion_hack", false);
         return root;
+    }
+
+    static JsonObject buildTemplatePoolJson(ResourceLocation id) {
+        JsonObject element = new JsonObject();
+        element.addProperty("element_type", "minecraft:single_pool_element");
+        element.addProperty("location", id.toString());
+        element.addProperty("processors", "minecraft:empty");
+        element.addProperty("projection", "rigid");
+
+        JsonObject weightedElement = new JsonObject();
+        weightedElement.add("element", element);
+        weightedElement.addProperty("weight", 1);
+
+        JsonArray elements = new JsonArray();
+        elements.add(weightedElement);
+
+        JsonObject pool = new JsonObject();
+        pool.addProperty("name", id + "_pool");
+        pool.addProperty("fallback", "minecraft:empty");
+        pool.add("elements", elements);
+        return pool;
     }
 
     private static JsonObject buildStructureSetJson(ResourceLocation id, Definition def) {
@@ -212,14 +217,11 @@ public final class ModpackStructureRegistry {
         return root;
     }
 
-    private static void writePackMcmetaIfMissing(Path datapackRoot) throws IOException {
+    private static void writePackMcmeta(Path datapackRoot) throws IOException {
         Path packMeta = datapackRoot.resolve("pack.mcmeta");
-        if (Files.exists(packMeta)) {
-            return;
-        }
         JsonObject root = new JsonObject();
         JsonObject pack = new JsonObject();
-        pack.addProperty("pack_format", 61);
+        pack.addProperty("pack_format", DetectedVersion.BUILT_IN.getPackVersion(PackType.SERVER_DATA));
         pack.addProperty("description", "Generated modpack structures for Wilderness Odyssey API");
         root.add("pack", pack);
         writeJson(packMeta, root);
@@ -266,13 +268,6 @@ public final class ModpackStructureRegistry {
         try (Writer writer = Files.newBufferedWriter(path)) {
             GSON.toJson(obj, writer);
         }
-    }
-
-    private static void writeJsonIfMissing(Path path, JsonObject obj) throws IOException {
-        if (Files.exists(path)) {
-            return;
-        }
-        writeJson(path, obj);
     }
 
     private static void writeTemplateConfigIfMissing() throws IOException {

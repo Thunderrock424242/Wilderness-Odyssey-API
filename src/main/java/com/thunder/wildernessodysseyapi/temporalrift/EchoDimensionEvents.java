@@ -13,6 +13,7 @@ import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
@@ -64,7 +65,8 @@ public final class EchoDimensionEvents {
 
     @SubscribeEvent
     public static void distortChunkOnLoad(ChunkEvent.Load event) {
-        if (!TemporalRiftConfig.ENABLE_ECHO_CHUNK_DISTORTION.get()) {
+        // Decay is generation decoration, not an ongoing rule that may rewrite player builds.
+        if (!event.isNewChunk() || !TemporalRiftConfig.ENABLE_ECHO_CHUNK_DISTORTION.get()) {
             return;
         }
         if (!(event.getLevel() instanceof net.minecraft.server.level.ServerLevel level)
@@ -88,22 +90,37 @@ public final class EchoDimensionEvents {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int minX = chunk.getPos().getMinBlockX();
         int minZ = chunk.getPos().getMinBlockZ();
-        int minY = level.getMinBuildHeight();
-        int maxY = level.getMaxBuildHeight();
+        LevelChunkSection[] sections = chunk.getSections();
 
-        for (int localX = 0; localX < 16; localX++) {
-            for (int localZ = 0; localZ < 16; localZ++) {
-                for (int y = minY; y < maxY; y++) {
-                    pos.set(minX + localX, y, minZ + localZ);
-                    BlockState state = chunk.getBlockState(pos);
-                    if (state.getBlock() instanceof DoorBlock && state.hasProperty(BlockStateProperties.OPEN) && !state.getValue(BlockStateProperties.OPEN)) {
-                        level.setBlock(pos, state.setValue(BlockStateProperties.OPEN, true), 3);
-                    } else if (state.is(BlockTags.LEAVES) && shouldStripLeaf(level.getSeed(), pos)) {
-                        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        // The palette check skips empty and irrelevant sections without 4,096 block reads apiece.
+        for (int sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+            LevelChunkSection section = sections[sectionIndex];
+            if (section.hasOnlyAir() || !section.maybeHas(EchoDimensionEvents::isDistortionCandidate)) {
+                continue;
+            }
+            int sectionMinY = chunk.getSectionYFromSectionIndex(sectionIndex) << 4;
+            for (int localY = 0; localY < 16; localY++) {
+                for (int localX = 0; localX < 16; localX++) {
+                    for (int localZ = 0; localZ < 16; localZ++) {
+                        BlockState state = section.getBlockState(localX, localY, localZ);
+                        if (!isDistortionCandidate(state)) {
+                            continue;
+                        }
+                        pos.set(minX + localX, sectionMinY + localY, minZ + localZ);
+                        if (state.getBlock() instanceof DoorBlock && state.hasProperty(BlockStateProperties.OPEN)
+                                && !state.getValue(BlockStateProperties.OPEN)) {
+                            level.setBlock(pos, state.setValue(BlockStateProperties.OPEN, true), 2);
+                        } else if (state.is(BlockTags.LEAVES) && shouldStripLeaf(level.getSeed(), pos)) {
+                            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+                        }
                     }
                 }
             }
         }
+    }
+
+    private static boolean isDistortionCandidate(BlockState state) {
+        return state.getBlock() instanceof DoorBlock || state.is(BlockTags.LEAVES);
     }
 
     private static boolean shouldStripLeaf(long seed, BlockPos pos) {

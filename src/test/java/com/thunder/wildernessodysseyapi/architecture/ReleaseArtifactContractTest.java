@@ -30,6 +30,8 @@ class ReleaseArtifactContractTest {
             "data/minecraft/tags/block/mineable/pickaxe.json",
             "data/minecraft/tags/block/needs_diamond_tool.json",
             "data/minecraft/tags/item/music_discs.json",
+            "data/wildernessodysseyapi/structure/village.nbt",
+            "logo.png",
             "assets/wildernessodysseyapi/textures/entity/rift_maw.png",
             "assets/wildernessodysseyapi/textures/entity/rift_listener.png"
     );
@@ -49,18 +51,20 @@ class ReleaseArtifactContractTest {
 
             assertFalse(Pattern.compile("(?m)^\\s*mandatory\\s*=").matcher(metadata).find());
             assertFalse(metadata.contains("${"), "Generated metadata still contains an unresolved placeholder");
-            assertEquals("[5,)", scalar(metadata, "loaderVersion"));
+            assertEquals("[4,)", scalar(metadata, "loaderVersion"));
             assertEquals("All Rights Reserved", scalar(metadata, "license"));
             assertTrue(metadata.contains("displayName=\"Wilderness Odyssey API\""));
             assertFalse(metadata.contains("a api for my modpack"));
             assertDependency(metadata, "minecraft", "required", "[1.21.1,1.22)");
             assertDependency(metadata, "neoforge", "required", "[21.1.0,)");
             assertDependency(metadata, "ticktoklib", "required", "[1.4.0,)");
-            assertDependency(metadata, "curios", "required", "[9.2.0,)");
+            assertDependency(metadata, "curios", "optional", "[9.2.0,)");
             assertDependency(metadata, "geckolib", "required", "[4.8.2,)");
             assertDependency(metadata, "create", "required", "[6.0.10,)");
             assertDependency(metadata, "worldedit", "optional", "[7.3.8,)");
             assertDependency(metadata, "spark", "optional", "[1.0.0,)");
+            assertFalse(metadata.contains("[[accessTransformers]]"));
+            assertTrue(jar.getJarEntry("META-INF/accesstransformer.cfg") == null);
         }
     }
 

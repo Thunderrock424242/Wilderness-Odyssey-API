@@ -6,6 +6,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.Random;
@@ -32,9 +33,12 @@ public final class SecretOrderVillagePlacer {
      * @param chunk the chunk being considered for placement
      */
     public static void tryPlace(ServerLevel level, LevelChunk chunk) {
+        if (!level.dimension().equals(Level.OVERWORLD)) {
+            return;
+        }
         BlockPos chunkOrigin = chunk.getPos().getWorldPosition();
-        Random random = new Random(chunkOrigin.asLong());
-        if (random.nextFloat() > StructureConfig.SECRET_ORDER_VILLAGE_SPAWN_CHANCE.get()) {
+        if (!passesRarityRoll(level.getSeed(), chunkOrigin.asLong(),
+                StructureConfig.SECRET_ORDER_VILLAGE_SPAWN_CHANCE.get())) {
             return;
         }
 
@@ -45,6 +49,21 @@ public final class SecretOrderVillagePlacer {
         }
 
         placeStructure(level, surfacePosition);
+    }
+
+    static boolean passesRarityRoll(long worldSeed, long chunkOrigin, double chance) {
+        if (chance <= 0.0D) {
+            return false;
+        }
+        if (chance >= 1.0D) {
+            return true;
+        }
+        Random random = new Random(raritySeed(worldSeed, chunkOrigin));
+        return random.nextDouble() < chance;
+    }
+
+    static long raritySeed(long worldSeed, long chunkOrigin) {
+        return worldSeed ^ Long.rotateLeft(chunkOrigin, 23);
     }
 
     /**

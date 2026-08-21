@@ -3,8 +3,8 @@ package com.thunder.wildernessodysseyapi.changelog.tool;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Properties;
 
 record GeneratorOptions(
         Path repository,
@@ -17,9 +17,6 @@ record GeneratorOptions(
 
     private static final Path DEFAULT_OUTPUT = Path.of(
             "src", "main", "resources", "config", "wildernessodysseyapi", "changelog.txt"
-    );
-    private static final Pattern BUILD_GRADLE_VERSION = Pattern.compile(
-            "(?m)^version\\s*=\\s*[\"']([^\"']+)[\"']\\s*(?://.*)?$"
     );
     private static final Pattern VALID_VERSION = Pattern.compile("[0-9A-Za-z][0-9A-Za-z._+-]*");
 
@@ -57,7 +54,7 @@ record GeneratorOptions(
                 Generates src/main/resources/config/wildernessodysseyapi/changelog.txt from Git commits.
 
                 Options:
-                  --version <version>       Version heading; defaults to the top-level build.gradle version.
+                  --version <version>       Version heading; defaults to mod_version in gradle.properties.
                   --first-run-days <days>   First automatic lookback window; defaults to 30.
                   --output <path>           Output path relative to the repository.
                   --repo <path>             Repository root; defaults to the current directory.
@@ -67,13 +64,16 @@ record GeneratorOptions(
     }
 
     private static String readPackVersion(Path repository) throws IOException {
-        Path buildFile = repository.resolve("build.gradle");
-        String source = Files.readString(buildFile);
-        Matcher matcher = BUILD_GRADLE_VERSION.matcher(source);
-        if (!matcher.find()) {
-            throw new IOException("Could not find the top-level project version in " + buildFile);
+        Path propertiesFile = repository.resolve("gradle.properties");
+        Properties properties = new Properties();
+        try (var reader = Files.newBufferedReader(propertiesFile)) {
+            properties.load(reader);
         }
-        return matcher.group(1);
+        String version = properties.getProperty("mod_version", "").trim();
+        if (version.isEmpty()) {
+            throw new IOException("Could not find mod_version in " + propertiesFile);
+        }
+        return version;
     }
 
     private static String requireValue(String[] args, int index, String option) {

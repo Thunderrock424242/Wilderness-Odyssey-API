@@ -39,18 +39,8 @@ class ChangelogGeneratorTest {
     }
 
     @Test
-    void readsTopLevelBuildGradleVersionByDefault(@TempDir Path repository) throws IOException {
-        Files.writeString(repository.resolve("build.gradle"), """
-                plugins {
-                    id 'java'
-                }
-
-                version = "4.2.0"
-
-                publishing {
-                    version = 'stale-publication-version'
-                }
-                """);
+    void readsGradlePropertyVersionByDefault(@TempDir Path repository) throws IOException {
+        Files.writeString(repository.resolve("gradle.properties"), "mod_version=4.2.0\n");
 
         GeneratorOptions options = GeneratorOptions.parse(new String[]{"--repo", repository.toString()});
 
@@ -58,9 +48,7 @@ class ChangelogGeneratorTest {
     }
 
     @Test
-    void explicitVersionStillOverridesBuildGradle(@TempDir Path repository) throws IOException {
-        Files.writeString(repository.resolve("build.gradle"), "version = \"4.2.0\"\n");
-
+    void explicitVersionDoesNotRequireRepositoryMetadata(@TempDir Path repository) throws IOException {
         GeneratorOptions options = GeneratorOptions.parse(new String[]{
                 "--repo", repository.toString(),
                 "--version", "4.2.1-rc.1"

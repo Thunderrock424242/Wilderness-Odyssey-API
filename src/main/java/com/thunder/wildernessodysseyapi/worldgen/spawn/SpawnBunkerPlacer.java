@@ -202,6 +202,7 @@ public final class SpawnBunkerPlacer {
         CryoSpawnData data = CryoSpawnData.get(level);
         data.markStarterBunkerPlaced();
         data.replaceAll(cryoPositions);
+        data.setStarterBunkerBounds(result.bounds());
 
         if (!cryoPositions.isEmpty()) {
             PlayerSpawnHandler.setSpawnBlocks(cryoPositions);

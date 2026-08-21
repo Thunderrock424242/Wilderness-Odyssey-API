@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
@@ -39,7 +40,8 @@ public class PartnerAdHandler {
 
     private static final Set<UUID> OPTED_OUT = new HashSet<>();
     private static final String TAG_OPT_OUT = "partnerad_optout";
-    private static final String TAG_VERSION = "partnerad_version";
+    private static final String TAG_RELEASE_VERSION = "partnerad_release_version";
+    private static final String LEGACY_TAG_WORLD_VERSION = "partnerad_world_version";
 
     private static final String PARTNER_NAME = "Kinetic_Hosting";
     private static final String PARTNER_CODE = "THUNDER";
@@ -114,7 +116,7 @@ public class PartnerAdHandler {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                                     CompoundTag data = player.getPersistentData();
                                     data.putBoolean(TAG_OPT_OUT, true);
-                                    data.putString(TAG_VERSION, ModConstants.MOD_DEFAULT_WORLD_VERSION);
+                                    data.putString(TAG_RELEASE_VERSION, ModConstants.currentVersion());
                                     OPTED_OUT.add(player.getUUID());
                                     PENDING_ADS.remove(player.getUUID());
                                     player.sendSystemMessage(
@@ -129,7 +131,7 @@ public class PartnerAdHandler {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                                     CompoundTag data = player.getPersistentData();
                                     data.putBoolean(TAG_OPT_OUT, false);
-                                    data.putString(TAG_VERSION, ModConstants.MOD_DEFAULT_WORLD_VERSION);
+                                    data.putString(TAG_RELEASE_VERSION, ModConstants.currentVersion());
                                     OPTED_OUT.remove(player.getUUID());
                                     PENDING_ADS.put(player.getUUID(), tickCounter + DELAY_TICKS);
                                     player.sendSystemMessage(
@@ -151,11 +153,17 @@ public class PartnerAdHandler {
 
         UUID uuid = player.getUUID();
         CompoundTag data = player.getPersistentData();
-        String currentVersion = ModConstants.MOD_DEFAULT_WORLD_VERSION;
-        String storedVersion = data.getString(TAG_VERSION);
+        String currentVersion = ModConstants.currentVersion();
+
+        // Preserve the player's existing choice while moving off the unrelated world-version label.
+        if (!data.contains(TAG_RELEASE_VERSION, Tag.TAG_STRING)
+                && data.contains(LEGACY_TAG_WORLD_VERSION, Tag.TAG_STRING)) {
+            data.putString(TAG_RELEASE_VERSION, currentVersion);
+        }
+        String storedVersion = data.getString(TAG_RELEASE_VERSION);
         if (!storedVersion.equals(currentVersion)) {
             data.putBoolean(TAG_OPT_OUT, false);
-            data.putString(TAG_VERSION, currentVersion);
+            data.putString(TAG_RELEASE_VERSION, currentVersion);
         }
 
         if (data.getBoolean(TAG_OPT_OUT)) {

@@ -47,7 +47,7 @@ public final class SafeStructureOutput {
         if (Files.isSymbolicLink(destination)) {
             throw new IOException("Refusing symbolic-link generated destination: " + destination);
         }
-        rejectExistingSymbolicLinks(paths.projectRoot().resolve("build"), destination.getParent());
+        rejectExistingSymbolicLinks(paths.buildRoot(), destination.getParent());
         return destination;
     }
 
@@ -55,7 +55,7 @@ public final class SafeStructureOutput {
     public GeneratedStructure writeVerified(StructureModel model) throws IOException {
         Path destination = preflight(model);
         Files.createDirectories(destination.getParent());
-        rejectExistingSymbolicLinks(paths.projectRoot().resolve("build"), destination.getParent());
+        rejectExistingSymbolicLinks(paths.buildRoot(), destination.getParent());
 
         Path temporary = Files.createTempFile(
                 destination.getParent(),

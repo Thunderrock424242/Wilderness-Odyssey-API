@@ -33,7 +33,8 @@ class StructureGenCliCatalogTest {
                         "generate",
                         "--project-dir", projectRoot.toString(),
                         "--blueprints", projectRoot.resolve("src/main/structure_blueprints").toString(),
-                        "--output-resources", projectRoot.resolve("build/generated/resources").toString()
+                        "--output-resources",
+                        projectRoot.resolve("build/generated/structuregen/resources").toString()
                 }))
         );
         assertTrue(exception.getMessage().contains("Missing required option --catalog-fingerprint"));
@@ -55,6 +56,19 @@ class StructureGenCliCatalogTest {
         );
         assertInstanceOf(VanillaStructureBlockCatalog.class, stale);
         assertTrue(stale.blocks().keySet().stream().allMatch(id -> "minecraft".equals(id.getNamespace())));
+    }
+
+    @Test
+    void acceptsCatalogFromTaskSpecificIsolatedBuildRoot() throws IOException {
+        Path projectRoot = tempDirectory.resolve("isolated-catalog-project");
+        Path snapshot = projectRoot.resolve(
+                ".codex-build/generated/structuregen/catalog/available-content.json");
+        writeSnapshot(snapshot, CURRENT_FINGERPRINT);
+
+        StructureBlockCatalog catalog = StructureGenCli.loadContentCatalog(
+                projectRoot, snapshot.toString(), CURRENT_FINGERPRINT);
+
+        assertInstanceOf(JsonSnapshotStructureBlockCatalog.class, catalog);
     }
 
     @Test
