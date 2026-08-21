@@ -3,44 +3,22 @@ package com.thunder.wildernessodysseyapi.util;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.io.CompressionCodec;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumSet;
-import java.util.concurrent.CompletableFuture;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * Helpers for writing and rewriting NBT with configurable compression settings.
+ * Writes already-validated NBT with configurable compression settings.
  */
 public final class NbtCompressionUtils {
 
     private static final EnumSet<CompressionCodec> MISSING_CODEC_WARNED = EnumSet.noneOf(CompressionCodec.class);
 
     private NbtCompressionUtils() {
-    }
-
-    /**
-     * Reads a compressed NBT file from disk without any size accounting limits.
-     */
-    public static CompoundTag readCompressed(Path source, CompressionCodec codec) throws IOException {
-        try (InputStream fileStream = Files.newInputStream(source)) {
-            if (codec == CompressionCodec.VANILLA_GZIP) {
-                return NbtIo.readCompressed(fileStream, NbtAccounter.unlimitedHeap());
-            }
-            try (InputStream decodedStream = wrapDecompressor(codec, fileStream);
-                 DataInputStream in = new DataInputStream(decodedStream)) {
-                return NbtIo.read(in, NbtAccounter.unlimitedHeap());
-            }
-        }
-    }
-
-    public static CompoundTag readCompressed(Path source) throws IOException {
-        return readCompressed(source, CompressionCodec.VANILLA_GZIP);
     }
 
     /**
@@ -77,39 +55,6 @@ public final class NbtCompressionUtils {
         writeCompressed(target, tag, compressionLevel, CompressionCodec.VANILLA_GZIP);
     }
 
-    /**
-     * Rewrites an existing compressed NBT payload with the provided compression level.
-     * Logs failures at debug level so a bad structure file doesn't break saving.
-     */
-    public static void rewriteCompressed(Path target, int compressionLevel) {
-        rewriteCompressed(target, compressionLevel, CompressionCodec.VANILLA_GZIP);
-    }
-
-    public static void rewriteCompressed(Path target, int compressionLevel, CompressionCodec codec) {
-        try {
-            CompoundTag tag = readCompressed(target, codec);
-            writeCompressed(target, tag, compressionLevel, codec);
-        } catch (IOException e) {
-            ModConstants.LOGGER.debug("Failed to recompress NBT file {}", target, e);
-        }
-    }
-
-    public static void rewriteCompressedAsync(Path target, int compressionLevel, CompressionCodec codec) {
-        CompletableFuture.runAsync(() -> rewriteCompressed(target, compressionLevel, codec));
-    }
-
-    private static InputStream wrapDecompressor(CompressionCodec codec, InputStream inputStream) throws IOException {
-        try {
-            return switch (codec) {
-                case VANILLA_GZIP -> new GZIPInputStream(inputStream);
-                case ZSTD -> createZstdInputStream(inputStream);
-                case LZ4 -> createOptionalInputStream("net.jpountz.lz4.LZ4BlockInputStream", inputStream);
-            };
-        } catch (NoClassDefFoundError missingCodec) {
-            return fallbackDecompressor(codec, inputStream, missingCodec);
-        }
-    }
-
     private static OutputStream wrapCompressor(CompressionCodec codec, OutputStream target, int compressionLevel) throws IOException {
         try {
             return switch (codec) {
@@ -124,11 +69,6 @@ public final class NbtCompressionUtils {
         } catch (NoClassDefFoundError missingCodec) {
             return fallbackCompressor(codec, target, compressionLevel, missingCodec);
         }
-    }
-
-    private static InputStream fallbackDecompressor(CompressionCodec codec, InputStream inputStream, NoClassDefFoundError missingCodec) throws IOException {
-        logMissingCodec(codec, missingCodec);
-        return new GZIPInputStream(inputStream);
     }
 
     private static OutputStream fallbackCompressor(CompressionCodec codec, OutputStream target, int compressionLevel, NoClassDefFoundError missingCodec) throws IOException {
@@ -151,10 +91,6 @@ public final class NbtCompressionUtils {
         }
     }
 
-    private static InputStream createZstdInputStream(InputStream source) throws IOException {
-        return createOptionalInputStream("com.github.luben.zstd.ZstdInputStream", source);
-    }
-
     private static OutputStream createZstdOutputStream(OutputStream target, int compressionLevel) throws IOException {
         OutputStream stream = createOptionalOutputStream("com.github.luben.zstd.ZstdOutputStream", target);
         try {
@@ -162,17 +98,6 @@ public final class NbtCompressionUtils {
             return stream;
         } catch (ReflectiveOperationException e) {
             throw new IOException("Failed to configure Zstandard compression level", e);
-        }
-    }
-
-    private static InputStream createOptionalInputStream(String className, InputStream source) throws IOException {
-        try {
-            Class<?> codecClass = Class.forName(className);
-            return InputStream.class.cast(codecClass.getConstructor(InputStream.class).newInstance(source));
-        } catch (ClassNotFoundException | NoClassDefFoundError e) {
-            throw missingCodec(className, e);
-        } catch (ReflectiveOperationException e) {
-            throw new IOException("Failed to initialize " + className, e);
         }
     }
 

@@ -15,11 +15,19 @@ import java.util.List;
  * <p>
  * Vanilla assumes that structures are relatively small, which can lead to cascading chunk loads
  * or thousands of block updates happening in the same tick when Wilderness Odyssey deploys its
- * massive prefabs. The helpers in this class prepare the terrain ahead of time and expose
- * chunk-aware slices that higher level callers can process incrementally.
+ * massive prefabs. The helpers in this class validate the placement footprint without loading
+ * chunks and expose chunk-aware bounds for diagnostics and downstream bookkeeping.
  */
 public final class LargeStructurePlacementOptimizer {
     private static final int CHUNK_SIZE = 16;
+    /** Maximum decoded template volume accepted by the runtime loader. */
+    public static final long MAX_TEMPLATE_VOLUME = 8_000_000L;
+    /** Maximum number of serialized block entries accepted from one template. */
+    public static final int MAX_TEMPLATE_BLOCKS = 2_000_000;
+    /** Maximum number of serialized entities accepted from one template. */
+    public static final int MAX_TEMPLATE_ENTITIES = 1_024;
+    /** Maximum number of already-loaded chunks one synchronous placement may touch. */
+    public static final int MAX_PLACEMENT_CHUNKS = 256;
 
     private LargeStructurePlacementOptimizer() {
     }
@@ -52,6 +60,48 @@ public final class LargeStructurePlacementOptimizer {
     }
 
     /**
+     * Validates template dimensions before any world access or block mutation occurs.
+     *
+     * @param size decoded template dimensions
+     * @return whether every axis and the total volume fit the runtime placement budget
+     */
+    public static boolean isWithinTemplateBudget(Vec3i size) {
+        if (size == null || size.getX() <= 0 || size.getY() <= 0 || size.getZ() <= 0
+                || exceedsStructureBlockLimit(size)) {
+            return false;
+        }
+        long volume = (long) size.getX() * size.getY() * size.getZ();
+        return volume <= MAX_TEMPLATE_VOLUME;
+    }
+
+    /**
+     * Validates serialized content counts before a decoded template can reach world mutation.
+     *
+     * @param blockCount serialized block entries in the structure NBT
+     * @param entityCount serialized entity entries in the structure NBT
+     * @return whether both counts fit the synchronous placement policy
+     */
+    public static boolean isWithinContentBudget(int blockCount, int entityCount) {
+        return blockCount >= 0 && blockCount <= MAX_TEMPLATE_BLOCKS
+                && entityCount >= 0 && entityCount <= MAX_TEMPLATE_ENTITIES;
+    }
+
+    /**
+     * Returns the number of horizontal chunks touched by the requested placement.
+     */
+    public static long countPlacementChunks(BlockPos origin, Vec3i size) {
+        if (origin == null || size == null || size.getX() <= 0 || size.getZ() <= 0) {
+            return 0L;
+        }
+        BlockPos max = origin.offset(size.getX() - 1, 0, size.getZ() - 1);
+        long chunkXCount = (long) Math.floorDiv(max.getX(), CHUNK_SIZE)
+                - Math.floorDiv(origin.getX(), CHUNK_SIZE) + 1L;
+        long chunkZCount = (long) Math.floorDiv(max.getZ(), CHUNK_SIZE)
+                - Math.floorDiv(origin.getZ(), CHUNK_SIZE) + 1L;
+        return Math.max(0L, chunkXCount) * Math.max(0L, chunkZCount);
+    }
+
+    /**
      * Computes the axis-aligned bounding box occupied by a structure that starts at {@code origin}.
      * The resulting bounds are inclusive of all blocks touched by the template and expand by one
      * block on each axis to match vanilla's block placement checks.
@@ -78,12 +128,18 @@ public final class LargeStructurePlacementOptimizer {
     }
 
     /**
-     * Ensures that all chunks touched by the structure are fully loaded before the template is placed.
-     * This avoids a cascade of synchronous chunk loads at placement time.
+     * Confirms that all chunks touched by the structure are already fully loaded.
+     *
+     * <p>This method never requests a chunk. Placement is refused when a caller has not arranged
+     * the required tickets, preventing a template from synchronously cascading into neighboring
+     * chunk generation.</p>
+     *
+     * @return {@code true} when the placement is within budget and every touched chunk is loaded
      */
-    public static void preparePlacement(ServerLevel level, BlockPos origin, Vec3i size) {
-        if (level == null) {
-            return;
+    public static boolean preparePlacement(ServerLevel level, BlockPos origin, Vec3i size) {
+        long chunkCount = countPlacementChunks(origin, size);
+        if (level == null || chunkCount <= 0L || chunkCount > MAX_PLACEMENT_CHUNKS) {
+            return false;
         }
         BlockPos max = origin.offset(Math.max(0, size.getX() - 1), 0, Math.max(0, size.getZ() - 1));
         int minChunkX = Math.floorDiv(origin.getX(), CHUNK_SIZE);
@@ -93,22 +149,26 @@ public final class LargeStructurePlacementOptimizer {
 
         for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
             for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
-                level.getChunk(chunkX, chunkZ);
+                if (level.getChunkSource().getChunkNow(chunkX, chunkZ) == null) {
+                    return false;
+                }
             }
         }
+        return true;
     }
 
     /**
-     * Splits the bounding box of the structure into chunk-aligned slices. Callers can iterate over
-     * the returned list to process the structure in smaller batches, reducing the risk of hitting
-     * the server's tick budget with a single placement.
+     * Splits the bounding box of the structure into chunk-aligned slices for diagnostics and
+     * placement-result bookkeeping. The current template placement is still one synchronous
+     * operation; this method intentionally does not claim to make it incremental.
      *
      * @param origin the structure origin
      * @param size   the template size
      * @return chunk-aligned AABBs ordered from lowest chunk to highest
      */
     public static List<AABB> computeChunkSlices(BlockPos origin, Vec3i size) {
-        if (size.getX() <= 0 || size.getY() <= 0 || size.getZ() <= 0) {
+        long chunkCount = countPlacementChunks(origin, size);
+        if (!isWithinTemplateBudget(size) || chunkCount <= 0L || chunkCount > MAX_PLACEMENT_CHUNKS) {
             return Collections.emptyList();
         }
 
@@ -120,7 +180,7 @@ public final class LargeStructurePlacementOptimizer {
         int chunkXCount = maxChunkX - minChunkX + 1;
         int chunkZCount = maxChunkZ - minChunkZ + 1;
         long estimatedSlices = (long) chunkXCount * chunkZCount;
-        int initialCapacity = (int) Math.min(Integer.MAX_VALUE, Math.max(0L, estimatedSlices));
+        int initialCapacity = (int) Math.min(MAX_PLACEMENT_CHUNKS, Math.max(0L, estimatedSlices));
         List<AABB> slices = new ArrayList<>(initialCapacity);
 
         for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {

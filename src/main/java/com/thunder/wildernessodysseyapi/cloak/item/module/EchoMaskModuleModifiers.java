@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.cloak.item.module;
 
+/** Immutable gameplay modifier bundle contributed by an installed extension module. */
 public record EchoMaskModuleModifiers(
         int extraSlots,
         int safeUseTicksBonus,

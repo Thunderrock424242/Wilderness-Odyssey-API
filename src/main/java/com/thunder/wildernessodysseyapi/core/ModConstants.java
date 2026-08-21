@@ -15,7 +15,13 @@ public final class ModConstants {
     /** NeoForge namespace used for registrations and resource locations. */
     public static final String MOD_ID = "wildernessodysseyapi";
 
-    /** Save-data compatibility version used by world migration checks. */
+    /**
+     * Historical JSON world label retained only for binary/source compatibility.
+     *
+     * @deprecated migration schema versions live in {@code WorldUpgradeManager}; release-scoped
+     * state must use {@link #currentVersion()}
+     */
+    @Deprecated(forRemoval = false)
     public static final String MOD_DEFAULT_WORLD_VERSION = "1.0.0";
 
     /**

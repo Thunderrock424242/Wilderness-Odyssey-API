@@ -24,6 +24,21 @@ class WorldUpgradeSavedDataTest {
     }
 
     @Test
+    void formatTwoCompletedUpgradeRemainsCompletedWhenMetadataFormatAdvances() {
+        CompoundTag completed = new CompoundTag();
+        completed.putInt("data_format", 2);
+        completed.putInt("target_version", 1);
+        completed.putBoolean("running", false);
+        completed.putString("last_pack_version", "4.2.0");
+
+        WorldUpgradeSavedData restored = new WorldUpgradeSavedData(completed, null);
+
+        assertFalse(restored.isRunning());
+        assertEquals("4.2.0", restored.getLastPackVersion());
+        assertEquals("", restored.getPendingPackVersion());
+    }
+
+    @Test
     void storedTargetNeverMovesBehindTheCurrentMigrationChain() {
         CompoundTag stored = new CompoundTag();
         stored.putInt("data_format", 2);

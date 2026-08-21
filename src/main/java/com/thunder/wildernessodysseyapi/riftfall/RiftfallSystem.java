@@ -90,6 +90,17 @@ public final class RiftfallSystem {
     }
 
     public static void tick(ServerLevel level) {
+        advanceClock(level);
+        tickOptionalGameplay(level);
+    }
+
+    /**
+     * Advances authoritative phase, cooldown, and exposure state every server tick.
+     *
+     * <p>This path remains bounded by the connected player count and never performs block sampling
+     * or entity search. It must run even when Minecraft reports no spare optional-work time.</p>
+     */
+    public static void advanceClock(ServerLevel level) {
         if (!canRunIn(level)) {
             return;
         }
@@ -102,15 +113,7 @@ public final class RiftfallSystem {
         RiftfallState state = stateFor(level);
 
         if (state.cooldownTicksRemaining > 0) state.cooldownTicksRemaining--;
-
-        LocalWeather localWeather = weatherAtPlayers(level);
-        if (!localWeather.precipitating() && state.stage != RiftfallStage.CLEAR) {
-            enterStage(level, RiftfallStage.ENDING, RiftfallConfig.CONFIG.endingTicks());
-        }
-
-        if (state.stage == RiftfallStage.CLEAR) {
-            maybeStartRiftfall(level, localWeather);
-        } else {
+        if (state.stage != RiftfallStage.CLEAR) {
             state.stageTicksRemaining--;
             if (state.stageTicksRemaining <= 0) {
                 advanceStage(level);
@@ -119,6 +122,25 @@ public final class RiftfallSystem {
 
         RiftfallStage currentStage = stateFor(level).stage;
         tickExposure(level, currentStage);
+    }
+
+    /**
+     * Runs weather sampling, terrain effects, and spawn searches only while spare tick time exists.
+     */
+    public static void tickOptionalGameplay(ServerLevel level) {
+        if (!canRunIn(level) || !RiftfallConfig.CONFIG.enabled()) {
+            return;
+        }
+        RiftfallState state = stateFor(level);
+        LocalWeather localWeather = weatherAtPlayers(level);
+        if (!localWeather.precipitating() && state.stage != RiftfallStage.CLEAR
+                && state.stage != RiftfallStage.ENDING) {
+            enterStage(level, RiftfallStage.ENDING, RiftfallConfig.CONFIG.endingTicks());
+        } else if (state.stage == RiftfallStage.CLEAR) {
+            maybeStartRiftfall(level, localWeather);
+        }
+
+        RiftfallStage currentStage = stateFor(level).stage;
         tickCorrosion(level, currentStage);
         tickRiftbornSpawning(level, currentStage);
         tickRiftListenerSpawning(level, currentStage);

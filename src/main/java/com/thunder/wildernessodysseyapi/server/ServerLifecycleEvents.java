@@ -60,9 +60,13 @@ public final class ServerLifecycleEvents {
         }
     }
 
-    /** Drains optional main-thread work only while Minecraft reports spare tick time. */
+    /** Advances gameplay clocks first, then drains optional work while Minecraft reports spare time. */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        for (ServerLevel level : event.getServer().getAllLevels()) {
+            RiftfallSystem.advanceClock(level);
+        }
+
         if (!event.hasTime()) {
             return;
         }
@@ -75,7 +79,7 @@ public final class ServerLifecycleEvents {
             return;
         }
         for (ServerLevel level : event.getServer().getAllLevels()) {
-            RiftfallSystem.tick(level);
+            RiftfallSystem.tickOptionalGameplay(level);
             if (!event.hasTime()) {
                 break;
             }

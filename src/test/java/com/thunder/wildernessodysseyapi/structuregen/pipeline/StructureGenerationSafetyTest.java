@@ -38,6 +38,24 @@ class StructureGenerationSafetyTest {
     Path tempDirectory;
 
     @Test
+    void acceptsTaskSpecificIsolatedBuildRootsButRejectsArbitraryProjectDirectories() throws IOException {
+        Path projectRoot = tempDirectory.resolve("isolated-project");
+        Path blueprints = projectRoot.resolve("src/main/structure_blueprints");
+        Files.createDirectories(blueprints);
+
+        StructureGenPaths isolated = new StructureGenPaths(
+                projectRoot,
+                blueprints,
+                projectRoot.resolve(".codex-build/generated/structuregen/resources"));
+
+        assertEquals(projectRoot.resolve(".codex-build").toAbsolutePath().normalize(), isolated.buildRoot());
+        assertThrows(IllegalArgumentException.class, () -> new StructureGenPaths(
+                projectRoot,
+                blueprints,
+                projectRoot.resolve("src/generated/structuregen/resources")));
+    }
+
+    @Test
     void rejectsTraversalAndUnsafeNamesBeforeTheyCanBecomeGeneratedTargets() throws IOException {
         StructureGenPaths paths = paths(tempDirectory.resolve("traversal-project"));
         BlueprintValidator validator = validator();

@@ -83,10 +83,14 @@ Output path:
 
 For each structure id, scaffold writes:
 
-- `data/<namespace>/structures/<path>.nbt` (copy of source template)
+- `data/<namespace>/structure/<path>.nbt` (copy of source template)
+- `data/<namespace>/worldgen/template_pool/<path>_pool.json`
 - `data/<namespace>/worldgen/structure/<path>.json`
 - `data/<namespace>/worldgen/structure_set/<path>.json`
-- `data/<namespace>/tags/worldgen/biome/has_structure/<path>.json`
+- `pack.mcmeta`
+
+The configured `biomeTag` is referenced directly by the generated structure. Use an existing
+Minecraft/mod tag or provide that tag in the datapack; the scaffold does not invent or overwrite it.
 
 ## 5) Move scaffold output into your modpack datapack
 

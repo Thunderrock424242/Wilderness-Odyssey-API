@@ -34,6 +34,8 @@ public class FaqManager {
     private static final int MAX_ID_LENGTH = 64;
     private static final int MAX_QUESTION_LENGTH = 180;
     private static final int MAX_ANSWER_LENGTH = 1_500;
+    private static final int MAX_NO_RESULT_QUERIES = 256;
+    private static final int MAX_DIAGNOSTIC_QUERY_LENGTH = 160;
 
     private static final Map<String, FaqEntry> FAQ_ENTRIES = new HashMap<>();
     private static final Map<String, List<FaqEntry>> FAQ_BY_TOPIC = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
@@ -172,11 +174,21 @@ public class FaqManager {
                 .toList();
 
         if (results.isEmpty()) {
-            NO_RESULT_QUERIES.merge(query, 1, Integer::sum);
-            LOGGER.info("FAQ no-result query '{}' seen {} times", query, NO_RESULT_QUERIES.get(query));
+            recordNoResultQuery(query);
         }
 
         return results;
+    }
+
+    static void recordNoResultQuery(String query) {
+        String diagnosticQuery = query.length() <= MAX_DIAGNOSTIC_QUERY_LENGTH
+                ? query
+                : query.substring(0, MAX_DIAGNOSTIC_QUERY_LENGTH);
+        if (NO_RESULT_QUERIES.containsKey(diagnosticQuery)
+                || NO_RESULT_QUERIES.size() < MAX_NO_RESULT_QUERIES) {
+            int count = NO_RESULT_QUERIES.merge(diagnosticQuery, 1, Integer::sum);
+            LOGGER.debug("FAQ no-result query '{}' seen {} times", diagnosticQuery, count);
+        }
     }
 
     private static int relevanceScore(FaqEntry entry, String query, List<String> terms) {

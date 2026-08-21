@@ -14,6 +14,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Data-component storage helpers for extension-owned Echo-mask module interactions.
+ *
+ * <p>All mutations require an already registered module and operate only on the supplied stack;
+ * the base mod intentionally provides no automatic or hidden installation path.</p>
+ */
 public final class EchoMaskModuleStorage {
     public static final String MODULES_TAG = ModConstants.MOD_ID + ":echo_mask_modules";
 

@@ -1,32 +1,35 @@
 name: Publish to GitHub Packages
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [created]
   workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
-      - name: Grant execute permission to gradlew
-        run: chmod +x ./gradlew
+      - name: Run release-gate tests and build
+        run: ./gradlew build -PcodexBuildDir=.release-build --no-daemon --console=plain
 
-      - name: Publish to GitHub Packages
+      - name: Publish verified artifact to GitHub Packages
         env:
           USERNAME: ${{ github.actor }}
-          TOKEN: ${{ secrets.GIT_TOKEN }}
-        run: ./gradlew publish
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew publish -PcodexBuildDir=.release-build --no-daemon --console=plain

@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteServices;
 import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteSource;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.meteor.worldgen.CraterGenerator;
+import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -168,6 +169,11 @@ public class MeteorEntity extends Entity {
     }
 
     private void onGroundImpact(ServerLevel level, BlockPos impactPos) {
+        // Re-check at the mutation boundary in case an operator disabled sites while this meteor was in flight.
+        if (StructureConfig.DEBUG_DISABLE_IMPACT_SITES.get()) {
+            discard();
+            return;
+        }
         // Impact boom particles
         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER,
                 impactPos.getX() + 0.5, impactPos.getY() + 0.5, impactPos.getZ() + 0.5,

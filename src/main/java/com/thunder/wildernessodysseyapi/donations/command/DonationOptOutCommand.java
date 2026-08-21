@@ -24,7 +24,7 @@ public class DonationOptOutCommand {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
         dispatcher.register(Commands.literal("donation_optout").executes(ctx -> {
             DonationReminderConfig.disableReminder.set(true);
-            DonationReminderConfig.optOutWorldVersion.set(ModConstants.MOD_DEFAULT_WORLD_VERSION);
+            DonationReminderConfig.optOutReleaseVersion.set(ModConstants.currentVersion());
             DonationReminderConfig.save();
             ctx.getSource().sendSuccess(() -> Component.literal("✅ You will no longer receive donation reminders."), false);
             return 1;

@@ -6,6 +6,29 @@ plugins {
     id 'net.neoforged.moddev' version '2.0.143'
 }
 
+// Configure isolated output before any build paths are captured by later project configuration.
+def codexBuildDir = providers.gradleProperty('codexBuildDir')
+if (codexBuildDir.isPresent()) {
+    def requestedBuildDir = codexBuildDir.get().trim()
+    layout.buildDirectory.set(file(requestedBuildDir.isEmpty() ? '.codex-build' : requestedBuildDir))
+}
+
+// Fail the verification lifecycle if a future edit accepts the isolation property but stops
+// applying it. This is intentionally active only for invocations that request isolated output.
+def verifyBuildIsolation = tasks.register('verifyBuildIsolation') {
+    group = 'verification'
+    description = 'Verifies that -PcodexBuildDir owns the effective Gradle build directory.'
+    onlyIf { codexBuildDir.isPresent() }
+    doLast {
+        def requestedBuildDir = codexBuildDir.get().trim()
+        def expected = file(requestedBuildDir.isEmpty() ? '.codex-build' : requestedBuildDir).canonicalFile
+        def actual = layout.buildDirectory.get().asFile.canonicalFile
+        if (actual != expected) {
+            throw new GradleException("Expected isolated build directory ${expected}, but Gradle uses ${actual}")
+        }
+    }
+}
+
 
 tasks.named('wrapper', Wrapper).configure {
     // Define wrapper values here so as to not have to always do so when updating gradlew.properties.
@@ -34,9 +57,6 @@ neoForge {
         mappingsVersion = project.parchment_mappings_version
         minecraftVersion = project.parchment_minecraft_version
     }
-
-    // This line is optional. Access Transformers are automatically detected
-    accessTransformers = project.files('src/main/templates/META-INF/accesstransformer.cfg')
 
     // Default run configurations.
     // These can be tweaked, removed, or duplicated as needed.
@@ -141,6 +161,11 @@ tasks.named('processResources') {
     // Minecraft datagen stores provider hashes beneath its output root. Those
     // local cache records are build bookkeeping, not mod resources.
     exclude '.cache/**'
+
+    // NeoForge resolves logoFile relative to the root of the packaged mod JAR.
+    from(layout.projectDirectory.file('logo.png')) {
+        into ''
+    }
 
     from('src/main/resources/data/minecraft/structures/empty.nbt') {
         // 1.21 resource-pack structures use the singular `structure` folder;
@@ -259,7 +284,6 @@ dependencies {
     implementation "curse.maven:terrablender-neoforge-940057:6054947"
     implementation "curse.maven:geckolib-388172:7023453"
     implementation "curse.maven:locate-fixer-1301683:6762552"
-    implementation "curse.maven:curios-309927:6529130"
     implementation "curse.maven:amendments-896746:7461027"
     implementation "curse.maven:selene-499980:8261785"
     implementation "curse.maven:supplementaries-412082:8244187"
@@ -598,6 +622,10 @@ tasks.named('test').configure {
     dependsOn tasks.named('jar')
 }
 
+tasks.named('check').configure {
+    dependsOn verifyBuildIsolation
+}
+
 // junit-fml installs a global LauncherSession listener that boots every mod.
 // Remove only that adapter; ordinary JUnit and the Minecraft libraries remain.
 def structureGenOfflineRuntime = files(
@@ -639,12 +667,6 @@ tasks.named('compileTestJava', JavaCompile) {
     classpath = files(tasks.named('jar').flatMap { it.archiveFile }) + classpath
 }
 
-// Keep packaging available when the NeoForge/JUnit runtime is unhealthy.
-// Tests remain opt-in through `gradlew test` instead of blocking `gradlew build`.
-tasks.named('build') {
-    setDependsOn([tasks.named('assemble')])
-}
-
 tasks.register('profileChunkWorkload', JavaExec) {
     group = 'performance'
     description = 'Executes the chunk workload driver with JFR and optional async-profiler attached.'
@@ -668,8 +690,6 @@ tasks.register('profileChunkWorkload', JavaExec) {
         jvmArgs += "-agentpath:${asyncProfilerHome}/build/libasyncProfiler.so=start,event=cpu,file=${asyncOutput.absolutePath}"
     }
 }
-
-def codexBuildDir = providers.gradleProperty("codexBuildDir")
 
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.

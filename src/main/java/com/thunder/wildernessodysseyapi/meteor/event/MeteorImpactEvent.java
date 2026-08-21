@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.meteor.event;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.meteor.entity.MeteorEntity;
 import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteSource;
+import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -125,6 +126,9 @@ public final class MeteorImpactEvent {
             int count,
             MeteorSiteSource source
     ) {
+        if (StructureConfig.DEBUG_DISABLE_IMPACT_SITES.get()) {
+            return 0;
+        }
         List<ServerPlayer> players = level.players();
         if (players.isEmpty()) return 0;
 

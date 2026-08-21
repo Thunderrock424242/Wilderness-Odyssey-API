@@ -1,12 +1,12 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.structureblock.bridge.StructureBlockCornerCacheBridge;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockCornerCache;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockDetectionContext;
 import com.thunder.wildernessodysseyapi.util.NbtCompressionUtils;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockHostileSpawnContext;
+import com.thunder.wildernessodysseyapi.structureblock.StructureBlockIoExecutor;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockWorkBudget;
 import net.minecraft.core.BlockPos;
@@ -1105,7 +1105,7 @@ public abstract class StructureBlockEntityMixin extends BlockEntity implements S
     @Unique
     private static void wildernessodysseyapi$rewriteCompressedAsync(java.nio.file.Path structurePath,
             int compressionLevel, long nbtLimit) {
-        boolean submitted = AsyncTaskManager.trySubmitIoWork("structure-block-nbt-recompress", () -> {
+        boolean submitted = StructureBlockIoExecutor.trySubmit(() -> {
             try {
                 if (Files.size(structurePath) > nbtLimit) {
                     return;

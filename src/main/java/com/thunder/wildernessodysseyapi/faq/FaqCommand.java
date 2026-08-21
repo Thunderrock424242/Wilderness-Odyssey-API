@@ -222,4 +222,14 @@ public class FaqCommand {
         QUERY_COOLDOWN.put(player.getUUID(), now);
         return true;
     }
+
+    /** Releases one player's session-only query throttle at logout. */
+    static void clearCooldown(UUID playerId) {
+        QUERY_COOLDOWN.remove(playerId);
+    }
+
+    /** Releases all query throttles when the owning server stops. */
+    static void clearCooldowns() {
+        QUERY_COOLDOWN.clear();
+    }
 }

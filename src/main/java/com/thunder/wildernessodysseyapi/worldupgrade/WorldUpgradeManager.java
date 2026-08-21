@@ -1,12 +1,14 @@
 package com.thunder.wildernessodysseyapi.worldupgrade;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
+import com.google.gson.JsonParser;
 import com.thunder.wildernessodysseyapi.capabilities.ChunkDataCapability;
 import com.thunder.wildernessodysseyapi.util.ChunkErrorReporter;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.storage.LevelResource;
 
 import java.util.ArrayDeque;
 import java.util.HashSet;
@@ -15,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.stream.Collectors;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
@@ -43,6 +47,7 @@ public final class WorldUpgradeManager {
         FAILED_TASKS.clear();
 
         WorldUpgradeSavedData state = WorldUpgradeSavedData.get(server);
+        importLegacyWorldLabel(server, state);
         state.advanceTargetVersion(TARGET_VERSION);
         String packVersion = currentVersion();
         if (state.shouldRunForPackVersion(packVersion)) {
@@ -53,6 +58,30 @@ public final class WorldUpgradeManager {
             LOGGER.info("World upgrade for pack version {} is {} and will resume from per-chunk versions.",
                     state.getPendingPackVersion(),
                     state.isRunning() ? "running" : "paused");
+        }
+    }
+
+    // Imports the deprecated display label once, but never treats it as proof of a completed migration.
+    private static void importLegacyWorldLabel(MinecraftServer server, WorldUpgradeSavedData state) {
+        if (state.isLegacyImportComplete()) {
+            return;
+        }
+        Path legacyPath = server.getWorldPath(LevelResource.ROOT).resolve("world_version.json");
+        String legacyLabel = "";
+        if (Files.exists(legacyPath)) {
+            try (var reader = Files.newBufferedReader(legacyPath)) {
+                var root = JsonParser.parseReader(reader).getAsJsonObject();
+                if (root.has("world_version") && root.get("world_version").isJsonPrimitive()) {
+                    legacyLabel = root.get("world_version").getAsString();
+                }
+            } catch (Exception exception) {
+                LOGGER.warn("Could not import deprecated world label from {}. The authoritative upgrade state is unaffected.",
+                        legacyPath, exception);
+            }
+        }
+        state.recordLegacyWorldLabel(legacyLabel);
+        if (!legacyLabel.isBlank()) {
+            LOGGER.info("Imported deprecated world label '{}' as non-authoritative compatibility metadata.", legacyLabel);
         }
     }
 

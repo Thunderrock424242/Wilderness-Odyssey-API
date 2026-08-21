@@ -212,7 +212,7 @@ public final class StructureGenerationPipeline {
     }
 
     private void requireSafeOwnedRoot(Path generatedRoot) throws IOException {
-        Path buildRoot = paths.projectRoot().resolve("build").toAbsolutePath().normalize();
+        Path buildRoot = paths.buildRoot();
         Path outputRoot = paths.outputResourceRoot().toAbsolutePath().normalize();
         if (!outputRoot.startsWith(buildRoot) || !generatedRoot.startsWith(outputRoot)) {
             throw new IOException("Generated structure root escapes the output resource root: " + generatedRoot);

@@ -11,9 +11,10 @@ import java.util.regex.Pattern;
 /**
  * Normalized project-owned paths used by StructureGen generation.
  *
- * <p>Generated resources are required to remain beneath this checkout's {@code build/}
- * tree. That hard boundary prevents a command-line typo from targeting a world, save,
- * source resource, or external Minecraft installation.</p>
+ * <p>Generated resources are required to remain beneath this checkout's normal {@code build/}
+ * tree or an explicitly selected hidden {@code *-build} isolation tree. That hard boundary
+ * prevents a command-line typo from targeting a world, save, source resource, or external
+ * Minecraft installation.</p>
  */
 public final class StructureGenPaths {
 
@@ -22,6 +23,7 @@ public final class StructureGenPaths {
     private final Path projectRoot;
     private final Path blueprintRoot;
     private final Path outputResourceRoot;
+    private final Path buildRoot;
     private final Path generatedStructureRoot;
     private final Path legacyGeneratedStructureRoot;
     private final Path handAuthoredResourceRoot;
@@ -32,6 +34,8 @@ public final class StructureGenPaths {
         this.projectRoot = normalize(projectRoot);
         this.blueprintRoot = normalize(blueprintRoot);
         this.outputResourceRoot = normalize(outputResourceRoot);
+        this.buildRoot = StructureGenOwnedPaths.requireBuildRoot(
+                this.projectRoot, this.outputResourceRoot, "Generated resource directory");
         this.generatedStructureRoot = this.outputResourceRoot
                 .resolve("data")
                 .resolve(StructureGenConstants.NAMESPACE)
@@ -50,8 +54,11 @@ public final class StructureGenPaths {
 
         requireContained(this.projectRoot.resolve("src/main/structure_blueprints").normalize(), this.blueprintRoot,
                 "Blueprint source directory");
-        requireContained(this.projectRoot.resolve("build").normalize(), this.outputResourceRoot,
-                "Generated resource directory");
+        Path expectedOutputRoot = this.buildRoot.resolve("generated/structuregen/resources").normalize();
+        if (!this.outputResourceRoot.equals(expectedOutputRoot)) {
+            throw new IllegalArgumentException("Generated resource directory must be "
+                    + expectedOutputRoot + ": " + this.outputResourceRoot);
+        }
         requireContained(this.outputResourceRoot, this.generatedStructureRoot,
                 "Generated structure directory");
         requireContained(this.outputResourceRoot, this.legacyGeneratedStructureRoot,
@@ -73,6 +80,11 @@ public final class StructureGenPaths {
 
     public Path outputResourceRoot() {
         return outputResourceRoot;
+    }
+
+    /** Returns the selected normal or task-specific isolated build root. */
+    public Path buildRoot() {
+        return buildRoot;
     }
 
     public Path generatedStructureRoot() {
