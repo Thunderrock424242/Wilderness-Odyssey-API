@@ -2,45 +2,126 @@
 
 # Repository Guidelines
 
-## AI Coding Expectations
+## Priority Rules
 
-When working in this repository, act like a careful Minecraft/NeoForge developer, not just a code generator.
+These rules take priority during normal repository work.
 
-Before making large changes:
-
-* Inspect the existing package structure and follow the project’s current patterns.
-* Briefly explain the implementation plan before editing files.
-* Prefer small, modular changes over giant all-in-one classes.
-* Do not rewrite unrelated systems unless specifically asked.
-* Reuse existing architecture, helpers, registries, configs, and patterns when appropriate.
-* Ask for clarification only when a requirement is truly blocked. Otherwise, make a reasonable implementation choice and explain the assumption.
-* Avoid speculative refactors that are not necessary to complete the requested task.
-
-When writing code:
-
-* Add short comments above major sections explaining what that section does.
-* Use Javadocs for public classes, public methods, registries, config classes, event handlers, capabilities, mixins, and API-facing systems.
-* Explain why Minecraft/NeoForge systems are being used, especially registries, event buses, data generation, capabilities, mixins, networking, worldgen, and config syncing.
-* Do not over-comment obvious lines such as simple assignments, getters, setters, or basic conditionals.
-* Keep comments useful for a future developer who did not write the system.
-* Prefer readable code over clever code.
-* Keep methods focused and avoid unnecessarily large classes.
-* Avoid adding abstractions unless they solve a real project need.
-* Do not introduce new dependencies when the existing stack can reasonably handle the task.
-
-When finishing a task:
-
-* Summarize what files changed.
-* Explain what each new class or major method does.
-* Explain how to test the feature in-game when applicable.
-* Mention limitations, assumptions, or follow-up work.
-* Run the relevant Gradle task when possible and fix compile errors before calling the task complete.
-* Prefer targeted validation before broad validation.
-* Do not perform unnecessary recovery work or alternate build pipelines when the normal project build system is sufficient.
+1. Follow the user's requested scope. Do not expand a task into unrelated cleanup, redesign, or refactoring.
+2. Inspect the existing implementation and architecture before making substantial changes.
+3. Prefer source-code changes over generated-output manipulation.
+4. Keep changes modular, focused, and compatible with existing project patterns.
+5. Use the smallest meaningful validation step first.
+6. Only one agent or process controlled by Codex may run Gradle, NeoGradle, NeoForm, Minecraft development runs, or data generation at a time.
+7. Treat generated NeoForm and Gradle JARs as build infrastructure, not source files.
+8. Do not modify Windows permissions, NTFS ACLs, antivirus settings, Codex sandbox permissions, or system security settings without explicit user approval.
+9. Do not describe an environment or permission failure as a code failure.
+10. Never claim validation passed unless the validation command actually completed successfully.
 
 ---
 
-## Project Structure & Module Organization
+## AI Coding Expectations
+
+When working in this repository, act like a careful Minecraft/NeoForge developer, not merely a code generator.
+
+### Before making changes
+
+* Inspect the existing package structure and follow current project patterns.
+* Inspect relevant callers, registrations, configs, resources, and documentation before changing architecture.
+* Briefly explain the implementation plan before making substantial changes.
+* Prefer small, modular changes over giant all-in-one classes.
+* Reuse existing architecture, helpers, registries, configs, APIs, and conventions when appropriate.
+* Do not rewrite unrelated systems unless specifically requested.
+* Avoid speculative refactors that are unnecessary for the requested task.
+* Ask for clarification only when a requirement is genuinely blocked.
+* Otherwise make a reasonable implementation decision and clearly state the assumption.
+
+### When writing code
+
+* Prefer readable code over clever code.
+* Keep methods focused.
+* Avoid unnecessarily large classes.
+* Add short comments above major or non-obvious sections when useful.
+* Use Javadocs for public classes, public methods, registries, config classes, event handlers, capabilities or attachments, mixins, and API-facing systems.
+* Explain why Minecraft or NeoForge systems are being used when the reasoning is not obvious.
+* This is especially important for registries, event buses, data generation, attachments, mixins, networking, worldgen, threading, rendering, and config synchronization.
+* Do not over-comment simple assignments, getters, setters, or obvious conditions.
+* Keep comments useful for a future developer who did not write the system.
+* Avoid abstractions that do not solve a real project problem.
+* Do not introduce a new dependency when the existing stack can reasonably handle the task.
+
+### When finishing a task
+
+* Review the final diff.
+* Summarize meaningful files and systems changed.
+* Explain new classes or major methods.
+* Explain how to test the feature in-game when applicable.
+* Mention assumptions, limitations, compatibility concerns, or deferred work.
+* Run the relevant Gradle task when practical.
+* Fix genuine compile or test failures caused by the change before calling the implementation complete.
+* Report environment-blocked validation separately from code failures.
+* Prefer targeted validation before broader validation.
+* Do not invent alternate build pipelines when the normal Gradle/NeoForge build system is sufficient.
+
+---
+
+# Standard Task Workflow
+
+Use this workflow unless the task requires something different.
+
+## 1. Inspect
+
+Determine:
+
+* Which feature owns the requested behavior.
+* Which classes currently implement related behavior.
+* Which registrations, configs, resources, events, mixins, or networking paths are involved.
+* Whether tests already exist.
+* Whether the change affects client, server, or both.
+
+## 2. Plan
+
+For non-trivial changes, briefly describe:
+
+* Files likely to change.
+* Architecture being reused.
+* New responsibilities being introduced.
+* Important compatibility or lifecycle considerations.
+
+## 3. Implement
+
+* Keep the change focused.
+* Preserve surrounding style.
+* Avoid unrelated cleanup.
+* Keep intermediate states compile-safe when practical.
+
+## 4. Validate
+
+Use the smallest meaningful validation command first.
+
+Escalate only when broader validation adds useful confidence.
+
+## 5. Review
+
+Before finishing:
+
+* Review the diff.
+* Remove debug code.
+* Check for unintended generated files.
+* Check for unrelated formatting changes.
+* Check for secrets or machine-specific paths.
+
+## 6. Report
+
+Clearly separate:
+
+* Implementation result.
+* Validation result.
+* Environment limitations.
+* Remaining manual testing.
+
+---
+
+# Project Structure & Module Organization
 
 Production code lives in:
 
@@ -53,7 +134,7 @@ Organize code into feature packages such as:
 * `ai`
 * `riftfall`
 
-Keep new code with the feature it supports rather than creating broad utility packages.
+Keep new code with the feature it supports rather than creating broad generic utility packages.
 
 Examples:
 
@@ -62,9 +143,15 @@ Examples:
 * AI companion systems belong in `ai`.
 * World generation, structures, biome logic, placement, and data generation helpers belong in `worldgen`.
 
-Avoid creating generic packages such as `util`, `manager`, or `helper` unless the functionality is genuinely shared by several independent systems.
+Avoid generic packages such as:
 
-Feature-specific helpers should stay inside their feature package.
+* `util`
+* `manager`
+* `helper`
+
+unless the functionality is genuinely shared by several independent systems.
+
+Feature-specific helpers should remain inside their feature package.
 
 Minecraft assets, data-pack JSON, shaders, YAML, configs, and defaults belong in:
 
@@ -92,68 +179,102 @@ Treat the following as generated local output:
 * `.codex-build/`
 * `run/`
 
-Never commit generated local output unless the task specifically requires generated resources.
+Never commit generated local output unless the task explicitly requires generated resources.
 
 ---
 
-## Build, Test, and Development Commands
+# Build, Test, and Development Commands
 
 Use the checked-in Gradle wrapper and JDK 21.
 
 On Windows PowerShell:
 
-* `.\gradlew.bat build` — compile, test, and produce the mod JAR under `build/libs/`.
-* `.\gradlew.bat test` — run the JUnit test suite.
-* `.\gradlew.bat compileJava` — compile Java sources without performing a full build.
-* `.\gradlew.bat runClient` — launch a development Minecraft client.
-* `.\gradlew.bat runServer` — launch the dedicated development server without a GUI.
-* `.\gradlew.bat runGameTestServer` — execute registered NeoForge GameTests.
-* `.\gradlew.bat runData` — regenerate data into `src/generated/resources`.
+`.\gradlew.bat compileJava`
 
-Use `clean` only when stale outputs are reasonably suspected.
+Compiles Java sources without performing a full build.
+
+`.\gradlew.bat test`
+
+Runs the JUnit test suite.
+
+`.\gradlew.bat build`
+
+Compiles, tests, packages resources, and produces the mod JAR.
+
+`.\gradlew.bat runClient`
+
+Launches the development Minecraft client.
+
+`.\gradlew.bat runServer`
+
+Launches the dedicated development server.
+
+`.\gradlew.bat runGameTestServer`
+
+Runs registered NeoForge GameTests.
+
+`.\gradlew.bat runData`
+
+Regenerates data under `src/generated/resources`.
+
+Use `clean` only when stale generated output is reasonably suspected.
+
+Do not routinely use:
+
+`.\gradlew.bat clean build`
+
+as normal validation.
 
 Use:
 
 `--refresh-dependencies`
 
-only when dependency resolution, corrupted caches, or IDE imports indicate that dependency refresh is actually needed.
+only when dependency resolution, cache corruption, or IDE import problems provide a reason to refresh dependencies.
 
-Do not routinely combine `clean` with every Gradle invocation.
+Do not use dependency refresh as routine troubleshooting.
 
 ---
 
-## Codex Validation & Usage Efficiency
+# Codex Validation Strategy
 
-Prefer the smallest validation step that gives meaningful confidence in the change.
+Codex should prefer the smallest validation step that meaningfully exercises the change.
 
 Do not automatically run a full `build` after every edit.
 
-Use this validation order when appropriate:
+Use this general escalation order:
 
-1. Compile the affected source set or run the most targeted relevant test.
-2. Run the affected test class or subsystem tests.
-3. Run the full `test` task when broader regression coverage is useful.
-4. Run the full `build` when changes affect registration, startup, resources, packaging, multiple systems, or final integration validation.
+1. Compile the affected source set.
+2. Run the most relevant targeted test.
+3. Run relevant subsystem tests.
+4. Run the full `test` task when broader regression coverage is useful.
+5. Run `build` when packaging, startup, registrations, resources, or integration behavior requires it.
+6. Launch Minecraft only when behavior genuinely requires a running Minecraft environment.
 
-Examples:
+For routine Java changes:
 
-For a small Java implementation change:
+```powershell
+.\gradlew.bat compileJava -PcodexBuildDir=.codex-build --no-parallel
+```
 
-`.\gradlew.bat compileJava -PcodexBuildDir=.codex-build`
+For Java logic with tests:
 
-For pure Java logic with tests:
+```powershell
+.\gradlew.bat test -PcodexBuildDir=.codex-build --no-parallel
+```
 
-`.\gradlew.bat test -PcodexBuildDir=.codex-build`
+For integration, registration, startup, resource, or packaging changes:
 
-For registration, startup, integration, or packaging changes:
-
-`.\gradlew.bat build -PcodexBuildDir=.codex-build`
+```powershell
+.\gradlew.bat build -PcodexBuildDir=.codex-build --no-parallel
+```
 
 For data generation:
 
-`.\gradlew.bat runData -PcodexBuildDir=.codex-build`
+```powershell
+.\gradlew.bat runData -PcodexBuildDir=.codex-build --no-parallel
+```
 
-Do not repeatedly rerun an unchanged failing command without first determining why it failed.
+Do not repeatedly rerun an unchanged failing command without first identifying why it failed.
 
 Do not launch:
 
@@ -166,35 +287,90 @@ unless the requested change actually requires that environment.
 
 For small Java-only changes, prefer compilation and targeted tests over launching Minecraft.
 
-Avoid unnecessary diagnostic commands when the previous validation already establishes the relevant result.
-
-Do not perform multiple equivalent validation passes simply to increase confidence unless the task is high risk or the user specifically requests deeper validation.
+Do not perform several equivalent validation passes simply to increase confidence unless the change is high-risk or deeper validation was specifically requested.
 
 ---
 
-## Codex Gradle Build Isolation
+# Gradle and NeoForm Execution Safety
 
-Windows may lock generated JAR files that are being used by Minecraft, IntelliJ, Gradle, antivirus software, another Java process, or another development tool.
+NeoForge development uses Gradle, NeoGradle, NeoForm, Minecraft artifacts, transformed JARs, generated JARs, and temporary build files.
 
-Routine Codex validation should therefore use the isolated Codex build directory:
+These are normal parts of the build system.
+
+## Generated JAR policy
+
+Generated or dependency JARs are build infrastructure.
+
+Examples include files under paths resembling:
+
+```text
+build/tmp/neoformruntime/
+.codex-build/tmp/neoformruntime/
+.gradle/
+```
+
+Codex must not treat these JARs as normal editable project files.
+
+Do not manually:
+
+* Patch generated NeoForm JARs.
+* Replace generated NeoForm JARs.
+* Rename generated NeoForm JARs.
+* Delete individual NeoForm output JARs while Gradle is running.
+* Modify Minecraft dependency JARs.
+* Edit Gradle cache JARs.
+* Repackage dependency JARs as a routine workaround.
+* Extract entire dependency caches without a specific diagnostic reason.
+
+Gradle, NeoGradle, Java, and NeoForm are expected to read JAR dependencies during normal compilation.
+
+That is not itself a problem.
+
+Codex should access those artifacts indirectly through the normal Gradle build pipeline whenever possible.
+
+## Dependency inspection
+
+When source or API inspection is necessary, prefer:
+
+1. Existing project source.
+2. Existing generated sources.
+3. Source JARs.
+4. NeoForge or library documentation.
+5. Targeted dependency inspection.
+
+Do not recursively inspect or unpack the entire Gradle cache merely to understand one API.
+
+---
+
+# Codex Gradle Build Isolation
+
+Routine Codex validation should use:
 
 `-PcodexBuildDir=.codex-build`
 
 Examples:
 
-`.\gradlew.bat compileJava -PcodexBuildDir=.codex-build`
+```powershell
+.\gradlew.bat compileJava -PcodexBuildDir=.codex-build --no-parallel
+```
 
-`.\gradlew.bat test -PcodexBuildDir=.codex-build`
+```powershell
+.\gradlew.bat test -PcodexBuildDir=.codex-build --no-parallel
+```
 
-`.\gradlew.bat build -PcodexBuildDir=.codex-build`
+```powershell
+.\gradlew.bat build -PcodexBuildDir=.codex-build --no-parallel
+```
 
-Do not use the normal `build/` directory for routine Codex compile and test validation when isolated output is available.
+The isolated directory reduces conflicts between Codex validation and normal IDE or local development output.
 
-The `.codex-build/` directory is generated local output and must never be committed.
+Do not use the normal `build/` directory for routine Codex validation when isolated output is available.
+
+`.codex-build/` is generated local output and must never be committed.
 
 The Gradle build must support the `codexBuildDir` project property.
 
-The root build configuration should contain equivalent behavior to:
+Equivalent root build behavior should remain available:
 
 ```gradle
 def codexBuildDir = providers.gradleProperty("codexBuildDir")
@@ -204,49 +380,267 @@ if (codexBuildDir.isPresent()) {
 }
 ```
 
-Do not remove or bypass this behavior unless the project architecture changes and an equivalent isolated validation mechanism replaces it.
+Do not remove or bypass this behavior unless equivalent isolation replaces it.
+
+## Important limitation
+
+Build-directory isolation reduces output collisions.
+
+It does **not** guarantee protection from:
+
+* Windows filesystem locks.
+* NTFS permission problems.
+* Codex Windows sandbox restrictions.
+* Antivirus interference.
+* Gradle cache permissions.
+* External processes holding files.
+* NeoForm-specific temporary-file failures.
+
+Therefore:
+
+A failure inside `.codex-build/` must not automatically be interpreted as a source-code failure.
 
 ---
 
-## Windows Gradle Lock Recovery
+# Gradle and NeoForm Concurrency
 
-If Gradle reports that a generated JAR, build directory, or other generated output is locked:
+Only one Codex-controlled Gradle or Minecraft development process may operate on this repository at a time.
 
-1. Confirm that the failure is actually a file-lock problem rather than a compilation, dependency, or test failure.
+This includes:
 
-2. Confirm that the command is using:
+* `compileJava`
+* `test`
+* `build`
+* `clean`
+* `runClient`
+* `runServer`
+* `runData`
+* `runGameTestServer`
+* dependency refreshes
+* NeoForm setup or transformation tasks
 
-   `-PcodexBuildDir=.codex-build`
+Do not have multiple subagents run Gradle concurrently.
 
-3. If it was not using isolated output, retry once using the isolated Codex build directory.
+Do not start another Gradle validation command while one is still active.
 
-4. Do not repeatedly rerun the same locked command unchanged.
+Do not have one agent run `runClient` while another runs `build`.
 
-5. Do not immediately extract dependency JARs.
+Do not run parallel NeoForm initialization attempts.
 
-6. Do not manually construct large Java classpaths.
+Subagents may independently inspect unrelated code, but Gradle and NeoForm validation should normally remain owned by the main agent.
 
-7. Do not replace Gradle validation with manual `javac` compilation unless genuinely necessary as a last-resort diagnostic.
-
-8. Do not kill unrelated Java processes automatically.
-
-9. Do not delete global Gradle caches simply because a generated project JAR is locked.
-
-10. Do not disable Gradle performance features globally as a first-line workaround.
-
-11. If the isolated Gradle build is also blocked, identify and report the exact locked file.
-
-12. Continue with safe validation that does not require inventing a separate build system.
-
-Manual dependency extraction, alternate compilation pipelines, or custom classpath reconstruction are last-resort diagnostics and should not become the normal response to a Windows file lock.
-
-The goal is to avoid turning a simple validation problem into a large diagnostic workflow.
+If multiple agents modify independent files, return control to the main agent before repository-wide validation.
 
 ---
 
-## Agent and Subagent Efficiency
+# Windows Lock and Access-Denied Diagnosis
 
-Use the main agent for normal repository exploration, implementation, validation, testing, and review.
+Do not treat every Windows filesystem failure as the same problem.
+
+## Likely file-lock indicators
+
+Messages such as:
+
+```text
+The process cannot access the file because it is being used by another process
+```
+
+or explicit Windows sharing violations strongly indicate an active file handle.
+
+Possible holders include:
+
+* Minecraft.
+* Gradle.
+* Java.
+* IntelliJ.
+* Antivirus.
+* Another terminal.
+* Another Codex process.
+* Another development tool.
+
+## Access-denied indicators
+
+Errors such as:
+
+```text
+java.nio.file.AccessDeniedException
+```
+
+or:
+
+```text
+Access is denied
+```
+
+may indicate:
+
+* NTFS permissions.
+* Codex sandbox permissions.
+* Ownership or ACL behavior.
+* Antivirus or security software.
+* A locked file.
+* A process attempting an unsupported filesystem operation.
+
+An `AccessDeniedException` alone is not enough evidence to claim that a JAR is locked.
+
+Report it as an access-denied failure unless stronger evidence identifies a file lock.
+
+---
+
+# Windows Gradle and NeoForm Recovery
+
+If Gradle or NeoForm fails because of a generated JAR, temporary JAR, or generated directory:
+
+## Step 1 — Capture the failure
+
+Record:
+
+* The Gradle command.
+* The exact exception.
+* The exact path.
+* The task that failed.
+
+Do not immediately begin destructive recovery.
+
+## Step 2 — Check Codex concurrency
+
+Confirm that Codex does not currently have:
+
+* Another Gradle task running.
+* `runClient` running.
+* `runServer` running.
+* Another subagent performing validation.
+* Another NeoForm operation running.
+
+## Step 3 — Confirm isolated output
+
+Routine Codex validation should use:
+
+`-PcodexBuildDir=.codex-build`
+
+If isolated output was not used, retry once with isolated output when appropriate.
+
+## Step 4 — Stop Gradle daemons if a stale handle is plausible
+
+Use:
+
+```powershell
+.\gradlew.bat --stop
+```
+
+Do this only when relevant.
+
+Do not repeatedly stop and restart Gradle without evidence that it may help.
+
+## Step 5 — Retry the smallest validation once
+
+For example:
+
+```powershell
+.\gradlew.bat compileJava -PcodexBuildDir=.codex-build --no-daemon --no-parallel
+```
+
+`--no-daemon` is primarily a recovery or diagnostic option.
+
+It does not need to be used on every successful normal build.
+
+## Step 6 — Stop escalating if access remains blocked
+
+If the same NeoForm or generated-JAR path still fails with `AccessDeniedException` after one reasonable recovery attempt:
+
+* Do not endlessly retry.
+* Do not call the code broken without evidence.
+* Report validation as blocked by the environment.
+* Include the exact path and exception.
+* Continue only with safe validation that does not require destructive workarounds.
+
+---
+
+# Forbidden Automatic Recovery Actions
+
+Codex must not automatically perform the following solely to work around a Gradle, NeoForm, JAR, Windows, or sandbox failure:
+
+* Modify NTFS ACLs.
+* Run `icacls` to broaden permissions.
+* Run `takeown`.
+* Give sandbox users Full Control.
+* Grant broad access to the user's home directory.
+* Grant broad access to a drive.
+* Disable Windows Defender.
+* Add antivirus exclusions.
+* Disable security software.
+* Run the entire development environment as Administrator.
+* Switch Codex to Full Access.
+* Change Codex sandbox mode.
+* Delete the global Gradle cache.
+* Delete the entire user Gradle directory.
+* Kill unrelated Java processes.
+* Kill IntelliJ.
+* Kill unrelated Minecraft instances.
+* Delete arbitrary JAR files from caches.
+* Reconstruct the build system manually.
+* Build giant hand-written Java classpaths.
+* Replace Gradle validation with manual `javac` compilation.
+
+If one of these actions appears necessary, explain:
+
+1. Why it may help.
+2. The exact scope required.
+3. The risk involved.
+
+Then wait for explicit user approval.
+
+---
+
+# Clean and Cache Policy
+
+`clean` is not normal validation.
+
+Use it only when:
+
+* Outputs are clearly stale.
+* Generated state is known to be inconsistent.
+* A task explicitly requires clean-build behavior.
+* The user requests it.
+
+Do not repeatedly use:
+
+```powershell
+.\gradlew.bat clean build
+```
+
+as a generic fix.
+
+Do not delete:
+
+```text
+.gradle/
+```
+
+or the global Gradle cache merely because NeoForm encountered one access error.
+
+Use:
+
+```text
+--refresh-dependencies
+```
+
+only when dependency corruption or resolution problems are reasonably suspected.
+
+Generated-output deletion should target the smallest relevant project-local scope.
+
+---
+
+# Agent and Subagent Efficiency
+
+Use the main agent for normal:
+
+* Repository exploration.
+* Implementation.
+* Validation.
+* Testing.
+* Review.
+* Gradle execution.
 
 Do not spawn subagents for:
 
@@ -255,62 +649,111 @@ Do not spawn subagents for:
 * Simple repository exploration.
 * Normal Gradle validation.
 * One-system refactors.
-* Tasks that can reasonably be completed in one context.
+* Tasks that comfortably fit in one context.
 
-Use subagents when the task contains clearly independent workstreams where parallel analysis provides meaningful value.
+Use subagents when there are genuinely independent analysis workstreams.
 
-Examples include:
+Examples:
 
 * Large repository audits.
-* Independent security, performance, architecture, or correctness reviews.
-* Large migrations involving separate modules.
-* Broad investigations involving multiple unrelated systems.
-* Tasks where several independent areas of the repository can be inspected without overlapping work.
+* Independent performance reviews.
+* Security reviews.
+* Architecture reviews.
+* Large migrations involving separate systems.
+* Broad investigations involving unrelated areas.
 
-Avoid having several agents:
+Subagents should avoid:
 
-* Investigate the same problem.
-* Read the same files unnecessarily.
-* Edit overlapping files.
-* Run duplicate validation.
-* Produce redundant summaries.
+* Reading the same files unnecessarily.
+* Investigating the same problem.
+* Editing overlapping files.
+* Producing duplicate findings.
+* Running duplicate validation.
+* Running Gradle concurrently.
+* Running NeoForm concurrently.
+* Launching multiple Minecraft development instances.
 
-Prefer one focused agent over multiple agents when parallelism does not substantially improve the result.
+When subagents are used, assign clear ownership boundaries.
 
----
-
-## Validation Rules by Change Type
-
-When changing pure Java logic:
-
-* Prefer `compileJava`.
-* Run relevant JUnit tests when available.
-* Run the full `test` suite when the change could affect multiple logic paths.
-
-When changing registries, startup logic, event registration, networking registration, configs, or common setup:
-
-* Run `build`.
-
-When changing worldgen, entities, dimensions, rendering, shaders, gameplay behavior, or systems requiring an actual Minecraft environment:
-
-* Run appropriate compile/test validation first.
-* Describe the relevant `runClient` or `runServer` manual test procedure.
-* Launch the game only when practical and necessary.
-
-When changing data generation:
-
-* Run `runData`.
-* Review the resulting generated resource diff.
-
-When fixing a bug:
-
-* Add a regression test when practical.
-* Validate the original failure condition when possible.
-* Avoid unrelated refactoring during the bug fix.
+The main agent should normally perform final integration validation.
 
 ---
 
-## Coding Style & Naming Conventions
+# Validation Rules by Change Type
+
+## Pure Java logic
+
+Prefer:
+
+```powershell
+.\gradlew.bat compileJava -PcodexBuildDir=.codex-build --no-parallel
+```
+
+Run relevant JUnit tests when available.
+
+Run the broader test suite when the change could affect multiple logic paths.
+
+## Registries and startup
+
+For changes involving:
+
+* Registries.
+* Common setup.
+* Event registration.
+* Networking registration.
+* Config registration.
+* Startup logic.
+* Resource packaging.
+
+Run:
+
+```powershell
+.\gradlew.bat build -PcodexBuildDir=.codex-build --no-parallel
+```
+
+when practical.
+
+## Minecraft runtime behavior
+
+For changes involving:
+
+* Worldgen.
+* Entities.
+* Dimensions.
+* Rendering.
+* Shaders.
+* Fluids.
+* Gameplay behavior.
+* Actual world interaction.
+
+First run compile or test validation.
+
+Then describe the relevant in-game test.
+
+Launch Minecraft only when practical and necessary.
+
+## Data generation
+
+Run:
+
+```powershell
+.\gradlew.bat runData -PcodexBuildDir=.codex-build --no-parallel
+```
+
+Review generated-resource diffs afterward.
+
+## Bug fixes
+
+When practical:
+
+* Reproduce the original failure.
+* Add a regression test.
+* Validate the corrected behavior.
+* Avoid unrelated refactoring.
+
+---
+
+# Coding Style & Naming Conventions
 
 Java sources use:
 
@@ -334,113 +777,114 @@ Match surrounding NeoForge registration and event-handler patterns.
 
 No automatic formatter is currently configured.
 
-Keep diffs tidy and use Qodana findings as the lint baseline.
+Use Qodana findings as the lint baseline.
 
 Avoid formatting unrelated files.
 
-Avoid changing whitespace, imports, comments, or ordering in unrelated code unless required.
+Avoid changing unrelated whitespace, imports, comments, or declaration ordering.
 
-Keep commits and diffs focused on the requested task.
+Keep diffs focused.
 
 ---
 
-## Minecraft and NeoForge Guidelines
+# Minecraft and NeoForge Guidelines
 
 Follow the NeoForge 1.21.1 conventions already established by the project.
 
-When adding or editing a Minecraft system:
+When adding or modifying a Minecraft system:
 
-* Keep registration code consistent with existing registry patterns.
-* Keep mod IDs, resource locations, translation keys, config keys, and JSON paths lowercase when required.
-* Prefer config-driven behavior when values may require balancing.
-* Avoid hardcoding player-facing balance values directly into gameplay classes when a config is more appropriate.
-* Keep client-only logic separated from common/server logic.
-* Avoid loading client-only Minecraft classes from common/server code.
+* Keep registration consistent with existing patterns.
+* Keep mod IDs, resource locations, translation keys, config keys, and JSON paths lowercase where required.
+* Prefer config-driven behavior where values may require balancing.
+* Avoid hardcoding player-facing balance values directly into gameplay classes when config is more appropriate.
+* Keep client-only logic separate from common and server logic.
+* Never load client-only Minecraft classes from common or dedicated-server code.
 * Make logical-side and physical-side assumptions explicit when relevant.
-* Be careful with worldgen, ticking, chunk operations, rendering, and event handlers because they can significantly affect performance.
-* Avoid expensive work every tick unless it is genuinely necessary.
+* Be especially careful with ticking, worldgen, chunks, rendering, networking, entities, and event handlers.
+* Avoid expensive work every tick unless it is truly necessary.
 * Cache, batch, rate-limit, precompute, or use dirty-state updates when practical.
 * Avoid unnecessary chunk loading.
-* Avoid repeatedly scanning large world areas.
-* Avoid allocations in hot tick/render loops when a reusable or cached approach is reasonable.
+* Avoid repeated large-area world scans.
+* Avoid avoidable allocations in hot tick or render loops.
 
-Prefer existing NeoForge hooks and APIs over invasive techniques.
+Prefer supported NeoForge hooks and APIs over invasive modifications.
 
-Use mixins only when an appropriate supported hook does not exist or cannot satisfy the requirement.
+Use mixins only when an appropriate supported hook cannot reasonably satisfy the requirement.
 
 ---
 
-## Event Guidelines
+# Event Guidelines
 
 When using events:
 
-* Add a short comment explaining what triggers the event and why the handler belongs there.
-* Avoid duplicate event registrations.
-* Make server/client side checks explicit when required.
-* Avoid subscribing broad handlers to high-frequency events unless necessary.
+* Explain what triggers important handlers and why the handler belongs there.
+* Avoid duplicate registration.
+* Make server/client checks explicit when needed.
+* Avoid broad handlers on high-frequency events unless necessary.
 * Keep expensive work out of per-tick events when possible.
-* Ensure lifecycle events are registered on the correct event bus.
+* Register lifecycle events on the correct event bus.
 * Follow existing project patterns before introducing new event architecture.
 
 ---
 
-## Mixin Guidelines
+# Mixin Guidelines
 
 When using mixins:
 
-* Keep mixins narrow and targeted.
-* Add comments explaining why the mixin is necessary.
-* Explain why an event, config option, NeoForge API, or other supported hook is insufficient.
-* Avoid fragile injections when a safer hook exists.
+* Keep them narrow and targeted.
+* Explain why the mixin is required.
+* Explain why an event, NeoForge API, config option, or supported hook is insufficient.
+* Avoid fragile injections where safer hooks exist.
 * Avoid broad method overwrites unless absolutely necessary.
-* Prefer targeted injections with clear assumptions.
-* Document assumptions about target methods, ordinals, locals, or invocation order when applicable.
-* Consider compatibility with other mods modifying the same code path.
-* Avoid placing unrelated behavior into one mixin.
+* Prefer targeted injections.
+* Document assumptions about targets, ordinals, locals, and invocation order where relevant.
+* Consider compatibility with other mods modifying the same path.
+* Keep unrelated behavior in separate mixins.
 
 ---
 
-## Networking Guidelines
+# Networking Guidelines
 
 When using networking:
 
-* Keep packet names clear and descriptive.
+* Use descriptive packet names.
 * Validate server-side data.
-* Never trust client input simply because it came through a registered packet.
-* Validate IDs, ranges, positions, permissions, dimensions, and player state when relevant.
-* Avoid sending packets every tick unless genuinely required.
-* Batch or rate-limit synchronization when practical.
-* Add comments explaining what each packet synchronizes and when it is sent.
+* Never trust client input merely because it came through a registered packet.
+* Validate IDs, ranges, positions, permissions, dimensions, and player state where relevant.
+* Avoid packets every tick unless truly required.
+* Batch or rate-limit synchronization where practical.
+* Explain what important packets synchronize and when they are sent.
 * Keep clientbound and serverbound responsibilities clear.
-* Avoid duplicating authoritative state on the client.
-* Treat the server as authoritative for gameplay state.
+* Avoid duplicating authoritative gameplay state on the client.
+* Treat the server as authoritative for gameplay.
 
 ---
 
-## Worldgen Guidelines
+# Worldgen Guidelines
 
-World generation changes can have large performance and compatibility impacts.
+World generation can have major performance and compatibility impacts.
 
 When changing worldgen:
 
-* Follow existing project worldgen architecture.
-* Avoid unnecessary chunk lookups during generation.
+* Follow existing project architecture.
+* Avoid unnecessary chunk lookups.
 * Avoid forcing neighboring chunks to load.
-* Be careful with biome queries, structure placement, heightmaps, fluids, and feature ordering.
-* Prefer deterministic behavior when world seed and position should control results.
-* Keep generation-time logic separate from runtime ticking systems.
-* Avoid doing work during every world tick that could have been determined during generation.
-* Use data-driven registration where practical.
-* Validate resource locations and generated JSON paths.
+* Be careful with biome queries, structures, heightmaps, fluids, feature ordering, and placement.
+* Prefer deterministic behavior when seed and position should control results.
+* Keep generation-time logic separate from runtime ticking.
+* Avoid calculating at runtime what could safely have been determined during generation.
+* Prefer data-driven registration where appropriate.
+* Validate resource locations.
+* Validate generated JSON paths.
 * Consider compatibility with other terrain, biome, and structure mods.
 
-Large worldgen systems should include documentation under `docs/` when their architecture is not obvious.
+Large worldgen systems should include documentation under `docs/` when the architecture is not obvious.
 
 ---
 
-## Performance Guidelines
+# Performance Guidelines
 
-Performance-sensitive code includes:
+Performance-sensitive areas include:
 
 * Tick handlers.
 * Entity AI.
@@ -448,54 +892,55 @@ Performance-sensitive code includes:
 * Chunk access.
 * Rendering.
 * Networking.
-* Capability or attachment synchronization.
+* Attachments or capability synchronization.
 * Large collections.
 * Data scanning.
 * File I/O.
 * Pathfinding.
-* Repeated registry/resource lookups.
+* Repeated registry or resource lookups.
 
 For performance-sensitive systems:
 
 * Identify the hot path before optimizing.
-* Avoid unnecessary work rather than only making expensive work slightly faster.
-* Prefer event-driven or dirty-state updates over polling when appropriate.
+* Prefer eliminating unnecessary work over merely making unnecessary work faster.
+* Prefer event-driven or dirty-state updates over polling where appropriate.
 * Cache stable values where safe.
-* Avoid caching values whose invalidation rules are unclear.
+* Do not cache values with unclear invalidation rules.
 * Rate-limit expensive checks.
 * Spread large workloads across ticks when latency allows.
 * Avoid blocking the main server thread with file or network I/O.
 * Avoid unbounded collections.
-* Remove stale cached state when worlds, players, chunks, or entities unload.
-* Avoid premature micro-optimization that makes the code much harder to maintain.
+* Remove stale state when worlds, players, chunks, or entities unload.
+* Avoid premature micro-optimization that makes maintenance significantly harder.
 
-Any new per-tick system should clearly justify why it must run at that frequency.
+Any new per-tick system should clearly justify why it needs that frequency.
 
 ---
 
-## Threading & Async Safety
+# Threading & Async Safety
 
-Minecraft state is generally not safe to modify from arbitrary background threads.
+Minecraft state is generally unsafe to modify from arbitrary background threads.
 
 When using asynchronous work:
 
-* Do not modify world, entity, player, registry, or other main-thread-owned Minecraft state from an unsafe thread.
-* Perform expensive pure computation asynchronously only when its inputs can safely be captured.
+* Do not directly modify world, entity, player, registry, or other main-thread-owned Minecraft state from unsafe threads.
+* Perform expensive pure computation asynchronously only when inputs can safely be captured.
 * Schedule Minecraft state changes back onto the appropriate game thread.
-* Avoid creating uncontrolled thread pools.
+* Avoid uncontrolled thread pools.
 * Reuse project executors or standard APIs when available.
-* Ensure async work cannot continue indefinitely after shutdown or world unload.
-* Be careful with concurrent collections and lifecycle cleanup.
+* Ensure asynchronous work cannot continue indefinitely after shutdown or world unload.
+* Handle lifecycle cleanup.
+* Be careful with concurrent collections.
 
-Do not add asynchronous behavior purely because it sounds faster.
+Do not introduce asynchronous behavior merely because it sounds faster.
 
 ---
 
-## Config Guidelines
+# Config Guidelines
 
-Prefer config-driven values when server owners or pack developers may reasonably want to tune behavior.
+Prefer config-driven values when server owners or pack developers may reasonably need to tune behavior.
 
-Examples include:
+Examples:
 
 * Cooldowns.
 * Durations.
@@ -504,14 +949,14 @@ Examples include:
 * Feature toggles.
 * Performance budgets.
 * Rates.
-* Damage values.
+* Damage.
 * Limits.
 
-Do not create config options for internal constants that users should never need to change.
+Do not create config entries for internal constants users should never need to change.
 
 Validate config values where appropriate.
 
-Document units such as:
+Document units including:
 
 * Ticks.
 * Blocks.
@@ -519,21 +964,19 @@ Document units such as:
 * Percentages.
 * Probabilities.
 
-Keep server-authoritative settings synchronized safely when clients require them.
+Synchronize server-authoritative settings safely when clients require them.
 
 ---
 
-## Documentation and Code Comments
+# Documentation and Code Comments
 
-This project should remain understandable to future contributors.
-
-Use comments that explain intent.
+Comments should explain intent, constraints, or non-obvious reasoning.
 
 Good:
 
 ```java
 // Tracks cloak cooldown separately from the active cloak timer so the player
-// cannot instantly re-trigger the ability after it ends.
+// cannot immediately re-trigger the ability after it ends.
 ```
 
 Avoid comments that merely restate code.
@@ -553,36 +996,37 @@ Example:
  * Handles server-side cloak state for players.
  *
  * <p>This class owns cloak activation, duration tracking, and cooldown timing.
- * Client rendering should read synced state instead of duplicating this logic.</p>
+ * Client rendering should read synchronized state instead of duplicating
+ * authoritative gameplay logic.</p>
  */
 ```
 
-For substantial new systems, include a short class-level or documentation explanation covering:
+For substantial systems, document:
 
 * What the system does.
-* Which class or subsystem owns the state.
+* Which subsystem owns authoritative state.
 * What runs on the server.
 * What runs on the client.
 * How state is synchronized.
 * Important lifecycle behavior.
-* Performance considerations when relevant.
-* How the system is tested or manually verified.
+* Performance considerations.
+* Testing strategy.
 
-Avoid creating documentation that only repeats method names or obvious implementation details.
+Avoid documentation that only repeats method or class names.
 
 ---
 
-## Testing Guidelines
+# Testing Guidelines
 
 Tests use JUnit Jupiter 5.
 
-Name test classes:
+Test classes should use:
 
 `*Test`
 
-Mirror the source package structure.
+Mirror the production package structure.
 
-Use behavior-focused test method names such as:
+Use behavior-focused test names such as:
 
 `ignoresEmptyAllocations`
 
@@ -596,32 +1040,30 @@ Use GameTests for behavior requiring:
 * Structures.
 * Game rules.
 * Server lifecycle.
-* Other environment-specific behavior.
+* Other Minecraft-specific behavior.
 
 There is no declared coverage threshold.
 
-Every bug fix should include a regression test where practical.
+Every bug fix should include a regression test when practical.
 
-When adding a regression test:
+Regression tests should:
 
-* Reproduce the old failure condition.
+* Reproduce the old failure.
 * Assert the corrected behavior.
-* Avoid testing unrelated implementation details.
-
-Run relevant tests before considering the task complete.
+* Avoid unrelated implementation details.
 
 If a useful automated test cannot reasonably be added:
 
 * Explain why.
 * Provide manual validation steps.
 
-Do not create meaningless tests solely to increase test count.
+Do not create meaningless tests merely to increase the test count.
 
 ---
 
-## Feature Development Guidelines
+# Feature Development Guidelines
 
-When adding a feature, split it into clear responsibilities when practical:
+When adding a feature, separate responsibilities where practical:
 
 * Registration.
 * Config.
@@ -632,27 +1074,27 @@ When adding a feature, split it into clear responsibilities when practical:
 * Tests or manual validation.
 * Documentation.
 
-For larger features, prefer phased implementation:
+For larger features, phased implementation is preferred:
 
 1. Minimal compile-safe skeleton.
-2. Core gameplay behavior.
+2. Core behavior.
 3. Config and balancing.
 4. Client visuals, audio, or UI.
 5. Tests, documentation, compatibility, and polish.
 
-Keep each phase usable and compile-safe when practical.
+Keep phases usable and compile-safe when practical.
 
-Do not invent a new architecture if the existing project already has a clear suitable pattern.
+Do not invent a new architecture when the project already has a suitable pattern.
 
 Do not add unnecessary dependencies.
 
 Avoid placing an entire major feature in one class.
 
-Prefer composition and clearly separated responsibilities.
+Prefer composition and clear responsibility boundaries.
 
 ---
 
-## Compatibility Guidelines
+# Compatibility Guidelines
 
 Wilderness Odyssey may run alongside many other mods.
 
@@ -660,37 +1102,37 @@ When modifying vanilla or NeoForge behavior:
 
 * Prefer additive behavior over destructive replacement when possible.
 * Avoid assuming Wilderness Odyssey is the only mod modifying a system.
-* Avoid hard dependencies on optional mods unless specifically intended.
+* Avoid hard dependencies on optional mods unless intentionally required.
 * Guard optional integrations safely.
-* Keep compatibility logic isolated from core logic.
-* Avoid directly referencing optional mod classes unless the dependency is known to be loaded.
+* Keep compatibility logic separate from core logic.
+* Avoid directly referencing optional mod classes unless the dependency is loaded.
 * Be especially careful with mixins, worldgen, rendering, shaders, fluids, networking, and registries.
 
-If a change may create compatibility concerns, mention them in the final response.
+Mention meaningful compatibility concerns in the final response.
 
 ---
 
-## Resource and Data Guidelines
+# Resource and Data Guidelines
 
-For JSON, textures, models, shaders, tags, loot tables, recipes, structures, and other resources:
+For JSON, textures, models, shaders, tags, loot tables, recipes, structures, and related resources:
 
 * Follow Minecraft resource naming conventions.
 * Keep paths lowercase where required.
 * Use the `wildernessodysseyapi` namespace.
 * Do not create duplicate resource IDs.
 * Keep generated resources separate from handwritten resources.
-* Review generated diffs after running data generation.
-* Avoid manually editing generated output when the generator should own it.
+* Review generated diffs after data generation.
+* Avoid manually editing generated output when a generator owns it.
 
-When adding player-facing text:
+For player-facing text:
 
 * Prefer translation keys over hardcoded display strings when appropriate.
 
 ---
 
-## Error Handling & Logging
+# Error Handling & Logging
 
-Use logging for information that is useful during development or diagnosis.
+Use logging for information useful during development or diagnosis.
 
 Do not spam logs from:
 
@@ -702,68 +1144,69 @@ Do not spam logs from:
 
 Use appropriate log levels.
 
-Avoid logging sensitive information.
+Do not log secrets or sensitive data.
 
-Do not silently swallow exceptions unless failure is intentionally recoverable and properly handled.
+Do not silently swallow exceptions unless the failure is intentionally recoverable and properly handled.
 
-Error messages should provide enough context to diagnose the failing subsystem.
+Error messages should identify enough context to locate the failing subsystem.
 
-Avoid printing full stack traces repeatedly for an expected recoverable condition.
+Avoid repeatedly printing full stack traces for expected recoverable conditions.
 
 ---
 
-## Security and Secrets
+# Security and Secrets
 
 Never commit:
 
 * API keys.
 * Discord bot tokens.
 * Webhook URLs.
-* Local server IPs or credentials.
-* Private configs.
+* Credentials.
 * Authentication tokens.
-* Crash logs containing personal paths or sensitive information.
+* Private configuration.
+* Sensitive environment files.
+* Crash logs containing sensitive personal paths or credentials.
 * Files from `run/`.
 * IDE-specific secrets.
-* Environment files containing credentials.
 
-If a feature needs a token or external service:
+If a feature requires a token or external service:
 
-* Use an environment variable or ignored local configuration file.
+* Use an environment variable or ignored local configuration.
 * Keep secrets out of source code.
 * Document setup without including real credentials.
-* Never include placeholder values that look like real active secrets.
+* Never use placeholders that resemble active secrets.
 
-Do not expose server-authoritative sensitive information to clients unless necessary.
+Do not expose sensitive server-authoritative information to clients unless necessary.
 
 ---
 
-## Git and Diff Hygiene
+# Git and Diff Hygiene
 
 Keep changes focused on the requested task.
 
 Before finishing:
 
 * Review the final diff.
-* Check for accidental unrelated modifications.
+* Check for unrelated modifications.
 * Check for generated files that should not be committed.
-* Check for debug logging or temporary diagnostics.
-* Check for commented-out experimental code.
+* Check for temporary diagnostics.
+* Check for debug logging.
+* Check for commented-out experiments.
 * Check for temporary assets or test files.
-* Check for local paths or machine-specific values.
+* Check for machine-specific paths.
 * Check for secrets.
 
-Avoid large formatting-only diffs unless formatting was specifically requested.
+Avoid large formatting-only diffs unless formatting was requested.
 
 Do not modify unrelated files simply because they could be improved.
 
 ---
 
-## Commit & Pull Request Guidelines
+# Commit & Pull Request Guidelines
 
-Recent commits use concise lowercase summaries.
+Use concise lowercase commit summaries.
 
-Keep that style while making the scope specific and using an imperative verb.
+Prefer imperative, specific descriptions.
 
 Examples:
 
@@ -773,53 +1216,54 @@ Examples:
 * `optimize weather tick scheduling`
 * `add lab keycard validation`
 
-Keep each commit focused.
+Keep commits focused.
 
 Pull requests should explain:
 
 * What changed.
-* The player-facing impact.
+* Player-facing impact.
 * Relevant issues.
 * Important architecture decisions.
 * Validation commands.
-* Test results.
-* Screenshots or logs for rendering, UI, world-generation, startup, or crash fixes when useful.
+* Validation results.
+* Useful screenshots or logs for UI, rendering, worldgen, startup, or crash fixes.
 
-Do not include generated local output in commits.
+Do not include generated local output.
 
 ---
 
-## Large Refactors
+# Large Refactors
 
-Do not perform large refactors unless they are necessary for the requested task or specifically requested.
+Do not perform large refactors unless required by the requested task or specifically requested.
 
 Before a large refactor:
 
-* Inspect all major callers.
-* Identify API or behavior compatibility risks.
+* Inspect major callers.
+* Identify API compatibility risks.
+* Identify behavioral compatibility risks.
 * Explain the intended architecture.
-* Keep the refactor staged when practical.
+* Stage the work when practical.
 * Preserve behavior unless behavior changes are intentional.
 * Run broader regression validation afterward.
 
-Avoid combining a large refactor with an unrelated feature implementation.
+Do not combine an unrelated feature with a large refactor.
 
 ---
 
-## Repository Audit Tasks
+# Repository Audit Tasks
 
 When asked to audit the repository, inspect for:
 
 * Duplicate or overlapping features.
 * Incomplete implementations.
 * Dead code.
-* TODO/FIXME markers.
+* TODO or FIXME markers.
 * Potential crashes.
 * Incorrect side handling.
 * Registry problems.
 * Event registration issues.
 * Networking trust problems.
-* Mixins with fragile injections.
+* Fragile mixins.
 * Performance hot spots.
 * Unbounded ticking work.
 * Memory leaks.
@@ -837,55 +1281,77 @@ When asked to audit the repository, inspect for:
 
 Prioritize findings by practical impact.
 
-Do not make speculative changes during an audit unless the task also requests fixes.
+Separate:
 
-Separate confirmed problems from possible concerns.
+* Confirmed problems.
+* Likely problems.
+* Possible concerns.
+
+Do not make speculative fixes during an audit unless the task also asks for fixes.
 
 ---
 
-## Final Response Format for AI Agents
+# Final Response Format for AI Agents
 
-After completing a coding task, respond with:
+After completing a coding task, respond with the following sections.
 
-### 1. What changed
+## 1. What changed
 
-* List the important files and systems changed.
-* Keep the summary focused on meaningful changes rather than every trivial edit.
+List meaningful files and systems changed.
 
-### 2. How it works
+Do not enumerate every trivial edit.
 
-* Explain the main classes, methods, events, registries, configs, resources, networking, or other architecture involved.
+## 2. How it works
 
-### 3. How to test
+Explain relevant:
 
-* Give exact relevant Gradle commands.
-* Include in-game testing steps when applicable.
+* Classes.
+* Methods.
+* Events.
+* Registries.
+* Configs.
+* Resources.
+* Networking.
+* Architecture.
 
-### 4. Validation
+Keep this focused on what is necessary to understand the implementation.
 
-State exactly which validation commands were run.
+## 3. How to test
 
-Example:
+Provide exact relevant commands.
 
-`.\gradlew.bat test -PcodexBuildDir=.codex-build`
+Include in-game testing steps when applicable.
 
-Report whether each command:
+## 4. Validation
+
+State exactly which commands were actually run.
+
+For example:
+
+```powershell
+.\gradlew.bat test -PcodexBuildDir=.codex-build --no-parallel
+```
+
+Report each command as:
 
 * Passed.
-* Failed.
-* Was blocked by the environment.
-* Was not run and why.
+* Failed because of code or tests.
+* Blocked by the environment.
+* Not run, with the reason.
 
-Never claim validation passed when the command was not actually executed.
+If NeoForm or Gradle is blocked by a Windows or Codex sandbox access failure, explicitly identify it as an environment-blocked validation result unless evidence shows that project code caused the failure.
 
-### 5. Notes
+Never claim validation passed when a command was not actually executed successfully.
 
-Mention:
+## 5. Notes
+
+Mention relevant:
 
 * Limitations.
 * Assumptions.
 * Compatibility concerns.
+* Environment problems.
 * Deferred work.
-* Useful follow-up ideas.
+* Useful follow-up work.
 
-Keep the final response concise enough to review quickly while still providing the information needed to understand and verify the change.
+Keep the final response concise enough to review quickly.
