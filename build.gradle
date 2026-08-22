@@ -14,6 +14,15 @@ if (codexBuildDir.isPresent()) {
     layout.buildDirectory.set(file(requestedBuildDir.isEmpty() ? '.codex-build' : requestedBuildDir))
 }
 
+// A deprecation audit is stricter than an ordinary build: Gradle DSL/API
+// deprecations fail the same invocation instead of remaining console warnings.
+def requestedTaskNames = gradle.startParameter.taskNames.collect { taskPath ->
+    taskPath.tokenize(':').last()
+}
+if (requestedTaskNames.contains('checkDeprecations')) {
+    gradle.startParameter.warningMode = org.gradle.api.logging.configuration.WarningMode.Fail
+}
+
 
 tasks.named('wrapper', Wrapper).configure {
     // Define wrapper values here so as to not have to always do so when updating gradlew.properties.
@@ -193,7 +202,7 @@ configurations {
 
 repositories {
     maven {
-        url "https://cursemaven.com"
+        url = "https://cursemaven.com"
     }
     maven {
         // Sodium publishes loader-specific developer artifacts here. Restrict
@@ -552,9 +561,6 @@ tasks.register('compareStructures', JavaExec) {
 // a clean checkout before mod-aware blueprints can validate against it. Keep
 // that catalog-refresh invocation single-purpose; every normal resource,
 // packaging, and development invocation retains the generation gate below.
-def requestedTaskNames = gradle.startParameter.taskNames.collect { taskPath ->
-    taskPath.tokenize(':').last()
-}
 def refreshingStructureGenCatalog = requestedTaskNames == ['runData']
 
 // Every packaged or development resource set is regenerated from validated
@@ -590,6 +596,22 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+// Compile production sources into a disposable, non-packaged destination with
+// javac's detailed deprecation categories enabled. -Werror turns each use of a
+// deprecated API (including one marked for removal) into a verification failure.
+tasks.register('checkDeprecations', JavaCompile) {
+    group = 'verification'
+    description = 'Fails on deprecated Java API usage or deprecated Gradle build logic.'
+    source(sourceSets.main.java)
+    classpath = sourceSets.main.compileClasspath
+    destinationDirectory.set(layout.buildDirectory.dir('classes/java/deprecationCheck'))
+    options.compilerArgs.addAll([
+            '-Xlint:deprecation',
+            '-Xlint:removal',
+            '-Werror'
+    ])
 }
 
 tasks.withType(Test).configureEach {
