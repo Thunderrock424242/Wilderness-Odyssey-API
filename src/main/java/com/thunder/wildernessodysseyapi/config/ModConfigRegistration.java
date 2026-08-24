@@ -37,6 +37,7 @@ import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.config.ModConfigEvent;
+import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
@@ -57,6 +58,16 @@ public final class ModConfigRegistration {
      * @param container the mod container that owns the config specs
      */
     public static void register(ModContainer container) {
+        PerformanceConfigMigration.MigrationResult performanceMigration = PerformanceConfigMigration.prepare(
+                FMLPaths.CONFIGDIR.get().resolve(MOD_ID)
+        );
+        if (performanceMigration == PerformanceConfigMigration.MigrationResult.INVALID_DIRECTORY
+                || performanceMigration == PerformanceConfigMigration.MigrationResult.FAILED) {
+            throw new IllegalStateException(
+                    "Cannot safely prepare the unified Wilderness performance config: " + performanceMigration
+            );
+        }
+
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-structures.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC,
@@ -75,10 +86,8 @@ public final class ModConfigRegistration {
 
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, BackgroundEfficiencyConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-background-efficiency-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TickEngineConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-tick-engine-server.toml");
+        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PerformanceServerConfig.CONFIG_SPEC,
+                CONFIG_FOLDER + PerformanceServerConfig.FILE_NAME);
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StudioConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-development-studio-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER,
@@ -106,8 +115,6 @@ public final class ModConfigRegistration {
                 CONFIG_FOLDER + "wildernessodysseyapi-ecosystem-server.toml");
         ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, VegetationConfig.CONFIG_SPEC,
                 CONFIG_FOLDER + "wildernessodysseyapi-vegetation-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, DataEngineConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-data-engine-server.toml");
     }
 
     /** Applies runtime-backed settings after NeoForge loads a config file. */
@@ -130,10 +137,12 @@ public final class ModConfigRegistration {
             if (server != null) {
                 server.execute(() -> AsyncTaskManager.reload(AsyncThreadingConfig.values()));
             }
-        } else if (config.getSpec() == BackgroundEfficiencyConfig.CONFIG_SPEC) {
-            applyOnServerThread(() -> BackgroundEfficiencyManager.reload(BackgroundEfficiencyConfig.values()));
-        } else if (config.getSpec() == TickEngineConfig.CONFIG_SPEC) {
-            applyOnServerThread(() -> TickEngine.reload(TickEngineConfig.values()));
+        } else if (config.getSpec() == PerformanceServerConfig.CONFIG_SPEC) {
+            applyOnServerThread(() -> {
+                BackgroundEfficiencyManager.reload(BackgroundEfficiencyConfig.values());
+                TickEngine.reload(TickEngineConfig.values());
+                DataEngine.get().reload(DataEngineConfig.values());
+            });
         } else if (config.getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
         } else if (config.getSpec() == WeatherConfig.CONFIG_SPEC) {
@@ -151,16 +160,6 @@ public final class ModConfigRegistration {
                     DistantWildlifeManager.get().markAllPlayersDirty(server);
                     EcosystemSimulationManager.get().onConfigurationReload(server);
                 });
-            }
-        } else if (config.getSpec() == DataEngineConfig.CONFIG_SPEC) {
-            DataEngineConfig.Values values = DataEngineConfig.values();
-            var server = ServerLifecycleHooks.getCurrentServer();
-            if (server == null) {
-                DataEngine.get().reload(values);
-            } else {
-                // Queue/budget state is server-owned even though config events
-                // originate on the mod bus during live reload.
-                server.execute(() -> DataEngine.get().reload(values));
             }
         }
     }

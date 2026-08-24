@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.simulation;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.weather.integration.WeatherPerformanceIntegration;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -22,14 +23,18 @@ public final class WeatherServerEvents {
     private WeatherServerEvents() {
     }
 
-    /** Advances throttled dimension simulations after normal server tick work. */
+    /** Advances world effects and the disabled-Data-Engine fallback path. */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (!event.hasTime()) {
-            return;
-        }
+        WeatherPerformanceIntegration.runFallbackIfDataEngineDisabled(
+                event.getServer(),
+                event::hasTime
+        );
         for (ServerLevel level : event.getServer().getAllLevels()) {
-            WeatherAuthority.get().tick(level);
+            if (!event.hasTime()) {
+                break;
+            }
+            WeatherAuthority.get().tickWorldEffects(level, event::hasTime);
         }
     }
 
@@ -69,6 +74,7 @@ public final class WeatherServerEvents {
     @SubscribeEvent
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel() instanceof ServerLevel level) {
+            WeatherPerformanceIntegration.forgetLevel(level);
             WeatherAuthority.get().unload(level);
         }
     }
@@ -76,6 +82,7 @@ public final class WeatherServerEvents {
     /** Releases process-scoped network and cache state after worlds have saved. */
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
+        WeatherPerformanceIntegration.shutdown();
         WeatherAuthority.get().shutdown();
     }
 }

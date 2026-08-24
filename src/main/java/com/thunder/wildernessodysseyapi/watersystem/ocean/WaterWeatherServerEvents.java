@@ -1,11 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.ocean;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WeatherHydrologyManager;
-import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedSimulationManager;
-import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
-import com.thunder.wildernessodysseyapi.watersystem.water.network.OceanSeaStateSynchronizer;
-import com.thunder.wildernessodysseyapi.watersystem.water.network.WatershedSynchronizer;
+import com.thunder.wildernessodysseyapi.watersystem.water.integration.WaterPerformanceIntegration;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -23,28 +19,16 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class WaterWeatherServerEvents {
 
-    private static final int NETWORK_INTERVAL_TICKS = 20;
-
     private WaterWeatherServerEvents() {
     }
 
-    /** Advances and synchronizes regional sea response once server work is complete. */
+    /** Preserves synchronous regional maintenance when Data Engine is disabled. */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (!event.hasTime()) {
-            return;
-        }
-        for (ServerLevel level : event.getServer().getAllLevels()) {
-            OceanSeaStateField.tickLevel(level);
-            WatershedSimulationManager.tickLevel(level);
-            if (!WaterSimulationConfig.watershedSimulationEnabled()) {
-                WeatherHydrologyManager.tickLevel(level);
-            }
-            if (Math.floorMod(level.getGameTime(), NETWORK_INTERVAL_TICKS) == 0L) {
-                OceanSeaStateSynchronizer.syncLevel(level);
-                WatershedSynchronizer.syncLevel(level);
-            }
-        }
+        WaterPerformanceIntegration.runFallbackIfDataEngineDisabled(
+                event.getServer(),
+                event::hasTime
+        );
     }
 
     /** Clears the unloading dimension's ephemeral wave-response cells. */

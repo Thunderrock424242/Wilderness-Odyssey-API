@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.ecosystem.distant;
 
+import com.thunder.wildernessodysseyapi.ecosystem.integration.EcosystemPerformanceIntegration;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
+import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -18,12 +20,17 @@ public final class DistantWildlifeServerEvents {
     /** Runs bounded group and transition work after ordinary server simulation. */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        // Cell levels own AI suspension and must advance even when the server
-        // has exhausted its optional tick-time budget.
-        EcosystemSimulationManager.get().tick(event.getServer());
-        if (event.hasTime()) {
-            DistantWildlifeManager.get().tick(event.getServer());
-        }
+        // Player-driven cell changes own AI restoration and remain immediate.
+        // Periodic scans and distant-population work use the bounded engines.
+        TickEngine.metrics().time(
+                "ecosystem",
+                () -> EcosystemSimulationManager.get().tick(event.getServer()),
+                event.getServer().getTickCount()
+        );
+        EcosystemPerformanceIntegration.runFallbackIfDataEngineDisabled(
+                event.getServer(),
+                event::hasTime
+        );
     }
 
     /** Requests the first full snapshot after login. */
@@ -70,6 +77,7 @@ public final class DistantWildlifeServerEvents {
     /** Clears process-scoped cursors only after the server has saved its worlds. */
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
+        EcosystemPerformanceIntegration.shutdown();
         EcosystemSimulationManager.get().shutdown(event.getServer());
         DistantWildlifeManager.get().shutdown();
     }

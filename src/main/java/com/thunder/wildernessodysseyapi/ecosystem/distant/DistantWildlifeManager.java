@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.ecosystem.api.WildlifeSimulationLod;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileManager;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.network.DistantWildlifeSyncPayload;
+import com.thunder.wildernessodysseyapi.ecosystem.integration.EcosystemPerformanceIntegration;
 import com.thunder.wildernessodysseyapi.ecosystem.memory.EnvironmentalMemoryManager;
 import com.thunder.wildernessodysseyapi.ecosystem.service.EcosystemServices;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.AbstractEcosystemModel;
@@ -75,15 +76,25 @@ public final class DistantWildlifeManager {
         return INSTANCE;
     }
 
-    /** Advances bounded transition work from the server post-tick event. */
+    /** Advances bounded transition work from the ecosystem Data Engine adapter. */
     public void tick(MinecraftServer server) {
         EcosystemConfig.DistantWildlifeSettings settings = EcosystemConfig.distantWildlifeSettings();
-        int serverTick = server.getTickCount();
+        long serverTick = server.getTickCount();
 
-        if (settings.enabled() && serverTick % MATERIALIZATION_INTERVAL_TICKS == 0) {
-            for (ServerLevel level : server.getAllLevels()) {
+        for (ServerLevel level : server.getAllLevels()) {
+            RuntimeState runtime = runtime(level);
+            boolean populationUpdateDue = intervalElapsed(
+                    serverTick,
+                    runtime.lastPopulationUpdateTick,
+                    settings.updateInterval()
+            );
+            if (settings.enabled() && intervalElapsed(
+                    serverTick,
+                    runtime.lastMaterializationTick,
+                    MATERIALIZATION_INTERVAL_TICKS
+            )) {
+                runtime.lastMaterializationTick = serverTick;
                 long started = System.nanoTime();
-                RuntimeState runtime = runtime(level);
                 int materializedBefore = runtime.materializedSinceUpdate;
                 materializeNearbyGroups(
                         level,
@@ -95,27 +106,30 @@ public final class DistantWildlifeManager {
                     runtime.transitionSyncDirty = true;
                 }
                 if (runtime.transitionSyncDirty
-                        && serverTick % TRANSITION_SYNC_INTERVAL_TICKS == 0
-                        && serverTick % settings.updateInterval() != 0) {
+                        && !populationUpdateDue
+                        && intervalElapsed(
+                                serverTick,
+                                runtime.lastTransitionSyncTick,
+                                TRANSITION_SYNC_INTERVAL_TICKS
+                        )) {
                     runtime.transitionPacketsSinceUpdate += syncEnabled(
                             level, DistantWildlifeSavedData.get(level), settings
                     );
                     runtime.transitionSyncDirty = false;
+                    runtime.lastTransitionSyncTick = serverTick;
                 }
                 EcosystemSimulationManager.get().recordExternalWork(
                         level, level.getGameTime(), System.nanoTime() - started
                 );
             }
-        }
 
-        if (serverTick % settings.updateInterval() != 0) {
-            return;
-        }
-        for (ServerLevel level : server.getAllLevels()) {
-            if (settings.enabled()) {
-                updateEnabledLevel(level, settings);
-            } else {
-                syncDisabled(level, settings);
+            if (populationUpdateDue) {
+                runtime.lastPopulationUpdateTick = serverTick;
+                if (settings.enabled()) {
+                    updateEnabledLevel(level, settings);
+                } else {
+                    syncDisabled(level, settings);
+                }
             }
         }
     }
@@ -123,6 +137,7 @@ public final class DistantWildlifeManager {
     /** Forces a fresh enabled/disabled snapshot on the next configured pass. */
     public void markPlayerDirty(ServerPlayer player) {
         playerSyncEnabled.remove(player);
+        EcosystemPerformanceIntegration.markClientStateDirty("distant wildlife player lifecycle changed");
     }
 
     /** Marks every connected player dirty after a server config reload. */
@@ -157,6 +172,31 @@ public final class DistantWildlifeManager {
         return runtime == null ? Diagnostics.EMPTY : runtime.diagnostics;
     }
 
+    /** Sends only player snapshots invalidated by login, respawn, travel, or config changes. */
+    public int syncDirtyPlayers(MinecraftServer server) {
+        EcosystemConfig.DistantWildlifeSettings settings = EcosystemConfig.distantWildlifeSettings();
+        int packets = 0;
+        for (ServerLevel level : server.getAllLevels()) {
+            if (settings.enabled()) {
+                int levelPackets = syncEnabled(
+                        level,
+                        DistantWildlifeSavedData.get(level),
+                        settings,
+                        true
+                );
+                RuntimeState runtime = runtime(level);
+                runtime.transitionPacketsSinceUpdate += levelPackets;
+                if (levelPackets > 0) {
+                    runtime.lastPlayerSyncTick = level.getGameTime();
+                }
+                packets += levelPackets;
+            } else {
+                packets += syncDisabled(level, settings);
+            }
+        }
+        return packets;
+    }
+
     private void updateEnabledLevel(
             ServerLevel level,
             EcosystemConfig.DistantWildlifeSettings settings
@@ -172,7 +212,10 @@ public final class DistantWildlifeManager {
                 runtime
         );
         advanceGroups(level, data, settings);
-        int packets = syncEnabled(level, data, settings) + runtime.transitionPacketsSinceUpdate;
+        int currentSyncPackets = runtime.lastPlayerSyncTick == level.getGameTime()
+                ? 0
+                : syncEnabled(level, data, settings);
+        int packets = currentSyncPackets + runtime.transitionPacketsSinceUpdate;
         runtime.transitionSyncDirty = false;
         runtime.diagnostics = new Diagnostics(
                 true,
@@ -565,11 +608,23 @@ public final class DistantWildlifeManager {
             DistantWildlifeSavedData data,
             EcosystemConfig.DistantWildlifeSettings settings
     ) {
+        return syncEnabled(level, data, settings, false);
+    }
+
+    private int syncEnabled(
+            ServerLevel level,
+            DistantWildlifeSavedData data,
+            EcosystemConfig.DistantWildlifeSettings settings,
+            boolean dirtyOnly
+    ) {
         int packets = 0;
         long gameTime = level.getGameTime();
         double maximumDistanceSquared = (double) settings.distantWildlifeDistance()
                 * settings.distantWildlifeDistance();
         for (ServerPlayer player : level.players()) {
+            if (dirtyOnly && playerSyncEnabled.containsKey(player)) {
+                continue;
+            }
             List<DistantWildlifeSyncPayload.GroupSnapshot> relevant = snapshotsForPlayer(
                     data,
                     player.position(),
@@ -622,10 +677,11 @@ public final class DistantWildlifeManager {
         return List.copyOf(snapshots);
     }
 
-    private void syncDisabled(
+    private int syncDisabled(
             ServerLevel level,
             EcosystemConfig.DistantWildlifeSettings settings
     ) {
+        int packets = 0;
         for (ServerPlayer player : level.players()) {
             if (Boolean.FALSE.equals(playerSyncEnabled.get(player))) {
                 continue;
@@ -637,7 +693,15 @@ public final class DistantWildlifeManager {
                     settings
             ));
             playerSyncEnabled.put(player, false);
+            packets++;
         }
+        return packets;
+    }
+
+    static boolean intervalElapsed(long currentTick, long lastTick, int intervalTicks) {
+        return lastTick == Long.MIN_VALUE
+                || currentTick < lastTick
+                || currentTick - lastTick >= Math.max(1, intervalTicks);
     }
 
     private static boolean isSafeToAbstract(PathfinderMob animal, long gameTime, RuntimeState runtime) {
@@ -781,5 +845,9 @@ public final class DistantWildlifeManager {
         private int materializedSinceUpdate;
         private int transitionPacketsSinceUpdate;
         private boolean transitionSyncDirty;
+        private long lastMaterializationTick = Long.MIN_VALUE;
+        private long lastPopulationUpdateTick = Long.MIN_VALUE;
+        private long lastTransitionSyncTick = Long.MIN_VALUE;
+        private long lastPlayerSyncTick = Long.MIN_VALUE;
     }
 }

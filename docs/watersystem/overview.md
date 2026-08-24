@@ -216,6 +216,42 @@ is cleared and consumers fall back to Minecraft's dimension-wide rain and
 thunder levels. Full configuration and verification details are documented in
 [`weather-coupling.md`](weather-coupling.md).
 
+## Phase 3 Data and Tick Engine integration
+
+`WaterPerformanceIntegration` is the bounded scheduling adapter for optional
+server-owned water maintenance. It does not replace a water simulator or data
+store. Every task calls the existing authoritative owner on the logical server
+thread, retains its loaded-only chunk rules, and records time under the Tick
+Engine's `water` subsystem.
+
+| Coalescing lane | Normal minimum cadence | Existing owner |
+| --- | ---: | --- |
+| Regional sea state and hydrology | 1 tick | `OceanSeaStateField`, `WatershedSimulationManager`, legacy hydrology fallback |
+| Player-bounded shoreline flow | 1 tick | `ShorelineWaterManager` |
+| Local SPH publication | 4 ticks | `SphSnapshotSynchronizer` |
+| Canonical sparse-volume publication | 10 ticks | `WaterVolumeSynchronizer` |
+| Regional ocean/watershed publication | 20 ticks | Existing regional synchronizers |
+| Periodic mobile-SPH persistence | 20 ticks | `SPHSimulationManager` |
+
+Each dimension/lane pair has a distinct session-local coalescing key. The Data
+Engine rechecks Minecraft's live tick-time allowance and its shared non-critical
+budget between queued units. A delayed unit stays due, successful completion
+advances only that lane, and recovery runs it once rather than replaying every
+missed interval. Under severe Tick Engine pressure the central non-suspendable
+poll can expand to at most 100 ticks. If the Data Engine is disabled, a bounded
+synchronous fallback runs the same units and rechecks the live allowance before
+each one.
+
+Gameplay-critical SPH collision, motion, and canonical settlement continue on
+the direct server tick. Those operations query block collision/voxel state and
+mutate authoritative water, so they are not sent to worker threads. Watershed
+SavedData, packet codecs, per-player payload bounds, client snapshots, render
+uploads, vanilla-fluid compatibility, and chunk lifecycle ownership are
+unchanged. Phase 3 therefore proves central scheduling, coalescing, lifecycle,
+and measurement; a representative multiplayer profile is still required before
+claiming an MSPT, allocation, or network improvement or proposing an async water
+calculation boundary.
+
 ## Entity hydrodynamics
 
 Boats, items, and living entities use the same `WaterBuoyancyProvider` boundary.

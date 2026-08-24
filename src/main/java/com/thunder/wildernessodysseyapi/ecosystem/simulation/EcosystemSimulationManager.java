@@ -50,10 +50,41 @@ public final class EcosystemSimulationManager {
         return INSTANCE;
     }
 
-    /** Advances bounded cell classification and entity suspension for every dimension. */
+    /** Advances immediate player-driven cell classification for every dimension. */
     public void tick(MinecraftServer server) {
         for (ServerLevel level : server.getAllLevels()) {
             tickLevel(level);
+        }
+    }
+
+    /**
+     * Runs periodic loaded-wildlife scans from the bounded Data Engine path.
+     *
+     * <p>Only already-loaded entities are inspected. A player entering a new
+     * ecosystem cell still performs the immediate scan in {@link #tick} so
+     * manager-owned AI suspension cannot delay visible wildlife recovery.</p>
+     */
+    public void runOptionalMaintenance(MinecraftServer server) {
+        for (ServerLevel level : server.getAllLevels()) {
+            LevelRuntime runtime = runtimes.get(level);
+            if (runtime == null || !runtime.wildlifeScanRequested) {
+                continue;
+            }
+            EcosystemSimulationSettings settings = EcosystemSimulationSettings.fromConfig();
+            if (!settings.enabled()) {
+                runtime.wildlifeScanRequested = false;
+                continue;
+            }
+
+            long gameTime = level.getGameTime();
+            beginMetricsTick(runtime, gameTime);
+            WildlifeScanMetrics scan = scanLoadedWildlife(level, runtime, settings);
+            applyWildlifeScan(runtime, gameTime, scan);
+            runtime.managerNanos += scan.elapsedNanos();
+            int regionUpdates = runtime.metrics.tick() == gameTime
+                    ? runtime.metrics.regionUpdates()
+                    : 0;
+            publishMetrics(level, runtime, gameTime, regionUpdates);
         }
     }
 
@@ -267,25 +298,30 @@ public final class EcosystemSimulationManager {
         if (!settings.enabled()) {
             resumeAll(level);
             runtime.clearCells();
-            publishMetrics(level, runtime, gameTime, 0, System.nanoTime() - started);
+            runtime.managerNanos += Math.max(0L, System.nanoTime() - started);
+            publishMetrics(level, runtime, gameTime, 0);
             return;
         }
 
-        boolean coverageDue = playersMovedCells
-                || gameTime - runtime.lastCoverageRefresh >= settings.regionalUpdateInterval();
+        boolean periodicCoverageDue = intervalElapsed(
+                gameTime,
+                runtime.lastCoverageRefresh,
+                settings.regionalUpdateInterval()
+        );
+        boolean coverageDue = playersMovedCells || periodicCoverageDue;
         if (coverageDue) {
             scheduleKnownCells(level, runtime, settings);
             runtime.lastCoverageRefresh = gameTime;
         }
         int regionUpdates = processCellQueue(level, runtime, settings);
-        if (coverageDue) {
+        if (playersMovedCells) {
             WildlifeScanMetrics scan = scanLoadedWildlife(level, runtime, settings);
-            runtime.lastWildlifeScanTick = gameTime;
-            runtime.lastScannedLoadedEntities = scan.scannedLoadedEntities();
-            runtime.lastProfiledWildlife = scan.profiledWildlife();
-            runtime.lastWildlifeScanNanos = scan.elapsedNanos();
+            applyWildlifeScan(runtime, gameTime, scan);
+        } else if (periodicCoverageDue) {
+            runtime.wildlifeScanRequested = true;
         }
-        publishMetrics(level, runtime, gameTime, regionUpdates, System.nanoTime() - started);
+        runtime.managerNanos += Math.max(0L, System.nanoTime() - started);
+        publishMetrics(level, runtime, gameTime, regionUpdates);
     }
 
     // Only cells with actual ecosystem relevance are queued; empty radius grids are never built.
@@ -386,6 +422,18 @@ public final class EcosystemSimulationManager {
         );
     }
 
+    private static void applyWildlifeScan(
+            LevelRuntime runtime,
+            long gameTime,
+            WildlifeScanMetrics scan
+    ) {
+        runtime.lastWildlifeScanTick = gameTime;
+        runtime.lastScannedLoadedEntities = scan.scannedLoadedEntities();
+        runtime.lastProfiledWildlife = scan.profiledWildlife();
+        runtime.lastWildlifeScanNanos = scan.elapsedNanos();
+        runtime.wildlifeScanRequested = false;
+    }
+
     private static void suspendAi(PathfinderMob animal, AnimalNeedsState needs) {
         if (needs.simulationAiSuspended()) {
             return;
@@ -459,8 +507,7 @@ public final class EcosystemSimulationManager {
             ServerLevel level,
             LevelRuntime runtime,
             long gameTime,
-            int regionUpdates,
-            long managerNanos
+            int regionUpdates
     ) {
         int active = 0;
         int near = 0;
@@ -491,7 +538,7 @@ public final class EcosystemSimulationManager {
                 runtime.lastScannedLoadedEntities,
                 runtime.lastProfiledWildlife,
                 runtime.lastWildlifeScanNanos,
-                runtime.entityEvaluationNanos + runtime.externalNanos + Math.max(0L, managerNanos)
+                runtime.entityEvaluationNanos + runtime.externalNanos + runtime.managerNanos
         );
     }
 
@@ -500,7 +547,14 @@ public final class EcosystemSimulationManager {
             runtime.metricsTick = gameTime;
             runtime.entityEvaluationNanos = 0L;
             runtime.externalNanos = 0L;
+            runtime.managerNanos = 0L;
         }
+    }
+
+    private static boolean intervalElapsed(long currentTick, long lastTick, int intervalTicks) {
+        return lastTick == Long.MIN_VALUE
+                || currentTick < lastTick
+                || currentTick - lastTick >= Math.max(1, intervalTicks);
     }
 
     private static void queueFirst(LevelRuntime runtime, long key) {
@@ -546,11 +600,13 @@ public final class EcosystemSimulationManager {
         private long metricsTick = Long.MIN_VALUE;
         private long entityEvaluationNanos;
         private long externalNanos;
+        private long managerNanos;
         private long lastWildlifeScanTick;
         private int lastScannedLoadedEntities;
         private int lastProfiledWildlife;
         private long lastWildlifeScanNanos;
         private int lastFullySimulatedEntities;
+        private boolean wildlifeScanRequested;
         private EcosystemSimulationMetrics.Snapshot metrics = EcosystemSimulationMetrics.Snapshot.EMPTY;
 
         private void clearCells() {
@@ -562,6 +618,7 @@ public final class EcosystemSimulationManager {
             lastProfiledWildlife = 0;
             lastWildlifeScanNanos = 0L;
             lastFullySimulatedEntities = 0;
+            wildlifeScanRequested = false;
         }
     }
 }
