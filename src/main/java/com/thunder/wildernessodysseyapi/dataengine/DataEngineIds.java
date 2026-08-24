@@ -10,6 +10,11 @@ public final class DataEngineIds {
             ModConstants.MOD_ID,
             "data_engine_debug_metrics"
     );
+    /** Batched client-visual vegetation snapshots for newly tracked chunks. */
+    public static final ResourceLocation REACTIVE_VEGETATION = ResourceLocation.fromNamespaceAndPath(
+            ModConstants.MOD_ID,
+            "reactive_vegetation"
+    );
 
     private DataEngineIds() {
     }

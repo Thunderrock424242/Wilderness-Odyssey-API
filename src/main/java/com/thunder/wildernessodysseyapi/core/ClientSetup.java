@@ -10,6 +10,7 @@ import com.thunder.wildernessodysseyapi.temporalrift.client.RiftCoreBlockEntityR
 import com.thunder.wildernessodysseyapi.temporalrift.client.TemporalRiftShaders;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockEntities;
 import com.thunder.wildernessodysseyapi.vegetation.client.ReactiveVegetationClientColors;
+import com.thunder.wildernessodysseyapi.vegetation.client.ReactiveVegetationDataEngineClient;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterShaders;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.VolumetricCloudShaders;
@@ -54,6 +55,7 @@ public class ClientSetup {
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         DebugPageRegistry.bootstrapDefaults();
+        ReactiveVegetationDataEngineClient.register();
         ModConstants.LOGGER.info("[Wilderness Debug HUD] Custom debug overlay registered");
         ModConstants.LOGGER.info("[Wilderness Debug HUD] Visible-overlay arrow paging and scrolling active");
         ModConstants.LOGGER.info("[Wilderness Debug HUD] Registered {} debug pages", DebugPageRegistry.size());

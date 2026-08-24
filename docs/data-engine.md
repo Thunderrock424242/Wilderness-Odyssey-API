@@ -16,6 +16,20 @@ Weather is the second production adopter. `weather_runtime` converts the configu
 
 Water is the third production adopter. `water_runtime` splits optional per-level maintenance into distinct coalescing lanes for regional sea/hydrology state, shoreline flow, local SPH snapshots, canonical-volume snapshots, regional network publication, and periodic SPH persistence. The central queue therefore rechecks Minecraft's live time allowance and the shared Data Engine budget between units instead of one event handler running every due water owner as a block. Successful completion advances each lane independently; delay, queue coalescing, or tick-counter rollback creates no catch-up loop. Tick Engine pressure may expand the central poll to at most 100 ticks, but the non-suspendable water policy ensures that persistent gameplay state continues to advance. Disabling the Data Engine uses the same bounded lanes synchronously and rechecks the live allowance before each one. Canonical water storage, watershed and sea-state SavedData, existing payload codecs, player-interest bounds, and loaded-chunk-only rules remain owned by their established subsystems. Gameplay-critical SPH collision, motion, and settlement remain on the direct server tick because they read and mutate live Minecraft state; no water worker-thread migration is claimed without a detached snapshot boundary and representative profiling evidence.
 
+Reactive Vegetation is the Phase 4 production networking adopter. Its burst of
+initial climate snapshots created by normal chunk tracking is encoded with the
+existing `ReactiveVegetationSyncPayload` codec and queued as normal-priority
+`reactive_vegetation` deltas. Entries for the same player, dimension, and chunk
+coalesce to the newest complete snapshot, then share the bounded
+`DataPacketBatch` transport. The client handler decodes back into the existing dimension-aware,
+revision-checked vegetation store; the Data Engine does not own chunk tracking
+or plant state. Visual changes after initial tracking remain direct packets so
+an already visible chunk is not deliberately delayed. A disabled engine,
+disabled `networkBatching`, or a rejected bounded-queue submission uses the
+original direct payload immediately. Network protocol version 22 makes the new
+client handler a required connection capability instead of silently accepting
+an incompatible client.
+
 ## Pipeline
 
 ```text
@@ -213,7 +227,7 @@ Queue and async structural bounds changed during a live config reload apply on t
 
 ## Metrics and debugging
 
-The engine measures submissions, processed/coalesced/failed updates, dirty and queued gauges, queue peak, network batches/entries/estimated bytes, cache hits/misses/entries, async submitted/completed/rejected/queued work, main and worker processing time, interest filtering, dropped/superseded background work, backpressure, and per-system totals.
+The engine measures submissions, processed/coalesced/failed updates, dirty and queued gauges, queue peak, network batches/entries/estimated bytes, cache hits/misses/entries, async submitted/completed/rejected/queued work, main and worker processing time, interest filtering, dropped/superseded background work, backpressure, and per-system totals. Per-system totals now include the real packet batches containing that system, its entry count, and its estimated encoded delta bytes; a mixed packet counts once for every represented system while the global total still counts one packet.
 
 Commands require permission level 2:
 
@@ -245,7 +259,7 @@ The existing paged F3 HUD includes `WO DATA ENGINE`. Only a permission-level 2 p
 1. Ecosystem: first production phase integrated. Continue profiling the periodic scan and migrate only proven immutable calculations; retain server authority, existing packet compatibility, and population persistence.
 2. Weather: Phase 2 is complete through Phase 2A scheduling/coalesced publication and Phase 2B immutable cell calculation. `WeatherDataEngineGameTests` closes the loaded-server correctness gate by creating real level-owned cells and asserting the normal schedule, one shared-worker completion, revision-checked server-thread apply, and zero rejection/failure delta; the same server run confirms Data Engine initialization and normal shutdown. This is correctness evidence, not a representative performance profile. Any later network phase is measurement-gated and must retain `WeatherAuthority`, payload-v4 full-snapshot recovery, and client interpolation ownership.
 3. Water: Phase 3 is complete for bounded scheduling/coalescing and Tick Engine measurement. `WaterPerformanceIntegrationTest` covers cadence, pressure, key separation, overflow, first-run behavior, and tick rollback; the loaded-server integration test requires `water_runtime` registration, positive processed work, and no failure delta. This is correctness and lifecycle evidence, not a representative performance profile. Any future async water phase remains measurement-gated and must first define an immutable input, pure computation, and bounded revision-checked server-thread apply without replacing canonical water storage, vanilla-fluid compatibility, chunk ownership, or render-thread upload ownership.
-4. Networking-heavy systems: move repeated compatible small payloads to explicit codecs and bounded batches one subsystem at a time.
+4. Networking-heavy systems: Phase 4 is complete for Reactive Vegetation's bursty initial chunk snapshots. Keep later migrations subsystem-specific; weather recovery snapshots, water correctness-sensitive streams, and immediate gameplay changes retain their established transports until representative measurement justifies a compatible move.
 5. Aether and analytics: use event-driven aggregation and shared async workers, with bounded persistence queues.
 6. Labs/power: convert power changes into explicit server-owned events driving doors/lights/alarms; do not poll every component every tick.
 

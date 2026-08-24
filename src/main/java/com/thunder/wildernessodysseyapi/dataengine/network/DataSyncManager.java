@@ -193,7 +193,7 @@ public final class DataSyncManager {
                 DataPacketBatch batch = new DataPacketBatch(entries);
                 try {
                     PacketDistributor.sendToPlayer(player, batch);
-                    metrics.recordNetworkBatch(entries.size(), batch.approximateEncodedBytes());
+                    metrics.recordNetworkBatch(entries, batch.approximateEncodedBytes());
                 } catch (RuntimeException exception) {
                     metrics.recordFailure(entries.getFirst().systemId());
                     ModConstants.LOGGER.error(
@@ -233,7 +233,7 @@ public final class DataSyncManager {
         DataPacketBatch batch = new DataPacketBatch(List.of(delta));
         try {
             PacketDistributor.sendToPlayer(player, batch);
-            metrics.recordNetworkBatch(1, batch.approximateEncodedBytes());
+            metrics.recordNetworkBatch(List.of(delta), batch.approximateEncodedBytes());
             return true;
         } catch (RuntimeException exception) {
             metrics.recordFailure(delta.systemId());
