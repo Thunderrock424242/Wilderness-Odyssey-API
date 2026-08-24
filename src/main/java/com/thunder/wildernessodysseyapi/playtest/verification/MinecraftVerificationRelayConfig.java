@@ -1,19 +1,24 @@
 package com.thunder.wildernessodysseyapi.playtest.verification;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * Server-side Discord webhook relay settings for official playtest verification.
  */
 public final class MinecraftVerificationRelayConfig {
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec CONFIG_SPEC;
 
-    private static final ModConfigSpec.BooleanValue ENABLE_SERVER_VERIFICATION_RELAY;
-    private static final ModConfigSpec.ConfigValue<String> DISCORD_VERIFICATION_WEBHOOK_URL;
-    private static final ModConfigSpec.IntValue REQUEST_TIMEOUT_SECONDS;
+    private static ModConfigSpec.BooleanValue ENABLE_SERVER_VERIFICATION_RELAY;
+    private static ModConfigSpec.ConfigValue<String> DISCORD_VERIFICATION_WEBHOOK_URL;
+    private static ModConfigSpec.IntValue REQUEST_TIMEOUT_SECONDS;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines the verification-relay category in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
 
         builder.comment("Server-side Minecraft account verification relay settings.").push("verificationRelay");
 
@@ -32,8 +37,6 @@ public final class MinecraftVerificationRelayConfig {
                 .defineInRange("requestTimeoutSeconds", 10, 1, 60);
 
         builder.pop();
-
-        CONFIG_SPEC = builder.build();
     }
 
     private MinecraftVerificationRelayConfig() {

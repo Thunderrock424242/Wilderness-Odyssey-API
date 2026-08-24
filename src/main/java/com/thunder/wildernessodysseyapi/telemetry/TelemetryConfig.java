@@ -1,21 +1,28 @@
 package com.thunder.wildernessodysseyapi.telemetry;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * Server-wide telemetry configuration options.
  */
 public final class TelemetryConfig {
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec CONFIG_SPEC;
 
-    public static final ModConfigSpec.BooleanValue MASTER_ENABLED;
-    public static final ModConfigSpec.IntValue QUEUE_MAX_SIZE;
-    public static final ModConfigSpec.IntValue QUEUE_FLUSH_INTERVAL_TICKS;
-    public static final ModConfigSpec.IntValue QUEUE_FLUSH_BATCH_SIZE;
+    public static ModConfigSpec.BooleanValue MASTER_ENABLED;
+    public static ModConfigSpec.IntValue QUEUE_MAX_SIZE;
+    public static ModConfigSpec.IntValue QUEUE_FLUSH_INTERVAL_TICKS;
+    public static ModConfigSpec.IntValue QUEUE_FLUSH_BATCH_SIZE;
 
-    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
+    private static ModConfigSpec.Builder BUILDER;
 
     static {
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines the telemetry-master category in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
+        BUILDER = builder;
         BUILDER.push("telemetry");
 
         MASTER_ENABLED = BUILDER.comment("Master toggle for all telemetry features.")
@@ -31,8 +38,7 @@ public final class TelemetryConfig {
                 .defineInRange("queueFlushBatchSize", 32, 1, 512);
 
         BUILDER.pop();
-
-        CONFIG_SPEC = BUILDER.build();
+        BUILDER = null;
     }
 
     private TelemetryConfig() {

@@ -81,9 +81,10 @@ Studio access is server-authoritative. Both conditions must pass:
 The server config is generated at:
 
 ```text
-config/wildernessodysseyapi/wildernessodysseyapi-development-studio-server.toml
+config/wildernessodysseyapi/wildernessodysseyapi-server.toml
 ```
 
+Development Studio settings are grouped under `[development_studio]`.
 `allowInNormalWorlds` defaults to `false`. Every request, including read-only refreshes and modifying lab/weather actions, rechecks access.
 
 ## Opening Studio

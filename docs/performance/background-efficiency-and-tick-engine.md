@@ -15,9 +15,9 @@ Every end-of-tick queue observes NeoForge's live `ServerTickEvent.hasTime()` sup
 
 The server-side performance stack now uses one file:
 
-`config/wildernessodysseyapi/wildernessodysseyapi-performance-server.toml`
+`config/wildernessodysseyapi/wildernessodysseyapi-server.toml`
 
-Its nested layout is:
+Its nested layout remains under `[performance]`:
 
 - `performance.enabled`: reversible master switch for all three Wilderness-owned engines.
 - `performance.backgroundEfficiency`: background scheduler, bounded worker, activity, network-batch, and analytics-batch settings.

@@ -1,23 +1,32 @@
 # Configuration layout
 
-Wilderness Odyssey is moving from many feature files to a smaller, scope-aware
-configuration suite. “Common” in this project means a shared user-facing layout;
-it does not erase NeoForge's distinct `CLIENT`, `COMMON`, and `SERVER` ownership
-types.
+Wilderness Odyssey registers exactly three NeoForge configuration files:
 
-Those types must remain separate:
+| File | NeoForge scope | What belongs there |
+| --- | --- | --- |
+| `wildernessodysseyapi-common.toml` | `COMMON` | Installation-wide structure, async-threading, and ownership settings |
+| `wildernessodysseyapi-client.toml` | `CLIENT` | Local reminders, debug HUD, water rendering, and weather rendering |
+| `wildernessodysseyapi-server.toml` | `SERVER` | World/server-authoritative gameplay, simulation, telemetry, and performance settings |
 
-- Client settings belong to the local player and must never load on a dedicated server.
-- Common settings are installation-wide inputs loaded on both physical sides.
-- Server settings are world/server authoritative and may be supplied per world.
+All three are stored under `config/wildernessodysseyapi/`. The separation keeps
+NeoForge's side and lifecycle rules intact while categories keep the individual
+systems readable.
 
-Combining all three into one `ModConfigSpec` would give settings the wrong
-lifecycle and synchronization behavior. Consolidation therefore proceeds as a
-small suite with nested feature sections and explicit, non-destructive migrations.
+## Categories
 
-## Implemented first group
+The common file contains `[structures]`, `[asyncThreading]`, and `[ownership]`.
 
-`wildernessodysseyapi-performance-server.toml` contains:
+The client file contains `[donations]`, `[debug_hud]`, `[water_rendering]`, and
+`[weather_rendering]`. Existing feature sections remain nested below those roots;
+for example, localized cloud settings live under
+`[weather_rendering.localized_clouds]`.
+
+The server file contains the feature roots `[structure_blocks]`, `[performance]`,
+`[development_studio]`, `[verificationRelay]`, `[telemetry]`,
+`[playerTelemetry]`, `[eventTelemetry]`, `[feedback]`, `[riftfall]`,
+`[meteor_event]`, `[temporal_rift]`, `[water_simulation]`, `[weather]`,
+`[ecosystem]`, and `[reactiveVegetation]`. Existing feature-specific subsections remain nested under
+their owner. For example:
 
 ```toml
 [performance]
@@ -26,28 +35,34 @@ enabled = true
 [performance.backgroundEfficiency]
 enabled = true
 
-[performance.tickEngine]
+[weather]
 enabled = true
 
-[performance.dataEngine]
+[ecosystem]
 enabled = true
 ```
 
-The master switch controls only Wilderness-owned performance work. It never
-replaces Minecraft's tick loop or assumes ownership of vanilla/modded chunks,
-entities, block entities, networking, saving, or world lifecycle.
+The performance master switch controls only Wilderness-owned performance work.
+It never replaces Minecraft's tick loop or assumes ownership of vanilla or
+modded chunks, entities, block entities, networking, saving, or world lifecycle.
 
-If the unified file is absent, startup can migrate values from these exact files:
+## Migration from feature files
 
-- `wildernessodysseyapi-background-efficiency-server.toml`
-- `wildernessodysseyapi-tick-engine-server.toml`
-- `wildernessodysseyapi-data-engine-server.toml`
+When a unified destination does not yet exist, startup collects the corresponding
+legacy feature files into it. The migration:
 
-Migration writes a temporary file in the same config directory and moves it into
-place without overwrite. It never deletes, renames, or edits a legacy file. If
-safe creation fails, registration stops with a readable error instead of silently
-discarding administrator tuning.
+- preserves existing values and comments;
+- adds only the category nesting required by the new layout;
+- creates the destination through a temporary file in the same directory;
+- never overwrites an existing unified file; and
+- never deletes, renames, or edits a legacy file.
 
-Other feature files remain authoritative until a later scope-compatible group has
-its own migration and reload coverage. They should not be manually merged into
-the performance file.
+The old files therefore remain as rollback copies, but NeoForge no longer
+registers them after consolidation. Once the three new files have been checked,
+an administrator may archive the legacy files manually. If safe creation fails,
+registration stops with a readable error instead of silently discarding tuning.
+
+The earlier performance migration is still honored: the former background,
+tick-engine, and data-engine files are first combined into the legacy performance
+layout when needed, then that layout is included under `[performance]` in the new
+server file.

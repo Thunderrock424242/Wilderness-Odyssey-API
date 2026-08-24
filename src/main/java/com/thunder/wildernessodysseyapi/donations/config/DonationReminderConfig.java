@@ -1,28 +1,31 @@
 package com.thunder.wildernessodysseyapi.donations.config;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * Configuration options for donation reminders.
  */
 public class DonationReminderConfig {
-    public static final ModConfigSpec.BooleanValue disableReminder;
-    public static final ModConfigSpec.ConfigValue<String> optOutReleaseVersion;
+    public static ModConfigSpec.BooleanValue disableReminder;
+    public static ModConfigSpec.ConfigValue<String> optOutReleaseVersion;
     /** @deprecated use {@link #optOutReleaseVersion}; retained for source compatibility. */
     @Deprecated(forRemoval = false)
-    public static final ModConfigSpec.ConfigValue<String> optOutWorldVersion;
-    public static final DonationReminderConfig INSTANCE;
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec.ConfigValue<String> optOutWorldVersion;
+    public static final DonationReminderConfig INSTANCE = new DonationReminderConfig();
+    public static ModConfigSpec CONFIG_SPEC;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines the donations category in the unified client config. */
+    public static void define(ModConfigSpec.Builder builder) {
         disableReminder = builder.comment("Disable donation reminders").define("disableReminder", false);
         optOutReleaseVersion = builder.comment("Packaged mod release when opt out was last set")
                 .define("optOutReleaseVersion", ModConstants.VERSION);
         optOutWorldVersion = optOutReleaseVersion;
-        CONFIG_SPEC = builder.build();
-        INSTANCE = new DonationReminderConfig();
     }
 
     /** Saves the configuration to disk. */

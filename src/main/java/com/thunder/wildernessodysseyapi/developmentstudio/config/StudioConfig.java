@@ -1,16 +1,21 @@
 package com.thunder.wildernessodysseyapi.developmentstudio.config;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /** Server-owned safety and capacity settings for Development Studio access. */
 public final class StudioConfig {
-    public static final ModConfigSpec CONFIG_SPEC;
-    public static final ModConfigSpec.BooleanValue ALLOW_IN_NORMAL_WORLDS;
-    public static final ModConfigSpec.IntValue MAX_BOOKMARKS;
-    public static final ModConfigSpec.IntValue MAX_ENTITY_LAB_ENTITIES;
+    public static ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec.BooleanValue ALLOW_IN_NORMAL_WORLDS;
+    public static ModConfigSpec.IntValue MAX_BOOKMARKS;
+    public static ModConfigSpec.IntValue MAX_ENTITY_LAB_ENTITIES;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines Development Studio categories in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
         builder.push("access");
         ALLOW_IN_NORMAL_WORLDS = builder.comment(
                         "Allows authorized operators to use Studio tools in a non-Studio test world.",
@@ -32,7 +37,6 @@ public final class StudioConfig {
                 )
                 .defineInRange("maximumEntityLabEntities", 48, 1, 128);
         builder.pop();
-        CONFIG_SPEC = builder.build();
     }
 
     private StudioConfig() {

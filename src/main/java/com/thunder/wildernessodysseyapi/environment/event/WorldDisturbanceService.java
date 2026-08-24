@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.ecosystem.service.EcosystemServices;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
 import com.thunder.wildernessodysseyapi.environment.api.EnvironmentDimensionProfile;
 import com.thunder.wildernessodysseyapi.environment.api.EnvironmentServices;
+import com.thunder.wildernessodysseyapi.simulation.api.SimulationServices;
 import com.thunder.wildernessodysseyapi.vegetation.api.PlantDisturbance;
 import com.thunder.wildernessodysseyapi.vegetation.api.ReactiveVegetationServices;
 import net.minecraft.core.BlockPos;
@@ -93,6 +94,15 @@ public final class WorldDisturbanceService {
             );
         }
         EnvironmentServices.invalidate(level, position, radius);
+        SimulationServices.publishWorldDisturbance(
+                level,
+                position,
+                type,
+                bounded,
+                radius,
+                sourceId,
+                allowPlantDamage
+        );
     }
 
     private static double configuredIntensity(WorldDisturbanceType type) {

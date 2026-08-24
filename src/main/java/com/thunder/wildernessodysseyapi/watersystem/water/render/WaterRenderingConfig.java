@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.world.level.Level;
@@ -15,68 +16,72 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public final class WaterRenderingConfig {
     private static final int ABSOLUTE_OCEAN_SURFACE_DISTANCE_CAP_BLOCKS = 256;
 
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec CONFIG_SPEC;
 
-    public static final ModConfigSpec.BooleanValue ENABLE_GERSTNER_WAVES;
-    public static final ModConfigSpec.BooleanValue ENABLE_DYNAMIC_OCEAN_SURFACE;
-    public static final ModConfigSpec.BooleanValue ENABLE_SHORELINE_SURFACE;
-    public static final ModConfigSpec.BooleanValue REPLACE_VANILLA_WATER_TOPS;
-    public static final ModConfigSpec.BooleanValue SUPPRESS_VANILLA_WATER_TOPS;
-    public static final ModConfigSpec.BooleanValue ENABLE_WATER_CORE_SHADER;
-    public static final ModConfigSpec.BooleanValue ENABLE_SCREEN_SPACE_REFLECTIONS;
-    public static final ModConfigSpec.BooleanValue ENABLE_UNDERWATER_OPTICS;
-    public static final ModConfigSpec.BooleanValue ENABLE_UNDERWATER_CAUSTICS;
-    public static final ModConfigSpec.BooleanValue ENABLE_SPH_WATER_RENDERING;
-    public static final ModConfigSpec.BooleanValue ENABLE_RIPPLES;
-    public static final ModConfigSpec.BooleanValue ENABLE_AMBIENT_WATER_PARTICLES;
-    public static final ModConfigSpec.BooleanValue ENABLE_PERSISTENT_WAKE_FOAM;
-    public static final ModConfigSpec.BooleanValue AUTO_OPTIMIZE_WITH_RENDERER_MODS;
-    public static final ModConfigSpec.BooleanValue MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE;
-    public static final ModConfigSpec.BooleanValue SHOW_CLOCK_TIDE_TOOLTIP;
-    public static final ModConfigSpec.BooleanValue SHOW_CONTEXTUAL_CLOCK_TIDE_DISPLAY;
-    public static final ModConfigSpec.EnumValue<WaterQuality> WATER_QUALITY;
-    public static final ModConfigSpec.EnumValue<SphLocalEffectQuality> SPH_LOCAL_EFFECT_QUALITY;
+    public static ModConfigSpec.BooleanValue ENABLE_GERSTNER_WAVES;
+    public static ModConfigSpec.BooleanValue ENABLE_DYNAMIC_OCEAN_SURFACE;
+    public static ModConfigSpec.BooleanValue ENABLE_SHORELINE_SURFACE;
+    public static ModConfigSpec.BooleanValue REPLACE_VANILLA_WATER_TOPS;
+    public static ModConfigSpec.BooleanValue SUPPRESS_VANILLA_WATER_TOPS;
+    public static ModConfigSpec.BooleanValue ENABLE_WATER_CORE_SHADER;
+    public static ModConfigSpec.BooleanValue ENABLE_SCREEN_SPACE_REFLECTIONS;
+    public static ModConfigSpec.BooleanValue ENABLE_UNDERWATER_OPTICS;
+    public static ModConfigSpec.BooleanValue ENABLE_UNDERWATER_CAUSTICS;
+    public static ModConfigSpec.BooleanValue ENABLE_SPH_WATER_RENDERING;
+    public static ModConfigSpec.BooleanValue ENABLE_RIPPLES;
+    public static ModConfigSpec.BooleanValue ENABLE_AMBIENT_WATER_PARTICLES;
+    public static ModConfigSpec.BooleanValue ENABLE_PERSISTENT_WAKE_FOAM;
+    public static ModConfigSpec.BooleanValue AUTO_OPTIMIZE_WITH_RENDERER_MODS;
+    public static ModConfigSpec.BooleanValue MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE;
+    public static ModConfigSpec.BooleanValue SHOW_CLOCK_TIDE_TOOLTIP;
+    public static ModConfigSpec.BooleanValue SHOW_CONTEXTUAL_CLOCK_TIDE_DISPLAY;
+    public static ModConfigSpec.EnumValue<WaterQuality> WATER_QUALITY;
+    public static ModConfigSpec.EnumValue<SphLocalEffectQuality> SPH_LOCAL_EFFECT_QUALITY;
 
-    public static final ModConfigSpec.DoubleValue UNDERWATER_VISIBILITY_BLOCKS;
-    public static final ModConfigSpec.DoubleValue UNDERWATER_TURBIDITY_STRENGTH;
-    public static final ModConfigSpec.DoubleValue SURFACE_ABSORPTION_STRENGTH;
-    public static final ModConfigSpec.DoubleValue SURFACE_OPACITY_STRENGTH;
-    public static final ModConfigSpec.DoubleValue SHORELINE_OVERLAY_STRENGTH;
-    public static final ModConfigSpec.DoubleValue REFRACTION_STRENGTH;
-    public static final ModConfigSpec.IntValue MAX_OCEAN_SURFACE_DISTANCE_BLOCKS;
-    public static final ModConfigSpec.IntValue DYNAMIC_OCEAN_CACHE_LIFETIME_TICKS;
-    public static final ModConfigSpec.IntValue DYNAMIC_OCEAN_MAX_CELL_SIZE;
-    public static final ModConfigSpec.DoubleValue DYNAMIC_OCEAN_TEXTURE_SCALE;
-    public static final ModConfigSpec.DoubleValue DYNAMIC_OCEAN_LOD_TEXTURE_SOFTENING;
+    public static ModConfigSpec.DoubleValue UNDERWATER_VISIBILITY_BLOCKS;
+    public static ModConfigSpec.DoubleValue UNDERWATER_TURBIDITY_STRENGTH;
+    public static ModConfigSpec.DoubleValue SURFACE_ABSORPTION_STRENGTH;
+    public static ModConfigSpec.DoubleValue SURFACE_OPACITY_STRENGTH;
+    public static ModConfigSpec.DoubleValue SHORELINE_OVERLAY_STRENGTH;
+    public static ModConfigSpec.DoubleValue REFRACTION_STRENGTH;
+    public static ModConfigSpec.IntValue MAX_OCEAN_SURFACE_DISTANCE_BLOCKS;
+    public static ModConfigSpec.IntValue DYNAMIC_OCEAN_CACHE_LIFETIME_TICKS;
+    public static ModConfigSpec.IntValue DYNAMIC_OCEAN_MAX_CELL_SIZE;
+    public static ModConfigSpec.DoubleValue DYNAMIC_OCEAN_TEXTURE_SCALE;
+    public static ModConfigSpec.DoubleValue DYNAMIC_OCEAN_LOD_TEXTURE_SOFTENING;
 
-    public static final ModConfigSpec.IntValue NORMAL_SPH_RENDER_DISTANCE_BLOCKS;
-    public static final ModConfigSpec.IntValue NORMAL_MAX_RENDERED_SPH_SIMULATIONS;
-    public static final ModConfigSpec.IntValue NORMAL_SPH_MESH_REVISION_INTERVAL;
-    public static final ModConfigSpec.IntValue NORMAL_MAX_RIPPLES;
-    public static final ModConfigSpec.IntValue NORMAL_RIPPLE_SEGMENTS;
-    public static final ModConfigSpec.IntValue NORMAL_SPLASH_PARTICLES;
-    public static final ModConfigSpec.IntValue NORMAL_WAVE_TRAINS;
-    public static final ModConfigSpec.IntValue NORMAL_OCEAN_RENDER_DISTANCE_BLOCKS;
-    public static final ModConfigSpec.IntValue NORMAL_OCEAN_CELL_SIZE;
-    public static final ModConfigSpec.IntValue NORMAL_MAX_OCEAN_SURFACE_PATCHES;
-    public static final ModConfigSpec.IntValue NORMAL_SHORELINE_RENDER_DISTANCE_BLOCKS;
-    public static final ModConfigSpec.IntValue NORMAL_MAX_SHORELINE_SURFACE_PATCHES;
+    public static ModConfigSpec.IntValue NORMAL_SPH_RENDER_DISTANCE_BLOCKS;
+    public static ModConfigSpec.IntValue NORMAL_MAX_RENDERED_SPH_SIMULATIONS;
+    public static ModConfigSpec.IntValue NORMAL_SPH_MESH_REVISION_INTERVAL;
+    public static ModConfigSpec.IntValue NORMAL_MAX_RIPPLES;
+    public static ModConfigSpec.IntValue NORMAL_RIPPLE_SEGMENTS;
+    public static ModConfigSpec.IntValue NORMAL_SPLASH_PARTICLES;
+    public static ModConfigSpec.IntValue NORMAL_WAVE_TRAINS;
+    public static ModConfigSpec.IntValue NORMAL_OCEAN_RENDER_DISTANCE_BLOCKS;
+    public static ModConfigSpec.IntValue NORMAL_OCEAN_CELL_SIZE;
+    public static ModConfigSpec.IntValue NORMAL_MAX_OCEAN_SURFACE_PATCHES;
+    public static ModConfigSpec.IntValue NORMAL_SHORELINE_RENDER_DISTANCE_BLOCKS;
+    public static ModConfigSpec.IntValue NORMAL_MAX_SHORELINE_SURFACE_PATCHES;
 
-    public static final ModConfigSpec.IntValue OPTIMIZED_SPH_RENDER_DISTANCE_BLOCKS;
-    public static final ModConfigSpec.IntValue OPTIMIZED_MAX_RENDERED_SPH_SIMULATIONS;
-    public static final ModConfigSpec.IntValue OPTIMIZED_SPH_MESH_REVISION_INTERVAL;
-    public static final ModConfigSpec.IntValue OPTIMIZED_MAX_RIPPLES;
-    public static final ModConfigSpec.IntValue OPTIMIZED_RIPPLE_SEGMENTS;
-    public static final ModConfigSpec.IntValue OPTIMIZED_SPLASH_PARTICLES;
-    public static final ModConfigSpec.IntValue OPTIMIZED_WAVE_TRAINS;
-    public static final ModConfigSpec.IntValue OPTIMIZED_OCEAN_RENDER_DISTANCE_BLOCKS;
-    public static final ModConfigSpec.IntValue OPTIMIZED_OCEAN_CELL_SIZE;
-    public static final ModConfigSpec.IntValue OPTIMIZED_MAX_OCEAN_SURFACE_PATCHES;
-    public static final ModConfigSpec.IntValue OPTIMIZED_SHORELINE_RENDER_DISTANCE_BLOCKS;
-    public static final ModConfigSpec.IntValue OPTIMIZED_MAX_SHORELINE_SURFACE_PATCHES;
+    public static ModConfigSpec.IntValue OPTIMIZED_SPH_RENDER_DISTANCE_BLOCKS;
+    public static ModConfigSpec.IntValue OPTIMIZED_MAX_RENDERED_SPH_SIMULATIONS;
+    public static ModConfigSpec.IntValue OPTIMIZED_SPH_MESH_REVISION_INTERVAL;
+    public static ModConfigSpec.IntValue OPTIMIZED_MAX_RIPPLES;
+    public static ModConfigSpec.IntValue OPTIMIZED_RIPPLE_SEGMENTS;
+    public static ModConfigSpec.IntValue OPTIMIZED_SPLASH_PARTICLES;
+    public static ModConfigSpec.IntValue OPTIMIZED_WAVE_TRAINS;
+    public static ModConfigSpec.IntValue OPTIMIZED_OCEAN_RENDER_DISTANCE_BLOCKS;
+    public static ModConfigSpec.IntValue OPTIMIZED_OCEAN_CELL_SIZE;
+    public static ModConfigSpec.IntValue OPTIMIZED_MAX_OCEAN_SURFACE_PATCHES;
+    public static ModConfigSpec.IntValue OPTIMIZED_SHORELINE_RENDER_DISTANCE_BLOCKS;
+    public static ModConfigSpec.IntValue OPTIMIZED_MAX_SHORELINE_SURFACE_PATCHES;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines the water-rendering category in the unified client config. */
+    public static void define(ModConfigSpec.Builder builder) {
 
         builder.comment("Client-side water rendering options.")
                 .push("water_rendering");
@@ -254,7 +259,6 @@ public final class WaterRenderingConfig {
         builder.pop();
 
         builder.pop();
-        CONFIG_SPEC = builder.build();
     }
 
     private WaterRenderingConfig() {

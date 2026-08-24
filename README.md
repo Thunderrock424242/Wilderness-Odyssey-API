@@ -53,7 +53,8 @@ On the official playtest server, players can link their Minecraft identity throu
 2. Copy the one-time code returned by the bot.
 3. On the playtest server, run `/wo link CODE`.
 
-The server config lives at `config/wildernessodysseyapi/wildernessodysseyapi-verification-relay-server.toml`:
+The server config lives at `config/wildernessodysseyapi/wildernessodysseyapi-server.toml`
+under `[verificationRelay]`:
 
 ```toml
 [verificationRelay]
@@ -66,7 +67,8 @@ The server sends a Discord webhook message to the private verification relay cha
 
 Multithreaded Task System:
 --------------------------
-An opt-in async task system now ships with the mod. Enable or tune it in `config/wildernessodysseyapi/wildernessodysseyapi-async.toml`.
+An opt-in async task system now ships with the mod. Enable or tune it in
+`config/wildernessodysseyapi/wildernessodysseyapi-common.toml` under `[asyncThreading]`.
 Use `/asyncstats` (level 2 permission) to view worker usage, queue depth, and rejected tasks. See `docs/async-threading-plan.md`
 for architecture and tuning notes, including guidance on keeping main-thread mutations safe when scheduling heavy jobs.
 

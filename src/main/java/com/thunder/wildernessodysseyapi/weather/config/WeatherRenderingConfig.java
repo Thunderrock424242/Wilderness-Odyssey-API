@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.weather.config;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
@@ -10,42 +11,42 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  */
 public final class WeatherRenderingConfig {
 
-    public static final ModConfigSpec CONFIG_SPEC;
-    public static final ModConfigSpec.BooleanValue ENABLE_LOCALIZED_CLOUDS;
-    public static final ModConfigSpec.BooleanValue ENABLE_VOLUMETRIC_CLOUDS;
-    public static final ModConfigSpec.BooleanValue ENABLE_RAYMARCHED_CLOUDS;
-    public static final ModConfigSpec.IntValue RAYMARCH_STEPS;
-    public static final ModConfigSpec.IntValue RENDER_DISTANCE_BLOCKS;
-    public static final ModConfigSpec.IntValue REBUILD_INTERVAL_TICKS;
-    public static final ModConfigSpec.DoubleValue WIND_DETAIL_SPEED_BLOCKS_PER_SECOND;
-    public static final ModConfigSpec.IntValue MAXIMUM_CLOUD_TILES;
-    public static final ModConfigSpec.DoubleValue OPACITY_MULTIPLIER;
-    public static final ModConfigSpec.IntValue VOLUMETRIC_LAYER_COUNT;
-    public static final ModConfigSpec.DoubleValue VOLUMETRIC_DETAIL_STRENGTH;
-    public static final ModConfigSpec.BooleanValue ENABLE_DISTANT_RAIN_SHAFTS;
-    public static final ModConfigSpec.BooleanValue ENABLE_WIND_DRIVEN_PRECIPITATION;
-    public static final ModConfigSpec.DoubleValue PRECIPITATION_WIND_SLANT_BLOCKS;
-    public static final ModConfigSpec.IntValue DISTANT_RAIN_DISTANCE_BLOCKS;
-    public static final ModConfigSpec.IntValue DISTANT_RAIN_SPACING_BLOCKS;
-    public static final ModConfigSpec.IntValue MAXIMUM_DISTANT_RAIN_SHAFTS;
-    public static final ModConfigSpec.DoubleValue PRECIPITATION_STREAK_DENSITY;
-    public static final ModConfigSpec.DoubleValue PRECIPITATION_OPACITY;
-    public static final ModConfigSpec.DoubleValue PRECIPITATION_IMPACT_DENSITY;
-    public static final ModConfigSpec.IntValue MAXIMUM_PRECIPITATION_IMPACTS;
-    public static final ModConfigSpec.BooleanValue ENABLE_DISTANT_CLOUD_LAYER;
-    public static final ModConfigSpec.IntValue DISTANT_CLOUD_DISTANCE_BLOCKS;
-    public static final ModConfigSpec.IntValue DISTANT_CLOUD_SPACING_BLOCKS;
-    public static final ModConfigSpec.IntValue MAXIMUM_DISTANT_CLOUD_TILES;
-    public static final ModConfigSpec.DoubleValue CLOUD_SHADOW_STRENGTH;
-    public static final ModConfigSpec.BooleanValue ENABLE_SURFACE_OVERLAYS;
-    public static final ModConfigSpec.IntValue SURFACE_OVERLAY_RADIUS_BLOCKS;
-    public static final ModConfigSpec.IntValue MAXIMUM_SURFACE_PATCHES;
-    public static final ModConfigSpec.BooleanValue DISTANT_THUNDER_ENABLED;
-    public static final ModConfigSpec.DoubleValue DISTANT_THUNDER_MINIMUM_STORM_INTENSITY;
-    public static final ModConfigSpec.IntValue DISTANT_THUNDER_MAXIMUM_AUDIBLE_DISTANCE;
-    public static final ModConfigSpec.IntValue DISTANT_THUNDER_MINIMUM_INTERVAL;
-    public static final ModConfigSpec.IntValue DISTANT_THUNDER_MAXIMUM_INTERVAL;
-    public static final ModConfigSpec.DoubleValue DISTANT_THUNDER_VOLUME_MULTIPLIER;
+    public static ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec.BooleanValue ENABLE_LOCALIZED_CLOUDS;
+    public static ModConfigSpec.BooleanValue ENABLE_VOLUMETRIC_CLOUDS;
+    public static ModConfigSpec.BooleanValue ENABLE_RAYMARCHED_CLOUDS;
+    public static ModConfigSpec.IntValue RAYMARCH_STEPS;
+    public static ModConfigSpec.IntValue RENDER_DISTANCE_BLOCKS;
+    public static ModConfigSpec.IntValue REBUILD_INTERVAL_TICKS;
+    public static ModConfigSpec.DoubleValue WIND_DETAIL_SPEED_BLOCKS_PER_SECOND;
+    public static ModConfigSpec.IntValue MAXIMUM_CLOUD_TILES;
+    public static ModConfigSpec.DoubleValue OPACITY_MULTIPLIER;
+    public static ModConfigSpec.IntValue VOLUMETRIC_LAYER_COUNT;
+    public static ModConfigSpec.DoubleValue VOLUMETRIC_DETAIL_STRENGTH;
+    public static ModConfigSpec.BooleanValue ENABLE_DISTANT_RAIN_SHAFTS;
+    public static ModConfigSpec.BooleanValue ENABLE_WIND_DRIVEN_PRECIPITATION;
+    public static ModConfigSpec.DoubleValue PRECIPITATION_WIND_SLANT_BLOCKS;
+    public static ModConfigSpec.IntValue DISTANT_RAIN_DISTANCE_BLOCKS;
+    public static ModConfigSpec.IntValue DISTANT_RAIN_SPACING_BLOCKS;
+    public static ModConfigSpec.IntValue MAXIMUM_DISTANT_RAIN_SHAFTS;
+    public static ModConfigSpec.DoubleValue PRECIPITATION_STREAK_DENSITY;
+    public static ModConfigSpec.DoubleValue PRECIPITATION_OPACITY;
+    public static ModConfigSpec.DoubleValue PRECIPITATION_IMPACT_DENSITY;
+    public static ModConfigSpec.IntValue MAXIMUM_PRECIPITATION_IMPACTS;
+    public static ModConfigSpec.BooleanValue ENABLE_DISTANT_CLOUD_LAYER;
+    public static ModConfigSpec.IntValue DISTANT_CLOUD_DISTANCE_BLOCKS;
+    public static ModConfigSpec.IntValue DISTANT_CLOUD_SPACING_BLOCKS;
+    public static ModConfigSpec.IntValue MAXIMUM_DISTANT_CLOUD_TILES;
+    public static ModConfigSpec.DoubleValue CLOUD_SHADOW_STRENGTH;
+    public static ModConfigSpec.BooleanValue ENABLE_SURFACE_OVERLAYS;
+    public static ModConfigSpec.IntValue SURFACE_OVERLAY_RADIUS_BLOCKS;
+    public static ModConfigSpec.IntValue MAXIMUM_SURFACE_PATCHES;
+    public static ModConfigSpec.BooleanValue DISTANT_THUNDER_ENABLED;
+    public static ModConfigSpec.DoubleValue DISTANT_THUNDER_MINIMUM_STORM_INTENSITY;
+    public static ModConfigSpec.IntValue DISTANT_THUNDER_MAXIMUM_AUDIBLE_DISTANCE;
+    public static ModConfigSpec.IntValue DISTANT_THUNDER_MINIMUM_INTERVAL;
+    public static ModConfigSpec.IntValue DISTANT_THUNDER_MAXIMUM_INTERVAL;
+    public static ModConfigSpec.DoubleValue DISTANT_THUNDER_VOLUME_MULTIPLIER;
 
     private static final Settings DEFAULTS = new Settings(
             true,
@@ -87,7 +88,11 @@ public final class WeatherRenderingConfig {
     private static volatile Settings activeSettings = DEFAULTS;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines the weather-rendering category in the unified client config. */
+    public static void define(ModConfigSpec.Builder builder) {
         builder.comment("Client-side rendering options for server-authored localized weather.")
                 .push("localized_clouds");
         ENABLE_LOCALIZED_CLOUDS = builder
@@ -208,7 +213,6 @@ public final class WeatherRenderingConfig {
                 .comment("Hard cap on rendered wet or puddled ground patches per frame.")
                 .defineInRange("maximumPatches", 256, 32, 1_024);
         builder.pop();
-        CONFIG_SPEC = builder.build();
     }
 
     private WeatherRenderingConfig() {

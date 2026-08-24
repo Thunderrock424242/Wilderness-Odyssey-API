@@ -90,7 +90,7 @@ receive the updated profile on the next scheduled snapshot.
 ## Server configuration
 
 Wind settings live under `[weather.wind]` in
-`wildernessodysseyapi-weather-server.toml`.
+`wildernessodysseyapi-server.toml`.
 
 | Setting | Default | Unit and effect |
 | --- | ---: | --- |

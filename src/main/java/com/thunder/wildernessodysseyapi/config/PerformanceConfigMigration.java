@@ -40,7 +40,9 @@ public final class PerformanceConfigMigration {
             return MigrationResult.INVALID_DIRECTORY;
         }
         if (Files.exists(destination)) {
-            return MigrationResult.ALREADY_PRESENT;
+            return Files.isRegularFile(destination)
+                    ? MigrationResult.ALREADY_PRESENT
+                    : MigrationResult.INVALID_DIRECTORY;
         }
 
         List<Path> sources = new ArrayList<>();
@@ -136,6 +138,7 @@ public final class PerformanceConfigMigration {
         }
     }
 
+    /** Outcome of preparing the legacy performance destination. */
     public enum MigrationResult {
         MIGRATED,
         ALREADY_PRESENT,

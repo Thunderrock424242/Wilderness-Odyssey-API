@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.meteor.config;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.minecraft.util.RandomSource;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -17,32 +18,38 @@ public final class MeteorConfig {
     private static volatile long lastWarnedMeteorRange = Long.MIN_VALUE;
     private static volatile long lastWarnedCraterRange = Long.MIN_VALUE;
 
-    public static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
-    public static final ModConfigSpec SPEC;
+    private static ModConfigSpec.Builder BUILDER;
+    public static ModConfigSpec SPEC;
 
     // Event spawning
-    public static final ModConfigSpec.BooleanValue NATURAL_EVENTS_ENABLED;
-    public static final ModConfigSpec.IntValue EVENT_CHECK_INTERVAL_TICKS;
-    public static final ModConfigSpec.IntValue EVENT_CHANCE_PER_CHECK;   // 1-in-N chance
-    public static final ModConfigSpec.IntValue MIN_METEORS;
-    public static final ModConfigSpec.IntValue MAX_METEORS;
-    public static final ModConfigSpec.IntValue SPAWN_RADIUS;             // blocks around a player to aim meteors
+    public static ModConfigSpec.BooleanValue NATURAL_EVENTS_ENABLED;
+    public static ModConfigSpec.IntValue EVENT_CHECK_INTERVAL_TICKS;
+    public static ModConfigSpec.IntValue EVENT_CHANCE_PER_CHECK;   // 1-in-N chance
+    public static ModConfigSpec.IntValue MIN_METEORS;
+    public static ModConfigSpec.IntValue MAX_METEORS;
+    public static ModConfigSpec.IntValue SPAWN_RADIUS;             // blocks around a player to aim meteors
 
     // Impact destruction
-    public static final ModConfigSpec.EnumValue<DestructionLevel> DESTRUCTION_LEVEL;
-    public static final ModConfigSpec.IntValue CRATER_RADIUS_MIN;
-    public static final ModConfigSpec.IntValue CRATER_RADIUS_MAX;
-    public static final ModConfigSpec.IntValue GOUGE_LENGTH_MULTIPLIER;  // multiplied by horizontal speed
+    public static ModConfigSpec.EnumValue<DestructionLevel> DESTRUCTION_LEVEL;
+    public static ModConfigSpec.IntValue CRATER_RADIUS_MIN;
+    public static ModConfigSpec.IntValue CRATER_RADIUS_MAX;
+    public static ModConfigSpec.IntValue GOUGE_LENGTH_MULTIPLIER;  // multiplied by horizontal speed
 
     // Player safety
-    public static final ModConfigSpec.IntValue PLAYER_AVOID_RADIUS;      // meteors won't land within this many blocks of a player
-    public static final ModConfigSpec.IntValue CRYING_OBSIDIAN_SEARCH_RADIUS; // radius to look for crying obsidian bias
+    public static ModConfigSpec.IntValue PLAYER_AVOID_RADIUS;      // meteors won't land within this many blocks of a player
+    public static ModConfigSpec.IntValue CRYING_OBSIDIAN_SEARCH_RADIUS; // radius to look for crying obsidian bias
 
     // Visual / sound
-    public static final ModConfigSpec.BooleanValue SHOW_WARNING_MESSAGE;
-    public static final ModConfigSpec.IntValue WARNING_TICKS_BEFORE_IMPACT; // ticks before impact to send warning
+    public static ModConfigSpec.BooleanValue SHOW_WARNING_MESSAGE;
+    public static ModConfigSpec.IntValue WARNING_TICKS_BEFORE_IMPACT; // ticks before impact to send warning
 
     static {
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines meteor categories in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
+        BUILDER = builder;
         BUILDER.comment("Meteor Impact Weather Event Configuration").push("meteor_event");
 
         NATURAL_EVENTS_ENABLED = BUILDER
@@ -114,8 +121,7 @@ public final class MeteorConfig {
 
         BUILDER.pop();
         BUILDER.pop();
-
-        SPEC = BUILDER.build();
+        BUILDER = null;
     }
 
     private MeteorConfig() {

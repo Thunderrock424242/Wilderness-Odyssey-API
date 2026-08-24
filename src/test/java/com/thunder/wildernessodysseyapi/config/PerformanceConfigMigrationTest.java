@@ -91,6 +91,16 @@ class PerformanceConfigMigrationTest {
     }
 
     @Test
+    void directoryAtUnifiedDestinationIsRejected() throws IOException {
+        Files.createDirectory(configDirectory.resolve(PerformanceServerConfig.FILE_NAME));
+
+        PerformanceConfigMigration.MigrationResult result =
+                PerformanceConfigMigration.prepare(configDirectory);
+
+        assertEquals(PerformanceConfigMigration.MigrationResult.INVALID_DIRECTORY, result);
+    }
+
+    @Test
     void absentLegacyFilesLeaveDirectoryUntouched() {
         PerformanceConfigMigration.MigrationResult result =
                 PerformanceConfigMigration.prepare(configDirectory);

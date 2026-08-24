@@ -14,6 +14,7 @@ import com.thunder.wildernessodysseyapi.performance.background.config.Background
 import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
 import com.thunder.wildernessodysseyapi.performance.tickengine.config.TickEngineConfig;
 import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
+import com.thunder.wildernessodysseyapi.simulation.core.SimulationEngine;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryReporter;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueue;
 import com.thunder.wildernessodysseyapi.watersystem.water.entity.BoatTiltStore;
@@ -53,6 +54,7 @@ public final class ServerLifecycleEvents {
         EcosystemPerformanceIntegration.register(DataEngine.get());
         WeatherPerformanceIntegration.register(DataEngine.get(), event.getServer());
         WaterPerformanceIntegration.register(DataEngine.get(), event.getServer());
+        SimulationEngine.get().start(event.getServer(), DataEngine.get());
         ServerPropertiesTemplateManager.ensureManagedServerProperties(event.getServer());
         GameRulesListManager.ensureRulesFileExists(event.getServer());
         GameRulesListManager.applyConfiguredRules(event.getServer());
@@ -101,6 +103,7 @@ public final class ServerLifecycleEvents {
         }
         waterManager.shutdown();
         WaterPerformanceIntegration.shutdown();
+        SimulationEngine.get().shutdown();
         TickEngine.shutdown();
         BackgroundEfficiencyManager.shutdown();
         DataEngine.get().shutdown();
@@ -116,6 +119,9 @@ public final class ServerLifecycleEvents {
     public static void onLevelUnload(LevelEvent.Unload event) {
         WaterBodyClassifier.clearCache();
         BoatTiltStore.clear();
+        if (event.getLevel() instanceof ServerLevel level) {
+            SimulationEngine.get().unload(level);
+        }
         // ServerTickHandler and ClientTickHandler release only the unloading
         // level. A global shutdown here used to erase water in other dimensions.
     }

@@ -2,43 +2,30 @@ package com.thunder.wildernessodysseyapi.config;
 
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
-import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import com.thunder.wildernessodysseyapi.dataengine.DataEngine;
 import com.thunder.wildernessodysseyapi.dataengine.config.DataEngineConfig;
-import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
-import com.thunder.wildernessodysseyapi.developmentstudio.config.StudioConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.EcosystemEvents;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileManager;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.DistantWildlifeManager;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
-import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
-import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
-import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
 import com.thunder.wildernessodysseyapi.performance.background.BackgroundEfficiencyManager;
 import com.thunder.wildernessodysseyapi.performance.background.config.BackgroundEfficiencyConfig;
 import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
 import com.thunder.wildernessodysseyapi.performance.tickengine.config.TickEngineConfig;
-import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationRelayConfig;
-import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
+import com.thunder.wildernessodysseyapi.simulation.core.SimulationEngine;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
-import com.thunder.wildernessodysseyapi.structureblock.config.StructureBlockConfig;
-import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryConfig;
-import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryConfig;
-import com.thunder.wildernessodysseyapi.telemetry.TelemetryConfig;
-import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
-import com.thunder.wildernessodysseyapi.vegetation.config.VegetationConfig;
-import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
-import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import com.thunder.wildernessodysseyapi.weather.simulation.WeatherAuthority;
-import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
 
@@ -58,63 +45,45 @@ public final class ModConfigRegistration {
      * @param container the mod container that owns the config specs
      */
     public static void register(ModContainer container) {
-        PerformanceConfigMigration.MigrationResult performanceMigration = PerformanceConfigMigration.prepare(
-                FMLPaths.CONFIGDIR.get().resolve(MOD_ID)
-        );
-        if (performanceMigration == PerformanceConfigMigration.MigrationResult.INVALID_DIRECTORY
-                || performanceMigration == PerformanceConfigMigration.MigrationResult.FAILED) {
+        Path configDirectory = FMLPaths.CONFIGDIR.get().resolve(MOD_ID);
+        if (!Files.exists(configDirectory.resolve(WildernessConfigSpecs.SERVER_FILE))) {
+            PerformanceConfigMigration.MigrationResult performanceMigration =
+                    PerformanceConfigMigration.prepare(configDirectory);
+            if (performanceMigration == PerformanceConfigMigration.MigrationResult.INVALID_DIRECTORY
+                    || performanceMigration == PerformanceConfigMigration.MigrationResult.FAILED) {
+                throw new IllegalStateException(
+                        "Cannot safely prepare the unified Wilderness performance config: " + performanceMigration
+                );
+            }
+        }
+
+        UnifiedConfigMigration.MigrationResult unifiedMigration = UnifiedConfigMigration.prepare(configDirectory);
+        if (unifiedMigration == UnifiedConfigMigration.MigrationResult.INVALID_DIRECTORY
+                || unifiedMigration == UnifiedConfigMigration.MigrationResult.FAILED) {
             throw new IllegalStateException(
-                    "Cannot safely prepare the unified Wilderness performance config: " + performanceMigration
+                    "Cannot safely prepare the three Wilderness config files: " + unifiedMigration
             );
         }
 
-        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, StructureConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-structures.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, AsyncThreadingConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-async.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.COMMON, OwnershipConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-ownership.toml");
-
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DonationReminderConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-donations-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, DebugOverlayConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-debug-overlay-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, WaterRenderingConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-water-rendering-client.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.CLIENT, WeatherRenderingConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-weather-rendering-client.toml");
-
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StructureBlockConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-structureblocks-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PerformanceServerConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + PerformanceServerConfig.FILE_NAME);
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, StudioConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-development-studio-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER,
-                MinecraftVerificationRelayConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-verification-relay-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, PlayerTelemetryConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-telemetry-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, EventTelemetryConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-event-telemetry-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TelemetryConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-telemetry-master-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, FeedbackConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-feedback-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, RiftfallConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-riftfall-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, MeteorConfig.SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-meteors-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, TemporalRiftConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-temporal-rift-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, WaterSimulationConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-water-simulation-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, WeatherConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-weather-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, EcosystemConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-ecosystem-server.toml");
-        ConfigRegistrationValidator.register(container, ModConfig.Type.SERVER, VegetationConfig.CONFIG_SPEC,
-                CONFIG_FOLDER + "wildernessodysseyapi-vegetation-server.toml");
+        WildernessConfigSpecs.initialize();
+        ConfigRegistrationValidator.register(
+                container,
+                ModConfig.Type.COMMON,
+                WildernessConfigSpecs.commonSpec(),
+                CONFIG_FOLDER + WildernessConfigSpecs.COMMON_FILE
+        );
+        ConfigRegistrationValidator.register(
+                container,
+                ModConfig.Type.CLIENT,
+                WildernessConfigSpecs.clientSpec(),
+                CONFIG_FOLDER + WildernessConfigSpecs.CLIENT_FILE
+        );
+        ConfigRegistrationValidator.register(
+                container,
+                ModConfig.Type.SERVER,
+                WildernessConfigSpecs.serverSpec(),
+                CONFIG_FOLDER + WildernessConfigSpecs.SERVER_FILE
+        );
     }
 
     /** Applies runtime-backed settings after NeoForge loads a config file. */
@@ -125,10 +94,13 @@ public final class ModConfigRegistration {
     /** Refreshes runtime-backed settings after a config file is reloaded. */
     public static void onConfigReloaded(ModConfigEvent.Reloading event) {
         applyRuntimeSettings(event.getConfig());
+        if (event.getConfig().getSpec() == WildernessConfigSpecs.serverSpec()) {
+            applyOnServerThread(() -> SimulationEngine.get().onConfigurationReload());
+        }
     }
 
     private static void applyRuntimeSettings(ModConfig config) {
-        if (config.getSpec() == AsyncThreadingConfig.CONFIG_SPEC) {
+        if (config.getSpec() == WildernessConfigSpecs.commonSpec()) {
             // Executor replacement and the shared result queue are runtime-owned.
             // Initial config loading precedes server ownership, so it must not
             // create worker pools on the mod-loading thread. ServerStarting
@@ -137,20 +109,17 @@ public final class ModConfigRegistration {
             if (server != null) {
                 server.execute(() -> AsyncTaskManager.reload(AsyncThreadingConfig.values()));
             }
-        } else if (config.getSpec() == PerformanceServerConfig.CONFIG_SPEC) {
+        } else if (config.getSpec() == WildernessConfigSpecs.clientSpec()) {
+            WeatherRenderingConfig.reload();
+        } else if (config.getSpec() == WildernessConfigSpecs.serverSpec()) {
             applyOnServerThread(() -> {
                 BackgroundEfficiencyManager.reload(BackgroundEfficiencyConfig.values());
                 TickEngine.reload(TickEngineConfig.values());
                 DataEngine.get().reload(DataEngineConfig.values());
             });
-        } else if (config.getSpec() == StructureBlockConfig.CONFIG_SPEC) {
             StructureBlockSettings.reloadFromConfig();
-        } else if (config.getSpec() == WeatherConfig.CONFIG_SPEC) {
             WeatherConfig.reload();
             WeatherAuthority.get().onConfigurationReload();
-        } else if (config.getSpec() == WeatherRenderingConfig.CONFIG_SPEC) {
-            WeatherRenderingConfig.reload();
-        } else if (config.getSpec() == EcosystemConfig.CONFIG_SPEC) {
             EcosystemConfig.reload();
             SpeciesBehaviorProfileManager.clearConfiguredProfiles();
             var server = ServerLifecycleHooks.getCurrentServer();

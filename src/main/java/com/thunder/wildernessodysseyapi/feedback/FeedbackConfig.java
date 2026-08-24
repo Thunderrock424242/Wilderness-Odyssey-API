@@ -1,21 +1,28 @@
 package com.thunder.wildernessodysseyapi.feedback;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * Server configuration for player feedback submissions.
  */
 public final class FeedbackConfig {
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec CONFIG_SPEC;
 
-    public static final ModConfigSpec.BooleanValue ENABLED;
-    public static final ModConfigSpec.ConfigValue<String> WEBHOOK_URL;
-    public static final ModConfigSpec.IntValue REQUEST_TIMEOUT_SECONDS;
-    public static final ModConfigSpec.IntValue MAX_MESSAGE_LENGTH;
+    public static ModConfigSpec.BooleanValue ENABLED;
+    public static ModConfigSpec.ConfigValue<String> WEBHOOK_URL;
+    public static ModConfigSpec.IntValue REQUEST_TIMEOUT_SECONDS;
+    public static ModConfigSpec.IntValue MAX_MESSAGE_LENGTH;
 
-    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
+    private static ModConfigSpec.Builder BUILDER;
 
     static {
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines feedback settings in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
+        BUILDER = builder;
         BUILDER.push("feedback");
 
         ENABLED = BUILDER.comment("Master toggle for player feedback submissions.")
@@ -33,8 +40,7 @@ public final class FeedbackConfig {
                 .defineInRange("maxMessageLength", 500, 20, 2000);
 
         BUILDER.pop();
-
-        CONFIG_SPEC = BUILDER.build();
+        BUILDER = null;
     }
 
     private FeedbackConfig() {

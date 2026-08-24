@@ -84,7 +84,8 @@ Custom blocks that already receive vanilla random ticks can call `ReactiveVegeta
 
 ## Configuration
 
-Server settings are written to `wildernessodysseyapi/wildernessodysseyapi-vegetation-server.toml`.
+Server settings are written to `wildernessodysseyapi/wildernessodysseyapi-server.toml`
+under `[reactiveVegetation]`.
 
 | Setting | Default | Meaning |
 | --- | ---: | --- |

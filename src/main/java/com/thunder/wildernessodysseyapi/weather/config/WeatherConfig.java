@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.weather.config;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import com.thunder.wildernessodysseyapi.weather.api.WindSettings;
 import com.thunder.wildernessodysseyapi.weather.simulation.SimulationSettings;
 import com.thunder.wildernessodysseyapi.weather.integration.WeatherOwnershipCoordinator;
@@ -23,77 +24,77 @@ import java.util.Set;
  * asynchronous calculations use captured values without reading live config.</p>
  */
 public final class WeatherConfig {
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec CONFIG_SPEC;
 
-    public static final ModConfigSpec.BooleanValue WEATHER_SYSTEM_ENABLED;
-    public static final ModConfigSpec.IntValue ATMOSPHERIC_CELL_SIZE;
-    public static final ModConfigSpec.IntValue SIMULATION_INTERVAL_TICKS;
-    public static final ModConfigSpec.IntValue ACTIVE_SIMULATION_RADIUS;
-    public static final ModConfigSpec.IntValue INACTIVE_CELL_GRACE_PERIOD_TICKS;
-    public static final ModConfigSpec.IntValue ENVIRONMENT_RESAMPLE_INTERVAL_TICKS;
-    public static final ModConfigSpec.IntValue SNAPSHOT_SYNC_INTERVAL_TICKS;
-    public static final ModConfigSpec.IntValue MAX_PERSISTED_CELLS;
-    public static final ModConfigSpec.DoubleValue SIMULATION_SPEED;
-    public static final ModConfigSpec.DoubleValue HUMIDITY_TRANSPORT_RATE;
-    public static final ModConfigSpec.DoubleValue TEMPERATURE_TRANSPORT_RATE;
-    public static final ModConfigSpec.DoubleValue PRESSURE_EQUALIZATION_RATE;
-    public static final ModConfigSpec.DoubleValue WEATHER_FRONT_STRENGTH;
-    public static final ModConfigSpec.DoubleValue EVAPORATION_STRENGTH;
-    public static final ModConfigSpec.DoubleValue CLOUD_FORMATION_THRESHOLD;
-    public static final ModConfigSpec.DoubleValue PRECIPITATION_THRESHOLD;
-    public static final ModConfigSpec.DoubleValue STORM_FORMATION_THRESHOLD;
-    public static final ModConfigSpec.DoubleValue MAXIMUM_PRECIPITATION_INTENSITY;
-    public static final ModConfigSpec.DoubleValue RANDOM_VARIATION;
-    public static final ModConfigSpec.BooleanValue WIND_ENABLED;
-    public static final ModConfigSpec.DoubleValue BASE_WIND_STRENGTH;
-    public static final ModConfigSpec.DoubleValue GUST_FREQUENCY;
-    public static final ModConfigSpec.DoubleValue GUST_STRENGTH;
-    public static final ModConfigSpec.DoubleValue STORM_WIND_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue MAX_WIND_SPEED;
-    public static final ModConfigSpec.BooleanValue SEASON_INTEGRATION_ENABLED;
-    public static final ModConfigSpec.DoubleValue SEASON_TEMPERATURE_AMPLITUDE_CELSIUS;
-    public static final ModConfigSpec.DoubleValue SEASON_HUMIDITY_AMPLITUDE;
-    public static final ModConfigSpec.DoubleValue SEASON_STORMINESS_AMPLITUDE;
-    public static final ModConfigSpec.BooleanValue COLD_SWEAT_INTEGRATION_ENABLED;
-    public static final ModConfigSpec.DoubleValue COLD_SWEAT_MAXIMUM_OFFSET_CELSIUS;
-    public static final ModConfigSpec.BooleanValue THIRST_WAS_TAKEN_INTEGRATION_ENABLED;
-    public static final ModConfigSpec.IntValue THIRST_WEATHER_INTERVAL_TICKS;
-    public static final ModConfigSpec.DoubleValue THIRST_MAXIMUM_EXHAUSTION_PER_INTERVAL;
-    public static final ModConfigSpec.BooleanValue LOCALIZED_LIGHTNING_ENABLED;
-    public static final ModConfigSpec.IntValue LIGHTNING_CHECK_INTERVAL_TICKS;
-    public static final ModConfigSpec.IntValue LIGHTNING_DIMENSION_COOLDOWN_TICKS;
-    public static final ModConfigSpec.IntValue LIGHTNING_CELL_COOLDOWN_TICKS;
-    public static final ModConfigSpec.IntValue LIGHTNING_CANDIDATE_RADIUS_BLOCKS;
-    public static final ModConfigSpec.IntValue LIGHTNING_MAX_CANDIDATE_ATTEMPTS;
-    public static final ModConfigSpec.DoubleValue LIGHTNING_MAXIMUM_CHANCE_PER_CHECK;
-    public static final ModConfigSpec.BooleanValue WILDFIRES_ENABLED;
-    public static final ModConfigSpec.IntValue WILDFIRE_CHECK_INTERVAL_TICKS;
-    public static final ModConfigSpec.IntValue WILDFIRE_DIMENSION_COOLDOWN_TICKS;
-    public static final ModConfigSpec.IntValue WILDFIRE_CELL_COOLDOWN_TICKS;
-    public static final ModConfigSpec.IntValue WILDFIRE_CANDIDATE_CHUNK_RADIUS;
-    public static final ModConfigSpec.IntValue WILDFIRE_CANDIDATE_CHUNKS_PER_PLAYER;
-    public static final ModConfigSpec.IntValue WILDFIRE_EMBER_RANGE_BLOCKS;
-    public static final ModConfigSpec.IntValue WILDFIRE_TARGET_ATTEMPTS;
-    public static final ModConfigSpec.DoubleValue WILDFIRE_MAXIMUM_CHANCE_PER_CHECK;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> DIMENSION_ALLOWLIST;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> DIMENSION_DENYLIST;
-    public static final ModConfigSpec.EnumValue<VanillaWeatherCompatibilityMode> VANILLA_WEATHER_COMPATIBILITY_MODE;
-    public static final ModConfigSpec.EnumValue<WeatherOwnershipMode> WEATHER_OWNERSHIP_MODE;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> EXTERNAL_WEATHER_MOD_IDS;
-    public static final ModConfigSpec.BooleanValue PERSISTENT_SYSTEMS_ENABLED;
-    public static final ModConfigSpec.IntValue MAXIMUM_WEATHER_SYSTEMS;
-    public static final ModConfigSpec.DoubleValue WEATHER_SYSTEM_MOVEMENT_SPEED;
-    public static final ModConfigSpec.BooleanValue WEATHER_SYSTEM_SPLITTING_ENABLED;
-    public static final ModConfigSpec.BooleanValue SURFACE_WEATHERING_ENABLED;
-    public static final ModConfigSpec.IntValue SURFACE_WEATHERING_INTERVAL_TICKS;
-    public static final ModConfigSpec.IntValue SURFACE_WEATHERING_ATTEMPTS_PER_PLAYER;
-    public static final ModConfigSpec.IntValue MAXIMUM_SNOW_LAYERS;
-    public static final ModConfigSpec.BooleanValue SEVERE_WEATHER_ENABLED;
-    public static final ModConfigSpec.BooleanValue TORNADOES_ENABLED;
-    public static final ModConfigSpec.BooleanValue CYCLONES_ENABLED;
-    public static final ModConfigSpec.BooleanValue SEVERE_BLOCK_DAMAGE_ENABLED;
-    public static final ModConfigSpec.DoubleValue SEVERE_ENTITY_WIND_STRENGTH;
-    public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
+    public static ModConfigSpec.BooleanValue WEATHER_SYSTEM_ENABLED;
+    public static ModConfigSpec.IntValue ATMOSPHERIC_CELL_SIZE;
+    public static ModConfigSpec.IntValue SIMULATION_INTERVAL_TICKS;
+    public static ModConfigSpec.IntValue ACTIVE_SIMULATION_RADIUS;
+    public static ModConfigSpec.IntValue INACTIVE_CELL_GRACE_PERIOD_TICKS;
+    public static ModConfigSpec.IntValue ENVIRONMENT_RESAMPLE_INTERVAL_TICKS;
+    public static ModConfigSpec.IntValue SNAPSHOT_SYNC_INTERVAL_TICKS;
+    public static ModConfigSpec.IntValue MAX_PERSISTED_CELLS;
+    public static ModConfigSpec.DoubleValue SIMULATION_SPEED;
+    public static ModConfigSpec.DoubleValue HUMIDITY_TRANSPORT_RATE;
+    public static ModConfigSpec.DoubleValue TEMPERATURE_TRANSPORT_RATE;
+    public static ModConfigSpec.DoubleValue PRESSURE_EQUALIZATION_RATE;
+    public static ModConfigSpec.DoubleValue WEATHER_FRONT_STRENGTH;
+    public static ModConfigSpec.DoubleValue EVAPORATION_STRENGTH;
+    public static ModConfigSpec.DoubleValue CLOUD_FORMATION_THRESHOLD;
+    public static ModConfigSpec.DoubleValue PRECIPITATION_THRESHOLD;
+    public static ModConfigSpec.DoubleValue STORM_FORMATION_THRESHOLD;
+    public static ModConfigSpec.DoubleValue MAXIMUM_PRECIPITATION_INTENSITY;
+    public static ModConfigSpec.DoubleValue RANDOM_VARIATION;
+    public static ModConfigSpec.BooleanValue WIND_ENABLED;
+    public static ModConfigSpec.DoubleValue BASE_WIND_STRENGTH;
+    public static ModConfigSpec.DoubleValue GUST_FREQUENCY;
+    public static ModConfigSpec.DoubleValue GUST_STRENGTH;
+    public static ModConfigSpec.DoubleValue STORM_WIND_MULTIPLIER;
+    public static ModConfigSpec.DoubleValue MAX_WIND_SPEED;
+    public static ModConfigSpec.BooleanValue SEASON_INTEGRATION_ENABLED;
+    public static ModConfigSpec.DoubleValue SEASON_TEMPERATURE_AMPLITUDE_CELSIUS;
+    public static ModConfigSpec.DoubleValue SEASON_HUMIDITY_AMPLITUDE;
+    public static ModConfigSpec.DoubleValue SEASON_STORMINESS_AMPLITUDE;
+    public static ModConfigSpec.BooleanValue COLD_SWEAT_INTEGRATION_ENABLED;
+    public static ModConfigSpec.DoubleValue COLD_SWEAT_MAXIMUM_OFFSET_CELSIUS;
+    public static ModConfigSpec.BooleanValue THIRST_WAS_TAKEN_INTEGRATION_ENABLED;
+    public static ModConfigSpec.IntValue THIRST_WEATHER_INTERVAL_TICKS;
+    public static ModConfigSpec.DoubleValue THIRST_MAXIMUM_EXHAUSTION_PER_INTERVAL;
+    public static ModConfigSpec.BooleanValue LOCALIZED_LIGHTNING_ENABLED;
+    public static ModConfigSpec.IntValue LIGHTNING_CHECK_INTERVAL_TICKS;
+    public static ModConfigSpec.IntValue LIGHTNING_DIMENSION_COOLDOWN_TICKS;
+    public static ModConfigSpec.IntValue LIGHTNING_CELL_COOLDOWN_TICKS;
+    public static ModConfigSpec.IntValue LIGHTNING_CANDIDATE_RADIUS_BLOCKS;
+    public static ModConfigSpec.IntValue LIGHTNING_MAX_CANDIDATE_ATTEMPTS;
+    public static ModConfigSpec.DoubleValue LIGHTNING_MAXIMUM_CHANCE_PER_CHECK;
+    public static ModConfigSpec.BooleanValue WILDFIRES_ENABLED;
+    public static ModConfigSpec.IntValue WILDFIRE_CHECK_INTERVAL_TICKS;
+    public static ModConfigSpec.IntValue WILDFIRE_DIMENSION_COOLDOWN_TICKS;
+    public static ModConfigSpec.IntValue WILDFIRE_CELL_COOLDOWN_TICKS;
+    public static ModConfigSpec.IntValue WILDFIRE_CANDIDATE_CHUNK_RADIUS;
+    public static ModConfigSpec.IntValue WILDFIRE_CANDIDATE_CHUNKS_PER_PLAYER;
+    public static ModConfigSpec.IntValue WILDFIRE_EMBER_RANGE_BLOCKS;
+    public static ModConfigSpec.IntValue WILDFIRE_TARGET_ATTEMPTS;
+    public static ModConfigSpec.DoubleValue WILDFIRE_MAXIMUM_CHANCE_PER_CHECK;
+    public static ModConfigSpec.ConfigValue<List<? extends String>> DIMENSION_ALLOWLIST;
+    public static ModConfigSpec.ConfigValue<List<? extends String>> DIMENSION_DENYLIST;
+    public static ModConfigSpec.EnumValue<VanillaWeatherCompatibilityMode> VANILLA_WEATHER_COMPATIBILITY_MODE;
+    public static ModConfigSpec.EnumValue<WeatherOwnershipMode> WEATHER_OWNERSHIP_MODE;
+    public static ModConfigSpec.ConfigValue<List<? extends String>> EXTERNAL_WEATHER_MOD_IDS;
+    public static ModConfigSpec.BooleanValue PERSISTENT_SYSTEMS_ENABLED;
+    public static ModConfigSpec.IntValue MAXIMUM_WEATHER_SYSTEMS;
+    public static ModConfigSpec.DoubleValue WEATHER_SYSTEM_MOVEMENT_SPEED;
+    public static ModConfigSpec.BooleanValue WEATHER_SYSTEM_SPLITTING_ENABLED;
+    public static ModConfigSpec.BooleanValue SURFACE_WEATHERING_ENABLED;
+    public static ModConfigSpec.IntValue SURFACE_WEATHERING_INTERVAL_TICKS;
+    public static ModConfigSpec.IntValue SURFACE_WEATHERING_ATTEMPTS_PER_PLAYER;
+    public static ModConfigSpec.IntValue MAXIMUM_SNOW_LAYERS;
+    public static ModConfigSpec.BooleanValue SEVERE_WEATHER_ENABLED;
+    public static ModConfigSpec.BooleanValue TORNADOES_ENABLED;
+    public static ModConfigSpec.BooleanValue CYCLONES_ENABLED;
+    public static ModConfigSpec.BooleanValue SEVERE_BLOCK_DAMAGE_ENABLED;
+    public static ModConfigSpec.DoubleValue SEVERE_ENTITY_WIND_STRENGTH;
+    public static ModConfigSpec.BooleanValue DEBUG_LOGGING;
 
     private static final int DEFAULT_CELL_SIZE = 256;
     private static final int DEFAULT_SIMULATION_INTERVAL = 60;
@@ -119,7 +120,11 @@ public final class WeatherConfig {
     private static volatile DimensionSelection cachedDimensionSelection = DimensionSelection.DEFAULT;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines weather categories in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
         builder.comment("Server-authoritative localized atmospheric weather.")
                 .push("weather");
 
@@ -377,7 +382,6 @@ public final class WeatherConfig {
                 .define("debugLogging", false);
 
         builder.pop();
-        CONFIG_SPEC = builder.build();
     }
 
     private WeatherConfig() {

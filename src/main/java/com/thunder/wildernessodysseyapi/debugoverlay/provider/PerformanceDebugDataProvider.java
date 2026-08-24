@@ -5,6 +5,8 @@ import com.thunder.wildernessodysseyapi.debugoverlay.DebugSection;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugValue;
 import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
 import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngineSnapshot;
+import com.thunder.wildernessodysseyapi.simulation.api.SimulationServices;
+import com.thunder.wildernessodysseyapi.simulation.debug.SimulationDebugSnapshot;
 import net.minecraft.client.Minecraft;
 
 import java.util.List;
@@ -28,9 +30,10 @@ public final class PerformanceDebugDataProvider implements DebugDataProvider {
                 .add("Maximum heap", formatBytes(max))
                 .build();
         DebugSection tickEngine = tickEngineSection(minecraft);
+        DebugSection simulationEngine = simulationEngineSection(minecraft);
 
         if (minecraft.level == null) {
-            return List.of(frame, memory, tickEngine, DebugSection.builder("WORLD LOAD")
+            return List.of(frame, memory, tickEngine, simulationEngine, DebugSection.builder("WORLD LOAD")
                     .add("State", DebugValue.unavailable("No world loaded"))
                     .build());
         }
@@ -45,7 +48,7 @@ public final class PerformanceDebugDataProvider implements DebugDataProvider {
                 .add("Particles", minecraft.particleEngine.countParticles())
                 .add("Chunk renderer", minecraft.levelRenderer.getSectionStatistics())
                 .build();
-        return List.of(frame, memory, tickEngine, worldLoad);
+        return List.of(frame, memory, tickEngine, simulationEngine, worldLoad);
     }
 
     private static DebugSection frameSection(Minecraft minecraft) {
@@ -96,6 +99,31 @@ public final class PerformanceDebugDataProvider implements DebugDataProvider {
                 .add("Deferred work", snapshot.deferredTasks() + snapshot.backgroundQueuedTasks())
                 .add("Throttled systems", snapshot.throttledSubsystems())
                 .add("Worst WO subsystem", snapshot.worstSubsystem())
+                .build();
+    }
+
+    private static DebugSection simulationEngineSection(Minecraft minecraft) {
+        if (minecraft.getSingleplayerServer() == null) {
+            return DebugSection.builder("WO SIMULATION ENGINE")
+                    .add("State", DebugValue.unavailable("Use /wo simulation status on the server"))
+                    .build();
+        }
+        SimulationDebugSnapshot snapshot = SimulationServices.debugSnapshot();
+        return DebugSection.builder("WO SIMULATION ENGINE")
+                .add("State", snapshot.running() ? DebugValue.good("Running") : DebugValue.unavailable("Stopped"))
+                .add("Systems", snapshot.enabledSystems() + " / " + snapshot.registeredSystems())
+                .add("Regions", snapshot.pendingRegions() + " pending / " + snapshot.trackedRegions() + " tracked")
+                .add("Activity", snapshot.activeRegions() + " active / "
+                        + snapshot.nearbyRegions() + " near / "
+                        + snapshot.backgroundRegions() + " distant / "
+                        + snapshot.dormantRegions() + " dormant")
+                .add("Requests", snapshot.acceptedRequests() + " accepted / "
+                        + snapshot.coalescedRequests() + " coalesced / "
+                        + snapshot.rejectedRequests() + " rejected")
+                .add("Last pass", snapshot.lastPassTick() + " | "
+                        + String.format(Locale.ROOT, "%.3f ms", snapshot.lastPassNanos() / 1_000_000.0D))
+                .add("Failures", snapshot.systemFailures() + " systems / "
+                        + snapshot.eventListenerFailures() + " listeners")
                 .build();
     }
 

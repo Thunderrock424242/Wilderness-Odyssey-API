@@ -1,38 +1,45 @@
 package com.thunder.wildernessodysseyapi.temporalrift.config;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.List;
 
 public final class TemporalRiftConfig {
-    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
-    public static final ModConfigSpec CONFIG_SPEC;
+    private static ModConfigSpec.Builder BUILDER;
+    public static ModConfigSpec CONFIG_SPEC;
 
-    public static final ModConfigSpec.BooleanValue ENABLE_RIFT_SYSTEM;
-    public static final ModConfigSpec.IntValue RIFT_INTERVAL_DAYS;
-    public static final ModConfigSpec.IntValue RIFT_OPEN_DURATION_TICKS;
-    public static final ModConfigSpec.IntValue RIFT_SPAWN_RADIUS;
-    public static final ModConfigSpec.BooleanValue ENABLE_RIFT_SINKHOLE;
-    public static final ModConfigSpec.IntValue RIFT_SINKHOLE_RADIUS;
-    public static final ModConfigSpec.IntValue RIFT_SINKHOLE_DEPTH;
-    public static final ModConfigSpec.BooleanValue ENABLE_RIFT_OPENING_DISASTER;
-    public static final ModConfigSpec.BooleanValue ENABLE_RIFT_PULL_EFFECT;
-    public static final ModConfigSpec.BooleanValue ENABLE_RIFT_TERRAIN_AGING;
-    public static final ModConfigSpec.IntValue TIME_CAPSULE_DELAY_DAYS;
-    public static final ModConfigSpec.IntValue TIME_CAPSULE_BURIAL_DEPTH;
-    public static final ModConfigSpec.BooleanValue ENABLE_TEMPORAL_ECHOES;
-    public static final ModConfigSpec.IntValue TEMPORAL_ECHO_DELAY_DAYS;
-    public static final ModConfigSpec.IntValue TEMPORAL_ECHO_BURIAL_DEPTH;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> BEFORE_ALLOWED_MOBS;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> BEFORE_ALLOWED_STRUCTURES;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> ECHO_ALLOWED_MOBS;
-    public static final ModConfigSpec.BooleanValue ENABLE_ECHO_CHUNK_DISTORTION;
-    public static final ModConfigSpec.BooleanValue ENABLE_ECHO_BUILD_ECHOES;
-    public static final ModConfigSpec.BooleanValue RETURN_ONLY_ACTIVE_RIFT;
-    public static final ModConfigSpec.BooleanValue CHAT_BROADCASTS;
-    public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
+    public static ModConfigSpec.BooleanValue ENABLE_RIFT_SYSTEM;
+    public static ModConfigSpec.IntValue RIFT_INTERVAL_DAYS;
+    public static ModConfigSpec.IntValue RIFT_OPEN_DURATION_TICKS;
+    public static ModConfigSpec.IntValue RIFT_SPAWN_RADIUS;
+    public static ModConfigSpec.BooleanValue ENABLE_RIFT_SINKHOLE;
+    public static ModConfigSpec.IntValue RIFT_SINKHOLE_RADIUS;
+    public static ModConfigSpec.IntValue RIFT_SINKHOLE_DEPTH;
+    public static ModConfigSpec.BooleanValue ENABLE_RIFT_OPENING_DISASTER;
+    public static ModConfigSpec.BooleanValue ENABLE_RIFT_PULL_EFFECT;
+    public static ModConfigSpec.BooleanValue ENABLE_RIFT_TERRAIN_AGING;
+    public static ModConfigSpec.IntValue TIME_CAPSULE_DELAY_DAYS;
+    public static ModConfigSpec.IntValue TIME_CAPSULE_BURIAL_DEPTH;
+    public static ModConfigSpec.BooleanValue ENABLE_TEMPORAL_ECHOES;
+    public static ModConfigSpec.IntValue TEMPORAL_ECHO_DELAY_DAYS;
+    public static ModConfigSpec.IntValue TEMPORAL_ECHO_BURIAL_DEPTH;
+    public static ModConfigSpec.ConfigValue<List<? extends String>> BEFORE_ALLOWED_MOBS;
+    public static ModConfigSpec.ConfigValue<List<? extends String>> BEFORE_ALLOWED_STRUCTURES;
+    public static ModConfigSpec.ConfigValue<List<? extends String>> ECHO_ALLOWED_MOBS;
+    public static ModConfigSpec.BooleanValue ENABLE_ECHO_CHUNK_DISTORTION;
+    public static ModConfigSpec.BooleanValue ENABLE_ECHO_BUILD_ECHOES;
+    public static ModConfigSpec.BooleanValue RETURN_ONLY_ACTIVE_RIFT;
+    public static ModConfigSpec.BooleanValue CHAT_BROADCASTS;
+    public static ModConfigSpec.BooleanValue DEBUG_LOGGING;
 
     static {
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines temporal-rift settings in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
+        BUILDER = builder;
         BUILDER.comment("Wilderness Odyssey - Temporal Rift System").push("temporal_rift");
 
         ENABLE_RIFT_SYSTEM = BUILDER
@@ -166,7 +173,7 @@ public final class TemporalRiftConfig {
                 .define("debugLogging", false);
 
         BUILDER.pop();
-        CONFIG_SPEC = BUILDER.build();
+        BUILDER = null;
     }
 
     private TemporalRiftConfig() {
