@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.ecosystem.config;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import com.thunder.wildernessodysseyapi.ecosystem.api.AnimalBehaviorTag;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -32,71 +33,75 @@ public final class EcosystemConfig {
             "minecraft:wolf=wolf"
     );
 
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec CONFIG_SPEC;
 
-    public static final ModConfigSpec.BooleanValue ENABLED;
-    public static final ModConfigSpec.BooleanValue SIMULATION_ZONES_ENABLED;
-    public static final ModConfigSpec.IntValue REGIONAL_UPDATE_INTERVAL;
-    public static final ModConfigSpec.IntValue MAX_REGION_UPDATES_PER_TICK;
-    public static final ModConfigSpec.IntValue ENTITY_TRANSITION_RATE;
-    public static final ModConfigSpec.IntValue BEHAVIOR_UPDATE_FREQUENCY;
-    public static final ModConfigSpec.IntValue FAR_ANIMAL_UPDATE_MULTIPLIER;
-    public static final ModConfigSpec.IntValue FAR_ANIMAL_DISTANCE;
-    public static final ModConfigSpec.IntValue NEAR_ANIMAL_DISTANCE;
-    public static final ModConfigSpec.IntValue DISTANT_ANIMAL_DISTANCE;
-    public static final ModConfigSpec.IntValue DISTANT_ANIMAL_UPDATE_MULTIPLIER;
-    public static final ModConfigSpec.IntValue DORMANT_ANIMAL_UPDATE_MULTIPLIER;
-    public static final ModConfigSpec.IntValue MAXIMUM_SEARCH_RADIUS;
-    public static final ModConfigSpec.DoubleValue THIRST_RATE_MULTIPLIER;
-    public static final ModConfigSpec.BooleanValue WEATHER_SHELTER_ENABLED;
-    public static final ModConfigSpec.BooleanValue PRE_STORM_REACTIONS_ENABLED;
-    public static final ModConfigSpec.BooleanValue PREDATOR_HUNTING_ENABLED;
-    public static final ModConfigSpec.BooleanValue HERD_BEHAVIOR_ENABLED;
-    public static final ModConfigSpec.BooleanValue GROUP_AI_ENABLED;
-    public static final ModConfigSpec.IntValue MAX_GROUP_SIZE;
-    public static final ModConfigSpec.IntValue LEADER_DECISION_INTERVAL;
-    public static final ModConfigSpec.IntValue MEMBER_VALIDATION_INTERVAL;
-    public static final ModConfigSpec.DoubleValue FOLLOW_DISTANCE;
-    public static final ModConfigSpec.DoubleValue GROUP_FORMATION_RADIUS;
-    public static final ModConfigSpec.IntValue MAXIMUM_EXPENSIVE_EVALUATIONS_PER_TICK;
-    public static final ModConfigSpec.DoubleValue DISTURBANCE_DECAY_PER_DAY;
-    public static final ModConfigSpec.DoubleValue MOVEMENT_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue PLAYER_ACTIVITY_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue COMBAT_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue EXPLOSION_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue FIRE_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue LIGHTNING_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue SEVERE_WEATHER_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue FLOOD_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue DROUGHT_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue METEOR_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue RADIATION_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue RIFTFALL_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue MAXIMUM_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue DISTURBANCE_CLEANUP_THRESHOLD;
-    public static final ModConfigSpec.DoubleValue WILDLIFE_MILD_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue WILDLIFE_REDUCED_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue WILDLIFE_STRONG_AVOIDANCE_DISTURBANCE;
-    public static final ModConfigSpec.DoubleValue WILDLIFE_MILD_SPAWN_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue WILDLIFE_REDUCED_SPAWN_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue WILDLIFE_STRONG_SPAWN_MULTIPLIER;
-    public static final ModConfigSpec.BooleanValue DEBUG_COMMANDS_ENABLED;
-    public static final ModConfigSpec.BooleanValue AUTO_DETECT_MODDED_ANIMALS;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> BEHAVIOR_TAG_ASSIGNMENTS;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> SPECIES_BEHAVIOR_MULTIPLIERS;
-    public static final ModConfigSpec.BooleanValue ENABLE_DISTANT_WILDLIFE;
-    public static final ModConfigSpec.IntValue REAL_ENTITY_DISTANCE;
-    public static final ModConfigSpec.IntValue DISTANT_WILDLIFE_DISTANCE;
-    public static final ModConfigSpec.IntValue MAX_DISTANT_GROUPS;
-    public static final ModConfigSpec.IntValue MAX_REPRESENTED_ANIMALS;
-    public static final ModConfigSpec.IntValue DISTANT_WILDLIFE_UPDATE_INTERVAL;
-    public static final ModConfigSpec.IntValue TRANSITION_BUFFER;
+    public static ModConfigSpec.BooleanValue ENABLED;
+    public static ModConfigSpec.BooleanValue SIMULATION_ZONES_ENABLED;
+    public static ModConfigSpec.IntValue REGIONAL_UPDATE_INTERVAL;
+    public static ModConfigSpec.IntValue MAX_REGION_UPDATES_PER_TICK;
+    public static ModConfigSpec.IntValue ENTITY_TRANSITION_RATE;
+    public static ModConfigSpec.IntValue BEHAVIOR_UPDATE_FREQUENCY;
+    public static ModConfigSpec.IntValue FAR_ANIMAL_UPDATE_MULTIPLIER;
+    public static ModConfigSpec.IntValue FAR_ANIMAL_DISTANCE;
+    public static ModConfigSpec.IntValue NEAR_ANIMAL_DISTANCE;
+    public static ModConfigSpec.IntValue DISTANT_ANIMAL_DISTANCE;
+    public static ModConfigSpec.IntValue DISTANT_ANIMAL_UPDATE_MULTIPLIER;
+    public static ModConfigSpec.IntValue DORMANT_ANIMAL_UPDATE_MULTIPLIER;
+    public static ModConfigSpec.IntValue MAXIMUM_SEARCH_RADIUS;
+    public static ModConfigSpec.DoubleValue THIRST_RATE_MULTIPLIER;
+    public static ModConfigSpec.BooleanValue WEATHER_SHELTER_ENABLED;
+    public static ModConfigSpec.BooleanValue PRE_STORM_REACTIONS_ENABLED;
+    public static ModConfigSpec.BooleanValue PREDATOR_HUNTING_ENABLED;
+    public static ModConfigSpec.BooleanValue HERD_BEHAVIOR_ENABLED;
+    public static ModConfigSpec.BooleanValue GROUP_AI_ENABLED;
+    public static ModConfigSpec.IntValue MAX_GROUP_SIZE;
+    public static ModConfigSpec.IntValue LEADER_DECISION_INTERVAL;
+    public static ModConfigSpec.IntValue MEMBER_VALIDATION_INTERVAL;
+    public static ModConfigSpec.DoubleValue FOLLOW_DISTANCE;
+    public static ModConfigSpec.DoubleValue GROUP_FORMATION_RADIUS;
+    public static ModConfigSpec.IntValue MAXIMUM_EXPENSIVE_EVALUATIONS_PER_TICK;
+    public static ModConfigSpec.DoubleValue DISTURBANCE_DECAY_PER_DAY;
+    public static ModConfigSpec.DoubleValue MOVEMENT_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue PLAYER_ACTIVITY_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue COMBAT_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue EXPLOSION_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue FIRE_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue LIGHTNING_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue SEVERE_WEATHER_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue FLOOD_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue DROUGHT_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue METEOR_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue RADIATION_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue RIFTFALL_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue MAXIMUM_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue DISTURBANCE_CLEANUP_THRESHOLD;
+    public static ModConfigSpec.DoubleValue WILDLIFE_MILD_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue WILDLIFE_REDUCED_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue WILDLIFE_STRONG_AVOIDANCE_DISTURBANCE;
+    public static ModConfigSpec.DoubleValue WILDLIFE_MILD_SPAWN_MULTIPLIER;
+    public static ModConfigSpec.DoubleValue WILDLIFE_REDUCED_SPAWN_MULTIPLIER;
+    public static ModConfigSpec.DoubleValue WILDLIFE_STRONG_SPAWN_MULTIPLIER;
+    public static ModConfigSpec.BooleanValue DEBUG_COMMANDS_ENABLED;
+    public static ModConfigSpec.BooleanValue AUTO_DETECT_MODDED_ANIMALS;
+    public static ModConfigSpec.ConfigValue<List<? extends String>> BEHAVIOR_TAG_ASSIGNMENTS;
+    public static ModConfigSpec.ConfigValue<List<? extends String>> SPECIES_BEHAVIOR_MULTIPLIERS;
+    public static ModConfigSpec.BooleanValue ENABLE_DISTANT_WILDLIFE;
+    public static ModConfigSpec.IntValue REAL_ENTITY_DISTANCE;
+    public static ModConfigSpec.IntValue DISTANT_WILDLIFE_DISTANCE;
+    public static ModConfigSpec.IntValue MAX_DISTANT_GROUPS;
+    public static ModConfigSpec.IntValue MAX_REPRESENTED_ANIMALS;
+    public static ModConfigSpec.IntValue DISTANT_WILDLIFE_UPDATE_INTERVAL;
+    public static ModConfigSpec.IntValue TRANSITION_BUFFER;
 
     private static volatile BehaviorTagRules cachedBehaviorTagRules = BehaviorTagRules.EMPTY;
     private static volatile Map<ResourceLocation, Double> cachedSpeciesMultipliers = Map.of();
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines ecosystem categories in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
         builder.comment("Server-authoritative, budgeted animal ecosystem behavior.")
                 .push("ecosystem");
 
@@ -329,7 +334,6 @@ public final class EcosystemConfig {
         builder.pop();
 
         builder.pop();
-        CONFIG_SPEC = builder.build();
     }
 
     private EcosystemConfig() {

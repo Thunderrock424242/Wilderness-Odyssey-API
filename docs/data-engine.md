@@ -194,11 +194,15 @@ Do not capture a `Level`, chunk, entity, player, block entity, or other live Min
 
 Localized weather follows this split literally: `SimulationBatch` contains only immutable records, copied sets/maps/lists, captured tracker influence, and scalar settings. Its worker task calls only the pure calculation entry point. Level/config generation changes, cell edits/removals, unloads, and superseded submissions reject the entire result before mutation so cell evolution and persistent-system observations cannot be partially mixed across generations.
 
-The shared async executor is configured in `wildernessodysseyapi-async.toml`; Data Engine limits its own in-flight use separately. Executor shutdown remains owned by the existing `AsyncTaskManager`, while Data Engine clears pending calculation results and world references before that shared executor is stopped.
+The shared async executor is configured under `[asyncThreading]` in
+`wildernessodysseyapi-common.toml`; Data Engine limits its own in-flight use
+separately. Executor shutdown remains owned by the existing `AsyncTaskManager`,
+while Data Engine clears pending calculation results and world references before
+that shared executor is stopped.
 
 ## Configuration
 
-Server config: `config/wildernessodysseyapi/wildernessodysseyapi-performance-server.toml`
+Server config: `config/wildernessodysseyapi/wildernessodysseyapi-server.toml`
 
 The file has one reversible `performance.enabled` master switch for all three
 Wilderness performance engines. Data Engine retains its own subsection switch.

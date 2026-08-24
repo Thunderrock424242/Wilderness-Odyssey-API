@@ -1,21 +1,23 @@
 package com.thunder.wildernessodysseyapi.ownership.config;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
-import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Common configuration that lets modpack creators declare ownership/credit details.
  */
 public final class OwnershipConfig {
 
-    public static final OwnershipConfig CONFIG;
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static OwnershipConfig CONFIG;
+    public static ModConfigSpec CONFIG_SPEC;
 
     static {
-        Pair<OwnershipConfig, ModConfigSpec> pair = new ModConfigSpec.Builder()
-                .configure(OwnershipConfig::new);
-        CONFIG = pair.getLeft();
-        CONFIG_SPEC = pair.getRight();
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines the ownership category in the unified common config. */
+    public static void define(ModConfigSpec.Builder builder) {
+        CONFIG = new OwnershipConfig(builder);
     }
 
     private final ModConfigSpec.ConfigValue<String> ownerName;

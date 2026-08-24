@@ -80,7 +80,8 @@ When a page exceeds the calculated multi-column capacity, the center footer disp
 
 ## Configuration and compatibility fallback
 
-The client config is `config/wildernessodysseyapi/wildernessodysseyapi-debug-overlay-client.toml`:
+The client config is `config/wildernessodysseyapi/wildernessodysseyapi-client.toml`.
+These settings are grouped under `[debug_hud]`:
 
 - `enableCustomDebugHud`: master switch, default `true`;
 - `rememberLastDebugPage`: retain the page across F3 toggles in the current client session, default `true`;

@@ -1,36 +1,43 @@
 package com.thunder.wildernessodysseyapi.telemetry;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * Server configuration for player telemetry exports.
  */
 public final class PlayerTelemetryConfig {
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec CONFIG_SPEC;
 
-    public static final ModConfigSpec.BooleanValue ENABLED;
-    public static final ModConfigSpec.ConfigValue<String> GEO_IP_ENDPOINT;
-    public static final ModConfigSpec.ConfigValue<String> ACCOUNT_AGE_ENDPOINT;
-    public static final ModConfigSpec.ConfigValue<String> SHEET_WEBHOOK_URL;
-    public static final ModConfigSpec.IntValue REQUEST_TIMEOUT_SECONDS;
-    public static final ModConfigSpec.BooleanValue EXPORT_ON_LOGOUT;
-    public static final ModConfigSpec.BooleanValue INCLUDE_SPARK_REPORT;
-    public static final ModConfigSpec.ConfigValue<String> SPARK_WEBHOOK_URL;
-    public static final ModConfigSpec.BooleanValue BLOCK_LOGOUT_UNTIL_SPARK_SENT;
-    public static final ModConfigSpec.IntValue LOGOUT_BLOCK_TIMEOUT_SECONDS;
-    public static final ModConfigSpec.DoubleValue SAMPLE_RATE_PERCENT;
-    public static final ModConfigSpec.IntValue SAMPLE_EVERY_NTH;
-    public static final ModConfigSpec.BooleanValue HASH_PLAYER_IDENTIFIERS;
-    public static final ModConfigSpec.ConfigValue<String> IDENTIFIER_HASH_SALT;
-    public static final ModConfigSpec.IntValue GEO_CACHE_TTL_SECONDS;
-    public static final ModConfigSpec.IntValue ACCOUNT_AGE_CACHE_TTL_SECONDS;
-    public static final ModConfigSpec.IntValue RETRY_MAX_ATTEMPTS;
-    public static final ModConfigSpec.IntValue RETRY_BASE_DELAY_MS;
-    public static final ModConfigSpec.IntValue RETRY_MAX_DELAY_MS;
+    public static ModConfigSpec.BooleanValue ENABLED;
+    public static ModConfigSpec.ConfigValue<String> GEO_IP_ENDPOINT;
+    public static ModConfigSpec.ConfigValue<String> ACCOUNT_AGE_ENDPOINT;
+    public static ModConfigSpec.ConfigValue<String> SHEET_WEBHOOK_URL;
+    public static ModConfigSpec.IntValue REQUEST_TIMEOUT_SECONDS;
+    public static ModConfigSpec.BooleanValue EXPORT_ON_LOGOUT;
+    public static ModConfigSpec.BooleanValue INCLUDE_SPARK_REPORT;
+    public static ModConfigSpec.ConfigValue<String> SPARK_WEBHOOK_URL;
+    public static ModConfigSpec.BooleanValue BLOCK_LOGOUT_UNTIL_SPARK_SENT;
+    public static ModConfigSpec.IntValue LOGOUT_BLOCK_TIMEOUT_SECONDS;
+    public static ModConfigSpec.DoubleValue SAMPLE_RATE_PERCENT;
+    public static ModConfigSpec.IntValue SAMPLE_EVERY_NTH;
+    public static ModConfigSpec.BooleanValue HASH_PLAYER_IDENTIFIERS;
+    public static ModConfigSpec.ConfigValue<String> IDENTIFIER_HASH_SALT;
+    public static ModConfigSpec.IntValue GEO_CACHE_TTL_SECONDS;
+    public static ModConfigSpec.IntValue ACCOUNT_AGE_CACHE_TTL_SECONDS;
+    public static ModConfigSpec.IntValue RETRY_MAX_ATTEMPTS;
+    public static ModConfigSpec.IntValue RETRY_BASE_DELAY_MS;
+    public static ModConfigSpec.IntValue RETRY_MAX_DELAY_MS;
 
-    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
+    private static ModConfigSpec.Builder BUILDER;
 
     static {
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines player telemetry in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
+        BUILDER = builder;
         BUILDER.push("playerTelemetry");
 
         ENABLED = BUILDER.comment("Master toggle for exporting player telemetry to a Google Sheets webhook.")
@@ -116,8 +123,7 @@ public final class PlayerTelemetryConfig {
                 .defineInRange("retryMaxDelayMs", 5000, 100, 60000);
 
         BUILDER.pop();
-
-        CONFIG_SPEC = BUILDER.build();
+        BUILDER = null;
     }
 
     private PlayerTelemetryConfig() {

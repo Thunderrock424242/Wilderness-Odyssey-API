@@ -1,16 +1,19 @@
 package com.thunder.wildernessodysseyapi.riftfall.config;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
-import org.apache.commons.lang3.tuple.Pair;
 
 public class RiftfallConfig {
-    public static final RiftfallConfig CONFIG;
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static RiftfallConfig CONFIG;
+    public static ModConfigSpec CONFIG_SPEC;
 
     static {
-        Pair<RiftfallConfig, ModConfigSpec> pair = new ModConfigSpec.Builder().configure(RiftfallConfig::new);
-        CONFIG = pair.getLeft();
-        CONFIG_SPEC = pair.getRight();
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines the Riftfall category in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
+        CONFIG = new RiftfallConfig(builder);
     }
 
     private final ModConfigSpec.BooleanValue enabled;

@@ -1,21 +1,23 @@
 package com.thunder.wildernessodysseyapi.structureblock.config;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
-import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Server-side configuration for expanded structure block behavior.
  */
 public class StructureBlockConfig {
 
-    public static final StructureBlockConfig CONFIG;
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static StructureBlockConfig CONFIG;
+    public static ModConfigSpec CONFIG_SPEC;
 
     static {
-        Pair<StructureBlockConfig, ModConfigSpec> pair = new ModConfigSpec.Builder()
-                .configure(StructureBlockConfig::new);
-        CONFIG = pair.getLeft();
-        CONFIG_SPEC = pair.getRight();
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines the structure-block category in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
+        CONFIG = new StructureBlockConfig(builder);
     }
 
     private final ModConfigSpec.IntValue maxStructureSize;

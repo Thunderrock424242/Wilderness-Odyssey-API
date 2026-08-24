@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.config;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
@@ -11,77 +12,81 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  */
 public final class WaterSimulationConfig {
 
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec CONFIG_SPEC;
 
-    public static final ModConfigSpec.BooleanValue ENABLE_WILDERNESS_ODYSSEY_WATER;
-    public static final ModConfigSpec.BooleanValue ENABLE_VANILLA_BUCKET_COMPAT;
-    public static final ModConfigSpec.BooleanValue ENABLE_VANILLA_BOAT_COMPAT;
-    public static final ModConfigSpec.BooleanValue ENABLE_ENTITY_WATER_COMPAT;
-    public static final ModConfigSpec.BooleanValue ENABLE_ENTITY_HYDRODYNAMICS;
-    public static final ModConfigSpec.DoubleValue ENTITY_BUOYANCY_SCALE;
-    public static final ModConfigSpec.DoubleValue ENTITY_DRAG_SCALE;
-    public static final ModConfigSpec.DoubleValue ENTITY_MAX_ADDED_VELOCITY_SCALE;
-    public static final ModConfigSpec.DoubleValue ENTITY_PLANING_SCALE;
-    public static final ModConfigSpec.DoubleValue ENTITY_SLAMMING_SCALE;
-    public static final ModConfigSpec.DoubleValue ENTITY_ANGULAR_RESPONSE_SCALE;
-    public static final ModConfigSpec.BooleanValue ENABLE_FISHING_COMPAT;
-    public static final ModConfigSpec.BooleanValue ENABLE_STRUCTURE_WATER_MARKERS;
-    public static final ModConfigSpec.BooleanValue ENABLE_FLUID_HANDLER_COMPAT;
-    public static final ModConfigSpec.BooleanValue ENABLE_CREATE_WATER_COMPAT;
-    public static final ModConfigSpec.IntValue LOCAL_FLOW_CELLS_PER_TICK;
-    public static final ModConfigSpec.DoubleValue LOCAL_FLOW_SLEEP_SPEED;
-    public static final ModConfigSpec.IntValue LARGE_BODY_CACHE_MAX_COLUMNS;
-    public static final ModConfigSpec.IntValue WATER_BODY_UPDATES_PER_TICK;
-    public static final ModConfigSpec.IntValue LOCAL_WATER_NETWORK_EVENTS_PER_TICK;
-    public static final ModConfigSpec.BooleanValue ENABLE_SERVER_SPH_LOCAL_SIMULATION;
-    public static final ModConfigSpec.IntValue SERVER_SPH_MAX_ACTIVE_BODIES;
-    public static final ModConfigSpec.IntValue SERVER_SPH_MAX_PARTICLES_PER_BODY;
-    public static final ModConfigSpec.IntValue SERVER_SPH_PARTICLE_TICK_BUDGET;
-    public static final ModConfigSpec.BooleanValue ENABLE_WEATHER_WATER_COUPLING;
-    public static final ModConfigSpec.IntValue SEA_STATE_CELL_SIZE;
-    public static final ModConfigSpec.IntValue SEA_STATE_SYNC_RADIUS_CELLS;
-    public static final ModConfigSpec.IntValue SEA_STATE_UPDATE_INTERVAL_TICKS;
-    public static final ModConfigSpec.DoubleValue SEA_STATE_BUILD_TIME_SECONDS;
-    public static final ModConfigSpec.DoubleValue SEA_STATE_DECAY_TIME_SECONDS;
-    public static final ModConfigSpec.IntValue SEA_STATE_MAX_CELLS;
-    public static final ModConfigSpec.BooleanValue ENABLE_WEATHER_HYDROLOGY;
-    public static final ModConfigSpec.IntValue HYDROLOGY_INTERVAL_TICKS;
-    public static final ModConfigSpec.IntValue HYDROLOGY_PROBES_PER_PLAYER;
-    public static final ModConfigSpec.IntValue HYDROLOGY_MAX_TRANSFERS_PER_TICK;
-    public static final ModConfigSpec.IntValue HYDROLOGY_RAIN_UNITS_PER_PROBE;
-    public static final ModConfigSpec.IntValue HYDROLOGY_EVAPORATION_UNITS_PER_PROBE;
-    public static final ModConfigSpec.IntValue HYDROLOGY_MIN_TRANSFER_UNITS;
-    public static final ModConfigSpec.IntValue HYDROLOGY_MAX_LEDGER_ENTRIES;
-    public static final ModConfigSpec.BooleanValue ENABLE_WATERSHED_SIMULATION;
-    public static final ModConfigSpec.DoubleValue WATERSHED_RAINFALL_ACCUMULATION_RATE;
-    public static final ModConfigSpec.DoubleValue WATERSHED_SNOWMELT_RATE;
-    public static final ModConfigSpec.BooleanValue ENABLE_WATERSHED_GROUNDWATER;
-    public static final ModConfigSpec.DoubleValue WATERSHED_GROUNDWATER_RECHARGE_RATE;
-    public static final ModConfigSpec.DoubleValue WATERSHED_GROUNDWATER_SEEPAGE_RATE;
-    public static final ModConfigSpec.DoubleValue WATERSHED_SPRING_THRESHOLD;
-    public static final ModConfigSpec.DoubleValue WATERSHED_DRAINAGE_RATE;
-    public static final ModConfigSpec.DoubleValue WATERSHED_MAX_WATER_LEVEL_OFFSET;
-    public static final ModConfigSpec.BooleanValue ENABLE_LOCALIZED_FLOODING;
-    public static final ModConfigSpec.DoubleValue WATERSHED_FLOOD_THRESHOLD;
-    public static final ModConfigSpec.IntValue FLOOD_MAX_PLACEMENTS_PER_TICK;
-    public static final ModConfigSpec.IntValue FLOOD_MAX_REMOVALS_PER_TICK;
-    public static final ModConfigSpec.IntValue WATERSHED_SIMULATION_DISTANCE_CHUNKS;
-    public static final ModConfigSpec.IntValue WATERSHED_UPDATE_INTERVAL_TICKS;
-    public static final ModConfigSpec.IntValue WATERSHED_CHUNKS_PER_TICK;
-    public static final ModConfigSpec.IntValue WATERSHED_MAX_SAVED_CHUNKS;
-    public static final ModConfigSpec.IntValue WATERSHED_MAX_TEMPORARY_FLOOD_CELLS;
-    public static final ModConfigSpec.BooleanValue ENABLE_RAIN_FED_SURFACE_WATER;
-    public static final ModConfigSpec.DoubleValue WATERSHED_POND_FORMATION_THRESHOLD;
-    public static final ModConfigSpec.DoubleValue WATERSHED_WETLAND_FORMATION_THRESHOLD;
-    public static final ModConfigSpec.IntValue SURFACE_WATER_MAX_PLACEMENTS_PER_TICK;
-    public static final ModConfigSpec.IntValue SURFACE_WATER_MINIMUM_LIFETIME_TICKS;
-    public static final ModConfigSpec.BooleanValue ENABLE_WATERSHED_SEDIMENT_EFFECTS;
-    public static final ModConfigSpec.BooleanValue ENABLE_WATERSHED_DEBRIS_EFFECTS;
-    public static final ModConfigSpec.BooleanValue WATERSHED_DEBUG_LOGGING;
-    public static final ModConfigSpec.IntValue DEBUG_COMMAND_MAX_RADIUS;
+    public static ModConfigSpec.BooleanValue ENABLE_WILDERNESS_ODYSSEY_WATER;
+    public static ModConfigSpec.BooleanValue ENABLE_VANILLA_BUCKET_COMPAT;
+    public static ModConfigSpec.BooleanValue ENABLE_VANILLA_BOAT_COMPAT;
+    public static ModConfigSpec.BooleanValue ENABLE_ENTITY_WATER_COMPAT;
+    public static ModConfigSpec.BooleanValue ENABLE_ENTITY_HYDRODYNAMICS;
+    public static ModConfigSpec.DoubleValue ENTITY_BUOYANCY_SCALE;
+    public static ModConfigSpec.DoubleValue ENTITY_DRAG_SCALE;
+    public static ModConfigSpec.DoubleValue ENTITY_MAX_ADDED_VELOCITY_SCALE;
+    public static ModConfigSpec.DoubleValue ENTITY_PLANING_SCALE;
+    public static ModConfigSpec.DoubleValue ENTITY_SLAMMING_SCALE;
+    public static ModConfigSpec.DoubleValue ENTITY_ANGULAR_RESPONSE_SCALE;
+    public static ModConfigSpec.BooleanValue ENABLE_FISHING_COMPAT;
+    public static ModConfigSpec.BooleanValue ENABLE_STRUCTURE_WATER_MARKERS;
+    public static ModConfigSpec.BooleanValue ENABLE_FLUID_HANDLER_COMPAT;
+    public static ModConfigSpec.BooleanValue ENABLE_CREATE_WATER_COMPAT;
+    public static ModConfigSpec.IntValue LOCAL_FLOW_CELLS_PER_TICK;
+    public static ModConfigSpec.DoubleValue LOCAL_FLOW_SLEEP_SPEED;
+    public static ModConfigSpec.IntValue LARGE_BODY_CACHE_MAX_COLUMNS;
+    public static ModConfigSpec.IntValue WATER_BODY_UPDATES_PER_TICK;
+    public static ModConfigSpec.IntValue LOCAL_WATER_NETWORK_EVENTS_PER_TICK;
+    public static ModConfigSpec.BooleanValue ENABLE_SERVER_SPH_LOCAL_SIMULATION;
+    public static ModConfigSpec.IntValue SERVER_SPH_MAX_ACTIVE_BODIES;
+    public static ModConfigSpec.IntValue SERVER_SPH_MAX_PARTICLES_PER_BODY;
+    public static ModConfigSpec.IntValue SERVER_SPH_PARTICLE_TICK_BUDGET;
+    public static ModConfigSpec.BooleanValue ENABLE_WEATHER_WATER_COUPLING;
+    public static ModConfigSpec.IntValue SEA_STATE_CELL_SIZE;
+    public static ModConfigSpec.IntValue SEA_STATE_SYNC_RADIUS_CELLS;
+    public static ModConfigSpec.IntValue SEA_STATE_UPDATE_INTERVAL_TICKS;
+    public static ModConfigSpec.DoubleValue SEA_STATE_BUILD_TIME_SECONDS;
+    public static ModConfigSpec.DoubleValue SEA_STATE_DECAY_TIME_SECONDS;
+    public static ModConfigSpec.IntValue SEA_STATE_MAX_CELLS;
+    public static ModConfigSpec.BooleanValue ENABLE_WEATHER_HYDROLOGY;
+    public static ModConfigSpec.IntValue HYDROLOGY_INTERVAL_TICKS;
+    public static ModConfigSpec.IntValue HYDROLOGY_PROBES_PER_PLAYER;
+    public static ModConfigSpec.IntValue HYDROLOGY_MAX_TRANSFERS_PER_TICK;
+    public static ModConfigSpec.IntValue HYDROLOGY_RAIN_UNITS_PER_PROBE;
+    public static ModConfigSpec.IntValue HYDROLOGY_EVAPORATION_UNITS_PER_PROBE;
+    public static ModConfigSpec.IntValue HYDROLOGY_MIN_TRANSFER_UNITS;
+    public static ModConfigSpec.IntValue HYDROLOGY_MAX_LEDGER_ENTRIES;
+    public static ModConfigSpec.BooleanValue ENABLE_WATERSHED_SIMULATION;
+    public static ModConfigSpec.DoubleValue WATERSHED_RAINFALL_ACCUMULATION_RATE;
+    public static ModConfigSpec.DoubleValue WATERSHED_SNOWMELT_RATE;
+    public static ModConfigSpec.BooleanValue ENABLE_WATERSHED_GROUNDWATER;
+    public static ModConfigSpec.DoubleValue WATERSHED_GROUNDWATER_RECHARGE_RATE;
+    public static ModConfigSpec.DoubleValue WATERSHED_GROUNDWATER_SEEPAGE_RATE;
+    public static ModConfigSpec.DoubleValue WATERSHED_SPRING_THRESHOLD;
+    public static ModConfigSpec.DoubleValue WATERSHED_DRAINAGE_RATE;
+    public static ModConfigSpec.DoubleValue WATERSHED_MAX_WATER_LEVEL_OFFSET;
+    public static ModConfigSpec.BooleanValue ENABLE_LOCALIZED_FLOODING;
+    public static ModConfigSpec.DoubleValue WATERSHED_FLOOD_THRESHOLD;
+    public static ModConfigSpec.IntValue FLOOD_MAX_PLACEMENTS_PER_TICK;
+    public static ModConfigSpec.IntValue FLOOD_MAX_REMOVALS_PER_TICK;
+    public static ModConfigSpec.IntValue WATERSHED_SIMULATION_DISTANCE_CHUNKS;
+    public static ModConfigSpec.IntValue WATERSHED_UPDATE_INTERVAL_TICKS;
+    public static ModConfigSpec.IntValue WATERSHED_CHUNKS_PER_TICK;
+    public static ModConfigSpec.IntValue WATERSHED_MAX_SAVED_CHUNKS;
+    public static ModConfigSpec.IntValue WATERSHED_MAX_TEMPORARY_FLOOD_CELLS;
+    public static ModConfigSpec.BooleanValue ENABLE_RAIN_FED_SURFACE_WATER;
+    public static ModConfigSpec.DoubleValue WATERSHED_POND_FORMATION_THRESHOLD;
+    public static ModConfigSpec.DoubleValue WATERSHED_WETLAND_FORMATION_THRESHOLD;
+    public static ModConfigSpec.IntValue SURFACE_WATER_MAX_PLACEMENTS_PER_TICK;
+    public static ModConfigSpec.IntValue SURFACE_WATER_MINIMUM_LIFETIME_TICKS;
+    public static ModConfigSpec.BooleanValue ENABLE_WATERSHED_SEDIMENT_EFFECTS;
+    public static ModConfigSpec.BooleanValue ENABLE_WATERSHED_DEBRIS_EFFECTS;
+    public static ModConfigSpec.BooleanValue WATERSHED_DEBUG_LOGGING;
+    public static ModConfigSpec.IntValue DEBUG_COMMAND_MAX_RADIUS;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines water simulation categories in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
 
         builder.comment("Server-side water simulation and compatibility options.")
                 .push("water_simulation");
@@ -300,7 +305,6 @@ public final class WaterSimulationConfig {
                 .defineInRange("debugCommandMaxRadius", 16, 1, 64);
 
         builder.pop();
-        CONFIG_SPEC = builder.build();
     }
 
     private WaterSimulationConfig() {

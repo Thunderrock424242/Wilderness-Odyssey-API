@@ -332,7 +332,14 @@ With debug commands enabled, `/woecosystem distant` reports persisted groups, re
 
 ## Configuration and diagnostics
 
-Server settings are generated in `config/wildernessodysseyapi/wildernessodysseyapi-ecosystem-server.toml`. They control behavior-tag assignments, automatic modded-animal detection, the master switch, simulation zones, evaluation frequency, radius caps, thirst multiplier, shelter/herd/predator switches, per-tick expensive-evaluation budget, per-entity behavior multipliers, and the environmental-memory decay/source/cleanup/wildlife response values.
+Server settings are generated in `config/wildernessodysseyapi/wildernessodysseyapi-server.toml`
+under `[ecosystem]`. Environmental-memory values are grouped under
+`[ecosystem.environmentalMemory]`, while distant-wildlife values remain under
+`[ecosystem.distantWildlife]`. They control behavior-tag assignments, automatic
+modded-animal detection, the master switch, simulation zones, evaluation
+frequency, radius caps, thirst multiplier, shelter/herd/predator switches,
+per-tick expensive-evaluation budget, per-entity behavior multipliers, and the
+environmental-memory decay/source/cleanup/wildlife response values.
 
 Zone controls are `simulationZonesEnabled`, `activeRadius`, `nearRadius`, `distantRadius`, `regionalUpdateInterval`, `maxRegionUpdatesPerTick`, and `entityTransitionRate`. `farAnimalUpdateMultiplier` controls only the reduced ecosystem-decision frequency of real `NEAR` wildlife. With zones disabled, loaded animals remain real and use the legacy nearest-player slowdown.
 

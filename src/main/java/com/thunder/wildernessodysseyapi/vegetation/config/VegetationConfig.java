@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.vegetation.config;
 
+import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
@@ -11,18 +12,22 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  */
 public final class VegetationConfig {
 
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec CONFIG_SPEC;
 
-    public static final ModConfigSpec.BooleanValue VEGETATION_UPDATES_ENABLED;
-    public static final ModConfigSpec.IntValue UPDATES_PER_CHUNK;
-    public static final ModConfigSpec.IntValue UPDATE_INTERVAL;
-    public static final ModConfigSpec.DoubleValue DROUGHT_SENSITIVITY;
-    public static final ModConfigSpec.DoubleValue RAIN_RECOVERY_RATE;
-    public static final ModConfigSpec.BooleanValue FLOWER_WEATHER_CLOSING;
-    public static final ModConfigSpec.BooleanValue FLOWER_NIGHT_CLOSING;
+    public static ModConfigSpec.BooleanValue VEGETATION_UPDATES_ENABLED;
+    public static ModConfigSpec.IntValue UPDATES_PER_CHUNK;
+    public static ModConfigSpec.IntValue UPDATE_INTERVAL;
+    public static ModConfigSpec.DoubleValue DROUGHT_SENSITIVITY;
+    public static ModConfigSpec.DoubleValue RAIN_RECOVERY_RATE;
+    public static ModConfigSpec.BooleanValue FLOWER_WEATHER_CLOSING;
+    public static ModConfigSpec.BooleanValue FLOWER_NIGHT_CLOSING;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        WildernessConfigSpecs.initialize();
+    }
+
+    /** Defines reactive vegetation in the unified server config. */
+    public static void define(ModConfigSpec.Builder builder) {
         builder.comment(
                 "Server-authoritative regional vegetation climate and bounded plant sampling.",
                 "Normal vegetation never receives block entities or per-plant server ticks."
@@ -54,7 +59,6 @@ public final class VegetationConfig {
                 .define("flowerNightClosing", true);
 
         builder.pop();
-        CONFIG_SPEC = builder.build();
     }
 
     private VegetationConfig() {

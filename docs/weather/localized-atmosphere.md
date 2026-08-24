@@ -785,8 +785,9 @@ last sound profile, and whether local thunder has taken over.
 
 ## Client cloud configuration
 
-Localized cloud quality settings are client-only and are registered as
-`wildernessodysseyapi/wildernessodysseyapi-weather-rendering-client.toml`.
+Localized cloud quality settings are client-only and are registered in
+`wildernessodysseyapi/wildernessodysseyapi-client.toml` under
+`[weather_rendering.localized_clouds]`.
 They do not change server weather authority, precipitation decisions, or the
 synchronized atmospheric footprint.
 
@@ -839,8 +840,9 @@ render thread and invalidates the cached mesh when values change.
 ## Server configuration
 
 The server config is registered as
-`wildernessodysseyapi/wildernessodysseyapi-weather-server.toml`. Values are
-validated by NeoForge and copied into immutable scheduling/simulation records.
+`wildernessodysseyapi/wildernessodysseyapi-server.toml`. Weather values remain
+grouped under `[weather]`; values are validated by NeoForge and copied into
+immutable scheduling/simulation records.
 
 | Config path under `weather` | Default | Allowed range or behavior |
 | --- | ---: | --- |
@@ -1233,8 +1235,8 @@ explicitly changes them; changing size resets atmospheric state.
    **Off** and confirm clouds
    disappear while localized rain remains; restore Fancy before continuing.
 4. **Verify client config fallback.** Stop the client and set
-   `localized_clouds.enabled=false` in
-   `config/wildernessodysseyapi/wildernessodysseyapi-weather-rendering-client.toml`.
+   `weather_rendering.localized_clouds.enabled=false` in
+   `config/wildernessodysseyapi/wildernessodysseyapi-client.toml`.
    Restart, force rain, and confirm the F3 cloud-mesh line is inactive while
    vanilla cloud fallback is used. Re-enable it and restart; confirm the local
    mesh returns. Optionally set `renderDistanceBlocks=96` and
