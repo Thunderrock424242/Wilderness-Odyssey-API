@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.vegetation.api.ReactivePlantRegistry;
 import com.thunder.wildernessodysseyapi.vegetation.api.ReactivePlantTrait;
 import com.thunder.wildernessodysseyapi.vegetation.api.ReactiveVegetationServices;
 import com.thunder.wildernessodysseyapi.vegetation.api.VegetationClimateState;
+import com.thunder.wildernessodysseyapi.vegetation.network.ReactiveVegetationSyncService;
 import com.thunder.wildernessodysseyapi.vegetation.simulation.ReactiveVegetationScheduler;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -80,6 +81,17 @@ public final class ReactiveVegetationDebugCommand {
                 diagnostics.plantsProcessed(),
                 diagnostics.blockStateChanges(),
                 diagnostics.averageChunkProcessingMicros()
+        )), false);
+        ReactiveVegetationSyncService.NetworkDiagnostics network =
+                ReactiveVegetationSyncService.networkDiagnostics();
+        source.sendSuccess(() -> Component.literal(String.format(
+                Locale.ROOT,
+                "Vegetation network: %d initial snapshots, %d queued through Data Engine, %d direct fallbacks, %d direct visual changes, %d unchanged states skipped.",
+                network.initialSnapshots(),
+                network.dataEngineInitialSnapshots(),
+                network.directInitialSnapshots(),
+                network.changedSnapshots(),
+                network.unchangedSkipped()
         )), false);
         return diagnostics.loadedChunks();
     }

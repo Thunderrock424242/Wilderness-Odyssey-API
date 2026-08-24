@@ -28,6 +28,8 @@ public final class ReactiveVegetationSyncService {
     private static final long DIAGNOSTIC_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(30);
     private static final Map<ServerLevel, AtomicLong> REVISIONS = new ConcurrentHashMap<>();
     private static final AtomicLong INITIAL_SNAPSHOTS = new AtomicLong();
+    private static final AtomicLong DATA_ENGINE_INITIAL_SNAPSHOTS = new AtomicLong();
+    private static final AtomicLong DIRECT_INITIAL_SNAPSHOTS = new AtomicLong();
     private static final AtomicLong CHANGED_SNAPSHOTS = new AtomicLong();
     private static final AtomicLong UNCHANGED_SKIPPED = new AtomicLong();
     private static final AtomicLong LAST_DIAGNOSTIC_NANOS = new AtomicLong();
@@ -45,10 +47,13 @@ public final class ReactiveVegetationSyncService {
             return;
         }
         VegetationClimateState state = existing.get().snapshot();
-        PacketDistributor.sendToPlayer(
-                event.getPlayer(),
-                payload(event.getLevel(), event.getChunk(), state)
-        );
+        ReactiveVegetationSyncPayload payload = payload(event.getLevel(), event.getChunk(), state);
+        if (ReactiveVegetationSnapshotTransport.queueInitial(event.getPlayer(), payload)) {
+            DATA_ENGINE_INITIAL_SNAPSHOTS.incrementAndGet();
+        } else {
+            PacketDistributor.sendToPlayer(event.getPlayer(), payload);
+            DIRECT_INITIAL_SNAPSHOTS.incrementAndGet();
+        }
         INITIAL_SNAPSHOTS.incrementAndGet();
         logDiagnosticsIfDue();
     }
@@ -88,6 +93,23 @@ public final class ReactiveVegetationSyncService {
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
         REVISIONS.clear();
+        INITIAL_SNAPSHOTS.set(0L);
+        DATA_ENGINE_INITIAL_SNAPSHOTS.set(0L);
+        DIRECT_INITIAL_SNAPSHOTS.set(0L);
+        CHANGED_SNAPSHOTS.set(0L);
+        UNCHANGED_SKIPPED.set(0L);
+        LAST_DIAGNOSTIC_NANOS.set(0L);
+    }
+
+    /** Returns process-local transport counters for operator diagnostics. */
+    public static NetworkDiagnostics networkDiagnostics() {
+        return new NetworkDiagnostics(
+                INITIAL_SNAPSHOTS.get(),
+                DATA_ENGINE_INITIAL_SNAPSHOTS.get(),
+                DIRECT_INITIAL_SNAPSHOTS.get(),
+                CHANGED_SNAPSHOTS.get(),
+                UNCHANGED_SKIPPED.get()
+        );
     }
 
     private static ReactiveVegetationSyncPayload payload(
@@ -120,10 +142,22 @@ public final class ReactiveVegetationSyncService {
             return;
         }
         ModConstants.LOGGER.debug(
-                "[WO ChunkData] Vegetation sync totals: initial={}, visualChanges={}, unchangedSkipped={}.",
+                "[WO ChunkData] Vegetation sync totals: initial={} (Data Engine={}, directFallback={}), visualChanges={}, unchangedSkipped={}.",
                 INITIAL_SNAPSHOTS.get(),
+                DATA_ENGINE_INITIAL_SNAPSHOTS.get(),
+                DIRECT_INITIAL_SNAPSHOTS.get(),
                 CHANGED_SNAPSHOTS.get(),
                 UNCHANGED_SKIPPED.get()
         );
+    }
+
+    /** Immutable counters separating batching adoption from direct fallback traffic. */
+    public record NetworkDiagnostics(
+            long initialSnapshots,
+            long dataEngineInitialSnapshots,
+            long directInitialSnapshots,
+            long changedSnapshots,
+            long unchangedSkipped
+    ) {
     }
 }

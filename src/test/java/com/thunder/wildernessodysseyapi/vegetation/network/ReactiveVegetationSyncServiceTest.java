@@ -25,6 +25,14 @@ class ReactiveVegetationSyncServiceTest {
         assertTrue(ReactiveVegetationSyncService.shouldSynchronize(before, after));
     }
 
+    @Test
+    void batchingRequiresRunningEnabledEngineAndNetworkToggle() {
+        assertTrue(ReactiveVegetationSnapshotTransport.batchingAvailable(true, true, true));
+        assertFalse(ReactiveVegetationSnapshotTransport.batchingAvailable(false, true, true));
+        assertFalse(ReactiveVegetationSnapshotTransport.batchingAvailable(true, false, true));
+        assertFalse(ReactiveVegetationSnapshotTransport.batchingAvailable(true, true, false));
+    }
+
     private static VegetationClimateState state(
             double moisture,
             double rainfall,

@@ -56,7 +56,8 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModPayloads {
 
-    private static final String NETWORK_VERSION = "21";
+    // Phase 4 adds the required reactive-vegetation Data Engine handler.
+    private static final String NETWORK_VERSION = "22";
 
     private ModPayloads() {
     }

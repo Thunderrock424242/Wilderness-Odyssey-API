@@ -41,6 +41,25 @@ The cost depends on loaded chunks and configured probes, not forest density. The
 
 Client grass dryness is a tint layered over Minecraft's current biome grass color. That preserves biome and season-mod color ownership. Synchronized climate changes invalidate at most two client chunks per tick, and only their heightmap-identified surface sections are rebuilt.
 
+### Initial snapshot batching
+
+When Minecraft begins tracking a loaded chunk for a player, the server creates
+the same immutable, dimension-aware vegetation climate snapshot as before.
+With both `performance.enabled` and
+`performance.dataEngine.networkBatching` enabled, Phase 4 places that snapshot
+in the Data Engine's bounded per-player queue. Chunk-tracking bursts can share
+one packet, and a newer complete snapshot for the same dimension and chunk
+replaces an older pending one. The configured maximum delay defaults to two
+ticks.
+
+This is transport coalescing only. Minecraft still owns chunk tracking and
+packet lifecycle, the vegetation attachment remains authoritative, and the
+client's existing monotonic revision and dimension checks remain the acceptance
+boundary. Later climate changes for an already tracked chunk use the original
+direct packet path. If the performance stack or Data Engine batching is
+disabled, or the bounded queue rejects the entry, the initial snapshot also
+uses that direct path immediately.
+
 ## Current behavior
 
 ### Moisture and drought
@@ -84,8 +103,13 @@ Changing the interval rebuilds only the in-memory due schedule. Persisted chunk 
 Operator commands are under `/wilderness vegetation`:
 
 - `/wilderness vegetation sample` reports regional moisture, recent rainfall, drought, storm intensity, season, mushroom opportunity, last climate update, last vegetation pass, registered plants processed, and average regional processing time.
-- `/wilderness vegetation stats` reports loaded/scheduled chunks plus the most recent tick's chunk count, bounded probes, registered plants, visual state changes, and smoothed chunk-pass time.
+- `/wilderness vegetation stats` reports loaded/scheduled chunks plus the most recent tick's chunk count, bounded probes, registered plants, visual state changes, smoothed chunk-pass time, and initial snapshot counts split between Data Engine and direct fallback transport.
 - `/wilderness vegetation registry` reports registered blocks and trait counts.
+
+`/wo dataengine stats` provides the matching `reactive_vegetation` packet
+batch, entry, and estimated-byte totals. These counters establish which path
+ran; representative multiplayer profiling is still required before claiming a
+network or tick-time improvement.
 
 Useful validation scenarios:
 

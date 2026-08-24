@@ -85,11 +85,14 @@ public final class DataEngineCommand {
         for (DataSystemMetricsSnapshot system : metrics.systems().values()) {
             source.sendSuccess(() -> Component.literal(String.format(
                     Locale.ROOT,
-                    "  %s: %d processed | %.3f ms total | %d failures",
+                    "  %s: %d processed | %.3f ms total | %d failures | network %d batches / %d entries / %.1f KiB",
                     system.systemId(),
                     system.updatesProcessed(),
                     system.processingNanos() / 1_000_000.0D,
-                    system.updateFailures()
+                    system.updateFailures(),
+                    system.networkBatches(),
+                    system.networkEntries(),
+                    system.estimatedNetworkBytes() / 1024.0D
             )), false);
         }
         return 1;

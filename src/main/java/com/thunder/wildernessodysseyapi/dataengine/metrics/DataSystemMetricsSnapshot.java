@@ -8,6 +8,9 @@ public record DataSystemMetricsSnapshot(
         long updatesSubmitted,
         long updatesProcessed,
         long updateFailures,
-        long processingNanos
+        long processingNanos,
+        long networkBatches,
+        long networkEntries,
+        long estimatedNetworkBytes
 ) {
 }

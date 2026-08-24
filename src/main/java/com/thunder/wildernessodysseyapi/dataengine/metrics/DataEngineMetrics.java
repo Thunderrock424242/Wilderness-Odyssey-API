@@ -1,10 +1,14 @@
 package com.thunder.wildernessodysseyapi.dataengine.metrics;
 
+import com.thunder.wildernessodysseyapi.dataengine.network.DataDelta;
 import com.thunder.wildernessodysseyapi.dataengine.queue.DataUpdateQueue;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -125,6 +129,27 @@ public final class DataEngineMetrics {
         estimatedBytesSent.add(Math.max(0L, estimatedBytes));
     }
 
+    /** Records one real packet batch and attributes its entries to their owning systems. */
+    public void recordNetworkBatch(List<DataDelta> deltas, long estimatedBytes) {
+        if (!enabled) {
+            return;
+        }
+        List<DataDelta> entries = List.copyOf(deltas);
+        recordNetworkBatch(entries.size(), estimatedBytes);
+        Set<ResourceLocation> systemsInBatch = new HashSet<>();
+        for (DataDelta delta : entries) {
+            SystemCounters counters = systems.computeIfAbsent(
+                    delta.systemId(),
+                    ignored -> new SystemCounters()
+            );
+            counters.networkEntries.increment();
+            counters.estimatedNetworkBytes.add(delta.approximateEncodedBytes());
+            if (systemsInBatch.add(delta.systemId())) {
+                counters.networkBatches.increment();
+            }
+        }
+    }
+
     /** Records replacement of an older pending network delta by newer final state. */
     public void recordNetworkCoalesced() {
         if (enabled) {
@@ -237,7 +262,10 @@ public final class DataEngineMetrics {
                     counters.submitted.sum(),
                     counters.processed.sum(),
                     counters.failures.sum(),
-                    counters.processingNanos.sum()
+                    counters.processingNanos.sum(),
+                    counters.networkBatches.sum(),
+                    counters.networkEntries.sum(),
+                    counters.estimatedNetworkBytes.sum()
             ));
         }
         return new DataEngineMetricsSnapshot(
@@ -318,12 +346,18 @@ public final class DataEngineMetrics {
         private final LongAdder processed = new LongAdder();
         private final LongAdder failures = new LongAdder();
         private final LongAdder processingNanos = new LongAdder();
+        private final LongAdder networkBatches = new LongAdder();
+        private final LongAdder networkEntries = new LongAdder();
+        private final LongAdder estimatedNetworkBytes = new LongAdder();
 
         private void reset() {
             submitted.reset();
             processed.reset();
             failures.reset();
             processingNanos.reset();
+            networkBatches.reset();
+            networkEntries.reset();
+            estimatedNetworkBytes.reset();
         }
     }
 }
