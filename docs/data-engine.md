@@ -8,6 +8,14 @@ Minecraft and NeoForge still own the authoritative server tick, worlds, chunks, 
 
 The root service is `DataEngine.get()`. Mutable API calls are server-thread-only unless their Javadoc explicitly says otherwise.
 
+## Production integrations
+
+The ecosystem is the first production adopter. `ecosystem_runtime` uses the central scheduler for periodic loaded-wildlife scans and distant-population maintenance, and it uses dirty-state coalescing for login, respawn, dimension-change, and config-driven client refreshes. Tick Engine pressure and activity policy may defer that optional maintenance; player-driven zone changes and manager-owned AI restoration remain on the ordinary server tick. The existing distant-wildlife payload codec and SavedData authority are deliberately unchanged in this first phase.
+
+Weather is the second production adopter. `weather_runtime` converts the configured simulation/snapshot cadence into one central schedule and then submits one coalescible callback per loaded level, allowing the Data Engine to recheck Minecraft's live time allowance between dimensions. Phase 2B captures biome/water/environment inputs, frozen neighborhoods, persistent-system influence, config, and cell revisions on the server thread; only the detached atmospheric math runs through the shared worker pool. `WeatherAuthority` validates the level generation and the complete captured revision set before applying the batch, updating tracked systems, or touching SavedData. One calculation is tracked per level, failed/dropped work becomes due again after a bounded timeout, and explicit worker backpressure retains work for a later poll instead of caller-running it. Due snapshot publication is deferred behind an accepted calculation and enters the dirty queue under a separate session-local key; the existing bounded `WeatherRegionSyncPayload` v4 and per-player revision manager remain the wire authority. Tick Engine pressure can expand the polling interval, but weather is non-suspendable and a deliberately slower operator-configured interval is never shortened. Lightning, wildfire, surface weathering, severe entity/block effects, and survival bridges stay on the server thread and recheck the live allowance between callbacks. When the Data Engine is disabled, the same authority uses its synchronous, bounded direct fallback.
+
+Water is the third production adopter. `water_runtime` splits optional per-level maintenance into distinct coalescing lanes for regional sea/hydrology state, shoreline flow, local SPH snapshots, canonical-volume snapshots, regional network publication, and periodic SPH persistence. The central queue therefore rechecks Minecraft's live time allowance and the shared Data Engine budget between units instead of one event handler running every due water owner as a block. Successful completion advances each lane independently; delay, queue coalescing, or tick-counter rollback creates no catch-up loop. Tick Engine pressure may expand the central poll to at most 100 ticks, but the non-suspendable water policy ensures that persistent gameplay state continues to advance. Disabling the Data Engine uses the same bounded lanes synchronously and rechecks the live allowance before each one. Canonical water storage, watershed and sea-state SavedData, existing payload codecs, player-interest bounds, and loaded-chunk-only rules remain owned by their established subsystems. Gameplay-critical SPH collision, motion, and settlement remain on the direct server tick because they read and mutate live Minecraft state; no water worker-thread migration is claimed without a detached snapshot boundary and representative profiling evidence.
+
 ## Pipeline
 
 ```text
@@ -170,29 +178,36 @@ Thread contract:
 
 Do not capture a `Level`, chunk, entity, player, block entity, or other live Minecraft object and touch it from `compute()`. Validation exists because the world may change while calculation is running. Completed results are bounded and applied through a separate server-thread queue.
 
+Localized weather follows this split literally: `SimulationBatch` contains only immutable records, copied sets/maps/lists, captured tracker influence, and scalar settings. Its worker task calls only the pure calculation entry point. Level/config generation changes, cell edits/removals, unloads, and superseded submissions reject the entire result before mutation so cell evolution and persistent-system observations cannot be partially mixed across generations.
+
 The shared async executor is configured in `wildernessodysseyapi-async.toml`; Data Engine limits its own in-flight use separately. Executor shutdown remains owned by the existing `AsyncTaskManager`, while Data Engine clears pending calculation results and world references before that shared executor is stopped.
 
 ## Configuration
 
-Server config: `config/wildernessodysseyapi/wildernessodysseyapi-data-engine-server.toml`
+Server config: `config/wildernessodysseyapi/wildernessodysseyapi-performance-server.toml`
+
+The file has one reversible `performance.enabled` master switch for all three
+Wilderness performance engines. Data Engine retains its own subsection switch.
+Neither switch disables or replaces Minecraft/NeoForge ticking, chunks,
+entities, networking, saves, or other lifecycle owners.
 
 | Setting | Default | Meaning |
 | --- | ---: | --- |
-| `dataEngine.enabled` | `true` | Master processing switch |
-| `dataEngine.tickBudgetMs` | `2.0` | Shared non-critical main-thread budget |
-| `dataEngine.maxQueueSize` | `10000` | Pending update action bound |
-| `dataEngine.maxDirtyEntries` | `10000` | Active dirty-key bound |
-| `dataEngine.maxCompletedTasks` | `1024` | Worker results waiting to apply |
-| `dataEngine.maxAsyncInFlight` | `128` | Data Engine use of shared workers |
-| `dataEngine.networkBatching` | `true` | Enables delayed small-delta grouping |
-| `dataEngine.maxBatchEntries` | `256` | Per-packet delta entry bound |
-| `dataEngine.maxBatchBytes` | `32768` | Approximate per-packet byte bound |
-| `dataEngine.maxBatchDelayTicks` | `2` | Collection delay before a batch is due |
-| `dataEngine.maxPendingNetworkBytes` | `8388608` | Global pending network-memory bound |
-| `dataEngine.interestManagement` | `true` | Enables spatial recipient filtering |
-| `dataEngine.defaultCacheMaxEntries` | `4096` | Default registered-cache LRU bound |
-| `dataEngine.metrics` | `true` | Enables counter/timing collection |
-| `dataEngine.debugLogging` | `false` | Enables rate-limited lifecycle/backpressure detail |
+| `performance.dataEngine.enabled` | `true` | Data Engine processing switch |
+| `performance.dataEngine.tickBudgetMs` | `2.0` | Shared non-critical main-thread budget |
+| `performance.dataEngine.maxQueueSize` | `10000` | Pending update action bound |
+| `performance.dataEngine.maxDirtyEntries` | `10000` | Active dirty-key bound |
+| `performance.dataEngine.maxCompletedTasks` | `1024` | Worker results waiting to apply |
+| `performance.dataEngine.maxAsyncInFlight` | `128` | Data Engine use of shared workers |
+| `performance.dataEngine.networkBatching` | `true` | Enables delayed small-delta grouping |
+| `performance.dataEngine.maxBatchEntries` | `256` | Per-packet delta entry bound |
+| `performance.dataEngine.maxBatchBytes` | `32768` | Approximate per-packet byte bound |
+| `performance.dataEngine.maxBatchDelayTicks` | `2` | Collection delay before a batch is due |
+| `performance.dataEngine.maxPendingNetworkBytes` | `8388608` | Global pending network-memory bound |
+| `performance.dataEngine.interestManagement` | `true` | Enables spatial recipient filtering |
+| `performance.dataEngine.defaultCacheMaxEntries` | `4096` | Default registered-cache LRU bound |
+| `performance.dataEngine.metrics` | `true` | Enables counter/timing collection |
+| `performance.dataEngine.debugLogging` | `false` | Enables rate-limited lifecycle/backpressure detail |
 
 Queue and async structural bounds changed during a live config reload apply on the next server start so existing work is not discarded. Budget, batching, interest, metric, and logging settings update live.
 
@@ -210,6 +225,8 @@ Commands require permission level 2:
 
 The benchmark is an isolated 512-submission in-memory workload. It does not enqueue gameplay state or send packets. Its timing is a development observation, not a claimed production before/after improvement.
 
+`/wo dataengine stats` includes an `Async` line with submitted, completed, rejected, waiting-to-apply, and cumulative worker-time values. These counters make worker saturation and completion visible on a live server without enabling per-tick debug logging.
+
 The existing paged F3 HUD includes `WO DATA ENGINE`. Only a permission-level 2 player actively viewing that page subscribes. Once per second, the engine schedules a debug update, marks its final snapshot dirty, coalesces it, filters to explicit subscribers, encodes one compact delta, and lets normal batching deliver it. Closing/changing the page sends one unsubscribe transition; there is no client request every tick and no metric packet for uninterested players.
 
 ## Lifecycle and failure isolation
@@ -225,9 +242,9 @@ The existing paged F3 HUD includes `WO DATA ENGINE`. Only a permission-level 2 p
 
 ## Recommended migration order
 
-1. Ecosystem: move active-region cadence and expensive immutable-snapshot calculations first; retain server authority and existing persistence.
-2. Weather: migrate dirty weather cells and recipient-first field deltas; retain the current `WeatherAuthority` and client interpolation ownership.
-3. Water: integrate only proven hot synchronization/calculation boundaries; do not replace canonical water storage, vanilla-fluid compatibility, or render-thread upload ownership.
+1. Ecosystem: first production phase integrated. Continue profiling the periodic scan and migrate only proven immutable calculations; retain server authority, existing packet compatibility, and population persistence.
+2. Weather: Phase 2 is complete through Phase 2A scheduling/coalesced publication and Phase 2B immutable cell calculation. `WeatherDataEngineGameTests` closes the loaded-server correctness gate by creating real level-owned cells and asserting the normal schedule, one shared-worker completion, revision-checked server-thread apply, and zero rejection/failure delta; the same server run confirms Data Engine initialization and normal shutdown. This is correctness evidence, not a representative performance profile. Any later network phase is measurement-gated and must retain `WeatherAuthority`, payload-v4 full-snapshot recovery, and client interpolation ownership.
+3. Water: Phase 3 is complete for bounded scheduling/coalescing and Tick Engine measurement. `WaterPerformanceIntegrationTest` covers cadence, pressure, key separation, overflow, first-run behavior, and tick rollback; the loaded-server integration test requires `water_runtime` registration, positive processed work, and no failure delta. This is correctness and lifecycle evidence, not a representative performance profile. Any future async water phase remains measurement-gated and must first define an immutable input, pure computation, and bounded revision-checked server-thread apply without replacing canonical water storage, vanilla-fluid compatibility, chunk ownership, or render-thread upload ownership.
 4. Networking-heavy systems: move repeated compatible small payloads to explicit codecs and bounded batches one subsystem at a time.
 5. Aether and analytics: use event-driven aggregation and shared async workers, with bounded persistence queues.
 6. Labs/power: convert power changes into explicit server-owned events driving doors/lights/alarms; do not poll every component every tick.

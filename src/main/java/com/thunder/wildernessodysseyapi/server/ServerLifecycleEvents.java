@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileReloadListener;
 import com.thunder.wildernessodysseyapi.dataengine.DataEngine;
+import com.thunder.wildernessodysseyapi.ecosystem.integration.EcosystemPerformanceIntegration;
 import com.thunder.wildernessodysseyapi.faq.FaqReloadListener;
 import com.thunder.wildernessodysseyapi.gamerules.GameRulesListManager;
 import com.thunder.wildernessodysseyapi.modpack.structure.ModpackStructureRegistry;
@@ -16,8 +17,10 @@ import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryReporter;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueue;
 import com.thunder.wildernessodysseyapi.watersystem.water.entity.BoatTiltStore;
+import com.thunder.wildernessodysseyapi.watersystem.water.integration.WaterPerformanceIntegration;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
+import com.thunder.wildernessodysseyapi.weather.integration.WeatherPerformanceIntegration;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -47,6 +50,9 @@ public final class ServerLifecycleEvents {
         BackgroundEfficiencyManager.start(BackgroundEfficiencyConfig.values());
         TickEngine.start(TickEngineConfig.values(), BackgroundEfficiencyManager.schedulerControl());
         DataEngine.get().start(event.getServer());
+        EcosystemPerformanceIntegration.register(DataEngine.get());
+        WeatherPerformanceIntegration.register(DataEngine.get(), event.getServer());
+        WaterPerformanceIntegration.register(DataEngine.get(), event.getServer());
         ServerPropertiesTemplateManager.ensureManagedServerProperties(event.getServer());
         GameRulesListManager.ensureRulesFileExists(event.getServer());
         GameRulesListManager.applyConfiguredRules(event.getServer());
@@ -94,6 +100,7 @@ public final class ServerLifecycleEvents {
             waterManager.capturePersistentLevel(level);
         }
         waterManager.shutdown();
+        WaterPerformanceIntegration.shutdown();
         TickEngine.shutdown();
         BackgroundEfficiencyManager.shutdown();
         DataEngine.get().shutdown();

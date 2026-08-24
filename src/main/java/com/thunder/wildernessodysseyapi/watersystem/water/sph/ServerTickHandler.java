@@ -1,9 +1,9 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.sph;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.watersystem.water.network.SphSnapshotSynchronizer;
-import com.thunder.wildernessodysseyapi.watersystem.water.network.WaterVolumeSynchronizer;
+import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.integration.WaterPerformanceIntegration;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -14,34 +14,19 @@ import net.minecraft.server.level.ServerLevel;
 /**
  * ServerTickHandler
  *
- * Advances, synchronizes, and persists server-owned local SPH water each tick.
+ * Advances gameplay-critical server-owned local SPH water each tick.
  * Buckets become canonical immediately; SPH is reserved for tiny active effects
  * such as falling canonical slices that later settle back into chunk cells.
+ * Optional synchronization and periodic persistence are scheduled separately
+ * by the Water Data Engine integration.
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public class ServerTickHandler {
 
     private static final float SERVER_TICK_DELTA = 0.05f;
-    private static int ticksUntilSnapshot = SPHConstants.NETWORK_SNAPSHOT_INTERVAL_TICKS;
-    private static int ticksUntilPersistence = SPHConstants.PERSISTENCE_CAPTURE_INTERVAL_TICKS;
-    private static int ticksUntilVolumeSnapshot = 10;
-
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         if (event.getServer() == null) return;
-
-        boolean publishSnapshot = --ticksUntilSnapshot <= 0;
-        if (publishSnapshot) {
-            ticksUntilSnapshot = SPHConstants.NETWORK_SNAPSHOT_INTERVAL_TICKS;
-        }
-        boolean capturePersistence = --ticksUntilPersistence <= 0;
-        if (capturePersistence) {
-            ticksUntilPersistence = SPHConstants.PERSISTENCE_CAPTURE_INTERVAL_TICKS;
-        }
-        boolean publishVolumeSnapshot = --ticksUntilVolumeSnapshot <= 0;
-        if (publishVolumeSnapshot) {
-            ticksUntilVolumeSnapshot = 10;
-        }
 
         SPHSimulationManager manager = SPHSimulationManager.get();
         for (var level : event.getServer().getAllLevels()) {
@@ -50,16 +35,11 @@ public class ServerTickHandler {
                 continue;
             }
             manager.ensurePersistentLevelLoaded(level);
-            manager.tickLevel(level, SERVER_TICK_DELTA);
-            if (publishSnapshot) {
-                SphSnapshotSynchronizer.syncLevel(level);
-            }
-            if (publishVolumeSnapshot) {
-                WaterVolumeSynchronizer.syncLevel(level);
-            }
-            if (capturePersistence) {
-                manager.capturePersistentLevel(level);
-            }
+            TickEngine.metrics().time(
+                    "water",
+                    () -> manager.tickLevel(level, SERVER_TICK_DELTA),
+                    event.getServer().getTickCount()
+            );
         }
     }
 
@@ -75,6 +55,7 @@ public class ServerTickHandler {
             // runtime references; the periodic capture may be several ticks old.
             manager.capturePersistentLevel(serverLevel);
             manager.clearLevel(serverLevel);
+            WaterPerformanceIntegration.forgetLevel(serverLevel);
             CanonicalWater.clearLevel(serverLevel);
         }
     }

@@ -5,7 +5,6 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifi
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
-import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 /**
  * Couples the analytic tide to non-destructive shoreline simulation.
@@ -18,14 +17,6 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
 public final class TideWorldUpdater {
 
     private TideWorldUpdater() {
-    }
-
-    /** Advances server-authoritative shallow-water regions after each level tick. */
-    @SubscribeEvent
-    public static void onLevelTick(LevelTickEvent.Post event) {
-        if (event.getLevel() instanceof ServerLevel level && !level.players().isEmpty()) {
-            ShorelineWaterManager.get().tick(level);
-        }
     }
 
     /** Releases bounded region caches when a dimension unloads. */

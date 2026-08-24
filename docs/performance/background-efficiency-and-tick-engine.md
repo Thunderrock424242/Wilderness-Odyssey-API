@@ -11,6 +11,37 @@ Neither package replaces Minecraft's tick loop. They do not cache world state, a
 
 Every end-of-tick queue observes NeoForge's live `ServerTickEvent.hasTime()` supplier. The scheduler checks it before each optional callback, including callbacks labeled `CRITICAL` or `GAMEPLAY`, and immediately leaves remaining work queued when Minecraft withdraws the allowance. Those priority names order Wilderness-owned work; they never outrank Minecraft's chunk IO or generation completion.
 
+## Unified performance configuration
+
+The server-side performance stack now uses one file:
+
+`config/wildernessodysseyapi/wildernessodysseyapi-performance-server.toml`
+
+Its nested layout is:
+
+- `performance.enabled`: reversible master switch for all three Wilderness-owned engines.
+- `performance.backgroundEfficiency`: background scheduler, bounded worker, activity, network-batch, and analytics-batch settings.
+- `performance.tickEngine`: pressure, budget, deferred-work, profiling, adaptive interval, and tick-debt settings.
+- `performance.dataEngine`: bounded update, dirty-state, async-result, network, cache, and metric settings.
+
+Setting `performance.enabled = false` reloads Background Efficiency, Tick Engine,
+and Data Engine in their disabled modes. Existing subsystem owners then use their
+documented synchronous/direct fallbacks; this switch does not stop vanilla ticks
+or take ownership of Minecraft entities, block entities, chunks, networking,
+saves, or world lifecycle.
+
+On the first launch after this change, the exact legacy background, tick, and
+data config files are copied into the new section layout only when the unified
+file does not already exist. The legacy files are retained unchanged as rollback
+references. Once the unified file exists, it is authoritative and later edits to
+the three legacy files are intentionally ignored.
+
+NeoForge `CLIENT`, `COMMON`, and `SERVER` config types have different loading,
+sync, and world ownership semantics, so they cannot safely become one literal
+spec. The long-term consolidation model is a small scope-aware suite (client,
+global/common, and world/server), with migrations handled one compatible group
+at a time. This phase consolidates only the three performance `SERVER` specs.
+
 ## Submitting background work
 
 Callbacks submitted to `BackgroundEfficiencyManager.scheduler()` run on the logical server thread. Keep one callback step bounded. Return `BackgroundTask.Result.DEFER` when the task retained a cursor and needs another processing pass.
@@ -129,10 +160,16 @@ WO block entities may use `AdaptiveBlockEntityTicker` around only their expensiv
 
 `BackgroundMetrics.snapshot()` exposes queue counts, task outcomes, async state, batch backlogs, activity gauges, and aggregated per-subsystem time. Systems that own a known set of regions or objects can publish current activity gauges with `setActivityCount`.
 
-`TickEngine.snapshot()` exposes TPS, current/rolling/worst MSPT, pressure, budget use, deferred queue pressure, background queue pressure, throttled subsystem count, and subsystem timings. Integrated singleplayer displays a `WO TICK ENGINE` section on the existing Performance F3 page. Dedicated/remote clients deliberately show that server metrics are not synchronized; no new debug packet or permission surface was added.
+`TickEngine.snapshot()` exposes TPS, current/rolling/worst MSPT, pressure, budget use, deferred queue pressure, background queue pressure, throttled subsystem count, and subsystem timings. The ecosystem adapter records both its immediate player-driven zone pass and its bounded optional maintenance under the `ecosystem` timing. The weather adapter records per-level atmospheric maintenance and authoritative snapshot publication under `weather`; loaded-world effect schedulers remain server-thread work and retain their own bounded cadences. The water adapter records direct gameplay-critical SPH simulation plus the centrally queued regional, shoreline, synchronization, and persistence lanes under `water`. Integrated singleplayer displays a `WO TICK ENGINE` section on the existing Performance F3 page. Dedicated/remote clients deliberately show that server metrics are not synchronized; no new debug packet or permission surface was added.
 
 ## Compatibility and rollout
 
-The only runtime integrations in this implementation are config registration, server start/stop lifecycle, the pre/post tick event bridge, the background-budget bridge, and integrated-server debug presentation. Weather, ecosystem, water, labs, mobs, block entities, chunks, and existing payloads retain their current behavior until each eligible owner is migrated and profiled separately. An architecture regression test rejects chunk-lifecycle APIs in the optimization packages and rejects optimization-governor dependencies from the worldgen and mixin packages.
+The ecosystem is the first production integration. Player movement still performs immediate zone classification and AI restoration, while periodic loaded-wildlife scans and distant-population maintenance enter the Data Engine's bounded schedule and obey the Tick Engine's adaptive `ecosystem` policy. Player lifecycle/config refreshes use coalesced Data Engine dirty state while retaining the existing payload codec.
+
+Weather Phase 2B is the second production integration. `weather_runtime` centrally schedules optional atmospheric maintenance, places each loaded dimension in its own coalescible queue step, and routes due snapshot publication through retained dirty state. `WeatherAuthority` now captures immutable per-level batches on the server thread, delegates only frozen atmospheric math to the shared Data Engine worker pool, and validates lifecycle generation plus the complete captured cell-revision set before bounded server-thread apply. Saturation retains due work rather than caller-running it; timeouts recover failed or dropped completions, and disabling the Data Engine uses the authority's synchronous fallback. The non-suspendable Tick Engine `weather` policy can slow configured work under pressure without making an operator's slower cadence run more often. Weather SavedData, tracked-system mutation, the existing v4 regional payload, client interpolation, and every world-affecting callback remain server-thread confined. Field-masked Data Engine network deltas remain deferred until measurement justifies a compatibility-preserving migration.
+
+Water Phase 3 is the third production integration. `water_runtime` centrally polls once per eligible tick and creates separate session-local coalescing keys for each loaded dimension's regional state, shoreline, SPH snapshot, canonical-volume snapshot, regional network, and persistence work. Their normal eligibility cadences remain 1, 1, 4, 10, 20, and 20 ticks respectively; Tick Engine pressure may slow the central non-suspendable poll to 100 ticks. Each completed lane records its own cadence, so deferred work runs once after recovery rather than replaying every missed interval. Data Engine-off fallback executes the same owners synchronously while checking the live time allowance between lanes. Direct SPH physics remains outside the optional queue and on the logical server thread, and all water owners retain their existing loaded-chunk, SavedData, payload, and lifecycle rules. No worker-thread water phase or measured speedup is claimed: the inspected regional and SPH paths currently depend on live server-owned state, while the pure shoreline grid is small enough that mandatory copying would need profiling evidence before it could justify offloading. Labs, ordinary mobs/block entities, chunks, and other existing payloads retain their current behavior until each eligible owner is migrated and profiled separately. An architecture regression test rejects chunk-lifecycle APIs in the optimization packages and rejects optimization-governor dependencies from the worldgen and mixin packages.
+
+The loaded-server gate is `WeatherDataEngineGameTests`. It runs through the real dedicated GameTest lifecycle and ordinary production schedulers, then requires an authoritative weather cell revision/simulation-tick advance, a positive shared-worker submission and completion delta, positive worker processing time, and no rejection or engine-failure delta. The same test requires the Phase 3 `water_runtime` metric bucket, positive centrally processed water work, and no water failure delta. The surrounding server run confirms Data Engine initialization and normal shutdown. This proves ownership, threading, registration, apply, and lifecycle behavior; it does not establish a before/after MSPT, allocation, network, or player-count improvement.
 
 For a large-modpack validation pass, profile the Tick Engine's measured full-event MSPT against Spark/Minecraft timing, watch both bounded queue pressures, confirm recovery does not release all deferred work together, and verify direct player actions remain immediate at every pressure level.

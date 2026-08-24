@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.performance.tickengine.config;
 
+import com.thunder.wildernessodysseyapi.config.PerformanceServerConfig;
 import com.thunder.wildernessodysseyapi.performance.tickengine.TickBudgetManager;
 import com.thunder.wildernessodysseyapi.performance.tickengine.TickMonitor;
 import com.thunder.wildernessodysseyapi.performance.tickengine.TickWorkScheduler;
@@ -7,96 +8,97 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 /** Server configuration for the additive Wilderness Odyssey Tick Engine. */
 public final class TickEngineConfig {
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec CONFIG_SPEC;
 
-    public static final ModConfigSpec.BooleanValue ENABLED;
-    public static final ModConfigSpec.DoubleValue TARGET_MSPT;
-    public static final ModConfigSpec.DoubleValue SOFT_BUDGET_MSPT;
-    public static final ModConfigSpec.DoubleValue BUSY_MSPT;
-    public static final ModConfigSpec.DoubleValue HIGH_MSPT;
-    public static final ModConfigSpec.DoubleValue CRITICAL_MSPT;
-    public static final ModConfigSpec.DoubleValue OVERLOADED_MSPT;
-    public static final ModConfigSpec.DoubleValue RECOVERY_MARGIN_MSPT;
-    public static final ModConfigSpec.IntValue ESCALATION_SAMPLES;
-    public static final ModConfigSpec.IntValue RECOVERY_TICKS;
-    public static final ModConfigSpec.DoubleValue RELAXED_BUDGET_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue BUSY_BUDGET_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue HIGH_BUDGET_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue CRITICAL_BUDGET_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue OVERLOADED_BUDGET_MULTIPLIER;
-    public static final ModConfigSpec.IntValue MAX_TASKS_PER_TICK;
-    public static final ModConfigSpec.IntValue MAX_DEFERRED_TASKS;
-    public static final ModConfigSpec.IntValue MAX_TASKS_PER_SUBSYSTEM;
-    public static final ModConfigSpec.BooleanValue PROFILING;
-    public static final ModConfigSpec.DoubleValue SLOW_SUBSYSTEM_WARNING_MS;
-    public static final ModConfigSpec.IntValue SLOW_WARNING_INTERVAL_TICKS;
-    public static final ModConfigSpec.BooleanValue ADAPTIVE_THROTTLE;
-    public static final ModConfigSpec.BooleanValue TICK_DEBT_COLLAPSING;
-    public static final ModConfigSpec.IntValue MAX_INDIVIDUAL_DEBT_STEPS;
+    public static ModConfigSpec.BooleanValue ENABLED;
+    public static ModConfigSpec.DoubleValue TARGET_MSPT;
+    public static ModConfigSpec.DoubleValue SOFT_BUDGET_MSPT;
+    public static ModConfigSpec.DoubleValue BUSY_MSPT;
+    public static ModConfigSpec.DoubleValue HIGH_MSPT;
+    public static ModConfigSpec.DoubleValue CRITICAL_MSPT;
+    public static ModConfigSpec.DoubleValue OVERLOADED_MSPT;
+    public static ModConfigSpec.DoubleValue RECOVERY_MARGIN_MSPT;
+    public static ModConfigSpec.IntValue ESCALATION_SAMPLES;
+    public static ModConfigSpec.IntValue RECOVERY_TICKS;
+    public static ModConfigSpec.DoubleValue RELAXED_BUDGET_MULTIPLIER;
+    public static ModConfigSpec.DoubleValue BUSY_BUDGET_MULTIPLIER;
+    public static ModConfigSpec.DoubleValue HIGH_BUDGET_MULTIPLIER;
+    public static ModConfigSpec.DoubleValue CRITICAL_BUDGET_MULTIPLIER;
+    public static ModConfigSpec.DoubleValue OVERLOADED_BUDGET_MULTIPLIER;
+    public static ModConfigSpec.IntValue MAX_TASKS_PER_TICK;
+    public static ModConfigSpec.IntValue MAX_DEFERRED_TASKS;
+    public static ModConfigSpec.IntValue MAX_TASKS_PER_SUBSYSTEM;
+    public static ModConfigSpec.BooleanValue PROFILING;
+    public static ModConfigSpec.DoubleValue SLOW_SUBSYSTEM_WARNING_MS;
+    public static ModConfigSpec.IntValue SLOW_WARNING_INTERVAL_TICKS;
+    public static ModConfigSpec.BooleanValue ADAPTIVE_THROTTLE;
+    public static ModConfigSpec.BooleanValue TICK_DEBT_COLLAPSING;
+    public static ModConfigSpec.IntValue MAX_INDIVIDUAL_DEBT_STEPS;
 
-    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
-
-    static {
-        BUILDER.push("tickEngine");
-        ENABLED = BUILDER.comment("Controls only opt-in Wilderness Odyssey work; vanilla ticking is never replaced.")
+    /** Defines this section inside the unified performance spec. */
+    public static void define(ModConfigSpec.Builder builder) {
+        if (ENABLED != null) {
+            throw new IllegalStateException("Tick Engine config section is already defined");
+        }
+        builder.push("tickEngine");
+        ENABLED = builder.comment("Controls only opt-in Wilderness Odyssey work; vanilla ticking is never replaced.")
                 .define("enabled", true);
-        TARGET_MSPT = BUILDER.comment("Minecraft server target duration used for diagnostics.")
+        TARGET_MSPT = builder.comment("Minecraft server target duration used for diagnostics.")
                 .defineInRange("targetMspt", 50.0D, 10.0D, 200.0D);
-        SOFT_BUDGET_MSPT = BUILDER.comment("Safety target below which optional WO work may consume remaining time.")
+        SOFT_BUDGET_MSPT = builder.comment("Safety target below which optional WO work may consume remaining time.")
                 .defineInRange("softBudgetMs", 45.0D, 0.0D, 200.0D);
 
-        BUILDER.push("pressure");
-        BUSY_MSPT = BUILDER.comment("Rolling short-average threshold for BUSY pressure.")
+        builder.push("pressure");
+        BUSY_MSPT = builder.comment("Rolling short-average threshold for BUSY pressure.")
                 .defineInRange("busy", 30.0D, 1.0D, 200.0D);
-        HIGH_MSPT = BUILDER.comment("Rolling short-average threshold for HIGH pressure.")
+        HIGH_MSPT = builder.comment("Rolling short-average threshold for HIGH pressure.")
                 .defineInRange("high", 40.0D, 1.0D, 200.0D);
-        CRITICAL_MSPT = BUILDER.comment("Rolling short-average threshold for CRITICAL pressure.")
+        CRITICAL_MSPT = builder.comment("Rolling short-average threshold for CRITICAL pressure.")
                 .defineInRange("critical", 47.0D, 1.0D, 200.0D);
-        OVERLOADED_MSPT = BUILDER.comment("Rolling short-average threshold for OVERLOADED pressure.")
+        OVERLOADED_MSPT = builder.comment("Rolling short-average threshold for OVERLOADED pressure.")
                 .defineInRange("overloaded", 50.0D, 1.0D, 500.0D);
-        RECOVERY_MARGIN_MSPT = BUILDER.comment("Required MSPT margin below the entry threshold before recovery progresses.")
+        RECOVERY_MARGIN_MSPT = builder.comment("Required MSPT margin below the entry threshold before recovery progresses.")
                 .defineInRange("recoveryMargin", 2.0D, 0.0D, 25.0D);
-        ESCALATION_SAMPLES = BUILDER.comment("Consecutive rolling samples required before pressure escalates.")
+        ESCALATION_SAMPLES = builder.comment("Consecutive rolling samples required before pressure escalates.")
                 .defineInRange("escalationSamples", 3, 1, 100);
-        RECOVERY_TICKS = BUILDER.comment("Sustained healthy samples required for each one-level recovery step.")
+        RECOVERY_TICKS = builder.comment("Sustained healthy samples required for each one-level recovery step.")
                 .defineInRange("recoveryTicks", 40, 1, 12000);
-        BUILDER.pop();
+        builder.pop();
 
-        BUILDER.push("budgetMultipliers");
-        RELAXED_BUDGET_MULTIPLIER = defineMultiplier("relaxed", 1.0D);
-        BUSY_BUDGET_MULTIPLIER = defineMultiplier("busy", 0.70D);
-        HIGH_BUDGET_MULTIPLIER = defineMultiplier("high", 0.35D);
-        CRITICAL_BUDGET_MULTIPLIER = defineMultiplier("critical", 0.10D);
-        OVERLOADED_BUDGET_MULTIPLIER = defineMultiplier("overloaded", 0.0D);
-        BUILDER.pop();
+        builder.push("budgetMultipliers");
+        RELAXED_BUDGET_MULTIPLIER = defineMultiplier(builder, "relaxed", 1.0D);
+        BUSY_BUDGET_MULTIPLIER = defineMultiplier(builder, "busy", 0.70D);
+        HIGH_BUDGET_MULTIPLIER = defineMultiplier(builder, "high", 0.35D);
+        CRITICAL_BUDGET_MULTIPLIER = defineMultiplier(builder, "critical", 0.10D);
+        OVERLOADED_BUDGET_MULTIPLIER = defineMultiplier(builder, "overloaded", 0.0D);
+        builder.pop();
 
-        BUILDER.push("deferredWork");
-        MAX_TASKS_PER_TICK = BUILDER.comment("Maximum tick-aware task steps processed in one tick.")
+        builder.push("deferredWork");
+        MAX_TASKS_PER_TICK = builder.comment("Maximum tick-aware task steps processed in one tick.")
                 .defineInRange("maxTasksPerTick", 64, 1, 4096);
-        MAX_DEFERRED_TASKS = BUILDER.comment("Global bounded Tick Engine queue capacity.")
+        MAX_DEFERRED_TASKS = builder.comment("Global bounded Tick Engine queue capacity.")
                 .defineInRange("maxDeferredTasks", 2048, 16, 65536);
-        MAX_TASKS_PER_SUBSYSTEM = BUILDER.comment("Per-subsystem queue cap.")
+        MAX_TASKS_PER_SUBSYSTEM = builder.comment("Per-subsystem queue cap.")
                 .defineInRange("maxTasksPerSubsystem", 256, 1, 8192);
-        BUILDER.pop();
+        builder.pop();
 
-        BUILDER.push("profiling");
-        PROFILING = BUILDER.comment("Collects lightweight timing only for explicitly wrapped WO work.")
+        builder.push("profiling");
+        PROFILING = builder.comment("Collects lightweight timing only for explicitly wrapped WO work.")
                 .define("enabled", true);
-        SLOW_SUBSYSTEM_WARNING_MS = BUILDER.comment("Average WO subsystem time that triggers a rate-limited warning.")
+        SLOW_SUBSYSTEM_WARNING_MS = builder.comment("Average WO subsystem time that triggers a rate-limited warning.")
                 .defineInRange("slowSubsystemWarningMs", 5.0D, 0.0D, 100.0D);
-        SLOW_WARNING_INTERVAL_TICKS = BUILDER.comment("Minimum game ticks between warnings for one subsystem.")
+        SLOW_WARNING_INTERVAL_TICKS = builder.comment("Minimum game ticks between warnings for one subsystem.")
                 .defineInRange("warningIntervalTicks", 1200, 20, 72000);
-        BUILDER.pop();
+        builder.pop();
 
-        ADAPTIVE_THROTTLE = BUILDER.comment("Allows registered WO systems to query adaptive intervals.")
+        ADAPTIVE_THROTTLE = builder.comment("Allows registered WO systems to query adaptive intervals.")
                 .define("adaptiveThrottle", true);
-        TICK_DEBT_COLLAPSING = BUILDER.comment("Enables explicit collapsed/discarded/individual missed-tick policies.")
+        TICK_DEBT_COLLAPSING = builder.comment("Enables explicit collapsed/discarded/individual missed-tick policies.")
                 .define("tickDebtCollapsing", true);
-        MAX_INDIVIDUAL_DEBT_STEPS = BUILDER.comment("Maximum individually required catch-up steps performed per call.")
+        MAX_INDIVIDUAL_DEBT_STEPS = builder.comment("Maximum individually required catch-up steps performed per call.")
                 .defineInRange("maxIndividualDebtSteps", 8, 1, 1000);
 
-        BUILDER.pop();
-        CONFIG_SPEC = BUILDER.build();
+        builder.pop();
     }
 
     private TickEngineConfig() {
@@ -104,8 +106,9 @@ public final class TickEngineConfig {
 
     /** Returns sanitized values or safe defaults when config state is unavailable. */
     public static Values values() {
+        ensureDefined();
         try {
-            return sanitize(new Values(
+            Values values = sanitize(new Values(
                     ENABLED.get(), TARGET_MSPT.get(), SOFT_BUDGET_MSPT.get(),
                     BUSY_MSPT.get(), HIGH_MSPT.get(), CRITICAL_MSPT.get(), OVERLOADED_MSPT.get(),
                     RECOVERY_MARGIN_MSPT.get(), ESCALATION_SAMPLES.get(), RECOVERY_TICKS.get(),
@@ -116,13 +119,16 @@ public final class TickEngineConfig {
                     SLOW_SUBSYSTEM_WARNING_MS.get(), SLOW_WARNING_INTERVAL_TICKS.get(),
                     ADAPTIVE_THROTTLE.get(), TICK_DEBT_COLLAPSING.get(), MAX_INDIVIDUAL_DEBT_STEPS.get()
             ));
+            return PerformanceServerConfig.enabled() ? values : disabled(values);
         } catch (RuntimeException exception) {
-            return defaults();
+            Values values = defaults();
+            return PerformanceServerConfig.enabled() ? values : disabled(values);
         }
     }
 
     /** Returns built-in defaults without requiring a loaded server config. */
     public static Values defaults() {
+        ensureDefined();
         return new Values(
                 true, 50.0D, 45.0D, 30.0D, 40.0D, 47.0D, 50.0D,
                 2.0D, 3, 40, 1.0D, 0.70D, 0.35D, 0.10D, 0.0D,
@@ -177,8 +183,53 @@ public final class TickEngineConfig {
         );
     }
 
-    private static ModConfigSpec.DoubleValue defineMultiplier(String name, double defaultValue) {
-        return BUILDER.comment("Fraction of remaining soft-budget time allowed at " + name + " pressure.")
+    /** Attaches the compatibility alias after the unified spec has been assembled. */
+    public static void attachSpec(ModConfigSpec spec) {
+        if (CONFIG_SPEC != null && CONFIG_SPEC != spec) {
+            throw new IllegalStateException("Tick Engine config spec is already attached");
+        }
+        CONFIG_SPEC = spec;
+    }
+
+    private static Values disabled(Values values) {
+        return new Values(
+                false,
+                values.targetMspt(),
+                values.softBudgetMspt(),
+                values.busyMspt(),
+                values.highMspt(),
+                values.criticalMspt(),
+                values.overloadedMspt(),
+                values.recoveryMarginMspt(),
+                values.escalationSamples(),
+                values.recoveryTicks(),
+                values.relaxedBudgetMultiplier(),
+                values.busyBudgetMultiplier(),
+                values.highBudgetMultiplier(),
+                values.criticalBudgetMultiplier(),
+                values.overloadedBudgetMultiplier(),
+                values.maximumTasksPerTick(),
+                values.maximumDeferredTasks(),
+                values.maximumTasksPerSubsystem(),
+                values.profiling(),
+                values.slowSubsystemWarningMillis(),
+                values.slowWarningIntervalTicks(),
+                values.adaptiveThrottle(),
+                values.tickDebtCollapsing(),
+                values.maximumIndividualDebtSteps()
+        );
+    }
+
+    private static void ensureDefined() {
+        PerformanceServerConfig.initialize();
+    }
+
+    private static ModConfigSpec.DoubleValue defineMultiplier(
+            ModConfigSpec.Builder builder,
+            String name,
+            double defaultValue
+    ) {
+        return builder.comment("Fraction of remaining soft-budget time allowed at " + name + " pressure.")
                 .defineInRange(name, defaultValue, 0.0D, 1.0D);
     }
 

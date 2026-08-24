@@ -73,6 +73,15 @@ public final class DataEngineCommand {
                 workers.configuredThreads(),
                 workers.queuedWorkerTasks()
         )), false);
+        source.sendSuccess(() -> Component.literal(String.format(
+                Locale.ROOT,
+                "Async: %d submitted | %d completed | %d rejected | %d waiting to apply | %.3f ms worker total",
+                metrics.asyncTasksSubmitted(),
+                metrics.asyncTasksCompleted(),
+                metrics.asyncTasksRejected(),
+                metrics.asyncQueueLength(),
+                metrics.totalWorkerProcessingNanos() / 1_000_000.0D
+        )), false);
         for (DataSystemMetricsSnapshot system : metrics.systems().values()) {
             source.sendSuccess(() -> Component.literal(String.format(
                     Locale.ROOT,

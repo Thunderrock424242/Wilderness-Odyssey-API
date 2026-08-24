@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.performance.background.config;
 
+import com.thunder.wildernessodysseyapi.config.PerformanceServerConfig;
 import com.thunder.wildernessodysseyapi.performance.background.BackgroundWorkScheduler;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -9,91 +10,92 @@ import java.util.concurrent.TimeUnit;
  * Server configuration for Wilderness Odyssey's opt-in background framework.
  */
 public final class BackgroundEfficiencyConfig {
-    public static final ModConfigSpec CONFIG_SPEC;
+    public static ModConfigSpec CONFIG_SPEC;
 
-    public static final ModConfigSpec.BooleanValue ENABLED;
-    public static final ModConfigSpec.IntValue MAX_TASKS_PER_TICK;
-    public static final ModConfigSpec.DoubleValue MAX_BACKGROUND_TIME_MS;
-    public static final ModConfigSpec.IntValue MAX_QUEUED_TASKS;
-    public static final ModConfigSpec.IntValue MAX_TASKS_PER_SUBSYSTEM;
-    public static final ModConfigSpec.BooleanValue ASYNC_ENABLED;
-    public static final ModConfigSpec.IntValue ASYNC_WORKER_THREADS;
-    public static final ModConfigSpec.IntValue ASYNC_MAX_QUEUED_JOBS;
-    public static final ModConfigSpec.IntValue ASYNC_APPLY_PER_TICK;
-    public static final ModConfigSpec.BooleanValue ACTIVITY_ENABLED;
-    public static final ModConfigSpec.BooleanValue NETWORK_BATCHING_ENABLED;
-    public static final ModConfigSpec.IntValue NETWORK_MAX_BATCH_SIZE;
-    public static final ModConfigSpec.IntValue NETWORK_MAX_DELAY_TICKS;
-    public static final ModConfigSpec.IntValue NETWORK_MAX_QUEUED_UPDATES;
-    public static final ModConfigSpec.BooleanValue ANALYTICS_BATCHING_ENABLED;
-    public static final ModConfigSpec.IntValue ANALYTICS_MAX_BATCH_SIZE;
-    public static final ModConfigSpec.IntValue ANALYTICS_MAX_DELAY_TICKS;
-    public static final ModConfigSpec.IntValue ANALYTICS_MAX_QUEUED_EVENTS;
+    public static ModConfigSpec.BooleanValue ENABLED;
+    public static ModConfigSpec.IntValue MAX_TASKS_PER_TICK;
+    public static ModConfigSpec.DoubleValue MAX_BACKGROUND_TIME_MS;
+    public static ModConfigSpec.IntValue MAX_QUEUED_TASKS;
+    public static ModConfigSpec.IntValue MAX_TASKS_PER_SUBSYSTEM;
+    public static ModConfigSpec.BooleanValue ASYNC_ENABLED;
+    public static ModConfigSpec.IntValue ASYNC_WORKER_THREADS;
+    public static ModConfigSpec.IntValue ASYNC_MAX_QUEUED_JOBS;
+    public static ModConfigSpec.IntValue ASYNC_APPLY_PER_TICK;
+    public static ModConfigSpec.BooleanValue ACTIVITY_ENABLED;
+    public static ModConfigSpec.BooleanValue NETWORK_BATCHING_ENABLED;
+    public static ModConfigSpec.IntValue NETWORK_MAX_BATCH_SIZE;
+    public static ModConfigSpec.IntValue NETWORK_MAX_DELAY_TICKS;
+    public static ModConfigSpec.IntValue NETWORK_MAX_QUEUED_UPDATES;
+    public static ModConfigSpec.BooleanValue ANALYTICS_BATCHING_ENABLED;
+    public static ModConfigSpec.IntValue ANALYTICS_MAX_BATCH_SIZE;
+    public static ModConfigSpec.IntValue ANALYTICS_MAX_DELAY_TICKS;
+    public static ModConfigSpec.IntValue ANALYTICS_MAX_QUEUED_EVENTS;
 
-    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
-
-    static {
+    /** Defines this section inside the unified performance spec. */
+    public static void define(ModConfigSpec.Builder builder) {
+        if (ENABLED != null) {
+            throw new IllegalStateException("Background Efficiency config section is already defined");
+        }
         int processors = Math.max(1, Runtime.getRuntime().availableProcessors());
         int conservativeWorkers = Math.max(1, Math.min(4, processors - 2));
 
-        BUILDER.push("backgroundEfficiency");
-        ENABLED = BUILDER.comment("Master toggle for Wilderness Odyssey background scheduling and batching.")
+        builder.push("backgroundEfficiency");
+        ENABLED = builder.comment("Master toggle for Wilderness Odyssey background scheduling and batching.")
                 .define("enabled", true);
 
-        BUILDER.push("scheduler");
-        MAX_TASKS_PER_TICK = BUILDER.comment("Maximum background task steps executed in one server-tick pass.")
+        builder.push("scheduler");
+        MAX_TASKS_PER_TICK = builder.comment("Maximum background task steps executed in one server-tick pass.")
                 .defineInRange("maxTasksPerTick", 64, 1, 4096);
-        MAX_BACKGROUND_TIME_MS = BUILDER.comment("Maximum nominal server-thread time reserved for background work.")
+        MAX_BACKGROUND_TIME_MS = builder.comment("Maximum nominal server-thread time reserved for background work.")
                 .defineInRange("maxBackgroundTimeMs", 2.0D, 0.0D, 25.0D);
-        MAX_QUEUED_TASKS = BUILDER.comment("Global bounded task queue capacity.")
+        MAX_QUEUED_TASKS = builder.comment("Global bounded task queue capacity.")
                 .defineInRange("maxQueuedTasks", 2048, 16, 65536);
-        MAX_TASKS_PER_SUBSYSTEM = BUILDER.comment("Per-subsystem queue limit that prevents a single producer from flooding work.")
+        MAX_TASKS_PER_SUBSYSTEM = builder.comment("Per-subsystem queue limit that prevents a single producer from flooding work.")
                 .defineInRange("maxTasksPerSubsystem", 256, 1, 8192);
-        BUILDER.pop();
+        builder.pop();
 
-        BUILDER.push("async");
-        ASYNC_ENABLED = BUILDER.comment(
+        builder.push("async");
+        ASYNC_ENABLED = builder.comment(
                         "Allows pure computation over immutable snapshots on bounded worker threads.",
                         "Disabled by default until a production subsystem explicitly adopts this secondary pool."
                 )
                 .define("enabled", false);
-        ASYNC_WORKER_THREADS = BUILDER.comment("CPU worker count; defaults conservatively below the available processor count.")
+        ASYNC_WORKER_THREADS = builder.comment("CPU worker count; defaults conservatively below the available processor count.")
                 .defineInRange("workerThreads", conservativeWorkers, 1, 16);
-        ASYNC_MAX_QUEUED_JOBS = BUILDER.comment("Maximum computations waiting for a worker or server-thread application.")
+        ASYNC_MAX_QUEUED_JOBS = builder.comment("Maximum computations waiting for a worker or server-thread application.")
                 .defineInRange("maxQueuedJobs", 128, 1, 8192);
-        ASYNC_APPLY_PER_TICK = BUILDER.comment("Maximum completed calculation results applied in one tick.")
+        ASYNC_APPLY_PER_TICK = builder.comment("Maximum completed calculation results applied in one tick.")
                 .defineInRange("maxApplyPerTick", 32, 1, 1024);
-        BUILDER.pop();
+        builder.pop();
 
-        BUILDER.push("activity");
-        ACTIVITY_ENABLED = BUILDER.comment("Allows callers to classify work by player proximity.")
+        builder.push("activity");
+        ACTIVITY_ENABLED = builder.comment("Allows callers to classify work by player proximity.")
                 .define("enabled", true);
-        BUILDER.pop();
+        builder.pop();
 
-        BUILDER.push("networkBatching");
-        NETWORK_BATCHING_ENABLED = BUILDER.comment("Enables opt-in WO packet aggregation channels.")
+        builder.push("networkBatching");
+        NETWORK_BATCHING_ENABLED = builder.comment("Enables opt-in WO packet aggregation channels.")
                 .define("enabled", true);
-        NETWORK_MAX_BATCH_SIZE = BUILDER.comment("Maximum updates combined into one channel dispatch.")
+        NETWORK_MAX_BATCH_SIZE = builder.comment("Maximum updates combined into one channel dispatch.")
                 .defineInRange("maxBatchSize", 32, 1, 1024);
-        NETWORK_MAX_DELAY_TICKS = BUILDER.comment("Maximum age before a non-empty batch becomes eligible to flush.")
+        NETWORK_MAX_DELAY_TICKS = builder.comment("Maximum age before a non-empty batch becomes eligible to flush.")
                 .defineInRange("maxDelayTicks", 5, 1, 200);
-        NETWORK_MAX_QUEUED_UPDATES = BUILDER.comment("Global bounded number of pending network updates.")
+        NETWORK_MAX_QUEUED_UPDATES = builder.comment("Global bounded number of pending network updates.")
                 .defineInRange("maxQueuedUpdates", 4096, 16, 65536);
-        BUILDER.pop();
+        builder.pop();
 
-        BUILDER.push("analyticsBatching");
-        ANALYTICS_BATCHING_ENABLED = BUILDER.comment("Enables opt-in batching for non-save WO analytics and IO events.")
+        builder.push("analyticsBatching");
+        ANALYTICS_BATCHING_ENABLED = builder.comment("Enables opt-in batching for non-save WO analytics and IO events.")
                 .define("enabled", true);
-        ANALYTICS_MAX_BATCH_SIZE = BUILDER.comment("Maximum analytics events in one immutable worker batch.")
+        ANALYTICS_MAX_BATCH_SIZE = builder.comment("Maximum analytics events in one immutable worker batch.")
                 .defineInRange("maxBatchSize", 64, 1, 2048);
-        ANALYTICS_MAX_DELAY_TICKS = BUILDER.comment("Maximum ticks before a partial analytics batch is submitted.")
+        ANALYTICS_MAX_DELAY_TICKS = builder.comment("Maximum ticks before a partial analytics batch is submitted.")
                 .defineInRange("maxDelayTicks", 100, 1, 12000);
-        ANALYTICS_MAX_QUEUED_EVENTS = BUILDER.comment("Global bounded analytics event capacity.")
+        ANALYTICS_MAX_QUEUED_EVENTS = builder.comment("Global bounded analytics event capacity.")
                 .defineInRange("maxQueuedEvents", 4096, 16, 65536);
-        BUILDER.pop();
+        builder.pop();
 
-        BUILDER.pop();
-        CONFIG_SPEC = BUILDER.build();
+        builder.pop();
     }
 
     private BackgroundEfficiencyConfig() {
@@ -101,8 +103,9 @@ public final class BackgroundEfficiencyConfig {
 
     /** Returns sanitized values or safe defaults if NeoForge has not loaded the file yet. */
     public static Values values() {
+        ensureDefined();
         try {
-            return sanitize(new Values(
+            Values values = sanitize(new Values(
                     ENABLED.get(),
                     MAX_TASKS_PER_TICK.get(),
                     MAX_BACKGROUND_TIME_MS.get(),
@@ -122,13 +125,16 @@ public final class BackgroundEfficiencyConfig {
                     ANALYTICS_MAX_DELAY_TICKS.get(),
                     ANALYTICS_MAX_QUEUED_EVENTS.get()
             ));
+            return PerformanceServerConfig.enabled() ? values : disabled(values);
         } catch (RuntimeException exception) {
-            return defaults();
+            Values values = defaults();
+            return PerformanceServerConfig.enabled() ? values : disabled(values);
         }
     }
 
     /** Returns spec defaults without requiring an installed config. */
     public static Values defaults() {
+        ensureDefined();
         return sanitize(new Values(
                 ENABLED.getDefault(),
                 MAX_TASKS_PER_TICK.getDefault(),
@@ -149,6 +155,41 @@ public final class BackgroundEfficiencyConfig {
                 ANALYTICS_MAX_DELAY_TICKS.getDefault(),
                 ANALYTICS_MAX_QUEUED_EVENTS.getDefault()
         ));
+    }
+
+    /** Attaches the compatibility alias after the unified spec has been assembled. */
+    public static void attachSpec(ModConfigSpec spec) {
+        if (CONFIG_SPEC != null && CONFIG_SPEC != spec) {
+            throw new IllegalStateException("Background Efficiency config spec is already attached");
+        }
+        CONFIG_SPEC = spec;
+    }
+
+    private static Values disabled(Values values) {
+        return new Values(
+                false,
+                values.maximumTasksPerTick(),
+                values.maximumBackgroundTimeMillis(),
+                values.maximumQueuedTasks(),
+                values.maximumTasksPerSubsystem(),
+                values.asyncEnabled(),
+                values.asyncWorkerThreads(),
+                values.asyncMaximumQueuedJobs(),
+                values.asyncMaximumApplyPerTick(),
+                values.activityEnabled(),
+                values.networkBatchingEnabled(),
+                values.networkMaximumBatchSize(),
+                values.networkMaximumDelayTicks(),
+                values.networkMaximumQueuedUpdates(),
+                values.analyticsBatchingEnabled(),
+                values.analyticsMaximumBatchSize(),
+                values.analyticsMaximumDelayTicks(),
+                values.analyticsMaximumQueuedEvents()
+        );
+    }
+
+    private static void ensureDefined() {
+        PerformanceServerConfig.initialize();
     }
 
     /** Normalizes externally constructed values for tests and defensive API use. */

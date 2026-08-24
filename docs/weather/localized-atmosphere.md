@@ -61,9 +61,10 @@ that layer never becomes a second atmosphere authority.
 flowchart LR
     A["Loaded biome, elevation, daylight, dimension, season, and water inputs"] --> B["AtmosphereInputSampler"]
     B --> C["Immutable AtmosphereEnvironment"]
-    D["Previous AtmosphereGrid snapshot"] --> Q["AtmosphericFrontModel"]
+    D["Previous AtmosphereGrid snapshot"] --> R["Immutable SimulationBatch"]
+    C --> R
+    R --> Q["Data Engine worker: AtmosphericFrontModel"]
     Q --> E["AtmosphereSimulationEngine"]
-    C --> E
     E --> F["Revision-checked apply by WeatherAuthority"]
     F --> G["Dimension AtmosphereGrid"]
     G --> H["AtmosphereSavedData"]
@@ -80,8 +81,9 @@ flowchart LR
 The principal ownership boundaries are:
 
 - `WeatherAuthority` is the singular server authority. It schedules dimensions,
-  captures inputs on the server thread, runs the pure engine, applies results by
-  revision, and initiates synchronization.
+  captures inputs on the server thread, exposes only opaque immutable batches
+  to the shared worker, validates generation and all captured revisions, applies
+  results on the server thread, and initiates synchronization.
 - `AtmosphereGrid` owns mutable cells. Other systems receive only immutable
   `AtmosphereView` and `WeatherSample` values.
 - `AtmosphereSavedData` owns one grid per dimension. Environment caches and all
@@ -97,11 +99,13 @@ The principal ownership boundaries are:
 - Each level runtime also owns one bounded `WildfireScheduler`. It reads loaded
   campfires and authoritative weather, but vanilla fire owns all later spread.
 
-The first implementation is synchronous and throttled. World, chunk, biome,
-registry, and water reads stay on the server thread. The engine accepts only
-immutable inputs, and result application checks the cell revision, so its pure
-calculation phase can move off-thread later without allowing stale work to
-overwrite newer state.
+World, chunk, biome, registry, water, tracker, and config capture stays on the
+server thread. Phase 2B runs only the pure calculation over an immutable batch
+on the Data Engine's shared worker pool. Application rejects the whole batch if
+the level/config generation changed or any participating cell was edited or
+removed. Backpressure retains the due pass for retry instead of running it on
+the server thread. A synchronous bounded route remains only when the Data
+Engine is disabled.
 
 ## Atmospheric grid and units
 
@@ -1011,7 +1015,19 @@ The current implementation deliberately avoids the expensive failure modes of
 a block-scale weather system:
 
 - state is one compact cell per large horizontal region, not per block;
-- simulation is interval-driven, not per tick;
+- simulation is interval-driven through the Data Engine's `weather_runtime`
+  registration, not per tick;
+- Tick Engine pressure may expand optional maintenance cadence without
+  suspending weather or overriding a deliberately slower configured interval;
+- each loaded dimension is a separate coalescible queue step, so Minecraft's
+  live spare-time allowance is rechecked between dimensions;
+- server-thread capture freezes cell/environment/tracker inputs, while only the
+  detached per-cell atmospheric math runs on the shared worker pool;
+- one calculation is tracked per level; generation/revision validation rejects
+  stale batches atomically, worker backpressure retains the due pass, and a
+  bounded timeout recovers calculations whose failure produced no completion;
+- due regional publication uses retained dirty state while preserving the
+  existing v4 payload and per-player cell revision filtering;
 - nearby players share a deduplicated active-cell set;
 - only active, grace-period, and persistent-storm cells evolve;
 - environment and water reads use fixed lattices, bounded caches, and loaded
@@ -1032,17 +1048,20 @@ a block-scale weather system:
   entity-ticking chunks, and can add at most one bolt per dimension check;
 - wildfire checks rotate through at most 64 loaded chunks, cap inspected block
   entities/campfires, make one probability roll, and place at most one fire; and
-- all world reads are server-thread confined.
+- all world reads and every authority/persistence mutation are server-thread confined.
 
 Remaining risks are bounded but worth profiling. Each simulation
-pass currently copies retained immutable views into temporary maps/lists, so a
+capture still copies retained immutable views into temporary maps/lists on the
+server thread, so a
 very high `maxPersistedCells` combined with many active dimensions can create
 allocation pressure. Catch-up repeats at most 12 pure steps using one captured
 neighbor/environment window, which is safe and cheap but only an approximation
 of the missed timeline. The two 2,048-entry environment caches can churn on a
-server that rotates rapidly through many distant cells. Simulation is still on
-the server thread, so aggressive radius, interval, or speed settings should be
-profiled before production use. On the client, high cloud render distance and
+server that rotates rapidly through many distant cells. Pure cell math now runs
+on the shared worker, but capture, validation, apply, and the disabled-engine
+fallback remain server-thread work; aggressive radius, interval, or speed
+settings therefore still require representative profiling before any
+performance claim. On the client, high cloud render distance and
 tile-cap settings combined with a very short rebuild interval increase CPU mesh
 construction and GPU upload frequency. Volumetric layer count multiplies cloud
 vertices and translucent fill rate, so the default eight layers should remain
@@ -1143,6 +1162,15 @@ Additional limits and compatibility boundaries:
 
 ## In-game validation checklist
 
+The automated Phase 2 completion gate runs under `runGameTestServer` as
+`WeatherDataEngineGameTests`. It initializes real clear atmosphere cells in a
+loaded level, waits for the ordinary `weather_runtime` schedule and shared
+worker, and requires an accepted revision-checked apply with no new rejection
+or Data Engine failure. Its log reports the submission/completion deltas and
+worker time. This validates the dedicated-server lifecycle and execution path;
+it does not validate client rendering, audio, multiplayer interpolation, or
+representative performance.
+
 Use JDK 21 and build first:
 
 ```powershell
@@ -1157,8 +1185,10 @@ explicitly changes them; changing size resets atmospheric state.
 1. **Inspect the baseline.** Join, open F3, and confirm the
    `WO Atmosphere` lines appear after the first sync. Run
    `/wilderness weather sample`, `/wilderness weather cell`, and
-   `/wilderness weather dump`. Confirm the command values match the local F3
-   sample within network quantization and the two-second client blend.
+   `/wilderness weather dump`. Run `/wo dataengine stats` and confirm the
+   `Async` line exposes submitted, completed, rejected, waiting-to-apply, and
+   cumulative worker-time values. Confirm the weather command values match the
+   local F3 sample within network quantization and the two-second client blend.
 2. **Verify vanilla command integration.** Run `/weather rain 20s`; confirm
    rain quads, particles, precipitation sounds, sky darkening, air fog, and
    cloud cover around every Overworld player. Move into a newly relevant cell

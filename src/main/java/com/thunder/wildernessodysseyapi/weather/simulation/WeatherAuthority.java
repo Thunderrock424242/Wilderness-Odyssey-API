@@ -41,26 +41,30 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
+import java.util.function.LongFunction;
 
 /**
  * Singular server authority for dimension-local atmospheric weather.
  *
  * <p>The authority identifies player-relevant cells, captures immutable world
- * inputs on the server thread, calculates from one frozen neighborhood, and
- * applies results with revision checks. The first pass is synchronous and
- * throttled; the capture/calculate/apply boundary is ready for future pure
- * off-thread calculation without permitting world access away from the server.</p>
+ * inputs on the server thread, calculates from frozen neighborhoods, and
+ * applies results with generation and revision checks. The Data Engine may run
+ * only the immutable calculation phase on a shared worker; capture, validation,
+ * persistence, and every Minecraft mutation remain on the server thread.</p>
  */
 public final class WeatherAuthority implements WeatherQuery {
 
     private static final int MAX_CATCH_UP_STEPS = 12;
     private static final double PERSISTENT_STORM_ENERGY = 0.55;
+    private static final BooleanSupplier ALWAYS_HAS_TIME = () -> true;
     private static final WeatherAuthority INSTANCE = new WeatherAuthority();
 
     private final AtmosphereSimulationEngine engine = new AtmosphereSimulationEngine();
@@ -74,30 +78,118 @@ public final class WeatherAuthority implements WeatherQuery {
         return INSTANCE;
     }
 
-    /**
-     * Advances and synchronizes one dimension from the server tick event.
-     */
+    /** Advances one complete dimension pass without an external time budget. */
     public void tick(ServerLevel level) {
+        OptionalMaintenanceResult maintenance = runOptionalMaintenance(level);
+        tickWorldEffects(level, ALWAYS_HAS_TIME);
+        if (maintenance.snapshotDue()) {
+            publishSnapshot(level);
+        }
+    }
+
+    /**
+     * Advances optional atmospheric simulation and requests due publication.
+     *
+     * <p>This method is server-thread-only. The Data Engine invokes it as one
+     * bounded per-level callback; it does not send packets or apply unrelated
+     * world effects. Missed invocations produce one elapsed-time pass instead
+     * of replaying every missed scheduler boundary.</p>
+     */
+    public OptionalMaintenanceResult runOptionalMaintenance(ServerLevel level) {
+        OptionalMaintenancePreparation preparation = prepareOptionalMaintenance(level, true);
+        SimulationBatch batch = preparation.simulationBatch();
+        if (batch != null) {
+            markSimulationBatchScheduled(level, batch);
+            SimulationResult result = calculateSimulationBatch(batch);
+            applySimulationResult(level, result);
+        }
+        return new OptionalMaintenanceResult(preparation.simulationDue(), preparation.snapshotDue());
+    }
+
+    /**
+     * Captures due optional weather work without performing atmospheric math.
+     *
+     * <p>SERVER THREAD ONLY. When {@code allowSimulationCapture} is false, a
+     * due autonomous pass remains due so the caller can retry after its current
+     * worker task completes. Vanilla command maintenance is always applied here
+     * because it directly owns authoritative weather for its configured span.</p>
+     */
+    public OptionalMaintenancePreparation prepareOptionalMaintenance(
+            ServerLevel level,
+            boolean allowSimulationCapture
+    ) {
         Objects.requireNonNull(level, "level");
         WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
         long gameTime = level.getGameTime();
+        LevelRuntime runtime = runtime(level);
+        boolean simulationDue = isElapsedDue(
+                gameTime,
+                runtime.lastSimulationMaintenanceTick,
+                scheduling.simulationIntervalTicks()
+        );
+        boolean snapshotDue = isElapsedDue(
+                gameTime,
+                runtime.lastSnapshotRequestTick,
+                scheduling.snapshotSyncIntervalTicks()
+        );
         boolean enabled = WeatherConfig.dimensionEnabled(level.dimension());
         if (!enabled) {
-            if (isDue(gameTime, scheduling.snapshotSyncIntervalTicks())) {
-                WeatherSnapshotManager.syncDisabled(
-                        level,
-                        scheduling.cellSize(),
-                        synchronizationRadius(scheduling)
-                );
-                DistantThunderSnapshotManager.syncDisabled(level);
+            if (snapshotDue) {
+                runtime.lastSnapshotRequestTick = gameTime;
             }
+            return new OptionalMaintenancePreparation(false, snapshotDue, null);
+        }
+
+        AtmosphereSavedData data = data(level, scheduling, runtime);
+        expireVanillaCommandWeather(level, runtime, data, gameTime);
+        SimulationBatch batch = null;
+        if (runtime.vanillaWeatherState != null) {
+            // The vanilla command owns weather for its requested duration.
+            // Refresh on simulation and sync boundaries so moving players do
+            // not briefly receive autonomous weather in newly relevant cells.
+            if (simulationDue || snapshotDue) {
+                maintainVanillaCommandWeather(level, runtime, data, scheduling, gameTime);
+            }
+        } else if (simulationDue && allowSimulationCapture) {
+            batch = captureSimulationBatch(
+                    level,
+                    runtime,
+                    data,
+                    scheduling,
+                    WeatherConfig.settings(),
+                    gameTime
+            );
+        }
+
+        if (simulationDue && runtime.vanillaWeatherState != null) {
+            runtime.lastSimulationMaintenanceTick = gameTime;
+        }
+        if (snapshotDue) {
+            runtime.lastSnapshotRequestTick = gameTime;
+        }
+        return new OptionalMaintenancePreparation(simulationDue, snapshotDue, batch);
+    }
+
+    /**
+     * Runs loaded-world weather effects while repeatedly honoring Minecraft's
+     * live spare-time allowance.
+     *
+     * <p>Every callback remains on the logical server thread. Atmospheric
+     * calculation scheduling and client publication are handled separately so
+     * a slow effect cannot accidentally authorize later optional work.</p>
+     */
+    public void tickWorldEffects(ServerLevel level, BooleanSupplier serverHasTime) {
+        Objects.requireNonNull(level, "level");
+        Objects.requireNonNull(serverHasTime, "Server time allowance is required");
+        if (!WeatherConfig.dimensionEnabled(level.dimension())) {
             return;
         }
 
+        WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
+        long gameTime = level.getGameTime();
         LevelRuntime runtime = runtime(level);
         AtmosphereSavedData data = data(level, scheduling, runtime);
-        AtmosphereGrid grid = data.grid();
-        if (grid.ensureCellSize(scheduling.cellSize())) {
+        if (data.grid().ensureCellSize(scheduling.cellSize())) {
             data.markChanged();
             WeatherSnapshotManager.markLevelDirty(level.dimension());
         }
@@ -108,19 +200,10 @@ public final class WeatherAuthority implements WeatherQuery {
             // adapters and Wilderness gameplay consumers already read locally.
             level.setWeatherParameters(6_000, 0, false, false);
         }
-
-        boolean simulationDue = isDue(gameTime, scheduling.simulationIntervalTicks());
-        boolean synchronizationDue = isDue(gameTime, scheduling.snapshotSyncIntervalTicks());
         expireVanillaCommandWeather(level, runtime, data, gameTime);
-        if (runtime.vanillaWeatherState != null) {
-            // The vanilla command owns weather for its requested duration.
-            // Refresh on simulation and sync boundaries so moving players do
-            // not briefly receive autonomous weather in newly relevant cells.
-            if (simulationDue || synchronizationDue) {
-                maintainVanillaCommandWeather(level, runtime, data, scheduling, gameTime);
-            }
-        } else if (simulationDue) {
-            simulate(level, runtime, data, scheduling, WeatherConfig.settings(), gameTime);
+
+        if (!serverHasTime.getAsBoolean()) {
+            return;
         }
         runtime.lightningScheduler.tick(
                 level,
@@ -128,6 +211,9 @@ public final class WeatherAuthority implements WeatherQuery {
                 scheduling.cellSize(),
                 WeatherConfig.lightning()
         );
+        if (!serverHasTime.getAsBoolean()) {
+            return;
+        }
         runtime.wildfireScheduler.tick(
                 level,
                 gameTime,
@@ -135,21 +221,45 @@ public final class WeatherAuthority implements WeatherQuery {
                 scheduling.environmentResampleIntervalTicks(),
                 WeatherConfig.wildfires()
         );
+        if (!serverHasTime.getAsBoolean()) {
+            return;
+        }
         WeatherConfig.FeatureSettings features = WeatherConfig.features();
-        List<TrackedWeatherSystem> trackedSystems = systems(level);
         runtime.surfaceWeatheringScheduler.tick(level, gameTime, this, features);
+        if (!serverHasTime.getAsBoolean()) {
+            return;
+        }
+        List<TrackedWeatherSystem> trackedSystems = systems(level);
         runtime.severeWeatherScheduler.tick(level, gameTime, trackedSystems, features);
+        if (!serverHasTime.getAsBoolean()) {
+            return;
+        }
         SurvivalWeatherIntegrations.tick(level, this);
-        if (synchronizationDue) {
-            WeatherSnapshotManager.syncLevel(
+    }
+
+    /** Publishes one due authoritative regional snapshot on the server thread. */
+    public void publishSnapshot(ServerLevel level) {
+        Objects.requireNonNull(level, "level");
+        WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
+        if (!WeatherConfig.dimensionEnabled(level.dimension())) {
+            WeatherSnapshotManager.syncDisabled(
                     level,
-                    grid,
-                    true,
                     scheduling.cellSize(),
                     synchronizationRadius(scheduling)
             );
-            DistantThunderSnapshotManager.syncLevel(level, grid, trackedSystems);
+            DistantThunderSnapshotManager.syncDisabled(level);
+            return;
         }
+
+        AtmosphereGrid grid = data(level, scheduling, runtime(level)).grid();
+        WeatherSnapshotManager.syncLevel(
+                level,
+                grid,
+                true,
+                scheduling.cellSize(),
+                synchronizationRadius(scheduling)
+        );
+        DistantThunderSnapshotManager.syncLevel(level, grid, systems(level));
     }
 
     @Override
@@ -547,10 +657,13 @@ public final class WeatherAuthority implements WeatherQuery {
         WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
         for (Map.Entry<ServerLevel, LevelRuntime> entry : runtimes.entrySet()) {
             data(entry.getKey(), scheduling, entry.getValue());
+            entry.getValue().invalidateSimulationGeneration();
             entry.getValue().inputSampler.clear();
             entry.getValue().lightningScheduler.reset();
             entry.getValue().wildfireScheduler.reset();
             entry.getValue().approachingWeatherCache.clear();
+            entry.getValue().lastSimulationMaintenanceTick = Long.MIN_VALUE;
+            entry.getValue().lastSnapshotRequestTick = Long.MIN_VALUE;
             WeatherSnapshotManager.markLevelDirty(entry.getKey().dimension());
         }
     }
@@ -593,7 +706,7 @@ public final class WeatherAuthority implements WeatherQuery {
         DistantThunderSnapshotManager.forgetPlayer(player);
     }
 
-    private void simulate(
+    private SimulationBatch captureSimulationBatch(
             ServerLevel level,
             LevelRuntime runtime,
             AtmosphereSavedData data,
@@ -614,6 +727,11 @@ public final class WeatherAuthority implements WeatherQuery {
             ensureCell(level, data, key, scheduling);
             grid.markActive(key, gameTime);
         }
+        if (!activeKeys.isEmpty()) {
+            // Activity watermarks are persistent authority state even if a
+            // later worker result is rejected as stale.
+            data.markChanged();
+        }
 
         Map<Long, AtmosphereView> previous = grid.snapshotByPackedKey();
         Set<Long> scheduledKeys = new HashSet<>(activeKeys);
@@ -633,8 +751,8 @@ public final class WeatherAuthority implements WeatherQuery {
             }
         }
 
-        List<CalculatedCell> calculated = new ArrayList<>(scheduledKeys.size());
-        List<WeatherSystemTracker.Observation> observations = new ArrayList<>();
+        List<CellCalculationInput> inputs = new ArrayList<>(scheduledKeys.size());
+        Map<Long, Long> expectedRevisions = new HashMap<>(Math.max(16, scheduledKeys.size() * 2));
         for (long packedKey : scheduledKeys) {
             AtmosphereView view = previous.get(packedKey);
             if (view == null) {
@@ -653,68 +771,196 @@ public final class WeatherAuthority implements WeatherQuery {
                     scheduling.simulationIntervalTicks(),
                     MAX_CATCH_UP_STEPS
             );
-            WeatherSample next = view.sample();
-            for (int step = 0; step < catchUpSteps; step++) {
-                next = engine.simulate(next, environment, neighbors, settings);
-            }
             double centerX = (view.key().x() + 0.5) * scheduling.cellSize();
             double centerZ = (view.key().z() + 0.5) * scheduling.cellSize();
+            inputs.add(new CellCalculationInput(
+                    view.key(),
+                    view.revision(),
+                    view.sample(),
+                    environment,
+                    neighbors,
+                    catchUpSteps,
+                    tracker.influenceAt(centerX, centerZ),
+                    centerX,
+                    centerZ
+            ));
+            expectedRevisions.put(packedKey, view.revision());
+        }
+        return new SimulationBatch(
+                runtime.simulationGeneration,
+                gameTime,
+                scheduling.cellSize(),
+                scheduling.simulationIntervalTicks(),
+                scheduling.maxPersistedCells(),
+                scheduling.debugLogging(),
+                settings,
+                features,
+                features.trackingSettings(scheduling.simulationIntervalTicks()),
+                Set.copyOf(activeKeys),
+                Map.copyOf(expectedRevisions),
+                List.copyOf(inputs)
+        );
+    }
+
+    /**
+     * Performs pure atmospheric math from a detached server-thread capture.
+     *
+     * <p>WORKER SAFE. This method does not access levels, chunks, registries,
+     * persistence, the runtime map, or any other mutable Minecraft owner.</p>
+     */
+    public SimulationResult calculateSimulationBatch(SimulationBatch batch) {
+        Objects.requireNonNull(batch, "Simulation batch is required");
+        List<CalculatedCell> calculated = new ArrayList<>(batch.inputs.size());
+        List<WeatherSystemTracker.Observation> observations = new ArrayList<>();
+        for (CellCalculationInput input : batch.inputs) {
+            WeatherSample next = input.sample;
+            for (int step = 0; step < input.catchUpSteps; step++) {
+                next = engine.simulate(next, input.environment, input.neighborhood, batch.settings);
+            }
             next = WeatherSystemInfluenceModel.apply(
                     next,
-                    tracker.influenceAt(centerX, centerZ),
-                    settings.maximumPrecipitationIntensity()
+                    input.systemInfluence,
+                    batch.settings.maximumPrecipitationIntensity()
             );
-            AtmosphericFrontModel.FrontState front = AtmosphericFrontModel.analyze(next, neighbors);
+            AtmosphericFrontModel.FrontState front = AtmosphericFrontModel.analyze(next, input.neighborhood);
             WeatherHazardModel.HazardProfile hazards = WeatherHazardModel.evaluate(
-                    next, environment, front.type(), front.strength()
+                    next, input.environment, front.type(), front.strength()
             );
             collectObservations(
                     observations,
                     next,
                     front,
                     hazards,
-                    features,
-                    centerX,
-                    centerZ,
-                    scheduling.cellSize()
+                    batch.features,
+                    input.centerX,
+                    input.centerZ,
+                    batch.cellSize
             );
-            calculated.add(new CalculatedCell(view.key(), view.revision(), next));
+            calculated.add(new CalculatedCell(input.key, input.baseRevision, next));
         }
+        return new SimulationResult(batch, List.copyOf(calculated), List.copyOf(observations));
+    }
 
+    /** SERVER THREAD ONLY. Marks an accepted batch as owning this cadence slot. */
+    public boolean markSimulationBatchScheduled(ServerLevel level, SimulationBatch batch) {
+        Objects.requireNonNull(level, "level");
+        Objects.requireNonNull(batch, "Simulation batch is required");
+        LevelRuntime runtime = runtimes.get(level);
+        if (runtime == null || runtime.simulationGeneration != batch.generation) {
+            return false;
+        }
+        runtime.lastSimulationMaintenanceTick = batch.gameTime;
+        return true;
+    }
+
+    /**
+     * SERVER THREAD ONLY. Rejects work captured before a lifecycle/config change
+     * or any intervening authoritative edit to a participating cell.
+     */
+    public boolean isSimulationResultCurrent(ServerLevel level, SimulationResult result) {
+        if (level == null || result == null || !WeatherConfig.dimensionEnabled(level.dimension())) {
+            return false;
+        }
+        LevelRuntime runtime = runtimes.get(level);
+        SimulationBatch batch = result.batch;
+        AtmosphereGrid grid = runtime == null ? null : runtime.atmosphereGrid;
+        return runtime != null
+                && runtime.simulationGeneration == batch.generation
+                && grid != null
+                && grid.cellSize() == batch.cellSize
+                && result.calculated.size() == batch.inputs.size()
+                && revisionsMatch(batch.expectedRevisions, packedKey -> {
+                    AtmosphereView view = grid.view(packedKey);
+                    return view == null ? null : view.revision();
+                });
+    }
+
+    /**
+     * SERVER THREAD ONLY. Applies one fully validated batch and updates its
+     * persistent weather-system identities as a single logical pass.
+     */
+    public boolean applySimulationResult(ServerLevel level, SimulationResult result) {
+        if (!isSimulationResultCurrent(level, result)) {
+            return false;
+        }
+        SimulationBatch batch = result.batch;
+        LevelRuntime runtime = runtimes.get(level);
+        AtmosphereSavedData data = data(level, WeatherConfig.scheduling(), runtime);
+        if (!isSimulationResultCurrent(level, result)) {
+            return false;
+        }
+        AtmosphereGrid grid = data.grid();
         boolean changed = false;
-        for (CalculatedCell result : calculated) {
+        for (CalculatedCell calculated : result.calculated) {
             changed |= grid.applyIfRevision(
-                    result.key,
-                    result.baseRevision,
-                    result.sample,
-                    gameTime
+                    calculated.key,
+                    calculated.baseRevision,
+                    calculated.sample,
+                    batch.gameTime
             );
         }
-        int removed = grid.trimToLimit(scheduling.maxPersistedCells(), activeKeys);
+        Set<Long> protectedKeys = new HashSet<>(batch.activeKeys);
+        WeatherConfig.SchedulingSettings currentScheduling = WeatherConfig.scheduling();
+        if (currentScheduling.cellSize() == batch.cellSize) {
+            protectedKeys.addAll(collectActiveKeys(level, currentScheduling));
+        }
+        int removed = grid.trimToLimit(batch.maximumPersistedCells, protectedKeys);
+        WeatherSystemsSavedData systemsData = WeatherSystemsSavedData.get(level, batch.features);
+        WeatherSystemTracker tracker = systemsData.tracker();
         boolean systemsChanged = tracker.update(
-                observations,
-                gameTime,
-                scheduling.simulationIntervalTicks(),
-                features.trackingSettings(scheduling.simulationIntervalTicks())
+                result.observations,
+                batch.gameTime,
+                batch.simulationIntervalTicks,
+                batch.trackingSettings
         );
         if (systemsChanged) {
             systemsData.markChanged();
             runtime.approachingWeatherCache.clear();
         }
-        if (changed || removed > 0 || !activeKeys.isEmpty() || !calculated.isEmpty()) {
+        if (changed || removed > 0 || !batch.activeKeys.isEmpty() || !result.calculated.isEmpty()) {
             data.markChanged();
         }
 
-        if (scheduling.debugLogging() && isDue(gameTime, 1_200)) {
+        if (batch.debugLogging && isDue(batch.gameTime, 1_200)) {
             ModConstants.LOGGER.debug(
                     "Atmosphere {}: {} retained cells, {} active, {} simulated, {} evicted",
                     level.dimension().location(),
                     grid.size(),
-                    activeKeys.size(),
-                    calculated.size(),
+                    batch.activeKeys.size(),
+                    result.calculated.size(),
                     removed
             );
         }
+        return true;
+    }
+
+    /** SERVER THREAD ONLY. Makes a discarded accepted batch due again. */
+    public void requestSimulationRetry(ServerLevel level, SimulationBatch batch) {
+        if (level == null || batch == null) {
+            return;
+        }
+        LevelRuntime runtime = runtimes.get(level);
+        if (runtime != null
+                && runtime.simulationGeneration == batch.generation
+                && runtime.lastSimulationMaintenanceTick == batch.gameTime) {
+            runtime.lastSimulationMaintenanceTick = Long.MIN_VALUE;
+        }
+    }
+
+    /** Exact revision-set comparison shared with focused stale-result tests. */
+    static boolean revisionsMatch(
+            Map<Long, Long> expectedRevisions,
+            LongFunction<Long> currentRevision
+    ) {
+        Objects.requireNonNull(expectedRevisions, "Expected revisions are required");
+        Objects.requireNonNull(currentRevision, "Current revision lookup is required");
+        for (Map.Entry<Long, Long> expected : expectedRevisions.entrySet()) {
+            Long current = currentRevision.apply(expected.getKey());
+            if (!Objects.equals(expected.getValue(), current)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // Converts continuous cell physics into sparse observations while the
@@ -1083,6 +1329,12 @@ public final class WeatherAuthority implements WeatherQuery {
             LevelRuntime runtime
     ) {
         AtmosphereSavedData data = AtmosphereSavedData.get(level, scheduling);
+        int attachedCellSize = data.grid().cellSize();
+        if (runtime.attachedCellSize >= 0 && runtime.attachedCellSize != attachedCellSize) {
+            runtime.invalidateSimulationGeneration();
+            WeatherSnapshotManager.markLevelDirty(level.dimension());
+        }
+        runtime.attachedCellSize = attachedCellSize;
         runtime.atmosphereGrid = data.grid();
         return data;
     }
@@ -1112,6 +1364,96 @@ public final class WeatherAuthority implements WeatherQuery {
         return Math.floorMod(gameTime, Math.max(1, interval)) == 0L;
     }
 
+    /** Modulo-free due check shared with focused cadence tests. */
+    static boolean isElapsedDue(long currentTick, long lastTick, int intervalTicks) {
+        return lastTick == Long.MIN_VALUE
+                || currentTick < lastTick
+                || currentTick - lastTick >= Math.max(1, intervalTicks);
+    }
+
+    /** Result returned to the performance adapter after one optional level pass. */
+    public record OptionalMaintenanceResult(boolean simulationRan, boolean snapshotDue) {
+    }
+
+    /** Server-thread capture outcome consumed by the performance adapter. */
+    public record OptionalMaintenancePreparation(
+            boolean simulationDue,
+            boolean snapshotDue,
+            SimulationBatch simulationBatch
+    ) {
+    }
+
+    /**
+     * Opaque immutable input for one atmospheric calculation generation.
+     *
+     * <p>The object intentionally exposes only its size; worker code passes it
+     * back to this authority instead of interpreting ownership state itself.</p>
+     */
+    public static final class SimulationBatch {
+        private final long generation;
+        private final long gameTime;
+        private final int cellSize;
+        private final int simulationIntervalTicks;
+        private final int maximumPersistedCells;
+        private final boolean debugLogging;
+        private final SimulationSettings settings;
+        private final WeatherConfig.FeatureSettings features;
+        private final WeatherSystemTracker.TrackingSettings trackingSettings;
+        private final Set<Long> activeKeys;
+        private final Map<Long, Long> expectedRevisions;
+        private final List<CellCalculationInput> inputs;
+
+        private SimulationBatch(
+                long generation,
+                long gameTime,
+                int cellSize,
+                int simulationIntervalTicks,
+                int maximumPersistedCells,
+                boolean debugLogging,
+                SimulationSettings settings,
+                WeatherConfig.FeatureSettings features,
+                WeatherSystemTracker.TrackingSettings trackingSettings,
+                Set<Long> activeKeys,
+                Map<Long, Long> expectedRevisions,
+                List<CellCalculationInput> inputs
+        ) {
+            this.generation = generation;
+            this.gameTime = gameTime;
+            this.cellSize = cellSize;
+            this.simulationIntervalTicks = simulationIntervalTicks;
+            this.maximumPersistedCells = maximumPersistedCells;
+            this.debugLogging = debugLogging;
+            this.settings = settings;
+            this.features = features;
+            this.trackingSettings = trackingSettings;
+            this.activeKeys = activeKeys;
+            this.expectedRevisions = expectedRevisions;
+            this.inputs = inputs;
+        }
+
+        /** Returns the number of detached cell calculations in this batch. */
+        public int cellCount() {
+            return inputs.size();
+        }
+    }
+
+    /** Opaque immutable calculation output awaiting server-thread validation. */
+    public static final class SimulationResult {
+        private final SimulationBatch batch;
+        private final List<CalculatedCell> calculated;
+        private final List<WeatherSystemTracker.Observation> observations;
+
+        private SimulationResult(
+                SimulationBatch batch,
+                List<CalculatedCell> calculated,
+                List<WeatherSystemTracker.Observation> observations
+        ) {
+            this.batch = batch;
+            this.calculated = calculated;
+            this.observations = observations;
+        }
+    }
+
     /** Debug-editable atmospheric scalar. */
     public enum ControlField {
         TEMPERATURE,
@@ -1139,6 +1481,10 @@ public final class WeatherAuthority implements WeatherQuery {
         private volatile AtmosphereGrid atmosphereGrid;
         private VanillaWeatherCommandAdapter.State vanillaWeatherState;
         private long vanillaWeatherUntilTick;
+        private long lastSimulationMaintenanceTick = Long.MIN_VALUE;
+        private long lastSnapshotRequestTick = Long.MIN_VALUE;
+        private long simulationGeneration = 1L;
+        private int attachedCellSize = -1;
 
         private LevelRuntime(
                 AtmosphereInputSampler inputSampler,
@@ -1168,6 +1514,25 @@ public final class WeatherAuthority implements WeatherQuery {
             vanillaWeatherUntilTick = 0L;
             vanillaWeatherAppliedKeys.clear();
         }
+
+        private void invalidateSimulationGeneration() {
+            simulationGeneration = simulationGeneration == Long.MAX_VALUE
+                    ? 1L
+                    : simulationGeneration + 1L;
+        }
+    }
+
+    private record CellCalculationInput(
+            AtmosphereCellKey key,
+            long baseRevision,
+            WeatherSample sample,
+            AtmosphereEnvironment environment,
+            AtmosphereSimulationEngine.Neighborhood neighborhood,
+            int catchUpSteps,
+            WeatherSystemTracker.SystemInfluence systemInfluence,
+            double centerX,
+            double centerZ
+    ) {
     }
 
     private record CalculatedCell(
