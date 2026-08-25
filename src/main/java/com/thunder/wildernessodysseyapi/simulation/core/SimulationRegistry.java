@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.simulation.core;
 
 import com.thunder.wildernessodysseyapi.simulation.api.SimulationSystem;
+import com.thunder.wildernessodysseyapi.simulation.api.SimulationRegionCollector;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 
@@ -51,6 +52,26 @@ public final class SimulationRegistry {
     /** Returns whether any optional participant can currently consume regional work. */
     public boolean hasEnabledSystem() {
         return enabledSystemCount() > 0;
+    }
+
+    /** Collects owner-known regions in deterministic system order with failure isolation. */
+    public void collectRegions(
+            MinecraftServer server,
+            SimulationRegionCollector collector,
+            LifecycleFailureHandler failures
+    ) {
+        Objects.requireNonNull(server, "Minecraft server is required");
+        Objects.requireNonNull(collector, "Simulation region collector is required");
+        Objects.requireNonNull(failures, "Region collection failure handler is required");
+        for (SimulationSystem system : systems()) {
+            try {
+                if (system.isEnabled()) {
+                    system.collectRegions(server, collector);
+                }
+            } catch (RuntimeException exception) {
+                failures.onFailure(system.id(), "region collection", exception);
+            }
+        }
     }
 
     /** Invokes start hooks in deterministic order with per-system failure isolation. */

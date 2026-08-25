@@ -17,6 +17,7 @@ public record DistantWildlifeGroup(
         long id,
         ResourceLocation species,
         int populationEstimate,
+        double populationRemainder,
         double anchorX,
         double anchorY,
         double anchorZ,
@@ -46,6 +47,11 @@ public record DistantWildlifeGroup(
         species = Objects.requireNonNull(species, "species");
         if (populationEstimate <= 0 || populationEstimate > MAXIMUM_GROUP_POPULATION) {
             throw new IllegalArgumentException("Invalid distant wildlife population: " + populationEstimate);
+        }
+        if (!Double.isFinite(populationRemainder)
+                || populationRemainder < -0.5
+                || populationRemainder > 0.5) {
+            throw new IllegalArgumentException("Invalid distant wildlife population remainder: " + populationRemainder);
         }
         requireCoordinate(anchorX, "anchorX");
         requireCoordinate(anchorY, "anchorY");
@@ -80,6 +86,41 @@ public record DistantWildlifeGroup(
         disturbance = environment.disturbance();
         weatherImpact = environment.weatherImpact();
         form = Objects.requireNonNullElse(form, DistantWildlifeForm.GROUND);
+    }
+
+    /** Retains the data-version-two construction shape without a fractional remainder. */
+    public DistantWildlifeGroup(
+            long id,
+            ResourceLocation species,
+            int populationEstimate,
+            double anchorX,
+            double anchorY,
+            double anchorZ,
+            double directionX,
+            double directionZ,
+            double cruiseSpeed,
+            double activityScale,
+            long seed,
+            long referenceGameTime,
+            long populationReferenceGameTime,
+            double foodAvailability,
+            double waterAvailability,
+            double foodPressure,
+            double disturbance,
+            double weatherImpact,
+            DistantWildlifeForm form,
+            boolean nocturnal,
+            boolean weatherSensitive
+    ) {
+        this(
+                id, species, populationEstimate, 0.0,
+                anchorX, anchorY, anchorZ,
+                directionX, directionZ,
+                cruiseSpeed, activityScale,
+                seed, referenceGameTime, populationReferenceGameTime,
+                foodAvailability, waterAvailability, foodPressure, disturbance, weatherImpact,
+                form, nocturnal, weatherSensitive
+        );
     }
 
     /** Retains the original construction shape for integrations compiled against data version one. */
@@ -141,7 +182,7 @@ public record DistantWildlifeGroup(
     ) {
         Objects.requireNonNull(anchor, "anchor");
         return new DistantWildlifeGroup(
-                id, species, populationEstimate,
+                id, species, populationEstimate, populationRemainder,
                 anchor.x, anchor.y, anchor.z,
                 newDirectionX, newDirectionZ,
                 cruiseSpeed, newActivityScale,
@@ -154,7 +195,7 @@ public record DistantWildlifeGroup(
     /** Replaces only the owned population count after a committed transition. */
     public DistantWildlifeGroup withPopulation(int population) {
         return new DistantWildlifeGroup(
-                id, species, population,
+                id, species, population, populationRemainder,
                 anchorX, anchorY, anchorZ,
                 directionX, directionZ,
                 cruiseSpeed, activityScale,
@@ -179,9 +220,14 @@ public record DistantWildlifeGroup(
         AbstractEcosystemModel.Environment previous = new AbstractEcosystemModel.Environment(
                 foodAvailability, waterAvailability, foodPressure, disturbance, weatherImpact
         );
-        int population = AbstractEcosystemModel.advancePopulation(populationEstimate, elapsed, previous);
+        AbstractEcosystemModel.PopulationState population = AbstractEcosystemModel.advancePopulationState(
+                populationEstimate,
+                populationRemainder,
+                elapsed,
+                previous
+        );
         AbstractEcosystemModel.Environment advanced = AbstractEcosystemModel.advanceEnvironment(
-                previous, elapsed, population
+                previous, elapsed, population.population()
         );
         AbstractEcosystemModel.Environment observed = observedEnvironment == null ? advanced : observedEnvironment;
         AbstractEcosystemModel.Environment merged = new AbstractEcosystemModel.Environment(
@@ -191,14 +237,36 @@ public record DistantWildlifeGroup(
                 Math.max(advanced.disturbance(), observed.disturbance()),
                 Math.max(advanced.weatherImpact(), observed.weatherImpact())
         );
+        int boundedPopulation = Math.max(1, Math.min(MAXIMUM_GROUP_POPULATION, population.population()));
+        double boundedRemainder = boundedPopulation == population.population() ? population.remainder() : 0.0;
         return new DistantWildlifeGroup(
-                id, species, Math.max(1, Math.min(MAXIMUM_GROUP_POPULATION, population)),
+                id, species, boundedPopulation, boundedRemainder,
                 anchorX, anchorY, anchorZ,
                 directionX, directionZ,
                 cruiseSpeed, activityScale,
                 seed, referenceGameTime, safeTime,
                 merged.foodAvailability(), merged.waterAvailability(), merged.foodPressure(),
                 merged.disturbance(), merged.weatherImpact(),
+                form, nocturnal, weatherSensitive
+        );
+    }
+
+    /** Applies a validated ecology result while preserving current group motion. */
+    public DistantWildlifeGroup withPopulationEcologyState(
+            int population,
+            double remainder,
+            long populationGameTime,
+            AbstractEcosystemModel.Environment environment
+    ) {
+        Objects.requireNonNull(environment, "environment");
+        return new DistantWildlifeGroup(
+                id, species, population, remainder,
+                anchorX, anchorY, anchorZ,
+                directionX, directionZ,
+                cruiseSpeed, activityScale,
+                seed, referenceGameTime, populationGameTime,
+                environment.foodAvailability(), environment.waterAvailability(), environment.foodPressure(),
+                environment.disturbance(), environment.weatherImpact(),
                 form, nocturnal, weatherSensitive
         );
     }
@@ -219,7 +287,7 @@ public record DistantWildlifeGroup(
         );
         double mergedCruiseSpeed = cruiseSpeed * existingWeight + sourceCruiseSpeed * sourceWeight;
         return new DistantWildlifeGroup(
-                id, species, newPopulation,
+                id, species, newPopulation, populationRemainder,
                 mergedAnchor.x, mergedAnchor.y, mergedAnchor.z,
                 directionX, directionZ,
                 mergedCruiseSpeed, activityScale,

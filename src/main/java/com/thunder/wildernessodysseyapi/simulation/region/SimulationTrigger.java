@@ -2,9 +2,10 @@ package com.thunder.wildernessodysseyapi.simulation.region;
 
 /** Identifies why a region entered the optional orchestration queue. */
 public enum SimulationTrigger {
-    PLAYER_INTEREST(0),
-    EXPLICIT_REQUEST(1),
-    WORLD_DISTURBANCE(2);
+    SYSTEM_RELEVANCE(0),
+    PLAYER_INTEREST(1),
+    EXPLICIT_REQUEST(2),
+    WORLD_DISTURBANCE(3);
 
     private final int urgency;
 

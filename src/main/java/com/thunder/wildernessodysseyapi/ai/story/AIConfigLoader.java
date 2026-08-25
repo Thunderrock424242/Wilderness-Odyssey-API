@@ -101,7 +101,13 @@ public final class AIConfigLoader {
         config.getSettings().setVoiceEnabled(readBoolean(settings.get("voice_enabled")));
         config.getSettings().setSpeechRecognition(readBoolean(settings.get("speech_recognition")));
         config.getSettings().setWakeWord(readStringValue(settings.get("wake_word")));
+        config.getSettings().setProvider(readStringValue(settings.get("provider")));
+        config.getSettings().setEndpoint(readStringValue(settings.get("endpoint")));
         config.getSettings().setModel(readStringValue(settings.get("model")));
+        config.getSettings().setRequestTimeoutSeconds(readInteger(settings.get("request_timeout_seconds")));
+        config.getSettings().setMaxHistoryMessages(readInteger(settings.get("max_history_messages")));
+        config.getSettings().setMaxResponseCharacters(readInteger(settings.get("max_response_characters")));
+        config.getSettings().setMaxOutputTokens(readInteger(settings.get("max_output_tokens")));
 
         Map<String, Object> onboarding = readStringObjectMap(root.get("onboarding"));
         config.getOnboarding().setEnabled(readBoolean(onboarding.get("enabled")));

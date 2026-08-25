@@ -9,6 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Covers the per-axis structure size guard used by the custom template loader. */
 class LargeStructurePlacementOptimizerTest {
+    private static final int STARTER_BUNKER_BLOCKS = 2_171_624;
+    private static final int STARTER_BUNKER_ENTITIES = 68;
+    private static final long STARTER_BUNKER_ACCOUNTED_NBT_BYTES = 541_918_092L;
 
     @Test
     void acceptsLargeVolumeWhenEveryAxisIsWithinTheSupportedSpan() {
@@ -35,6 +38,22 @@ class LargeStructurePlacementOptimizerTest {
                 LargeStructurePlacementOptimizer.MAX_TEMPLATE_BLOCKS + 1, 0));
         assertFalse(LargeStructurePlacementOptimizer.isWithinContentBudget(
                 0, LargeStructurePlacementOptimizer.MAX_TEMPLATE_ENTITIES + 1));
+    }
+
+    @Test
+    void acceptsTrackedStarterBunkerOnlyWithinItsMeasuredAllowance() {
+        assertFalse(LargeStructurePlacementOptimizer.isWithinContentBudget(
+                STARTER_BUNKER_BLOCKS, STARTER_BUNKER_ENTITIES));
+        assertTrue(LargeStructurePlacementOptimizer.isWithinContentBudget(
+                STARTER_BUNKER_BLOCKS,
+                STARTER_BUNKER_ENTITIES,
+                NBTStructurePlacer.STARTER_BUNKER_MAX_TEMPLATE_BLOCKS));
+        assertFalse(LargeStructurePlacementOptimizer.isWithinContentBudget(
+                NBTStructurePlacer.STARTER_BUNKER_MAX_TEMPLATE_BLOCKS + 1,
+                STARTER_BUNKER_ENTITIES,
+                NBTStructurePlacer.STARTER_BUNKER_MAX_TEMPLATE_BLOCKS));
+        assertTrue(STARTER_BUNKER_ACCOUNTED_NBT_BYTES
+                <= NBTStructurePlacer.STARTER_BUNKER_MAX_DECODED_NBT_BYTES);
     }
 
     @Test

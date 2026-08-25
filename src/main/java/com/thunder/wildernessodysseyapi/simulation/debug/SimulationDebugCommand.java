@@ -3,8 +3,10 @@ package com.thunder.wildernessodysseyapi.simulation.debug;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import com.thunder.wildernessodysseyapi.environment.api.EnvironmentServices;
+import com.thunder.wildernessodysseyapi.ecosystem.debug.map.EcosystemDebugMapService;
 import com.thunder.wildernessodysseyapi.simulation.api.SimulationServices;
 import com.thunder.wildernessodysseyapi.simulation.integration.EcosystemSimulationBridge;
+import com.thunder.wildernessodysseyapi.simulation.integration.PopulationEcologySimulationSystem;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -18,7 +20,7 @@ public final class SimulationDebugCommand {
     private SimulationDebugCommand() {
     }
 
-    /** Registers {@code /wo simulation status|region}. */
+    /** Registers {@code /wo simulation status|region|population|map}. */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("wo")
                 .requires(source -> source.hasPermission(2))
@@ -26,7 +28,11 @@ public final class SimulationDebugCommand {
                         .then(Commands.literal("status")
                                 .executes(SimulationDebugCommand::status))
                         .then(Commands.literal("region")
-                                .executes(SimulationDebugCommand::region))));
+                                .executes(SimulationDebugCommand::region))
+                        .then(Commands.literal("population")
+                                .executes(SimulationDebugCommand::population))
+                        .then(Commands.literal("map")
+                                .executes(SimulationDebugCommand::map))));
     }
 
     private static int status(CommandContext<CommandSourceStack> context) {
@@ -95,5 +101,37 @@ public final class SimulationDebugCommand {
                 environment.influence().overallHazard()
         )), false);
         return 1;
+    }
+
+    private static int population(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        PopulationEcologySimulationSystem.Diagnostics diagnostics = PopulationEcologySimulationSystem.get()
+                .diagnostics(source.getLevel());
+        source.sendSuccess(() -> Component.literal(
+                "WO population ecology enabled=" + diagnostics.enabled()
+                        + " interval=" + diagnostics.updateIntervalTicks()
+                        + " carryingCapacity=" + diagnostics.regionalCarryingCapacity()
+                        + " inFlight=" + diagnostics.inFlight()
+                        + " lastApply=" + diagnostics.lastApplyGameTime()
+        ), false);
+        source.sendSuccess(() -> Component.literal(
+                "  regions requested/rejected=" + diagnostics.regionRequests()
+                        + "/" + diagnostics.regionRequestRejections()
+                        + " batches submitted/rejected/applied/discarded/timeout="
+                        + diagnostics.submittedBatches() + "/" + diagnostics.rejectedBatches()
+                        + "/" + diagnostics.appliedBatches() + "/" + diagnostics.discardedBatches()
+                        + "/" + diagnostics.timedOutSubmissions()
+        ), false);
+        source.sendSuccess(() -> Component.literal(
+                "  groups applied/stale=" + diagnostics.appliedGroups() + "/" + diagnostics.staleGroups()
+                        + " animals added/removed=" + diagnostics.animalsAdded()
+                        + "/" + diagnostics.animalsRemoved()
+        ), false);
+        return 1;
+    }
+
+    private static int map(CommandContext<CommandSourceStack> context)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        return EcosystemDebugMapService.open(context.getSource().getPlayerOrException()) ? 1 : 0;
     }
 }

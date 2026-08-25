@@ -21,6 +21,7 @@ import com.thunder.wildernessodysseyapi.network.ModPayloads;
 import com.thunder.wildernessodysseyapi.performance.tickengine.PerformanceServerEvents;
 import com.thunder.wildernessodysseyapi.radiation.RadiationTickHandler;
 import com.thunder.wildernessodysseyapi.server.ServerLifecycleEvents;
+import com.thunder.wildernessodysseyapi.simulation.integration.PopulationEcologySimulationSystem;
 import com.thunder.wildernessodysseyapi.structuregen.content.StructureBlockCatalogSnapshotProvider;
 import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryReporter;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryReporter;
@@ -80,6 +81,7 @@ public final class WildernessOdysseyAPIMainModClass {
 
         ModRegistries.register(modEventBus);
         ModConfigRegistration.register(container);
+        PopulationEcologySimulationSystem.bootstrap();
         SurvivalWeatherIntegrations.bootstrap();
         registerGameEventHandlers();
         RadiationTickHandler.register();

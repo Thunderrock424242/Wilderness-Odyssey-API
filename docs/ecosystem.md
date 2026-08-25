@@ -36,11 +36,11 @@ The default bands are intentionally not four equal rings:
 | `ACTIVE` | through 96 blocks | Real wildlife, normal ecosystem decision frequency, full vanilla AI. |
 | `NEAR` | through 224 blocks | Real wildlife and normal behavior choices, with ecosystem environment evaluations slowed by `farAnimalUpdateMultiplier`. |
 | `DISTANT` | through 512 blocks | Eligible wildlife is gradually moved into the population ledger; individual ecosystem AI is not evaluated. Groups keep coarse position, migration, and environmental state. |
-| `DORMANT` | beyond 512 blocks or without a relevant player | Only known abstract groups remain. They do no routine population work and catch up analytically when relevant again. |
+| `DORMANT` | beyond 512 blocks or without a relevant player | Only known abstract groups remain. Optional daily population work is requested from the bounded group ledger and catches up analytically when admitted. |
 
 Distances are measured to the closest point on a cell's horizontal footprint, so a cell touching a nearer band is conservatively promoted. Hand-edited radii are normalized into increasing bands at runtime. The 224-block `NEAR` default leaves a wider stability band than the conceptual 192-block example and avoids churn around the distant-wildlife transition while players fly quickly.
 
-`DistantWildlifeSavedData` remains the only persistent population authority. Each group records species population, group identity, migration direction, food availability, water availability, food pressure, disturbance, weather impact, and the game time of the last population calculation. Catch-up is one bounded formula over elapsed Minecraft days; three unloaded days do not become 72,000 simulated ticks. Weather, public `WaterServices`, persistent environmental memory, migrations, herds, seasons, wildfire, and the client distant-representation layer therefore meet at coarse snapshots without creating a second population count.
+`DistantWildlifeSavedData` remains the only persistent population authority. Each group records species population, a bounded fractional population remainder, group identity, migration direction, food availability, water availability, food pressure, disturbance, weather impact, and the game time of the last population calculation. `PopulationEcologySimulationSystem` derives carrying pressure from immutable ecosystem/environment snapshots, computes through the existing Data Engine, and lets the ledger revalidate and commit on the server thread. Catch-up is one bounded formula over elapsed Minecraft days; three unloaded days do not become 72,000 simulated ticks. Weather, public `WaterServices`, persistent environmental memory, migrations, herds, seasons, wildfire, and the client distant-representation layer therefore meet at coarse snapshots without creating a second population count.
 
 Transitions are deliberately gradual. `entityTransitionRate` bounds materialization in each dimension tick and absorption in each infrequent population scan, and materialization decrements population only after a loaded, habitat-valid entity was successfully added. Abstraction never removes named, tamed, vanilla-persistent, custom-persistent, mounted, ridden, leashed, combat-active, player-targeting, or externally `NoAI` wildlife. Mods and data packs can also add entity types to `#wildernessodysseyapi:ecosystem/never_abstract`. Babies, breeding animals, injured animals, scoreboard-tagged animals, and recently materialized animals receive additional transition vetoes.
 
@@ -297,7 +297,7 @@ All sections and fields have safe defaults. Radius fields are still capped by th
 
 Distant wildlife is a lightweight visual form of the same ecosystem population, not a second spawn system. A represented animal has one owner at a time: either a real `PathfinderMob` in a loaded level or a count inside dimension-scoped `DistantWildlifeSavedData`. `DistantWildlifeManager` commits conversions between those forms, while `EcosystemSimulationManager` supplies the nearest-player simulation zone and the shared `EcosystemEntitySafety` policy vetoes named, tamed, persistent, tagged, mounted, leashed, combat-active, or externally frozen animals.
 
-One `DistantWildlifeGroup` stores a species ID, population estimate, anchor, normalized movement direction, speed, deterministic seed, and reference game time. It also stores coarse food, water, disturbance, weather, and population-update state. Movement is calculated analytically from the anchor and elapsed time, and dormant population pressure is advanced lazily, so the server never creates a pathfinder, collision body, goal selector, or tick object for every represented animal.
+One `DistantWildlifeGroup` stores a species ID, population estimate, fractional analytical remainder, anchor, normalized movement direction, speed, deterministic seed, and reference game time. It also stores coarse food, water, disturbance, weather, and population-update state. Movement is calculated analytically from the anchor and elapsed time, and dormant population pressure is advanced lazily, so the server never creates a pathfinder, collision body, goal selector, or tick object for every represented animal.
 
 The default LOD contract is:
 
@@ -306,7 +306,7 @@ The default LOD contract is:
 - Beyond the transition band and inside `distantWildlifeDistance` (512 blocks), the client renders distant groups.
 - The final transition buffer fades the silhouettes out before the maximum distance. Beyond it the population remains abstract and is not sent to that player.
 
-These values are server config, not renderer constants. The `distantWildlife` section contains `enableDistantWildlife`, `realEntityDistance`, `distantWildlifeDistance`, `maxDistantGroups`, `maxRepresentedAnimals`, `updateInterval`, and `transitionBuffer`. The simulation-zone `entityTransitionRate` separately bounds materialization per dimension tick and absorption per infrequent population scan.
+These values are server config, not renderer constants. The `distantWildlife` section contains `enableDistantWildlife`, `realEntityDistance`, `distantWildlifeDistance`, `maxDistantGroups`, `maxRepresentedAnimals`, `updateInterval`, and `transitionBuffer`. Its nested `populationEcology` category contains `enabled`, `updateIntervalTicks` (24,000 by default), and `regionalCarryingCapacity` (96 by default). The simulation-zone `entityTransitionRate` separately bounds materialization per dimension tick and absorption per infrequent population scan.
 
 ### Rendering and synchronization
 
@@ -355,7 +355,9 @@ Diagnostics are disabled by default. After enabling `debugCommandsEnabled`, oper
 - `/woecosystem memory` for the executing player's cell disturbance, activity channels, last update, elapsed decay, source kind/position/entity, and dimension-local stored-cell count.
 - `/woecosystem memory <x> <y> <z>` for the same information at a loaded position.
 - `/woecosystem memory clear` to remove the executing player's current chunk cell.
-- `/woecosystem distant` for distant groups, represented population, actual entities avoided, LOD state, transition distances, update frequency, and recent conversion/packet work.
+- `/woecosystem distant` for distant groups, represented population/remainder/reference time, actual entities avoided, LOD state, transition distances, update frequency, and recent conversion/packet work.
+- `/wo simulation population` for population-region requests, async batches, stale validation, additions/removals, in-flight work, cadence, and regional carrying capacity.
+- `/wo simulation map` for a bounded, on-demand 17 by 17 regional view of abstract groups, population, simulation LOD, food, water, food pressure, disturbance, weather impact, and migration direction. The same read-only map is available from the Development Studio Ecosystem page.
 
 When `debugCommandsEnabled` is true, the existing categorized F3 **World** page also shows the current chunk's server-owned environmental-memory snapshot. Synchronization is limited to one small current-cell packet per player per second and is completely absent while diagnostics are disabled.
 
@@ -366,11 +368,11 @@ When `debugCommandsEnabled` is true, the existing categorized F3 **World** page 
 - Shelter discovery recognizes standable positions with overhead collision. It does not yet understand claimed structures, doors, or species-specific nests.
 - Herds now have transient same-entity-type identity and elected loaded leaders. Cross-species groups, persistent migration routes, home ranges, breeding pressure, and genetics remain future layers.
 - Individual animal threat targets remain transient. Regional environmental disturbance is a separate persistent signal and survives server restart through per-dimension `SavedData`.
-- Predator population safeguards are local, not a global ecology census. Long-term population accounting should use a separate chunk-level sampling system rather than entity NBT.
+- Predator hunting safeguards still inspect nearby loaded prey; they do not yet consume the abstract regional ecology counts or simulate a predator/prey food web.
 - Visual behavior still needs development-client observation around irregular shorelines, dense canopies, fences, and modded navigation implementations.
 - Automatic predator detection recognizes the standard `NearestAttackableTargetGoal`. A mod that hides predation in a custom goal requires an explicit `predator` assignment; a non-predator using that goal should be assigned `animal` or `disabled` explicitly.
 - Fire activity currently records successful Wilderness weather wildfire ignition, not every vanilla fire-spread block. Guns, vehicles, machine operation, large-player-group weighting, and other loud-event publishers are intentionally left for later integrations through `DisturbanceSource` and `EnvironmentalMemoryManager`.
-- Abstract population currently uses bounded pressure-driven growth or decline per species group rather than breeding pairs, genetics, predation networks, or a global carrying-capacity solver. The stored fields and snapshot API are intended integration points for those later models.
+- Abstract population uses bounded regional carrying pressure and pressure-driven growth or decline per species group rather than breeding pairs, genetics, predation networks, or a global carrying-capacity solver. The stored fields and snapshot API are intended integration points for those later models.
 - Materialization requires an already-loaded, obstruction-free, habitat-valid spawn position. A failed placement leaves population abstract and retries on a later bounded pass; the zone manager never force-loads a chunk to create wildlife.
 
 ## Manual simulation-zone test matrix
@@ -381,3 +383,9 @@ When `debugCommandsEnabled` is true, the existing categorized F3 **World** page 
 4. Stop the dedicated server with real wildlife waiting in a distant transition and with abstract groups in unloaded chunks. Restart, revisit both areas, and confirm zone-owned `NoAI` state is restored safely and abstract population catches up once from elapsed game time.
 5. Name, tame, leash, ride, damage, breed, command-tag, or data-pack-tag representative animals and move all players away. Confirm every protected individual remains a real entity. Also test an entity that another mod marks persistent or keeps `NoAI`.
 6. Temporarily disable `simulationZonesEnabled` and `enableDistantWildlife` independently. Confirm zone-owned AI suspension is released and no new abstraction occurs. Re-enable each setting and verify gradual transitions resume.
+7. With at least one abstract group, temporarily lower `populationEcology.updateIntervalTicks` to 1,200 and run `/wo simulation population`. Confirm requested, submitted, and applied counters advance while in-flight work returns to zero.
+8. Compare `/woecosystem distant` before and after several ecology intervals in a productive region and in a high-disturbance or overcrowded region. Confirm population changes are gradual, each group stays between 1 and 64, and the dimension total never exceeds `maxRepresentedAnimals`.
+9. Materialize or absorb a group while an ecology batch is pending. Confirm the owner reports a stale group rather than overwriting the newer real/abstract transition, and that a later bounded pass retries normally.
+10. Save and restart after a fractional update, then advance several intervals. Confirm the population reference and fractional remainder persist, catch-up happens once, and two overlapping players do not duplicate the regional update.
+11. Run `/wo simulation map` and cycle every layer. Confirm the center marker follows the requesting player, LOD bands match configured distances, each abstract group appears in exactly one cell, cell totals match `/woecosystem distant`, and hover/click details show the same population and pressure values.
+12. Open the same map from Development Studio's Ecosystem page, move across a cell boundary, and use Refresh. Confirm the map recenters only on request, does not keep sending packets while left open, and does not create chunk tickets or materialize wildlife.

@@ -78,7 +78,7 @@
   "screen.wildernessodysseyapi.studio.module.locations": "Persistent world bookmarks and registered campus destinations.",
   "screen.wildernessodysseyapi.studio.module.structures": "Bounded structure previews, exact lab placement, and persisted pad resets.",
   "screen.wildernessodysseyapi.studio.module.entities": "Allowlisted tagged entity spawning and scoped lab controls.",
-  "screen.wildernessodysseyapi.studio.module.ecosystem": "Bounded inspection of real profiled animals, needs state, and update budgets.",
+  "screen.wildernessodysseyapi.studio.module.ecosystem": "Bounded inspection of real and abstract wildlife, regional pressures, and the animal ecosystem map.",
   "screen.wildernessodysseyapi.studio.module.weather": "Real local Weather authority inspection and bounded 3x3-cell experiments.",
   "screen.wildernessodysseyapi.studio.module.water": "Real custom-water authority, generated spans, watershed state, and diagnostics.",
   "screen.wildernessodysseyapi.studio.module.worldgen": "Current loaded chunk, biome, generator, height, and structure inspection.",

@@ -1,10 +1,13 @@
 package com.thunder.wildernessodysseyapi.ai.story;
 
 import com.thunder.wildernessodysseyapi.ai.perf.MemoryStore;
+import com.thunder.wildernessodysseyapi.ai.story.provider.OllamaChatClient;
+import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 import net.minecraft.server.MinecraftServer;
@@ -23,6 +26,7 @@ public class AIClient {
     private final AIKnowledgeStore knowledgeStore = new AIKnowledgeStore();
     private final AIOnboardingStore onboardingStore = new AIOnboardingStore();
     private final AIFallbackResponder fallbackResponder = new AIFallbackResponder();
+    private final OllamaChatClient ollamaChatClient = new OllamaChatClient();
     private boolean onboardingEnabled;
     private String onboardingCompletionMessage = "You're all set. You can ask me anything now.";
     private String onboardingInvalidChoiceMessage = "Pick one of the numbered options so I can guide you.";
@@ -67,10 +71,10 @@ public class AIClient {
     }
 
     public synchronized void scanGameData(MinecraftServer server) {
-        if (server == null) {
+        if (!AIChatAccessPolicy.isAvailable(server) || !settings.isOllamaEnabled()) {
             return;
         }
-        // Crafting assistance is intentionally disabled; leave this hook for future non-recipe scans.
+        AsyncTaskManager.trySubmitIoWork("Aether_Ollama_Warmup", () -> ollamaChatClient.warmUp(settings));
     }
 
     private void applySettings(AIConfig config) {
@@ -90,8 +94,26 @@ public class AIClient {
         if (configSettings.getWakeWord() != null) {
             settings.setWakeWord(configSettings.getWakeWord());
         }
+        if (configSettings.getProvider() != null) {
+            settings.setProvider(configSettings.getProvider());
+        }
+        if (configSettings.getEndpoint() != null) {
+            settings.setEndpoint(configSettings.getEndpoint());
+        }
         if (configSettings.getModel() != null) {
             settings.setModelName(configSettings.getModel());
+        }
+        if (configSettings.getRequestTimeoutSeconds() != null) {
+            settings.setRequestTimeoutSeconds(configSettings.getRequestTimeoutSeconds());
+        }
+        if (configSettings.getMaxHistoryMessages() != null) {
+            settings.setMaxHistoryMessages(configSettings.getMaxHistoryMessages());
+        }
+        if (configSettings.getMaxResponseCharacters() != null) {
+            settings.setMaxResponseCharacters(configSettings.getMaxResponseCharacters());
+        }
+        if (configSettings.getMaxOutputTokens() != null) {
+            settings.setMaxOutputTokens(configSettings.getMaxOutputTokens());
         }
 
         AIConfig.Personality personality = config.getPersonality();
@@ -158,7 +180,10 @@ public class AIClient {
         }
         AIFallbackResponder.ResponseContext safeResponseContext =
                 responseContext == null ? AIFallbackResponder.ResponseContext.empty() : responseContext;
-        String speaker = resolveSpeaker(message);
+        Optional<AIFallbackResponder.FallbackReply> authoredReply =
+                fallbackResponder.buildReply(message, safeResponseContext);
+        String speaker = authoredReply.map(AIFallbackResponder.FallbackReply::speaker)
+                .orElseGet(() -> resolveSpeaker(message));
         String learnedFact = knowledgeStore.extractLearnedFact(message);
         if (learnedFact != null) {
             boolean added = knowledgeStore.addFact(learnedFact);
@@ -175,12 +200,52 @@ public class AIClient {
             memoryStore.addAiMessage(world, player, speaker, reply);
             return voiceIntegration.wrap(speaker, reply);
         }
-        var deterministicFallback = fallbackResponder.buildReply(message, safeResponseContext);
-        String reply = deterministicFallback.map(AIFallbackResponder.FallbackReply::text)
+
+        if (authoredReply.map(AIFallbackResponder.FallbackReply::menu).orElse(false)) {
+            String menu = authoredReply.get().text();
+            memoryStore.addAiMessage(world, player, speaker, menu);
+            return voiceIntegration.wrap(speaker, menu);
+        }
+
+        if (settings.isOllamaEnabled()) {
+            String authoredReference = authoredReply
+                    .filter(AIFallbackResponder.FallbackReply::knownIntent)
+                    .map(AIFallbackResponder.FallbackReply::text)
+                    .orElse("");
+            String systemPrompt = AetherSystemPrompt.build(
+                    settings,
+                    story,
+                    backgroundHistory,
+                    corruptedLore,
+                    speaker,
+                    safeResponseContext,
+                    knowledgeContext,
+                    authoredReference
+            );
+            List<MemoryStore.ConversationMessage> history = memoryStore.getRecentMessages(
+                    world,
+                    player,
+                    settings.getMaxHistoryMessages()
+            );
+            OllamaChatClient.ModelResponse modelResponse = ollamaChatClient.generate(
+                    settings,
+                    systemPrompt,
+                    speaker,
+                    history
+            );
+            if (modelResponse.successful()) {
+                memoryStore.addAiMessage(world, player, speaker, modelResponse.text());
+                return voiceIntegration.wrap(speaker, modelResponse.text());
+            }
+        }
+
+        String reply = authoredReply.map(AIFallbackResponder.FallbackReply::text)
                 .orElse("Archive gap detected. I do not have a recovered answer for that yet.");
-        String replySpeaker = deterministicFallback.map(AIFallbackResponder.FallbackReply::speaker).orElse(speaker);
-        memoryStore.addAiMessage(world, player, replySpeaker, reply);
-        return voiceIntegration.wrap(replySpeaker, reply);
+        if (settings.isOllamaEnabled()) {
+            reply = fallbackResponder.appendUnavailableHint(reply);
+        }
+        memoryStore.addAiMessage(world, player, speaker, reply);
+        return voiceIntegration.wrap(speaker, reply);
     }
 
     public String handleOnboarding(UUID playerId, String message) {

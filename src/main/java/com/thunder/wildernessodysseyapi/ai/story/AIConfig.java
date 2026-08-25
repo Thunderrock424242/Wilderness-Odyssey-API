@@ -88,7 +88,13 @@ public class AIConfig {
         private Boolean voiceEnabled;
         private Boolean speechRecognition;
         private String wakeWord;
+        private String provider;
+        private String endpoint;
         private String model;
+        private Integer requestTimeoutSeconds;
+        private Integer maxHistoryMessages;
+        private Integer maxResponseCharacters;
+        private Integer maxOutputTokens;
 
         public Boolean getAtlasEnabled() {
             return atlasEnabled;
@@ -122,12 +128,60 @@ public class AIConfig {
             this.wakeWord = wakeWord;
         }
 
+        public String getProvider() {
+            return provider;
+        }
+
+        public void setProvider(String provider) {
+            this.provider = provider;
+        }
+
+        public String getEndpoint() {
+            return endpoint;
+        }
+
+        public void setEndpoint(String endpoint) {
+            this.endpoint = endpoint;
+        }
+
         public String getModel() {
             return model;
         }
 
         public void setModel(String model) {
             this.model = model;
+        }
+
+        public Integer getRequestTimeoutSeconds() {
+            return requestTimeoutSeconds;
+        }
+
+        public void setRequestTimeoutSeconds(Integer requestTimeoutSeconds) {
+            this.requestTimeoutSeconds = requestTimeoutSeconds;
+        }
+
+        public Integer getMaxHistoryMessages() {
+            return maxHistoryMessages;
+        }
+
+        public void setMaxHistoryMessages(Integer maxHistoryMessages) {
+            this.maxHistoryMessages = maxHistoryMessages;
+        }
+
+        public Integer getMaxResponseCharacters() {
+            return maxResponseCharacters;
+        }
+
+        public void setMaxResponseCharacters(Integer maxResponseCharacters) {
+            this.maxResponseCharacters = maxResponseCharacters;
+        }
+
+        public Integer getMaxOutputTokens() {
+            return maxOutputTokens;
+        }
+
+        public void setMaxOutputTokens(Integer maxOutputTokens) {
+            this.maxOutputTokens = maxOutputTokens;
         }
     }
 

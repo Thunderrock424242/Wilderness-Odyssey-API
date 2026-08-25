@@ -103,5 +103,9 @@ class WildernessConfigSpecsTest {
                 List.of("ecosystem", "enabled"),
                 EcosystemConfig.ENABLED.getPath()
         );
+        assertEquals(
+                List.of("ecosystem", "distantWildlife", "populationEcology", "regionalCarryingCapacity"),
+                EcosystemConfig.REGIONAL_CARRYING_CAPACITY.getPath()
+        );
     }
 }

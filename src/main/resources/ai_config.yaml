@@ -18,13 +18,19 @@ settings:
   voice_enabled: false
   speech_recognition: false
   wake_word: "aether"
-  model: "scripted-intent-engine"
+  provider: "ollama"
+  endpoint: "http://127.0.0.1:11434"
+  model: "llama3.2:latest"
+  request_timeout_seconds: 15
+  max_history_messages: 12
+  max_response_characters: 800
+  max_output_tokens: 180
 
 fallback:
   enabled: true
   minimum_keyword_matches: 2
   menu_prompt: "A.E.T.H.E.R recovered intent prompts:"
-  unavailable_hint: "Aether is running scripted recovered-intent mode. Say Aether, then ask about a recovered topic or choose Aegis, Eclipse, Terra, Helios, Enforcer, or Requiem."
+  unavailable_hint: "The local intelligence link is offline, so scripted recovered-intent mode is active. You can still ask about a recovered topic or choose Aegis, Eclipse, Terra, Helios, Enforcer, or Requiem."
   unknown_responses:
     - "I do not have enough recovered data for that request."
     - "Archive gap detected. Give me a location, recovered record, or subsystem."
