@@ -105,6 +105,28 @@ public final class EcosystemSimulationManager {
         );
     }
 
+    /**
+     * Classifies one position for a bounded diagnostic view without retaining
+     * an otherwise-empty ecosystem cell.
+     *
+     * <p>This server-thread method uses the manager's current connected-player
+     * points, initializing them once when necessary, then applies the same owner
+     * policy as normal cell classification. It does not inspect entities, load
+     * chunks, or add the sampled cell to the relevance cache.</p>
+     */
+    public WildlifeSimulationLod previewSimulationLevel(ServerLevel level, BlockPos position) {
+        EcosystemSimulationSettings settings = EcosystemSimulationSettings.fromConfig();
+        if (!settings.enabled()) {
+            return WildlifeSimulationLod.ACTIVE;
+        }
+        LevelRuntime runtime = runtime(level);
+        if (!runtime.playersInitialized) {
+            refreshPlayers(level, runtime, settings);
+        }
+        EcosystemCellKey key = EcosystemCellKey.fromBlock(position, settings.cellSize());
+        return EcosystemZoneClassifier.classifyCell(key, runtime.players, settings);
+    }
+
     /** Returns whether the cell uses the complete individual ecosystem behavior layer. */
     public boolean isFullySimulated(ServerLevel level, BlockPos position) {
         return getSimulationLevel(level, position) == WildlifeSimulationLod.ACTIVE;

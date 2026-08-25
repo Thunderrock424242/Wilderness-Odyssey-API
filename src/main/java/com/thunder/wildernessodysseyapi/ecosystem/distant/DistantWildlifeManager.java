@@ -9,7 +9,6 @@ import com.thunder.wildernessodysseyapi.ecosystem.distant.network.DistantWildlif
 import com.thunder.wildernessodysseyapi.ecosystem.integration.EcosystemPerformanceIntegration;
 import com.thunder.wildernessodysseyapi.ecosystem.memory.EnvironmentalMemoryManager;
 import com.thunder.wildernessodysseyapi.ecosystem.service.EcosystemServices;
-import com.thunder.wildernessodysseyapi.ecosystem.simulation.AbstractEcosystemModel;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemEntitySafety;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationSettings;
@@ -83,7 +82,7 @@ public final class DistantWildlifeManager {
 
         for (ServerLevel level : server.getAllLevels()) {
             RuntimeState runtime = runtime(level);
-            boolean populationUpdateDue = intervalElapsed(
+            boolean groupUpdateDue = intervalElapsed(
                     serverTick,
                     runtime.lastPopulationUpdateTick,
                     settings.updateInterval()
@@ -106,7 +105,7 @@ public final class DistantWildlifeManager {
                     runtime.transitionSyncDirty = true;
                 }
                 if (runtime.transitionSyncDirty
-                        && !populationUpdateDue
+                        && !groupUpdateDue
                         && intervalElapsed(
                                 serverTick,
                                 runtime.lastTransitionSyncTick,
@@ -123,7 +122,7 @@ public final class DistantWildlifeManager {
                 );
             }
 
-            if (populationUpdateDue) {
+            if (groupUpdateDue) {
                 runtime.lastPopulationUpdateTick = serverTick;
                 if (settings.enabled()) {
                     updateEnabledLevel(level, settings);
@@ -147,6 +146,11 @@ public final class DistantWildlifeManager {
                 markPlayerDirty(player);
             }
         }
+    }
+
+    /** Requests a bounded corrective snapshot after an ecology-owned count change. */
+    public void markPopulationChanged(ServerLevel level) {
+        runtime(level).transitionSyncDirty = true;
     }
 
     /** Releases per-player state immediately after disconnect. */
@@ -340,7 +344,7 @@ public final class DistantWildlifeManager {
         return absorbed;
     }
 
-    // Evaluates time, weather, habitat, and disturbance once per whole group.
+    // Evaluates movement, weather, habitat, and disturbance once per whole group.
     private void advanceGroups(
             ServerLevel level,
             DistantWildlifeSavedData data,
@@ -373,34 +377,6 @@ public final class DistantWildlifeManager {
                             .map(memory -> memory.strongestActivity())
                             .orElse(0.0)
             );
-            if (gameTime - group.populationReferenceGameTime() >= AbstractEcosystemModel.TICKS_PER_DAY) {
-                var watershed = currentChunkLoaded ? regionalEnvironment.watershed() : null;
-                double waterAvailability = watershed == null
-                        ? group.waterAvailability()
-                        : regionalEnvironment.influence().waterAvailability();
-                double foodPressure = Math.min(1.0, group.populationEstimate() / 48.0);
-                double foodAvailability = Math.max(
-                        0.05,
-                        (1.0 - foodPressure * 0.70)
-                                * (0.55 + regionalEnvironment.influence().habitatProductivity() * 0.45)
-                );
-                double weatherImpact = regionalEnvironment.influence().overallHazard();
-                DistantWildlifeGroup advanced = group.withLazyPopulationUpdate(
-                        new AbstractEcosystemModel.Environment(
-                                foodAvailability,
-                                waterAvailability,
-                                foodPressure,
-                                disturbanceIntensity,
-                                weatherImpact
-                        ),
-                        gameTime
-                );
-                if (data.replace(advanced)) {
-                    group = advanced;
-                    current = group.positionAt(gameTime);
-                    currentPos = BlockPos.containing(current);
-                }
-            }
             double activityScale = DistantWildlifeActivityPolicy.movementScale(
                     group.nocturnal(),
                     level.getDayTime(),

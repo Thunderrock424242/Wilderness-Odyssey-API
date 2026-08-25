@@ -92,6 +92,9 @@ public final class EcosystemConfig {
     public static ModConfigSpec.IntValue MAX_REPRESENTED_ANIMALS;
     public static ModConfigSpec.IntValue DISTANT_WILDLIFE_UPDATE_INTERVAL;
     public static ModConfigSpec.IntValue TRANSITION_BUFFER;
+    public static ModConfigSpec.BooleanValue POPULATION_ECOLOGY_ENABLED;
+    public static ModConfigSpec.IntValue POPULATION_ECOLOGY_UPDATE_INTERVAL;
+    public static ModConfigSpec.IntValue REGIONAL_CARRYING_CAPACITY;
 
     private static volatile BehaviorTagRules cachedBehaviorTagRules = BehaviorTagRules.EMPTY;
     private static volatile Map<ResourceLocation, Double> cachedSpeciesMultipliers = Map.of();
@@ -331,6 +334,27 @@ public final class EcosystemConfig {
         TRANSITION_BUFFER = builder
                 .comment("Cross-fade and early-materialization band outside realEntityDistance, in blocks.")
                 .defineInRange("transitionBuffer", 32, 8, 256);
+
+        builder.comment(
+                "Analytical population ecology for persisted distant-wildlife groups.",
+                "This optional work is orchestrated by the Simulation Engine and never creates or loads entities."
+        ).push("populationEcology");
+        POPULATION_ECOLOGY_ENABLED = builder
+                .comment("Allow resource pressure and regional hazards to grow or reduce abstract group populations.")
+                .define("enabled", true);
+        POPULATION_ECOLOGY_UPDATE_INTERVAL = builder
+                .comment(
+                        "Minimum ticks between population calculations for a group.",
+                        "Elapsed time is applied analytically; missed ticks are never replayed in a loop."
+                )
+                .defineInRange("updateIntervalTicks", 24_000, 1_200, 1_728_000);
+        REGIONAL_CARRYING_CAPACITY = builder
+                .comment(
+                        "Baseline abstract animals supportable by one 64x64 ecosystem region.",
+                        "Habitat productivity and water availability reduce the effective capacity in poor regions."
+                )
+                .defineInRange("regionalCarryingCapacity", 96, 1, 4_096);
+        builder.pop();
         builder.pop();
 
         builder.pop();
@@ -396,6 +420,16 @@ public final class EcosystemConfig {
         );
     }
 
+    /** Returns one immutable snapshot for optional regional population ecology. */
+    public static PopulationEcologySettings populationEcologySettings() {
+        return new PopulationEcologySettings(
+                ENABLED.get() && ENABLE_DISTANT_WILDLIFE.get() && POPULATION_ECOLOGY_ENABLED.get(),
+                POPULATION_ECOLOGY_UPDATE_INTERVAL.get(),
+                REGIONAL_CARRYING_CAPACITY.get(),
+                MAX_REPRESENTED_ANIMALS.get()
+        );
+    }
+
     private static boolean isSpeciesOverride(Object value) {
         if (!(value instanceof String entry)) {
             return false;
@@ -425,6 +459,15 @@ public final class EcosystemConfig {
             int maximumRepresentedAnimals,
             int updateInterval,
             int transitionBuffer
+    ) {
+    }
+
+    /** Immutable population limits captured before optional worker computation. */
+    public record PopulationEcologySettings(
+            boolean enabled,
+            int updateIntervalTicks,
+            int regionalCarryingCapacity,
+            int maximumRepresentedAnimals
     ) {
     }
 }

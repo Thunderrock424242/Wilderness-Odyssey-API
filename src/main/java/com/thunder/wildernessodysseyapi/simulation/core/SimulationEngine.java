@@ -253,6 +253,7 @@ public final class SimulationEngine {
             }
 
             lastPassTick = currentTick;
+            queueSystemRegions(currentServer);
             queuePlayerRegions(currentServer);
             int maximumRegions = regionLimit(TickEngine.pressure());
             if (maximumRegions == 0) {
@@ -269,6 +270,18 @@ public final class SimulationEngine {
             TickEngine.metrics().recordExecution(TICK_SUBSYSTEM_ID, lastPassNanos, currentTick);
             processedRegions += report.processedRegions();
         }
+    }
+
+    private void queueSystemRegions(MinecraftServer currentServer) {
+        registry.collectRegions(
+                currentServer,
+                (level, position) -> requestRegion(
+                        level,
+                        position,
+                        SimulationTrigger.SYSTEM_RELEVANCE
+                ),
+                this::recordFailure
+        );
     }
 
     private void queuePlayerRegions(MinecraftServer currentServer) {

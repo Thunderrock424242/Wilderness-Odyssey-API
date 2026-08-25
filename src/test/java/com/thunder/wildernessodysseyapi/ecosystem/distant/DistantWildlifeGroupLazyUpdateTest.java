@@ -41,6 +41,7 @@ class DistantWildlifeGroupLazyUpdateTest {
         );
 
         assertEquals(original.populationReferenceGameTime(), moved.populationReferenceGameTime());
+        assertEquals(original.populationRemainder(), moved.populationRemainder());
         assertEquals(original.foodAvailability(), moved.foodAvailability());
         assertEquals(original.waterAvailability(), moved.waterAvailability());
     }

@@ -27,6 +27,16 @@ public interface SimulationSystem {
     }
 
     /**
+     * Publishes bounded regions already known to this participant's owner.
+     *
+     * <p>This hook runs on the logical server thread before a regional pass.
+     * Implementations must use existing bounded indexes or ledgers; they must
+     * never scan the world, enumerate unloaded chunks, or force chunk loads.</p>
+     */
+    default void collectRegions(MinecraftServer server, SimulationRegionCollector collector) {
+    }
+
+    /**
      * Performs one bounded server-thread update for the supplied region.
      *
      * <p>Expensive pure computation should submit

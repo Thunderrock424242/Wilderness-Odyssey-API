@@ -147,6 +147,8 @@ public final class EcosystemDebugCommand {
                     "  #" + group.id()
                             + " " + group.species()
                             + " population=" + group.populationEstimate()
+                            + " remainder=" + number(group.populationRemainder())
+                            + " populationRef=" + group.populationReferenceGameTime()
                             + " pos=" + number(position.x) + "," + number(position.y) + "," + number(position.z)
                             + " speed=" + number(group.speed())
                             + " form=" + group.form()

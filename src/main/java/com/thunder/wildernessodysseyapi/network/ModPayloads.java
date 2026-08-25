@@ -14,6 +14,10 @@ import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioStructur
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEntityActionPayload;
 import com.thunder.wildernessodysseyapi.dataengine.network.DataEnginePayloads;
 import com.thunder.wildernessodysseyapi.ecosystem.client.EnvironmentalMemoryClientState;
+import com.thunder.wildernessodysseyapi.ecosystem.debug.map.EcosystemDebugMapPayload;
+import com.thunder.wildernessodysseyapi.ecosystem.debug.map.EcosystemDebugMapRequestPayload;
+import com.thunder.wildernessodysseyapi.ecosystem.debug.map.EcosystemDebugMapService;
+import com.thunder.wildernessodysseyapi.ecosystem.debug.map.client.EcosystemDebugMapClientState;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.client.ClientDistantWildlifeState;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.network.DistantWildlifeSyncPayload;
 import com.thunder.wildernessodysseyapi.ecosystem.network.EnvironmentalMemoryDebugPayload;
@@ -57,7 +61,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class ModPayloads {
 
     // Phase 4 adds the required reactive-vegetation Data Engine handler.
-    private static final String NETWORK_VERSION = "22";
+    private static final String NETWORK_VERSION = "23";
 
     private ModPayloads() {
     }
@@ -161,6 +165,21 @@ public final class ModPayloads {
                 EnvironmentalMemoryDebugPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() ->
                         EnvironmentalMemoryClientState.accept(payload))
+        );
+        registrar.playToServer(
+                EcosystemDebugMapRequestPayload.TYPE,
+                EcosystemDebugMapRequestPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer serverPlayer) {
+                        EcosystemDebugMapService.open(serverPlayer);
+                    }
+                })
+        );
+        registrar.playToClient(
+                EcosystemDebugMapPayload.TYPE,
+                EcosystemDebugMapPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        EcosystemDebugMapClientState.accept(payload))
         );
         registrar.playToClient(
                 EnvironmentSyncPayload.TYPE,

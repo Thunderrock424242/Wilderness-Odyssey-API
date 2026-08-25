@@ -55,6 +55,10 @@ import net.neoforged.fml.ModList;
 public class NBTStructurePlacer {
     private static final long MAX_COMPRESSED_TEMPLATE_BYTES = 16L * 1024L * 1024L;
     private static final long MAX_DECODED_NBT_BYTES = 64L * 1024L * 1024L;
+    // The immutable starter bunker fixture accounts for 541,918,092 decoded NBT bytes and
+    // 2,171,624 block records. Keep its bounded allowance local to this trusted built-in ID.
+    static final long STARTER_BUNKER_MAX_DECODED_NBT_BYTES = 640L * 1024L * 1024L;
+    static final int STARTER_BUNKER_MAX_TEMPLATE_BLOCKS = 2_250_000;
     private static final String CRYO_TUBE_NAME = "wildernessodysseyapi:cryo_tube";
     private static final String CREATE_ELEVATOR_PULLEY_NAME = "create:elevator_pulley";
     private static final String LEVELING_MARKER_NAME =
@@ -826,6 +830,12 @@ public class NBTStructurePlacer {
 
     // Bounds both compressed input and decoded NBT accounting before a template object is created.
     private CompoundTag readBoundedCompressed(InputStream source) throws Exception {
+        long maxDecodedNbtBytes = isStarterBunker()
+                ? STARTER_BUNKER_MAX_DECODED_NBT_BYTES
+                : MAX_DECODED_NBT_BYTES;
+        int maxTemplateBlocks = isStarterBunker()
+                ? STARTER_BUNKER_MAX_TEMPLATE_BLOCKS
+                : LargeStructurePlacementOptimizer.MAX_TEMPLATE_BLOCKS;
         try (source) {
             byte[] compressed = source.readNBytes((int) MAX_COMPRESSED_TEMPLATE_BYTES + 1);
             if (compressed.length > MAX_COMPRESSED_TEMPLATE_BYTES) {
@@ -833,13 +843,14 @@ public class NBTStructurePlacer {
                         + MAX_COMPRESSED_TEMPLATE_BYTES + " bytes");
             }
             try (ByteArrayInputStream bounded = new ByteArrayInputStream(compressed)) {
-                CompoundTag tag = NbtIo.readCompressed(bounded, NbtAccounter.create(MAX_DECODED_NBT_BYTES));
+                CompoundTag tag = NbtIo.readCompressed(bounded, NbtAccounter.create(maxDecodedNbtBytes));
                 int blockCount = tag.getList("blocks", Tag.TAG_COMPOUND).size();
                 int entityCount = tag.getList("entities", Tag.TAG_COMPOUND).size();
-                if (!LargeStructurePlacementOptimizer.isWithinContentBudget(blockCount, entityCount)) {
+                if (!LargeStructurePlacementOptimizer.isWithinContentBudget(
+                        blockCount, entityCount, maxTemplateBlocks)) {
                     throw new IllegalArgumentException(
                             "structure template content exceeds placement limits: "
-                                    + blockCount + "/" + LargeStructurePlacementOptimizer.MAX_TEMPLATE_BLOCKS
+                                    + blockCount + "/" + maxTemplateBlocks
                                     + " blocks, "
                                     + entityCount + "/" + LargeStructurePlacementOptimizer.MAX_TEMPLATE_ENTITIES
                                     + " entities");

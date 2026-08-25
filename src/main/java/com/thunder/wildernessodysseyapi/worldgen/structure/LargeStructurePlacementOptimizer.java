@@ -82,7 +82,18 @@ public final class LargeStructurePlacementOptimizer {
      * @return whether both counts fit the synchronous placement policy
      */
     public static boolean isWithinContentBudget(int blockCount, int entityCount) {
-        return blockCount >= 0 && blockCount <= MAX_TEMPLATE_BLOCKS
+        return isWithinContentBudget(blockCount, entityCount, MAX_TEMPLATE_BLOCKS);
+    }
+
+    /**
+     * Validates serialized content against a caller-owned block ceiling while retaining the shared entity limit.
+     *
+     * <p>The overload lets a known built-in template use a measured bounded allowance without increasing the
+     * default limit applied to other bundled and operator-supplied templates.</p>
+     */
+    static boolean isWithinContentBudget(int blockCount, int entityCount, int maxTemplateBlocks) {
+        return maxTemplateBlocks >= 0
+                && blockCount >= 0 && blockCount <= maxTemplateBlocks
                 && entityCount >= 0 && entityCount <= MAX_TEMPLATE_ENTITIES;
     }
 

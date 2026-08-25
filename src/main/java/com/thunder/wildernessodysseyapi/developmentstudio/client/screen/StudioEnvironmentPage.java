@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.developmentstudio.inspection.StudioInspe
 import com.thunder.wildernessodysseyapi.developmentstudio.inspection.StudioInspectionLine;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEnvironmentActionPayload;
 import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioLocationTeleportPayload;
+import com.thunder.wildernessodysseyapi.ecosystem.debug.map.EcosystemDebugMapRequestPayload;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
@@ -51,6 +52,16 @@ final class StudioEnvironmentPage implements StudioPage {
             addAction(screen, left + (buttonWidth + gap), top + 24, buttonWidth, "Hail",
                     StudioEnvironmentActionPayload.Action.WEATHER_HAIL);
             addTeleport(screen, left + (buttonWidth + gap) * 2, top + 24, buttonWidth);
+            return;
+        }
+
+        if ("ecosystem".equals(modulePath)) {
+            int third = Math.max(72, (width - gap * 2) / 3);
+            addAction(screen, left, top, third, "Inspect Position", inspectAction);
+            screen.addStudioWidget(Button.builder(Component.literal("Animal Map"), ignored ->
+                    PacketDistributor.sendToServer(new EcosystemDebugMapRequestPayload())
+            ).bounds(left + third + gap, top, third, 20).build());
+            addTeleport(screen, left + (third + gap) * 2, top, third);
             return;
         }
 

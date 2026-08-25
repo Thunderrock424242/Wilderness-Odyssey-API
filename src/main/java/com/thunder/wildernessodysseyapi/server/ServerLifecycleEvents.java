@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileReloadListener;
 import com.thunder.wildernessodysseyapi.dataengine.DataEngine;
+import com.thunder.wildernessodysseyapi.ecosystem.debug.map.EcosystemDebugMapService;
 import com.thunder.wildernessodysseyapi.ecosystem.integration.EcosystemPerformanceIntegration;
 import com.thunder.wildernessodysseyapi.faq.FaqReloadListener;
 import com.thunder.wildernessodysseyapi.gamerules.GameRulesListManager;
@@ -103,6 +104,7 @@ public final class ServerLifecycleEvents {
         }
         waterManager.shutdown();
         WaterPerformanceIntegration.shutdown();
+        EcosystemDebugMapService.shutdown(event.getServer());
         SimulationEngine.get().shutdown();
         TickEngine.shutdown();
         BackgroundEfficiencyManager.shutdown();

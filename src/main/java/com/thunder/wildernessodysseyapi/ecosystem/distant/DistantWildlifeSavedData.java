@@ -1,7 +1,9 @@
 package com.thunder.wildernessodysseyapi.ecosystem.distant;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemCellKey;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -12,8 +14,11 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Dimension-scoped authority for wildlife that is not currently an entity.
@@ -24,7 +29,7 @@ import java.util.Optional;
  */
 public final class DistantWildlifeSavedData extends SavedData {
     private static final String DATA_NAME = ModConstants.MOD_ID + "_distant_wildlife";
-    private static final int DATA_VERSION = 2;
+    private static final int DATA_VERSION = 3;
     private static final int MAXIMUM_PERSISTED_GROUPS = 256;
     private static final double GROUP_MERGE_DISTANCE_SQUARED = 48.0 * 48.0;
 
@@ -94,6 +99,120 @@ public final class DistantWildlifeSavedData extends SavedData {
     /** Returns the number of real entities currently avoided by this ledger. */
     public int representedAnimals() {
         return groups.stream().mapToInt(DistantWildlifeGroup::populationEstimate).sum();
+    }
+
+    /** Returns immutable groups currently occupying one existing ecosystem region. */
+    public List<DistantWildlifeGroup> groupsInRegion(
+            EcosystemCellKey region,
+            int cellSize,
+            long gameTime
+    ) {
+        List<DistantWildlifeGroup> matches = new ArrayList<>();
+        for (DistantWildlifeGroup group : groups) {
+            BlockPos position = BlockPos.containing(group.positionAt(gameTime));
+            if (region.equals(EcosystemCellKey.fromBlock(position, cellSize))) {
+                matches.add(group);
+            }
+        }
+        matches.sort(Comparator.comparingLong(DistantWildlifeGroup::id));
+        return List.copyOf(matches);
+    }
+
+    /** Returns whether at least one worker update still matches owner state. */
+    public boolean hasCurrentPopulationUpdate(List<DistantWildlifePopulationUpdate> updates) {
+        for (DistantWildlifePopulationUpdate update : updates) {
+            DistantWildlifeGroup current = currentGroup(update.groupId());
+            if (update.matches(current)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Applies validated worker results without surrendering population authority.
+     *
+     * <p>Declines are committed before growth so the dimension-wide cap is
+     * honored deterministically. Stale groups are skipped individually, current
+     * motion is preserved, and the ledger is dirtied once for the whole batch.</p>
+     */
+    public PopulationApplyResult applyPopulationUpdates(
+            List<DistantWildlifePopulationUpdate> updates,
+            int maximumRepresentedAnimals
+    ) {
+        if (updates == null || updates.isEmpty()) {
+            return PopulationApplyResult.EMPTY;
+        }
+        int maximumAnimals = Math.max(1, maximumRepresentedAnimals);
+        List<DistantWildlifePopulationUpdate> ordered = updates.stream()
+                .sorted(Comparator.comparingLong(DistantWildlifePopulationUpdate::groupId))
+                .toList();
+        Set<Long> seen = new HashSet<>();
+        List<DistantWildlifePopulationUpdate> growth = new ArrayList<>();
+        int applied = 0;
+        int stale = 0;
+        int added = 0;
+        int removed = 0;
+        boolean changed = false;
+
+        for (DistantWildlifePopulationUpdate update : ordered) {
+            if (!seen.add(update.groupId())) {
+                stale++;
+                continue;
+            }
+            DistantWildlifeGroup current = currentGroup(update.groupId());
+            if (!update.matches(current)) {
+                stale++;
+                continue;
+            }
+            if (update.population() > current.populationEstimate()) {
+                growth.add(update);
+                continue;
+            }
+            DistantWildlifeGroup replacement = current.withPopulationEcologyState(
+                    update.population(),
+                    update.remainder(),
+                    update.referenceGameTime(),
+                    update.environment()
+            );
+            if (!replacement.equals(current)) {
+                replaceInPlace(replacement);
+                applied++;
+                removed += current.populationEstimate() - replacement.populationEstimate();
+                changed = true;
+            }
+        }
+
+        int availableGrowth = Math.max(0, maximumAnimals - representedAnimals());
+        for (DistantWildlifePopulationUpdate update : growth) {
+            DistantWildlifeGroup current = currentGroup(update.groupId());
+            if (!update.matches(current)) {
+                stale++;
+                continue;
+            }
+            int requestedGrowth = update.population() - current.populationEstimate();
+            int acceptedGrowth = Math.min(requestedGrowth, availableGrowth);
+            int population = current.populationEstimate() + acceptedGrowth;
+            double remainder = acceptedGrowth == requestedGrowth ? update.remainder() : 0.0;
+            DistantWildlifeGroup replacement = current.withPopulationEcologyState(
+                    population,
+                    remainder,
+                    update.referenceGameTime(),
+                    update.environment()
+            );
+            if (!replacement.equals(current)) {
+                replaceInPlace(replacement);
+                applied++;
+                added += acceptedGrowth;
+                availableGrowth -= acceptedGrowth;
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            setDirty();
+        }
+        return new PopulationApplyResult(applied, stale, added, removed);
     }
 
     /**
@@ -199,11 +318,30 @@ public final class DistantWildlifeSavedData extends SavedData {
         return nextGroupId++;
     }
 
+    private DistantWildlifeGroup currentGroup(long id) {
+        for (DistantWildlifeGroup group : groups) {
+            if (group.id() == id) {
+                return group;
+            }
+        }
+        return null;
+    }
+
+    private void replaceInPlace(DistantWildlifeGroup replacement) {
+        for (int index = 0; index < groups.size(); index++) {
+            if (groups.get(index).id() == replacement.id()) {
+                groups.set(index, replacement);
+                return;
+            }
+        }
+    }
+
     private static CompoundTag writeGroup(DistantWildlifeGroup group) {
         CompoundTag tag = new CompoundTag();
         tag.putLong("id", group.id());
         tag.putString("species", group.species().toString());
         tag.putInt("population", group.populationEstimate());
+        tag.putDouble("population_remainder", group.populationRemainder());
         tag.putDouble("x", group.anchorX());
         tag.putDouble("y", group.anchorY());
         tag.putDouble("z", group.anchorZ());
@@ -244,6 +382,8 @@ public final class DistantWildlifeSavedData extends SavedData {
                 tag.getLong("id"),
                 species,
                 tag.getInt("population"),
+                tag.contains("population_remainder", Tag.TAG_DOUBLE)
+                        ? tag.getDouble("population_remainder") : 0.0,
                 tag.getDouble("x"),
                 tag.getDouble("y"),
                 tag.getDouble("z"),
@@ -263,5 +403,20 @@ public final class DistantWildlifeSavedData extends SavedData {
                 tag.getBoolean("nocturnal"),
                 tag.getBoolean("weather_sensitive")
         );
+    }
+
+    /** Outcome of one server-thread population commit. */
+    public record PopulationApplyResult(
+            int appliedGroups,
+            int staleGroups,
+            int animalsAdded,
+            int animalsRemoved
+    ) {
+        public static final PopulationApplyResult EMPTY = new PopulationApplyResult(0, 0, 0, 0);
+
+        /** Returns whether client-visible population counts changed. */
+        public boolean populationChanged() {
+            return animalsAdded > 0 || animalsRemoved > 0;
+        }
     }
 }

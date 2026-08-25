@@ -12,7 +12,7 @@ It does **not** merge the existing systems into a new global simulator. Weather,
 water, ecosystem, vegetation, meteors, Riftfall, the Data Engine, and the Tick
 Engine keep their existing ownership and lifecycle responsibilities.
 
-The first foundation provides:
+The foundation and first concrete participant provide:
 
 - deterministic registration for optional regional participants;
 - bounded, deduplicated regional requests;
@@ -21,13 +21,14 @@ The first foundation provides:
 - Data Engine scheduling and Tick Engine pressure admission;
 - per-system failure isolation and timings;
 - server lifecycle/config-reload cleanup;
-- `/wo simulation status`, `/wo simulation region`, and integrated-server F3
-  diagnostics.
+- coarse population ecology for existing distant-wildlife groups;
+- `/wo simulation status`, `/wo simulation region`, `/wo simulation population`,
+  an on-demand animal ecosystem map, and integrated-server F3 diagnostics.
 
-The foundation deliberately registers no empty weather/water/vegetation
-participants. Those owners already run their required work correctly. A
-`SimulationSystem` should be added only when there is real optional regional
-work to coordinate.
+The engine deliberately registers no empty weather/water/vegetation
+participants. Those owners already run their required work correctly. The one
+built-in participant performs real optional ecosystem work while leaving
+`DistantWildlifeSavedData` authoritative.
 
 ## Existing functionality reused
 
@@ -122,7 +123,10 @@ population, group behavior, and migration ownership. The
   `ActivityLevel` vocabulary;
 - expose the immutable `EcosystemRegionSnapshot` when the owner has one.
 
-It does not alter animals or population ledgers.
+The bridge itself does not alter animals or population ledgers. The separate
+`PopulationEcologySimulationSystem` submits copied regional/group data for pure
+calculation, then asks `DistantWildlifeSavedData` to revalidate and commit the
+result on the server thread.
 
 ### Vegetation
 
@@ -205,9 +209,11 @@ overlapping players request one shared regional evaluation. This key exists only
 for deduplication; it does not force weather, water, vegetation, meteors, or any
 future system to adopt ecosystem distances or persistence.
 
-Only the player-occupied cell is added during the periodic pass. The engine does
-not construct a radius grid around every player. Disturbances and explicit
-callers may request other known positions.
+Player-occupied cells are added during the periodic pass without constructing a
+radius grid. A participant may also publish positions from an already-bounded
+owner index through `collectRegions(...)`. Population ecology uses only the
+maximum-256-group dimension ledger; it does not discover chunks or entities.
+Disturbances and explicit callers may request other known positions.
 
 ## Relationship to the Data Engine
 
@@ -253,6 +259,9 @@ not be moved behind this contract.
 The coordinator also passes one elapsed-tick value from the last processed
 regional state. It never expands missed time into a catch-up loop. Distant or
 dormant systems may use that value analytically when their model supports it.
+Population ecology uses the group's persisted `populationReferenceGameTime`
+instead of the transient regional value so restart catch-up is applied exactly
+once and survives an integrated- or dedicated-server restart.
 
 ## Regional model and bounds
 
@@ -283,12 +292,13 @@ The manager never:
 ## Extension API
 
 A real optional regional participant registers once during common setup or
-another stable bootstrap point:
+another stable bootstrap point. Participants with bounded owner indexes may
+also contribute known regions without waiting for player proximity:
 
 ```java
 SimulationServices.register(new SimulationSystem() {
     private static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(
-            "wildernessodysseyapi", "population_ecology"
+            "examplemod", "future_regional_system"
     );
 
     @Override
@@ -298,7 +308,14 @@ SimulationServices.register(new SimulationSystem() {
 
     @Override
     public boolean isEnabled() {
-        return PopulationEcologyConfig.enabled();
+        return FutureSystemConfig.enabled();
+    }
+
+    @Override
+    public void collectRegions(MinecraftServer server, SimulationRegionCollector collector) {
+        // Iterate only an existing bounded owner index; never scan chunks or entities.
+        FutureSystemOwner.knownPositions(server).forEach(entry ->
+                collector.request(entry.level(), entry.position()));
     }
 
     @Override
@@ -321,6 +338,8 @@ Important extension rules:
 - IDs must be unique; duplicates fail registration immediately.
 - Ordering is deterministic by full resource-location string.
 - `isEnabled()` and `shouldUpdate(...)` must be cheap.
+- `collectRegions(...)` may iterate only bounded state already known to an
+  authoritative owner. It is not a world-discovery hook.
 - One participant failure is isolated and counted; it does not stop later
   participants.
 - A participant may read another owner's public snapshot, but must not reach
@@ -388,6 +407,24 @@ cleanly without duplicate bootstrap registration.
 abstract ecosystem groups/population, habitat, water, wildlife activity,
 migration pressure, vegetation stress, and hazard without mutating the world.
 
+`/wo simulation population` reports the configured analytical interval and
+regional carrying capacity plus owner-region requests, Data Engine
+submissions/rejections, applied/discarded/timed-out batches, stale owner
+validations, population additions/removals, and current in-flight work.
+
+`/wo simulation map` opens the development animal ecosystem map for an
+authorized player. The same map is available from Development Studio's
+Ecosystem page. It displays a fixed 17 by 17 window of the existing 64 by 64
+ecosystem cells with switchable animal-population, LOD, food, water, food
+pressure, disturbance, and weather-impact layers. Persisted group markers show
+species, population, location, and movement direction; hovering or selecting a
+cell shows its aggregate details. Refreshes are explicit and rate-limited.
+
+The map is schematic rather than a terrain minimap. Its server snapshot reads
+only pure LOD classification and the bounded distant-wildlife ledger. It never
+scans real entities, enumerates or loads chunks, stores another ecosystem map,
+or runs simulation work merely because the screen is open.
+
 The existing paged F3 Performance page includes a `WO SIMULATION ENGINE`
 section for an integrated server. Remote servers use the authoritative command;
 simulation metrics are not broadcast continuously merely to populate F3. The
@@ -414,12 +451,38 @@ Every current and future participant must preserve these invariants:
 Profiling should identify a real hot path before introducing more caching,
 parallelism, or cadence complexity.
 
-## What the foundation does not do
+## First participant: coarse population ecology
 
-This phase does not implement:
+`wildernessodysseyapi:population_ecology` is the first registered
+`SimulationSystem`. It:
 
-- population ecology or carrying-capacity state;
+- discovers only cells containing persisted distant-wildlife groups;
+- derives regional food pressure from the existing ecosystem population,
+  configured carrying capacity, habitat productivity, and water availability;
+- incorporates stored/immediate disturbance and the shared environment hazard;
+- advances elapsed time in one analytical calculation rather than replaying
+  ticks;
+- runs the pure group calculation through the existing Data Engine worker pool;
+- revalidates group ID, discrete population, fractional remainder, and
+  population-reference time before the owner applies a result;
+- preserves newer group motion while applying population/environment fields;
+- applies declines before deterministic capped growth so
+  `maxRepresentedAnimals` remains a hard dimension limit;
+- never removes the final abstract member of a group, creates an entity, or
+  force-loads a chunk.
+
+`DistantWildlifeGroup` persists a bounded fractional population remainder.
+This retains sub-animal analytical change across daily updates so small growth
+or decline is not rounded away forever. Older data has no remainder field and
+loads with zero, preserving compatibility.
+
+## What the current implementation does not do
+
+The current implementation does not implement:
+
 - food webs or predator/prey population equations;
+- species-specific carrying capacities, breeding pairs, age structure, or
+  genetics;
 - persistent migration routes, territories, nests, or dens;
 - carcasses, scavenging, decomposition, or disease;
 - a wildfire model;
@@ -428,20 +491,16 @@ This phase does not implement:
 - a new weather/water/vegetation/meteor/Riftfall scheduler;
 - a new persistent region database;
 - a new async executor;
-- remote continuous simulation-debug synchronization.
+- remote continuous simulation-debug synchronization;
+- terrain, biome, loaded-entity, or live-pathfinding visualization in the
+  animal ecosystem map.
 
 ## Recommended next feature
 
-The best first real participant is **coarse population ecology for existing
-distant wildlife groups**. It already has bounded persistent group ownership,
-regional ecosystem snapshots, analytical elapsed-time motion, and explicit
-real-versus-abstract invariants. A first iteration can calculate regional
-carrying pressure from `SimulationSnapshot.environment()` and
-`ecosystem()` without creating entities, scanning chunks, or taking ownership
-away from `DistantWildlifeSavedData`. Any population change should be validated
-and committed by the ecosystem owner on the server thread.
-
-That feature will exercise the registration, regional deduplication,
-elapsed-time, Data Engine async, Tick Engine pressure, lifecycle, and diagnostics
-contracts without forcing weather, water, vegetation, or Riftfall to adopt a
-new simulation model.
+After live validation of population persistence and transitions, the smallest
+useful extension is **species-specific regional ecology profiles**: optional
+carrying-capacity and pressure multipliers keyed by species/profile data. That
+can enrich the existing pure calculation without adding a second population
+ledger, scanning real entities, or jumping directly to a global food-web
+solver. Predator/prey interaction should follow only after those per-species
+inputs and live population behavior are measured.

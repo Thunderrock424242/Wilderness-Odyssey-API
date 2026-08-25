@@ -133,7 +133,7 @@ public class AIFallbackResponder {
     private FallbackReply buildAetherReply(MatchInput input, Persona aether, ResponseContext context) {
         Optional<Persona> explicitSubsystem = resolveSubsystemFromAether(input.lower(), aether);
         if (shouldShowMenu(input.lower(), aether)) {
-            return new FallbackReply(aether.name(), buildAetherSubsystemMenu(aether), true);
+            return new FallbackReply(aether.name(), buildAetherSubsystemMenu(aether), true, true);
         }
 
         Optional<PromptMatch> direct = aether.bestPrompt(input, context, minimumKeywordMatches);
@@ -155,7 +155,7 @@ public class AIFallbackResponder {
 
     private FallbackReply buildPersonaReply(MatchInput input, Persona persona, ResponseContext context) {
         if (shouldShowMenu(input.lower(), persona)) {
-            return new FallbackReply(persona.name(), persona.buildMenu(menuPrompt), true);
+            return new FallbackReply(persona.name(), persona.buildMenu(menuPrompt), true, true);
         }
         Optional<PromptMatch> match = persona.bestPrompt(input, context, minimumKeywordMatches);
         if (match.isPresent()) {
@@ -179,12 +179,12 @@ public class AIFallbackResponder {
     }
 
     private FallbackReply replyFrom(Persona persona, PromptMatch match, MatchInput input) {
-        return new FallbackReply(persona.name(), match.prompt().selectResponse(input), false);
+        return new FallbackReply(persona.name(), match.prompt().selectResponse(input), false, true);
     }
 
     private FallbackReply buildUnknownReply(Persona persona, MatchInput input) {
         int index = Math.floorMod((input.normalizedText() + "|" + persona.name()).hashCode(), unknownResponses.size());
-        return new FallbackReply(persona.name(), unknownResponses.get(index), false);
+        return new FallbackReply(persona.name(), unknownResponses.get(index), false, false);
     }
 
     private Optional<Persona> resolveSubsystemFromAether(String lower, Persona aether) {
@@ -421,7 +421,7 @@ public class AIFallbackResponder {
         return new Prompt(label, "", response, List.of(), triggers, keywords, 0, List.of(), List.of());
     }
 
-    public record FallbackReply(String speaker, String text, boolean menu) {
+    public record FallbackReply(String speaker, String text, boolean menu, boolean knownIntent) {
     }
 
     public record ResponseContext(Set<String> tags) {

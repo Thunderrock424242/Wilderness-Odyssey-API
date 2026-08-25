@@ -32,6 +32,17 @@ class SimulationRegionManagerTest {
     }
 
     @Test
+    void playerInterestOutranksParticipantDiscoveredRelevance() {
+        SimulationRegionManager manager = new SimulationRegionManager(4, 4);
+        SimulationRegion region = SimulationRegion.fromBlock(OVERWORLD, BlockPos.ZERO, 64);
+
+        manager.request(region, SimulationTrigger.SYSTEM_RELEVANCE, 10L);
+        manager.request(region, SimulationTrigger.PLAYER_INTEREST, 12L);
+
+        assertEquals(SimulationTrigger.PLAYER_INTEREST, manager.poll().orElseThrow().trigger());
+    }
+
+    @Test
     void queueAndRecentStateRemainBounded() {
         SimulationRegionManager manager = new SimulationRegionManager(1, 1);
         SimulationRegion first = SimulationRegion.fromBlock(OVERWORLD, new BlockPos(0, 64, 0), 64);
