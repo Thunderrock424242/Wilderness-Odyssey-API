@@ -27,14 +27,34 @@ public final class CinematicEvents {
         }
     }
 
-    /** Denies block, item, and entity use on both logical sides while the server lock is active. */
+    /** Denies block breaking while the authoritative server lock is active. */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onPlayerInteract(PlayerInteractEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player
-                && CinematicManager.controlsLocked(player)
-                && event instanceof ICancellableEvent cancellable) {
-            cancellable.setCanceled(true);
-        }
+    public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
+        cancelInteraction(event);
+    }
+
+    /** Denies block use while the authoritative server lock is active. */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        cancelInteraction(event);
+    }
+
+    /** Denies item use while the authoritative server lock is active. */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        cancelInteraction(event);
+    }
+
+    /** Denies general entity use while the authoritative server lock is active. */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
+        cancelInteraction(event);
+    }
+
+    /** Denies location-specific entity use while the authoritative server lock is active. */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onEntityInteractSpecific(PlayerInteractEvent.EntityInteractSpecific event) {
+        cancelInteraction(event);
     }
 
     /** Denies entity attacks independently from right-click interaction events. */
@@ -42,6 +62,14 @@ public final class CinematicEvents {
     public static void onAttackEntity(AttackEntityEvent event) {
         if (event.getEntity() instanceof ServerPlayer player && CinematicManager.controlsLocked(player)) {
             event.setCanceled(true);
+        }
+    }
+
+    private static void cancelInteraction(PlayerInteractEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player
+                && CinematicManager.controlsLocked(player)
+                && event instanceof ICancellableEvent cancellable) {
+            cancellable.setCanceled(true);
         }
     }
 
