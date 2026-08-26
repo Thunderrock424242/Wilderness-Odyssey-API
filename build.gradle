@@ -652,6 +652,17 @@ tasks.register('structureGenTest', Test) {
     }
 }
 
+tasks.register('aiTest', Test) {
+    group = 'verification'
+    description = 'Runs focused A.E.T.H.E.R logic tests without starting Minecraft or loading project mods.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.ai.*'
+    }
+}
+
 tasks.register('structureGenBunkerTest', Test) {
     group = 'verification'
     description = 'Runs the memory-intensive read-only bunker fixture regression.'

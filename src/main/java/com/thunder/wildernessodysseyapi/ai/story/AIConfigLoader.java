@@ -24,10 +24,13 @@ public final class AIConfigLoader {
         Path configPath = FMLPaths.CONFIGDIR.get().resolve(CONFIG_NAME);
         ensureDefaultConfig(configPath);
         String content = readConfig(configPath);
+        String bundledContent = readBundledConfig();
         if (content == null || content.isBlank()) {
-            content = readBundledConfig();
+            content = bundledContent;
         }
-        return parse(content);
+        AIConfig config = parse(content);
+        applyBundledKnowledgeDefaults(config, parse(bundledContent));
+        return config;
     }
 
     private static void ensureDefaultConfig(Path configPath) {
@@ -90,6 +93,8 @@ public final class AIConfigLoader {
         config.getStory().addAll(readStringList(root.get("story")));
         config.getBackgroundHistory().addAll(readStringList(root.get("background_history")));
         config.getCorruptedData().addAll(readStringList(root.get("corrupted_data")));
+        config.getAuthoritativeKnowledge().addAll(readStringList(root.get("authoritative_knowledge")));
+        config.getKnowledgeBoundaries().addAll(readStringList(root.get("knowledge_boundaries")));
         config.setCorruptedPrefix(readStringValue(root.get("corrupted_prefix")));
         Map<String, Object> personality = readStringObjectMap(root.get("personality"));
         config.getPersonality().setName(readStringValue(personality.get("name")));
@@ -129,6 +134,21 @@ public final class AIConfigLoader {
         hydrateFallbackPromptFiles(config.getFallback().getPersonas());
 
         return config;
+    }
+
+    static void applyBundledKnowledgeDefaults(AIConfig config, AIConfig bundled) {
+        if (config == null || bundled == null) {
+            return;
+        }
+        // Older live configs are preserved on disk. New code-owned knowledge
+        // sections are supplied from the bundled defaults until the player adds
+        // explicit sections to their existing config.
+        if (config.getAuthoritativeKnowledge().isEmpty()) {
+            config.getAuthoritativeKnowledge().addAll(bundled.getAuthoritativeKnowledge());
+        }
+        if (config.getKnowledgeBoundaries().isEmpty()) {
+            config.getKnowledgeBoundaries().addAll(bundled.getKnowledgeBoundaries());
+        }
     }
 
     private static Map<?, ?> parseWithSnakeYaml(String content) {

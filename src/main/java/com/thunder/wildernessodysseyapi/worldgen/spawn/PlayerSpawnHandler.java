@@ -1,5 +1,9 @@
 package com.thunder.wildernessodysseyapi.worldgen.spawn;
 
+import com.thunder.wildernessodysseyapi.cinematic.CinematicManager;
+import com.thunder.wildernessodysseyapi.cinematic.CinematicPlaybackOptions;
+import com.thunder.wildernessodysseyapi.cinematic.CinematicPlayerData;
+import com.thunder.wildernessodysseyapi.cinematic.CinematicSequences;
 import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -18,6 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
+import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 
 /**
  * Handles assigning players to cryo tubes when they first join the world.
@@ -73,6 +78,19 @@ public class PlayerSpawnHandler {
         PENDING_ASSIGNMENTS.remove(event.getEntity().getUUID());
     }
 
+    /** Preserves the one-time cryo assignment when Minecraft replaces the player entity. */
+    @SubscribeEvent
+    public static void onPlayerClone(PlayerEvent.Clone event) {
+        CompoundTag original = event.getOriginal().getPersistentData();
+        CompoundTag replacement = event.getEntity().getPersistentData();
+        if (original.getBoolean(CRYO_ASSIGNED_TAG)) {
+            replacement.putBoolean(CRYO_ASSIGNED_TAG, true);
+        }
+        if (original.contains(CRYO_POS_TAG)) {
+            replacement.putLong(CRYO_POS_TAG, original.getLong(CRYO_POS_TAG));
+        }
+    }
+
     /** Releases discovery and retry state before another server starts in this process. */
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
@@ -84,7 +102,7 @@ public class PlayerSpawnHandler {
         CompoundTag tag = player.getPersistentData();
 
         if (tag.getBoolean(CRYO_ASSIGNED_TAG)) {
-            return true;
+            return tryResumeInterruptedIntro(player, tag);
         }
         if (spawnBlocks.isEmpty()) {
             return false;
@@ -95,10 +113,52 @@ public class PlayerSpawnHandler {
             return false;
         }
 
-        teleportPlayer(player, spawnPos);
         tag.putBoolean(CRYO_ASSIGNED_TAG, true);
         tag.putLong(CRYO_POS_TAG, spawnPos.asLong());
-        return true;
+        CinematicManager.PlayResult introResult = CinematicManager.play(
+                player,
+                CinematicSequences.CRYO_WAKEUP,
+                CinematicPlaybackOptions.automatic(spawnPos)
+        );
+        if (!introResult.started() && !introResult.retryable()) {
+            // Preserve the original spawn-placement behavior if the cinematic
+            // cannot start for a non-transient reason. A shared actor that is
+            // merely busy remains queued without stacking players in the pod.
+            teleportPlayer(player, spawnPos);
+        }
+        logNonRetryableIntroFailure(player, introResult);
+        return !introResult.retryable();
+    }
+
+    private static boolean tryResumeInterruptedIntro(ServerPlayer player, CompoundTag tag) {
+        if (!CinematicPlayerData.hasAutomaticStarted(player, CinematicSequences.CRYO_WAKEUP.id())
+                || CinematicPlayerData.hasCompleted(player, CinematicSequences.CRYO_WAKEUP.id())
+                || CinematicManager.isActive(player)
+                || !tag.contains(CRYO_POS_TAG)) {
+            return true;
+        }
+
+        BlockPos stored = BlockPos.of(tag.getLong(CRYO_POS_TAG));
+        if (!isCryoTube(player, stored)) {
+            return true;
+        }
+        CinematicManager.PlayResult result = CinematicManager.play(
+                player,
+                CinematicSequences.CRYO_WAKEUP,
+                CinematicPlaybackOptions.automatic(stored)
+        );
+        logNonRetryableIntroFailure(player, result);
+        return !result.retryable();
+    }
+
+    private static void logNonRetryableIntroFailure(
+            ServerPlayer player,
+            CinematicManager.PlayResult result
+    ) {
+        if (!result.started() && !result.retryable()) {
+            LOGGER.warn("Automatic cryo intro did not start for {}: {}",
+                    player.getGameProfile().getName(), result.message().getString());
+        }
     }
 
     private static BlockPos selectSpawn(ServerPlayer player, CompoundTag tag) {

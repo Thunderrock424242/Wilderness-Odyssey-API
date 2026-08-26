@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.ai.perf.MemoryStore;
 import com.thunder.wildernessodysseyapi.ai.story.AISettings;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -99,13 +100,7 @@ public final class OllamaChatClient {
                     history,
                     settings.getMaxOutputTokens()
             );
-            HttpRequest request = HttpRequest.newBuilder(chatUri.get())
-                    .timeout(Duration.ofSeconds(settings.getRequestTimeoutSeconds()))
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
-                    .build();
-            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = sendRequest(settings, chatUri.get(), payload);
             if (response.statusCode() / 100 != 2) {
                 return failure("Ollama returned HTTP " + response.statusCode());
             }
@@ -119,6 +114,37 @@ public final class OllamaChatClient {
             return failure("the local model request was interrupted");
         } catch (Exception exception) {
             return failure(exception.getClass().getSimpleName() + ": " + safeMessage(exception.getMessage()));
+        }
+    }
+
+    /** Uses the same local model as a bounded factual reviewer for a draft reply. */
+    public VerificationResponse verify(AISettings settings, String verifierPrompt) {
+        Optional<URI> chatUri = resolveChatUri(settings.getEndpoint());
+        if (chatUri.isEmpty()) {
+            logFailure("the configured endpoint is not a loopback Ollama address");
+            return new VerificationResponse(false, false);
+        }
+
+        try {
+            JsonObject payload = buildVerificationRequest(settings.getModelName(), verifierPrompt);
+            HttpResponse<String> response = sendRequest(settings, chatUri.get(), payload);
+            if (response.statusCode() / 100 != 2) {
+                logFailure("Ollama verification returned HTTP " + response.statusCode());
+                return new VerificationResponse(false, false);
+            }
+            Optional<Boolean> approved = parseVerificationResponse(response.body());
+            if (approved.isEmpty()) {
+                logFailure("Ollama returned no readable verification result");
+                return new VerificationResponse(false, false);
+            }
+            return new VerificationResponse(approved.get(), true);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            logFailure("the local verification request was interrupted");
+            return new VerificationResponse(false, false);
+        } catch (Exception exception) {
+            logFailure(exception.getClass().getSimpleName() + ": " + safeMessage(exception.getMessage()));
+            return new VerificationResponse(false, false);
         }
     }
 
@@ -152,6 +178,25 @@ public final class OllamaChatClient {
         JsonObject options = new JsonObject();
         options.addProperty("temperature", 0.65D);
         options.addProperty("num_predict", Math.max(32, Math.min(512, maxOutputTokens)));
+        payload.add("options", options);
+        return payload;
+    }
+
+    static JsonObject buildVerificationRequest(String model, String verifierPrompt) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("model", model);
+        payload.addProperty("stream", false);
+        payload.addProperty("keep_alive", MODEL_KEEP_ALIVE);
+        payload.addProperty("format", "json");
+
+        JsonArray messages = new JsonArray();
+        addMessage(messages, "system", verifierPrompt);
+        addMessage(messages, "user", "Verify the candidate reply now.");
+        payload.add("messages", messages);
+
+        JsonObject options = new JsonObject();
+        options.addProperty("temperature", 0.0D);
+        options.addProperty("num_predict", 32);
         payload.add("options", options);
         return payload;
     }
@@ -200,6 +245,38 @@ public final class OllamaChatClient {
             }
             String cleaned = sanitizeDialogue(contentElement.getAsString(), speaker, maxCharacters);
             return cleaned.isBlank() ? Optional.empty() : Optional.of(cleaned);
+        } catch (RuntimeException ignored) {
+            return Optional.empty();
+        }
+    }
+
+    static Optional<Boolean> parseVerificationResponse(String json) {
+        if (json == null || json.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            JsonElement outerElement = JsonParser.parseString(json);
+            if (!outerElement.isJsonObject()) {
+                return Optional.empty();
+            }
+            JsonElement messageElement = outerElement.getAsJsonObject().get("message");
+            if (messageElement == null || !messageElement.isJsonObject()) {
+                return Optional.empty();
+            }
+            JsonElement contentElement = messageElement.getAsJsonObject().get("content");
+            if (contentElement == null || !contentElement.isJsonPrimitive()) {
+                return Optional.empty();
+            }
+            JsonElement verdictElement = JsonParser.parseString(contentElement.getAsString());
+            if (!verdictElement.isJsonObject()) {
+                return Optional.empty();
+            }
+            JsonElement approvedElement = verdictElement.getAsJsonObject().get("approved");
+            if (approvedElement == null || !approvedElement.isJsonPrimitive()
+                    || !approvedElement.getAsJsonPrimitive().isBoolean()) {
+                return Optional.empty();
+            }
+            return Optional.of(approvedElement.getAsBoolean());
         } catch (RuntimeException ignored) {
             return Optional.empty();
         }
@@ -269,16 +346,35 @@ public final class OllamaChatClient {
     }
 
     private static ModelResponse failure(String reason) {
+        logFailure(reason);
+        return new ModelResponse("", false);
+    }
+
+    private static void logFailure(String reason) {
         long now = System.nanoTime();
         long previous = LAST_WARNING_NANOS.get();
         if ((previous == 0L || now - previous >= WARNING_INTERVAL_NANOS)
                 && LAST_WARNING_NANOS.compareAndSet(previous, now)) {
             ModConstants.LOGGER.warn("[Aether] Local Ollama response unavailable: {}", reason);
         }
-        return new ModelResponse("", false);
+    }
+
+    private static HttpResponse<String> sendRequest(AISettings settings, URI uri, JsonObject payload)
+            throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofSeconds(settings.getRequestTimeoutSeconds()))
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
+        return HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     /** Result of one local model request without exposing response internals to chat. */
     public record ModelResponse(String text, boolean successful) {
+    }
+
+    /** Result of the local factual review pass. */
+    public record VerificationResponse(boolean approved, boolean successful) {
     }
 }

@@ -10,8 +10,8 @@ public final class StudioWorldAccess {
     private StudioWorldAccess() {
     }
 
-    /** Initializes saved identity from the vanilla-derived noise-settings marker. */
-    public static boolean initializeFromPreset(ServerLevel level) {
+    /** Restores saved identity for worlds created with the removed Studio preset. */
+    public static boolean initializeFromLegacyMarker(ServerLevel level) {
         if (level == null || !level.dimension().equals(Level.OVERWORLD)
                 || !(level.getChunkSource().getGenerator() instanceof NoiseBasedChunkGenerator generator)
                 || !generator.generatorSettings().is(StudioWorldKeys.DEVELOPMENT_STUDIO_NOISE_SETTINGS)) {

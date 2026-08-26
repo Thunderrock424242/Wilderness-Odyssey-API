@@ -11,6 +11,8 @@ public class AIConfig {
     private final List<String> story = new ArrayList<>();
     private final List<String> corruptedData = new ArrayList<>();
     private final List<String> backgroundHistory = new ArrayList<>();
+    private final List<String> authoritativeKnowledge = new ArrayList<>();
+    private final List<String> knowledgeBoundaries = new ArrayList<>();
     private String corruptedPrefix;
     private final Personality personality = new Personality();
     private final Settings settings = new Settings();
@@ -27,6 +29,14 @@ public class AIConfig {
 
     public List<String> getBackgroundHistory() {
         return backgroundHistory;
+    }
+
+    public List<String> getAuthoritativeKnowledge() {
+        return authoritativeKnowledge;
+    }
+
+    public List<String> getKnowledgeBoundaries() {
+        return knowledgeBoundaries;
     }
 
     public String getCorruptedPrefix() {

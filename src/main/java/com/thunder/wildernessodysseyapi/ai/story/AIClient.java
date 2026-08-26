@@ -20,6 +20,8 @@ public class AIClient {
     private final List<String> story = new ArrayList<>();
     private final List<String> corruptedLore = new ArrayList<>();
     private final List<String> backgroundHistory = new ArrayList<>();
+    private final List<String> authoritativeKnowledge = new ArrayList<>();
+    private final List<String> knowledgeBoundaries = new ArrayList<>();
     private final AISettings settings = new AISettings();
     private final VoiceIntegration voiceIntegration = new VoiceIntegration(settings);
     private final MemoryStore memoryStore = new MemoryStore();
@@ -65,6 +67,8 @@ public class AIClient {
         story.addAll(config.getStory());
         corruptedLore.addAll(config.getCorruptedData());
         backgroundHistory.addAll(config.getBackgroundHistory());
+        authoritativeKnowledge.addAll(config.getAuthoritativeKnowledge());
+        knowledgeBoundaries.addAll(config.getKnowledgeBoundaries());
         applySettings(config);
         configureOnboarding(config.getOnboarding());
         fallbackResponder.configure(config.getFallback(), settings.getPersonaName(), settings.getWakeWord());
@@ -180,10 +184,7 @@ public class AIClient {
         }
         AIFallbackResponder.ResponseContext safeResponseContext =
                 responseContext == null ? AIFallbackResponder.ResponseContext.empty() : responseContext;
-        Optional<AIFallbackResponder.FallbackReply> authoredReply =
-                fallbackResponder.buildReply(message, safeResponseContext);
-        String speaker = authoredReply.map(AIFallbackResponder.FallbackReply::speaker)
-                .orElseGet(() -> resolveSpeaker(message));
+        String speaker = resolveSpeaker(message);
         String learnedFact = knowledgeStore.extractLearnedFact(message);
         if (learnedFact != null) {
             boolean added = knowledgeStore.addFact(learnedFact);
@@ -201,26 +202,17 @@ public class AIClient {
             return voiceIntegration.wrap(speaker, reply);
         }
 
-        if (authoredReply.map(AIFallbackResponder.FallbackReply::menu).orElse(false)) {
-            String menu = authoredReply.get().text();
-            memoryStore.addAiMessage(world, player, speaker, menu);
-            return voiceIntegration.wrap(speaker, menu);
-        }
-
         if (settings.isOllamaEnabled()) {
-            String authoredReference = authoredReply
-                    .filter(AIFallbackResponder.FallbackReply::knownIntent)
-                    .map(AIFallbackResponder.FallbackReply::text)
-                    .orElse("");
             String systemPrompt = AetherSystemPrompt.build(
                     settings,
                     story,
                     backgroundHistory,
                     corruptedLore,
+                    authoritativeKnowledge,
+                    knowledgeBoundaries,
                     speaker,
                     safeResponseContext,
-                    knowledgeContext,
-                    authoredReference
+                    knowledgeContext
             );
             List<MemoryStore.ConversationMessage> history = memoryStore.getRecentMessages(
                     world,
@@ -234,11 +226,32 @@ public class AIClient {
                     history
             );
             if (modelResponse.successful()) {
-                memoryStore.addAiMessage(world, player, speaker, modelResponse.text());
-                return voiceIntegration.wrap(speaker, modelResponse.text());
+                String verifierPrompt = AetherSystemPrompt.buildVerifier(
+                        story,
+                        backgroundHistory,
+                        corruptedLore,
+                        authoritativeKnowledge,
+                        knowledgeBoundaries,
+                        safeResponseContext,
+                        message,
+                        modelResponse.text()
+                );
+                OllamaChatClient.VerificationResponse verification =
+                        ollamaChatClient.verify(settings, verifierPrompt);
+                String verifiedReply = verification.successful() && verification.approved()
+                        ? modelResponse.text()
+                        : safeUngroundedReply(message);
+                memoryStore.addAiMessage(world, player, speaker, verifiedReply);
+                return voiceIntegration.wrap(speaker, verifiedReply);
             }
         }
 
+        // Scripted intent matching is an availability fallback, not the normal
+        // conversation authority. It runs only when Ollama is disabled or the
+        // local request did not produce a usable reply.
+        Optional<AIFallbackResponder.FallbackReply> authoredReply =
+                fallbackResponder.buildReply(message, safeResponseContext);
+        speaker = authoredReply.map(AIFallbackResponder.FallbackReply::speaker).orElse(speaker);
         String reply = authoredReply.map(AIFallbackResponder.FallbackReply::text)
                 .orElse("Archive gap detected. I do not have a recovered answer for that yet.");
         if (settings.isOllamaEnabled()) {
@@ -246,6 +259,17 @@ public class AIClient {
         }
         memoryStore.addAiMessage(world, player, speaker, reply);
         return voiceIntegration.wrap(speaker, reply);
+    }
+
+    private static String safeUngroundedReply(String message) {
+        String lower = message == null ? "" : message.trim().toLowerCase(Locale.ROOT);
+        if (lower.equals("hi") || lower.equals("hello") || lower.equals("hey")
+                || lower.equals("idk") || lower.equals("ok") || lower.equals("okay")
+                || lower.contains("how are you") || lower.contains("how is your day")
+                || lower.contains("thank you") || lower.contains("thanks")) {
+            return "I'm here and operational, if a little fragmented. What would you like to talk about?";
+        }
+        return "I don't have a recovered record for that. If you find field evidence, I can help interpret it.";
     }
 
     public String handleOnboarding(UUID playerId, String message) {

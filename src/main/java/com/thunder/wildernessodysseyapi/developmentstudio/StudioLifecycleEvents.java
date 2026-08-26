@@ -18,11 +18,11 @@ public final class StudioLifecycleEvents {
     private StudioLifecycleEvents() {
     }
 
-    /** Converts the preset's Overworld-equivalent marker into durable world metadata. */
+    /** Preserves durable identity for worlds created with the removed Studio preset. */
     @SubscribeEvent
     public static void onLevelLoad(LevelEvent.Load event) {
         if (event.getLevel() instanceof ServerLevel level && level.dimension().equals(Level.OVERWORLD)) {
-            StudioWorldAccess.initializeFromPreset(level);
+            StudioWorldAccess.initializeFromLegacyMarker(level);
         }
     }
 
@@ -35,7 +35,7 @@ public final class StudioLifecycleEvents {
         if (!(event.getLevel() instanceof ServerLevel level) || !level.dimension().equals(Level.OVERWORLD)) {
             return;
         }
-        StudioWorldAccess.initializeFromPreset(level);
+        StudioWorldAccess.initializeFromLegacyMarker(level);
         StudioCampusPlacer.placeIfNeeded(level);
     }
 

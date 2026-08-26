@@ -64,6 +64,22 @@ class OllamaChatClientTest {
     }
 
     @Test
+    void buildsAndParsesStrictJsonVerificationRequest() {
+        JsonObject request = OllamaChatClient.buildVerificationRequest("llama3.2:latest", "verify these facts");
+
+        assertEquals("json", request.get("format").getAsString());
+        assertEquals(0.0D, request.getAsJsonObject("options").get("temperature").getAsDouble());
+        assertEquals(32, request.getAsJsonObject("options").get("num_predict").getAsInt());
+        assertEquals(2, request.getAsJsonArray("messages").size());
+
+        String approved = "{\"message\":{\"content\":\"{\\\"approved\\\":true}\"}}";
+        String rejected = "{\"message\":{\"content\":\"{\\\"approved\\\":false}\"}}";
+        assertTrue(OllamaChatClient.parseVerificationResponse(approved).orElseThrow());
+        assertFalse(OllamaChatClient.parseVerificationResponse(rejected).orElseThrow());
+        assertTrue(OllamaChatClient.parseVerificationResponse("{\"message\":{\"content\":\"{}\"}}").isEmpty());
+    }
+
+    @Test
     void capsOversizedModelDialogue() {
         String longDialogue = "x".repeat(300);
 

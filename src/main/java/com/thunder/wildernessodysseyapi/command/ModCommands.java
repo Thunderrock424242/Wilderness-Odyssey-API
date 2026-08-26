@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.changelog.command.ChangelogCommand;
+import com.thunder.wildernessodysseyapi.cinematic.command.CinematicCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
 import com.thunder.wildernessodysseyapi.developmentstudio.command.StudioCommand;
 import com.thunder.wildernessodysseyapi.dataengine.debug.DataEngineCommand;
@@ -70,5 +71,6 @@ public final class ModCommands {
         StudioCommand.register(dispatcher);
         DataEngineCommand.register(dispatcher);
         SimulationDebugCommand.register(dispatcher);
+        CinematicCommand.register(dispatcher);
     }
 }
