@@ -4,7 +4,7 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 
 ## 1) Core identity
 - The system core is **A.E.T.H.E.R**.
-- Current design: a local Ollama conversation layer grounded by scripted recovered intents, with the scripted engine retained as the always-available fallback.
+- Current design: a local Ollama-first conversation layer grounded by compact canonical knowledge and strict knowledge boundaries, with the scripted engine retained only for provider failure or explicitly scripted mode.
 - A.E.T.H.E.R is intentionally limited. Missing data, corrupted records, and uncertainty are part of the character.
 - Purpose: provide immersive, lore-aware support while staying safe, performant, private, and single-player-only.
 
@@ -14,10 +14,12 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 - Require no held item, relay block, wake word, command, or spawned companion entity.
 - Clean the player message.
 - Gather cheap game context tags, such as dimension, biome, nearby meteor site, and collected lore IDs.
-- Match authored intents with keyword scoring instead of exact phrases only.
-- Use a matching authored response as a factual grounding reference when one exists.
-- Send the selected persona, bounded recent conversation, and immutable context to a loopback-only Ollama chat endpoint.
-- If the local provider fails, pick an authored response variant or answer in-universe with a recovered-data/corrupted-archive limitation.
+- Load canonical lore and knowledge boundaries from configuration, including safe inheritance for older live configs that do not yet contain the new sections.
+- Send the selected persona, bounded recent conversation, canonical knowledge, and immutable context directly to a loopback-only Ollama chat endpoint.
+- Run a short, zero-temperature local-model verification pass and accept the draft only when its concrete claims are supported by the same canonical knowledge and literal context.
+- Replace a rejected or unverifiable draft with a neutral in-character uncertainty response rather than exposing invented lore as fact.
+- Consult authored intent responses only when the local provider is disabled or fails to produce a usable response.
+- If no offline authored intent matches, answer in-universe with a recovered-data/corrupted-archive limitation.
 - Show the reply in local chat/UI with the chosen A.E.T.H.E.R persona speaker.
 
 ## 3) A.E.T.H.E.R sub-systems
@@ -43,7 +45,7 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 
 ## 5) Local configuration and performance coverage
 - Config-driven controls through `ai_config.yaml`.
-- Prompt libraries split by persona under `ai_fallback/`.
+- Offline response libraries split by persona under `ai_fallback/`; these do not steer normal Ollama replies.
 - Local Ollama provider at `http://127.0.0.1:11434` by default, using the configured exact model name.
 - Loopback endpoints only; player chat and game context cannot be configured to leave the local computer.
 - Lightweight deterministic behavior remains available when Ollama is stopped, missing the configured model, times out, or returns an invalid response.
@@ -52,6 +54,7 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 - Warm the configured local model on a background worker when the private integrated world starts; keep it warm for one hour after a request to avoid chat-time cold loads.
 - Conversation history is capped at 20 stored messages, with a configurable smaller request window.
 - Model output size and request duration are bounded.
+- Normal local-model replies use a second bounded verification request; this trades a small amount of local inference time for stronger factual discipline.
 
 ## 6) Boundaries
 - Single-player only. Opening the world to LAN disables A.E.T.H.E.R chat.
@@ -78,7 +81,7 @@ The supported model path is local Ollama over loopback. Remote/cloud endpoints r
 ## 9) Nice-to-have after MVP
 - More discovery/progression context tags.
 - Event-triggered hints for new biome, anomaly detected, first night, meteor site, or lore pickup.
-- More authored response banks for richer persona coverage.
+- More canonical knowledge and boundary entries for richer LLM conversation without expanding scripted coverage unnecessarily.
 
 ## One-line summary
 "A.E.T.H.E.R is a single-player chat companion that grounds a private local Ollama model with recovered lore and six specialist subsystems, while retaining a deterministic offline fallback."

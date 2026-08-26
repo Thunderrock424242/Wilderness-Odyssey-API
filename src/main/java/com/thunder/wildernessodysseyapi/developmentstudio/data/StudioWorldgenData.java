@@ -10,12 +10,12 @@ import net.neoforged.neoforge.data.event.GatherDataEvent;
 
 import java.util.Set;
 
-/** Generates the Studio marker from Minecraft's exact normal Overworld settings factory. */
+/** Generates the legacy Studio marker required to load existing Studio worlds. */
 public final class StudioWorldgenData {
     private StudioWorldgenData() {
     }
 
-    /** Adds only the server-side noise-settings registry entry during data generation. */
+    /** Adds only the compatibility noise-settings entry during data generation. */
     public static void onGatherData(GatherDataEvent event) {
         if (!event.includeServer()) {
             return;
@@ -26,11 +26,11 @@ public final class StudioWorldgenData {
     }
 
     /**
-     * Registers a key-distinct value built by vanilla's normal Overworld factory.
+     * Registers the key-distinct value used by the removed Studio world preset.
      *
-     * <p>The key gives Studio a one-time creation marker without changing the
-     * real Overworld dimension type, biome source, density functions, surface
-     * rules, aquifers, ore veins, or mob-generation behavior.</p>
+     * <p>Existing saves may reference this registry key from their serialized
+     * Overworld generator. Retaining the normal Overworld-equivalent value is a
+     * compatibility requirement, not a path for creating new Studio worlds.</p>
      */
     public static void bootstrapNoiseSettings(BootstrapContext<NoiseGeneratorSettings> context) {
         context.register(

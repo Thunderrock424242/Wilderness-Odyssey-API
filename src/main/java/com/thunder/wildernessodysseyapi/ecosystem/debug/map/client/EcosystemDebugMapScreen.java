@@ -95,6 +95,13 @@ public final class EcosystemDebugMapScreen extends Screen {
     }
 
     @Override
+    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // The map renders its own opaque full-screen surface before delegating
+        // widget rendering to Screen. Running vanilla's background pass there
+        // would blur the map and text while leaving the later buttons sharp.
+    }
+
+    @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0) {
             EcosystemDebugMapPayload.CellSnapshot cell = cellAt(mouseX, mouseY);

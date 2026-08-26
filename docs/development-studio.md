@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Wilderness Odyssey Development Studio is a selectable **World Type** for Minecraft 1.21.1. It creates a real naturally generated Wilderness Odyssey world and enables a persistent, server-authoritative developer layer over that world.
+Wilderness Odyssey Development Studio is a persistent, server-authoritative developer layer for existing Studio saves and explicitly enabled normal test worlds. It is no longer exposed as a selectable **World Type** when creating a world.
 
 It is not a dimension, superflat map, void world, debug generator, or fake simulation. The active level remains `minecraft:overworld`. Outside the bounded Development Campus, the world follows the same terrain, biome, cave, structure, water, ecosystem, weather, entity, and compatible modded-worldgen paths as a normal Wilderness Odyssey world.
 
@@ -15,28 +15,27 @@ Phases 1-3 provide the world foundation, controlled Structure and Entity Labs, p
 - Java 21
 - Mod namespace `wildernessodysseyapi`
 
-Minecraft 1.21.1 represents Create World's World Type choices with the data-driven `WorldPreset` registry. The Create World UI reads entries in `#minecraft:normal` and resolves names through `generator.<namespace>.<path>` translations. Development Studio uses that supported path and does not mix into the world-creation screen.
+Minecraft 1.21.1 represents Create World's World Type choices with the data-driven `WorldPreset` registry. Development Studio no longer contributes a preset, an entry to `#minecraft:normal`, or a generator-name translation, and it does not mix into the world-creation screen.
 
-## World Type registration
+## World Type removal and save compatibility
 
-The World Type is registered as:
-
-```text
-wildernessodysseyapi:development_studio
-```
-
-Its resources are:
+New builds do not package these former World Type resources:
 
 - `data/wildernessodysseyapi/worldgen/world_preset/development_studio.json`
-- `data/wildernessodysseyapi/worldgen/noise_settings/development_studio.json` (generated)
 - `data/minecraft/tags/worldgen/world_preset/normal.json`
 - translation key `generator.wildernessodysseyapi.development_studio`
 
-The normal world-preset tag exposes **Wilderness Odyssey Development Studio** in the ordinary World Type cycle. Minecraft 1.21.1's selector supports a translated preset name but no separate arbitrary-preset description field, so the in-world screen and this document explain its purpose.
+The generated noise-settings entry remains at:
 
-## Natural generation contract
+```text
+data/wildernessodysseyapi/worldgen/noise_settings/development_studio.json
+```
 
-The preset's Overworld uses:
+This is deliberate compatibility data. Worlds created with the former preset may serialize `wildernessodysseyapi:development_studio` as their Overworld noise-settings key. Removing that registry entry would put existing saves at risk even though it is no longer used to create new worlds.
+
+## Legacy natural-generation contract
+
+Existing Studio worlds use:
 
 - level stem `minecraft:overworld`
 - chunk generator `minecraft:noise`
@@ -44,11 +43,11 @@ The preset's Overworld uses:
 - biome-source preset `minecraft:overworld`
 - noise settings `wildernessodysseyapi:development_studio`, generated from Minecraft's exact normal Overworld factory
 
-The Nether and End use their standard vanilla stems and generator settings.
+Their Nether and End use the standard vanilla stems and generator settings.
 
-The Studio preset does not fork Wilderness Odyssey's terrain pipeline. Existing TerraBlender integration, biome modifiers, features, structures, custom water, ecosystem controllers, localized weather, mob AI, and compatible mod worldgen see a normal noise-based Overworld and continue through their existing owners.
+The former Studio preset did not fork Wilderness Odyssey's terrain pipeline. Existing TerraBlender integration, biome modifiers, features, structures, custom water, ecosystem controllers, localized weather, mob AI, and compatible mod worldgen therefore still see a normal noise-based Overworld and continue through their existing owners.
 
-The real dimension type remains `minecraft:overworld`. Data generation calls `NoiseGeneratorSettings.overworld(context, false, false)` and writes the result under the Studio key. The value keeps the normal noise router, surface rules, spawn targets, aquifers, ore veins, sea level, blocks, and density functions; only the holder key differs so it can act as a creation marker. It creates neither a second dimension nor another save directory.
+The real dimension type remains `minecraft:overworld`. Data generation continues to call `NoiseGeneratorSettings.overworld(context, false, false)` and writes the result under the legacy Studio key. The value keeps the normal noise router, surface rules, spawn targets, aquifers, ore veins, sea level, blocks, and density functions; only the holder key differs. It creates neither a second dimension nor another save directory.
 
 ## Persistent world identity
 
@@ -67,7 +66,7 @@ It persists:
 - the first validated Structure Lab block baseline
 - a saved-data format version
 
-On first Overworld load, `StudioWorldAccess` recognizes the vanilla-derived Studio noise-settings holder and writes `developmentStudioWorld = true`. Systems subsequently read the saved flag rather than guessing from a dimension ID, name, seed, or generator class.
+When an existing Studio Overworld loads, `StudioWorldAccess` recognizes the retained vanilla-derived noise-settings holder and writes `developmentStudioWorld = true` if needed. Systems subsequently read the saved flag rather than guessing from a dimension ID, name, seed, or generator class.
 
 Saved-data format 3 recognizes earlier 21x21 campuses as layout version 1. It does not destructively expand them merely because a world loaded. The World page offers an explicit **Upgrade legacy campus to 65x65 facility** action, explains the footprint, and commits the new origin/version only after placement succeeds. Normal worlds do not create Studio data merely by loading.
 
@@ -85,7 +84,7 @@ config/wildernessodysseyapi/wildernessodysseyapi-server.toml
 ```
 
 Development Studio settings are grouped under `[development_studio]`.
-`allowInNormalWorlds` defaults to `false`. Every request, including read-only refreshes and modifying lab/weather actions, rechecks access.
+`allowInNormalWorlds` defaults to `false`. Enabling it grants authorized operators access to Studio tools in an ordinary world; it does not convert that world into a Studio save or automatically place a campus. Every request, including read-only refreshes and modifying lab/weather actions, rechecks access.
 
 ## Opening Studio
 
@@ -274,19 +273,19 @@ $env:JAVA_HOME='C:\Program Files\Java\jdk-21.0.10'
 .\gradlew.bat build
 ```
 
-`runData` and `generateStructures` are separate repository tasks. Studio tests cover the preset/resources, saved identity/bookmarks/regions/snapshot migration, text sanitation, module states, campus destinations, and controlled-fixture dimensions. StructureGen validates and semantically re-reads all three generated templates. The current campus compiles as 65x15x65 with 21,709 stored records, 11,489 intentional air records, 10,220 occupied blocks, 45 vanilla block types, no block entities, and no entities.
+`runData` and `generateStructures` are separate repository tasks. Studio tests cover World Type removal, the retained legacy marker, saved identity/bookmarks/regions/snapshot migration, text sanitation, module states, campus destinations, and controlled-fixture dimensions. StructureGen validates and semantically re-reads all three generated templates. The current campus compiles as 65x15x65 with 21,709 stored records, 11,489 intentional air records, 10,220 occupied blocks, 45 vanilla block types, no block entities, and no entities.
 
-A prior dedicated-server Phase 1 smoke test created the Studio preset, prepared a normal Overworld, passed TerraBlender/Biolith recognition, and placed the campus. Phases 2-3 still require the live checks below; compilation is not proof of screen, renderer, entity, structure, or localized environment behavior.
+A prior dedicated-server Phase 1 smoke test covered a world created before the preset was removed: it prepared a normal Overworld, passed TerraBlender/Biolith recognition, and placed the campus. Live checks are still required after removal; compilation is not proof of Create World visibility, legacy-save loading, screen, renderer, entity, structure, or localized environment behavior.
 
 ## In-game validation
 
 1. Run `runClient`.
 2. Select **Singleplayer -> Create New World -> World -> World Type**.
-3. Confirm **Wilderness Odyssey Development Studio** appears.
-4. Create the world with structures enabled; Creative and cheats are useful but not forced.
-5. Confirm the normal starter-bunker workflow remains additive.
-6. Confirm the 65x65 campus occupies only a limited natural area near spawn and that its raised foundations meet the selected low-slope terrain without flattening the surrounding wilderness.
-7. Explore beyond it and compare terrain, biomes, caves, structures, water, ecosystems, Weather, and modded generation with a normal same-seed world.
+3. Confirm **Wilderness Odyssey Development Studio** does not appear.
+4. Create an ordinary world. Confirm Studio is denied by default and no campus is placed.
+5. With a backup available, open a world previously created with the Studio preset. Confirm it loads normally, retains its campus and bookmarks, and does not duplicate placement.
+6. Confirm the normal starter-bunker workflow remains additive in that existing Studio world.
+7. Explore beyond the campus and confirm terrain, biomes, caves, structures, water, ecosystems, Weather, and modded generation continue normally.
 8. Press F8 and run `/wilderness studio`. Confirm implemented modules appear in a left sidebar, deferred modules no longer consume navigation buttons, and the content panel stays fully visible at the configured GUI scale.
 9. Exercise Locations' separate Campus and Regression Bookmarks views, visit all eight operational destinations, and inspect blocks, block entities, passive mobs, hostile mobs, and a profiled animal.
 10. Preview `test_shelter` eight blocks ahead and enable Structure Preview. Confirm only bounds render.
@@ -295,14 +294,14 @@ A prior dedicated-server Phase 1 smoke test created the Studio preset, prepared 
 13. Enable Test Region Bounds and confirm the four campus regions toggle independently from structure preview.
 14. Inspect a natural river/ocean through Water, nearby animals through Ecosystem, current Weather, and a generated chunk through Worldgen.
 15. Use Weather Clear/Rain/Snow/Hail and confirm only the real local atmosphere changes.
-16. For an older Studio save, open World, read the footprint warning, move anything valuable out of the future 65x65 footprint, and approve the campus upgrade. Confirm the hub center remains fixed, the old colored pads are replaced, and facility teleporting becomes available.
+16. For a legacy-campus save, open World, read the footprint warning, move anything valuable out of the future 65x65 footprint, and approve the campus upgrade. Confirm the hub center remains fixed, the old colored pads are replaced, and facility teleporting becomes available.
 17. Quit/reload and repeat Structure Lab Reset to prove baseline persistence. Confirm campus, bookmarks, regions, and campus upgrades are not duplicated.
 18. Restart a dedicated server and repeat operator/non-operator checks.
-19. Create a normal same-seed world. Confirm Studio is denied by default and no campus is placed.
+19. In a disposable normal test world, explicitly enable `allowInNormalWorlds`. Confirm authorized operators can open the tools, no Studio identity is persisted, and no campus is automatically placed.
 
 ## Current limitations
 
-- The 1.21.1 World Type selector has no custom tooltip field.
+- New Studio worlds cannot be created from the World Type selector. The retained noise-settings entry exists only so older Studio saves remain loadable.
 - A legacy-campus upgrade intentionally replaces the mod-owned 65x65 area around the old hub. It is never automatic; move player-built work outside that footprint before approving it.
 - Campus site search is bounded and may decline an exceptionally hostile spawn region.
 - F8 does not enable cheats, Creative, or unrelated gamerules.

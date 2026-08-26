@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.core;
 
 import com.thunder.wildernessodysseyapi.ai.story.AIChatListener;
 import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
+import com.thunder.wildernessodysseyapi.cinematic.CinematicSequences;
 import com.thunder.wildernessodysseyapi.command.ModCommands;
 import com.thunder.wildernessodysseyapi.config.ModConfigRegistration;
 import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
@@ -69,6 +70,7 @@ public final class WildernessOdysseyAPIMainModClass {
 
         WildernessWaterRules.bootstrap();
         WaterCompatibilityRegistry.bootstrap(modEventBus);
+        CinematicSequences.bootstrap();
 
         // Mod-bus listeners handle lifecycle work that NeoForge runs during startup.
         modEventBus.addListener(this::commonSetup);

@@ -1,5 +1,9 @@
 package com.thunder.wildernessodysseyapi.network;
 
+import com.thunder.wildernessodysseyapi.cinematic.client.CinematicClientController;
+import com.thunder.wildernessodysseyapi.cinematic.network.CinematicStagePayload;
+import com.thunder.wildernessodysseyapi.cinematic.network.EndCinematicPayload;
+import com.thunder.wildernessodysseyapi.cinematic.network.StartCinematicPayload;
 import com.thunder.wildernessodysseyapi.cloak.item.CloakState;
 import com.thunder.wildernessodysseyapi.cloak.item.CloakTickHandler;
 import com.thunder.wildernessodysseyapi.cloak.network.CloakInputPayload;
@@ -61,7 +65,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class ModPayloads {
 
     // Phase 4 adds the required reactive-vegetation Data Engine handler.
-    private static final String NETWORK_VERSION = "23";
+    private static final String NETWORK_VERSION = "24";
 
     private ModPayloads() {
     }
@@ -74,6 +78,15 @@ public final class ModPayloads {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(NETWORK_VERSION);
         DataEnginePayloads.register(registrar);
+
+        // Cinematics synchronize only start, stage boundaries, and end. Camera
+        // interpolation and overlays remain client presentation concerns.
+        registrar.playToClient(StartCinematicPayload.TYPE, StartCinematicPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> CinematicClientController.accept(payload)));
+        registrar.playToClient(CinematicStagePayload.TYPE, CinematicStagePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> CinematicClientController.accept(payload)));
+        registrar.playToClient(EndCinematicPayload.TYPE, EndCinematicPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> CinematicClientController.accept(payload)));
 
         // PayloadRegistrar already marshals play handlers to the main thread.
         // Handle this dimension-sensitive state immediately so a second queue

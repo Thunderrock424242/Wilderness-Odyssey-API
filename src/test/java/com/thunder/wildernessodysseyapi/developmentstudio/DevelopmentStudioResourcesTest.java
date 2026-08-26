@@ -13,30 +13,33 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Guards the data-driven World Type contract and natural Overworld delegation. */
+/** Guards World Type removal, legacy-save compatibility, and Studio assets. */
 class DevelopmentStudioResourcesTest {
 
     @Test
-    void presetUsesNormalOverworldNoiseAndBiomeSource() throws IOException {
-        JsonObject preset = readJson(
+    void worldTypeIsNotExposed() throws IOException {
+        Path projectRoot = projectRoot();
+        assertFalse(Files.exists(projectRoot.resolve(
                 "src/main/resources/data/wildernessodysseyapi/worldgen/world_preset/development_studio.json"
-        );
-        JsonObject dimensions = preset.getAsJsonObject("dimensions");
-        JsonObject overworld = dimensions.getAsJsonObject("minecraft:overworld");
-        JsonObject generator = overworld.getAsJsonObject("generator");
-        JsonObject biomeSource = generator.getAsJsonObject("biome_source");
+        )));
 
-        assertEquals("minecraft:overworld", overworld.get("type").getAsString());
-        assertEquals("minecraft:noise", generator.get("type").getAsString());
-        assertEquals("wildernessodysseyapi:development_studio", generator.get("settings").getAsString());
-        assertEquals("minecraft:multi_noise", biomeSource.get("type").getAsString());
-        assertEquals("minecraft:overworld", biomeSource.get("preset").getAsString());
-        assertTrue(dimensions.has("minecraft:the_nether"));
-        assertTrue(dimensions.has("minecraft:the_end"));
+        Path normalPresetTag = projectRoot.resolve(
+                "src/main/resources/data/minecraft/tags/worldgen/world_preset/normal.json"
+        );
+        if (Files.exists(normalPresetTag)) {
+            JsonArray values = JsonParser.parseString(Files.readString(normalPresetTag))
+                    .getAsJsonObject()
+                    .getAsJsonArray("values");
+            assertFalse(values.asList().stream()
+                    .anyMatch(value -> "wildernessodysseyapi:development_studio".equals(value.getAsString())));
+        }
+
+        JsonObject language = readJson("src/main/resources/assets/wildernessodysseyapi/lang/en_us.json");
+        assertFalse(language.has("generator.wildernessodysseyapi.development_studio"));
     }
 
     @Test
-    void generatedMarkerUsesNormalOverworldNoiseBehavior() throws IOException {
+    void legacyMarkerUsesNormalOverworldNoiseBehavior() throws IOException {
         JsonObject settings = readJson(
                 "src/generated/resources/data/wildernessodysseyapi/worldgen/noise_settings/development_studio.json"
         );
@@ -52,22 +55,6 @@ class DevelopmentStudioResourcesTest {
         assertTrue(settings.has("noise_router"));
         assertTrue(settings.has("surface_rule"));
         assertTrue(settings.has("spawn_target"));
-    }
-
-    @Test
-    void normalPresetTagAndTranslationExposeWorldTypeInCreateWorld() throws IOException {
-        JsonObject tag = readJson(
-                "src/main/resources/data/minecraft/tags/worldgen/world_preset/normal.json"
-        );
-        JsonArray values = tag.getAsJsonArray("values");
-        assertTrue(values.asList().stream()
-                .anyMatch(value -> "wildernessodysseyapi:development_studio".equals(value.getAsString())));
-
-        JsonObject language = readJson("src/main/resources/assets/wildernessodysseyapi/lang/en_us.json");
-        assertEquals(
-                "Wilderness Odyssey Development Studio",
-                language.get("generator.wildernessodysseyapi.development_studio").getAsString()
-        );
     }
 
     @Test
@@ -99,10 +86,13 @@ class DevelopmentStudioResourcesTest {
     }
 
     private static JsonObject readJson(String relativePath) throws IOException {
-        Path projectRoot = Path.of(System.getProperty(
+        return JsonParser.parseString(Files.readString(projectRoot().resolve(relativePath))).getAsJsonObject();
+    }
+
+    private static Path projectRoot() {
+        return Path.of(System.getProperty(
                 "wildernessodysseyapi.projectDir",
                 System.getProperty("user.dir")
         ));
-        return JsonParser.parseString(Files.readString(projectRoot.resolve(relativePath))).getAsJsonObject();
     }
 }
