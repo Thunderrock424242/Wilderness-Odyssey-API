@@ -13,6 +13,7 @@ public class AIConfig {
     private final List<String> backgroundHistory = new ArrayList<>();
     private final List<String> authoritativeKnowledge = new ArrayList<>();
     private final List<String> knowledgeBoundaries = new ArrayList<>();
+    private final List<Subsystem> subsystems = new ArrayList<>();
     private String corruptedPrefix;
     private final Personality personality = new Personality();
     private final Settings settings = new Settings();
@@ -37,6 +38,10 @@ public class AIConfig {
 
     public List<String> getKnowledgeBoundaries() {
         return knowledgeBoundaries;
+    }
+
+    public List<Subsystem> getSubsystems() {
+        return subsystems;
     }
 
     public String getCorruptedPrefix() {
@@ -192,6 +197,52 @@ public class AIConfig {
 
         public void setMaxOutputTokens(Integer maxOutputTokens) {
             this.maxOutputTokens = maxOutputTokens;
+        }
+    }
+
+    /** Configured LLM personality operating beneath the central Aether intelligence. */
+    public static class Subsystem {
+        private String name;
+        private String role;
+        private String personality;
+        private final List<String> aliases = new ArrayList<>();
+        private final List<String> knowledge = new ArrayList<>();
+        private final List<String> boundaries = new ArrayList<>();
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getRole() {
+            return role;
+        }
+
+        public void setRole(String role) {
+            this.role = role;
+        }
+
+        public String getPersonality() {
+            return personality;
+        }
+
+        public void setPersonality(String personality) {
+            this.personality = personality;
+        }
+
+        public List<String> getAliases() {
+            return aliases;
+        }
+
+        public List<String> getKnowledge() {
+            return knowledge;
+        }
+
+        public List<String> getBoundaries() {
+            return boundaries;
         }
     }
 

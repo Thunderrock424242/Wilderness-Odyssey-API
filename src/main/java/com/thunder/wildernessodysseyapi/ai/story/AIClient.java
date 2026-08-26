@@ -13,7 +13,8 @@ import java.util.UUID;
 import net.minecraft.server.MinecraftServer;
 
 /**
- * AI client that answers from bundled deterministic prompts and local learned facts.
+ * Coordinates the central Aether intelligence, its local-model specialists,
+ * conversation memory, and the scripted provider-failure responder.
  */
 public class AIClient {
 
@@ -29,6 +30,7 @@ public class AIClient {
     private final AIOnboardingStore onboardingStore = new AIOnboardingStore();
     private final AIFallbackResponder fallbackResponder = new AIFallbackResponder();
     private final OllamaChatClient ollamaChatClient = new OllamaChatClient();
+    private AISubsystemRegistry subsystemRegistry = new AISubsystemRegistry("Aether", List.of());
     private boolean onboardingEnabled;
     private String onboardingCompletionMessage = "You're all set. You can ask me anything now.";
     private String onboardingInvalidChoiceMessage = "Pick one of the numbered options so I can guide you.";
@@ -55,11 +57,11 @@ public class AIClient {
             return false;
         }
         String lower = message.toLowerCase(Locale.ROOT);
-        return lower.contains(settings.getWakeWord()) || fallbackResponder.findMentionedPersonaName(message).isPresent();
+        return lower.contains(settings.getWakeWord()) || subsystemRegistry.findExplicitSpeaker(message).isPresent();
     }
 
     public String resolveSpeaker(String message) {
-        return fallbackResponder.findMentionedPersonaName(message).orElse(settings.getPersonaName());
+        return subsystemRegistry.findExplicitSpeaker(message).orElse(subsystemRegistry.centralName());
     }
 
     private void loadStory() {
@@ -70,6 +72,7 @@ public class AIClient {
         authoritativeKnowledge.addAll(config.getAuthoritativeKnowledge());
         knowledgeBoundaries.addAll(config.getKnowledgeBoundaries());
         applySettings(config);
+        subsystemRegistry = new AISubsystemRegistry(settings.getPersonaName(), config.getSubsystems());
         configureOnboarding(config.getOnboarding());
         fallbackResponder.configure(config.getFallback(), settings.getPersonaName(), settings.getWakeWord());
     }
@@ -184,7 +187,8 @@ public class AIClient {
         }
         AIFallbackResponder.ResponseContext safeResponseContext =
                 responseContext == null ? AIFallbackResponder.ResponseContext.empty() : responseContext;
-        String speaker = resolveSpeaker(message);
+        Optional<String> requiredSpeaker = subsystemRegistry.findExplicitSpeaker(message);
+        String speaker = requiredSpeaker.orElse(subsystemRegistry.centralName());
         String learnedFact = knowledgeStore.extractLearnedFact(message);
         if (learnedFact != null) {
             boolean added = knowledgeStore.addFact(learnedFact);
@@ -210,7 +214,8 @@ public class AIClient {
                     corruptedLore,
                     authoritativeKnowledge,
                     knowledgeBoundaries,
-                    speaker,
+                    subsystemRegistry,
+                    requiredSpeaker.orElse(""),
                     safeResponseContext,
                     knowledgeContext
             );
@@ -222,16 +227,21 @@ public class AIClient {
             OllamaChatClient.ModelResponse modelResponse = ollamaChatClient.generate(
                     settings,
                     systemPrompt,
-                    speaker,
+                    requiredSpeaker.orElse(""),
+                    subsystemRegistry.allowedSpeakers(),
+                    subsystemRegistry.centralName(),
                     history
             );
             if (modelResponse.successful()) {
+                speaker = subsystemRegistry.canonicalOrCentral(modelResponse.speaker());
                 String verifierPrompt = AetherSystemPrompt.buildVerifier(
                         story,
                         backgroundHistory,
                         corruptedLore,
                         authoritativeKnowledge,
                         knowledgeBoundaries,
+                        speaker,
+                        subsystemRegistry.profileFor(speaker).orElse(null),
                         safeResponseContext,
                         message,
                         modelResponse.text()
@@ -251,7 +261,9 @@ public class AIClient {
         // local request did not produce a usable reply.
         Optional<AIFallbackResponder.FallbackReply> authoredReply =
                 fallbackResponder.buildReply(message, safeResponseContext);
-        speaker = authoredReply.map(AIFallbackResponder.FallbackReply::speaker).orElse(speaker);
+        speaker = authoredReply.map(AIFallbackResponder.FallbackReply::speaker)
+                .map(subsystemRegistry::canonicalOrCentral)
+                .orElse(speaker);
         String reply = authoredReply.map(AIFallbackResponder.FallbackReply::text)
                 .orElse("Archive gap detected. I do not have a recovered answer for that yet.");
         if (settings.isOllamaEnabled()) {

@@ -85,7 +85,9 @@ public final class OllamaChatClient {
     public ModelResponse generate(
             AISettings settings,
             String systemPrompt,
-            String speaker,
+            String requiredSpeaker,
+            List<String> allowedSpeakers,
+            String centralSpeaker,
             List<MemoryStore.ConversationMessage> history
     ) {
         Optional<URI> chatUri = resolveChatUri(settings.getEndpoint());
@@ -104,11 +106,17 @@ public final class OllamaChatClient {
             if (response.statusCode() / 100 != 2) {
                 return failure("Ollama returned HTTP " + response.statusCode());
             }
-            Optional<String> parsed = parseResponse(response.body(), speaker, settings.getMaxResponseCharacters());
+            Optional<RoutedDialogue> parsed = parseRoutedResponse(
+                    response.body(),
+                    requiredSpeaker,
+                    allowedSpeakers,
+                    centralSpeaker,
+                    settings.getMaxResponseCharacters()
+            );
             if (parsed.isEmpty()) {
                 return failure("Ollama returned no readable dialogue");
             }
-            return new ModelResponse(parsed.get(), true);
+            return new ModelResponse(parsed.get().speaker(), parsed.get().reply(), true);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             return failure("the local model request was interrupted");
@@ -158,6 +166,7 @@ public final class OllamaChatClient {
         payload.addProperty("model", model);
         payload.addProperty("stream", false);
         payload.addProperty("keep_alive", MODEL_KEEP_ALIVE);
+        payload.addProperty("format", "json");
 
         JsonArray messages = new JsonArray();
         addMessage(messages, "system", systemPrompt);
@@ -169,7 +178,10 @@ public final class OllamaChatClient {
                 if (message.role() == MemoryStore.Role.PLAYER) {
                     addMessage(messages, "user", message.text());
                 } else {
-                    addMessage(messages, "assistant", message.speaker() + ": " + message.text());
+                    JsonObject previousReply = new JsonObject();
+                    previousReply.addProperty("speaker", message.speaker());
+                    previousReply.addProperty("reply", message.text());
+                    addMessage(messages, "assistant", previousReply.toString());
                 }
             }
         }
@@ -225,7 +237,13 @@ public final class OllamaChatClient {
         }
     }
 
-    static Optional<String> parseResponse(String json, String speaker, int maxCharacters) {
+    static Optional<RoutedDialogue> parseRoutedResponse(
+            String json,
+            String requiredSpeaker,
+            List<String> allowedSpeakers,
+            String centralSpeaker,
+            int maxCharacters
+    ) {
         if (json == null || json.isBlank()) {
             return Optional.empty();
         }
@@ -243,11 +261,40 @@ public final class OllamaChatClient {
             if (contentElement == null || !contentElement.isJsonPrimitive()) {
                 return Optional.empty();
             }
-            String cleaned = sanitizeDialogue(contentElement.getAsString(), speaker, maxCharacters);
-            return cleaned.isBlank() ? Optional.empty() : Optional.of(cleaned);
+            JsonElement routedElement = JsonParser.parseString(contentElement.getAsString());
+            if (!routedElement.isJsonObject()) {
+                return Optional.empty();
+            }
+            JsonObject routed = routedElement.getAsJsonObject();
+            JsonElement replyElement = routed.get("reply");
+            if (replyElement == null || !replyElement.isJsonPrimitive()) {
+                return Optional.empty();
+            }
+            String modelSpeaker = routed.has("speaker") && routed.get("speaker").isJsonPrimitive()
+                    ? routed.get("speaker").getAsString()
+                    : "";
+            String speaker = selectAllowedSpeaker(requiredSpeaker, modelSpeaker, allowedSpeakers, centralSpeaker);
+            String cleaned = sanitizeDialogue(replyElement.getAsString(), speaker, maxCharacters);
+            return cleaned.isBlank() ? Optional.empty() : Optional.of(new RoutedDialogue(speaker, cleaned));
         } catch (RuntimeException ignored) {
             return Optional.empty();
         }
+    }
+
+    static String selectAllowedSpeaker(
+            String requiredSpeaker,
+            String modelSpeaker,
+            List<String> allowedSpeakers,
+            String centralSpeaker
+    ) {
+        List<String> allowed = allowedSpeakers == null ? List.of() : allowedSpeakers;
+        String safeCentral = findCanonical(centralSpeaker, allowed)
+                .orElseGet(() -> allowed.isEmpty() ? "Aether" : allowed.get(0));
+        Optional<String> required = findCanonical(requiredSpeaker, allowed);
+        if (required.isPresent()) {
+            return required.get();
+        }
+        return findCanonical(modelSpeaker, allowed).orElse(safeCentral);
     }
 
     static Optional<Boolean> parseVerificationResponse(String json) {
@@ -323,6 +370,15 @@ public final class OllamaChatClient {
                 || "0:0:0:0:0:0:0:1".equals(normalized);
     }
 
+    private static Optional<String> findCanonical(String candidate, List<String> allowedSpeakers) {
+        if (candidate == null || candidate.isBlank() || allowedSpeakers == null) {
+            return Optional.empty();
+        }
+        return allowedSpeakers.stream()
+                .filter(allowed -> allowed != null && allowed.equalsIgnoreCase(candidate.trim()))
+                .findFirst();
+    }
+
     private static String stripSpeakerPrefix(String dialogue, String speaker) {
         if (dialogue.isBlank() || speaker == null || speaker.isBlank()) {
             return dialogue;
@@ -347,7 +403,7 @@ public final class OllamaChatClient {
 
     private static ModelResponse failure(String reason) {
         logFailure(reason);
-        return new ModelResponse("", false);
+        return new ModelResponse("", "", false);
     }
 
     private static void logFailure(String reason) {
@@ -371,7 +427,11 @@ public final class OllamaChatClient {
     }
 
     /** Result of one local model request without exposing response internals to chat. */
-    public record ModelResponse(String text, boolean successful) {
+    public record ModelResponse(String speaker, String text, boolean successful) {
+    }
+
+    /** Parsed and speaker-whitelisted main model output. */
+    record RoutedDialogue(String speaker, String reply) {
     }
 
     /** Result of the local factual review pass. */
