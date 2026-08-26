@@ -77,7 +77,7 @@ public final class AIConfigLoader {
         }
     }
 
-    private static AIConfig parse(String content) {
+    static AIConfig parse(String content) {
         AIConfig config = new AIConfig();
         if (content == null || content.isBlank()) {
             return config;
@@ -95,6 +95,7 @@ public final class AIConfigLoader {
         config.getCorruptedData().addAll(readStringList(root.get("corrupted_data")));
         config.getAuthoritativeKnowledge().addAll(readStringList(root.get("authoritative_knowledge")));
         config.getKnowledgeBoundaries().addAll(readStringList(root.get("knowledge_boundaries")));
+        config.getSubsystems().addAll(readSubsystems(root.get("subsystems")));
         config.setCorruptedPrefix(readStringValue(root.get("corrupted_prefix")));
         Map<String, Object> personality = readStringObjectMap(root.get("personality"));
         config.getPersonality().setName(readStringValue(personality.get("name")));
@@ -148,6 +149,9 @@ public final class AIConfigLoader {
         }
         if (config.getKnowledgeBoundaries().isEmpty()) {
             config.getKnowledgeBoundaries().addAll(bundled.getKnowledgeBoundaries());
+        }
+        if (config.getSubsystems().isEmpty()) {
+            config.getSubsystems().addAll(bundled.getSubsystems());
         }
     }
 
@@ -312,6 +316,30 @@ public final class AIConfigLoader {
         return personas;
     }
 
+    private static List<AIConfig.Subsystem> readSubsystems(Object value) {
+        if (!(value instanceof Iterable<?> items)) {
+            return List.of();
+        }
+        List<AIConfig.Subsystem> subsystems = new ArrayList<>();
+        for (Object entry : items) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                continue;
+            }
+            AIConfig.Subsystem subsystem = new AIConfig.Subsystem();
+            subsystem.setName(readStringValue(map.get("name")));
+            subsystem.setRole(readStringValue(map.get("role")));
+            subsystem.setPersonality(readStringValue(map.get("personality")));
+            subsystem.getAliases().addAll(readStringList(map.get("aliases")));
+            subsystem.getKnowledge().addAll(readStringList(map.get("knowledge")));
+            subsystem.getBoundaries().addAll(readStringList(map.get("boundaries")));
+            if (subsystem.getName() != null && !subsystem.getName().isBlank()
+                    && subsystem.getRole() != null && !subsystem.getRole().isBlank()) {
+                subsystems.add(subsystem);
+            }
+        }
+        return subsystems;
+    }
+
     private static void hydrateFallbackPromptFiles(List<AIConfig.FallbackPersona> personas) {
         if (personas == null || personas.isEmpty()) {
             return;
@@ -348,12 +376,15 @@ public final class AIConfigLoader {
     }
 
     private static String readPromptFileContent(String normalizedPath) {
-        Path externalPath = FMLPaths.CONFIGDIR.get().resolve(normalizedPath);
-        if (Files.exists(externalPath)) {
-            try {
-                return Files.readString(externalPath, StandardCharsets.UTF_8);
-            } catch (IOException e) {
-                ModConstants.LOGGER.warn("Failed reading fallback prompt file from config dir: {}", externalPath, e);
+        Path configDirectory = FMLPaths.CONFIGDIR.get();
+        if (configDirectory != null) {
+            Path externalPath = configDirectory.resolve(normalizedPath);
+            if (Files.exists(externalPath)) {
+                try {
+                    return Files.readString(externalPath, StandardCharsets.UTF_8);
+                } catch (IOException e) {
+                    ModConstants.LOGGER.warn("Failed reading fallback prompt file from config dir: {}", externalPath, e);
+                }
             }
         }
         try (InputStream in = AIConfigLoader.class.getClassLoader().getResourceAsStream(normalizedPath)) {

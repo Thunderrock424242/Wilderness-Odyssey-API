@@ -14,15 +14,18 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 - Require no held item, relay block, wake word, command, or spawned companion entity.
 - Clean the player message.
 - Gather cheap game context tags, such as dimension, biome, nearby meteor site, and collected lore IDs.
-- Load canonical lore and knowledge boundaries from configuration, including safe inheritance for older live configs that do not yet contain the new sections.
-- Send the selected persona, bounded recent conversation, canonical knowledge, and immutable context directly to a loopback-only Ollama chat endpoint.
-- Run a short, zero-temperature local-model verification pass and accept the draft only when its concrete claims are supported by the same canonical knowledge and literal context.
+- Load canonical lore, knowledge boundaries, and six bounded subsystem profiles from configuration, including safe inheritance for older live configs that do not yet contain the new sections.
+- Send the registered profiles, bounded recent conversation, canonical knowledge, and immutable context directly to a loopback-only Ollama chat endpoint.
+- Have the local model choose one registered speaker and write its reply in the same structured request. An explicitly named subsystem is enforced by code, and an unregistered model-selected name resolves to Aether.
+- Run a short, zero-temperature local-model verification pass using the selected subsystem's knowledge and boundaries; accept the draft only when its concrete claims are supported by the same canonical knowledge and literal context.
 - Replace a rejected or unverifiable draft with a neutral in-character uncertainty response rather than exposing invented lore as fact.
 - Consult authored intent responses only when the local provider is disabled or fails to produce a usable response.
 - If no offline authored intent matches, answer in-universe with a recovered-data/corrupted-archive limitation.
 - Show the reply in local chat/UI with the chosen A.E.T.H.E.R persona speaker.
 
 ## 3) A.E.T.H.E.R sub-systems
+- The six specialists are first-class personalities of the same local model, not six separate model processes.
+- Aether answers social, general, ambiguous, and multi-domain requests; the local model routes focused requests to the matching specialist.
 - **Aegis** - Health / Protection
   - Player safety guidance, hazard prevention reminders, defensive readiness.
 - **Eclipse** - Rift / Anomaly
@@ -35,6 +38,7 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
   - Combat readiness guidance, threat prioritization, security posture prompts.
 - **Requiem** - Archive / Memory / History
   - Lore memory, historical recall, archive-style narrative continuity.
+- **Atlas** remains historical logistics/archive context. Atlas is not currently registered as an active selectable subsystem; its present status is unknown.
 
 ## 4) Player-facing coverage
 - Expedition guidance: early priorities, hazards, shelter, and resource scouting.
@@ -54,6 +58,7 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 - Warm the configured local model on a background worker when the private integrated world starts; keep it warm for one hour after a request to avoid chat-time cold loads.
 - Conversation history is capped at 20 stored messages, with a configurable smaller request window.
 - Model output size and request duration are bounded.
+- Live-config subsystem profiles are capped before prompt construction, and every model-selected speaker is checked against the configured registry.
 - Normal local-model replies use a second bounded verification request; this trades a small amount of local inference time for stronger factual discipline.
 
 ## 6) Boundaries
@@ -70,8 +75,8 @@ The supported model path is local Ollama over loopback. Remote/cloud endpoints r
 
 ## 8) Definition of done (MVP)
 - A.E.T.H.E.R responds in-world with consistent tone and roleplay behavior.
-- Intent matching works across similar player phrasing, not exact phrases only.
-- Subsystem routing is available for the six domains.
+- LLM subsystem routing works across similar player phrasing without depending on the scripted fallback matcher.
+- Explicit subsystem names and aliases are honored, and automatic routing is available for all six domains.
 - Context tags can change responses when the player is in a known location/state.
 - Unknown answers feel intentional and in-universe.
 - Normal chat works without a relay item or activation command.

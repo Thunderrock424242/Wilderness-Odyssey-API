@@ -27,13 +27,17 @@ class OllamaChatClientTest {
         assertEquals("llama3.2:latest", request.get("model").getAsString());
         assertFalse(request.get("stream").getAsBoolean());
         assertEquals("60m", request.get("keep_alive").getAsString());
+        assertEquals("json", request.get("format").getAsString());
         assertEquals(180, request.getAsJsonObject("options").get("num_predict").getAsInt());
         JsonArray messages = request.getAsJsonArray("messages");
         assertEquals(3, messages.size());
         assertEquals("system", messages.get(0).getAsJsonObject().get("role").getAsString());
         assertEquals("user", messages.get(1).getAsJsonObject().get("role").getAsString());
         assertEquals("assistant", messages.get(2).getAsJsonObject().get("role").getAsString());
-        assertEquals("Aether: Signal received", messages.get(2).getAsJsonObject().get("content").getAsString());
+        JsonObject previousReply = com.google.gson.JsonParser.parseString(
+                messages.get(2).getAsJsonObject().get("content").getAsString()).getAsJsonObject();
+        assertEquals("Aether", previousReply.get("speaker").getAsString());
+        assertEquals("Signal received", previousReply.get("reply").getAsString());
     }
 
     @Test
@@ -52,15 +56,27 @@ class OllamaChatClientTest {
     }
 
     @Test
-    void parsesDialogueAndRemovesDuplicateSpeakerPrefix() {
-        String response = "{\"message\":{\"role\":\"assistant\",\"content\":\"[Aether] Signal received.\"},\"done\":true}";
+    void parsesRoutedDialogueAndRemovesDuplicateSpeakerPrefix() {
+        String response = "{\"message\":{\"role\":\"assistant\",\"content\":\"{\\\"speaker\\\":\\\"eCLipse\\\",\\\"reply\\\":\\\"[Eclipse] Signal received.\\\"}\"},\"done\":true}";
 
-        assertEquals(
-                "Signal received.",
-                OllamaChatClient.parseResponse(response, "Aether", 800).orElseThrow()
-        );
-        assertTrue(OllamaChatClient.parseResponse("{\"message\":{}}", "Aether", 800).isEmpty());
-        assertTrue(OllamaChatClient.parseResponse("not json", "Aether", 800).isEmpty());
+        OllamaChatClient.RoutedDialogue dialogue = OllamaChatClient.parseRoutedResponse(
+                response, "", List.of("Aether", "Eclipse"), "Aether", 800).orElseThrow();
+
+        assertEquals("Eclipse", dialogue.speaker());
+        assertEquals("Signal received.", dialogue.reply());
+        assertTrue(OllamaChatClient.parseRoutedResponse(
+                "{\"message\":{}}", "", List.of("Aether"), "Aether", 800).isEmpty());
+        assertTrue(OllamaChatClient.parseRoutedResponse(
+                "not json", "", List.of("Aether"), "Aether", 800).isEmpty());
+    }
+
+    @Test
+    void explicitAndAllowedSpeakerRulesCannotBeOverriddenByModelOutput() {
+        List<String> allowed = List.of("Aether", "Aegis", "Eclipse");
+
+        assertEquals("Aegis", OllamaChatClient.selectAllowedSpeaker("Aegis", "Eclipse", allowed, "Aether"));
+        assertEquals("Eclipse", OllamaChatClient.selectAllowedSpeaker("", "eCLipse", allowed, "Aether"));
+        assertEquals("Aether", OllamaChatClient.selectAllowedSpeaker("", "Overseer", allowed, "Aether"));
     }
 
     @Test
