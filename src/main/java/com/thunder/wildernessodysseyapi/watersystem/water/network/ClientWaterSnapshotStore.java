@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.network;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -54,6 +55,7 @@ public final class ClientWaterSnapshotStore {
         SNAPSHOTS.compute(key, (ignored, previous) -> previous == null
                 ? new ClientWaterChunkSnapshot(chunkX, chunkZ, generated.snapshot(), 0L, new int[0])
                 : previous.withGenerated(generated.snapshot()));
+        WaterBodyClassifier.invalidateChunk(level, chunkX, chunkZ);
         markDirty(key);
     }
 

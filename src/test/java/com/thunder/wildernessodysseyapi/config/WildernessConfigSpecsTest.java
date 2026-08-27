@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.config;
 
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
+import com.thunder.wildernessodysseyapi.ai.voice.config.AetherVoiceConfig;
 import com.thunder.wildernessodysseyapi.dataengine.config.DataEngineConfig;
 import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import com.thunder.wildernessodysseyapi.developmentstudio.config.StudioConfig;
@@ -43,6 +44,7 @@ class WildernessConfigSpecsTest {
         assertSame(WildernessConfigSpecs.commonSpec(), OwnershipConfig.CONFIG_SPEC);
 
         assertSame(WildernessConfigSpecs.clientSpec(), DonationReminderConfig.CONFIG_SPEC);
+        assertSame(WildernessConfigSpecs.clientSpec(), AetherVoiceConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.clientSpec(), DebugOverlayConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.clientSpec(), WaterRenderingConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.clientSpec(), WeatherRenderingConfig.CONFIG_SPEC);
@@ -78,6 +80,10 @@ class WildernessConfigSpecsTest {
         assertEquals(
                 List.of("donations", "disableReminder"),
                 DonationReminderConfig.disableReminder.getPath()
+        );
+        assertEquals(
+                List.of("aether_voice", "enabled"),
+                AetherVoiceConfig.VOICE_ENABLED.getPath()
         );
         assertEquals(
                 List.of("weather_rendering", "localized_clouds", "enabled"),

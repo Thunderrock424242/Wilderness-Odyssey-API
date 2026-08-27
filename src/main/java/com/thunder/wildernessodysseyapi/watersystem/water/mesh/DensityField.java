@@ -13,7 +13,7 @@ import java.util.List;
  * onto a uniform grid. The marching cubes algorithm samples this
  * field to extract the iso-surface (the water mesh).
  *
- * The field is rebuilt every frame from the current particle positions.
+ * The field is rebuilt only when the owning simulation publishes a new render revision.
  * Grid dimensions are determined dynamically from the particle AABB
  * plus a small padding.
  */
@@ -120,5 +120,62 @@ public class DensityField {
         out.set(originX + gx * cellSize,
                 originY + gy * cellSize,
                 originZ + gz * cellSize);
+    }
+
+    /**
+     * Writes a smooth outward normal from the trilinear density gradient.
+     *
+     * @return whether the sampled gradient was large enough to normalize
+     */
+    public boolean outwardNormal(float worldX, float worldY, float worldZ, Vector3f out) {
+        float gridX = (worldX - originX) * invCellSz;
+        float gridY = (worldY - originY) * invCellSz;
+        float gridZ = (worldZ - originZ) * invCellSz;
+        int x0 = (int) Math.floor(gridX);
+        int y0 = (int) Math.floor(gridY);
+        int z0 = (int) Math.floor(gridZ);
+        float tx = gridX - x0;
+        float ty = gridY - y0;
+        float tz = gridZ - z0;
+
+        // Differentiate the containing trilinear cell analytically. This uses
+        // eight density reads instead of six neighboring trilinear samples
+        // (48 reads) for every emitted marching-cubes vertex.
+        float c000 = sample(x0, y0, z0);
+        float c100 = sample(x0 + 1, y0, z0);
+        float c010 = sample(x0, y0 + 1, z0);
+        float c110 = sample(x0 + 1, y0 + 1, z0);
+        float c001 = sample(x0, y0, z0 + 1);
+        float c101 = sample(x0 + 1, y0, z0 + 1);
+        float c011 = sample(x0, y0 + 1, z0 + 1);
+        float c111 = sample(x0 + 1, y0 + 1, z0 + 1);
+
+        float gradientX = lerp(
+                lerp(c100 - c000, c110 - c010, ty),
+                lerp(c101 - c001, c111 - c011, ty),
+                tz
+        );
+        float gradientY = lerp(
+                lerp(c010 - c000, c110 - c100, tx),
+                lerp(c011 - c001, c111 - c101, tx),
+                tz
+        );
+        float gradientZ = lerp(
+                lerp(c001 - c000, c101 - c100, tx),
+                lerp(c011 - c010, c111 - c110, tx),
+                ty
+        );
+        out.set(-gradientX, -gradientY, -gradientZ);
+        float lengthSquared = out.lengthSquared();
+        if (lengthSquared <= 1.0e-10f) {
+            out.set(0.0f, 1.0f, 0.0f);
+            return false;
+        }
+        out.mul(1.0f / (float) Math.sqrt(lengthSquared));
+        return true;
+    }
+
+    private static float lerp(float from, float to, float alpha) {
+        return from + (to - from) * alpha;
     }
 }

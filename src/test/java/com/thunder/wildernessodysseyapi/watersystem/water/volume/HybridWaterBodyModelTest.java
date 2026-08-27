@@ -44,4 +44,29 @@ class HybridWaterBodyModelTest {
 
         assertArrayEquals(new float[]{1.2f, 0.2f}, flow, 1.0e-6f);
     }
+
+    @Test
+    void coastUsesTideWhileLakeRemainsEnclosed() {
+        float[] coast = HybridWaterBodyModel.combineFlow(
+                WaterBodyClassifier.WaterType.COAST,
+                WAVE,
+                0.0f,
+                0.0f,
+                0.5f,
+                0.6f,
+                0.8f
+        );
+        float[] lake = HybridWaterBodyModel.combineFlow(
+                WaterBodyClassifier.WaterType.LAKE,
+                WAVE,
+                0.0f,
+                0.0f,
+                0.5f,
+                0.6f,
+                0.8f
+        );
+
+        assertArrayEquals(new float[]{0.5f, 0.1f}, coast, 1.0e-6f);
+        assertArrayEquals(new float[]{0.2f, -0.3f}, lake, 1.0e-6f);
+    }
 }

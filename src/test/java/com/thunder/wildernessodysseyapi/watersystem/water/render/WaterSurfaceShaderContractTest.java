@@ -84,6 +84,8 @@ class WaterSurfaceShaderContractTest {
         assertTrue(vertex.contains("float horizontalScale = shape.z * amplitude"));
         assertTrue(vertex.contains("displacedPosition.xz += horizontalDisplacement"));
         assertTrue(vertex.contains("cross(tangentZ, tangentX)"));
+        assertTrue(vertex.contains("float foldSafetyScale = min(1.0, 0.82"));
+        assertTrue(vertex.contains("crestCompression = clamp((1.0 - horizontalJacobian) / 0.35"));
         assertTrue(vertex.contains("shoreHorizontalTaper"));
         assertTrue(vertex.contains("accumulateImpulse(localXZ"));
         assertTrue(vertex.contains("relativeChunkOrigin - impulse.xy"));
@@ -98,6 +100,8 @@ class WaterSurfaceShaderContractTest {
         assertTrue(vertex.contains("mix(corners[0], corners[3], blend.x)"));
         assertTrue(vertex.contains("mix(corners[1], corners[2], blend.x)"));
         assertTrue(vertex.contains("regionalSeaState = sea;"));
+        assertTrue(vertex.contains("float enclosedWaterFetch = mix(0.16, 0.68, depthFactor)"));
+        assertTrue(vertex.contains("mix(0.58, frameSpectrum.x, enclosedWaterFetch * 0.62)"));
         assertTrue(fragment.contains("flat in vec2 phaseChunkIndex"));
         assertTrue(fragment.contains("in float regionalSeaState;"));
         assertTrue(fragment.contains("in vec2 regionalWindDirection;"));
@@ -123,6 +127,11 @@ class WaterSurfaceShaderContractTest {
         assertFalse(vertex.contains("TimeFrameHigh"));
         assertFalse(fragment.contains("dot(worldPosition.xz"));
         assertTrue(fragment.contains("float shoreBreaker = shoreFactor"));
+        assertTrue(fragment.contains("float crestFoam = smoothstep"));
+        assertTrue(fragment.contains("float slopeFoam = rawSlopeFoam * smoothstep"));
+        assertTrue(fragment.contains("regionalWindSpeed / 16.0"));
+        assertTrue(fragment.contains("float rainRippleA = stableWaveLayer"));
+        assertTrue(fragment.contains("rather than one"));
         assertTrue(fragment.contains("float impulseFoam = disturbanceStrength"));
         assertTrue(vertex.contains("float waveFreedom = 1.0 - frozen * 0.94"));
         assertTrue(fragment.contains("float iceCoverage = smoothstep"));

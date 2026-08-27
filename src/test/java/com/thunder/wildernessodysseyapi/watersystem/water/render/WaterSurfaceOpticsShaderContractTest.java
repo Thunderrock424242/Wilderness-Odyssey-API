@@ -117,6 +117,7 @@ class WaterSurfaceOpticsShaderContractTest {
                 "mediumColor * (vec3(1.0) - transmission) * (1.0 - fresnel)"));
         assertTrue(fragment.contains("+ reflectedRadiance * fresnel"));
         assertTrue(fragment.contains("float foamCoverage ="));
+        assertTrue(fragment.contains("crestCompression"));
         assertTrue(fragment.contains("waterMaterialWeight * (1.0 - foamCoverage)"));
         assertTrue(fragment.contains("* (1.0 - foamCoverage);"));
         assertFalse(fragment.contains("mix(absorbedColor, reflectedColor, fresnel)"),

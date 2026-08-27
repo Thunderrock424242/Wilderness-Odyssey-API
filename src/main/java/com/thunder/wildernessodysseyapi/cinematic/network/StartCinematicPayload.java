@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.cinematic.network;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import io.netty.handler.codec.DecoderException;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -21,6 +22,7 @@ public record StartCinematicPayload(
         int stageDurationTicks,
         boolean controlsLocked,
         boolean hideHud,
+        BlockPos anchor,
         float baseYaw,
         float basePitch
 ) implements CustomPacketPayload {
@@ -35,6 +37,7 @@ public record StartCinematicPayload(
     public StartCinematicPayload {
         sequenceId = Objects.requireNonNull(sequenceId, "sequenceId");
         stageId = Objects.requireNonNull(stageId, "stageId");
+        anchor = Objects.requireNonNull(anchor, "anchor").immutable();
         validate(stageStartGameTime, stageDurationTicks, baseYaw, basePitch);
     }
 
@@ -45,6 +48,7 @@ public record StartCinematicPayload(
         buffer.writeVarInt(payload.stageDurationTicks);
         buffer.writeBoolean(payload.controlsLocked);
         buffer.writeBoolean(payload.hideHud);
+        buffer.writeBlockPos(payload.anchor);
         buffer.writeFloat(payload.baseYaw);
         buffer.writeFloat(payload.basePitch);
     }
@@ -57,6 +61,7 @@ public record StartCinematicPayload(
                 buffer.readVarInt(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
+                buffer.readBlockPos(),
                 buffer.readFloat(),
                 buffer.readFloat()
         );

@@ -22,6 +22,7 @@ public class MarchingCubes {
     // Scratch edge vertex positions (12 possible per cube)
     private final Vector3f[] edgeVerts = new Vector3f[12];
     private final Vector3f[] corners = new Vector3f[8];
+    private final Vector3f[] smoothNormals = new Vector3f[3];
 
     // Output buffer — rebuilt each frame
     private float[] vertices = new float[4096];
@@ -41,6 +42,7 @@ public class MarchingCubes {
     public MarchingCubes() {
         for (int i = 0; i < 12; i++) edgeVerts[i] = new Vector3f();
         for (int i = 0; i < 8; i++) corners[i] = new Vector3f();
+        for (int i = 0; i < smoothNormals.length; i++) smoothNormals[i] = new Vector3f();
     }
 
     /**
@@ -131,11 +133,38 @@ public class MarchingCubes {
             float ny = ez*fx - ex*fz;
             float nz = ex*fy - ey*fx;
             float len = (float)Math.sqrt(nx*nx + ny*ny + nz*nz);
-            if (len > 1e-6f) { nx/=len; ny/=len; nz/=len; }
+            if (len > 1e-6f) {
+                nx /= len;
+                ny /= len;
+                nz /= len;
+            } else {
+                nx = 0.0f;
+                ny = 1.0f;
+                nz = 0.0f;
+            }
 
-            emitVertex(v0.x, v0.y, v0.z, nx, ny, nz);
-            emitVertex(v1.x, v1.y, v1.z, nx, ny, nz);
-            emitVertex(v2.x, v2.y, v2.z, nx, ny, nz);
+            writeSmoothNormal(field, v0, smoothNormals[0], nx, ny, nz);
+            writeSmoothNormal(field, v1, smoothNormals[1], nx, ny, nz);
+            writeSmoothNormal(field, v2, smoothNormals[2], nx, ny, nz);
+            emitVertex(v0.x, v0.y, v0.z,
+                    smoothNormals[0].x, smoothNormals[0].y, smoothNormals[0].z);
+            emitVertex(v1.x, v1.y, v1.z,
+                    smoothNormals[1].x, smoothNormals[1].y, smoothNormals[1].z);
+            emitVertex(v2.x, v2.y, v2.z,
+                    smoothNormals[2].x, smoothNormals[2].y, smoothNormals[2].z);
+        }
+    }
+
+    private static void writeSmoothNormal(
+            DensityField field,
+            Vector3f position,
+            Vector3f normal,
+            float fallbackX,
+            float fallbackY,
+            float fallbackZ
+    ) {
+        if (!field.outwardNormal(position.x, position.y, position.z, normal)) {
+            normal.set(fallbackX, fallbackY, fallbackZ);
         }
     }
 

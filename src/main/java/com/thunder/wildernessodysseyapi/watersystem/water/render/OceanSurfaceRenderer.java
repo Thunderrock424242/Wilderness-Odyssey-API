@@ -172,7 +172,7 @@ public final class OceanSurfaceRenderer {
         float waveBlend = 0.25f + smoothStep(0.35f, 4.0f, patch.depth) * 0.75f;
         int waveLimit = WaterRenderingConfig.waveTrainLimit(patch.waterType);
         GerstnerWaveProfile waveProfile = profileFor(patch.waterType);
-        float localTideOffset = patch.waterType == WaterBodyClassifier.WaterType.OCEAN
+        float localTideOffset = WaterBodyClassifier.isOceanic(patch.waterType)
                 ? tideOffset
                 : 0.0f;
         float x0 = patch.x;
@@ -192,7 +192,7 @@ public final class OceanSurfaceRenderer {
         float textureU1 = textureU0 + textureSpan;
         float textureV1 = textureV0 + textureSpan;
 
-        WaveSpectrumState spectrum = patch.waterType == WaterBodyClassifier.WaterType.OCEAN
+        WaveSpectrumState spectrum = WaterBodyClassifier.isOceanic(patch.waterType)
                 ? seaState.spectrum()
                 : WaveSpectrumState.NEUTRAL;
         int firstColor = opticalColor(
@@ -781,19 +781,27 @@ public final class OceanSurfaceRenderer {
         int ocean = 0;
         int river = 0;
         int pond = 0;
+        int coast = 0;
+        int lake = 0;
         for (WaterColumn column : new WaterColumn[]{first, second, third, fourth}) {
             switch (column.waterType) {
                 case OCEAN -> ocean++;
                 case RIVER -> river++;
                 case POND -> pond++;
+                case COAST -> coast++;
+                case LAKE -> lake++;
             }
         }
-        if (ocean >= river && ocean >= pond) {
+        if (coast >= ocean && coast >= river && coast >= pond && coast >= lake) {
+            return WaterBodyClassifier.WaterType.COAST;
+        }
+        if (ocean >= river && ocean >= pond && ocean >= lake) {
             return WaterBodyClassifier.WaterType.OCEAN;
         }
-        return river >= pond
-                ? WaterBodyClassifier.WaterType.RIVER
-                : WaterBodyClassifier.WaterType.POND;
+        if (river >= pond && river >= lake) {
+            return WaterBodyClassifier.WaterType.RIVER;
+        }
+        return lake >= pond ? WaterBodyClassifier.WaterType.LAKE : WaterBodyClassifier.WaterType.POND;
     }
 
     private static GerstnerWaveProfile profileFor(WaterBodyClassifier.WaterType waterType) {
@@ -801,6 +809,8 @@ public final class OceanSurfaceRenderer {
             case OCEAN -> GerstnerWaveProfile.OCEAN;
             case RIVER -> GerstnerWaveProfile.RIVER;
             case POND -> GerstnerWaveProfile.POND;
+            case COAST -> GerstnerWaveProfile.COAST;
+            case LAKE -> GerstnerWaveProfile.LAKE;
         };
     }
 

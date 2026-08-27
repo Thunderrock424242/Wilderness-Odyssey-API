@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.ai.story.provider;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.thunder.wildernessodysseyapi.ai.perf.MemoryStore;
+import com.thunder.wildernessodysseyapi.ai.voice.VoiceEmotion;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -57,17 +58,33 @@ class OllamaChatClientTest {
 
     @Test
     void parsesRoutedDialogueAndRemovesDuplicateSpeakerPrefix() {
-        String response = "{\"message\":{\"role\":\"assistant\",\"content\":\"{\\\"speaker\\\":\\\"eCLipse\\\",\\\"reply\\\":\\\"[Eclipse] Signal received.\\\"}\"},\"done\":true}";
+        String response = "{\"message\":{\"role\":\"assistant\",\"content\":\"{\\\"speaker\\\":\\\"eCLipse\\\",\\\"display\\\":\\\"[Eclipse] [ARCHIVE CORRUPTED] Signal received.\\\",\\\"speech\\\":\\\"Signal received.\\\",\\\"emotion\\\":\\\"mysterious\\\",\\\"radioEffect\\\":0.18}\"},\"done\":true}";
 
         OllamaChatClient.RoutedDialogue dialogue = OllamaChatClient.parseRoutedResponse(
                 response, "", List.of("Aether", "Eclipse"), "Aether", 800).orElseThrow();
 
         assertEquals("Eclipse", dialogue.speaker());
-        assertEquals("Signal received.", dialogue.reply());
+        assertEquals("[ARCHIVE CORRUPTED] Signal received.", dialogue.displayText());
+        assertEquals("Signal received.", dialogue.speechText());
+        assertEquals(VoiceEmotion.MYSTERIOUS, dialogue.emotion());
+        assertEquals(0.18F, dialogue.radioEffect());
         assertTrue(OllamaChatClient.parseRoutedResponse(
                 "{\"message\":{}}", "", List.of("Aether"), "Aether", 800).isEmpty());
         assertTrue(OllamaChatClient.parseRoutedResponse(
                 "not json", "", List.of("Aether"), "Aether", 800).isEmpty());
+    }
+
+    @Test
+    void legacyReplyFallsBackToSanitizedSpeechAndSafeMetadata() {
+        String response = "{\"message\":{\"content\":\"{\\\"speaker\\\":\\\"Aether\\\",\\\"reply\\\":\\\"[ARCHIVE CORRUPTED] Still here.\\\",\\\"emotion\\\":\\\"invented\\\",\\\"radioEffect\\\":8}\"}}";
+
+        OllamaChatClient.RoutedDialogue dialogue = OllamaChatClient.parseRoutedResponse(
+                response, "", List.of("Aether"), "Aether", 800).orElseThrow();
+
+        assertEquals("[ARCHIVE CORRUPTED] Still here.", dialogue.displayText());
+        assertEquals("Still here.", dialogue.speechText());
+        assertEquals(VoiceEmotion.NORMAL, dialogue.emotion());
+        assertEquals(0.35F, dialogue.radioEffect());
     }
 
     @Test

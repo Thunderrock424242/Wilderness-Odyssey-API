@@ -1,6 +1,9 @@
 package com.thunder.wildernessodysseyapi.ai.story;
 
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
+import com.thunder.wildernessodysseyapi.ai.voice.VoiceEmotion;
+import com.thunder.wildernessodysseyapi.ai.voice.VoiceLine;
+import com.thunder.wildernessodysseyapi.ai.voice.network.AetherVoiceLinePayload;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookManager;
 import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteServices;
 import net.minecraft.network.chat.Component;
@@ -10,16 +13,19 @@ import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 /** Listens to ordinary single-player chat and returns A.E.T.H.E.R replies. */
 public class AIChatListener {
 
     private static final AIClient CLIENT = new AIClient();
+    private static final AtomicLong RESPONSE_IDS = new AtomicLong();
 
     public static AIClient getClient() {
         return CLIENT;
@@ -39,11 +45,22 @@ public class AIChatListener {
         AIFallbackResponder.ResponseContext responseContext = new AIFallbackResponder.ResponseContext(buildContextTags(player, worldKey));
         UUID playerId = player.getUUID();
         String playerName = player.getName().getString();
+        long responseId = RESPONSE_IDS.incrementAndGet();
 
         // Onboarding only reads the captured chat text and per-player progress.
         String onboardingReply = CLIENT.handleOnboarding(playerId, message);
         if (onboardingReply != null && !onboardingReply.isBlank()) {
             player.sendSystemMessage(Component.literal("[" + CLIENT.getDisplayName() + "] " + onboardingReply));
+            PacketDistributor.sendToPlayer(player, new AetherVoiceLinePayload(
+                    responseId,
+                    VoiceLine.authored(
+                            CLIENT.getDisplayName(),
+                            onboardingReply,
+                            "",
+                            VoiceEmotion.NORMAL,
+                            0.0F
+                    )
+            ));
             return;
         }
 
@@ -61,6 +78,10 @@ public class AIChatListener {
                 ServerPlayer onlinePlayer = owningServer.getPlayerList().getPlayer(playerId);
                 if (onlinePlayer != null) {
                     onlinePlayer.sendSystemMessage(Component.literal("[" + speaker + "] " + reply.text()));
+                    PacketDistributor.sendToPlayer(
+                            onlinePlayer,
+                            new AetherVoiceLinePayload(responseId, reply.asVoiceLine())
+                    );
                 }
             });
         }).thenAccept(accepted -> {

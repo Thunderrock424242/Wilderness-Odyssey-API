@@ -1,15 +1,14 @@
 package com.thunder.wildernessodysseyapi.cryo.block;
 
-/**
- * High-level synchronized cryo-tube state reserved for a future GeckoLib renderer.
- *
- * <p>No animation asset is implied by these values; they are the stable bridge
- * that a later Blockbench/GeckoLib controller can consume.</p>
- */
+/** High-level synchronized states consumed by the cryo tube's GeckoLib animation controller. */
 public enum CryoTubeAnimationState {
     IDLE,
-    WARNING,
-    UNLOCK,
+    SUSPENDED,
+    DIAGNOSTIC,
+    REWARMING,
+    CARDIAC_PACING,
+    DRAINING,
+    MASK_RELEASE,
     OPENING,
     OPEN
 }

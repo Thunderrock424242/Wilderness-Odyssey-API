@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.config;
 
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
+import com.thunder.wildernessodysseyapi.ai.voice.config.AetherVoiceConfig;
 import com.thunder.wildernessodysseyapi.dataengine.config.DataEngineConfig;
 import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import com.thunder.wildernessodysseyapi.developmentstudio.config.StudioConfig;
@@ -95,6 +96,7 @@ public final class WildernessConfigSpecs {
     private static ModConfigSpec buildClientSpec() {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         defineCategory(builder, "donations", DonationReminderConfig::define);
+        AetherVoiceConfig.define(builder);
         DebugOverlayConfig.define(builder);
         WaterRenderingConfig.define(builder);
         defineCategory(builder, "weather_rendering", WeatherRenderingConfig::define);
@@ -137,6 +139,7 @@ public final class WildernessConfigSpecs {
         OwnershipConfig.CONFIG_SPEC = commonSpec;
 
         DonationReminderConfig.CONFIG_SPEC = clientSpec;
+        AetherVoiceConfig.CONFIG_SPEC = clientSpec;
         DebugOverlayConfig.CONFIG_SPEC = clientSpec;
         WaterRenderingConfig.CONFIG_SPEC = clientSpec;
         WeatherRenderingConfig.CONFIG_SPEC = clientSpec;

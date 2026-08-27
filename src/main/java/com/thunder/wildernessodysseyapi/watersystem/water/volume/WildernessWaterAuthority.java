@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.volume;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.environment.WaterEnvironmentState;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import net.minecraft.core.BlockPos;
@@ -245,6 +246,21 @@ public final class WildernessWaterAuthority {
                 column.estimatedVolumeUnits(),
                 column.waterType().name()
         );
+    }
+
+    /**
+     * Returns the composed read-only weather/tide/current state for a loaded
+     * large-body surface without introducing another simulation owner.
+     */
+    public static WaterEnvironmentState sampleEnvironment(
+            Level level,
+            double x,
+            double z,
+            float partialTick
+    ) {
+        HybridWaterBodyModel.SurfaceSample sample = HybridWaterBodyModel.sampleSurface(
+                level, x, z, partialTick);
+        return sample.valid() ? sample.environment() : WaterEnvironmentState.CALM_POND;
     }
 
     /** Returns server-authoritative or immutable synchronized watershed metadata. */

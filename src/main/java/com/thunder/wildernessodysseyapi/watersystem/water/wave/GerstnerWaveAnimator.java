@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.wave;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
+import com.thunder.wildernessodysseyapi.watersystem.water.environment.WaterEnvironmentState;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import net.minecraft.client.Minecraft;
 
@@ -37,6 +38,7 @@ public final class GerstnerWaveAnimator {
             currentTime = mc.level.getGameTime() / (double) TICKS_PER_SECOND;
             clientTideOffset = TideSystem.getTideOffset(mc.level);
         } else {
+            currentTime = 0.0;
             clientTideOffset = 0.0f;
         }
     }
@@ -77,18 +79,23 @@ public final class GerstnerWaveAnimator {
         OceanSeaState.Sample seaState = minecraft.level == null
                 ? OceanSeaState.CALM
                 : ClientOceanSeaState.sampleAt(minecraft.level, worldX, worldZ);
+        float rain = minecraft.level == null ? 0.0f : minecraft.level.getRainLevel(0.0f);
+        WaveSpectrumState spectrum = WaterEnvironmentState.waveSpectrumFor(
+                type,
+                seaState,
+                rain,
+                fallbackFetch(type)
+        );
         WaveSurfaceSample sample = profile.sampleAt(
                 worldX,
                 worldZ,
                 currentTime,
                 WaterRenderingConfig.waveTrainLimit(type),
-                type == WaterBodyClassifier.WaterType.OCEAN
-                        ? seaState.spectrum()
-                        : WaveSpectrumState.NEUTRAL,
+                spectrum,
                 type == WaterBodyClassifier.WaterType.RIVER ? flowDirectionX : 0.0f,
                 type == WaterBodyClassifier.WaterType.RIVER ? flowDirectionZ : 0.0f
         );
-        if (type == WaterBodyClassifier.WaterType.OCEAN) {
+        if (WaterBodyClassifier.isOceanic(type)) {
             return sample.withHeightOffset(clientTideOffset * VISUAL_TIDE_SCALE);
         }
         return sample;
@@ -176,6 +183,24 @@ public final class GerstnerWaveAnimator {
             case OCEAN -> GerstnerWaveProfile.OCEAN;
             case RIVER -> GerstnerWaveProfile.RIVER;
             case POND -> GerstnerWaveProfile.POND;
+            case COAST -> GerstnerWaveProfile.COAST;
+            case LAKE -> GerstnerWaveProfile.LAKE;
+        };
+    }
+
+    /**
+     * Returns a constant-time exposure proxy for presentation-only sampling.
+     * Authoritative surface queries use generated depth and volume metadata;
+     * this path may also be called while terrain meshes are being assembled,
+     * so it must never trigger an authority query or neighboring chunk load.
+     */
+    private static float fallbackFetch(WaterBodyClassifier.WaterType type) {
+        return switch (type) {
+            case OCEAN -> 1.0f;
+            case COAST -> 0.76f;
+            case RIVER -> 0.28f;
+            case LAKE -> 0.52f;
+            case POND -> 0.08f;
         };
     }
 }

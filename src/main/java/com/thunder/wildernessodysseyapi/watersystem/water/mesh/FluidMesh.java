@@ -10,8 +10,8 @@ import java.util.List;
  * FluidMesh
  *
  * Owns the density field and marching cubes extractor for one
- * SPHSimulator. Each frame the mesh is rebuilt from the latest
- * particle positions. The resulting vertex data is stored as a
+ * SPHSimulator. The mesh is rebuilt only after the simulator publishes an
+ * eligible render revision. The resulting vertex data is stored as a
  * float[] ready for upload by FluidRenderer.
  *
  * Rebuild is triggered by FluidRenderer on the render thread.
@@ -33,8 +33,7 @@ public class FluidMesh {
     }
 
     /**
-     * Rebuild the mesh from current particle positions.
-     * Called every render frame.
+     * Rebuilds the mesh when the simulator revision passes the configured interval.
      */
     public void rebuild() {
         rebuild(1);

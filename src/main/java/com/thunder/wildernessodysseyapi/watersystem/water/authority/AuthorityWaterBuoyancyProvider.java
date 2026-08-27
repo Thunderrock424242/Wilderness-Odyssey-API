@@ -20,6 +20,8 @@ public final class AuthorityWaterBuoyancyProvider implements WaterBuoyancyProvid
     private static final double MIN_SAMPLE_INSET = 0.02;
     private static final double MAX_SAMPLE_INSET = 0.18;
     private static final double LEADING_SAMPLE_BIAS = 0.35;
+    private static final double MINIMUM_HULL_ASPECT = 1.45;
+    private static final double HULL_WIDTH_SCALE = 0.90;
 
     private final WaterAccess waterAccess;
     private final ThreadLocal<WorkingState> workingState = ThreadLocal.withInitial(WorkingState::new);
@@ -51,6 +53,82 @@ public final class AuthorityWaterBuoyancyProvider implements WaterBuoyancyProvid
         double leadZ = clamp(motion.z * LEADING_SAMPLE_BIAS, -halfSampleZ, halfSampleZ);
         samplePoint(level, bounds, working, centerX + leadX, queryY, centerZ + leadZ);
         return working.accumulator.finish();
+    }
+
+    /**
+     * Samples bow-port, bow-starboard, stern-port, and stern-starboard points
+     * in the craft's yaw frame, followed by the existing motion-biased center.
+     */
+    @Override
+    public BuoyancySample sampleOriented(
+            Level level,
+            AABB bounds,
+            Vec3 velocity,
+            float yawDegrees
+    ) {
+        WorkingState working = workingState.get();
+        working.accumulator.reset();
+        Vec3 motion = velocity == null ? Vec3.ZERO : velocity;
+
+        double centerX = (bounds.minX + bounds.maxX) * 0.5;
+        double centerZ = (bounds.minZ + bounds.maxZ) * 0.5;
+        double horizontalMinimum = Math.min(bounds.getXsize(), bounds.getZsize());
+        double hullLength = Math.max(
+                Math.max(bounds.getXsize(), bounds.getZsize()),
+                horizontalMinimum * MINIMUM_HULL_ASPECT
+        );
+        double hullWidth = horizontalMinimum * HULL_WIDTH_SCALE;
+        double halfLength = sampleHalfExtent(hullLength);
+        double halfWidth = sampleHalfExtent(hullWidth);
+        double queryY = bounds.minY + Math.min(0.05, Math.max(0.0, bounds.getYsize() * 0.1));
+        double forwardX = forwardX(yawDegrees);
+        double forwardZ = forwardZ(yawDegrees);
+        double rightX = rightX(yawDegrees);
+        double rightZ = rightZ(yawDegrees);
+
+        samplePoint(level, bounds, working,
+                centerX + forwardX * halfLength - rightX * halfWidth,
+                queryY,
+                centerZ + forwardZ * halfLength - rightZ * halfWidth);
+        samplePoint(level, bounds, working,
+                centerX + forwardX * halfLength + rightX * halfWidth,
+                queryY,
+                centerZ + forwardZ * halfLength + rightZ * halfWidth);
+        samplePoint(level, bounds, working,
+                centerX - forwardX * halfLength - rightX * halfWidth,
+                queryY,
+                centerZ - forwardZ * halfLength - rightZ * halfWidth);
+        samplePoint(level, bounds, working,
+                centerX - forwardX * halfLength + rightX * halfWidth,
+                queryY,
+                centerZ - forwardZ * halfLength + rightZ * halfWidth);
+
+        double leadForward = clamp(
+                motion.x * forwardX + motion.z * forwardZ,
+                -halfLength,
+                halfLength
+        ) * LEADING_SAMPLE_BIAS;
+        samplePoint(level, bounds, working,
+                centerX + forwardX * leadForward,
+                queryY,
+                centerZ + forwardZ * leadForward);
+        return working.accumulator.finish();
+    }
+
+    static double forwardX(float yawDegrees) {
+        return -Math.sin(Math.toRadians(yawDegrees));
+    }
+
+    static double forwardZ(float yawDegrees) {
+        return Math.cos(Math.toRadians(yawDegrees));
+    }
+
+    static double rightX(float yawDegrees) {
+        return Math.cos(Math.toRadians(yawDegrees));
+    }
+
+    static double rightZ(float yawDegrees) {
+        return Math.sin(Math.toRadians(yawDegrees));
     }
 
     static double submergedFraction(double minimumY, double maximumY, double surfaceHeight) {

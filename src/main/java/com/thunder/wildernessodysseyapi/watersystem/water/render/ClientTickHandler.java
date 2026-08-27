@@ -57,6 +57,7 @@ public class ClientTickHandler {
             ClientWaterImmersion.clear(level);
             OceanSurfaceRenderer.clearLevel(level);
             WaterBodyClassifier.clearCache(level);
+            WaveAnimator.reset();
             WaterEnvironmentalEffectPool.clear();
             RiverSoundscape.clear();
         }

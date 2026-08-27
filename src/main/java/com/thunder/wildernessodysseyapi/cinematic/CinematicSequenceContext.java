@@ -18,4 +18,7 @@ public interface CinematicSequenceContext {
 
     /** Sends a high-level cue to the block entity cached by position for this sequence. */
     boolean cueActor(ResourceLocation cueId);
+
+    /** Sends a registered client narration cue once during this playback session. */
+    boolean narrateOnce(ResourceLocation cueId, int durationTicks);
 }

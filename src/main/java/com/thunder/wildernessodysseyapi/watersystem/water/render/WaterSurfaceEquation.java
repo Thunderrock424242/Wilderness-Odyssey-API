@@ -114,9 +114,57 @@ public final class WaterSurfaceEquation {
             float tideOffset,
             float transientHeight
     ) {
+        return snapshotSurfaceHeight(
+                baseSurfaceY,
+                worldX,
+                worldZ,
+                timeSeconds,
+                oceanSpectrum,
+                WaveSpectrumState.NEUTRAL,
+                oceanWaveLimit,
+                riverWaveLimit,
+                pondWaveLimit,
+                oceanWeight,
+                riverWeight,
+                lakeWeight,
+                currentX,
+                currentZ,
+                surfaceContinuity,
+                tideOffset,
+                transientHeight
+        );
+    }
+
+    /**
+     * Mirrors the active snapshot surface with an explicit enclosed-water
+     * spectrum. Older callers retain neutral lake energy through the overload
+     * above, while immersion can follow the shader's depth-bounded wind proxy.
+     */
+    public static float snapshotSurfaceHeight(
+            float baseSurfaceY,
+            double worldX,
+            double worldZ,
+            double timeSeconds,
+            WaveSpectrumState oceanSpectrum,
+            WaveSpectrumState enclosedWaterSpectrum,
+            int oceanWaveLimit,
+            int riverWaveLimit,
+            int pondWaveLimit,
+            float oceanWeight,
+            float riverWeight,
+            float lakeWeight,
+            float currentX,
+            float currentZ,
+            float surfaceContinuity,
+            float tideOffset,
+            float transientHeight
+    ) {
         WaveSpectrumState safeOceanSpectrum = oceanSpectrum == null
                 ? WaveSpectrumState.NEUTRAL
                 : oceanSpectrum;
+        WaveSpectrumState safeEnclosedSpectrum = enclosedWaterSpectrum == null
+                ? WaveSpectrumState.NEUTRAL
+                : enclosedWaterSpectrum;
         float boundedOceanWeight = Math.max(0.0f, finiteOrZero(oceanWeight));
         float boundedRiverWeight = Math.max(0.0f, finiteOrZero(riverWeight));
         float boundedLakeWeight = Math.max(0.0f, finiteOrZero(lakeWeight));
@@ -138,8 +186,12 @@ public final class WaterSurfaceEquation {
                 currentX,
                 currentZ
         ).height() * boundedRiverWeight;
-        waveHeight += GerstnerWaveProfile.POND.sampleAt(
-                worldX, worldZ, finiteOrZero(timeSeconds), Math.max(0, pondWaveLimit), WaveSpectrumState.NEUTRAL
+        waveHeight += GerstnerWaveProfile.LAKE.sampleAt(
+                worldX,
+                worldZ,
+                finiteOrZero(timeSeconds),
+                Math.max(0, pondWaveLimit),
+                safeEnclosedSpectrum
         ).height() * boundedLakeWeight;
         float continuity = surfaceContinuityFactor(surfaceContinuity);
         return finiteOrZero(baseSurfaceY)
@@ -191,7 +243,7 @@ public final class WaterSurfaceEquation {
                 approximateSpectrum,
                 GerstnerWaveProfile.OCEAN.waveCount,
                 GerstnerWaveProfile.RIVER.waveCount,
-                GerstnerWaveProfile.POND.waveCount,
+                GerstnerWaveProfile.LAKE.waveCount,
                 oceanWeight,
                 riverWeight,
                 lakeWeight,

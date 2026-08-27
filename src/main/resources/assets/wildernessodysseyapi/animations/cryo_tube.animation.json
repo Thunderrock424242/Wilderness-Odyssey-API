@@ -1,0 +1,196 @@
+{
+  "format_version": "1.8.0",
+  "animations": {
+    "idle": {
+      "loop": true,
+      "animation_length": 2.0,
+      "bones": {
+        "warning_lights": {"scale": {"vector": [0.45, 0.45, 0.45]}}
+      }
+    },
+    "suspended": {
+      "loop": true,
+      "animation_length": 2.4,
+      "bones": {
+        "suspension_fluid": {
+          "position": {
+            "0.0": {"vector": [0, 0, 0]},
+            "1.2": {"vector": [0, 0.35, 0]},
+            "2.4": {"vector": [0, 0, 0]}
+          }
+        },
+        "tube_left": {
+          "rotation": {
+            "0.0": {"vector": [0, 0, -8]},
+            "1.2": {"vector": [1.5, 0, -6]},
+            "2.4": {"vector": [0, 0, -8]}
+          }
+        },
+        "tube_right": {
+          "rotation": {
+            "0.0": {"vector": [0, 0, 8]},
+            "1.2": {"vector": [-1.5, 0, 6]},
+            "2.4": {"vector": [0, 0, 8]}
+          }
+        }
+      }
+    },
+    "diagnostic": {
+      "loop": true,
+      "animation_length": 0.8,
+      "bones": {
+        "warning_lights": {
+          "scale": {
+            "0.0": {"vector": [0.35, 0.35, 0.35]},
+            "0.2": {"vector": [1.3, 1.3, 1.3]},
+            "0.4": {"vector": [0.35, 0.35, 0.35]},
+            "0.8": {"vector": [0.35, 0.35, 0.35]}
+          }
+        },
+        "suspension_fluid": {
+          "position": {
+            "0.0": {"vector": [0, 0, 0]},
+            "0.4": {"vector": [0, 0.18, 0]},
+            "0.8": {"vector": [0, 0, 0]}
+          }
+        }
+      }
+    },
+    "rewarming": {
+      "loop": true,
+      "animation_length": 1.6,
+      "bones": {
+        "suspension_fluid": {
+          "position": {
+            "0.0": {"vector": [0, 0, 0]},
+            "0.8": {"vector": [0, 0.55, 0]},
+            "1.6": {"vector": [0, 0, 0]}
+          }
+        },
+        "warning_lights": {
+          "scale": {
+            "0.0": {"vector": [0.55, 0.55, 0.55]},
+            "0.8": {"vector": [1.0, 1.0, 1.0]},
+            "1.6": {"vector": [0.55, 0.55, 0.55]}
+          }
+        }
+      }
+    },
+    "cardiac_pacing": {
+      "loop": true,
+      "animation_length": 0.7,
+      "bones": {
+        "medical_mask": {
+          "position": {
+            "0.0": {"vector": [0, 0, 0]},
+            "0.08": {"vector": [0, 0, -0.7]},
+            "0.16": {"vector": [0, 0, 0]},
+            "0.7": {"vector": [0, 0, 0]}
+          }
+        },
+        "glass_door": {
+          "rotation": {
+            "0.0": {"vector": [0, 0, 0]},
+            "0.08": {"vector": [0, 0, 0.8]},
+            "0.16": {"vector": [0, 0, 0]},
+            "0.7": {"vector": [0, 0, 0]}
+          }
+        },
+        "warning_lights": {
+          "scale": {
+            "0.0": {"vector": [0.45, 0.45, 0.45]},
+            "0.08": {"vector": [1.55, 1.55, 1.55]},
+            "0.16": {"vector": [0.45, 0.45, 0.45]},
+            "0.7": {"vector": [0.45, 0.45, 0.45]}
+          }
+        }
+      }
+    },
+    "draining": {
+      "loop": "hold_on_last_frame",
+      "animation_length": 5.0,
+      "bones": {
+        "suspension_fluid": {
+          "position": {
+            "0.0": {"vector": [0, 0, 0]},
+            "5.0": {"vector": [0, -24, 0]}
+          },
+          "scale": {
+            "0.0": {"vector": [1, 1, 1]},
+            "5.0": {"vector": [1, 0.08, 1]}
+          }
+        },
+        "warning_lights": {
+          "scale": {
+            "0.0": {"vector": [1.1, 1.1, 1.1]},
+            "5.0": {"vector": [0.55, 0.55, 0.55]}
+          }
+        }
+      }
+    },
+    "mask_release": {
+      "loop": "hold_on_last_frame",
+      "animation_length": 2.0,
+      "bones": {
+        "medical_mask": {
+          "position": {
+            "0.0": {"vector": [0, 0, 0]},
+            "0.5": {"vector": [0, 0, -2.5]},
+            "2.0": {"vector": [0, 4, -7]}
+          },
+          "rotation": {
+            "0.0": {"vector": [0, 0, 0]},
+            "2.0": {"vector": [-25, 0, 0]}
+          }
+        },
+        "tube_left": {
+          "rotation": {
+            "0.0": {"vector": [0, 0, -8]},
+            "2.0": {"vector": [0, 0, -28]}
+          }
+        },
+        "tube_right": {
+          "rotation": {
+            "0.0": {"vector": [0, 0, 8]},
+            "2.0": {"vector": [0, 0, 28]}
+          }
+        }
+      }
+    },
+    "opening": {
+      "loop": "hold_on_last_frame",
+      "animation_length": 3.0,
+      "bones": {
+        "suspension_fluid": {"position": {"vector": [0, -24, 0]}, "scale": {"vector": [1, 0.08, 1]}},
+        "medical_mask": {"position": {"vector": [0, 4, -7]}, "rotation": {"vector": [-25, 0, 0]}},
+        "glass_door": {
+          "position": {
+            "0.0": {"vector": [0, 0, 0]},
+            "0.7": {"vector": [0, 0, -2]},
+            "3.0": {"vector": [0, 0, -13]}
+          },
+          "rotation": {
+            "0.0": {"vector": [0, 0, 0]},
+            "3.0": {"vector": [-4, 0, 0]}
+          }
+        }
+      }
+    },
+    "open": {
+      "loop": true,
+      "animation_length": 2.0,
+      "bones": {
+        "suspension_fluid": {"position": {"vector": [0, -24, 0]}, "scale": {"vector": [1, 0.08, 1]}},
+        "medical_mask": {"position": {"vector": [0, 4, -7]}, "rotation": {"vector": [-25, 0, 0]}},
+        "glass_door": {"position": {"vector": [0, 0, -13]}, "rotation": {"vector": [-4, 0, 0]}},
+        "warning_lights": {
+          "scale": {
+            "0.0": {"vector": [0.45, 0.45, 0.45]},
+            "1.0": {"vector": [0.7, 0.7, 0.7]},
+            "2.0": {"vector": [0.45, 0.45, 0.45]}
+          }
+        }
+      }
+    }
+  }
+}

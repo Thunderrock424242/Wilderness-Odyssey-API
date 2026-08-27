@@ -17,7 +17,7 @@ public record WaveSpectrumState(
         float directionBlend
 ) {
 
-    /** Unmodified profile used by rivers, ponds, and compatibility callers. */
+    /** Unmodified profile used by rivers and compatibility callers. */
     public static final WaveSpectrumState NEUTRAL =
             new WaveSpectrumState(1.0f, 1.0f, 1.0f, 0.0f, 0.0f);
 

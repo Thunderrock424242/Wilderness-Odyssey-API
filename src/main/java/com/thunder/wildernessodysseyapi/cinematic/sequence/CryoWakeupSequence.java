@@ -1,11 +1,14 @@
 package com.thunder.wildernessodysseyapi.cinematic.sequence;
 
+import com.thunder.wildernessodysseyapi.cinematic.CinematicActor;
 import com.thunder.wildernessodysseyapi.cinematic.CinematicControlPolicy;
 import com.thunder.wildernessodysseyapi.cinematic.CinematicSequence;
 import com.thunder.wildernessodysseyapi.cinematic.CinematicSequenceContext;
 import com.thunder.wildernessodysseyapi.cinematic.CinematicStage;
 import com.thunder.wildernessodysseyapi.cinematic.CinematicStopReason;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModRegistries;
+import com.thunder.wildernessodysseyapi.core.PrivateSingleplayerPolicy;
 import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -17,6 +20,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -25,61 +30,73 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Twenty-four-second cryogenic wake-up built on the generic cinematic timeline.
+ * Single-player cryogenic revival followed by an unlocked A.E.T.H.E.R recovery briefing.
  *
- * <p>All cue times are expressed here as stage durations. World effects occur
- * once at boundaries, while camera, eyelids, and warning text remain entirely
- * client-presentational.</p>
+ * <p>The first forty-four seconds are a controlled cinematic. The final twenty
+ * seconds retain only presentation and recovery effects, allowing the player
+ * to walk while A.E.T.H.E.R completes the introduction.</p>
  */
 public final class CryoWakeupSequence implements CinematicSequence {
     public static final ResourceLocation ID = id("cryo_wakeup");
 
     public static final ResourceLocation BLACK_SCREEN = stageId("black_screen");
-    public static final ResourceLocation MACHINERY_HUM = stageId("machinery_hum");
-    public static final ResourceLocation HEARTBEAT = stageId("heartbeat");
-    public static final ResourceLocation EYES_PARTIAL = stageId("eyes_partial");
-    public static final ResourceLocation EYES_CLOSED = stageId("eyes_closed");
+    public static final ResourceLocation EXTERIOR_REVEAL = stageId("exterior_reveal");
+    public static final ResourceLocation MEDICAL_DIAGNOSTIC = stageId("medical_diagnostic");
+    public static final ResourceLocation REVIVAL_PROTOCOL = stageId("revival_protocol");
+    public static final ResourceLocation CARDIAC_PACING = stageId("cardiac_pacing");
+    public static final ResourceLocation SUSPENSION_DRAIN = stageId("suspension_drain");
+    public static final ResourceLocation BLACKOUT_TRANSITION = stageId("blackout_transition");
     public static final ResourceLocation EYES_REOPENING = stageId("eyes_reopening");
-    public static final ResourceLocation LIGHTS_FLICKER = stageId("lights_flicker");
-    public static final ResourceLocation WARNING_STARTED = stageId("warning_started");
-    public static final ResourceLocation WARNING_LIGHTS = stageId("warning_lights");
-    public static final ResourceLocation ALARM_BEEPS = stageId("alarm_beeps");
-    public static final ResourceLocation RELEASE_STARTED = stageId("release_started");
-    public static final ResourceLocation LOCKS_DISENGAGED = stageId("locks_disengaged");
-    public static final ResourceLocation MIST_RELEASE = stageId("mist_release");
+    public static final ResourceLocation MASK_RELEASE = stageId("mask_release");
     public static final ResourceLocation CRYO_OPENING = stageId("cryo_opening");
-    public static final ResourceLocation CAMERA_TURN = stageId("camera_turn");
-    public static final ResourceLocation CRYO_OPEN = stageId("cryo_open");
-    public static final ResourceLocation LIGHTS_STABLE = stageId("lights_stable");
-    public static final ResourceLocation CAMERA_RELEASE = stageId("camera_release");
-    public static final ResourceLocation CONTROL_RETURN = stageId("control_return");
+    public static final ResourceLocation BALANCE_CHECK = stageId("balance_check");
+    public static final ResourceLocation RECOVERY_WALK = stageId("recovery_walk");
 
-    public static final ResourceLocation CUE_IDLE = cueId("idle");
-    public static final ResourceLocation CUE_WARNING = cueId("warning");
-    public static final ResourceLocation CUE_UNLOCK = cueId("unlock");
-    public static final ResourceLocation CUE_OPENING = cueId("opening");
-    public static final ResourceLocation CUE_OPEN = cueId("open");
+    public static final ResourceLocation CUE_IDLE = actorCue("idle");
+    public static final ResourceLocation CUE_SUSPENDED = actorCue("suspended");
+    public static final ResourceLocation CUE_DIAGNOSTIC = actorCue("diagnostic");
+    public static final ResourceLocation CUE_REWARMING = actorCue("rewarming");
+    public static final ResourceLocation CUE_CARDIAC_PACING = actorCue("cardiac_pacing");
+    public static final ResourceLocation CUE_DRAINING = actorCue("draining");
+    public static final ResourceLocation CUE_MASK_RELEASE = actorCue("mask_release");
+    public static final ResourceLocation CUE_OPENING = actorCue("opening");
+    public static final ResourceLocation CUE_OPEN = actorCue("open");
 
+    public static final ResourceLocation NARRATION_MEDICAL_ONLINE = narration("medical_online");
+    public static final ResourceLocation NARRATION_OCCUPANT_DETECTED = narration("occupant_detected");
+    public static final ResourceLocation NARRATION_CONTAMINATION = narration("contamination");
+    public static final ResourceLocation NARRATION_FILTRATION_OFFLINE = narration("filtration_offline");
+    public static final ResourceLocation NARRATION_REVIVAL_AUTHORIZED = narration("revival_authorized");
+    public static final ResourceLocation NARRATION_THERMAL_RESTORATION = narration("thermal_restoration");
+    public static final ResourceLocation NARRATION_CIRCULATORY_ASSIST = narration("circulatory_assist");
+    public static final ResourceLocation NARRATION_CRYOPROTECTANT_PURGE = narration("cryoprotectant_purge");
+    public static final ResourceLocation NARRATION_REANIMATION_COMPOUND = narration("reanimation_compound");
+    public static final ResourceLocation NARRATION_CARDIAC_LOW = narration("cardiac_low");
+    public static final ResourceLocation NARRATION_PACING = narration("pacing");
+    public static final ResourceLocation NARRATION_RHYTHM_RESTORED = narration("rhythm_restored");
+    public static final ResourceLocation NARRATION_RESPIRATORY_RESPONSE = narration("respiratory_response");
+    public static final ResourceLocation NARRATION_DRAINING = narration("draining");
+    public static final ResourceLocation NARRATION_MASK_RELEASING = narration("mask_releasing");
+    public static final ResourceLocation NARRATION_MOVE_SLOWLY = narration("move_slowly");
+    public static final ResourceLocation NARRATION_AWAKE = narration("awake");
+    public static final ResourceLocation NARRATION_AETHER_IDENTITY = narration("aether_identity");
+    public static final ResourceLocation NARRATION_AETHER_LIMITS = narration("aether_limits");
+    public static final ResourceLocation NARRATION_FIND_EXIT = narration("find_exit");
+
+    private static final int NARRATION_TICKS = 70;
     private static final List<CinematicStage> STAGES = List.of(
-            stage(BLACK_SCREEN, 20, CinematicControlPolicy.LOCKED),       // 0:00
-            stage(MACHINERY_HUM, 20, CinematicControlPolicy.LOCKED),      // 0:01
-            stage(HEARTBEAT, 20, CinematicControlPolicy.LOCKED),          // 0:02
-            stage(EYES_PARTIAL, 40, CinematicControlPolicy.LOCKED),       // 0:03
-            stage(EYES_CLOSED, 20, CinematicControlPolicy.LOCKED),        // 0:05
-            stage(EYES_REOPENING, 20, CinematicControlPolicy.LOCKED),     // 0:06
-            stage(LIGHTS_FLICKER, 20, CinematicControlPolicy.LOCKED),     // 0:07
-            stage(WARNING_STARTED, 20, CinematicControlPolicy.LOCKED),    // 0:08
-            stage(WARNING_LIGHTS, 20, CinematicControlPolicy.LOCKED),     // 0:09
-            stage(ALARM_BEEPS, 40, CinematicControlPolicy.LOCKED),        // 0:10
-            stage(RELEASE_STARTED, 20, CinematicControlPolicy.LOCKED),    // 0:12
-            stage(LOCKS_DISENGAGED, 20, CinematicControlPolicy.LOCKED),   // 0:13
-            stage(MIST_RELEASE, 20, CinematicControlPolicy.LOCKED),       // 0:14
-            stage(CRYO_OPENING, 40, CinematicControlPolicy.LOCKED),       // 0:15
-            stage(CAMERA_TURN, 40, CinematicControlPolicy.LOCKED),        // 0:17
-            stage(CRYO_OPEN, 20, CinematicControlPolicy.LOCKED),          // 0:19
-            stage(LIGHTS_STABLE, 40, CinematicControlPolicy.LOCKED),      // 0:20
-            stage(CAMERA_RELEASE, 20, CinematicControlPolicy.LOCKED),     // 0:22
-            stage(CONTROL_RETURN, 20, CinematicControlPolicy.PRESENTATION_ONLY) // 0:23
+            stage(BLACK_SCREEN, 20, CinematicControlPolicy.LOCKED),
+            stage(EXTERIOR_REVEAL, 80, CinematicControlPolicy.LOCKED),
+            stage(MEDICAL_DIAGNOSTIC, 150, CinematicControlPolicy.LOCKED),
+            stage(REVIVAL_PROTOCOL, 220, CinematicControlPolicy.LOCKED),
+            stage(CARDIAC_PACING, 80, CinematicControlPolicy.LOCKED),
+            stage(SUSPENSION_DRAIN, 100, CinematicControlPolicy.LOCKED),
+            stage(BLACKOUT_TRANSITION, 20, CinematicControlPolicy.LOCKED),
+            stage(EYES_REOPENING, 80, CinematicControlPolicy.LOCKED),
+            stage(MASK_RELEASE, 40, CinematicControlPolicy.LOCKED),
+            stage(CRYO_OPENING, 60, CinematicControlPolicy.LOCKED),
+            stage(BALANCE_CHECK, 40, CinematicControlPolicy.LOCKED),
+            stage(RECOVERY_WALK, 400, CinematicControlPolicy.PRESENTATION_ONLY)
     );
 
     @Override
@@ -93,7 +110,17 @@ public final class CryoWakeupSequence implements CinematicSequence {
     }
 
     @Override
+    public boolean isPlaybackAllowed(ServerPlayer player) {
+        return PrivateSingleplayerPolicy.permits(player.server);
+    }
+
+    @Override
     public Optional<Component> validateStart(ServerPlayer player, BlockPos anchor) {
+        if (!isPlaybackAllowed(player)) {
+            return Optional.of(Component.literal(
+                    "The cryo awakening is available only in a private single-player world."
+            ));
+        }
         ServerLevel level = player.serverLevel();
         if (!level.hasChunkAt(anchor)) {
             return Optional.of(Component.literal("The cryo tube chunk is not loaded."));
@@ -102,7 +129,7 @@ public final class CryoWakeupSequence implements CinematicSequence {
             return Optional.of(Component.literal("No cryo tube exists at the cinematic anchor."));
         }
         BlockEntity blockEntity = level.getBlockEntity(anchor);
-        if (!(blockEntity instanceof com.thunder.wildernessodysseyapi.cinematic.CinematicActor)) {
+        if (!(blockEntity instanceof CinematicActor)) {
             return Optional.of(Component.literal("The cryo tube animation hook is unavailable."));
         }
         return Optional.empty();
@@ -138,66 +165,91 @@ public final class CryoWakeupSequence implements CinematicSequence {
 
     @Override
     public Vec3 lockedPosition(ServerPlayer player, BlockPos anchor) {
+        // Keep the authoritative body at the previously safe spawn position.
+        // The client camera and presentation-only occupant have independent anchors.
         return new Vec3(anchor.getX() + 0.5D, anchor.getY() + 0.5D, anchor.getZ() + 0.5D);
     }
 
     @Override
     public float initialYaw(ServerPlayer player, BlockPos anchor) {
-        BlockState state = player.serverLevel().getBlockState(anchor);
-        Direction facing = state.hasProperty(CryoTubeBlock.BlockImpl.FACING)
-                ? state.getValue(CryoTubeBlock.BlockImpl.FACING)
-                : Direction.NORTH;
-        return facing.toYRot();
+        return facing(player.serverLevel().getBlockState(anchor)).toYRot();
     }
 
     @Override
     public float initialPitch(ServerPlayer player, BlockPos anchor) {
-        return -4.0F;
+        return -3.0F;
     }
 
     @Override
     public void onStart(CinematicSequenceContext context) {
-        context.cueActor(CUE_IDLE);
+        context.cueActor(CUE_SUSPENDED);
     }
 
     @Override
     public void onStageStarted(CinematicSequenceContext context) {
         ResourceLocation stage = context.stage().id();
-        if (stage.equals(MACHINERY_HUM)) {
-            sound(context, SoundEvents.BEACON_AMBIENT, 0.32F, 0.62F);
-        } else if (stage.equals(HEARTBEAT)) {
-            sound(context, SoundEvents.PLAYER_BIG_FALL, 0.24F, 0.55F);
-            sound(context, SoundEvents.PLAYER_BREATH, 0.34F, 0.72F);
-        } else if (stage.equals(LIGHTS_FLICKER)) {
-            sound(context, SoundEvents.REDSTONE_TORCH_BURNOUT, 0.38F, 0.82F);
-        } else if (stage.equals(WARNING_STARTED)) {
-            context.cueActor(CUE_WARNING);
-            sound(context, SoundEvents.BEACON_POWER_SELECT, 0.42F, 1.45F);
-        } else if (stage.equals(ALARM_BEEPS)) {
-            sound(context, SoundEvents.BEACON_DEACTIVATE, 0.48F, 1.62F);
-        } else if (stage.equals(RELEASE_STARTED)) {
-            sound(context, SoundEvents.FIRE_EXTINGUISH, 0.58F, 0.74F);
-        } else if (stage.equals(LOCKS_DISENGAGED)) {
-            context.cueActor(CUE_UNLOCK);
-            sound(context, SoundEvents.IRON_DOOR_OPEN, 0.52F, 0.68F);
-        } else if (stage.equals(MIST_RELEASE)) {
+        if (stage.equals(EXTERIOR_REVEAL)) {
+            context.cueActor(CUE_SUSPENDED);
+            sound(context, SoundEvents.BEACON_AMBIENT, 0.30F, 0.60F);
+        } else if (stage.equals(MEDICAL_DIAGNOSTIC)) {
+            context.cueActor(CUE_DIAGNOSTIC);
+            sound(context, SoundEvents.BEACON_POWER_SELECT, 0.34F, 1.30F);
+        } else if (stage.equals(REVIVAL_PROTOCOL)) {
+            context.cueActor(CUE_REWARMING);
+            sound(context, SoundEvents.CONDUIT_AMBIENT, 0.34F, 0.72F);
+        } else if (stage.equals(CARDIAC_PACING)) {
+            context.cueActor(CUE_CARDIAC_PACING);
+            sound(context, SoundEvents.BEACON_DEACTIVATE, 0.50F, 1.55F);
+        } else if (stage.equals(SUSPENSION_DRAIN)) {
+            context.cueActor(CUE_DRAINING);
             spawnMist(context);
-            sound(context, SoundEvents.FIRE_EXTINGUISH, 0.72F, 0.62F);
+            sound(context, SoundEvents.FIRE_EXTINGUISH, 0.65F, 0.62F);
+        } else if (stage.equals(MASK_RELEASE)) {
+            context.cueActor(CUE_MASK_RELEASE);
+            sound(context, SoundEvents.IRON_TRAPDOOR_OPEN, 0.44F, 0.82F);
         } else if (stage.equals(CRYO_OPENING)) {
             context.cueActor(CUE_OPENING);
             sound(context, SoundEvents.PISTON_EXTEND, 0.58F, 0.72F);
-        } else if (stage.equals(CRYO_OPEN)) {
+        } else if (stage.equals(RECOVERY_WALK)) {
             context.cueActor(CUE_OPEN);
-            sound(context, SoundEvents.IRON_DOOR_OPEN, 0.50F, 0.84F);
+            releasePlayer(context);
+            applyRecoveryEffects(context.player());
+            context.narrateOnce(NARRATION_AWAKE, NARRATION_TICKS);
         }
     }
 
     @Override
     public void onTick(CinematicSequenceContext context) {
-        if (context.stage().id().equals(ALARM_BEEPS)
-                && context.stageElapsedTicks() > 0
-                && context.stageElapsedTicks() % 10 == 0) {
-            sound(context, SoundEvents.BEACON_DEACTIVATE, 0.42F, 1.68F);
+        ResourceLocation stage = context.stage().id();
+        int elapsed = context.stageElapsedTicks();
+        if (stage.equals(EXTERIOR_REVEAL) && elapsed == 8) {
+            context.narrateOnce(NARRATION_MEDICAL_ONLINE, NARRATION_TICKS);
+        } else if (stage.equals(MEDICAL_DIAGNOSTIC)) {
+            narrateAt(context, elapsed, 0, NARRATION_OCCUPANT_DETECTED);
+            narrateAt(context, elapsed, 50, NARRATION_CONTAMINATION);
+            narrateAt(context, elapsed, 100, NARRATION_FILTRATION_OFFLINE);
+        } else if (stage.equals(REVIVAL_PROTOCOL)) {
+            narrateAt(context, elapsed, 0, NARRATION_REVIVAL_AUTHORIZED);
+            narrateAt(context, elapsed, 44, NARRATION_THERMAL_RESTORATION);
+            narrateAt(context, elapsed, 88, NARRATION_CIRCULATORY_ASSIST);
+            narrateAt(context, elapsed, 132, NARRATION_CRYOPROTECTANT_PURGE);
+            narrateAt(context, elapsed, 176, NARRATION_REANIMATION_COMPOUND);
+        } else if (stage.equals(CARDIAC_PACING)) {
+            narrateAt(context, elapsed, 0, NARRATION_CARDIAC_LOW);
+            narrateAt(context, elapsed, 40, NARRATION_PACING);
+            if (elapsed == 48) {
+                sound(context, SoundEvents.LIGHTNING_BOLT_IMPACT, 0.38F, 1.35F);
+            }
+        } else if (stage.equals(SUSPENSION_DRAIN)) {
+            narrateAt(context, elapsed, 0, NARRATION_RHYTHM_RESTORED);
+            narrateAt(context, elapsed, 34, NARRATION_RESPIRATORY_RESPONSE);
+            narrateAt(context, elapsed, 68, NARRATION_DRAINING);
+        } else if (stage.equals(MASK_RELEASE)) {
+            narrateAt(context, elapsed, 0, NARRATION_MASK_RELEASING);
+        } else if (stage.equals(BALANCE_CHECK)) {
+            narrateAt(context, elapsed, 0, NARRATION_MOVE_SLOWLY);
+        } else if (stage.equals(RECOVERY_WALK)) {
+            tickRecoveryNarration(context, elapsed);
         }
     }
 
@@ -218,9 +270,69 @@ public final class CryoWakeupSequence implements CinematicSequence {
         return -1;
     }
 
-    /** Returns the complete authoritative timeline duration. */
     public static int totalDurationTicks() {
         return STAGES.stream().mapToInt(CinematicStage::durationTicks).sum();
+    }
+
+    private static void tickRecoveryNarration(CinematicSequenceContext context, int elapsed) {
+        double distanceSquared = context.player().position().distanceToSqr(Vec3.atCenterOf(context.anchor()));
+        if (elapsed >= 40 && distanceSquared >= 2.25D) {
+            context.narrateOnce(NARRATION_AETHER_IDENTITY, 90);
+        }
+        if (elapsed >= 140 && (distanceSquared >= 9.0D || elapsed >= 220)) {
+            context.narrateOnce(NARRATION_AETHER_LIMITS, 110);
+        }
+        if (elapsed >= 280 && (distanceSquared >= 25.0D || elapsed >= 360)) {
+            context.narrateOnce(NARRATION_FIND_EXIT, 100);
+        }
+    }
+
+    private static void releasePlayer(CinematicSequenceContext context) {
+        ServerPlayer player = context.player();
+        Direction facing = facing(player.serverLevel().getBlockState(context.anchor()));
+        Vec3 exit = Vec3.atCenterOf(context.anchor()).add(
+                facing.getStepX() * 1.35D,
+                0.0D,
+                facing.getStepZ() * 1.35D
+        );
+        player.teleportTo(
+                player.serverLevel(),
+                exit.x,
+                context.anchor().getY() + 0.5D,
+                exit.z,
+                facing.toYRot(),
+                0.0F
+        );
+    }
+
+    private static void applyRecoveryEffects(ServerPlayer player) {
+        player.addEffect(new MobEffectInstance(
+                ModRegistries.CRYO_SHAKES_EFFECT,
+                400,
+                0,
+                true,
+                false,
+                true
+        ));
+        player.addEffect(new MobEffectInstance(
+                MobEffects.MOVEMENT_SLOWDOWN,
+                120,
+                0,
+                true,
+                false,
+                false
+        ));
+    }
+
+    private static void narrateAt(
+            CinematicSequenceContext context,
+            int elapsed,
+            int cueTick,
+            ResourceLocation cueId
+    ) {
+        if (elapsed == cueTick) {
+            context.narrateOnce(cueId, NARRATION_TICKS);
+        }
     }
 
     private static void spawnMist(CinematicSequenceContext context) {
@@ -228,12 +340,12 @@ public final class CryoWakeupSequence implements CinematicSequence {
         context.player().serverLevel().sendParticles(
                 ParticleTypes.CLOUD,
                 anchor.getX() + 0.5D,
-                anchor.getY() + 1.0D,
+                anchor.getY() + 0.9D,
                 anchor.getZ() + 0.5D,
-                18,
-                0.38D,
-                0.72D,
-                0.38D,
+                24,
+                0.40D,
+                0.80D,
+                0.40D,
                 0.025D
         );
     }
@@ -247,6 +359,12 @@ public final class CryoWakeupSequence implements CinematicSequence {
                 volume,
                 pitch
         );
+    }
+
+    private static Direction facing(BlockState state) {
+        return state.hasProperty(CryoTubeBlock.BlockImpl.FACING)
+                ? state.getValue(CryoTubeBlock.BlockImpl.FACING)
+                : Direction.NORTH;
     }
 
     private static CinematicStage stage(
@@ -265,7 +383,11 @@ public final class CryoWakeupSequence implements CinematicSequence {
         return id("cinematic/cryo_wakeup/" + path);
     }
 
-    private static ResourceLocation cueId(String path) {
-        return id("cinematic/cryo_wakeup/cue/" + path);
+    private static ResourceLocation actorCue(String path) {
+        return id("cinematic/cryo_wakeup/actor/" + path);
+    }
+
+    private static ResourceLocation narration(String path) {
+        return id("cinematic/cryo_wakeup/narration/" + path);
     }
 }

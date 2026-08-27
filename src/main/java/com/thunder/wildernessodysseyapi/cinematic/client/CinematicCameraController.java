@@ -23,4 +23,16 @@ public final class CinematicCameraController {
             presentation.applyCamera(state, event);
         }
     }
+
+    @SubscribeEvent
+    public static void onFov(ViewportEvent.ComputeFov event) {
+        CinematicClientController state = CinematicClientController.get();
+        if (!state.isActive()) {
+            return;
+        }
+        ClientCinematicPresentation presentation = state.presentation();
+        if (presentation != null) {
+            presentation.applyFov(state, event);
+        }
+    }
 }

@@ -9,4 +9,17 @@ public interface WaterBuoyancyProvider {
 
     /** Samples buoyancy for boats, items, mobs, or future custom vehicles. */
     BuoyancySample sample(Level level, AABB bounds, Vec3 velocity);
+
+    /**
+     * Samples a yaw-oriented rigid-watercraft footprint. Providers that do not
+     * model hull orientation retain the ordinary bounds sample by default.
+     */
+    default BuoyancySample sampleOriented(
+            Level level,
+            AABB bounds,
+            Vec3 velocity,
+            float yawDegrees
+    ) {
+        return sample(level, bounds, velocity);
+    }
 }

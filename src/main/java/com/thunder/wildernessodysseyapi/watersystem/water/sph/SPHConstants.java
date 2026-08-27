@@ -15,7 +15,14 @@ public final class SPHConstants {
     // Particle properties
     // -------------------------------------------------------------------------
 
-    /** Mass of each particle (kg equivalent). */
+    /**
+     * Mass of each particle (kg equivalent).
+     *
+     * <p>The raw bucket spawn density is about 1,393 kg/m3. Kernel-boundary
+     * loss lowers the deterministic mean to roughly 1,100 kg/m3, keeping the
+     * median pour near the 1,000 kg/m3 rest target with useful positive
+     * pressure instead of requiring a large artificial spreading force.</p>
+     */
     public static final float PARTICLE_MASS       = 4.0f;
 
     /** Rest density — target density at equilibrium (kg/m³ equivalent). */
@@ -83,8 +90,8 @@ public final class SPHConstants {
     /** Friction coefficient applied to velocity tangent on collision. */
     public static final float FRICTION            = 0.12f;
 
-    /** Extra horizontal acceleration applied when particles hit a floor. */
-    public static final float GROUND_SPREAD_FORCE = 9.0f;
+    /** Maximum low-speed contact assistance after density gating. */
+    public static final float GROUND_SPREAD_FORCE = 2.4f;
 
     /** Clamp for horizontal speed so spreading stays stable. */
     public static final float MAX_HORIZONTAL_SPEED = 5.0f;

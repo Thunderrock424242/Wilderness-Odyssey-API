@@ -95,7 +95,9 @@ public final class AuthorityWaterAccess implements WaterAccess {
         if (surface.valid()) {
             WaterBody.Kind kind = switch (surface.waterType()) {
                 case "OCEAN" -> WaterBody.Kind.LARGE_OCEAN;
+                case "COAST" -> WaterBody.Kind.LARGE_COAST;
                 case "RIVER" -> WaterBody.Kind.LARGE_RIVER;
+                case "LAKE" -> WaterBody.Kind.LARGE_LAKE;
                 default -> WaterBody.Kind.LARGE_POND;
             };
             return Optional.of(new WaterBody(

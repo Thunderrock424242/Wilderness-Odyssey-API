@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.lorebook.client.codex;
 
+import com.thunder.wildernessodysseyapi.ai.voice.client.AetherVoiceClient;
+import com.thunder.wildernessodysseyapi.ai.voice.config.AetherVoiceConfig;
 import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
 import com.thunder.wildernessodysseyapi.lorebook.CodexJournalText;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookConfig;
@@ -46,6 +48,7 @@ public class CodexScreen extends Screen {
     private CodexView selectedView = CodexView.GUIDE;
     private MultiLineEditBox journalEditor;
     private Button saveButton;
+    private Button readAloudButton;
     private String lastSavedText = "";
     private String draftText;
     private boolean journalDirty;
@@ -85,6 +88,10 @@ public class CodexScreen extends Screen {
                 Component.literal("Save Journal"),
                 ignored -> saveJournal()
         ).bounds(bookX + RIGHT_PAGE_X + 4, bookY + PAGE_TOP + PAGE_HEIGHT - 28, PAGE_WIDTH - 16, 18).build());
+        this.readAloudButton = this.addRenderableWidget(Button.builder(
+                Component.literal("Read Aloud"),
+                ignored -> readCurrentLoreSpread()
+        ).bounds(bookX + BOOK_WIDTH / 2 - 45, bookY + BOOK_HEIGHT - 40, 90, 16).build());
         updateWidgetVisibility();
     }
 
@@ -353,6 +360,31 @@ public class CodexScreen extends Screen {
             saveButton.visible = selectedView == CodexView.JOURNAL;
             saveButton.active = selectedView == CodexView.JOURNAL && journalDirty;
         }
+        if (readAloudButton != null) {
+            boolean canRead = selectedView == CodexView.LORE
+                    && AetherVoiceClient.isVoiceAvailable()
+                    && AetherVoiceConfig.LORE_READ_ALOUD.get()
+                    && !lorePages().isEmpty();
+            readAloudButton.visible = canRead;
+            readAloudButton.active = canRead;
+        }
+    }
+
+    private void readCurrentLoreSpread() {
+        List<LorePage> pages = lorePages();
+        if (loreSpreadIndex < 0 || loreSpreadIndex >= pages.size()) {
+            return;
+        }
+        LorePage left = pages.get(loreSpreadIndex);
+        List<String> pageTexts = new ArrayList<>();
+        pageTexts.add(left.text());
+        if (loreSpreadIndex + 1 < pages.size()) {
+            pageTexts.add(pages.get(loreSpreadIndex + 1).text());
+        }
+        AetherVoiceClient.speakAuthored(
+                LoreNarration.fromSpread(left.title(), left.author(), pageTexts),
+                false
+        );
     }
 
     @Override

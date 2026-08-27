@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.core;
 
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugPageRegistry;
+import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
+import com.thunder.wildernessodysseyapi.cryo.client.CryoTubeRenderer;
 import com.thunder.wildernessodysseyapi.entity.client.RiftListenerRenderer;
 import com.thunder.wildernessodysseyapi.entity.client.RiftMawRenderer;
 import com.thunder.wildernessodysseyapi.entity.client.RiftbornRenderer;
@@ -79,6 +81,7 @@ public class ClientSetup {
         event.registerEntityRenderer(ModEntities.RIFT_LISTENER.get(), RiftListenerRenderer::new);
         event.registerEntityRenderer(ModEntities.RIFT_MAW.get(), RiftMawRenderer::new);
         event.registerEntityRenderer(ModEntities.RIFTBOUND_WRAITH.get(), RiftboundWraithRenderer::new);
+        event.registerBlockEntityRenderer(CryoTubeBlock.CRYO_TUBE_ENTITY.get(), CryoTubeRenderer::new);
         event.registerBlockEntityRenderer(TemporalRiftBlockEntities.RIFT_CORE.get(), RiftCoreBlockEntityRenderer::new);
     }
 

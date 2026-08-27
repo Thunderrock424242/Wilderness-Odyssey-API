@@ -7,34 +7,29 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class CryoWakeupSequenceTest {
     @Test
-    void timelineMatchesTheTwentyFourSecondCueSheet() {
+    void timelineMatchesTheRevivalAndRecoveryCueSheet() {
         assertEquals(0, CryoWakeupSequence.startTick(CryoWakeupSequence.BLACK_SCREEN));
-        assertEquals(20, CryoWakeupSequence.startTick(CryoWakeupSequence.MACHINERY_HUM));
-        assertEquals(40, CryoWakeupSequence.startTick(CryoWakeupSequence.HEARTBEAT));
-        assertEquals(60, CryoWakeupSequence.startTick(CryoWakeupSequence.EYES_PARTIAL));
-        assertEquals(100, CryoWakeupSequence.startTick(CryoWakeupSequence.EYES_CLOSED));
-        assertEquals(120, CryoWakeupSequence.startTick(CryoWakeupSequence.EYES_REOPENING));
-        assertEquals(140, CryoWakeupSequence.startTick(CryoWakeupSequence.LIGHTS_FLICKER));
-        assertEquals(160, CryoWakeupSequence.startTick(CryoWakeupSequence.WARNING_STARTED));
-        assertEquals(180, CryoWakeupSequence.startTick(CryoWakeupSequence.WARNING_LIGHTS));
-        assertEquals(200, CryoWakeupSequence.startTick(CryoWakeupSequence.ALARM_BEEPS));
-        assertEquals(240, CryoWakeupSequence.startTick(CryoWakeupSequence.RELEASE_STARTED));
-        assertEquals(260, CryoWakeupSequence.startTick(CryoWakeupSequence.LOCKS_DISENGAGED));
-        assertEquals(280, CryoWakeupSequence.startTick(CryoWakeupSequence.MIST_RELEASE));
-        assertEquals(300, CryoWakeupSequence.startTick(CryoWakeupSequence.CRYO_OPENING));
-        assertEquals(340, CryoWakeupSequence.startTick(CryoWakeupSequence.CAMERA_TURN));
-        assertEquals(380, CryoWakeupSequence.startTick(CryoWakeupSequence.CRYO_OPEN));
-        assertEquals(400, CryoWakeupSequence.startTick(CryoWakeupSequence.LIGHTS_STABLE));
-        assertEquals(440, CryoWakeupSequence.startTick(CryoWakeupSequence.CAMERA_RELEASE));
-        assertEquals(460, CryoWakeupSequence.startTick(CryoWakeupSequence.CONTROL_RETURN));
-        assertEquals(480, CryoWakeupSequence.totalDurationTicks());
+        assertEquals(20, CryoWakeupSequence.startTick(CryoWakeupSequence.EXTERIOR_REVEAL));
+        assertEquals(100, CryoWakeupSequence.startTick(CryoWakeupSequence.MEDICAL_DIAGNOSTIC));
+        assertEquals(250, CryoWakeupSequence.startTick(CryoWakeupSequence.REVIVAL_PROTOCOL));
+        assertEquals(470, CryoWakeupSequence.startTick(CryoWakeupSequence.CARDIAC_PACING));
+        assertEquals(550, CryoWakeupSequence.startTick(CryoWakeupSequence.SUSPENSION_DRAIN));
+        assertEquals(650, CryoWakeupSequence.startTick(CryoWakeupSequence.BLACKOUT_TRANSITION));
+        assertEquals(670, CryoWakeupSequence.startTick(CryoWakeupSequence.EYES_REOPENING));
+        assertEquals(750, CryoWakeupSequence.startTick(CryoWakeupSequence.MASK_RELEASE));
+        assertEquals(790, CryoWakeupSequence.startTick(CryoWakeupSequence.CRYO_OPENING));
+        assertEquals(850, CryoWakeupSequence.startTick(CryoWakeupSequence.BALANCE_CHECK));
+        assertEquals(890, CryoWakeupSequence.startTick(CryoWakeupSequence.RECOVERY_WALK));
+        assertEquals(1_290, CryoWakeupSequence.totalDurationTicks());
     }
 
     @Test
-    void movementReturnsOneSecondBeforePresentationCompletes() {
+    void movementReturnsForTheFinalTwentySecondBriefing() {
         var stages = new CryoWakeupSequence().stages();
-        assertEquals(CinematicControlPolicy.LOCKED, stages.get(stages.size() - 2).controlPolicy());
+        for (int i = 0; i < stages.size() - 1; i++) {
+            assertEquals(CinematicControlPolicy.LOCKED, stages.get(i).controlPolicy());
+        }
         assertEquals(CinematicControlPolicy.PRESENTATION_ONLY, stages.getLast().controlPolicy());
-        assertEquals(20, stages.getLast().durationTicks());
+        assertEquals(400, stages.getLast().durationTicks());
     }
 }

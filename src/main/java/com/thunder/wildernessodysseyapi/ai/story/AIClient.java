@@ -24,7 +24,7 @@ public class AIClient {
     private final List<String> authoritativeKnowledge = new ArrayList<>();
     private final List<String> knowledgeBoundaries = new ArrayList<>();
     private final AISettings settings = new AISettings();
-    private final VoiceIntegration voiceIntegration = new VoiceIntegration(settings);
+    private final VoiceIntegration voiceIntegration = new VoiceIntegration();
     private final MemoryStore memoryStore = new MemoryStore();
     private final AIKnowledgeStore knowledgeStore = new AIKnowledgeStore();
     private final AIOnboardingStore onboardingStore = new AIOnboardingStore();
@@ -91,12 +91,6 @@ public class AIClient {
         AIConfig.Settings configSettings = config.getSettings();
         if (configSettings.getAtlasEnabled() != null) {
             settings.setAtlasEnabled(configSettings.getAtlasEnabled());
-        }
-        if (configSettings.getVoiceEnabled() != null) {
-            settings.setVoiceEnabled(configSettings.getVoiceEnabled());
-        }
-        if (configSettings.getSpeechRecognition() != null) {
-            settings.setSpeechRecognition(configSettings.getSpeechRecognition());
         }
         if (configSettings.getWakeWord() != null) {
             settings.setWakeWord(configSettings.getWakeWord());
@@ -244,7 +238,8 @@ public class AIClient {
                         subsystemRegistry.profileFor(speaker).orElse(null),
                         safeResponseContext,
                         message,
-                        modelResponse.text()
+                        modelResponse.displayText(),
+                        modelResponse.speechText()
                 );
                 OllamaChatClient.VerificationResponse verification =
                         ollamaChatClient.verify(settings, verifierPrompt);
@@ -252,6 +247,15 @@ public class AIClient {
                         ? modelResponse.text()
                         : safeUngroundedReply(message);
                 memoryStore.addAiMessage(world, player, speaker, verifiedReply);
+                if (verification.successful() && verification.approved()) {
+                    return voiceIntegration.wrap(
+                            speaker,
+                            modelResponse.displayText(),
+                            modelResponse.speechText(),
+                            modelResponse.emotion(),
+                            modelResponse.radioEffect()
+                    );
+                }
                 return voiceIntegration.wrap(speaker, verifiedReply);
             }
         }

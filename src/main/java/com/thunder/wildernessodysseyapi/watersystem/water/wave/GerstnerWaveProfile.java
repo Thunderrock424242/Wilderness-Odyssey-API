@@ -21,6 +21,13 @@ public final class GerstnerWaveProfile {
     private static final float MIN_DIRECTIONAL_ENERGY = 0.55f;
     private static final float DIRECTIONAL_ENERGY_RANGE = 0.90f;
 
+    /**
+     * Upper bound for the summed Gerstner horizontal derivative. Keeping the
+     * value below one prevents the horizontal surface mapping from folding
+     * over itself under unusually energetic weather spectra.
+     */
+    public static final float MAX_COMBINED_STEEPNESS = 0.82f;
+
     /** Number of overlapping wave components in this profile. */
     public final int waveCount;
 
@@ -197,6 +204,26 @@ public final class GerstnerWaveProfile {
         float velocityY = 0.0f;
         float velocityZ = 0.0f;
 
+        float rawCombinedSteepness = 0.0f;
+        for (int i = 0; i < count; i++) {
+            float directionX = dirX[i];
+            float directionZ = dirZ[i];
+            if (flowAligned) {
+                float rotatedX = normalizedFlowX * directionX
+                        - normalizedFlowZ * directionZ;
+                float rotatedZ = normalizedFlowZ * directionX
+                        + normalizedFlowX * directionZ;
+                directionX = rotatedX;
+                directionZ = rotatedZ;
+            }
+            float energyScale = componentEnergyScale(i, spectrum, directionX, directionZ);
+            rawCombinedSteepness += steepness[i] * amplitude[i]
+                    * energyScale * waveNumber[i];
+        }
+        float horizontalBudgetScale = rawCombinedSteepness > MAX_COMBINED_STEEPNESS
+                ? MAX_COMBINED_STEEPNESS / rawCombinedSteepness
+                : 1.0f;
+
         // Tangents start as the flat X and Z axes. Their cross product gives
         // an analytic normal without noisy neighboring height samples.
         float tangentXX = 1.0f;
@@ -207,7 +234,6 @@ public final class GerstnerWaveProfile {
         float tangentZZ = 1.0f;
 
         for (int i = 0; i < count; i++) {
-            float componentBlend = waveCount <= 1 ? 0.0f : i / (float) (waveCount - 1);
             float authoredDirectionX = dirX[i];
             float authoredDirectionZ = dirZ[i];
             if (flowAligned) {
@@ -224,19 +250,9 @@ public final class GerstnerWaveProfile {
             float directionZ = authoredDirectionZ;
             float k = waveNumber[i];
             float omega = angularFrequency[i];
-            float energyScale = spectrum.swellScale()
-                    + (spectrum.chopScale() - spectrum.swellScale()) * componentBlend;
-            float windAlignment = Math.max(
-                    0.0f,
-                    directionX * spectrum.windDirectionX()
-                            + directionZ * spectrum.windDirectionZ()
-            );
-            float alignedEnergy = MIN_DIRECTIONAL_ENERGY
-                    + windAlignment * DIRECTIONAL_ENERGY_RANGE;
-            energyScale *= 1.0f
-                    + spectrum.directionBlend() * (alignedEnergy - 1.0f);
+            float energyScale = componentEnergyScale(i, spectrum, directionX, directionZ);
             float waveAmplitude = amplitude[i] * energyScale;
-            float horizontalScale = steepness[i] * waveAmplitude;
+            float horizontalScale = steepness[i] * waveAmplitude * horizontalBudgetScale;
             double phase = Math.IEEEremainder(
                     k * (directionX * safeWorldX + directionZ * safeWorldZ)
                             - omega * safeTimeSeconds
@@ -267,6 +283,8 @@ public final class GerstnerWaveProfile {
             tangentZZ -= horizontalDerivative * directionZ * directionZ;
         }
 
+        float horizontalJacobian = tangentXX * tangentZZ - tangentXZ * tangentZX;
+
         // tangentZ x tangentX points upward for an undisturbed XZ plane.
         float normalX = tangentZY * tangentXZ - tangentZZ * tangentXY;
         float normalY = tangentZZ * tangentXX - tangentZX * tangentXZ;
@@ -283,6 +301,13 @@ public final class GerstnerWaveProfile {
             normalZ *= inverseLength;
         }
 
+        float slope = Math.min(
+                4.0f,
+                (float) Math.sqrt(normalX * normalX + normalZ * normalZ)
+                        / Math.max(1.0e-4f, Math.abs(normalY))
+        );
+        float crestStrength = clamp01((1.0f - horizontalJacobian) / 0.35f);
+
         return new WaveSurfaceSample(
                 displacementX,
                 height,
@@ -292,8 +317,51 @@ public final class GerstnerWaveProfile {
                 normalZ,
                 velocityX,
                 velocityY,
-                velocityZ
+                velocityZ,
+                slope,
+                crestStrength
         );
+    }
+
+    /**
+     * Returns the effective summed steepness after the fold-prevention budget
+     * has been applied to the supplied environmental spectrum.
+     */
+    public float combinedSteepness(WaveSpectrumState spectrumState) {
+        WaveSpectrumState spectrum = spectrumState == null
+                ? WaveSpectrumState.NEUTRAL
+                : spectrumState;
+        float combined = 0.0f;
+        for (int i = 0; i < waveCount; i++) {
+            float energyScale = componentEnergyScale(i, spectrum, dirX[i], dirZ[i]);
+            combined += steepness[i] * amplitude[i] * energyScale * waveNumber[i];
+        }
+        return Math.min(MAX_COMBINED_STEEPNESS, combined);
+    }
+
+    private float componentEnergyScale(
+            int index,
+            WaveSpectrumState spectrum,
+            float directionX,
+            float directionZ
+    ) {
+        float componentBlend = waveCount <= 1 ? 0.0f : index / (float) (waveCount - 1);
+        float energyScale = spectrum.swellScale()
+                + (spectrum.chopScale() - spectrum.swellScale()) * componentBlend;
+        float windAlignment = Math.max(
+                0.0f,
+                directionX * spectrum.windDirectionX()
+                        + directionZ * spectrum.windDirectionZ()
+        );
+        float alignedEnergy = MIN_DIRECTIONAL_ENERGY
+                + windAlignment * DIRECTIONAL_ENERGY_RANGE;
+        return energyScale * (
+                1.0f + spectrum.directionBlend() * (alignedEnergy - 1.0f)
+        );
+    }
+
+    private static float clamp01(float value) {
+        return Math.max(0.0f, Math.min(1.0f, value));
     }
 
     private static double finiteOrZero(double value) {
@@ -344,6 +412,16 @@ public final class GerstnerWaveProfile {
             .boatBob(1.00f)
             .build();
 
+    /** Steeper coastal swell that retains short breaking-wave detail. */
+    public static final GerstnerWaveProfile COAST = new Builder(4, 6.0f)
+            .wave(0, 0.160f, 15.0f, 0.92f, 0.39f, 0.78f, 0.00f)
+            .wave(1, 0.082f, 7.5f, 0.83f, 0.56f, 0.67f, 1.18f)
+            .wave(2, 0.039f, 3.6f, 0.45f, -0.89f, 0.49f, 2.36f)
+            .wave(3, 0.017f, 1.7f, -0.55f, -0.84f, 0.31f, 0.69f)
+            .entityPush(0.010f)
+            .boatBob(0.95f)
+            .build();
+
     /** Directional river motion with small, depth-limited ripples. */
     public static final GerstnerWaveProfile RIVER = new Builder(3, 2.0f)
             .wave(0, 0.038f, 6.0f, 1.00f, 0.00f, 0.26f, 0.00f)
@@ -359,6 +437,15 @@ public final class GerstnerWaveProfile {
             .wave(1, 0.007f, 1.9f, -0.71f, 0.71f, 0.08f, 1.91f)
             .entityPush(0.0005f)
             .boatBob(0.35f)
+            .build();
+
+    /** Broad but subdued wind waves for inland lakes. */
+    public static final GerstnerWaveProfile LAKE = new Builder(3, 8.0f)
+            .wave(0, 0.070f, 10.0f, 0.82f, 0.57f, 0.38f, 0.00f)
+            .wave(1, 0.031f, 4.6f, 0.62f, -0.78f, 0.28f, 1.46f)
+            .wave(2, 0.012f, 2.1f, -0.48f, -0.88f, 0.17f, 2.57f)
+            .entityPush(0.003f)
+            .boatBob(0.55f)
             .build();
 
     /**

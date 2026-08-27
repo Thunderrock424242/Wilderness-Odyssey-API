@@ -106,11 +106,7 @@ public final class WaveEntityPhysics {
         BuoyancySample buoyancy = (cachedTouchingWater
                 || physicsProfile.rigidWatercraft()
                 || raisedWatershedSurface)
-                ? WaterServices.buoyancy().sample(
-                        level,
-                        entity.getBoundingBox(),
-                        entity.getDeltaMovement()
-                )
+                ? sampleBuoyancy(level, entity, physicsProfile)
                 : BuoyancySample.DRY;
         if (!buoyancy.touchingWater() && !mobileWater.wet()) {
             if (physicsProfile.rigidWatercraft()) {
@@ -131,6 +127,26 @@ public final class WaveEntityPhysics {
                 physicsProfile,
                 payloadUnits,
                 runtimeTuning
+        );
+    }
+
+    private static BuoyancySample sampleBuoyancy(
+            Level level,
+            Entity entity,
+            WaterPhysicsProfile physicsProfile
+    ) {
+        if (physicsProfile.rigidWatercraft()) {
+            return WaterServices.buoyancy().sampleOriented(
+                    level,
+                    entity.getBoundingBox(),
+                    entity.getDeltaMovement(),
+                    entity.getYRot()
+            );
+        }
+        return WaterServices.buoyancy().sample(
+                level,
+                entity.getBoundingBox(),
+                entity.getDeltaMovement()
         );
     }
 

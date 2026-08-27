@@ -22,7 +22,7 @@ class WaterSurfaceEquationTest {
                 * oceanWeight;
         expectedWaves += GerstnerWaveProfile.RIVER.sampleAt(
                 x, z, time, 2, WaveSpectrumState.NEUTRAL).height() * riverWeight;
-        expectedWaves += GerstnerWaveProfile.POND.sampleAt(
+        expectedWaves += GerstnerWaveProfile.LAKE.sampleAt(
                 x, z, time, 1, WaveSpectrumState.NEUTRAL).height() * pondWeight;
 
         float height = WaterSurfaceEquation.snapshotSurfaceHeight(
@@ -64,6 +64,39 @@ class WaterSurfaceEquationTest {
         );
 
         assertEquals(10.25f, height, 1.0e-6f);
+    }
+
+    @Test
+    void enclosedWaterUsesItsExplicitWeatherSpectrum() {
+        WaveSpectrumState enclosed = new WaveSpectrumState(
+                1.6f, 1.9f, 0.6f, 0.8f, 0.7f);
+        double x = 6.25;
+        double z = -4.75;
+        double time = 3.2;
+        float expected = GerstnerWaveProfile.LAKE.sampleAt(
+                x, z, time, 3, enclosed).height();
+
+        float height = WaterSurfaceEquation.snapshotSurfaceHeight(
+                30.0f,
+                x,
+                z,
+                time,
+                WaveSpectrumState.NEUTRAL,
+                enclosed,
+                0,
+                0,
+                3,
+                0.0f,
+                0.0f,
+                1.0f,
+                0.0f,
+                0.0f,
+                1.0f,
+                0.0f,
+                0.0f
+        );
+
+        assertEquals(30.0f + expected, height, 1.0e-6f);
     }
 
     @Test

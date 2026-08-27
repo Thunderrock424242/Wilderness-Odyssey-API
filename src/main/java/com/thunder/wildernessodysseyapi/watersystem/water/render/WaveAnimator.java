@@ -28,22 +28,32 @@ public class WaveAnimator {
     // --- Internal state ---
 
     private static float currentTime = 0f;
-    private static long lastFrameTime = -1L;
+    private static long lastFrameNanos = -1L;
 
     /**
      * Call once per frame (from the render mixin HEAD inject).
-     * Advances the wave timer using real elapsed time so waves
-     * look the same regardless of game tick rate or TPS.
+     * Advances the compatibility timer from a monotonic clock. The active
+     * Gerstner renderer uses Minecraft world time; this legacy path still
+     * clamps stalls so wall-clock changes and loading pauses cannot jump it.
      */
     public static void updateIfNeeded() {
-        long now = System.currentTimeMillis();
-        if (lastFrameTime < 0) {
-            lastFrameTime = now;
+        long now = System.nanoTime();
+        if (lastFrameNanos < 0L) {
+            lastFrameNanos = now;
             return;
         }
-        float deltaSeconds = (now - lastFrameTime) / 1000f;
+        float deltaSeconds = Math.max(0.0f, Math.min(
+                0.10f,
+                (now - lastFrameNanos) / 1_000_000_000.0f
+        ));
         currentTime += deltaSeconds;
-        lastFrameTime = now;
+        lastFrameNanos = now;
+    }
+
+    /** Resets the dormant compatibility clock during a world handoff. */
+    public static void reset() {
+        currentTime = 0.0f;
+        lastFrameNanos = -1L;
     }
 
     /**
