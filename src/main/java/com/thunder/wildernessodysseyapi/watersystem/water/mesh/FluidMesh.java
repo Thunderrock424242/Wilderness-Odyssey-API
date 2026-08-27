@@ -36,24 +36,40 @@ public class FluidMesh {
      * Rebuilds the mesh when the simulator revision passes the configured interval.
      */
     public void rebuild() {
-        rebuild(1);
+        rebuildIfNeeded(1);
     }
 
     public void rebuild(int revisionInterval) {
+        rebuildIfNeeded(revisionInterval);
+    }
+
+    /** Returns whether the simulator has published a revision eligible for extraction. */
+    public boolean needsRebuild(int revisionInterval) {
+        return needsRebuild(simulator.getRenderRevision(), revisionInterval);
+    }
+
+    private boolean needsRebuild(long revision, int revisionInterval) {
+        return revision != builtRevision
+                && (builtRevision < 0L
+                || revision - builtRevision >= Math.max(1, revisionInterval));
+    }
+
+    /** Rebuilds one eligible revision and reports whether extraction work ran. */
+    public boolean rebuildIfNeeded(int revisionInterval) {
         long revision = simulator.getRenderRevision();
-        if (revision == builtRevision) return;
-        if (builtRevision >= 0L && revision - builtRevision < Math.max(1, revisionInterval)) return;
+        if (!needsRebuild(revision, revisionInterval)) return false;
 
         List<SPHParticle> particles = simulator.getRenderParticles();
         if (particles.isEmpty()) {
             meshData = new float[0];
             builtRevision = revision;
-            return;
+            return true;
         }
 
         field.rebuild(particles);
         meshData = mc.extract(field);
         builtRevision = revision;
+        return true;
     }
 
     /** @return true if there is renderable geometry */

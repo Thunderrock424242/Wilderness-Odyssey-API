@@ -23,8 +23,9 @@ public class MarchingCubes {
     private final Vector3f[] edgeVerts = new Vector3f[12];
     private final Vector3f[] corners = new Vector3f[8];
     private final Vector3f[] smoothNormals = new Vector3f[3];
+    private final float[] cornerValues = new float[8];
 
-    // Output buffer — rebuilt each frame
+    // Reused output buffer for revision-gated mesh extractions.
     private float[] vertices = new float[4096];
     private int vertexCount = 0;
 
@@ -73,16 +74,18 @@ public class MarchingCubes {
 
     private void polygoniseCube(DensityField field, int gx, int gy, int gz, float iso) {
         // Sample density at the 8 corners of this cube
-        float[] val = {
-            field.sample(gx,   gy,   gz),
-            field.sample(gx+1, gy,   gz),
-            field.sample(gx+1, gy,   gz+1),
-            field.sample(gx,   gy,   gz+1),
-            field.sample(gx,   gy+1, gz),
-            field.sample(gx+1, gy+1, gz),
-            field.sample(gx+1, gy+1, gz+1),
-            field.sample(gx,   gy+1, gz+1)
-        };
+        // This method can visit nearly half a million cells for one capped
+        // density field. Reuse the instance scratch array so a large splash
+        // cannot create the same number of short-lived heap allocations.
+        float[] val = cornerValues;
+        val[0] = field.sample(gx,   gy,   gz);
+        val[1] = field.sample(gx+1, gy,   gz);
+        val[2] = field.sample(gx+1, gy,   gz+1);
+        val[3] = field.sample(gx,   gy,   gz+1);
+        val[4] = field.sample(gx,   gy+1, gz);
+        val[5] = field.sample(gx+1, gy+1, gz);
+        val[6] = field.sample(gx+1, gy+1, gz+1);
+        val[7] = field.sample(gx,   gy+1, gz+1);
 
         // Determine which corners are inside the isosurface
         int cubeIndex = 0;

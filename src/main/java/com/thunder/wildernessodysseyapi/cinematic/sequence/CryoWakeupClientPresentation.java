@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.cinematic.sequence;
 
+import com.thunder.wildernessodysseyapi.ai.voice.VoiceEmotion;
 import com.thunder.wildernessodysseyapi.cinematic.client.AetherCinematicVoice;
 import com.thunder.wildernessodysseyapi.cinematic.client.CinematicClientController;
 import com.thunder.wildernessodysseyapi.cinematic.client.CinematicPostEffectController;
@@ -221,7 +222,7 @@ public final class CryoWakeupClientPresentation implements ClientCinematicPresen
 
     @Override
     public void onNarration(CinematicClientController state, ResourceLocation cueId, Component text) {
-        AetherCinematicVoice.speak(text);
+        AetherCinematicVoice.speak(text, narrationEmotion(cueId), narrationRadioEffect(cueId));
     }
 
     @Override
@@ -242,6 +243,35 @@ public final class CryoWakeupClientPresentation implements ClientCinematicPresen
     /** Used by the cryo renderer to show the presentation-only local-player proxy. */
     public static boolean shouldRenderOccupant(ResourceLocation stage) {
         return CryoWakeupPresentationModel.isExteriorStage(stage);
+    }
+
+    /** Resolves only registered authored cues to bounded local voice delivery moods. */
+    static VoiceEmotion narrationEmotion(ResourceLocation cueId) {
+        if (CryoWakeupSequence.NARRATION_CONTAMINATION.equals(cueId)
+                || CryoWakeupSequence.NARRATION_FILTRATION_OFFLINE.equals(cueId)
+                || CryoWakeupSequence.NARRATION_CARDIAC_LOW.equals(cueId)) {
+            return VoiceEmotion.CONCERNED;
+        }
+        if (CryoWakeupSequence.NARRATION_REVIVAL_AUTHORIZED.equals(cueId)
+                || CryoWakeupSequence.NARRATION_PACING.equals(cueId)) {
+            return VoiceEmotion.URGENT;
+        }
+        if (CryoWakeupSequence.NARRATION_AETHER_IDENTITY.equals(cueId)
+                || CryoWakeupSequence.NARRATION_AETHER_LIMITS.equals(cueId)) {
+            return VoiceEmotion.DAMAGED;
+        }
+        return VoiceEmotion.NORMAL;
+    }
+
+    /** Adds restrained corruption only to A.E.T.H.E.R's damaged self-disclosure. */
+    static float narrationRadioEffect(ResourceLocation cueId) {
+        if (CryoWakeupSequence.NARRATION_AETHER_IDENTITY.equals(cueId)) {
+            return 0.18F;
+        }
+        if (CryoWakeupSequence.NARRATION_AETHER_LIMITS.equals(cueId)) {
+            return 0.14F;
+        }
+        return 0.07F;
     }
 
     private static void renderSubtitle(

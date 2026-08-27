@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.cinematic.sequence;
 
+import com.thunder.wildernessodysseyapi.ai.voice.VoiceEmotion;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -63,6 +64,27 @@ class CryoWakeupPresentationModelTest {
         ));
         assertEquals(0.0F, CryoWakeupPresentationModel.blurStrength(
                 CryoWakeupSequence.RECOVERY_WALK, 1.0F
+        ));
+    }
+
+    @Test
+    void authoredVoiceDeliveryEscalatesWithoutInventingNewModes() {
+        assertEquals(VoiceEmotion.NORMAL, CryoWakeupClientPresentation.narrationEmotion(
+                CryoWakeupSequence.NARRATION_MEDICAL_ONLINE
+        ));
+        assertEquals(VoiceEmotion.CONCERNED, CryoWakeupClientPresentation.narrationEmotion(
+                CryoWakeupSequence.NARRATION_CONTAMINATION
+        ));
+        assertEquals(VoiceEmotion.URGENT, CryoWakeupClientPresentation.narrationEmotion(
+                CryoWakeupSequence.NARRATION_PACING
+        ));
+        assertEquals(VoiceEmotion.DAMAGED, CryoWakeupClientPresentation.narrationEmotion(
+                CryoWakeupSequence.NARRATION_AETHER_IDENTITY
+        ));
+        assertTrue(CryoWakeupClientPresentation.narrationRadioEffect(
+                CryoWakeupSequence.NARRATION_AETHER_IDENTITY
+        ) > CryoWakeupClientPresentation.narrationRadioEffect(
+                CryoWakeupSequence.NARRATION_MEDICAL_ONLINE
         ));
     }
 }

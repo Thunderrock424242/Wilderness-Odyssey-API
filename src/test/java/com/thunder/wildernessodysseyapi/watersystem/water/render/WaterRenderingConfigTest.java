@@ -14,6 +14,7 @@ class WaterRenderingConfigTest {
         assertTrue(WaterRenderingConfig.SHOW_CONTEXTUAL_CLOCK_TIDE_DISPLAY.getDefault());
         assertTrue(WaterRenderingConfig.ENABLE_AMBIENT_WATER_PARTICLES.getDefault());
         assertTrue(WaterRenderingConfig.ENABLE_PERSISTENT_WAKE_FOAM.getDefault());
+        assertTrue(WaterRenderingConfig.AUTO_DETECT_WATER_QUALITY.getDefault());
     }
 
     @Test
@@ -65,5 +66,31 @@ class WaterRenderingConfigTest {
                 WaterRenderingConfig.WaterQuality.CINEMATIC, false));
         assertEquals(48.0f, WaterRenderingConfig.screenSpaceReflectionDistance(
                 WaterRenderingConfig.WaterQuality.CINEMATIC, true));
+    }
+
+    @Test
+    void renderThreadMeshBudgetsScaleWithoutAllowingStreamingBursts() {
+        assertEquals(1, WaterRenderingConfig.snapshotMeshRebuildsPerFrame(
+                WaterRenderingConfig.WaterQuality.LOW, false));
+        assertEquals(4, WaterRenderingConfig.snapshotMeshRebuildsPerFrame(
+                WaterRenderingConfig.WaterQuality.HIGH, false));
+        assertEquals(3, WaterRenderingConfig.snapshotMeshRebuildsPerFrame(
+                WaterRenderingConfig.WaterQuality.HIGH, true));
+        assertEquals(6, WaterRenderingConfig.snapshotMeshRebuildsPerFrame(
+                WaterRenderingConfig.WaterQuality.CINEMATIC, false));
+        assertEquals(3_500_000L, WaterRenderingConfig.snapshotMeshRebuildTimeBudgetNanos(
+                WaterRenderingConfig.WaterQuality.CINEMATIC, false));
+    }
+
+    @Test
+    void sphExtractionBudgetKeepsLocalDetailFairAndBounded() {
+        assertEquals(0, WaterRenderingConfig.sphMeshRebuildsPerFrame(
+                WaterRenderingConfig.WaterQuality.MEDIUM, false));
+        assertEquals(2, WaterRenderingConfig.sphMeshRebuildsPerFrame(
+                WaterRenderingConfig.WaterQuality.HIGH, false));
+        assertEquals(1, WaterRenderingConfig.sphMeshRebuildsPerFrame(
+                WaterRenderingConfig.WaterQuality.HIGH, true));
+        assertEquals(3, WaterRenderingConfig.sphMeshRebuildsPerFrame(
+                WaterRenderingConfig.WaterQuality.CINEMATIC, false));
     }
 }

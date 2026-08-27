@@ -112,6 +112,7 @@ public final class WaterRenderDiagnostics {
                 "WO Water path: " + snapshot.renderPath().label + " | scene capture "
                         + (snapshot.sceneCaptureAvailable() ? "ready" : "fallback") + " | "
                         + WaterRenderingConfig.profileName(),
+                "WO Water quality: " + WaterRenderingConfig.qualitySelectionSummary(),
                 "WO Water shader-pack alias: "
                         + ExternalShaderWaterMaterialBridge.status().label()
                         + " | renderer bridge "

@@ -225,6 +225,17 @@ buried or otherwise unclaimed fluid faces.
 All tiers retain snapshot culling, cached geometry, and the environment
 reflection fallback.
 
+`autoDetectWaterQuality` defaults to enabled. Once the client OpenGL context is
+available, a one-time render-thread probe selects the effective tier from the
+GPU family and reported VRAM, logical CPU capacity, installed physical RAM,
+Minecraft maximum heap, and framebuffer resolution. The weakest component
+caps the result: unfamiliar GPUs are treated conservatively, software renderers
+select `LOW`, common Intel/AMD integrated graphics do not exceed `MEDIUM`, and
+ultrawide/4K framebuffers cannot select `CINEMATIC` automatically. Detection
+changes only the effective client presentation tier and never rewrites the
+user's config.
+Disable `autoDetectWaterQuality` to restore the manual `waterQuality` value.
+
 - `LOW` uses reduced refraction, no SSR, and no ambient particle layer.
 - `MEDIUM` adds stronger optical detail, one capped ambient particle sample,
   and reduced wake foam while keeping SSR disabled.
@@ -232,6 +243,13 @@ reflection fallback.
   and a longer wake-foam tail.
 - `CINEMATIC` raises the bounded optical/rebuild budgets and permits up to three
   ambient particles per emission. Renderer-mod optimization reduces that to two.
+
+Dirty snapshot meshes are drained under both a quality-scaled count limit and
+a soft render-thread time limit. Backlogs do not unlock a larger one-frame
+burst; the existing custom mesh or vanilla fallback remains visible until its
+replacement is ready. Local SPH density/marching-cubes extraction has a separate
+rotating budget, so continuously changing nearby splashes cannot make every
+visible body rebuild in the same frame or starve later bodies.
 
 SSR is bounded by shader step count, travel distance, valid depth, and screen
 limits. It is an enhancement, not a requirement for water visibility.
@@ -302,6 +320,7 @@ Open the F3 debug screen and read the `WO Water` lines in the system panel:
 - total water-render CPU submission time;
 - scene-copy CPU submission time and copy count; and
 - bounded SSR timing when available.
+- the automatic/manual quality source and GPU/CPU/memory/display limiter tiers.
 
 The counters avoid synchronous GPU reads. Scene-copy and render values are CPU
 submission costs. A ring of asynchronous timer queries reports the most recent
