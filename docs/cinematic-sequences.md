@@ -54,7 +54,7 @@ Blur uses Minecraft's native transient blur pass and respects the screen-effect 
 
 ## A.E.T.H.E.R narration
 
-All medical and recovery lines are authored cue ids. They do not call Ollama and cannot invent a procedure, observation, or capability. The client always shows translated subtitles. When the optional local A.E.T.H.E.R voice service is enabled, the same authored text is queued through its Kokoro voice. Otherwise cinematic narration uses the operating system's offline narrator as a zero-setup fallback. Set `aether_voice.cinematicNarration` to false in the client config to silence authored cinematic speech while retaining subtitles.
+All medical and recovery lines are authored cue ids. They do not call Ollama and cannot invent a procedure, observation, or capability. The client always shows translated subtitles. When the optional local A.E.T.H.E.R voice service is enabled, the same authored text is queued through its configured Kokoro voice with bounded normal, concerned, urgent, or damaged delivery and restrained radio processing. When the master local voice service is not enabled, cinematic narration uses the operating system's offline narrator as a zero-setup fallback. Both paths recheck the private unpublished single-player boundary and are cleared when the cinematic stops. Set `aether_voice.cinematicNarration` to false in the client config to silence authored cinematic speech while retaining subtitles.
 
 The machinery, pacing, drain, mask, and opening cues reuse sparse vanilla sound events. No fake `.ogg` assets or nonexistent sound registrations are included. They can be replaced later with registered Wilderness Odyssey effects without changing sequence timing. Mist uses one bounded vanilla cloud-particle burst during drain.
 

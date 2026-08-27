@@ -106,7 +106,10 @@ retain sediment/clarity ownership.
 - Canonical flow remains queue- and config-budgeted.
 - SPH bodies, particles, substeps, meshes, snapshots, and persistence are
   bounded by existing caps.
-- Rendering reads immutable chunk snapshots and revision-gated meshes.
+- Rendering reads immutable chunk snapshots and revision-gated meshes. Dirty
+  chunk construction/upload has both a per-frame count and soft time budget;
+  SPH extraction uses a rotating per-frame budget so several bodies cannot
+  bunch all marching-cubes work into one frame.
 - Client visual code never writes server-authoritative water or movement.
 
 ## Validation Matrix

@@ -21,6 +21,13 @@ The client file contains `[donations]`, `[debug_hud]`, `[water_rendering]`, and
 for example, localized cloud settings live under
 `[weather_rendering.localized_clouds]`.
 
+Water rendering uses automatic hardware quality by default. Under
+`[water_rendering]`, `autoDetectWaterQuality = true` selects the effective tier
+once per client launch from GPU/VRAM, CPU capacity, physical RAM, Minecraft
+heap, and display resolution. Set it to `false` when the explicit
+`waterQuality = "LOW"`, `"MEDIUM"`, `"HIGH"`, or `"CINEMATIC"` value should
+remain authoritative.
+
 The server file contains the feature roots `[structure_blocks]`, `[performance]`,
 `[development_studio]`, `[verificationRelay]`, `[telemetry]`,
 `[playerTelemetry]`, `[eventTelemetry]`, `[feedback]`, `[riftfall]`,

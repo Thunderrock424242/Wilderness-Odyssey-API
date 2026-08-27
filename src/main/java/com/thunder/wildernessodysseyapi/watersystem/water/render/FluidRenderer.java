@@ -41,7 +41,11 @@ public class FluidRenderer {
     private static final List<SPHSimulator> ACTIVE_SIMULATIONS = new ArrayList<>(
             SPHConstants.MAX_ACTIVE_SIMULATIONS + SPHConstants.MAX_TRANSIENT_SHORE_SIMULATIONS
     );
+    private static final List<SPHSimulator> RENDER_SIMULATIONS = new ArrayList<>(
+            SPHConstants.MAX_ACTIVE_SIMULATIONS + SPHConstants.MAX_TRANSIENT_SHORE_SIMULATIONS
+    );
     private static final FluidState WATER_STATE = Fluids.WATER.defaultFluidState();
+    private static int meshRebuildCursor;
 
     private static final float WATER_ALPHA = 0.56f;
     private static final float DROPLET_ALPHA = 0.62f;
@@ -60,7 +64,7 @@ public class FluidRenderer {
 
     private static void renderScoped(RenderLevelStageEvent event) {
         if (!WaterRenderingConfig.ENABLE_SPH_WATER_RENDERING.get()) {
-            meshMap.clear();
+            clear();
             return;
         }
 
@@ -68,7 +72,7 @@ public class FluidRenderer {
         ClientLevel level = mc.level;
         if (level == null) return;
         if (!WildernessWaterRules.isEnabled(level)) {
-            meshMap.clear();
+            clear();
             return;
         }
 
@@ -77,7 +81,7 @@ public class FluidRenderer {
         manager.collectActive(level, ACTIVE_SIMULATIONS);
 
         if (ACTIVE_SIMULATIONS.isEmpty()) {
-            meshMap.clear();
+            clear();
             return;
         }
 
@@ -93,29 +97,30 @@ public class FluidRenderer {
         poseStack.pushPose();
         poseStack.translate(-camera.x, -camera.y, -camera.z);
 
-        boolean drew = false;
-        int renderedSimulations = 0;
         int maxRenderedSimulations = WaterRenderingConfig.maxRenderedSphSimulations();
         int meshRevisionInterval = WaterRenderingConfig.sphMeshRevisionInterval();
+        RENDER_SIMULATIONS.clear();
         for (SPHSimulator sim : ACTIVE_SIMULATIONS) {
-            if (renderedSimulations >= maxRenderedSimulations) {
+            if (RENDER_SIMULATIONS.size() >= maxRenderedSimulations) {
                 break;
             }
-
-            if (!isNearCamera(sim, camera.x, camera.y, camera.z)) {
-                continue;
+            if (isNearCamera(sim, camera.x, camera.y, camera.z)) {
+                RENDER_SIMULATIONS.add(sim);
             }
+        }
+        rebuildPendingMeshes(meshRevisionInterval);
 
-            FluidMesh mesh = meshMap.computeIfAbsent(sim, FluidMesh::new);
-            mesh.rebuild(meshRevisionInterval);
-
-            if (mesh.hasGeometry()) {
-                drawFluidMesh(mesh, poseStack.last(), buffer, waterSprite, level);
+        boolean drew = false;
+        for (SPHSimulator sim : RENDER_SIMULATIONS) {
+            FluidMesh mesh = meshMap.get(sim);
+            if (mesh != null && mesh.hasGeometry()) {
+                int tint = waterTint(level, sim.getCenterX(), sim.getCenterY(), sim.getCenterZ());
+                int light = waterLight(level, sim.getCenterX(), sim.getCenterY(), sim.getCenterZ());
+                drawFluidMesh(mesh, poseStack.last(), buffer, waterSprite, tint, light);
                 drew = true;
             }
 
             drew |= drawDroplets(sim, poseStack.last(), buffer, waterSprite, level);
-            renderedSimulations++;
         }
 
         poseStack.popPose();
@@ -123,6 +128,14 @@ public class FluidRenderer {
         if (drew) {
             // WaterRenderCoordinator flushes the shared translucent detail batch.
         }
+    }
+
+    /** Releases retained SPH mesh arrays when rendering or the client level stops. */
+    public static void clear() {
+        meshMap.clear();
+        ACTIVE_SIMULATIONS.clear();
+        RENDER_SIMULATIONS.clear();
+        meshRebuildCursor = 0;
     }
 
     private static boolean isNearCamera(SPHSimulator sim, double cameraX, double cameraY, double cameraZ) {
@@ -138,7 +151,41 @@ public class FluidRenderer {
         return dx * dx + dy * dy + dz * dz;
     }
 
-    private static void drawFluidMesh(FluidMesh mesh, PoseStack.Pose pose, VertexConsumer buffer, TextureAtlasSprite sprite, ClientLevel level) {
+    /**
+     * Spreads synchronous density-field and marching-cubes work across frames.
+     * The cursor rotates through the nearest renderable bodies so a continuously
+     * changing splash cannot starve other visible simulations.
+     */
+    private static void rebuildPendingMeshes(int revisionInterval) {
+        int simulationCount = RENDER_SIMULATIONS.size();
+        int rebuildBudget = WaterRenderingConfig.sphMeshRebuildsPerFrame();
+        if (simulationCount == 0 || rebuildBudget <= 0) {
+            meshRebuildCursor = 0;
+            return;
+        }
+
+        int startIndex = Math.floorMod(meshRebuildCursor, simulationCount);
+        int examined = 0;
+        int rebuilt = 0;
+        while (examined < simulationCount && rebuilt < rebuildBudget) {
+            SPHSimulator simulator = RENDER_SIMULATIONS.get((startIndex + examined) % simulationCount);
+            FluidMesh mesh = meshMap.computeIfAbsent(simulator, FluidMesh::new);
+            if (mesh.rebuildIfNeeded(revisionInterval)) {
+                rebuilt++;
+            }
+            examined++;
+        }
+        meshRebuildCursor = (startIndex + Math.max(1, examined)) % simulationCount;
+    }
+
+    private static void drawFluidMesh(
+            FluidMesh mesh,
+            PoseStack.Pose pose,
+            VertexConsumer buffer,
+            TextureAtlasSprite sprite,
+            int tint,
+            int light
+    ) {
         float[] data = mesh.meshData;
         if (data == null || data.length < 18) return;
 
@@ -164,11 +211,7 @@ public class FluidRenderer {
                 nz = 0.0f;
             }
 
-            float cx = (x0 + x1 + x2) / 3.0f;
-            float cy = (y0 + y1 + y2) / 3.0f;
-            float cz = (z0 + z1 + z2) / 3.0f;
-            int color = waterColor(level, cx, cy, cz, nx, ny, nz, WATER_ALPHA);
-            int light = waterLight(level, cx, cy, cz);
+            int color = waterColor(tint, nx, ny, nz, WATER_ALPHA);
 
             emitTriangleAsQuad(
                     buffer, pose, sprite, light, color,
@@ -286,8 +329,15 @@ public class FluidRenderer {
     }
 
     private static int waterColor(ClientLevel level, float x, float y, float z, float nx, float ny, float nz, float alpha) {
+        return waterColor(waterTint(level, x, y, z), nx, ny, nz, alpha);
+    }
+
+    private static int waterTint(ClientLevel level, float x, float y, float z) {
         BlockPos pos = BlockPos.containing(x, y, z);
-        int tint = IClientFluidTypeExtensions.of(Fluids.WATER).getTintColor(WATER_STATE, level, pos);
+        return IClientFluidTypeExtensions.of(Fluids.WATER).getTintColor(WATER_STATE, level, pos);
+    }
+
+    private static int waterColor(int tint, float nx, float ny, float nz, float alpha) {
         float tr = ((tint >> 16) & 0xFF) / 255.0f;
         float tg = ((tint >> 8) & 0xFF) / 255.0f;
         float tb = (tint & 0xFF) / 255.0f;

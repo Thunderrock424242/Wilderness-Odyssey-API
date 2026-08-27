@@ -32,6 +32,7 @@ public final class WaterRenderingConfig {
     public static ModConfigSpec.BooleanValue ENABLE_AMBIENT_WATER_PARTICLES;
     public static ModConfigSpec.BooleanValue ENABLE_PERSISTENT_WAKE_FOAM;
     public static ModConfigSpec.BooleanValue AUTO_OPTIMIZE_WITH_RENDERER_MODS;
+    public static ModConfigSpec.BooleanValue AUTO_DETECT_WATER_QUALITY;
     public static ModConfigSpec.BooleanValue MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE;
     public static ModConfigSpec.BooleanValue SHOW_CLOCK_TIDE_TOOLTIP;
     public static ModConfigSpec.BooleanValue SHOW_CONTEXTUAL_CLOCK_TIDE_DISPLAY;
@@ -75,6 +76,9 @@ public final class WaterRenderingConfig {
     public static ModConfigSpec.IntValue OPTIMIZED_MAX_OCEAN_SURFACE_PATCHES;
     public static ModConfigSpec.IntValue OPTIMIZED_SHORELINE_RENDER_DISTANCE_BLOCKS;
     public static ModConfigSpec.IntValue OPTIMIZED_MAX_SHORELINE_SURFACE_PATCHES;
+
+    private static volatile WaterQuality autoDetectedWaterQuality;
+    private static volatile String autoDetectedWaterQualitySummary = "pending hardware probe";
 
     static {
         WildernessConfigSpecs.initialize();
@@ -128,6 +132,9 @@ public final class WaterRenderingConfig {
         AUTO_OPTIMIZE_WITH_RENDERER_MODS = builder
                 .comment("Use the optimized profile automatically when Sodium is loaded.")
                 .define("autoOptimizeWithRendererMods", true);
+        AUTO_DETECT_WATER_QUALITY = builder
+                .comment("Automatically choose the effective water quality from the client GPU, CPU capacity, physical RAM, Minecraft heap, and display resolution. Disable this to use waterQuality manually.")
+                .define("autoDetectWaterQuality", true);
         MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE = builder
                 .comment("Extend the replacement surface toward the client view distance using coarser distant LODs.")
                 .define("matchOceanSurfaceToViewDistance", true);
@@ -138,7 +145,7 @@ public final class WaterRenderingConfig {
                 .comment("Show one compact tide line while a vanilla clock is held or targeted in an item frame.")
                 .define("showContextualClockTideDisplay", true);
         WATER_QUALITY = builder
-                .comment("Overall water quality target. LOW is cheap waves/no SPH, MEDIUM adds basic foam/ripples, HIGH enables capped local SPH, and CINEMATIC raises client visuals while still keeping hard safety caps.")
+                .comment("Manual/fallback water quality. Used when autoDetectWaterQuality is disabled. LOW is cheap waves/no SPH, MEDIUM adds basic foam/ripples, HIGH enables capped local SPH, and CINEMATIC raises client visuals while still keeping hard safety caps.")
                 .defineEnum("waterQuality", WaterQuality.CINEMATIC);
         SPH_LOCAL_EFFECT_QUALITY = builder
                 .comment("Quality for local SPH-only water effects. The overall waterQuality can still clamp this down; SPH never owns oceans, lakes, rivers, or permanent storage.")
@@ -277,12 +284,52 @@ public final class WaterRenderingConfig {
 
     /** Returns the human-readable active quality profile name. */
     public static String profileName() {
-        return (usesOptimizedProfile() ? "optimized" : "normal") + "/" + waterQuality().name().toLowerCase();
+        String selection = automaticallyDetectWaterQuality()
+                ? (autoDetectedWaterQuality == null ? "auto-pending" : "auto")
+                : "manual";
+        return (usesOptimizedProfile() ? "optimized" : "normal")
+                + "/" + waterQuality().name().toLowerCase()
+                + "/" + selection;
     }
 
     /** Returns the active top-level water quality target. */
     public static WaterQuality waterQuality() {
+        if (automaticallyDetectWaterQuality()) {
+            WaterQuality detected = autoDetectedWaterQuality;
+            // Use a stable balanced profile during the first startup ticks
+            // instead of briefly enabling the expensive manual CINEMATIC default.
+            return detected == null ? WaterQuality.HIGH : detected;
+        }
         return WATER_QUALITY.get();
+    }
+
+    /** Returns whether client hardware owns the effective water tier. */
+    public static boolean automaticallyDetectWaterQuality() {
+        try {
+            return AUTO_DETECT_WATER_QUALITY.get();
+        } catch (IllegalStateException configNotLoaded) {
+            return AUTO_DETECT_WATER_QUALITY.getDefault();
+        }
+    }
+
+    /** Publishes the one-time client hardware decision without rewriting user configuration. */
+    static void applyAutoDetectedWaterQuality(WaterQuality quality, String summary) {
+        autoDetectedWaterQuality = java.util.Objects.requireNonNull(quality, "quality");
+        autoDetectedWaterQualitySummary = summary == null || summary.isBlank()
+                ? "hardware result unavailable"
+                : summary;
+    }
+
+    /** Returns the source and limiting component tiers for F3 diagnostics. */
+    public static String qualitySelectionSummary() {
+        if (!automaticallyDetectWaterQuality()) {
+            return "manual " + WATER_QUALITY.get().name().toLowerCase();
+        }
+        WaterQuality detected = autoDetectedWaterQuality;
+        if (detected == null) {
+            return "auto pending; temporary high";
+        }
+        return "auto " + detected.name().toLowerCase() + " | " + autoDetectedWaterQualitySummary;
     }
 
     /** Returns the bounded SSR march count for the active quality tier. */
@@ -426,6 +473,50 @@ public final class WaterRenderingConfig {
                 ? OPTIMIZED_SPH_MESH_REVISION_INTERVAL.get()
                 : NORMAL_SPH_MESH_REVISION_INTERVAL.get();
         return waterQuality().sphMeshRevisionInterval(configured);
+    }
+
+    /** Returns how many expensive SPH surface extractions may run in one render frame. */
+    public static int sphMeshRebuildsPerFrame() {
+        return sphMeshRebuildsPerFrame(waterQuality(), usesOptimizedProfile());
+    }
+
+    static int sphMeshRebuildsPerFrame(WaterQuality quality, boolean optimizedProfile) {
+        return switch (quality) {
+            case LOW, MEDIUM -> 0;
+            case HIGH -> optimizedProfile ? 1 : 2;
+            case CINEMATIC -> optimizedProfile ? 2 : 3;
+        };
+    }
+
+    /** Returns the hard dirty-snapshot mesh count budget for one render frame. */
+    public static int snapshotMeshRebuildsPerFrame() {
+        return snapshotMeshRebuildsPerFrame(waterQuality(), usesOptimizedProfile());
+    }
+
+    static int snapshotMeshRebuildsPerFrame(WaterQuality quality, boolean optimizedProfile) {
+        return switch (quality) {
+            case LOW -> 1;
+            case MEDIUM -> 2;
+            case HIGH -> optimizedProfile ? 3 : 4;
+            case CINEMATIC -> optimizedProfile ? 4 : 6;
+        };
+    }
+
+    /** Returns the soft CPU/upload time budget for dirty snapshot meshes. */
+    public static long snapshotMeshRebuildTimeBudgetNanos() {
+        return snapshotMeshRebuildTimeBudgetNanos(waterQuality(), usesOptimizedProfile());
+    }
+
+    static long snapshotMeshRebuildTimeBudgetNanos(
+            WaterQuality quality,
+            boolean optimizedProfile
+    ) {
+        return switch (quality) {
+            case LOW -> 750_000L;
+            case MEDIUM -> 1_250_000L;
+            case HIGH -> optimizedProfile ? 1_750_000L : 2_500_000L;
+            case CINEMATIC -> optimizedProfile ? 2_500_000L : 3_500_000L;
+        };
     }
 
     /** Returns the active cosmetic ripple count cap. */

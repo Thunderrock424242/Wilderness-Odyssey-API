@@ -241,21 +241,16 @@ public final class WaterRenderCoordinator {
     }
 
     private static void rebuildDirtyGroups(ClientLevel level, RenderLevelStageEvent event) {
-        int baseBudget = switch (WaterRenderingConfig.waterQuality()) {
-            case LOW -> 4;
-            case MEDIUM -> 8;
-            case HIGH -> 16;
-            case CINEMATIC -> 24;
-        };
-        // Chunk streaming can publish generated and sparse snapshots together.
-        // A bounded burst drains that unique-key backlog before it becomes a
-        // visible flat fallback ring, while normal incremental updates retain
-        // the smaller per-quality rebuild budget.
-        int pending = ClientWaterSnapshotStore.pendingDirtyMeshCount();
-        int budget = pending > baseBudget * 3
-                ? Math.min(48, baseBudget * 2)
-                : baseBudget;
+        int budget = WaterRenderingConfig.snapshotMeshRebuildsPerFrame();
+        long timeBudgetNanos = WaterRenderingConfig.snapshotMeshRebuildTimeBudgetNanos();
+        long started = System.nanoTime();
         for (int rebuilt = 0; rebuilt < budget; rebuilt++) {
+            // One rebuild is always allowed so the queue cannot stall. Further
+            // CPU construction and GPU uploads defer once this frame's soft
+            // budget is spent, preserving the existing published/fallback mesh.
+            if (rebuilt > 0 && System.nanoTime() - started >= timeBudgetNanos) {
+                return;
+            }
             Long key = ClientWaterSnapshotStore.pollDirtyMesh();
             if (key == null) {
                 return;
@@ -470,6 +465,7 @@ public final class WaterRenderCoordinator {
         COMPLETED_COMPILATION.remove();
         REGIONAL_SEA_CORNERS.clear();
         WaterSurfaceDisplacement.clear();
+        FluidRenderer.clear();
         RippleRenderer.clear();
     }
 
