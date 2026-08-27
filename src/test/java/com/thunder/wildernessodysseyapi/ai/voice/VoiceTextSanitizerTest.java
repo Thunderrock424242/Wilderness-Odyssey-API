@@ -43,6 +43,12 @@ class VoiceTextSanitizerTest {
     }
 
     @Test
+    void recognizesTheBoundedCalmDeliveryMode() {
+        assertEquals(VoiceEmotion.CALM, VoiceEmotion.fromModelValue("calm"));
+        assertEquals(VoiceEmotion.CALM, VoiceEmotion.fromModelValue(" CALM "));
+    }
+
+    @Test
     void oversizedSpeechIsBounded() {
         String speech = VoiceTextSanitizer.sanitize("x".repeat(3_000));
 

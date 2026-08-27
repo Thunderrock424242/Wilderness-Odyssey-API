@@ -158,6 +158,72 @@ public final class CryoWakeupPresentationModel {
         return 0.0F;
     }
 
+    /** Returns whether the medical overlay has a meaningful patient signal for this stage. */
+    public static boolean showsMedicalTelemetry(ResourceLocation stage) {
+        return isExteriorStage(stage)
+                || CryoWakeupSequence.EYES_REOPENING.equals(stage)
+                || CryoWakeupSequence.MASK_RELEASE.equals(stage)
+                || CryoWakeupSequence.CRYO_OPENING.equals(stage)
+                || CryoWakeupSequence.BALANCE_CHECK.equals(stage);
+    }
+
+    /** Fictional but internally consistent estimated core temperature during controlled rewarming. */
+    public static float coreTemperatureCelsius(ResourceLocation stage, float progress) {
+        return Mth.lerp(smooth(medicalProgress(stage, progress)), 8.2F, 36.6F);
+    }
+
+    /** Stage-consistent monitor pulse used only by the cinematic telemetry display. */
+    public static int heartRateBpm(ResourceLocation stage, float progress) {
+        if (CryoWakeupSequence.CARDIAC_PACING.equals(stage)) {
+            return Math.round(Mth.lerp(smooth(progress), 32.0F, 74.0F));
+        }
+        if (CryoWakeupSequence.SUSPENSION_DRAIN.equals(stage)) {
+            return Math.round(Mth.lerp(smooth(progress), 74.0F, 79.0F));
+        }
+        if (CryoWakeupSequence.EYES_REOPENING.equals(stage)
+                || CryoWakeupSequence.MASK_RELEASE.equals(stage)
+                || CryoWakeupSequence.CRYO_OPENING.equals(stage)
+                || CryoWakeupSequence.BALANCE_CHECK.equals(stage)) {
+            return 78;
+        }
+        return Math.round(Mth.lerp(smooth(medicalProgress(stage, progress)), 18.0F, 38.0F));
+    }
+
+    /** Stage-consistent oxygen saturation used only by the cinematic telemetry display. */
+    public static int oxygenSaturation(ResourceLocation stage, float progress) {
+        if (CryoWakeupSequence.CARDIAC_PACING.equals(stage)) {
+            return Math.round(Mth.lerp(smooth(progress), 78.0F, 92.0F));
+        }
+        if (CryoWakeupSequence.SUSPENSION_DRAIN.equals(stage)) {
+            return Math.round(Mth.lerp(smooth(progress), 92.0F, 97.0F));
+        }
+        if (CryoWakeupSequence.EYES_REOPENING.equals(stage)
+                || CryoWakeupSequence.MASK_RELEASE.equals(stage)
+                || CryoWakeupSequence.CRYO_OPENING.equals(stage)
+                || CryoWakeupSequence.BALANCE_CHECK.equals(stage)) {
+            return 97;
+        }
+        return Math.round(Mth.lerp(smooth(medicalProgress(stage, progress)), 54.0F, 80.0F));
+    }
+
+    /** Brief optical response centered on the authoritative pacing discharge. */
+    public static float pacingFlash(ResourceLocation stage, float progress) {
+        if (!CryoWakeupSequence.CARDIAC_PACING.equals(stage)) {
+            return 0.0F;
+        }
+        float distance = Math.abs(progress - 0.60F);
+        return smooth(Mth.clamp(1.0F - distance / 0.075F, 0.0F, 1.0F));
+    }
+
+    /** Condensation pulse synchronized with the first spontaneous breaths. */
+    public static float breathFogAlpha(ResourceLocation stage, float time) {
+        if (!CryoWakeupSequence.EYES_REOPENING.equals(stage)
+                && !CryoWakeupSequence.MASK_RELEASE.equals(stage)) {
+            return 0.0F;
+        }
+        return 0.035F + (0.5F + 0.5F * Mth.sin(time * 0.16F)) * 0.055F;
+    }
+
     private static float shake(ResourceLocation stage, float progress, float time) {
         float intensity;
         if (CryoWakeupSequence.CARDIAC_PACING.equals(stage)) {
@@ -170,6 +236,16 @@ public final class CryoWakeupPresentationModel {
             return 0.0F;
         }
         return CinematicCameraShake.sample(time, intensity, progress, CinematicCameraShake.Falloff.SMOOTH);
+    }
+
+    private static float medicalProgress(ResourceLocation stage, float stageProgress) {
+        int start = CryoWakeupSequence.startTick(stage);
+        int duration = CryoWakeupSequence.durationTicks(stage);
+        if (start < 0 || duration <= 0) {
+            return 0.0F;
+        }
+        float timelineTick = start + Mth.clamp(stageProgress, 0.0F, 1.0F) * duration;
+        return Mth.clamp((timelineTick - 20.0F) / 830.0F, 0.0F, 1.0F);
     }
 
     private static float triangularBlink(float value, float center, float halfWidth) {

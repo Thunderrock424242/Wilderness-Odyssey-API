@@ -25,6 +25,9 @@ class AIConfigLoaderTest {
             );
             assertTrue(config.getSubsystems().get(1).getRole().startsWith("Rifts, anomalies"));
             assertEquals(2, config.getSubsystems().get(5).getBoundaries().size());
+            assertEquals(true, config.getPlayerMemory().getEnabled());
+            assertEquals(true, config.getPlayerMemory().getNaturalLearningEnabled());
+            assertEquals(12, config.getPlayerMemory().getMaxMemoriesPerPlayer());
         }
     }
 

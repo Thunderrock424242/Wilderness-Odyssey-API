@@ -113,6 +113,11 @@ public final class AIConfigLoader {
         config.getSettings().setMaxResponseCharacters(readInteger(settings.get("max_response_characters")));
         config.getSettings().setMaxOutputTokens(readInteger(settings.get("max_output_tokens")));
 
+        Map<String, Object> playerMemory = readStringObjectMap(root.get("player_memory"));
+        config.getPlayerMemory().setEnabled(readBoolean(playerMemory.get("enabled")));
+        config.getPlayerMemory().setNaturalLearningEnabled(readBoolean(playerMemory.get("natural_learning_enabled")));
+        config.getPlayerMemory().setMaxMemoriesPerPlayer(readInteger(playerMemory.get("max_memories_per_player")));
+
         Map<String, Object> onboarding = readStringObjectMap(root.get("onboarding"));
         config.getOnboarding().setEnabled(readBoolean(onboarding.get("enabled")));
         config.getOnboarding().setCompletionMessage(readStringValue(onboarding.get("completion_message")));

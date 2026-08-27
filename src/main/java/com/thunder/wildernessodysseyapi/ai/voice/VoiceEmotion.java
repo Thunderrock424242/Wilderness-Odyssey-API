@@ -5,6 +5,7 @@ import java.util.Locale;
 /** Bounded delivery moods understood by both the local voice service and Minecraft client. */
 public enum VoiceEmotion {
     NORMAL,
+    CALM,
     CONCERNED,
     URGENT,
     DAMAGED,

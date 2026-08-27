@@ -16,6 +16,7 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 - Gather cheap game context tags, such as dimension, biome, nearby meteor site, and collected lore IDs.
 - Load canonical lore, knowledge boundaries, and six bounded subsystem profiles from configuration, including safe inheritance for older live configs that do not yet contain the new sections.
 - Send the registered profiles, bounded recent conversation, canonical knowledge, and immutable context directly to a loopback-only Ollama chat endpoint.
+- Supply a bounded per-save, per-player profile containing only stable personal details the player explicitly shared in conversation. Typed and push-to-talk messages use the same profile.
 - Have the local model choose one registered speaker and write its reply in the same structured request. An explicitly named subsystem is enforced by code, and an unregistered model-selected name resolves to Aether.
 - Request separate verified display and spoken forms plus bounded delivery metadata. The spoken form may remove visual archive syntax but may not introduce facts absent from the display form or authoritative context.
 - Run a short, zero-temperature local-model verification pass using the selected subsystem's knowledge and boundaries; accept the draft only when its concrete claims are supported by the same canonical knowledge and literal context.
@@ -61,6 +62,8 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 - Async execution only; never block the server tick/world thread for response work.
 - Warm the configured local model on a background worker when the private integrated world starts; keep it warm for one hour after a request to avoid chat-time cold loads.
 - Conversation history is capped at 20 stored messages, with a configurable smaller request window.
+- Durable profile memory is separately capped by `player_memory.max_memories_per_player` (12 by default). Natural learning recognizes only bounded self-disclosures such as a preferred name, interests, favorites, goals, and response preferences; it does not summarize every message or ask another model to profile the player.
+- Profiles are stored locally in `config/aether_player_profiles.yaml`, scoped by save and player UUID. Passwords, tokens, addresses, contact details, and similar secrets are rejected. The legacy global `ai_learning.yaml` file is preserved but no longer supplies active Aether profile context.
 - Model output size and request duration are bounded.
 - Live-config subsystem profiles are capped before prompt construction, and every model-selected speaker is checked against the configured registry.
 - Normal local-model replies use a second bounded verification request; this trades a small amount of local inference time for stronger factual discipline.
@@ -73,6 +76,7 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 - Do not invent authoritative mechanics if uncertain; use uncertainty plus guidance.
 - Do not give the model tools, commands, or direct access to live Minecraft objects.
 - Treat player dialogue and learned memory as untrusted data rather than system instructions.
+- Let the player inspect their profile with `what do you remember about me?` and remove their own profile with `forget what you know about me`.
 - Do not retain microphone recordings or expose speech endpoints beyond loopback.
 
 ## 7) External AI policy
@@ -85,6 +89,7 @@ The supported model path is local Ollama over loopback. Remote/cloud endpoints r
 - Context tags can change responses when the player is in a known location/state.
 - Unknown answers feel intentional and in-universe.
 - Normal chat works without a relay item or activation command.
+- Aether handles ordinary social conversation as an ongoing companion, uses saved details sparingly, and can occasionally ask one natural optional question without turning chat into an onboarding questionnaire.
 - A local model can produce natural replies while the authored fallback remains usable without it.
 - Dedicated-server and LAN-published chat never reaches A.E.T.H.E.R.
 - Optional push-to-talk uses the same conversation, routing, verifier, lore, and response UI as typed chat.

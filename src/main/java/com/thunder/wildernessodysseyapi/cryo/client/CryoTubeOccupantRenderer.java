@@ -9,19 +9,21 @@ import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlockEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
-import software.bernie.geckolib.renderer.GeoBlockRenderer;
 
-/** Animated tube renderer with a presentation-only local-player occupant during the exterior reveal. */
-public final class CryoTubeRenderer extends GeoBlockRenderer<CryoTubeBlockEntity> {
-    public CryoTubeRenderer(BlockEntityRendererProvider.Context context) {
-        super(new CryoTubeModel());
+/**
+ * Adds only the cinematic player occupant over the original baked cryo-tube model.
+ *
+ * <p>Minecraft remains responsible for rendering the unchanged Blockbench JSON.
+ * This renderer never draws, replaces, or animates the tube geometry.</p>
+ */
+public final class CryoTubeOccupantRenderer implements BlockEntityRenderer<CryoTubeBlockEntity> {
+    public CryoTubeOccupantRenderer(BlockEntityRendererProvider.Context context) {
     }
 
     @Override
@@ -32,40 +34,6 @@ public final class CryoTubeRenderer extends GeoBlockRenderer<CryoTubeBlockEntity
             MultiBufferSource bufferSource,
             int packedLight,
             int packedOverlay
-    ) {
-        renderPresentationOccupant(tube, partialTick, poseStack, bufferSource, packedLight);
-        super.render(tube, partialTick, poseStack, bufferSource, packedLight, packedOverlay);
-    }
-
-    @Override
-    public RenderType getRenderType(
-            CryoTubeBlockEntity animatable,
-            ResourceLocation texture,
-            MultiBufferSource bufferSource,
-            float partialTick
-    ) {
-        return RenderType.entityTranslucent(texture);
-    }
-
-    @Override
-    public AABB getRenderBoundingBox(CryoTubeBlockEntity tube) {
-        var pos = tube.getBlockPos();
-        return new AABB(
-                pos.getX() - 1.0D,
-                pos.getY() - 1.0D,
-                pos.getZ() - 1.0D,
-                pos.getX() + 2.0D,
-                pos.getY() + 2.0D,
-                pos.getZ() + 2.0D
-        );
-    }
-
-    private static void renderPresentationOccupant(
-            CryoTubeBlockEntity tube,
-            float partialTick,
-            PoseStack poseStack,
-            MultiBufferSource bufferSource,
-            int packedLight
     ) {
         CinematicClientController cinematic = CinematicClientController.get();
         if (!cinematic.isActive()
@@ -97,5 +65,18 @@ public final class CryoTubeRenderer extends GeoBlockRenderer<CryoTubeBlockEntity
         PlayerRenderer renderer = (PlayerRenderer) minecraft.getEntityRenderDispatcher().getRenderer(player);
         renderer.render(player, facing.toYRot(), partialTick, poseStack, bufferSource, packedLight);
         poseStack.popPose();
+    }
+
+    @Override
+    public AABB getRenderBoundingBox(CryoTubeBlockEntity tube) {
+        var pos = tube.getBlockPos();
+        return new AABB(
+                pos.getX() - 1.0D,
+                pos.getY() - 1.0D,
+                pos.getZ() - 1.0D,
+                pos.getX() + 2.0D,
+                pos.getY() + 2.0D,
+                pos.getZ() + 2.0D
+        );
     }
 }

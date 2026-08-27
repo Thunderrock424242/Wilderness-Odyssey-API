@@ -14,7 +14,7 @@ from .models import VoiceModels
 SETTINGS = ServiceSettings.from_environment()
 MODELS = VoiceModels(SETTINGS)
 MAX_AUDIO_BYTES = 12 * 1024 * 1024
-ALLOWED_EMOTIONS = {"normal", "concerned", "urgent", "damaged", "weak", "mysterious"}
+ALLOWED_EMOTIONS = {"normal", "calm", "concerned", "urgent", "damaged", "weak", "mysterious"}
 
 
 @asynccontextmanager
