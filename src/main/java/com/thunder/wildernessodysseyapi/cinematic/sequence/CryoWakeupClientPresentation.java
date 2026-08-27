@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.cinematic.client.AetherCinematicVoice;
 import com.thunder.wildernessodysseyapi.cinematic.client.CinematicClientController;
 import com.thunder.wildernessodysseyapi.cinematic.client.CinematicPostEffectController;
 import com.thunder.wildernessodysseyapi.cinematic.client.ClientCinematicPresentation;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -15,6 +16,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -29,6 +31,15 @@ public final class CryoWakeupClientPresentation implements ClientCinematicPresen
     );
     private static final Component OBJECTIVE = Component.translatable(
             "cinematic.wildernessodysseyapi.cryo.objective"
+    );
+    private static final Component SPEAKER_LABEL = Component.translatable(
+            "cinematic.wildernessodysseyapi.cryo.speaker"
+    );
+    private static final Component BOOT_PRIMARY = Component.translatable(
+            "cinematic.wildernessodysseyapi.cryo.boot.primary"
+    );
+    private static final Component BOOT_SECONDARY = Component.translatable(
+            "cinematic.wildernessodysseyapi.cryo.boot.secondary"
     );
 
     private static final Set<ResourceLocation> STAGES = Set.of(
@@ -176,6 +187,9 @@ public final class CryoWakeupClientPresentation implements ClientCinematicPresen
                 || CryoWakeupSequence.BLACKOUT_TRANSITION.equals(stage)) {
             graphics.fill(0, 0, width, height, 0xFF000000);
         }
+        if (CryoWakeupSequence.BLACK_SCREEN.equals(stage)) {
+            renderBootSequence(graphics, width, height, progress);
+        }
 
         float suspensionAlpha = CryoWakeupPresentationModel.suspensionAlpha(stage, progress);
         if (suspensionAlpha > 0.0F) {
@@ -189,13 +203,23 @@ public final class CryoWakeupClientPresentation implements ClientCinematicPresen
             graphics.fill(0, 0, width, height, argb(warningAlpha, 0xA10916));
         }
 
+        float pacingFlash = CryoWakeupPresentationModel.pacingFlash(stage, progress);
+        if (pacingFlash > 0.0F) {
+            graphics.fill(0, 0, width, height, argb(pacingFlash * 0.34F, 0xE6FFFF));
+        }
+
         if (CryoWakeupPresentationModel.isFirstPersonStage(stage)) {
+            renderCondensation(graphics, width, height, stage, time);
             float eyeOpen = CryoWakeupPresentationModel.eyeOpenAmount(stage, progress);
             int lidHeight = Mth.clamp(Math.round((1.0F - eyeOpen) * height * 0.5F), 0, (height + 1) / 2);
             if (lidHeight > 0) {
                 graphics.fill(0, 0, width, lidHeight, 0xFF000000);
                 graphics.fill(0, height - lidHeight, width, height, 0xFF000000);
             }
+        }
+
+        if (CryoWakeupPresentationModel.showsMedicalTelemetry(stage)) {
+            renderMedicalTelemetry(graphics, width, height, stage, progress, time, warningAlpha);
         }
 
         Component status = statusMessage(stage);
@@ -254,24 +278,24 @@ public final class CryoWakeupClientPresentation implements ClientCinematicPresen
         }
         if (CryoWakeupSequence.NARRATION_REVIVAL_AUTHORIZED.equals(cueId)
                 || CryoWakeupSequence.NARRATION_PACING.equals(cueId)) {
-            return VoiceEmotion.URGENT;
+            return VoiceEmotion.CONCERNED;
         }
         if (CryoWakeupSequence.NARRATION_AETHER_IDENTITY.equals(cueId)
                 || CryoWakeupSequence.NARRATION_AETHER_LIMITS.equals(cueId)) {
             return VoiceEmotion.DAMAGED;
         }
-        return VoiceEmotion.NORMAL;
+        return VoiceEmotion.CALM;
     }
 
     /** Adds restrained corruption only to A.E.T.H.E.R's damaged self-disclosure. */
     static float narrationRadioEffect(ResourceLocation cueId) {
         if (CryoWakeupSequence.NARRATION_AETHER_IDENTITY.equals(cueId)) {
-            return 0.18F;
+            return 0.08F;
         }
         if (CryoWakeupSequence.NARRATION_AETHER_LIMITS.equals(cueId)) {
-            return 0.14F;
+            return 0.06F;
         }
-        return 0.07F;
+        return 0.015F;
     }
 
     private static void renderSubtitle(
@@ -292,6 +316,22 @@ public final class CryoWakeupClientPresentation implements ClientCinematicPresen
         int firstY = Math.round(height * 0.78F) - Math.max(0, lines.size() - 1) * 5;
         int backgroundAlpha = Mth.clamp(Math.round(alpha * 150.0F), 0, 150);
         int textAlpha = Mth.clamp(Math.round(alpha * 255.0F), 0, 255);
+        int labelY = firstY - 13;
+        int labelWidth = minecraft.font.width(SPEAKER_LABEL);
+        graphics.fill(
+                width / 2 - labelWidth / 2 - 4,
+                labelY - 2,
+                width / 2 + labelWidth / 2 + 4,
+                labelY + 10,
+                (backgroundAlpha << 24) | 0x071012
+        );
+        graphics.drawCenteredString(
+                minecraft.font,
+                SPEAKER_LABEL,
+                width / 2,
+                labelY,
+                (textAlpha << 24) | 0x74E8E1
+        );
         for (int i = 0; i < lines.size(); i++) {
             FormattedCharSequence line = lines.get(i);
             int lineWidth = minecraft.font.width(line);
@@ -305,6 +345,191 @@ public final class CryoWakeupClientPresentation implements ClientCinematicPresen
             );
             graphics.drawCenteredString(minecraft.font, line, width / 2, y, (textAlpha << 24) | 0xDFFFFA);
         }
+    }
+
+    private static void renderBootSequence(
+            GuiGraphics graphics,
+            int width,
+            int height,
+            float progress
+    ) {
+        Font font = Minecraft.getInstance().font;
+        int centerY = height / 2 - 10;
+        int alpha = Mth.clamp(Math.round(smooth(progress) * 255.0F), 0, 255);
+        graphics.drawCenteredString(font, BOOT_PRIMARY, width / 2, centerY, (alpha << 24) | 0x8FFCF3);
+        if (progress >= 0.30F) {
+            graphics.drawCenteredString(
+                    font,
+                    BOOT_SECONDARY,
+                    width / 2,
+                    centerY + 14,
+                    (alpha << 24) | 0xD6FFFB
+            );
+        }
+        int barWidth = Math.min(180, Math.max(80, width / 3));
+        int barX = width / 2 - barWidth / 2;
+        int barY = centerY + 32;
+        graphics.fill(barX, barY, barX + barWidth, barY + 2, 0x553B6F6C);
+        graphics.fill(barX, barY, barX + Math.round(barWidth * progress), barY + 2, 0xCC72E4DC);
+    }
+
+    private static void renderMedicalTelemetry(
+            GuiGraphics graphics,
+            int width,
+            int height,
+            ResourceLocation stage,
+            float progress,
+            float time,
+            float warningAlpha
+    ) {
+        if (width < 260 || height < 150) {
+            return;
+        }
+        Font font = Minecraft.getInstance().font;
+        int panelWidth = Math.min(176, Math.max(152, width / 3));
+        int panelHeight = 94;
+        int x = 12;
+        int y = Math.max(12, height / 12);
+        int accent = warningAlpha > 0.04F ? 0xFFE8646C : 0xFF72E4DC;
+
+        graphics.fill(x, y, x + panelWidth, y + panelHeight, 0xA6071113);
+        graphics.hLine(x, x + panelWidth, y, accent);
+        graphics.hLine(x, x + panelWidth, y + panelHeight, 0x803B6F6C);
+        graphics.vLine(x, y, y + panelHeight, 0x803B6F6C);
+        graphics.vLine(x + panelWidth, y, y + panelHeight, 0x803B6F6C);
+
+        graphics.drawString(
+                font,
+                Component.translatable("cinematic.wildernessodysseyapi.cryo.telemetry.title"),
+                x + 6,
+                y + 5,
+                accent,
+                false
+        );
+        graphics.drawString(font, telemetryStatus(stage), x + 6, y + 17, 0xFFC8DDD9, false);
+
+        String temperature = String.format(
+                Locale.ROOT,
+                "%.1f",
+                CryoWakeupPresentationModel.coreTemperatureCelsius(stage, progress)
+        );
+        int heartRate = CryoWakeupPresentationModel.heartRateBpm(stage, progress);
+        int oxygen = CryoWakeupPresentationModel.oxygenSaturation(stage, progress);
+        graphics.drawString(
+                font,
+                Component.translatable("cinematic.wildernessodysseyapi.cryo.telemetry.temperature", temperature),
+                x + 6,
+                y + 31,
+                0xFFE8F8F5,
+                false
+        );
+        graphics.drawString(
+                font,
+                Component.translatable("cinematic.wildernessodysseyapi.cryo.telemetry.heart_rate", heartRate),
+                x + 6,
+                y + 42,
+                0xFFE8F8F5,
+                false
+        );
+        graphics.drawString(
+                font,
+                Component.translatable("cinematic.wildernessodysseyapi.cryo.telemetry.oxygen", oxygen),
+                x + 6,
+                y + 53,
+                oxygen < 90 ? 0xFFFF8B91 : 0xFF9EF6CF,
+                false
+        );
+
+        renderWaveform(graphics, x + 6, y + 70, panelWidth - 12, heartRate, time, accent);
+        float thermalProgress = Mth.clamp(
+                (CryoWakeupPresentationModel.coreTemperatureCelsius(stage, progress) - 8.2F) / 28.4F,
+                0.0F,
+                1.0F
+        );
+        graphics.fill(x + 6, y + 87, x + panelWidth - 6, y + 89, 0x553B6F6C);
+        graphics.fill(
+                x + 6,
+                y + 87,
+                x + 6 + Math.round((panelWidth - 12) * thermalProgress),
+                y + 89,
+                accent
+        );
+    }
+
+    private static void renderWaveform(
+            GuiGraphics graphics,
+            int x,
+            int y,
+            int width,
+            int heartRate,
+            float time,
+            int color
+    ) {
+        int period = Mth.clamp(54 - heartRate / 2, 16, 44);
+        int offset = Mth.floor(time * 5.5F);
+        int previousY = y;
+        for (int i = 1; i < width; i += 2) {
+            int phase = Math.floorMod(i + offset, period);
+            int currentY = y;
+            if (phase == 0 || phase == 1) {
+                currentY = y - 7;
+            } else if (phase == 2 || phase == 3) {
+                currentY = y + 4;
+            } else if (phase == 6 || phase == 7) {
+                currentY = y - 2;
+            }
+            graphics.fill(
+                    x + i - 1,
+                    Math.min(previousY, currentY),
+                    x + i + 1,
+                    Math.max(previousY, currentY) + 1,
+                    color
+            );
+            previousY = currentY;
+        }
+    }
+
+    private static void renderCondensation(
+            GuiGraphics graphics,
+            int width,
+            int height,
+            ResourceLocation stage,
+            float time
+    ) {
+        float fogAlpha = CryoWakeupPresentationModel.breathFogAlpha(stage, time);
+        if (fogAlpha > 0.0F) {
+            graphics.fill(0, Math.round(height * 0.73F), width, height, argb(fogAlpha, 0xD8F2EE));
+        }
+        for (int i = 0; i < 10; i++) {
+            boolean left = (i & 1) == 0;
+            int edgeOffset = 8 + (i * 17) % Math.max(12, Math.min(54, width / 5));
+            int dropX = left ? edgeOffset : width - edgeOffset;
+            int dropY = Math.floorMod(Mth.floor(time * (0.42F + i * 0.035F)) + i * 37, Math.max(1, height));
+            int dropLength = 4 + i % 5;
+            graphics.fill(dropX, dropY, dropX + 1, Math.min(height, dropY + dropLength), 0x387EE0D8);
+        }
+    }
+
+    private static Component telemetryStatus(ResourceLocation stage) {
+        String key;
+        if (CryoWakeupSequence.EXTERIOR_REVEAL.equals(stage)) {
+            key = "cryostasis";
+        } else if (CryoWakeupSequence.MEDICAL_DIAGNOSTIC.equals(stage)) {
+            key = "diagnostic";
+        } else if (CryoWakeupSequence.REVIVAL_PROTOCOL.equals(stage)) {
+            key = "rewarming";
+        } else if (CryoWakeupSequence.CARDIAC_PACING.equals(stage)) {
+            key = "pacing";
+        } else if (CryoWakeupSequence.SUSPENSION_DRAIN.equals(stage)) {
+            key = "circulation";
+        } else if (CryoWakeupSequence.EYES_REOPENING.equals(stage)) {
+            key = "neurological";
+        } else if (CryoWakeupSequence.MASK_RELEASE.equals(stage)) {
+            key = "respiration";
+        } else {
+            key = "vestibular";
+        }
+        return Component.translatable("cinematic.wildernessodysseyapi.cryo.telemetry.status." + key);
     }
 
     private static Vec3 detachedCameraPosition(

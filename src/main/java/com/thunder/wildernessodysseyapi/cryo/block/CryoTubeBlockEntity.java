@@ -15,30 +15,14 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
-import software.bernie.geckolib.animatable.GeoBlockEntity;
-import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.animation.AnimatableManager;
-import software.bernie.geckolib.animation.AnimationController;
-import software.bernie.geckolib.animation.RawAnimation;
-import software.bernie.geckolib.util.GeckoLibUtil;
 
 /**
- * Block entity for the cryo tube and its synchronized cinematic animation hook.
+ * Block entity for the cryo tube and its synchronized cinematic cue state.
  */
-public class CryoTubeBlockEntity extends BlockEntity implements CinematicActor, GeoBlockEntity {
+public class CryoTubeBlockEntity extends BlockEntity implements CinematicActor {
     private static final String ANIMATION_STATE_TAG = "cinematic_animation_state";
-    private static final RawAnimation IDLE_ANIMATION = RawAnimation.begin().thenLoop("idle");
-    private static final RawAnimation SUSPENDED_ANIMATION = RawAnimation.begin().thenLoop("suspended");
-    private static final RawAnimation DIAGNOSTIC_ANIMATION = RawAnimation.begin().thenLoop("diagnostic");
-    private static final RawAnimation REWARMING_ANIMATION = RawAnimation.begin().thenLoop("rewarming");
-    private static final RawAnimation CARDIAC_PACING_ANIMATION = RawAnimation.begin().thenLoop("cardiac_pacing");
-    private static final RawAnimation DRAINING_ANIMATION = RawAnimation.begin().thenPlayAndHold("draining");
-    private static final RawAnimation MASK_RELEASE_ANIMATION = RawAnimation.begin().thenPlayAndHold("mask_release");
-    private static final RawAnimation OPENING_ANIMATION = RawAnimation.begin().thenPlayAndHold("opening");
-    private static final RawAnimation OPEN_ANIMATION = RawAnimation.begin().thenLoop("open");
 
     private CryoTubeAnimationState animationState = CryoTubeAnimationState.IDLE;
-    private final AnimatableInstanceCache animatableCache = GeckoLibUtil.createInstanceCache(this);
 
     public CryoTubeBlockEntity(BlockPos pos, BlockState state) {
         super(CryoTubeBlock.CRYO_TUBE_ENTITY.get(), pos, state);
@@ -55,7 +39,7 @@ public class CryoTubeBlockEntity extends BlockEntity implements CinematicActor, 
         }
     }
 
-    /** Returns the server-synchronized state consumed by the client animation controller. */
+    /** Returns the server-synchronized state reserved for cinematic presentation layers. */
     public CryoTubeAnimationState getAnimationState() {
         return animationState;
     }
@@ -63,8 +47,9 @@ public class CryoTubeBlockEntity extends BlockEntity implements CinematicActor, 
     /**
      * Translates generic cinematic cues into cryo-owned animation states.
      *
-     * <p>The sequence owns cue timing; the block entity owns its persistent,
-     * synchronized animation state.</p>
+     * <p>The original static Blockbench model remains the rendering source of
+     * truth. The sequence may still retain cue state for non-model presentation
+     * layers without replacing that geometry.</p>
      */
     @Override
     public boolean applyCinematicCue(ResourceLocation sequenceId, ResourceLocation cueId) {
@@ -96,31 +81,6 @@ public class CryoTubeBlockEntity extends BlockEntity implements CinematicActor, 
         }
         setAnimationState(next);
         return true;
-    }
-
-    @Override
-    public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(new AnimationController<>(this, "cryo_tube_controller", 4,
-                animation -> animation.setAndContinue(animationForState())));
-    }
-
-    @Override
-    public AnimatableInstanceCache getAnimatableInstanceCache() {
-        return animatableCache;
-    }
-
-    private RawAnimation animationForState() {
-        return switch (animationState) {
-            case SUSPENDED -> SUSPENDED_ANIMATION;
-            case DIAGNOSTIC -> DIAGNOSTIC_ANIMATION;
-            case REWARMING -> REWARMING_ANIMATION;
-            case CARDIAC_PACING -> CARDIAC_PACING_ANIMATION;
-            case DRAINING -> DRAINING_ANIMATION;
-            case MASK_RELEASE -> MASK_RELEASE_ANIMATION;
-            case OPENING -> OPENING_ANIMATION;
-            case OPEN -> OPEN_ANIMATION;
-            default -> IDLE_ANIMATION;
-        };
     }
 
     private void setAnimationState(CryoTubeAnimationState next) {

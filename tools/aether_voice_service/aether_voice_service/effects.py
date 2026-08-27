@@ -5,6 +5,7 @@ import numpy as np
 
 EMOTION_SPEED = {
     "normal": 1.00,
+    "calm": 0.93,
     "concerned": 0.94,
     "urgent": 1.08,
     "damaged": 0.97,
@@ -37,7 +38,7 @@ def apply_voice_effects(
 
     strength = float(np.clip(radio_effect, 0.0, 0.35))
     if emotion == "damaged":
-        strength = max(strength, 0.12)
+        strength = max(strength, 0.08)
     elif emotion == "mysterious":
         strength = max(strength, 0.035)
 
@@ -53,7 +54,7 @@ def apply_voice_effects(
     noise = np.random.default_rng(0xAE7E).normal(0.0, 0.0025 * strength, samples.size)
     samples += noise.astype(np.float32)
 
-    if emotion == "damaged" and strength >= 0.10:
+    if emotion == "damaged" and strength >= 0.16:
         dropout_samples = max(1, int(sample_rate * 0.012))
         for fraction in (0.29, 0.57, 0.81):
             start = int(samples.size * fraction)

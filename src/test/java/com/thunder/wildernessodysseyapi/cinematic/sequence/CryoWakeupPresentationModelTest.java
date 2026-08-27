@@ -68,14 +68,14 @@ class CryoWakeupPresentationModelTest {
     }
 
     @Test
-    void authoredVoiceDeliveryEscalatesWithoutInventingNewModes() {
-        assertEquals(VoiceEmotion.NORMAL, CryoWakeupClientPresentation.narrationEmotion(
+    void authoredVoiceDeliveryRemainsCalmWhilePreservingWarnings() {
+        assertEquals(VoiceEmotion.CALM, CryoWakeupClientPresentation.narrationEmotion(
                 CryoWakeupSequence.NARRATION_MEDICAL_ONLINE
         ));
         assertEquals(VoiceEmotion.CONCERNED, CryoWakeupClientPresentation.narrationEmotion(
                 CryoWakeupSequence.NARRATION_CONTAMINATION
         ));
-        assertEquals(VoiceEmotion.URGENT, CryoWakeupClientPresentation.narrationEmotion(
+        assertEquals(VoiceEmotion.CONCERNED, CryoWakeupClientPresentation.narrationEmotion(
                 CryoWakeupSequence.NARRATION_PACING
         ));
         assertEquals(VoiceEmotion.DAMAGED, CryoWakeupClientPresentation.narrationEmotion(
@@ -85,6 +85,34 @@ class CryoWakeupPresentationModelTest {
                 CryoWakeupSequence.NARRATION_AETHER_IDENTITY
         ) > CryoWakeupClientPresentation.narrationRadioEffect(
                 CryoWakeupSequence.NARRATION_MEDICAL_ONLINE
+        ));
+    }
+
+    @Test
+    void medicalTelemetryShowsAConsistentRecoveryTrend() {
+        assertTrue(CryoWakeupPresentationModel.showsMedicalTelemetry(
+                CryoWakeupSequence.MEDICAL_DIAGNOSTIC
+        ));
+        assertTrue(CryoWakeupPresentationModel.coreTemperatureCelsius(
+                CryoWakeupSequence.SUSPENSION_DRAIN, 1.0F
+        ) > CryoWakeupPresentationModel.coreTemperatureCelsius(
+                CryoWakeupSequence.EXTERIOR_REVEAL, 0.0F
+        ));
+        assertTrue(CryoWakeupPresentationModel.heartRateBpm(
+                CryoWakeupSequence.CARDIAC_PACING, 1.0F
+        ) > CryoWakeupPresentationModel.heartRateBpm(
+                CryoWakeupSequence.MEDICAL_DIAGNOSTIC, 0.0F
+        ));
+        assertTrue(CryoWakeupPresentationModel.oxygenSaturation(
+                CryoWakeupSequence.SUSPENSION_DRAIN, 1.0F
+        ) > CryoWakeupPresentationModel.oxygenSaturation(
+                CryoWakeupSequence.MEDICAL_DIAGNOSTIC, 0.0F
+        ));
+        assertTrue(CryoWakeupPresentationModel.pacingFlash(
+                CryoWakeupSequence.CARDIAC_PACING, 0.60F
+        ) > 0.9F);
+        assertEquals(0.0F, CryoWakeupPresentationModel.pacingFlash(
+                CryoWakeupSequence.REVIVAL_PROTOCOL, 0.60F
         ));
     }
 }

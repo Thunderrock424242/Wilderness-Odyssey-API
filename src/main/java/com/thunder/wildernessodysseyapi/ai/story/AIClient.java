@@ -26,7 +26,7 @@ public class AIClient {
     private final AISettings settings = new AISettings();
     private final VoiceIntegration voiceIntegration = new VoiceIntegration();
     private final MemoryStore memoryStore = new MemoryStore();
-    private final AIKnowledgeStore knowledgeStore = new AIKnowledgeStore();
+    private final AIPlayerProfileStore playerProfileStore = new AIPlayerProfileStore();
     private final AIOnboardingStore onboardingStore = new AIOnboardingStore();
     private final AIFallbackResponder fallbackResponder = new AIFallbackResponder();
     private final OllamaChatClient ollamaChatClient = new OllamaChatClient();
@@ -35,6 +35,9 @@ public class AIClient {
     private String onboardingCompletionMessage = "You're all set. You can ask me anything now.";
     private String onboardingInvalidChoiceMessage = "Pick one of the numbered options so I can guide you.";
     private final List<AIConfig.OnboardingStep> onboardingSteps = new ArrayList<>();
+    private boolean playerMemoryEnabled = true;
+    private boolean naturalPlayerLearningEnabled = true;
+    private int maxPlayerMemories = AIPlayerProfileStore.DEFAULT_MAX_MEMORIES;
 
     public AIClient() {
         loadStory();
@@ -72,6 +75,7 @@ public class AIClient {
         authoritativeKnowledge.addAll(config.getAuthoritativeKnowledge());
         knowledgeBoundaries.addAll(config.getKnowledgeBoundaries());
         applySettings(config);
+        configurePlayerMemory(config.getPlayerMemory());
         subsystemRegistry = new AISubsystemRegistry(settings.getPersonaName(), config.getSubsystems());
         configureOnboarding(config.getOnboarding());
         fallbackResponder.configure(config.getFallback(), settings.getPersonaName(), settings.getWakeWord());
@@ -147,6 +151,24 @@ public class AIClient {
         }
     }
 
+    private void configurePlayerMemory(AIConfig.PlayerMemory playerMemory) {
+        if (playerMemory == null) {
+            return;
+        }
+        if (playerMemory.getEnabled() != null) {
+            playerMemoryEnabled = playerMemory.getEnabled();
+        }
+        if (playerMemory.getNaturalLearningEnabled() != null) {
+            naturalPlayerLearningEnabled = playerMemory.getNaturalLearningEnabled();
+        }
+        if (playerMemory.getMaxMemoriesPerPlayer() != null) {
+            maxPlayerMemories = Math.max(
+                    1,
+                    Math.min(AIPlayerProfileStore.HARD_MAX_MEMORIES, playerMemory.getMaxMemoriesPerPlayer())
+            );
+        }
+    }
+
     /**
      * Adds the message to memory and returns a scripted reply.
      *
@@ -176,6 +198,16 @@ public class AIClient {
 
     public VoiceIntegration.VoiceResult sendMessageWithVoice(String world, String player, String message,
                                                             AIFallbackResponder.ResponseContext responseContext) {
+        return sendMessageWithVoice(world, player, player, message, responseContext);
+    }
+
+    public VoiceIntegration.VoiceResult sendMessageWithVoice(
+            String world,
+            String playerProfileKey,
+            String player,
+            String message,
+            AIFallbackResponder.ResponseContext responseContext
+    ) {
         if (!settings.isAtlasEnabled()) {
             return voiceIntegration.wrap(settings.getPersonaName(), "");
         }
@@ -183,19 +215,49 @@ public class AIClient {
                 responseContext == null ? AIFallbackResponder.ResponseContext.empty() : responseContext;
         Optional<String> requiredSpeaker = subsystemRegistry.findExplicitSpeaker(message);
         String speaker = requiredSpeaker.orElse(subsystemRegistry.centralName());
-        String learnedFact = knowledgeStore.extractLearnedFact(message);
-        if (learnedFact != null) {
-            boolean added = knowledgeStore.addFact(learnedFact);
-            String reply = added
-                    ? "Got it. I'll remember: " + learnedFact
-                    : "I already have that logged: " + learnedFact;
+
+        // Profile deletion stays available even when learning is disabled so
+        // the privacy control can always remove previously stored details.
+        if (AIPlayerProfileStore.isForgetRequest(message)) {
+            memoryStore.addPlayerMessage(world, player, message);
+            boolean removed = playerProfileStore.clear(playerProfileKey);
+            String reply = removed
+                    ? "I've cleared the personal details you shared with me. We can start fresh."
+                    : "I don't have a saved profile for you, so there was nothing to forget.";
             memoryStore.addAiMessage(world, player, speaker, reply);
             return voiceIntegration.wrap(speaker, reply);
         }
+
+        AIPlayerProfileStore.LearningResult learning = playerMemoryEnabled
+                ? playerProfileStore.learn(
+                        playerProfileKey,
+                        message,
+                        naturalPlayerLearningEnabled,
+                        maxPlayerMemories
+                )
+                : AIPlayerProfileStore.LearningResult.none();
+        if (learning.explicitRequest()) {
+            memoryStore.addPlayerMessage(world, player, message);
+            String reply;
+            if (!learning.accepted()) {
+                reply = learning.rejectionMessage();
+            } else if (learning.changed()) {
+                reply = "I'll remember that about you: " + learning.memory() + ".";
+            } else {
+                reply = "I already remember that about you: " + learning.memory() + ".";
+            }
+            memoryStore.addAiMessage(world, player, speaker, reply);
+            return voiceIntegration.wrap(speaker, reply);
+        }
+
         memoryStore.addPlayerMessage(world, player, message);
-        String knowledgeContext = knowledgeStore.getContextSnippet();
-        if (isMemoryRecallRequest(message) && !knowledgeContext.isBlank()) {
-            String reply = knowledgeContext.replace("Atlas learned:", "I have logged:");
+        String playerProfileContext = playerMemoryEnabled
+                ? playerProfileStore.getContextSnippet(playerProfileKey, maxPlayerMemories)
+                : "";
+        if (AIPlayerProfileStore.isRecallRequest(message)) {
+            String reply = playerMemoryEnabled
+                    ? playerProfileStore.describeForPlayer(playerProfileKey, maxPlayerMemories)
+                    : "Player profile memory is disabled in the local Aether configuration.";
             memoryStore.addAiMessage(world, player, speaker, reply);
             return voiceIntegration.wrap(speaker, reply);
         }
@@ -211,7 +273,7 @@ public class AIClient {
                     subsystemRegistry,
                     requiredSpeaker.orElse(""),
                     safeResponseContext,
-                    knowledgeContext
+                    playerProfileContext
             );
             List<MemoryStore.ConversationMessage> history = memoryStore.getRecentMessages(
                     world,
@@ -237,6 +299,7 @@ public class AIClient {
                         speaker,
                         subsystemRegistry.profileFor(speaker).orElse(null),
                         safeResponseContext,
+                        playerProfileContext,
                         message,
                         modelResponse.displayText(),
                         modelResponse.speechText()
@@ -310,17 +373,6 @@ public class AIClient {
         onboardingStore.setStep(playerId, nextStepIndex);
         String nextPrompt = buildOnboardingPrompt(onboardingSteps.get(nextStepIndex), null);
         return combineResponses(response, nextPrompt);
-    }
-
-    private boolean isMemoryRecallRequest(String message) {
-        if (message == null || message.isBlank()) {
-            return false;
-        }
-        String lower = message.toLowerCase(Locale.ROOT);
-        return lower.contains("what do you remember")
-                || lower.contains("what have you learned")
-                || lower.contains("learned facts")
-                || lower.contains("memory log");
     }
 
     private int resolveChoiceIndex(AIConfig.OnboardingStep step, String message) {

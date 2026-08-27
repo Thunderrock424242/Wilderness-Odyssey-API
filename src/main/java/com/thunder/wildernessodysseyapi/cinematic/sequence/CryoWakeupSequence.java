@@ -188,7 +188,9 @@ public final class CryoWakeupSequence implements CinematicSequence {
     @Override
     public void onStageStarted(CinematicSequenceContext context) {
         ResourceLocation stage = context.stage().id();
-        if (stage.equals(EXTERIOR_REVEAL)) {
+        if (stage.equals(BLACK_SCREEN)) {
+            sound(context, SoundEvents.CONDUIT_AMBIENT, 0.18F, 0.48F);
+        } else if (stage.equals(EXTERIOR_REVEAL)) {
             context.cueActor(CUE_SUSPENDED);
             sound(context, SoundEvents.BEACON_AMBIENT, 0.30F, 0.60F);
         } else if (stage.equals(MEDICAL_DIAGNOSTIC)) {
@@ -222,6 +224,7 @@ public final class CryoWakeupSequence implements CinematicSequence {
     public void onTick(CinematicSequenceContext context) {
         ResourceLocation stage = context.stage().id();
         int elapsed = context.stageElapsedTicks();
+        tickMedicalSounds(context, stage, elapsed);
         if (stage.equals(EXTERIOR_REVEAL) && elapsed == 8) {
             context.narrateOnce(NARRATION_MEDICAL_ONLINE, NARRATION_TICKS);
         } else if (stage.equals(MEDICAL_DIAGNOSTIC)) {
@@ -272,6 +275,16 @@ public final class CryoWakeupSequence implements CinematicSequence {
 
     public static int totalDurationTicks() {
         return STAGES.stream().mapToInt(CinematicStage::durationTicks).sum();
+    }
+
+    /** Returns one registered stage duration for client telemetry and tests. */
+    public static int durationTicks(ResourceLocation stageId) {
+        for (CinematicStage stage : STAGES) {
+            if (stage.id().equals(stageId)) {
+                return stage.durationTicks();
+            }
+        }
+        return 0;
     }
 
     private static void tickRecoveryNarration(CinematicSequenceContext context, int elapsed) {
@@ -332,6 +345,62 @@ public final class CryoWakeupSequence implements CinematicSequence {
     ) {
         if (elapsed == cueTick) {
             context.narrateOnce(cueId, NARRATION_TICKS);
+        }
+    }
+
+    /** Adds sparse, stage-synchronized medical and machinery layers without a ticking sound loop. */
+    private static void tickMedicalSounds(
+            CinematicSequenceContext context,
+            ResourceLocation stage,
+            int elapsed
+    ) {
+        if (stage.equals(EXTERIOR_REVEAL)) {
+            soundAt(context, elapsed, 26, SoundEvents.EXPERIENCE_ORB_PICKUP, 0.18F, 0.72F);
+            soundAt(context, elapsed, 62, SoundEvents.EXPERIENCE_ORB_PICKUP, 0.18F, 0.84F);
+        } else if (stage.equals(MEDICAL_DIAGNOSTIC)) {
+            soundAt(context, elapsed, 12, SoundEvents.EXPERIENCE_ORB_PICKUP, 0.22F, 0.64F);
+            soundAt(context, elapsed, 62, SoundEvents.EXPERIENCE_ORB_PICKUP, 0.22F, 0.68F);
+            soundAt(context, elapsed, 112, SoundEvents.EXPERIENCE_ORB_PICKUP, 0.22F, 0.72F);
+        } else if (stage.equals(REVIVAL_PROTOCOL)) {
+            soundAt(context, elapsed, 10, SoundEvents.BREWING_STAND_BREW, 0.20F, 0.56F);
+            soundAt(context, elapsed, 54, SoundEvents.PISTON_CONTRACT, 0.18F, 0.62F);
+            soundAt(context, elapsed, 98, SoundEvents.BREWING_STAND_BREW, 0.20F, 0.66F);
+            soundAt(context, elapsed, 142, SoundEvents.PISTON_CONTRACT, 0.18F, 0.70F);
+            soundAt(context, elapsed, 178, SoundEvents.DISPENSER_DISPENSE, 0.28F, 1.18F);
+        } else if (stage.equals(CARDIAC_PACING)) {
+            soundAt(context, elapsed, 8, SoundEvents.WARDEN_HEARTBEAT, 0.22F, 1.18F);
+            soundAt(context, elapsed, 28, SoundEvents.WARDEN_HEARTBEAT, 0.22F, 1.24F);
+            soundAt(context, elapsed, 60, SoundEvents.EXPERIENCE_ORB_PICKUP, 0.25F, 1.10F);
+            soundAt(context, elapsed, 72, SoundEvents.EXPERIENCE_ORB_PICKUP, 0.25F, 1.18F);
+        } else if (stage.equals(SUSPENSION_DRAIN)) {
+            soundAt(context, elapsed, 8, SoundEvents.EXPERIENCE_ORB_PICKUP, 0.20F, 1.16F);
+            soundAt(context, elapsed, 32, SoundEvents.BUBBLE_COLUMN_WHIRLPOOL_AMBIENT, 0.22F, 0.66F);
+            soundAt(context, elapsed, 40, SoundEvents.EXPERIENCE_ORB_PICKUP, 0.20F, 1.20F);
+            soundAt(context, elapsed, 64, SoundEvents.BUBBLE_COLUMN_WHIRLPOOL_AMBIENT, 0.22F, 0.72F);
+            soundAt(context, elapsed, 72, SoundEvents.EXPERIENCE_ORB_PICKUP, 0.20F, 1.22F);
+        } else if (stage.equals(EYES_REOPENING)) {
+            soundAt(context, elapsed, 18, SoundEvents.PLAYER_BREATH, 0.28F, 0.72F);
+            soundAt(context, elapsed, 56, SoundEvents.PLAYER_BREATH, 0.30F, 0.78F);
+        } else if (stage.equals(MASK_RELEASE)) {
+            soundAt(context, elapsed, 12, SoundEvents.PLAYER_BREATH, 0.34F, 0.84F);
+        } else if (stage.equals(CRYO_OPENING)) {
+            soundAt(context, elapsed, 18, SoundEvents.PISTON_CONTRACT, 0.24F, 0.64F);
+        } else if (stage.equals(BALANCE_CHECK)) {
+            soundAt(context, elapsed, 10, SoundEvents.PLAYER_BREATH, 0.24F, 0.88F);
+            soundAt(context, elapsed, 30, SoundEvents.PLAYER_BREATH, 0.22F, 0.94F);
+        }
+    }
+
+    private static void soundAt(
+            CinematicSequenceContext context,
+            int elapsed,
+            int cueTick,
+            SoundEvent sound,
+            float volume,
+            float pitch
+    ) {
+        if (elapsed == cueTick) {
+            sound(context, sound, volume, pitch);
         }
     }
 

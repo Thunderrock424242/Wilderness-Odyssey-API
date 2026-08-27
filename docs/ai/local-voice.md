@@ -10,7 +10,7 @@ Hold V in a private single-player world
   -> POST /v1/transcribe to 127.0.0.1
   -> faster-whisper returns text
   -> Minecraft sends that text as ordinary player chat
-  -> the existing Aether Ollama history, specialist router, lore context,
+  -> the existing Aether Ollama history, player profile, specialist router, lore context,
      factual verifier, and provider-outage fallback handle it
   -> the verified display response appears once in chat
   -> a client payload carries the matching spoken text and metadata
@@ -19,7 +19,7 @@ Hold V in a private single-player world
   -> JavaSound plays it and the client shows one temporary subtitle
 ```
 
-The local voice service intentionally owns only heavy speech work. The established Java-to-Ollama chat path remains the conversation authority, so typed and spoken requests cannot develop separate memories or personalities.
+The local voice service intentionally owns only heavy speech work. The established Java-to-Ollama chat path remains the conversation authority, so typed and spoken requests cannot develop separate memories, profiles, or personalities. Stable details shared through either input method are stored by the same bounded per-save, per-player profile owner.
 
 ## Uses beyond conversation
 
@@ -43,9 +43,9 @@ The `[aether_voice]` category contains:
 - `inputMode`: `TEXT` or `PUSH_TO_TALK`. `ALWAYS_LISTENING` is reserved but intentionally inactive.
 - `serviceEndpoint`: defaults to `http://127.0.0.1:8765` and is rejected unless it is plain HTTP on a loopback host.
 - `serviceToken`: optional bearer token shared with the service process.
-- `voiceName`: Kokoro voice ID, default `af_heart`.
+- `voiceName`: Kokoro voice ID, default `af_heart`, a warm feminine voice selected for A.E.T.H.E.R's calm synthetic-medical delivery.
 - `volume`: generated voice volume before Minecraft's Master and Voice sliders.
-- `speechSpeed`: base speech speed before bounded emotion adjustment.
+- `speechSpeed`: base speech speed before bounded emotion adjustment; fresh configs default to `0.96`, and authored calm lines apply an additional restrained slowdown.
 - `subtitles`, `radioProcessing`, `cinematicNarration`, and `loreReadAloud`.
 - `requestTimeoutSeconds`: client request timeout; no Minecraft thread waits for it.
 
@@ -105,6 +105,7 @@ The service selects CUDA/float16 for faster-whisper when CTranslate2 reports a u
 - Push-to-talk is capped at 30 seconds, and clips shorter than 200 ms are ignored.
 - Requests, responses, display strings, speaker names, emotion values, effect strengths, and audio sizes are bounded.
 - No process is launched automatically by the mod and no model is downloaded without the explicit environment opt-in plus model-load request.
+- Voice transcripts can contribute the same bounded personal preferences as typed chat, but raw microphone audio is never used as profile data. Say `what do you remember about me?` to inspect the profile or `forget what you know about me` to remove it.
 - A loopback listener can still be called by another local process. Set `AETHER_VOICE_TOKEN` and the matching client `serviceToken` when local process isolation is not enough. Never commit that token.
 
 ## Failure behavior

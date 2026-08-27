@@ -9,12 +9,14 @@ import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteServices;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.LevelResource;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -44,6 +46,7 @@ public class AIChatListener {
         String worldKey = player.serverLevel().dimension().location().toString();
         AIFallbackResponder.ResponseContext responseContext = new AIFallbackResponder.ResponseContext(buildContextTags(player, worldKey));
         UUID playerId = player.getUUID();
+        String playerProfileKey = buildPlayerProfileKey(server, playerId);
         String playerName = player.getName().getString();
         long responseId = RESPONSE_IDS.incrementAndGet();
 
@@ -66,7 +69,13 @@ public class AIChatListener {
 
         AsyncTaskManager.submitIoTask("AI_Chat_" + playerName, () -> {
             // Local model I/O and scripted matching never block the server thread.
-            VoiceIntegration.VoiceResult reply = CLIENT.sendMessageWithVoice(worldKey, playerName, message, responseContext);
+            VoiceIntegration.VoiceResult reply = CLIENT.sendMessageWithVoice(
+                    worldKey,
+                    playerProfileKey,
+                    playerName,
+                    message,
+                    responseContext
+            );
 
             if (reply.text() == null || reply.text().isBlank()) {
                 return java.util.Optional.empty();
@@ -143,6 +152,17 @@ public class AIChatListener {
     private static boolean isNearMeteorSite(ServerPlayer player) {
         return MeteorSiteServices.isNearSite(
                 player.serverLevel(), player.blockPosition(), 96);
+    }
+
+    private static String buildPlayerProfileKey(MinecraftServer server, UUID playerId) {
+        String saveIdentity = server.getWorldPath(LevelResource.ROOT)
+                .toAbsolutePath()
+                .normalize()
+                .toString();
+        UUID saveId = UUID.nameUUIDFromBytes(
+                saveIdentity.getBytes(StandardCharsets.UTF_8)
+        );
+        return saveId + "-" + playerId;
     }
 
     private static void addContextTag(Set<String> tags, String tag) {

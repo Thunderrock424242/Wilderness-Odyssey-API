@@ -15,8 +15,13 @@ import java.util.Set;
 import net.neoforged.fml.loading.FMLPaths;
 
 /**
- * Persists learned player facts to a lightweight YAML config.
+ * Legacy global Atlas-note store retained only to preserve older source and
+ * manually created {@code ai_learning.yaml} files.
+ *
+ * @deprecated Active Aether conversation uses {@link AIPlayerProfileStore},
+ * which separates saves and players and bounds profile data.
  */
+@Deprecated(forRemoval = false)
 public class AIKnowledgeStore {
 
     private static final String CONFIG_NAME = "ai_learning.yaml";

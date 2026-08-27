@@ -105,6 +105,11 @@ settings:
   max_response_characters: 800
   max_output_tokens: 180
 
+player_memory:
+  enabled: true
+  natural_learning_enabled: true
+  max_memories_per_player: 12
+
 fallback:
   enabled: true
   minimum_keyword_matches: 2

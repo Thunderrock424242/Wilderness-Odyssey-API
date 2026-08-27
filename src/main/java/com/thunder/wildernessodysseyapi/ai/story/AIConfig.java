@@ -17,6 +17,7 @@ public class AIConfig {
     private String corruptedPrefix;
     private final Personality personality = new Personality();
     private final Settings settings = new Settings();
+    private final PlayerMemory playerMemory = new PlayerMemory();
     private final Onboarding onboarding = new Onboarding();
     private final Fallback fallback = new Fallback();
 
@@ -58,6 +59,10 @@ public class AIConfig {
 
     public Settings getSettings() {
         return settings;
+    }
+
+    public PlayerMemory getPlayerMemory() {
+        return playerMemory;
     }
 
     public Onboarding getOnboarding() {
@@ -179,6 +184,37 @@ public class AIConfig {
 
         public void setMaxOutputTokens(Integer maxOutputTokens) {
             this.maxOutputTokens = maxOutputTokens;
+        }
+    }
+
+    /** Privacy and size controls for persistent conversational player profiles. */
+    public static class PlayerMemory {
+        private Boolean enabled;
+        private Boolean naturalLearningEnabled;
+        private Integer maxMemoriesPerPlayer;
+
+        public Boolean getEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(Boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public Boolean getNaturalLearningEnabled() {
+            return naturalLearningEnabled;
+        }
+
+        public void setNaturalLearningEnabled(Boolean naturalLearningEnabled) {
+            this.naturalLearningEnabled = naturalLearningEnabled;
+        }
+
+        public Integer getMaxMemoriesPerPlayer() {
+            return maxMemoriesPerPlayer;
+        }
+
+        public void setMaxMemoriesPerPlayer(Integer maxMemoriesPerPlayer) {
+            this.maxMemoriesPerPlayer = maxMemoriesPerPlayer;
         }
     }
 
