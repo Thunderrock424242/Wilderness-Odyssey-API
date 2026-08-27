@@ -34,6 +34,8 @@ public record WaterBody(
         LOCAL_VOLUME,
         LARGE_OCEAN,
         LARGE_RIVER,
-        LARGE_POND
+        LARGE_POND,
+        LARGE_COAST,
+        LARGE_LAKE
     }
 }

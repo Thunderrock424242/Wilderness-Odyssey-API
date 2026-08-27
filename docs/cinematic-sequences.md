@@ -8,27 +8,55 @@ Wilderness Odyssey cinematics are split into server authority and client present
 2. Register the immutable definition in `CinematicSequences.bootstrap()`.
 3. Implement `ClientCinematicPresentation` for camera and overlay behavior, then register it in `ClientCinematicPresentationRegistry`.
 4. Use `CinematicActor` when a block entity or other exact world object must translate sequence cues into feature-owned animation states.
-5. Start playback through `CinematicManager.play(player, sequence, options)`. Automatic story playback uses `CinematicPlaybackOptions.automatic`; development replay uses `developerReplay` and does not alter permanent completion.
+5. Emit only registered, authored narration ids through `CinematicSequenceContext.narrateOnce`. The client presentation resolves those ids to translated text; arbitrary server or model-authored speech is not accepted by this channel.
+6. Start playback through `CinematicManager.play(player, sequence, options)`. Automatic story playback uses `CinematicPlaybackOptions.automatic`; development replay uses `developerReplay` and does not alter permanent completion.
 
 Stage ids are the network contract between a server definition and its client presentation. Changing those ids requires a network-version change. Durations remain server authoritative, while smooth per-frame values are derived from stage start time and duration without per-tick packets.
 
 ## Cryo wake-up lifecycle
 
-The existing cryo spawn handler starts `wildernessodysseyapi:cryo_wakeup` only after a new player has been successfully assigned and positioned in a real cryo tube. The first automatic request records `automatic_started`; normal completion records the sequence id in `completed`. An interrupted started-but-incomplete intro is eligible for replay on the next login. Existing players who already had a cryo assignment before this feature are not enrolled automatically.
+The cryo origin is private single-player story content. The spawn handler leaves dedicated-server and LAN-published players on ordinary spawn behavior. `CinematicManager` independently rejects manual or automatic playback outside an unpublished integrated world and stops an active session if the owner publishes the world to LAN. A.E.T.H.E.R chat and voice use the same private-single-player policy.
 
-The normal timeline lasts 480 ticks (24 seconds). Movement and interactions are locked through tick 459, then returned for the final one-second presentation stage. Completion shows the temporary objective text, “Find a way out of the facility.” There is currently no separate quest/objective owner in the project, so this message is not persisted as quest state.
+In a private integrated world, the existing spawn handler starts `wildernessodysseyapi:cryo_wakeup` only after a new player has been successfully assigned to a real cryo tube. The first automatic request records `automatic_started`; normal completion records the sequence id in `completed`. An interrupted started-but-incomplete intro is eligible for replay on the next login. Existing players who already had a cryo assignment before this feature are not enrolled automatically.
 
-The server lock uses zero velocity plus temporary no-gravity. It corrects position only if the player actually drifts from the exact pod anchor; there is no unconditional teleport loop. Attacks and interactions are rejected server-side. The client uses an inert input object, cancels gameplay interaction key mappings and container screens, keeps first-person perspective, and hides the normal HUD.
+The normal timeline lasts 1,290 ticks (64.5 seconds):
 
-Every completion, manual cancellation, death, logout, dimension change, invalid state, exception, and server shutdown removes the active session and restores the original no-gravity state. Client completion, logout, and level unload restore the exact previous input object, GUI visibility preference, and camera perspective from one cleanup path. Cryo actors are exclusive while active so two players cannot drive the same pod animation concurrently.
+| Start | Stage | Presentation and authority |
+| ---: | --- | --- |
+| 0 | Black screen | Controls locked; tube occupant established |
+| 20 | Exterior reveal | Detached camera reveals the local-player proxy floating in the tube |
+| 100 | Medical diagnostic | Contamination and filtration warnings |
+| 250 | Revival protocol | Rewarming, circulation, cryoprotectant purge, and authored injection cue |
+| 470 | Cardiac pacing | Electrical pacing jolt and warning pulse |
+| 550 | Suspension drain | Contaminated fluid drains from the animated chamber |
+| 650 | Black transition | Exterior view cuts to black before first person |
+| 670 | Eyes reopening | Lower occupant-relative camera, eyelids, and strong blur |
+| 750 | Mask release | Breathing mask and conduits retract |
+| 790 | Tube opening | Door opens while blur and mechanical shake ease |
+| 850 | Balance check | Camera levels and A.E.T.H.E.R warns the player to move slowly |
+| 890 | Recovery walk | Controls return for a twenty-second, movement-aware briefing |
 
-## Cryo assets and temporary presentation
+Completion shows the temporary objective text, “Find a way out of the facility.” There is currently no separate quest/objective owner in the project, so this message is not persisted as quest state.
 
-`CryoTubeBlockEntity` synchronizes `IDLE`, `WARNING`, `UNLOCK`, `OPENING`, and `OPEN`. The current tube remains a static JSON model; a later Blockbench model, GeckoLib `GeoBlockEntity`, renderer, controller, geometry, texture, and animation JSON can consume `getAnimationState()` without changing cinematic timing or networking.
+The server lock uses zero velocity plus temporary no-gravity. It corrects position only if the player actually drifts from the exact pod anchor; there is no unconditional teleport loop. Attacks and interactions are rejected server-side. The client uses an inert input object, cancels gameplay interaction key mappings and container screens, keeps first-person render semantics, and hides the normal HUD. At tick 890 the server moves the real player once to the tube-facing exit, returns ordinary input, applies a short slowness interval plus the existing cryo-shakes recovery effect, and lets the last A.E.T.H.E.R lines respond to distance walked with bounded timeouts.
 
-The machinery, heartbeat, relay, alarm, release, lock, and opening cues currently reuse sparse vanilla sound events. No fake `.ogg` files or nonexistent custom sound registrations are included. Replace those event choices with registered Wilderness Odyssey sound events after real audio assets are added. Mist temporarily uses 18 vanilla cloud particles once at release.
+Every completion, manual cancellation, death, logout, dimension change, LAN publication, invalid state, exception, and server shutdown removes the active session and restores the original no-gravity state. Client completion, logout, and level unload restore the exact previous input object, GUI visibility preference, camera perspective, queued cinematic speech, and temporary subtitles from one cleanup path.
 
-Warning red light and early electrical flicker are currently client overlay presentation plus the pod's synchronized `WARNING` cue. The sequence does not rewrite facility blocks or invent an unrelated door/light controller. A future lab lighting or door owner can consume a cinematic actor cue at the relevant stage.
+## Cryo camera, occupant, and animated assets
+
+`CryoTubeBlockEntity` is a GeckoLib `GeoBlockEntity` and synchronizes `IDLE`, `SUSPENDED`, `DIAGNOSTIC`, `REWARMING`, `CARDIAC_PACING`, `DRAINING`, `MASK_RELEASE`, `OPENING`, and `OPEN`. Its geometry has separately animated suspension fluid, door, breathing mask, conduits, and warning lamps. The world block uses the block-entity renderer, while the item keeps a compact baked model.
+
+The exterior shot renders a presentation-only copy of the local player before the tube shell and glass. It never creates a second entity and never changes server gameplay authority. Strict single-player scope makes the tube anchor sufficient to identify the occupant. The real player remains at the server-owned safe position until control return.
+
+The detached camera position is anchored to the tube and follows its facing. The later first-person position is a separate lower eye anchor inside the chamber, which avoids inheriting the standing player's eye height that previously placed the view near the top of the model. NeoForge exposes camera-angle events but no world-position event in this version, so one narrow client-only `Camera.setup` tail injection applies a position only while an active presentation supplies it.
+
+Blur uses Minecraft's native transient blur pass and respects the screen-effect accessibility scale. Eyelids, contaminated-fluid tint, diagnostic scan, warning wash, subtitles, FOV, shake, and blur are presentation-only; they do not mutate player rotation or facility blocks.
+
+## A.E.T.H.E.R narration
+
+All medical and recovery lines are authored cue ids. They do not call Ollama and cannot invent a procedure, observation, or capability. The client always shows translated subtitles. When the optional local A.E.T.H.E.R voice service is enabled, the same authored text is queued through its Kokoro voice. Otherwise cinematic narration uses the operating system's offline narrator as a zero-setup fallback. Set `aether_voice.cinematicNarration` to false in the client config to silence authored cinematic speech while retaining subtitles.
+
+The machinery, pacing, drain, mask, and opening cues reuse sparse vanilla sound events. No fake `.ogg` assets or nonexistent sound registrations are included. They can be replaced later with registered Wilderness Odyssey effects without changing sequence timing. Mist uses one bounded vanilla cloud-particle burst during drain.
 
 ## Developer commands
 
@@ -40,8 +68,10 @@ Permission level 2 is required:
 /wo sequence stop
 ```
 
-The play command finds the nearest compatible cryo tube within three horizontal blocks and two vertical blocks. Developer replay never changes permanent completion state. The stop command executes the same authoritative cleanup used by abnormal lifecycle exits.
+The play command finds the nearest compatible cryo tube within three horizontal blocks and two vertical blocks. It is rejected on dedicated servers and as soon as an integrated world is published to LAN. Developer replay never changes permanent completion state. The stop command executes the same authoritative cleanup used by abnormal lifecycle exits.
 
 ## In-game verification
 
-Use a development client and verify both automatic first login and the developer command. During the first 23 seconds, attempt walking, jumping, sprinting, attacking, mining, using the tube, opening inventory, and changing perspective. Confirm none disrupt the sequence; chat and the pause menu intentionally remain available. Disconnect, die, change dimension through an external command, and use `/wo sequence stop` in separate replays, then confirm normal movement, gravity, HUD visibility, perspective, attacks, and interaction all return. A two-player check should also confirm independent overlays and rejection when both players attempt to use the same pod.
+Use a development client and verify both automatic first login and the developer command. During the first 44.5 seconds, attempt walking, jumping, sprinting, attacking, mining, using the tube, opening inventory, and changing perspective. Confirm none disrupt the sequence; chat and the pause menu intentionally remain available. Confirm the opening exterior view sees the full local-player proxy, mask, conduits, and fluid rather than the tube ceiling; the black cut then enters the lower first-person view. Check that blur fades, the door and fluid animate, subtitles stay synchronized, and controls return for the walking briefing.
+
+Disconnect, die, change dimension through an external command, use `/wo sequence stop`, and publish to LAN during separate replays. Confirm normal movement, gravity, HUD visibility, perspective, attacks, interaction, blur, and speech cleanup all return. On a dedicated server and LAN-published integrated world, confirm automatic cryo assignment is skipped and the developer play command is rejected.

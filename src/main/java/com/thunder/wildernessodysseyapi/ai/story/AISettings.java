@@ -9,8 +9,6 @@ public class AISettings {
 
     private static final String DEFAULT_OLLAMA_MODEL = "llama3.2:latest";
 
-    private boolean voiceEnabled = false;
-    private boolean speechRecognition = false;
     private boolean atlasEnabled = true;
     private String provider = "ollama";
     private String endpoint = "http://127.0.0.1:11434";
@@ -23,22 +21,6 @@ public class AISettings {
     private String personaName = "Atlas";
     private String personalityTone = "warm and conversational";
     private String empathyLevel = "balanced";
-
-    public boolean isVoiceEnabled() {
-        return voiceEnabled;
-    }
-
-    public void setVoiceEnabled(boolean voiceEnabled) {
-        this.voiceEnabled = voiceEnabled;
-    }
-
-    public boolean isSpeechRecognition() {
-        return speechRecognition;
-    }
-
-    public void setSpeechRecognition(boolean speechRecognition) {
-        this.speechRecognition = speechRecognition;
-    }
 
     public boolean isAtlasEnabled() {
         return atlasEnabled;

@@ -1,0 +1,92 @@
+{
+  "format_version": "1.12.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.cryo_tube",
+        "texture_width": 256,
+        "texture_height": 256,
+        "visible_bounds_width": 3.5,
+        "visible_bounds_height": 4.5,
+        "visible_bounds_offset": [0, 0.5, 0]
+      },
+      "bones": [
+        {
+          "name": "root",
+          "pivot": [0, 0, 0]
+        },
+        {
+          "name": "shell",
+          "parent": "root",
+          "pivot": [0, 0, 0],
+          "cubes": [
+            {"origin": [-10, -16, -10], "size": [20, 8, 20], "uv": [0, 0]},
+            {"origin": [-9, -8, 3], "size": [18, 28, 6], "uv": [0, 32]},
+            {"origin": [-10, -8, -8], "size": [3, 28, 11], "uv": [52, 0]},
+            {"origin": [7, -8, -8], "size": [3, 28, 11], "uv": [80, 0]},
+            {"origin": [-10, 20, -10], "size": [20, 8, 20], "uv": [0, 68]},
+            {"origin": [-7, -8, -7], "size": [14, 2, 10], "uv": [64, 68]},
+            {"origin": [-7, 17, -7], "size": [14, 3, 10], "uv": [64, 84]}
+          ]
+        },
+        {
+          "name": "suspension_fluid",
+          "parent": "root",
+          "pivot": [0, -7, -1],
+          "cubes": [
+            {"origin": [-6.25, -7, -5.8], "size": [12.5, 24, 8], "uv": [0, 68], "inflate": -0.15}
+          ]
+        },
+        {
+          "name": "glass_door",
+          "parent": "root",
+          "pivot": [0, -8, -8],
+          "cubes": [
+            {"origin": [-7, -8, -8.4], "size": [14, 28, 1.5], "uv": [60, 68], "inflate": 0.02},
+            {"origin": [-8, -9, -9], "size": [2, 30, 2], "uv": [60, 68]},
+            {"origin": [6, -9, -9], "size": [2, 30, 2], "uv": [72, 68]}
+          ]
+        },
+        {
+          "name": "medical_mask",
+          "parent": "root",
+          "pivot": [0, 13, -5.5],
+          "cubes": [
+            {"origin": [-4, 11, -6.6], "size": [8, 5, 2], "uv": [112, 0]},
+            {"origin": [-5.5, 12, -5.8], "size": [1.5, 2, 1], "uv": [132, 0]},
+            {"origin": [4, 12, -5.8], "size": [1.5, 2, 1], "uv": [138, 0]}
+          ]
+        },
+        {
+          "name": "tube_left",
+          "parent": "root",
+          "pivot": [-4.8, 14, -5.5],
+          "rotation": [0, 0, -8],
+          "cubes": [
+            {"origin": [-5.5, 14, -6.2], "size": [1.2, 10, 1.2], "uv": [112, 16]},
+            {"origin": [-5.5, 22.8, -4], "size": [1.2, 1.2, 4], "uv": [118, 16]}
+          ]
+        },
+        {
+          "name": "tube_right",
+          "parent": "root",
+          "pivot": [4.8, 14, -5.5],
+          "rotation": [0, 0, 8],
+          "cubes": [
+            {"origin": [4.3, 14, -6.2], "size": [1.2, 10, 1.2], "uv": [124, 16]},
+            {"origin": [4.3, 22.8, -4], "size": [1.2, 1.2, 4], "uv": [130, 16]}
+          ]
+        },
+        {
+          "name": "warning_lights",
+          "parent": "root",
+          "pivot": [0, 23, -10],
+          "cubes": [
+            {"origin": [-6, 22, -10.6], "size": [3, 2, 1], "uv": [86, 40], "inflate": 0.05},
+            {"origin": [3, 22, -10.6], "size": [3, 2, 1], "uv": [94, 40], "inflate": 0.05}
+          ]
+        }
+      ]
+    }
+  ]
+}

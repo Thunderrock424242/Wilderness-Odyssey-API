@@ -3,35 +3,66 @@ package com.thunder.wildernessodysseyapi.cinematic.sequence;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CryoWakeupPresentationModelTest {
     @Test
-    void eyelidsFollowCloseReopenAndFullyOpenPhases() {
+    void cameraModesSeparateExteriorRevealFromFirstPersonRecovery() {
+        assertTrue(CryoWakeupPresentationModel.isExteriorStage(CryoWakeupSequence.EXTERIOR_REVEAL));
+        assertTrue(CryoWakeupPresentationModel.isExteriorStage(CryoWakeupSequence.SUSPENSION_DRAIN));
+        assertFalse(CryoWakeupPresentationModel.isExteriorStage(CryoWakeupSequence.EYES_REOPENING));
+
+        assertTrue(CryoWakeupPresentationModel.isFirstPersonStage(CryoWakeupSequence.EYES_REOPENING));
+        assertTrue(CryoWakeupPresentationModel.isFirstPersonStage(CryoWakeupSequence.BALANCE_CHECK));
+        assertFalse(CryoWakeupPresentationModel.isFirstPersonStage(CryoWakeupSequence.RECOVERY_WALK));
+    }
+
+    @Test
+    void eyelidsOpenGraduallyAfterTheBlackTransition() {
         assertEquals(0.0F, CryoWakeupPresentationModel.eyeOpenAmount(
-                CryoWakeupSequence.BLACK_SCREEN, 0.5F
+                CryoWakeupSequence.BLACKOUT_TRANSITION, 0.5F
         ));
         assertTrue(CryoWakeupPresentationModel.eyeOpenAmount(
-                CryoWakeupSequence.EYES_PARTIAL, 0.55F
+                CryoWakeupSequence.EYES_REOPENING, 0.40F
         ) > 0.20F);
-        assertEquals(0.0F, CryoWakeupPresentationModel.eyeOpenAmount(
-                CryoWakeupSequence.EYES_CLOSED, 0.5F
-        ));
         assertTrue(CryoWakeupPresentationModel.eyeOpenAmount(
                 CryoWakeupSequence.EYES_REOPENING, 1.0F
-        ) >= 0.60F);
+        ) >= 0.80F);
         assertEquals(1.0F, CryoWakeupPresentationModel.eyeOpenAmount(
-                CryoWakeupSequence.LIGHTS_STABLE, 0.5F
+                CryoWakeupSequence.RECOVERY_WALK, 0.5F
         ));
     }
 
     @Test
-    void warningWashIsAbsentBeforeTheFailureCue() {
+    void contaminationWarningAndFluidWashClearAsTheTubeDrains() {
         assertEquals(0.0F, CryoWakeupPresentationModel.warningAlpha(
-                CryoWakeupSequence.BLACK_SCREEN, 0.5F, 100.0F
+                CryoWakeupSequence.EXTERIOR_REVEAL, 0.5F, 100.0F
         ));
         assertTrue(CryoWakeupPresentationModel.warningAlpha(
-                CryoWakeupSequence.WARNING_LIGHTS, 0.5F, 100.0F
+                CryoWakeupSequence.CARDIAC_PACING, 0.5F, 100.0F
         ) > 0.0F);
+        assertTrue(CryoWakeupPresentationModel.suspensionAlpha(
+                CryoWakeupSequence.SUSPENSION_DRAIN, 0.0F
+        ) > CryoWakeupPresentationModel.suspensionAlpha(
+                CryoWakeupSequence.SUSPENSION_DRAIN, 1.0F
+        ));
+    }
+
+    @Test
+    void blurFadesDuringFirstPersonRecovery() {
+        assertTrue(CryoWakeupPresentationModel.blurStrength(
+                CryoWakeupSequence.EYES_REOPENING, 0.0F
+        ) > CryoWakeupPresentationModel.blurStrength(
+                CryoWakeupSequence.BALANCE_CHECK, 1.0F
+        ));
+        assertTrue(CryoWakeupPresentationModel.blurStrength(
+                CryoWakeupSequence.RECOVERY_WALK, 0.0F
+        ) > CryoWakeupPresentationModel.blurStrength(
+                CryoWakeupSequence.RECOVERY_WALK, 1.0F
+        ));
+        assertEquals(0.0F, CryoWakeupPresentationModel.blurStrength(
+                CryoWakeupSequence.RECOVERY_WALK, 1.0F
+        ));
     }
 }

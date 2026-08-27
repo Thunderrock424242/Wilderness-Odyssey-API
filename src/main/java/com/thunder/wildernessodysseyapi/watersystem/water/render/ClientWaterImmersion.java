@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.environment.WaterEnvironmentState;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
@@ -11,6 +12,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LightTexture;
@@ -225,23 +227,37 @@ public final class ClientWaterImmersion {
         float surfaceContinuity = customSurface
                 ? sampleSurfaceContinuity(level, worldX, worldZ)
                 : 1.0f;
+        OceanSeaState.Sample seaState = ClientOceanSeaState.sampleAt(
+                level,
+                worldX,
+                worldZ,
+                partialTick
+        );
+        float depthFactor = clamp(
+                column.depth() / WaterSurfaceVertexData.DEPTH_NORMALIZATION_BLOCKS,
+                0.0f,
+                1.0f
+        );
+        float enclosedFetch = 0.16f + (0.68f - 0.16f) * depthFactor;
+        WaveSpectrumState enclosedSpectrum = WaterEnvironmentState.waveSpectrumFor(
+                WaterBodyClassifier.WaterType.LAKE,
+                seaState,
+                level.getRainLevel(partialTick),
+                enclosedFetch
+        );
         return WaterSurfaceEquation.snapshotSurfaceHeight(
                 column.baseSurfaceY() + watershed.waterLevelOffset(),
                 worldX,
                 worldZ,
                 timeSeconds,
-                ClientOceanSeaState.sampleAt(
-                        level,
-                        worldX,
-                        worldZ,
-                        partialTick
-                ).spectrum(),
+                seaState.spectrum(),
+                enclosedSpectrum,
                 waveSurface
                         ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.OCEAN) : 0,
                 waveSurface
                         ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.RIVER) : 0,
                 waveSurface
-                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.POND) : 0,
+                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.LAKE) : 0,
                 oceanWeight,
                 riverWeight,
                 lakeWeight,

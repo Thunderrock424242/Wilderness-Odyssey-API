@@ -100,8 +100,6 @@ public class AIConfig {
 
     public static class Settings {
         private Boolean atlasEnabled;
-        private Boolean voiceEnabled;
-        private Boolean speechRecognition;
         private String wakeWord;
         private String provider;
         private String endpoint;
@@ -117,22 +115,6 @@ public class AIConfig {
 
         public void setAtlasEnabled(Boolean atlasEnabled) {
             this.atlasEnabled = atlasEnabled;
-        }
-
-        public Boolean getVoiceEnabled() {
-            return voiceEnabled;
-        }
-
-        public void setVoiceEnabled(Boolean voiceEnabled) {
-            this.voiceEnabled = voiceEnabled;
-        }
-
-        public Boolean getSpeechRecognition() {
-            return speechRecognition;
-        }
-
-        public void setSpeechRecognition(Boolean speechRecognition) {
-            this.speechRecognition = speechRecognition;
         }
 
         public String getWakeWord() {

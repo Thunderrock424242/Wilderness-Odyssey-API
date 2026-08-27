@@ -1,7 +1,10 @@
 package com.thunder.wildernessodysseyapi.network;
 
+import com.thunder.wildernessodysseyapi.ai.voice.client.AetherVoiceClient;
+import com.thunder.wildernessodysseyapi.ai.voice.network.AetherVoiceLinePayload;
 import com.thunder.wildernessodysseyapi.cinematic.client.CinematicClientController;
 import com.thunder.wildernessodysseyapi.cinematic.network.CinematicStagePayload;
+import com.thunder.wildernessodysseyapi.cinematic.network.CinematicNarrationPayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.EndCinematicPayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.StartCinematicPayload;
 import com.thunder.wildernessodysseyapi.cloak.item.CloakState;
@@ -65,7 +68,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class ModPayloads {
 
     // Phase 4 adds the required reactive-vegetation Data Engine handler.
-    private static final String NETWORK_VERSION = "24";
+    private static final String NETWORK_VERSION = "26";
 
     private ModPayloads() {
     }
@@ -79,11 +82,17 @@ public final class ModPayloads {
         PayloadRegistrar registrar = event.registrar(NETWORK_VERSION);
         DataEnginePayloads.register(registrar);
 
+        registrar.playToClient(AetherVoiceLinePayload.TYPE, AetherVoiceLinePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        AetherVoiceClient.acceptAetherResponse(payload.responseId(), payload.line())));
+
         // Cinematics synchronize only start, stage boundaries, and end. Camera
         // interpolation and overlays remain client presentation concerns.
         registrar.playToClient(StartCinematicPayload.TYPE, StartCinematicPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> CinematicClientController.accept(payload)));
         registrar.playToClient(CinematicStagePayload.TYPE, CinematicStagePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> CinematicClientController.accept(payload)));
+        registrar.playToClient(CinematicNarrationPayload.TYPE, CinematicNarrationPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> CinematicClientController.accept(payload)));
         registrar.playToClient(EndCinematicPayload.TYPE, EndCinematicPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> CinematicClientController.accept(payload)));

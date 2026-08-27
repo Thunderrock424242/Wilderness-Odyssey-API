@@ -56,6 +56,7 @@
   },
   "client": [
     "BoatRenderMixin",
+    "CameraCinematicMixin",
     "ClientLevelChunkWaterMeshMixin",
     "ClientLevelLocalizedRainMixin",
     "ClientLevelLocalizedWeatherMixin",

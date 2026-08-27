@@ -76,7 +76,9 @@ public final class WeatherHydrologyManager {
                     continue;
                 }
                 Optional<WaterBody> body = water.getWaterBody(level, surfaceWater);
-                if (body.isEmpty() || body.get().kind() == WaterBody.Kind.LARGE_OCEAN) {
+                if (body.isEmpty()
+                        || body.get().kind() == WaterBody.Kind.LARGE_OCEAN
+                        || body.get().kind() == WaterBody.Kind.LARGE_COAST) {
                     continue;
                 }
                 WeatherSample weather = WeatherServices.query().sample(

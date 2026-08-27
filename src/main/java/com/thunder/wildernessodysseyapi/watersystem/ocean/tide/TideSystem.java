@@ -68,15 +68,51 @@ public final class TideSystem {
     }
 
     /**
-     * Returns the simplified tidal current direction in X/Z.
+     * Returns no direction when the caller has no coastline orientation.
      *
-     * <p>The current reverses during ebb and flood. Shore systems can blend
-     * this with their local coastline normal later; this global vector is a
-     * cheap deterministic fallback.</p>
+     * @deprecated A level-wide vector cannot represent differently oriented
+     * coastlines. Use {@link #addTidalCurrent(float, float, float, float[])}.
      */
+    @Deprecated(forRemoval = false)
     public static float[] getTidalCurrentDirection(Level level) {
-        float sign = getTideRate(level) > 0.0f ? 1.0f : -1.0f;
-        return new float[]{0.0f, sign};
+        return new float[]{0.0f, 0.0f};
+    }
+
+    /**
+     * Adds flood/ebb velocity along a local water-to-land coastline normal.
+     *
+     * <p>Rising water moves toward land and falling water moves offshore. A
+     * calm tide or missing coastline normal produces no invented world-axis
+     * current.</p>
+     *
+     * @param tideRate signed tide velocity in blocks per second
+     * @param coastlineNormalX local water-to-land normal X component
+     * @param coastlineNormalZ local water-to-land normal Z component
+     * @param horizontalVelocity caller-owned X/Z velocity receiving the current
+     */
+    public static void addTidalCurrent(
+            float tideRate,
+            float coastlineNormalX,
+            float coastlineNormalZ,
+            float[] horizontalVelocity
+    ) {
+        if (horizontalVelocity == null || horizontalVelocity.length < 2) {
+            throw new IllegalArgumentException("A two-component horizontal velocity is required");
+        }
+        if (!Float.isFinite(tideRate)
+                || !Float.isFinite(coastlineNormalX)
+                || !Float.isFinite(coastlineNormalZ)
+                || Math.abs(tideRate) < 1.0e-7f) {
+            return;
+        }
+        float lengthSquared = coastlineNormalX * coastlineNormalX
+                + coastlineNormalZ * coastlineNormalZ;
+        if (lengthSquared < 1.0e-8f) {
+            return;
+        }
+        float currentScale = tideRate / (float) Math.sqrt(lengthSquared);
+        horizontalVelocity[0] += coastlineNormalX * currentScale;
+        horizontalVelocity[1] += coastlineNormalZ * currentScale;
     }
 
     /** Returns a complete tide sample for renderers, physics, HUDs, and tests. */
@@ -138,4 +174,5 @@ public final class TideSystem {
             float tideAngle
     ) {
     }
+
 }

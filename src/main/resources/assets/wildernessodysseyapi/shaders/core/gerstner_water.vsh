@@ -81,6 +81,8 @@ out vec2 localCurrent;
 out float shoreFactor;
 out float depthFactor;
 out float disturbanceStrength;
+out float waveSlope;
+out float crestCompression;
 out vec3 celestialDirection;
 out float celestialDaylight;
 out float regionalSeaState;
@@ -306,18 +308,39 @@ void main() {
     accumulateWave(localXZ, RiverWaveParam3, RiverWaveShape3, 0.0, bodyBlend.y, localCurrent,
         frameWind, frameSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(localXZ, PondWaveParam0, PondWaveShape0, 0.0, bodyBlend.z, vec2(0.0),
-        frameWind, frameSpectrum,
+    // The third generated-body channel represents lakes and other enclosed
+    // water. Depth is a constant-time fetch proxy: sheltered shallow water
+    // responds less to the synchronized regional wind than open deep water.
+    float enclosedWaterFetch = mix(0.16, 0.68, depthFactor);
+    vec4 enclosedWaterSpectrum = vec4(
+        mix(0.58, frameSpectrum.x, enclosedWaterFetch * 0.62),
+        mix(0.62, frameSpectrum.y, enclosedWaterFetch * 0.82),
+        frameSpectrum.z * enclosedWaterFetch,
+        frameSpectrum.w
+    );
+    accumulateWave(localXZ, PondWaveParam0, PondWaveShape0, 1.0, bodyBlend.z, vec2(0.0),
+        frameWind, enclosedWaterSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(localXZ, PondWaveParam1, PondWaveShape1, 0.0, bodyBlend.z, vec2(0.0),
-        frameWind, frameSpectrum,
+    accumulateWave(localXZ, PondWaveParam1, PondWaveShape1, 1.0, bodyBlend.z, vec2(0.0),
+        frameWind, enclosedWaterSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(localXZ, PondWaveParam2, PondWaveShape2, 0.0, bodyBlend.z, vec2(0.0),
-        frameWind, frameSpectrum,
+    accumulateWave(localXZ, PondWaveParam2, PondWaveShape2, 1.0, bodyBlend.z, vec2(0.0),
+        frameWind, enclosedWaterSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
-    accumulateWave(localXZ, PondWaveParam3, PondWaveShape3, 0.0, bodyBlend.z, vec2(0.0),
-        frameWind, frameSpectrum,
+    accumulateWave(localXZ, PondWaveParam3, PondWaveShape3, 1.0, bodyBlend.z, vec2(0.0),
+        frameWind, enclosedWaterSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
+    // Bound the combined horizontal derivative after body-profile blending.
+    // Authored profiles normally remain well below this limit; the clamp is a
+    // safety net for storm energy and future designer tuning.
+    float combinedHorizontalDerivative = length(vec4(
+        tangentXDelta.x, tangentXDelta.z,
+        tangentZDelta.x, tangentZDelta.z
+    ));
+    float foldSafetyScale = min(1.0, 0.82 / max(combinedHorizontalDerivative, 0.0001));
+    horizontalDisplacement *= foldSafetyScale;
+    tangentXDelta.xz *= foldSafetyScale;
+    tangentZDelta.xz *= foldSafetyScale;
     float impulseHeight = 0.0;
     vec2 impulseGradient = vec2(0.0);
     float impulseActivity = 0.0;
@@ -387,6 +410,9 @@ void main() {
     vec3 combinedNormal = length(analyticNormal) > 0.00001
         ? normalize(analyticNormal)
         : vec3(0.0, 1.0, 0.0);
+    float horizontalJacobian = tangentX.x * tangentZ.z - tangentX.z * tangentZ.x;
+    waveSlope = clamp(length(combinedNormal.xz) / max(abs(combinedNormal.y), 0.0001), 0.0, 4.0);
+    crestCompression = clamp((1.0 - horizontalJacobian) / 0.35, 0.0, 1.0);
 
     vec4 view = ModelViewMat * vec4(displacedPosition, 1.0);
     viewPosition = view.xyz;

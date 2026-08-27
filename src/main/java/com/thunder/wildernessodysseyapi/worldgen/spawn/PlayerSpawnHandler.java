@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.cinematic.CinematicManager;
 import com.thunder.wildernessodysseyapi.cinematic.CinematicPlaybackOptions;
 import com.thunder.wildernessodysseyapi.cinematic.CinematicPlayerData;
 import com.thunder.wildernessodysseyapi.cinematic.CinematicSequences;
+import com.thunder.wildernessodysseyapi.core.PrivateSingleplayerPolicy;
 import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -99,6 +100,11 @@ public class PlayerSpawnHandler {
     }
 
     private static boolean tryAssignSpawn(ServerPlayer player) {
+        // The cryo-origin experience is personal story content. Dedicated and
+        // LAN-published worlds keep their ordinary spawn behavior untouched.
+        if (!PrivateSingleplayerPolicy.permits(player.server)) {
+            return true;
+        }
         CompoundTag tag = player.getPersistentData();
 
         if (tag.getBoolean(CRYO_ASSIGNED_TAG)) {

@@ -122,7 +122,7 @@ public final class ShoreWaveSpawner {
     private static ShoreCandidate findShoreCandidate(ServerLevel level, int x, int z) {
         BlockPos surface = findTopWaterSurface(level, x, z);
         if (surface == null) return null;
-        if (WaterBodyClassifier.classify(level, surface) != WaterBodyClassifier.WaterType.OCEAN) return null;
+        if (!WaterBodyClassifier.isOceanic(WaterBodyClassifier.classify(level, surface))) return null;
 
         for (Direction direction : Direction.Plane.HORIZONTAL) {
             BlockPos shore = surface.relative(direction);

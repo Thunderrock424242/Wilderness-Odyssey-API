@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManag
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
+import com.thunder.wildernessodysseyapi.watersystem.water.environment.WaterEnvironmentState;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
@@ -32,6 +33,14 @@ final class HybridWaterBodyModel {
 
     private static final float TICKS_PER_SECOND = 20.0f;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
+    private static final int[][] CARDINAL_OFFSETS = {
+            {1, 0},
+            {-1, 0},
+            {0, 1},
+            {0, -1}
+    };
+    private static final ThreadLocal<MutableShorelineDirection> SHORELINE_DIRECTION_SCRATCH =
+            ThreadLocal.withInitial(MutableShorelineDirection::new);
     private HybridWaterBodyModel() {
     }
 
@@ -43,7 +52,12 @@ final class HybridWaterBodyModel {
         if (!authority.water() || !authority.authorityOwned()) {
             return LargeBodyCell.INVALID;
         }
-        SurfaceColumn column = findSurfaceColumn(level, pos.getX(), pos.getZ());
+        SurfaceColumn column = findSurfaceColumn(
+                level,
+                pos.getX(),
+                pos.getZ(),
+                SHORELINE_DIRECTION_SCRATCH.get()
+        );
         if (!column.valid()
                 || pos.getY() > column.surfaceBlockY()
                 || pos.getY() <= column.floorY()) {
@@ -72,13 +86,21 @@ final class HybridWaterBodyModel {
      */
     static SurfaceSample sampleSurface(Level level, double x, double z, float partialTick) {
         BlockPos columnPos = BlockPos.containing(x, level.getSeaLevel(), z);
-        SurfaceColumn column = findSurfaceColumn(level, columnPos.getX(), columnPos.getZ());
+        MutableShorelineDirection shoreline = SHORELINE_DIRECTION_SCRATCH.get();
+        SurfaceColumn column = findSurfaceColumn(
+                level,
+                columnPos.getX(),
+                columnPos.getZ(),
+                shoreline
+        );
         if (!column.valid()) {
             return SurfaceSample.INVALID;
         }
+        float shoreNormalX = shoreline.normalX;
+        float shoreNormalZ = shoreline.normalZ;
 
         WaterBodyClassifier.WaterType type = column.waterType();
-        float tideOffset = type == WaterBodyClassifier.WaterType.OCEAN
+        float requestedTideOffset = WaterBodyClassifier.isOceanic(type)
                 ? TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE
                 : 0.0f;
         BlockPos surfacePosition = BlockPos.containing(x, column.baseSurfaceHeight(), z);
@@ -87,6 +109,22 @@ final class HybridWaterBodyModel {
         WaterVolumeChunk.WaterCell localCell = CanonicalWater.get(level, surfacePosition);
         float canonicalCurrentX = localCell.velocityX() + localFlow.currentX();
         float canonicalCurrentZ = localCell.velocityZ() + localFlow.currentZ();
+        OceanSeaState.Sample seaState = type == WaterBodyClassifier.WaterType.RIVER
+                ? OceanSeaState.CALM
+                : OceanSeaState.sampleAt(level, x, z, partialTick);
+        WaterEnvironmentState environment = WaterEnvironmentState.derive(
+                type,
+                seaState,
+                level.getRainLevel(partialTick),
+                requestedTideOffset,
+                WaterBodyClassifier.isOceanic(type) ? TideSystem.getTideRate(level) : 0.0f,
+                canonicalCurrentX,
+                canonicalCurrentZ,
+                column.depth(),
+                column.estimatedVolumeUnits(),
+                column.shoreline()
+        );
+        float tideOffset = environment.tideHeight();
         WaveSurfaceSample wave = sampleWave(
                 level,
                 x,
@@ -94,7 +132,8 @@ final class HybridWaterBodyModel {
                 type,
                 partialTick,
                 canonicalCurrentX,
-                canonicalCurrentZ
+                canonicalCurrentZ,
+                environment.waveSpectrum()
         );
         float localDisturbance = sampleLocalDisturbance(
                 level,
@@ -108,7 +147,15 @@ final class HybridWaterBodyModel {
                 + tideOffset
                 + wave.height()
                 + localDisturbance;
-        float[] flow = sampleFlow(level, type, wave, canonicalCurrentX, canonicalCurrentZ);
+        float[] flow = sampleFlow(
+                level,
+                type,
+                wave,
+                canonicalCurrentX,
+                canonicalCurrentZ,
+                shoreNormalX,
+                shoreNormalZ
+        );
 
         return new SurfaceSample(
                 true,
@@ -119,11 +166,20 @@ final class HybridWaterBodyModel {
                 localDisturbance,
                 flow[0],
                 flow[1],
-                wave
+                wave,
+                environment
         );
     }
 
-    private static SurfaceColumn findSurfaceColumn(Level level, int x, int z) {
+    private static SurfaceColumn findSurfaceColumn(
+            Level level,
+            int x,
+            int z,
+            MutableShorelineDirection shorelineDirection
+    ) {
+        if (shorelineDirection != null) {
+            shorelineDirection.clear();
+        }
         BlockPos chunkProbe = new BlockPos(x, level.getSeaLevel(), z);
         if (level.isOutsideBuildHeight(chunkProbe) || !level.hasChunkAt(chunkProbe)) {
             return SurfaceColumn.INVALID;
@@ -150,10 +206,22 @@ final class HybridWaterBodyModel {
         float baseSurfaceFill = Math.max(0.05f, Math.min(1.0f, cell.surfaceFillHeight()));
         float baseSurfaceHeight = surfaceY + baseSurfaceFill;
         float depth = Math.max(0.0f, baseSurfaceHeight - (floorY + 1.0f));
-        long estimatedVolume = spans.stream()
-                .mapToLong(span -> (long) (span.topY() - span.bottomY() + 1) * span.amountUnits())
-                .sum();
+        long estimatedVolume = 0L;
+        for (GeneratedWaterChunk.WaterSpan span : spans) {
+            estimatedVolume += (long) (span.topY() - span.bottomY() + 1)
+                    * span.amountUnits();
+        }
         WaterBodyClassifier.WaterType type = classifyWaterType(topSpan.cell().bodyType());
+        boolean shoreline = sampleShorelineDirection(
+                level,
+                x,
+                surfaceY,
+                z,
+                shorelineDirection
+        );
+        if (shoreline && type == WaterBodyClassifier.WaterType.OCEAN) {
+            type = WaterBodyClassifier.WaterType.COAST;
+        }
         return new SurfaceColumn(
                 true,
                 x >> 4,
@@ -168,37 +236,56 @@ final class HybridWaterBodyModel {
                 floorY,
                 depth,
                 estimatedVolume,
-                isShorelineColumn(level, x, surfaceY, z),
+                shoreline,
                 type
         );
     }
 
-    private static boolean isShorelineColumn(Level level, int x, int y, int z) {
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        int[][] offsets = {
-                {1, 0},
-                {-1, 0},
-                {0, 1},
-                {0, -1}
-        };
-        for (int[] offset : offsets) {
+    private static boolean sampleShorelineDirection(
+            Level level,
+            int x,
+            int y,
+            int z,
+            MutableShorelineDirection result
+    ) {
+        BlockPos.MutableBlockPos cursor = result == null
+                ? new BlockPos.MutableBlockPos()
+                : result.cursor;
+        boolean shoreline = false;
+        float normalX = 0.0f;
+        float normalZ = 0.0f;
+        for (int[] offset : CARDINAL_OFFSETS) {
             cursor.set(x + offset[0], y, z + offset[1]);
             if (!level.hasChunkAt(cursor)) {
-                return true;
+                shoreline = true;
+                continue;
             }
             WildernessWaterAuthority.CellAuthority neighbour = WildernessWaterAuthority.sampleCellOnly(level, cursor);
             if (!neighbour.water() || !neighbour.authorityOwned()) {
-                return true;
+                shoreline = true;
+                normalX += offset[0];
+                normalZ += offset[1];
             }
         }
-        return false;
+        float lengthSquared = normalX * normalX + normalZ * normalZ;
+        if (lengthSquared > 1.0e-8f) {
+            float inverseLength = 1.0f / (float) Math.sqrt(lengthSquared);
+            normalX *= inverseLength;
+            normalZ *= inverseLength;
+        }
+        if (result != null) {
+            result.normalX = normalX;
+            result.normalZ = normalZ;
+        }
+        return shoreline;
     }
 
     private static WaterBodyClassifier.WaterType classifyWaterType(GeneratedWaterChunk.BodyType bodyType) {
         return switch (bodyType) {
             case OCEAN -> WaterBodyClassifier.WaterType.OCEAN;
             case RIVER -> WaterBodyClassifier.WaterType.RIVER;
-            case LAKE, AQUIFER, SPRING -> WaterBodyClassifier.WaterType.POND;
+            case LAKE -> WaterBodyClassifier.WaterType.LAKE;
+            case AQUIFER, SPRING -> WaterBodyClassifier.WaterType.POND;
         };
     }
 
@@ -209,12 +296,10 @@ final class HybridWaterBodyModel {
             WaterBodyClassifier.WaterType type,
             float partialTick,
             float canonicalCurrentX,
-            float canonicalCurrentZ
+            float canonicalCurrentZ,
+            WaveSpectrumState spectrum
     ) {
         GerstnerWaveProfile profile = profileFor(type);
-        WaveSpectrumState spectrum = type == WaterBodyClassifier.WaterType.OCEAN
-                ? OceanSeaState.sampleAt(level, worldX, worldZ, partialTick).spectrum()
-                : WaveSpectrumState.NEUTRAL;
         double timeSeconds = (level.getGameTime() + (double) partialTick) / TICKS_PER_SECOND;
         return profile.sampleAt(
                 worldX,
@@ -232,6 +317,8 @@ final class HybridWaterBodyModel {
             case OCEAN -> GerstnerWaveProfile.OCEAN;
             case RIVER -> GerstnerWaveProfile.RIVER;
             case POND -> GerstnerWaveProfile.POND;
+            case COAST -> GerstnerWaveProfile.COAST;
+            case LAKE -> GerstnerWaveProfile.LAKE;
         };
     }
 
@@ -260,19 +347,28 @@ final class HybridWaterBodyModel {
             WaterBodyClassifier.WaterType type,
             WaveSurfaceSample wave,
             float canonicalCurrentX,
-            float canonicalCurrentZ
+            float canonicalCurrentZ,
+            float shoreNormalX,
+            float shoreNormalZ
     ) {
-        float tideRate = 0.0f;
-        float tideDirectionX = 0.0f;
-        float tideDirectionZ = 0.0f;
-        if (type == WaterBodyClassifier.WaterType.OCEAN) {
-            tideRate = TideSystem.getTideRate(level);
-            float[] tideDirection = TideSystem.getTidalCurrentDirection(level);
-            tideDirectionX = tideDirection[0];
-            tideDirectionZ = tideDirection[1];
+        float[] flow = combineFlow(
+                type,
+                wave,
+                canonicalCurrentX,
+                canonicalCurrentZ,
+                0.0f,
+                0.0f,
+                0.0f
+        );
+        if (WaterBodyClassifier.isOceanic(type)) {
+            TideSystem.addTidalCurrent(
+                    TideSystem.getTideRate(level),
+                    shoreNormalX,
+                    shoreNormalZ,
+                    flow
+            );
         }
-        return combineFlow(type, wave, canonicalCurrentX, canonicalCurrentZ,
-                tideRate, tideDirectionX, tideDirectionZ);
+        return flow;
     }
 
     static float[] combineFlow(
@@ -287,7 +383,7 @@ final class HybridWaterBodyModel {
         WaveSurfaceSample safeWave = wave == null ? WaveSurfaceSample.flat() : wave;
         float flowX = finiteOrZero(canonicalCurrentX) + safeWave.velocityX();
         float flowZ = finiteOrZero(canonicalCurrentZ) + safeWave.velocityZ();
-        if (type == WaterBodyClassifier.WaterType.OCEAN) {
+        if (WaterBodyClassifier.isOceanic(type)) {
             flowX += finiteOrZero(tideDirectionX) * finiteOrZero(tideRate);
             flowZ += finiteOrZero(tideDirectionZ) * finiteOrZero(tideRate);
         }
@@ -325,7 +421,8 @@ final class HybridWaterBodyModel {
             float localDisturbance,
             float flowX,
             float flowZ,
-            WaveSurfaceSample wave
+            WaveSurfaceSample wave,
+            WaterEnvironmentState environment
     ) {
         static final SurfaceSample INVALID = new SurfaceSample(
                 false,
@@ -336,7 +433,8 @@ final class HybridWaterBodyModel {
                 0.0f,
                 0.0f,
                 0.0f,
-                WaveSurfaceSample.flat()
+                WaveSurfaceSample.flat(),
+                WaterEnvironmentState.CALM_POND
         );
     }
 
@@ -375,5 +473,16 @@ final class HybridWaterBodyModel {
                 false,
                 WaterBodyClassifier.WaterType.POND
         );
+    }
+
+    private static final class MutableShorelineDirection {
+        private final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        private float normalX;
+        private float normalZ;
+
+        private void clear() {
+            normalX = 0.0f;
+            normalZ = 0.0f;
+        }
     }
 }

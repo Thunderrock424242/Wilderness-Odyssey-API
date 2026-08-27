@@ -96,8 +96,6 @@ corrupted_data:
 corrupted_prefix: "[Signal noise]"
 settings:
   atlas_enabled: true
-  voice_enabled: false
-  speech_recognition: false
   wake_word: "aether"
   provider: "ollama"
   endpoint: "http://127.0.0.1:11434"

@@ -385,12 +385,7 @@ public class SPHSimulator {
             }
             pi.density  = Math.max(density, 1f); // prevent division by zero
 
-            // Tait equation of state for pressure
-            float ratio = pi.density / SPHConstants.REST_DENSITY;
-            float pressure = SPHConstants.PRESSURE_STIFFNESS * (pressureGamma7(ratio) - 1f);
-            pi.pressure = Float.isFinite(pressure)
-                    ? Math.max(0f, Math.min(SPHConstants.MAX_PRESSURE, pressure))
-                    : SPHConstants.MAX_PRESSURE;
+            pi.pressure = SPHEquationOfState.pressureForDensity(pi.density);
         }
 
         // 3. Force pass: compute pressure gradients and viscosity
@@ -648,21 +643,29 @@ public class SPHSimulator {
         return true;
     }
 
-    private static float pressureGamma7(float ratio) {
-        float ratio2 = ratio * ratio;
-        float ratio4 = ratio2 * ratio2;
-        return ratio4 * ratio2 * ratio;
-    }
-
     private void applyGroundSpread(SPHParticle p, float centerX, float centerZ, float dt) {
         if (!p.onGround) return;
 
-        float dx = p.position.x - centerX;
-        float dz = p.position.z - centerZ;
-        float len = (float)Math.sqrt(dx * dx + dz * dz);
+        float horizontalSpeed = (float) Math.sqrt(
+                p.velocity.x * p.velocity.x + p.velocity.z * p.velocity.z
+        );
+        float assistFactor = SPHEquationOfState.groundAssistFactor(p.density, horizontalSpeed);
+        if (assistFactor <= 0.0f) return;
+
+        // Follow the real pressure acceleration when it supplies a stable
+        // horizontal direction. The body-center radial vector remains only a
+        // low-speed fallback for a perfectly symmetric floor impact.
+        float dx = p.acceleration.x;
+        float dz = p.acceleration.z;
+        float len = (float) Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.05f) {
+            dx = p.position.x - centerX;
+            dz = p.position.z - centerZ;
+            len = (float) Math.sqrt(dx * dx + dz * dz);
+        }
         if (len < 0.0001f) return;
 
-        float strength = SPHConstants.GROUND_SPREAD_FORCE * dt;
+        float strength = SPHConstants.GROUND_SPREAD_FORCE * assistFactor * dt;
         p.velocity.x += (dx / len) * strength;
         p.velocity.z += (dz / len) * strength;
     }

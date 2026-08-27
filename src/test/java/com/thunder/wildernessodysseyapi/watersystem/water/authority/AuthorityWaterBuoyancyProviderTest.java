@@ -53,6 +53,22 @@ class AuthorityWaterBuoyancyProviderTest {
         assertTrue(accumulator.finish().submerged());
     }
 
+    @Test
+    void orientedHullAxesFollowCardinalAndDiagonalYaw() {
+        assertEquals(0.0, AuthorityWaterBuoyancyProvider.forwardX(0.0f), 1.0e-9);
+        assertEquals(1.0, AuthorityWaterBuoyancyProvider.forwardZ(0.0f), 1.0e-9);
+        assertEquals(-1.0, AuthorityWaterBuoyancyProvider.forwardX(90.0f), 1.0e-9);
+        assertEquals(0.0, AuthorityWaterBuoyancyProvider.forwardZ(90.0f), 1.0e-9);
+        assertEquals(-Math.sqrt(0.5), AuthorityWaterBuoyancyProvider.forwardX(45.0f), 1.0e-9);
+        assertEquals(Math.sqrt(0.5), AuthorityWaterBuoyancyProvider.forwardZ(45.0f), 1.0e-9);
+        assertEquals(0.0,
+                AuthorityWaterBuoyancyProvider.forwardX(45.0f)
+                        * AuthorityWaterBuoyancyProvider.rightX(45.0f)
+                        + AuthorityWaterBuoyancyProvider.forwardZ(45.0f)
+                        * AuthorityWaterBuoyancyProvider.rightZ(45.0f),
+                1.0e-9);
+    }
+
     private static WaterSample sample(
             boolean water,
             double surfaceHeight,

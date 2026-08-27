@@ -337,11 +337,11 @@ public final class ShorelineSurfaceRenderer {
         }
 
         GerstnerWaveProfile waveProfile = profileFor(patch.waterType);
-        WaveSpectrumState spectrum = patch.waterType == WaterBodyClassifier.WaterType.OCEAN
+        WaveSpectrumState spectrum = WaterBodyClassifier.isOceanic(patch.waterType)
                 ? seaState.spectrum()
                 : WaveSpectrumState.NEUTRAL;
         int waveLimit = WaterRenderingConfig.waveTrainLimit(patch.waterType);
-        float localTideOffset = patch.waterType == WaterBodyClassifier.WaterType.OCEAN ? tideOffset : 0.0f;
+        float localTideOffset = WaterBodyClassifier.isOceanic(patch.waterType) ? tideOffset : 0.0f;
         float flowSpeed = (float) Math.sqrt(patch.velocityX * patch.velocityX + patch.velocityZ * patch.velocityZ);
         float fillWave = smoothStep(0.12f, 1.0f, patch.fillFraction);
         float flowChop = smoothStep(0.05f, 0.65f, flowSpeed) * 0.16f;
@@ -500,6 +500,8 @@ public final class ShorelineSurfaceRenderer {
             case OCEAN -> GerstnerWaveProfile.OCEAN;
             case RIVER -> GerstnerWaveProfile.RIVER;
             case POND -> GerstnerWaveProfile.POND;
+            case COAST -> GerstnerWaveProfile.COAST;
+            case LAKE -> GerstnerWaveProfile.LAKE;
         };
     }
 

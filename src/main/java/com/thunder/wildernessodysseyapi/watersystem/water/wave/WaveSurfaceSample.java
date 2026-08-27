@@ -17,6 +17,8 @@ package com.thunder.wildernessodysseyapi.watersystem.water.wave;
  * @param velocityX horizontal orbital velocity along X, in blocks per second
  * @param velocityY vertical orbital velocity, in blocks per second
  * @param velocityZ horizontal orbital velocity along Z, in blocks per second
+ * @param slope tangent of the local surface angle, derived from the unit normal
+ * @param crestStrength normalized horizontal compression used for foam and crest shading
  */
 public record WaveSurfaceSample(
         float displacementX,
@@ -27,13 +29,46 @@ public record WaveSurfaceSample(
         float normalZ,
         float velocityX,
         float velocityY,
-        float velocityZ
+        float velocityZ,
+        float slope,
+        float crestStrength
 ) {
     private static final WaveSurfaceSample FLAT = new WaveSurfaceSample(
             0.0f, 0.0f, 0.0f,
             0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 0.0f
+            0.0f, 0.0f, 0.0f,
+            0.0f, 0.0f
     );
+
+    /**
+     * Compatibility constructor for consumers that do not yet provide crest
+     * compression. Slope is still derived from the supplied surface normal.
+     */
+    public WaveSurfaceSample(
+            float displacementX,
+            float height,
+            float displacementZ,
+            float normalX,
+            float normalY,
+            float normalZ,
+            float velocityX,
+            float velocityY,
+            float velocityZ
+    ) {
+        this(
+                displacementX,
+                height,
+                displacementZ,
+                normalX,
+                normalY,
+                normalZ,
+                velocityX,
+                velocityY,
+                velocityZ,
+                slopeFromNormal(normalX, normalY, normalZ),
+                0.0f
+        );
+    }
 
     /**
      * Returns an undisturbed, stationary water surface.
@@ -74,7 +109,9 @@ public record WaveSurfaceSample(
                 blendedNormalZ * inverseLength,
                 velocityX * clamped,
                 velocityY * clamped,
-                velocityZ * clamped
+                velocityZ * clamped,
+                slope * clamped,
+                crestStrength * clamped
         );
     }
 
@@ -96,8 +133,15 @@ public record WaveSurfaceSample(
                 normalZ,
                 velocityX,
                 velocityY,
-                velocityZ
+                velocityZ,
+                slope,
+                crestStrength
         );
+    }
+
+    private static float slopeFromNormal(float x, float y, float z) {
+        float horizontal = (float) Math.sqrt(x * x + z * z);
+        return Math.min(4.0f, horizontal / Math.max(1.0e-4f, Math.abs(y)));
     }
 
     private static float inverseLength(float x, float y, float z) {

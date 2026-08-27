@@ -513,6 +513,8 @@ public final class WaterRenderingConfig {
             case OCEAN -> 4;
             case RIVER -> 3;
             case POND -> 2;
+            case COAST -> 4;
+            case LAKE -> 3;
         };
         return Math.max(1, Math.min(requested, profileMaximum));
     }

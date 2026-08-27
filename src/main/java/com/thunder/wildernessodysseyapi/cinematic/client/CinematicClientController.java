@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.cinematic.client;
 
 import com.thunder.wildernessodysseyapi.cinematic.network.CinematicStagePayload;
+import com.thunder.wildernessodysseyapi.cinematic.network.CinematicNarrationPayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.EndCinematicPayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.StartCinematicPayload;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
@@ -9,9 +10,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.player.Input;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -43,6 +46,7 @@ public final class CinematicClientController {
     private int stageDurationTicks;
     private boolean controlsLocked;
     private boolean hideHud;
+    private BlockPos anchor;
     private float baseYaw;
     private float basePitch;
 
@@ -55,6 +59,9 @@ public final class CinematicClientController {
     private Component postMessage;
     private int postMessageTicks;
     private int postMessageTotalTicks;
+    private Component subtitle;
+    private int subtitleTicks;
+    private int subtitleTotalTicks;
 
     private CinematicClientController() {
     }
@@ -71,6 +78,11 @@ public final class CinematicClientController {
     /** Accepts one sparse server-authored stage boundary. */
     public static void accept(CinematicStagePayload payload) {
         INSTANCE.changeStage(payload);
+    }
+
+    /** Accepts one validated, authored narration cue for the active presentation. */
+    public static void accept(CinematicNarrationPayload payload) {
+        INSTANCE.narrate(payload);
     }
 
     /** Ends presentation and restores all client-owned temporary state. */
@@ -104,6 +116,29 @@ public final class CinematicClientController {
 
     public float basePitch() {
         return basePitch;
+    }
+
+    public BlockPos anchor() {
+        return anchor;
+    }
+
+    /** Returns an optional world-space camera position supplied by the presentation. */
+    public java.util.Optional<Vec3> cameraPosition(float partialTick) {
+        return presentation == null ? java.util.Optional.empty() : presentation.cameraPosition(this, partialTick);
+    }
+
+    public Component subtitle() {
+        return subtitle;
+    }
+
+    public float subtitleAlpha(float partialTick) {
+        if (subtitle == null || subtitleTotalTicks <= 0) {
+            return 0.0F;
+        }
+        float remaining = Math.max(0.0F, subtitleTicks - partialTick);
+        float fadeIn = Math.min(1.0F, (subtitleTotalTicks - remaining) / 5.0F);
+        float fadeOut = Math.min(1.0F, remaining / 10.0F);
+        return Math.min(fadeIn, fadeOut);
     }
 
     /** Returns smooth stage progress derived from synchronized level time, without tick packets. */
@@ -153,6 +188,7 @@ public final class CinematicClientController {
         stageDurationTicks = payload.stageDurationTicks();
         controlsLocked = payload.controlsLocked();
         hideHud = payload.hideHud();
+        anchor = payload.anchor();
         baseYaw = payload.baseYaw();
         basePitch = payload.basePitch();
 
@@ -162,6 +198,7 @@ public final class CinematicClientController {
         previousHideGui = minecraft.options.hideGui;
         clientSettingsCaptured = true;
         enforceClientState(minecraft, player);
+        invokePresentation(() -> presentation.onStarted(this), "start");
     }
 
     private void changeStage(CinematicStagePayload payload) {
@@ -184,6 +221,22 @@ public final class CinematicClientController {
         if (minecraft.player != null) {
             enforceClientState(minecraft, minecraft.player);
         }
+        invokePresentation(() -> presentation.onStageChanged(this), "stage change");
+    }
+
+    private void narrate(CinematicNarrationPayload payload) {
+        if (!isActive() || !payload.sequenceId().equals(sequenceId) || presentation == null) {
+            return;
+        }
+        Component text = presentation.narration(payload.cueId()).orElse(null);
+        if (text == null) {
+            ModConstants.LOGGER.warn("Ignoring unknown narration cue {} for {}", payload.cueId(), sequenceId);
+            return;
+        }
+        subtitle = text;
+        subtitleTicks = payload.durationTicks();
+        subtitleTotalTicks = payload.durationTicks();
+        invokePresentation(() -> presentation.onNarration(this, payload.cueId(), text), "narration");
     }
 
     private void end(EndCinematicPayload payload) {
@@ -208,7 +261,8 @@ public final class CinematicClientController {
             return;
         }
         minecraft.options.hideGui = hideHud || previousHideGui;
-        if (minecraft.options.getCameraType() != CameraType.FIRST_PERSON) {
+        if (presentation != null && presentation.forcesFirstPerson(this)
+                && minecraft.options.getCameraType() != CameraType.FIRST_PERSON) {
             minecraft.options.setCameraType(CameraType.FIRST_PERSON);
         }
         if (controlsLocked) {
@@ -223,6 +277,10 @@ public final class CinematicClientController {
     /** Single restoration path used by normal completion and every abnormal client lifecycle exit. */
     private void reset(boolean clearPostMessage) {
         Minecraft minecraft = Minecraft.getInstance();
+        ClientCinematicPresentation oldPresentation = presentation;
+        if (oldPresentation != null) {
+            invokePresentation(() -> oldPresentation.onStopped(this), "cleanup");
+        }
         if (clientSettingsCaptured) {
             LocalPlayer player = minecraft.player;
             if (player != null && player.getUUID().equals(playerId)
@@ -242,6 +300,7 @@ public final class CinematicClientController {
         stageDurationTicks = 0;
         controlsLocked = false;
         hideHud = false;
+        anchor = null;
         baseYaw = 0.0F;
         basePitch = 0.0F;
         playerId = null;
@@ -249,6 +308,9 @@ public final class CinematicClientController {
         previousCameraType = null;
         previousHideGui = false;
         clientSettingsCaptured = false;
+        subtitle = null;
+        subtitleTicks = 0;
+        subtitleTotalTicks = 0;
         clearInput(LOCKED_INPUT);
         if (clearPostMessage) {
             postMessage = null;
@@ -272,6 +334,13 @@ public final class CinematicClientController {
             if (INSTANCE.postMessageTicks == 0) {
                 INSTANCE.postMessage = null;
                 INSTANCE.postMessageTotalTicks = 0;
+            }
+        }
+        if (INSTANCE.subtitleTicks > 0) {
+            INSTANCE.subtitleTicks--;
+            if (INSTANCE.subtitleTicks == 0) {
+                INSTANCE.subtitle = null;
+                INSTANCE.subtitleTotalTicks = 0;
             }
         }
     }
@@ -322,5 +391,13 @@ public final class CinematicClientController {
         input.right = false;
         input.jumping = false;
         input.shiftKeyDown = false;
+    }
+
+    private void invokePresentation(Runnable callback, String action) {
+        try {
+            callback.run();
+        } catch (RuntimeException exception) {
+            ModConstants.LOGGER.error("Client cinematic {} failed during {}", sequenceId, action, exception);
+        }
     }
 }

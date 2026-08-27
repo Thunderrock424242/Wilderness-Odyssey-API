@@ -18,6 +18,10 @@ build
 .gradle
 /.codex-build/
 /.codex-build-*/
+tools/aether_voice_service/.venv/
+tools/aether_voice_service/.models/
+tools/aether_voice_service/**/*.egg-info/
+tools/aether_voice_service/**/__pycache__/
 /src/generated/resources/.cache/
 
 # other

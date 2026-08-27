@@ -104,8 +104,6 @@ public final class AIConfigLoader {
 
         Map<String, Object> settings = readStringObjectMap(root.get("settings"));
         config.getSettings().setAtlasEnabled(readBoolean(settings.get("atlas_enabled")));
-        config.getSettings().setVoiceEnabled(readBoolean(settings.get("voice_enabled")));
-        config.getSettings().setSpeechRecognition(readBoolean(settings.get("speech_recognition")));
         config.getSettings().setWakeWord(readStringValue(settings.get("wake_word")));
         config.getSettings().setProvider(readStringValue(settings.get("provider")));
         config.getSettings().setEndpoint(readStringValue(settings.get("endpoint")));

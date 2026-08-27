@@ -75,13 +75,13 @@
     ,{ "name": "RiverWaveShape1", "type": "float", "count": 4, "values": [0.018, 1.57, 0.20, 0.5] }
     ,{ "name": "RiverWaveShape2", "type": "float", "count": 4, "values": [0.009, 2.64, 0.12, 1] }
     ,{ "name": "RiverWaveShape3", "type": "float", "count": 4, "values": [0, 0, 0, 0] }
-    ,{ "name": "PondWaveParam0", "type": "float", "count": 4, "values": [0.71, 0.71, 1.6535, 3.88] }
-    ,{ "name": "PondWaveParam1", "type": "float", "count": 4, "values": [-0.71, 0.71, 3.3069, 5.69] }
-    ,{ "name": "PondWaveParam2", "type": "float", "count": 4, "values": [0.71, 0.71, 1.6535, 3.88] }
-    ,{ "name": "PondWaveParam3", "type": "float", "count": 4, "values": [0.71, 0.71, 1.6535, 3.88] }
-    ,{ "name": "PondWaveShape0", "type": "float", "count": 4, "values": [0.014, 0, 0.12, 0] }
-    ,{ "name": "PondWaveShape1", "type": "float", "count": 4, "values": [0.007, 1.91, 0.08, 1] }
-    ,{ "name": "PondWaveShape2", "type": "float", "count": 4, "values": [0, 0, 0, 0] }
+    ,{ "name": "PondWaveParam0", "type": "float", "count": 4, "values": [0.821, 0.571, 0.6283, 2.48] }
+    ,{ "name": "PondWaveParam1", "type": "float", "count": 4, "values": [0.622, -0.783, 1.3659, 3.66] }
+    ,{ "name": "PondWaveParam2", "type": "float", "count": 4, "values": [-0.479, -0.878, 2.9920, 5.42] }
+    ,{ "name": "PondWaveParam3", "type": "float", "count": 4, "values": [0.821, 0.571, 0.6283, 2.48] }
+    ,{ "name": "PondWaveShape0", "type": "float", "count": 4, "values": [0.070, 0, 0.38, 0] }
+    ,{ "name": "PondWaveShape1", "type": "float", "count": 4, "values": [0.031, 1.46, 0.28, 0.5] }
+    ,{ "name": "PondWaveShape2", "type": "float", "count": 4, "values": [0.012, 2.57, 0.17, 1] }
     ,{ "name": "PondWaveShape3", "type": "float", "count": 4, "values": [0, 0, 0, 0] }
   ]
 }

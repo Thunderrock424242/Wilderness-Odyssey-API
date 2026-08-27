@@ -50,7 +50,41 @@ class GerstnerWaveProfileTest {
                         + sample.normalZ() * sample.normalZ()
         );
 
-        assertEquals(1.0f, length, 1.0e-5f);
+        assertAll(
+                () -> assertEquals(1.0f, length, 1.0e-5f),
+                () -> assertTrue(sample.slope() >= 0.0f && sample.slope() <= 4.0f),
+                () -> assertTrue(sample.crestStrength() >= 0.0f && sample.crestStrength() <= 1.0f)
+        );
+    }
+
+    @Test
+    void energeticSpectrumCannotFoldCombinedSurface() {
+        WaveSpectrumState extreme = new WaveSpectrumState(3.0f, 4.0f, 1.0f, 0.0f, 1.0f);
+        GerstnerWaveProfile deliberatelyOverdriven = new GerstnerWaveProfile.Builder(3, 2.0f)
+                .wave(0, 0.80f, 1.1f, 1.0f, 0.0f, 1.0f, 0.0f)
+                .wave(1, 0.70f, 1.3f, 0.7f, 0.7f, 1.0f, 1.1f)
+                .wave(2, 0.65f, 1.5f, -0.4f, 0.9f, 1.0f, 2.2f)
+                .build();
+        WaveSurfaceSample bounded = deliberatelyOverdriven.sampleAt(
+                4.25f, -2.5f, 3.4f, 3, extreme);
+
+        assertAll(
+                () -> assertTrue(GerstnerWaveProfile.OCEAN.combinedSteepness(extreme)
+                        <= GerstnerWaveProfile.MAX_COMBINED_STEEPNESS),
+                () -> assertTrue(GerstnerWaveProfile.COAST.combinedSteepness(extreme)
+                        <= GerstnerWaveProfile.MAX_COMBINED_STEEPNESS),
+                () -> assertTrue(GerstnerWaveProfile.LAKE.combinedSteepness(extreme)
+                        <= GerstnerWaveProfile.MAX_COMBINED_STEEPNESS),
+                () -> assertEquals(
+                        GerstnerWaveProfile.MAX_COMBINED_STEEPNESS,
+                        deliberatelyOverdriven.combinedSteepness(extreme),
+                        1.0e-6f
+                ),
+                () -> assertTrue(Float.isFinite(bounded.normalX())),
+                () -> assertTrue(Float.isFinite(bounded.normalY())),
+                () -> assertTrue(Float.isFinite(bounded.normalZ())),
+                () -> assertTrue(bounded.normalY() > 0.0f)
+        );
     }
 
     @Test

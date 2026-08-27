@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWater
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
@@ -15,7 +16,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LiquidBlock;
@@ -41,9 +41,7 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.Arrays;
 
 /**
  * Advances disturbed cells in the canonical finite-volume water state.
@@ -55,6 +53,7 @@ import java.util.List;
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class WildernessFluidRegistry {
+    static final boolean ALLOW_SOURCE_CONVERSION = false;
 
     public static final DeferredRegister<FluidType> FLUID_TYPES =
             DeferredRegister.create(NeoForgeRegistries.Keys.FLUID_TYPES, ModConstants.MOD_ID);
@@ -69,7 +68,7 @@ public final class WildernessFluidRegistry {
      * Fluid type used by the namespaced Wilderness water registry entries.
      *
      * <p>The type behaves like vanilla water for swimming, boating, hydration,
-     * source conversion, and bucket sounds. Compatibility with tag-aware
+     * finite storage behavior, and bucket sounds. Compatibility with tag-aware
      * systems is supplied by data tags, not by registering anything inside the
      * {@code minecraft} namespace.</p>
      */
@@ -79,7 +78,7 @@ public final class WildernessFluidRegistry {
                     .descriptionId("block.wildernessodysseyapi.wilderness_water")
                     .fallDistanceModifier(0.0F)
                     .canExtinguish(true)
-                    .canConvertToSource(true)
+                    .canConvertToSource(ALLOW_SOURCE_CONVERSION)
                     .supportsBoating(true)
                     .canHydrate(true)
                     .sound(SoundActions.BUCKET_FILL, SoundEvents.BUCKET_FILL)
@@ -93,10 +92,7 @@ public final class WildernessFluidRegistry {
                     )) {
                 @Override
                 public boolean canConvertToSource(FluidState state, LevelReader reader, BlockPos pos) {
-                    if (reader instanceof ServerLevel level) {
-                        return level.getGameRules().getBoolean(GameRules.RULE_WATER_SOURCE_CONVERSION);
-                    }
-                    return super.canConvertToSource(state, reader, pos);
+                    return ALLOW_SOURCE_CONVERSION;
                 }
             }
     );
@@ -127,10 +123,12 @@ public final class WildernessFluidRegistry {
                     new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1))
     );
 
-    private static final int MIN_FLOW_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK / 64;
-    private static final int MIN_LATERAL_DIFFERENCE_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK / 16;
-    private static final int MAX_VERTICAL_TRANSFER_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK * 3 / 4;
-    private static final int MAX_LATERAL_TRANSFER_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK / 4;
+    private static final Direction[] HORIZONTAL_DIRECTIONS = {
+            Direction.NORTH,
+            Direction.SOUTH,
+            Direction.WEST,
+            Direction.EAST
+    };
     private static final int MOBILE_POUR_MIN_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK / 4;
     private static final int MOBILE_POUR_MAX_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK / 2;
     private static final float FALL_SPEED = -4.8f;
@@ -198,8 +196,11 @@ public final class WildernessFluidRegistry {
      */
     @SubscribeEvent
     public static void onBlockBroken(BlockEvent.BreakEvent event) {
-        if (event.getLevel() instanceof ServerLevel level && WildernessWaterRules.isEnabled(level)) {
-            wakeTrackedWaterAround(level, event.getPos());
+        if (event.getLevel() instanceof ServerLevel level) {
+            WaterBodyClassifier.invalidate(level, event.getPos());
+            if (WildernessWaterRules.isEnabled(level)) {
+                wakeTrackedWaterAround(level, event.getPos());
+            }
         }
     }
 
@@ -211,20 +212,24 @@ public final class WildernessFluidRegistry {
      */
     @SubscribeEvent
     public static void onBlockPlaced(BlockEvent.EntityPlaceEvent event) {
-        if (event.getLevel() instanceof ServerLevel level && WildernessWaterRules.isEnabled(level)) {
-            displaceWaterForPlacedBlocks(level, event);
-            wakeTrackedWaterAround(level, event.getPos());
+        if (event.getLevel() instanceof ServerLevel level) {
+            WaterBodyClassifier.invalidate(level, event.getPos());
+            if (WildernessWaterRules.isEnabled(level)) {
+                displaceWaterForPlacedBlocks(level, event);
+                wakeTrackedWaterAround(level, event.getPos());
+            }
         }
     }
 
-    private static void tickCell(ServerLevel level, BlockPos pos) {
+    static void tickCell(ServerLevel level, BlockPos pos) {
         WaterVolumeChunk.WaterCell current = CanonicalWater.getOrImport(level, pos);
         if (current.volumeUnits() <= 0 || current.imported() || current.sleeping()) {
             return;
         }
 
         int remaining = current.volumeUnits();
-        boolean moved = false;
+        int transferredUnits = 0;
+        boolean downwardTransferPending = false;
 
         // Gravity gets first claim on unsettled volume. A falling sheet can
         // either fill canonical capacity below or hand high-energy water to SPH
@@ -232,13 +237,13 @@ public final class WildernessFluidRegistry {
         BlockPos below = pos.below();
         if (canOccupy(level, below)) {
             WaterVolumeChunk.WaterCell target = CanonicalWater.getOrImport(level, below);
-            int capacity = WaterVolumeChunk.UNITS_PER_BLOCK - target.volumeUnits();
-            int transfer = Math.min(remaining, Math.min(Math.max(0, capacity), MAX_VERTICAL_TRANSFER_UNITS));
+            int transfer = FiniteWaterFlowPlanner.verticalTransfer(remaining, target.volumeUnits());
             if (transfer > 0) {
                 int mobileTransfer = maybeCreateMobilePour(level, pos, current, target, transfer);
                 if (mobileTransfer > 0) {
                     remaining -= mobileTransfer;
-                    moved = true;
+                    transferredUnits += mobileTransfer;
+                    downwardTransferPending = mobileTransfer < transfer;
                 } else {
                     int accepted = addTargetVolume(
                             level,
@@ -248,19 +253,24 @@ public final class WildernessFluidRegistry {
                             Math.min(FALL_SPEED, current.velocityY() - 1.2f),
                             current.velocityZ() * 0.45f
                     );
+                    assert accepted >= 0 && accepted <= transfer
+                            : "Canonical destination accepted an invalid gravity transfer amount";
                     remaining -= accepted;
-                    moved |= accepted > 0;
+                    transferredUnits += accepted;
+                    downwardTransferPending = accepted < transfer;
                 }
             }
         }
 
-        if (remaining > MIN_FLOW_UNITS) {
+        if (!downwardTransferPending && remaining > FiniteWaterFlowPlanner.MIN_FLOW_UNITS) {
             int lateralMoved = flowSideways(level, pos, current, remaining);
             remaining -= lateralMoved;
-            moved |= lateralMoved > 0;
+            transferredUnits += lateralMoved;
         }
 
-        if (moved) {
+        assert current.volumeUnits() == remaining + transferredUnits
+                : "Finite-water transfer violated source conservation at " + pos;
+        if (transferredUnits > 0) {
             commitSource(level, pos, current, remaining);
         } else if (!shouldSleep(current)) {
             // A disturbed cell that cannot currently move should calm down
@@ -291,55 +301,49 @@ public final class WildernessFluidRegistry {
             WaterVolumeChunk.WaterCell source,
             int sourceVolume
     ) {
-        List<LateralCandidate> candidates = new ArrayList<>(4);
-        for (Direction direction : Direction.Plane.HORIZONTAL) {
+        BlockPos[] positions = new BlockPos[HORIZONTAL_DIRECTIONS.length];
+        int[] targetVolumes = new int[HORIZONTAL_DIRECTIONS.length];
+        Arrays.fill(targetVolumes, FiniteWaterFlowPlanner.BLOCKED_TARGET);
+        for (int index = 0; index < HORIZONTAL_DIRECTIONS.length; index++) {
+            Direction direction = HORIZONTAL_DIRECTIONS[index];
             BlockPos neighbourPos = sourcePos.relative(direction);
             if (!canOccupy(level, neighbourPos)) {
                 continue;
             }
             WaterVolumeChunk.WaterCell neighbour = CanonicalWater.getOrImport(level, neighbourPos);
-            int capacity = WaterVolumeChunk.UNITS_PER_BLOCK - neighbour.volumeUnits();
-            int difference = sourceVolume - neighbour.volumeUnits();
-            if (capacity > 0 && difference > MIN_LATERAL_DIFFERENCE_UNITS) {
-                candidates.add(new LateralCandidate(direction, neighbourPos, capacity, difference));
-            }
+            positions[index] = neighbourPos;
+            targetVolumes[index] = neighbour.volumeUnits();
         }
 
-        if (candidates.isEmpty()) {
-            return 0;
-        }
-        candidates.sort(Comparator.comparingInt(LateralCandidate::difference).reversed());
-
-        int remaining = sourceVolume;
+        FiniteWaterFlowPlanner.LateralPlan plan =
+                FiniteWaterFlowPlanner.planLateral(sourceVolume, targetVolumes);
         int moved = 0;
-        for (LateralCandidate candidate : candidates) {
-            if (remaining <= MIN_FLOW_UNITS) {
-                break;
-            }
-            float gradient = Math.min(1.0f,
-                    candidate.difference() / (float) WaterVolumeChunk.UNITS_PER_BLOCK);
-            int requested = Math.min(
-                    Math.min(candidate.capacity(), remaining),
-                    Math.max(MIN_FLOW_UNITS, Math.min(MAX_LATERAL_TRANSFER_UNITS,
-                            candidate.difference() / (candidates.size() + 1)))
-            );
-            if (requested <= 0) {
+        int[] transfers = plan.transfers();
+        for (int index = 0; index < transfers.length; index++) {
+            int requested = transfers[index];
+            BlockPos targetPos = positions[index];
+            if (requested <= 0 || targetPos == null) {
                 continue;
             }
+            Direction direction = HORIZONTAL_DIRECTIONS[index];
+            int difference = sourceVolume - targetVolumes[index];
+            float gradient = Math.min(1.0f,
+                    difference / (float) WaterVolumeChunk.UNITS_PER_BLOCK);
 
             float velocityX = source.velocityX() * 0.35f
-                    + candidate.direction().getStepX() * SIDE_FLOW_SPEED * gradient;
+                    + direction.getStepX() * SIDE_FLOW_SPEED * gradient;
             float velocityZ = source.velocityZ() * 0.35f
-                    + candidate.direction().getStepZ() * SIDE_FLOW_SPEED * gradient;
+                    + direction.getStepZ() * SIDE_FLOW_SPEED * gradient;
             int accepted = addTargetVolume(
                     level,
-                    candidate.pos(),
+                    targetPos,
                     requested,
                     velocityX,
                     source.velocityY() * 0.20f,
                     velocityZ
             );
-            remaining -= accepted;
+            assert accepted >= 0 && accepted <= requested
+                    : "Canonical destination accepted an invalid transfer amount";
             moved += accepted;
         }
         return moved;
@@ -469,6 +473,4 @@ public final class WildernessFluidRegistry {
         }
     }
 
-    private record LateralCandidate(Direction direction, BlockPos pos, int capacity, int difference) {
-    }
 }

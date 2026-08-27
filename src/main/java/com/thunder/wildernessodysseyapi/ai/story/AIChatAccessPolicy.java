@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.ai.story;
 
+import com.thunder.wildernessodysseyapi.core.PrivateSingleplayerPolicy;
 import net.minecraft.server.MinecraftServer;
 
 /**
@@ -16,7 +17,7 @@ public final class AIChatAccessPolicy {
 
     /** Returns whether A.E.T.H.E.R may listen to chat on the supplied server. */
     public static boolean isAvailable(MinecraftServer server) {
-        return server != null && isAvailable(server.isSingleplayer(), server.isPublished());
+        return PrivateSingleplayerPolicy.permits(server);
     }
 
     static boolean isAvailable(boolean singleplayer, boolean publishedToLan) {

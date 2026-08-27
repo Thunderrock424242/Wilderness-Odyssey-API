@@ -112,32 +112,43 @@ public final class ClientWaveEntityEffects {
 
         float centerHeight = renderedSurfaceHeight(
                 level, type, worldX, worldZ, selectionOrigin.x, selectionOrigin.z);
-        float frontHeight = renderedSurfaceHeight(
+        float bowPortHeight = renderedSurfaceHeight(
                 level, type,
-                worldX + forwardX * hullLength * 0.5f,
-                worldZ + forwardZ * hullLength * 0.5f,
+                worldX + forwardX * hullLength * 0.5f - rightX * hullWidth * 0.5f,
+                worldZ + forwardZ * hullLength * 0.5f - rightZ * hullWidth * 0.5f,
                 selectionOrigin.x, selectionOrigin.z);
-        float backHeight = renderedSurfaceHeight(
+        float bowStarboardHeight = renderedSurfaceHeight(
                 level, type,
-                worldX - forwardX * hullLength * 0.5f,
-                worldZ - forwardZ * hullLength * 0.5f,
+                worldX + forwardX * hullLength * 0.5f + rightX * hullWidth * 0.5f,
+                worldZ + forwardZ * hullLength * 0.5f + rightZ * hullWidth * 0.5f,
                 selectionOrigin.x, selectionOrigin.z);
-        float rightHeight = renderedSurfaceHeight(
+        float sternPortHeight = renderedSurfaceHeight(
                 level, type,
-                worldX + rightX * hullWidth * 0.5f,
-                worldZ + rightZ * hullWidth * 0.5f,
+                worldX - forwardX * hullLength * 0.5f - rightX * hullWidth * 0.5f,
+                worldZ - forwardZ * hullLength * 0.5f - rightZ * hullWidth * 0.5f,
                 selectionOrigin.x, selectionOrigin.z);
-        float leftHeight = renderedSurfaceHeight(
+        float sternStarboardHeight = renderedSurfaceHeight(
                 level, type,
-                worldX - rightX * hullWidth * 0.5f,
-                worldZ - rightZ * hullWidth * 0.5f,
+                worldX - forwardX * hullLength * 0.5f + rightX * hullWidth * 0.5f,
+                worldZ - forwardZ * hullLength * 0.5f + rightZ * hullWidth * 0.5f,
                 selectionOrigin.x, selectionOrigin.z);
 
+        float frontHeight = (bowPortHeight + bowStarboardHeight) * 0.5f;
+        float backHeight = (sternPortHeight + sternStarboardHeight) * 0.5f;
+        float rightHeight = (bowStarboardHeight + sternStarboardHeight) * 0.5f;
+        float leftHeight = (bowPortHeight + sternPortHeight) * 0.5f;
         float forwardSlope = (frontHeight - backHeight) / hullLength;
         float rightSlope = (rightHeight - leftHeight) / hullWidth;
         float pitch = clamp((float) Math.toDegrees(Math.atan(forwardSlope)), -25.0f, 25.0f);
         float roll = clamp((float) Math.toDegrees(Math.atan(rightSlope)), -20.0f, 20.0f);
-        float bob = clamp(centerHeight * profile.boatBobStrength, -0.55f, 0.55f);
+        float averageHullHeight = (
+                bowPortHeight
+                        + bowStarboardHeight
+                        + sternPortHeight
+                        + sternStarboardHeight
+        ) * 0.25f;
+        float bobTarget = centerHeight * 0.35f + averageHullHeight * 0.65f;
+        float bob = clamp(bobTarget * profile.boatBobStrength, -0.55f, 0.55f);
         BoatTiltStore.set(boat.getId(), pitch, roll, bob);
     }
 
@@ -176,6 +187,8 @@ public final class ClientWaveEntityEffects {
             case OCEAN -> GerstnerWaveProfile.OCEAN;
             case RIVER -> GerstnerWaveProfile.RIVER;
             case POND -> GerstnerWaveProfile.POND;
+            case COAST -> GerstnerWaveProfile.COAST;
+            case LAKE -> GerstnerWaveProfile.LAKE;
         };
     }
 

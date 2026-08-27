@@ -21,6 +21,11 @@ public interface CinematicSequence {
 
     List<CinematicStage> stages();
 
+    /** Returns whether this sequence may continue in the player's current server scope. */
+    default boolean isPlaybackAllowed(ServerPlayer player) {
+        return true;
+    }
+
     /** Returns an operator-facing failure when the world cannot safely start this sequence. */
     default Optional<Component> validateStart(ServerPlayer player, BlockPos anchor) {
         return Optional.empty();

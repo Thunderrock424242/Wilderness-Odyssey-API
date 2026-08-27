@@ -341,8 +341,8 @@ public final class WaterShaders {
         );
         updateWaveUniforms(
                 "Pond",
-                GerstnerWaveProfile.POND,
-                configuredWaveLimit(WaterBodyClassifier.WaterType.POND),
+                GerstnerWaveProfile.LAKE,
+                configuredWaveLimit(WaterBodyClassifier.WaterType.LAKE),
                 frameGameTime,
                 framePartialTick
         );

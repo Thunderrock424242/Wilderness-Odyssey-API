@@ -170,8 +170,18 @@ public class FluidRenderer {
             int color = waterColor(level, cx, cy, cz, nx, ny, nz, WATER_ALPHA);
             int light = waterLight(level, cx, cy, cz);
 
-            emitTriangleAsQuad(buffer, pose, sprite, light, color, nx, ny, nz, x0, y0, z0, x1, y1, z1, x2, y2, z2);
-            emitTriangleAsQuad(buffer, pose, sprite, light, color, -nx, -ny, -nz, x2, y2, z2, x1, y1, z1, x0, y0, z0);
+            emitTriangleAsQuad(
+                    buffer, pose, sprite, light, color,
+                    x0, y0, z0, nx0, ny0, nz0,
+                    x1, y1, z1, nx1, ny1, nz1,
+                    x2, y2, z2, nx2, ny2, nz2
+            );
+            emitTriangleAsQuad(
+                    buffer, pose, sprite, light, color,
+                    x2, y2, z2, -nx2, -ny2, -nz2,
+                    x1, y1, z1, -nx1, -ny1, -nz1,
+                    x0, y0, z0, -nx0, -ny0, -nz0
+            );
         }
     }
 
@@ -196,16 +206,20 @@ public class FluidRenderer {
         return drew;
     }
 
-    private static void emitTriangleAsQuad(VertexConsumer buffer, PoseStack.Pose pose, TextureAtlasSprite sprite, int light, int color,
-                                           float nx, float ny, float nz,
-                                           float x0, float y0, float z0,
-                                           float x1, float y1, float z1,
-                                           float x2, float y2, float z2) {
-        emitQuad(buffer, pose, sprite, light, color, nx, ny, nz,
-                x0, y0, z0,
-                x1, y1, z1,
-                x2, y2, z2,
-                x2, y2, z2);
+    private static void emitTriangleAsQuad(
+            VertexConsumer buffer,
+            PoseStack.Pose pose,
+            TextureAtlasSprite sprite,
+            int light,
+            int color,
+            float x0, float y0, float z0, float nx0, float ny0, float nz0,
+            float x1, float y1, float z1, float nx1, float ny1, float nz1,
+            float x2, float y2, float z2, float nx2, float ny2, float nz2
+    ) {
+        addWaterVertex(buffer, pose, sprite, light, color, nx0, ny0, nz0, x0, y0, z0);
+        addWaterVertex(buffer, pose, sprite, light, color, nx1, ny1, nz1, x1, y1, z1);
+        addWaterVertex(buffer, pose, sprite, light, color, nx2, ny2, nz2, x2, y2, z2);
+        addWaterVertex(buffer, pose, sprite, light, color, nx2, ny2, nz2, x2, y2, z2);
     }
 
     private static void emitQuad(VertexConsumer buffer, PoseStack.Pose pose, TextureAtlasSprite sprite, int light, int color,

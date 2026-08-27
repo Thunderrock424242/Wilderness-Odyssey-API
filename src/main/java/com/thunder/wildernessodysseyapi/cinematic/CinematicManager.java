@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.cinematic;
 
 import com.thunder.wildernessodysseyapi.cinematic.network.CinematicStagePayload;
+import com.thunder.wildernessodysseyapi.cinematic.network.CinematicNarrationPayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.EndCinematicPayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.StartCinematicPayload;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
@@ -20,6 +21,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -49,6 +52,11 @@ public final class CinematicManager {
         }
         if (ACTIVE.containsKey(player.getUUID())) {
             return PlayResult.failure(Component.literal("A cinematic is already active for this player."));
+        }
+        if (!sequence.isPlaybackAllowed(player)) {
+            return PlayResult.failure(Component.literal(
+                    "This cinematic is available only in a private single-player world."
+            ));
         }
         if (options.markCompletion()) {
             if (CinematicPlayerData.hasCompleted(player, sequence.id())) {
@@ -134,6 +142,10 @@ public final class CinematicManager {
         }
         if (!player.level().dimension().equals(running.dimension)) {
             stop(player, CinematicStopReason.DIMENSION_CHANGED);
+            return;
+        }
+        if (!running.sequence.isPlaybackAllowed(player)) {
+            stop(player, CinematicStopReason.INVALID_STATE);
             return;
         }
 
@@ -271,6 +283,7 @@ public final class CinematicManager {
                 stage.durationTicks(),
                 stage.locksControls(),
                 stage.hideHud(),
+                running.options.anchor(),
                 running.baseYaw,
                 running.basePitch
         ));
@@ -321,6 +334,7 @@ public final class CinematicManager {
         private final boolean originalNoGravity;
         private long stageStartGameTime;
         private boolean lockApplied;
+        private final Set<ResourceLocation> narrationCues = new HashSet<>();
 
         private RunningSequence(
                 ServerPlayer player,
@@ -370,6 +384,18 @@ public final class CinematicManager {
             BlockEntity blockEntity = level.getBlockEntity(options.anchor());
             return blockEntity instanceof CinematicActor actor
                     && actor.applyCinematicCue(sequence.id(), cueId);
+        }
+
+        @Override
+        public boolean narrateOnce(ResourceLocation cueId, int durationTicks) {
+            if (!narrationCues.add(cueId)) {
+                return false;
+            }
+            PacketDistributor.sendToPlayer(
+                    player,
+                    new CinematicNarrationPayload(sequence.id(), cueId, durationTicks)
+            );
+            return true;
         }
     }
 }

@@ -24,9 +24,15 @@ class WaterCycleFluxModelTest {
                 rain, WaterBody.Kind.LARGE_POND, 48.0, 18.0);
         double ocean = WaterCycleFluxModel.fluxUnits(
                 rain, WaterBody.Kind.LARGE_OCEAN, 48.0, 18.0);
+        double coast = WaterCycleFluxModel.fluxUnits(
+                rain, WaterBody.Kind.LARGE_COAST, 48.0, 18.0);
+        double lake = WaterCycleFluxModel.fluxUnits(
+                rain, WaterBody.Kind.LARGE_LAKE, 48.0, 18.0);
 
         assertTrue(pond > 0.0);
         assertEquals(0.0, ocean);
+        assertEquals(0.0, coast);
+        assertEquals(pond, lake, 1.0e-9);
     }
 
     @Test

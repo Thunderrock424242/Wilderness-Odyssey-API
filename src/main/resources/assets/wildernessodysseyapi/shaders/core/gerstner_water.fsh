@@ -37,6 +37,8 @@ in vec2 localCurrent;
 in float shoreFactor;
 in float depthFactor;
 in float disturbanceStrength;
+in float waveSlope;
+in float crestCompression;
 in float regionalSeaState;
 in vec2 regionalWindDirection;
 in float regionalWindSpeed;
@@ -148,6 +150,16 @@ vec3 proceduralWorldNormal(vec2 current, float sea) {
         gradient += (DETAIL_PRIMARY_DIRECTION * capillary * 0.008 * primaryWeight
             + DETAIL_DIAGONAL_DIRECTION * capillary * 0.007 * diagonalWeight)
             * detailEnergy;
+
+        // Rain is represented as two bounded capillary bands rather than one
+        // SPH particle or persistent event per drop.
+        float rainEnergy = clamp(Weather.x, 0.0, 1.0);
+        float rainRippleA = stableWaveLayer(warp, DETAIL_GLASS_DIRECTION,
+            17.3, SurfaceAnimationPhases1.y);
+        float rainRippleB = stableWaveLayer(-warp, DETAIL_CROSS_DIRECTION,
+            23.7, SurfaceAnimationPhases0.w);
+        gradient += (DETAIL_GLASS_DIRECTION * rainRippleA
+            + DETAIL_CROSS_DIRECTION * rainRippleB) * rainEnergy * 0.006;
     }
     if (quality >= 3.0) {
         float glassFrequency = 13.73;
@@ -477,7 +489,21 @@ void main() {
     }
 
     float slope = clamp(1.0 - combinedWorldNormal.y, 0.0, 1.0);
-    float slopeFoam = smoothstep(0.025, 0.14 + sea * 0.04, slope);
+    float normalizedWaveSlope = clamp(waveSlope / 2.0, 0.0, 1.0);
+    float breakingEnergy = clamp(
+        regionalSpectrumState.w * 0.70
+        + sea * 0.45
+        + clamp(regionalWindSpeed / 16.0, 0.0, 1.0) * 0.30,
+        0.0,
+        1.0
+    );
+    // A tilted calm surface is still clear water. Broad slope foam is admitted
+    // only once synchronized wind/sea energy approaches breaking conditions.
+    float rawSlopeFoam = smoothstep(0.025, 0.14 + sea * 0.04, slope);
+    float slopeFoam = rawSlopeFoam * smoothstep(0.16, 0.70, breakingEnergy);
+    float crestFoam = smoothstep(0.15, 0.72, crestCompression)
+        * smoothstep(0.18, 0.75, breakingEnergy)
+        * smoothstep(0.04, 0.35, normalizedWaveSlope);
     float currentSpeed = length(localCurrent);
     float shallowWater = 1.0 - clamp(depthFactor, 0.0, 1.0);
     // Shore proximity is a deterministic client snapshot-boundary/depth
@@ -503,7 +529,8 @@ void main() {
         }
     }
     float impulseFoam = disturbanceStrength * (0.34 + sea * 0.26);
-    float foam = clamp(max(slopeFoam, max(shoreBreaker, currentShear)) + impulseFoam, 0.0, 1.0)
+    float foam = clamp(max(max(slopeFoam, crestFoam), max(shoreBreaker, currentShear))
+        + impulseFoam, 0.0, 1.0)
         * (1.0 - frozen * 0.88);
     vec3 halfVector = celestialDirection + viewDirection;
     vec3 halfDirection = dot(halfVector, halfVector) > 0.000001

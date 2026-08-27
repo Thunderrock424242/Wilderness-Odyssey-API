@@ -25,19 +25,20 @@ public final class WaterCycleFluxModel {
     ) {
         WeatherSample safeWeather = weather == null ? WeatherSample.CLEAR : weather;
         WaterBody.Kind safeKind = kind == null ? WaterBody.Kind.LOCAL_VOLUME : kind;
-        if (safeKind == WaterBody.Kind.LARGE_OCEAN) {
+        if (safeKind == WaterBody.Kind.LARGE_OCEAN
+                || safeKind == WaterBody.Kind.LARGE_COAST) {
             return 0.0;
         }
 
         double rainMultiplier = switch (safeKind) {
             case LARGE_RIVER -> 0.72;
-            case LARGE_POND, LOCAL_VOLUME -> 1.0;
-            case LARGE_OCEAN -> 0.0;
+            case LARGE_POND, LARGE_LAKE, LOCAL_VOLUME -> 1.0;
+            case LARGE_OCEAN, LARGE_COAST -> 0.0;
         };
         double evaporationMultiplier = switch (safeKind) {
             case LARGE_RIVER -> 0.45;
-            case LARGE_POND, LOCAL_VOLUME -> 1.0;
-            case LARGE_OCEAN -> 0.0;
+            case LARGE_POND, LARGE_LAKE, LOCAL_VOLUME -> 1.0;
+            case LARGE_OCEAN, LARGE_COAST -> 0.0;
         };
 
         boolean liquidPrecipitation = safeWeather.precipitationType() == PrecipitationType.RAIN

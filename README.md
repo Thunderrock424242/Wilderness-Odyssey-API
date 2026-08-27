@@ -72,11 +72,11 @@ An opt-in async task system now ships with the mod. Enable or tune it in
 Use `/asyncstats` (level 2 permission) to view worker usage, queue depth, and rejected tasks. See `docs/async-threading-plan.md`
 for architecture and tuning notes, including guidance on keeping main-thread mutations safe when scheduling heavy jobs.
 
-A.E.T.H.E.R scripted companion (current MVP):
--------------------------------------
-AI purpose checklist: see `docs/ai/purpose-scope.md` for A.E.T.H.E.R core + subsystem scope, boundaries, and MVP definition.
+A.E.T.H.E.R local companion:
+----------------------------
+See `docs/ai/purpose-scope.md` for A.E.T.H.E.R's core boundaries and `docs/ai/local-voice.md` for optional faster-whisper/Kokoro setup.
 
-A.E.T.H.E.R is currently a scripted recovered-intent system, not a full LLM chatbot. Player messages are cleaned, scored against intent keywords, checked against lightweight game context, and answered from authored response banks. This keeps the first version safer, cheaper, lore-consistent, and easier to expand through updates.
+A.E.T.H.E.R uses a private loopback Ollama model for normal single-player chat, one grounded conversation history, six bounded specialist personalities, and a factual verification pass. The scripted response banks below are retained for local-provider outages; they are not the normal conversation authority. No relay item, wake word, command, cloud service, or multiplayer connection is required or accepted.
 
 Scripted response data lives in:
 - `src/main/resources/ai_config.yaml`
@@ -88,7 +88,7 @@ Scripted response data lives in:
 - `src/main/resources/ai_fallback/enforcer.yaml`
 - `src/main/resources/ai_fallback/requiem.yaml`
 
-A.E.T.H.E.R uses only authored local responses and does not call an online AI service. The old backend management commands were removed so the CurseForge build stays scripted-only.
+A.E.T.H.E.R can optionally add local push-to-talk, speech playback, subtitles, cinematic narration, and Codex lore reading through the separately started service under `tools/aether_voice_service`. Voice defaults off, never downloads models automatically, and cannot disable ordinary text chat when unavailable.
 Secrets:
 -------
 For local development, copy `.env.example` to `.env` and fill in required tokens.

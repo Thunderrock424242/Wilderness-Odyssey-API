@@ -1,9 +1,53 @@
 {
-  "parent": "wildernessodysseyapi:block/cryo_tube",
-  "display": {
-    "gui": {
-      "scale": [0.5, 0.5, 0.5]
+  "parent": "minecraft:block/block",
+  "texture_size": [256, 256],
+  "textures": {
+    "tube": "wildernessodysseyapi:block/cryo_tube",
+    "particle": "wildernessodysseyapi:block/cryo_tube"
+  },
+  "elements": [
+    {
+      "from": [2, 0, 2],
+      "to": [14, 3, 14],
+      "faces": {
+        "north": {"uv": [0, 0, 12, 3], "texture": "#tube"},
+        "east": {"uv": [0, 0, 12, 3], "texture": "#tube"},
+        "south": {"uv": [0, 0, 12, 3], "texture": "#tube"},
+        "west": {"uv": [0, 0, 12, 3], "texture": "#tube"},
+        "up": {"uv": [0, 0, 12, 12], "texture": "#tube"},
+        "down": {"uv": [0, 0, 12, 12], "texture": "#tube"}
+      }
+    },
+    {
+      "from": [2, 3, 11],
+      "to": [14, 14, 14],
+      "faces": {
+        "north": {"uv": [0, 3, 12, 14], "texture": "#tube"},
+        "east": {"uv": [0, 3, 3, 14], "texture": "#tube"},
+        "south": {"uv": [0, 3, 12, 14], "texture": "#tube"},
+        "west": {"uv": [0, 3, 3, 14], "texture": "#tube"},
+        "up": {"uv": [0, 0, 12, 3], "texture": "#tube"},
+        "down": {"uv": [0, 0, 12, 3], "texture": "#tube"}
+      }
+    },
+    {
+      "from": [1, 14, 1],
+      "to": [15, 16, 15],
+      "faces": {
+        "north": {"uv": [0, 0, 14, 2], "texture": "#tube"},
+        "east": {"uv": [0, 0, 14, 2], "texture": "#tube"},
+        "south": {"uv": [0, 0, 14, 2], "texture": "#tube"},
+        "west": {"uv": [0, 0, 14, 2], "texture": "#tube"},
+        "up": {"uv": [0, 0, 14, 14], "texture": "#tube"},
+        "down": {"uv": [0, 0, 14, 14], "texture": "#tube"}
+      }
     }
+  ],
+  "display": {
+    "gui": {"rotation": [20, 145, 0], "scale": [0.72, 0.72, 0.72]},
+    "ground": {"translation": [0, 3, 0], "scale": [0.45, 0.45, 0.45]},
+    "fixed": {"rotation": [0, 180, 0], "scale": [0.65, 0.65, 0.65]},
+    "thirdperson_righthand": {"translation": [0, 2.5, 0], "scale": [0.4, 0.4, 0.4]},
+    "firstperson_righthand": {"translation": [0, 3, 0], "scale": [0.45, 0.45, 0.45]}
   }
 }
-
