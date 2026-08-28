@@ -50,5 +50,5 @@ class ServiceSettings:
             whisper_model=os.getenv("AETHER_WHISPER_MODEL", "small.en").strip(),
             whisper_language=os.getenv("AETHER_WHISPER_LANGUAGE", "en").strip(),
             kokoro_language=os.getenv("AETHER_KOKORO_LANGUAGE", "a").strip(),
-            default_voice=os.getenv("AETHER_KOKORO_VOICE", "af_heart").strip(),
+            default_voice=os.getenv("AETHER_KOKORO_VOICE", "af_nicole").strip(),
         )

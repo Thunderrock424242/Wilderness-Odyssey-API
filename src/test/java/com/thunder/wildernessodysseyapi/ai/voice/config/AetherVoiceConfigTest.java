@@ -18,9 +18,10 @@ class AetherVoiceConfigTest {
         assertFalse(AetherVoiceConfig.VOICE_ENABLED.getDefault());
         assertEquals(VoiceInputMode.PUSH_TO_TALK, AetherVoiceConfig.INPUT_MODE.getDefault());
         assertEquals("http://127.0.0.1:8765", AetherVoiceConfig.SERVICE_ENDPOINT.getDefault());
-        assertEquals("af_heart", AetherVoiceConfig.VOICE_NAME.getDefault());
+        assertEquals("af_nicole", AetherVoiceConfig.VOICE_NAME.getDefault());
         assertEquals(0.96D, AetherVoiceConfig.SPEECH_SPEED.getDefault());
         assertTrue(AetherVoiceConfig.SUBTITLES.getDefault());
+        assertFalse(AetherVoiceConfig.RADIO_PROCESSING.getDefault());
         assertEquals(List.of("aether_voice", "enabled"), AetherVoiceConfig.VOICE_ENABLED.getPath());
     }
 }

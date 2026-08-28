@@ -23,7 +23,7 @@ The local voice service intentionally owns only heavy speech work. The establish
 
 ## Uses beyond conversation
 
-- Registered cinematic cues can queue deterministic authored narration through the same playback session. Their server-approved cue IDs, localized text, on-screen subtitle, and cinematic timing remain authoritative. The LLM does not rewrite a cinematic line.
+- Registered cryo cinematic cues play fixed bundled Kokoro WAVs through the same bounded JavaSound playback owner. Their server-approved cue IDs, localized text, measured subtitle duration, and cinematic timing remain authoritative. They do not need the service at runtime, and the LLM does not rewrite a cinematic line.
 - The recovered-lore Codex exposes **Read Aloud** while voice and lore reading are enabled. Requiem reads the exact visible page spread; the LLM does not invent missing pages.
 - A new player question, a new non-queued authored request, leaving the world, or disabling voice invalidates stale generated audio before it can begin playing.
 
@@ -43,10 +43,10 @@ The `[aether_voice]` category contains:
 - `inputMode`: `TEXT` or `PUSH_TO_TALK`. `ALWAYS_LISTENING` is reserved but intentionally inactive.
 - `serviceEndpoint`: defaults to `http://127.0.0.1:8765` and is rejected unless it is plain HTTP on a loopback host.
 - `serviceToken`: optional bearer token shared with the service process.
-- `voiceName`: Kokoro voice ID, default `af_heart`, a warm feminine voice selected for A.E.T.H.E.R's calm synthetic-medical delivery.
+- `voiceName`: Kokoro voice ID, default `af_nicole`, selected for A.E.T.H.E.R's subdued, intimate caretaker delivery.
 - `volume`: generated voice volume before Minecraft's Master and Voice sliders.
 - `speechSpeed`: base speech speed before bounded emotion adjustment; fresh configs default to `0.96`, and authored calm lines apply an additional restrained slowdown.
-- `subtitles`, `radioProcessing`, `cinematicNarration`, and `loreReadAloud`.
+- `subtitles`, `radioProcessing`, `cinematicNarration`, and `loreReadAloud`. Radio processing defaults off so the natural voice is preserved.
 - `requestTimeoutSeconds`: client request timeout; no Minecraft thread waits for it.
 
 The push-to-talk key defaults to **V** and can be changed in Minecraft's normal Controls screen. An unbound **Aether Voice Status** key is also available there; bind it to request local readiness and latency diagnostics even before enabling speech.
@@ -80,7 +80,7 @@ In a second terminal:
 Invoke-RestMethod -Method Post http://127.0.0.1:8765/v1/models/load
 ```
 
-The defaults are faster-whisper `small.en` and Kokoro `af_heart`. The model-load request also preloads that voice. Both Hugging Face/Kokoro files and the separate Whisper cache are directed outside the repository under `%USERPROFILE%\.cache\aether-voice` unless `AETHER_VOICE_MODEL_DIR` or an existing `HF_HOME` overrides the relevant cache location. For another voice, set `AETHER_KOKORO_VOICE` during this deliberate download step and use the same client `voiceName`. After the initial download, stop the service, remove `AETHER_VOICE_ALLOW_MODEL_DOWNLOADS`, and restart in the default cache-only mode.
+The defaults are faster-whisper `small.en` and Kokoro `af_nicole`. The model-load request also preloads that voice. Both Hugging Face/Kokoro files and the separate Whisper cache are directed outside the repository under `%USERPROFILE%\.cache\aether-voice` unless `AETHER_VOICE_MODEL_DIR` or an existing `HF_HOME` overrides the relevant cache location. For another voice, set `AETHER_KOKORO_VOICE` during this deliberate download step and use the same client `voiceName`. After the initial download, stop the service, remove `AETHER_VOICE_ALLOW_MODEL_DOWNLOADS`, and restart in the default cache-only mode.
 
 Normal startup is:
 

@@ -5,7 +5,6 @@
   "style": "subdued_human_caretaker",
   "speed": 0.95,
   "sample_rate": 24000,
-  "model_cache": "C:\\Users\\mason\\.cache\\aether-voice",
   "clips": {
     "medical_online": {
       "file": "medical_online.wav",

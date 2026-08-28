@@ -29,9 +29,25 @@ In a second terminal, explicitly start model loading:
 Invoke-RestMethod -Method Post http://127.0.0.1:8765/v1/models/load
 ```
 
-The default faster-whisper model is `small.en`; the default Kokoro voice is `af_heart`. `/v1/models/load` also preloads that voice so the first later speech request does not trigger a hidden download. Model caches are stored outside the repository at `%USERPROFILE%\.cache\aether-voice` unless `AETHER_VOICE_MODEL_DIR` or an existing `HF_HOME` overrides the relevant cache location. To use a different voice offline, set `AETHER_KOKORO_VOICE` to the same ID during the deliberate download/load step and use that ID in the Minecraft client config.
+The default faster-whisper model is `small.en`; the default Kokoro voice is the subdued `af_nicole` caretaker profile. `/v1/models/load` also preloads that voice so the first later speech request does not trigger a hidden download. Model caches are stored outside the repository at `%USERPROFILE%\.cache\aether-voice` unless `AETHER_VOICE_MODEL_DIR` or an existing `HF_HOME` overrides the relevant cache location. To use a different voice offline, set `AETHER_KOKORO_VOICE` to the same ID during the deliberate download/load step and use that ID in the Minecraft client config.
 
 After the initial download, stop the service, remove `AETHER_VOICE_ALLOW_MODEL_DOWNLOADS`, and start it again in cache-only mode.
+
+## Authored cryo narration
+
+The cryo awakening packages neural voice assets, so normal players do not need to run this service. After the virtual environment is installed, the first deliberate authoring run downloads Kokoro into the external model cache and generates the 20 English clips:
+
+```powershell
+.\generate_cryo_voice.ps1 -AllowModelDownloads
+```
+
+Later regenerations are offline by default:
+
+```powershell
+.\generate_cryo_voice.ps1
+```
+
+The generator uses `af_nicole` at 0.95 speed, reads the translation file as the dialogue source of truth, applies no radio or corruption filter, and rewrites the manifest with measured durations. Java cue durations and tests must be updated when generated durations change. Only the WAV files and manifest are shipped; `.venv`, model weights, and the external cache remain local authoring dependencies.
 
 ## Optional local token
 

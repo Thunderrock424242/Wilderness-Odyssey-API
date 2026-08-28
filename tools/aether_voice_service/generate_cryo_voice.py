@@ -4,7 +4,10 @@ import argparse
 import json
 import math
 import os
+from importlib.metadata import version
 from pathlib import Path
+from shutil import rmtree
+from uuid import uuid4
 
 import numpy as np
 import soundfile as sf
@@ -13,11 +16,12 @@ import soundfile as sf
 SAMPLE_RATE = 24_000
 SUBTITLE_FADE_TICKS = 6
 NARRATION_PREFIX = "cinematic.wildernessodysseyapi.cryo.narration."
+EXPECTED_KOKORO_VERSION = "0.9.4"
 
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate deterministic neural A.E.T.H.E.R cryo narration assets."
+        description="Generate version-pinned neural A.E.T.H.E.R cryo narration assets."
     )
     parser.add_argument("--voice", default="af_nicole")
     parser.add_argument("--speed", type=float, default=0.95)
@@ -75,10 +79,26 @@ def master_voice(chunks: list[np.ndarray]) -> np.ndarray:
     return np.clip(samples, -1.0, 1.0).astype(np.float32, copy=False)
 
 
+def create_staging_directory(repo_root: Path) -> Path:
+    staging_parent = repo_root / "build" / "tmp" / "aether_voice"
+    staging_parent.mkdir(parents=True, exist_ok=True)
+    staging_directory = staging_parent / uuid4().hex
+    # Use an ordinary inherited directory instead of TemporaryDirectory's
+    # private Windows ACL. os.replace preserves the staged file's ACL.
+    staging_directory.mkdir()
+    return staging_directory
+
+
 def main() -> None:
     arguments = parse_arguments()
     if not 0.75 <= arguments.speed <= 1.25:
         raise ValueError("speed must be between 0.75 and 1.25")
+    installed_kokoro = version("kokoro")
+    if installed_kokoro != EXPECTED_KOKORO_VERSION:
+        raise RuntimeError(
+            "authored cryo generation requires Kokoro "
+            f"{EXPECTED_KOKORO_VERSION}, found {installed_kokoro}"
+        )
 
     repo_root = Path(__file__).resolve().parents[2]
     language_path = (
@@ -89,7 +109,7 @@ def main() -> None:
         repo_root
         / "src/main/resources/assets/wildernessodysseyapi/voice/cryo"
     )
-    model_root = prepare_model_cache(arguments.allow_downloads)
+    prepare_model_cache(arguments.allow_downloads)
 
     # Import after the cache and offline policy are set. KPipeline downloads
     # only during the explicit authoring run that passes --allow-downloads.
@@ -110,34 +130,46 @@ def main() -> None:
     pipeline.load_voice(arguments.voice)
 
     clips: dict[str, dict[str, object]] = {}
-    for cue, subtitle in narration.items():
-        chunks = [
-            np.asarray(audio, dtype=np.float32)
-            for _, _, audio in pipeline(
-                spoken_version(str(subtitle)),
-                voice=arguments.voice,
-                speed=arguments.speed,
+    staging_directory = create_staging_directory(repo_root)
+    try:
+        for cue, subtitle in narration.items():
+            chunks = [
+                np.asarray(audio, dtype=np.float32)
+                for _, _, audio in pipeline(
+                    spoken_version(str(subtitle)),
+                    voice=arguments.voice,
+                    speed=arguments.speed,
+                )
+            ]
+            audio = master_voice(chunks)
+            staged_path = staging_directory / f"{cue}.wav"
+            sf.write(staged_path, audio, SAMPLE_RATE, format="WAV", subtype="PCM_16")
+            duration_seconds = audio.size / SAMPLE_RATE
+            clips[cue] = {
+                "file": staged_path.name,
+                "duration_ticks": math.ceil(duration_seconds * 20.0)
+                + SUBTITLE_FADE_TICKS,
+                "duration_seconds": round(duration_seconds, 3),
+            }
+            print(f"{cue}: {duration_seconds:.3f}s")
+
+        # Keep a failed model pass from leaving a half-regenerated authored set.
+        # All inference and encoding succeeds before source assets are replaced.
+        for cue in narration:
+            os.replace(
+                staging_directory / f"{cue}.wav",
+                output_directory / f"{cue}.wav",
             )
-        ]
-        audio = master_voice(chunks)
-        output_path = output_directory / f"{cue}.wav"
-        sf.write(output_path, audio, SAMPLE_RATE, format="WAV", subtype="PCM_16")
-        duration_seconds = audio.size / SAMPLE_RATE
-        clips[cue] = {
-            "file": output_path.name,
-            "duration_ticks": math.ceil(duration_seconds * 20.0) + SUBTITLE_FADE_TICKS,
-            "duration_seconds": round(duration_seconds, 3),
-        }
-        print(f"{cue}: {duration_seconds:.3f}s")
+    finally:
+        rmtree(staging_directory, ignore_errors=True)
 
     manifest = {
-        "engine": "Kokoro-82M 0.9.4",
+        "engine": f"Kokoro-82M {installed_kokoro}",
         "model": "hexgrad/Kokoro-82M",
         "voice": arguments.voice,
         "style": "subdued_human_caretaker",
         "speed": arguments.speed,
         "sample_rate": SAMPLE_RATE,
-        "model_cache": str(model_root),
         "clips": clips,
     }
     manifest_path = output_directory / "manifest.json"
