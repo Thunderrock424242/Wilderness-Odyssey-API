@@ -206,12 +206,12 @@ public final class CryoWakeupPresentationModel {
         return Math.round(Mth.lerp(smooth(medicalProgress(stage, progress)), 54.0F, 80.0F));
     }
 
-    /** Brief optical response centered on the authoritative pacing discharge. */
+    /** Brief optical response centered on the authored countdown's pacing discharge. */
     public static float pacingFlash(ResourceLocation stage, float progress) {
         if (!CryoWakeupSequence.CARDIAC_PACING.equals(stage)) {
             return 0.0F;
         }
-        float distance = Math.abs(progress - 0.60F);
+        float distance = Math.abs(progress - 94.0F / 120.0F);
         return smooth(Mth.clamp(1.0F - distance / 0.075F, 0.0F, 1.0F));
     }
 
@@ -245,7 +245,13 @@ public final class CryoWakeupPresentationModel {
             return 0.0F;
         }
         float timelineTick = start + Mth.clamp(stageProgress, 0.0F, 1.0F) * duration;
-        return Mth.clamp((timelineTick - 20.0F) / 830.0F, 0.0F, 1.0F);
+        int rewarmingStart = CryoWakeupSequence.startTick(CryoWakeupSequence.EXTERIOR_REVEAL);
+        int recoveryStart = CryoWakeupSequence.startTick(CryoWakeupSequence.RECOVERY_WALK);
+        return Mth.clamp(
+                (timelineTick - rewarmingStart) / Math.max(1.0F, recoveryStart - rewarmingStart),
+                0.0F,
+                1.0F
+        );
     }
 
     private static float triangularBlink(float value, float center, float halfWidth) {

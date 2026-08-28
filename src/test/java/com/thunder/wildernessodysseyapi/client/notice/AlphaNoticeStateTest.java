@@ -13,6 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies first-launch, version-bump, persistence, and fail-open state behavior. */
 class AlphaNoticeStateTest {
+    private static final AlphaNoticeState.VersionStamp CURRENT_VERSIONS =
+            new AlphaNoticeState.VersionStamp(1, 3, "4.2.0");
+
     @TempDir
     Path temporaryDirectory;
 
@@ -21,20 +24,35 @@ class AlphaNoticeStateTest {
         AlphaNoticeState.ReadResult result = AlphaNoticeState.read(temporaryDirectory.resolve("missing.properties"));
 
         assertTrue(result.readable());
-        assertEquals(0, result.acknowledgedVersion());
-        assertTrue(result.requiresNotice(1));
+        assertEquals(0, result.acknowledgedVersions().noticeVersion());
+        assertTrue(result.requiresNotice(CURRENT_VERSIONS));
     }
 
     @Test
-    void acceptedVersionPersistsAndAFutureVersionShowsAgain() throws IOException {
+    void acceptedVersionsPersistAndAnyVersionChangeShowsAgain() throws IOException {
         Path stateFile = temporaryDirectory.resolve("alpha_notice.properties");
-        AlphaNoticeState.write(stateFile, 1);
+        AlphaNoticeState.write(stateFile, CURRENT_VERSIONS);
 
         AlphaNoticeState.ReadResult result = AlphaNoticeState.read(stateFile);
         assertTrue(result.readable());
-        assertEquals(1, result.acknowledgedVersion());
-        assertFalse(result.requiresNotice(1));
-        assertTrue(result.requiresNotice(2));
+        assertEquals(CURRENT_VERSIONS, result.acknowledgedVersions());
+        assertFalse(result.requiresNotice(CURRENT_VERSIONS));
+        assertTrue(result.requiresNotice(new AlphaNoticeState.VersionStamp(2, 3, "4.2.0")));
+        assertTrue(result.requiresNotice(new AlphaNoticeState.VersionStamp(1, 4, "4.2.0")));
+        assertTrue(result.requiresNotice(new AlphaNoticeState.VersionStamp(1, 3, "4.2.1")));
+    }
+
+    @Test
+    void legacyNoticeOnlyStateShowsOnceForTheVersionFingerprintUpgrade() throws IOException {
+        Path stateFile = temporaryDirectory.resolve("alpha_notice.properties");
+        Files.writeString(stateFile, AlphaNoticeState.ACKNOWLEDGED_VERSION_KEY + "=1");
+
+        AlphaNoticeState.ReadResult result = AlphaNoticeState.read(stateFile);
+        assertTrue(result.readable());
+        assertEquals(1, result.acknowledgedVersions().noticeVersion());
+        assertEquals(0, result.acknowledgedVersions().worldSchemaVersion());
+        assertTrue(result.acknowledgedVersions().modpackVersion().isBlank());
+        assertTrue(result.requiresNotice(CURRENT_VERSIONS));
     }
 
     @Test
@@ -44,7 +62,7 @@ class AlphaNoticeStateTest {
 
         AlphaNoticeState.ReadResult result = AlphaNoticeState.read(stateFile);
         assertFalse(result.readable());
-        assertFalse(result.requiresNotice(1));
+        assertFalse(result.requiresNotice(CURRENT_VERSIONS));
         assertFalse(result.warning().isBlank());
     }
 
@@ -53,7 +71,7 @@ class AlphaNoticeStateTest {
         AlphaNoticeState.ReadResult result = AlphaNoticeState.read(temporaryDirectory);
 
         assertFalse(result.readable());
-        assertFalse(result.requiresNotice(1));
+        assertFalse(result.requiresNotice(CURRENT_VERSIONS));
         assertFalse(result.warning().isBlank());
     }
 }

@@ -13,12 +13,15 @@ import java.util.Properties;
 /**
  * Reads and writes the installation-local alpha notice acknowledgment.
  *
- * <p>The file contains only the last accepted notice version. A missing file is
- * a normal first launch, while malformed or unreadable data is reported as an
- * unusable result so the manager can fail open to the title screen.</p>
+ * <p>The file records the accepted notice revision, world migration schema,
+ * and packaged modpack release. A missing file is a normal first launch, while
+ * malformed or unreadable data is reported as an unusable result so the
+ * manager can fail open to the title screen.</p>
  */
 public final class AlphaNoticeState {
     static final String ACKNOWLEDGED_VERSION_KEY = "acknowledgedNoticeVersion";
+    static final String ACKNOWLEDGED_WORLD_SCHEMA_KEY = "acknowledgedWorldSchemaVersion";
+    static final String ACKNOWLEDGED_MODPACK_VERSION_KEY = "acknowledgedModpackVersion";
 
     private AlphaNoticeState() {
     }
@@ -32,7 +35,7 @@ public final class AlphaNoticeState {
     public static ReadResult read(Path stateFile) {
         try {
             if (Files.notExists(stateFile)) {
-                return ReadResult.readable(0);
+                return ReadResult.readable(VersionStamp.unacknowledged());
             }
 
             Properties properties = new Properties();
@@ -49,7 +52,19 @@ public final class AlphaNoticeState {
             if (acknowledgedVersion < 0) {
                 return ReadResult.unusable(ACKNOWLEDGED_VERSION_KEY + " cannot be negative");
             }
-            return ReadResult.readable(acknowledgedVersion);
+
+            int acknowledgedWorldSchema = parseOptionalNonNegativeInt(
+                    properties,
+                    ACKNOWLEDGED_WORLD_SCHEMA_KEY
+            );
+            String acknowledgedModpackVersion = properties
+                    .getProperty(ACKNOWLEDGED_MODPACK_VERSION_KEY, "")
+                    .trim();
+            return ReadResult.readable(new VersionStamp(
+                    acknowledgedVersion,
+                    acknowledgedWorldSchema,
+                    acknowledgedModpackVersion
+            ));
         } catch (IOException | RuntimeException exception) {
             String message = exception.getMessage();
             return ReadResult.unusable(
@@ -59,17 +74,13 @@ public final class AlphaNoticeState {
     }
 
     /**
-     * Atomically replaces the accepted notice version when the platform supports it.
+     * Atomically replaces the accepted version fingerprint when the platform supports it.
      *
      * @param stateFile installation-local state file
-     * @param acknowledgedVersion notice version the player accepted
+     * @param acknowledgedVersions notice, world-schema, and modpack versions the player accepted
      * @throws IOException when the state cannot be persisted
      */
-    public static void write(Path stateFile, int acknowledgedVersion) throws IOException {
-        if (acknowledgedVersion < 0) {
-            throw new IllegalArgumentException("acknowledgedVersion cannot be negative");
-        }
-
+    public static void write(Path stateFile, VersionStamp acknowledgedVersions) throws IOException {
         Path absoluteStateFile = stateFile.toAbsolutePath();
         Path parent = absoluteStateFile.getParent();
         if (parent == null) {
@@ -78,7 +89,18 @@ public final class AlphaNoticeState {
         Files.createDirectories(parent);
 
         Properties properties = new Properties();
-        properties.setProperty(ACKNOWLEDGED_VERSION_KEY, Integer.toString(acknowledgedVersion));
+        properties.setProperty(
+                ACKNOWLEDGED_VERSION_KEY,
+                Integer.toString(acknowledgedVersions.noticeVersion())
+        );
+        properties.setProperty(
+                ACKNOWLEDGED_WORLD_SCHEMA_KEY,
+                Integer.toString(acknowledgedVersions.worldSchemaVersion())
+        );
+        properties.setProperty(
+                ACKNOWLEDGED_MODPACK_VERSION_KEY,
+                acknowledgedVersions.modpackVersion()
+        );
         Path temporaryFile = Files.createTempFile(parent, "alpha_notice_", ".tmp");
         try {
             try (BufferedWriter writer = Files.newBufferedWriter(temporaryFile, StandardCharsets.UTF_8)) {
@@ -99,22 +121,55 @@ public final class AlphaNoticeState {
         }
     }
 
+    private static int parseOptionalNonNegativeInt(Properties properties, String key) {
+        String rawValue = properties.getProperty(key);
+        if (rawValue == null || rawValue.isBlank()) {
+            return 0;
+        }
+        int value = Integer.parseInt(rawValue.trim());
+        if (value < 0) {
+            throw new IllegalArgumentException(key + " cannot be negative");
+        }
+        return value;
+    }
+
+    /** Version fingerprint accepted by the player for this local installation. */
+    public record VersionStamp(int noticeVersion, int worldSchemaVersion, String modpackVersion) {
+        public VersionStamp {
+            if (noticeVersion < 0) {
+                throw new IllegalArgumentException("noticeVersion cannot be negative");
+            }
+            if (worldSchemaVersion < 0) {
+                throw new IllegalArgumentException("worldSchemaVersion cannot be negative");
+            }
+            modpackVersion = modpackVersion == null ? "" : modpackVersion.trim();
+        }
+
+        private static VersionStamp unacknowledged() {
+            return new VersionStamp(0, 0, "");
+        }
+    }
+
     /** Result of reading an acknowledgment file. */
-    public record ReadResult(int acknowledgedVersion, boolean readable, String warning) {
-        private static ReadResult readable(int acknowledgedVersion) {
-            return new ReadResult(acknowledgedVersion, true, "");
+    public record ReadResult(VersionStamp acknowledgedVersions, boolean readable, String warning) {
+        private static ReadResult readable(VersionStamp acknowledgedVersions) {
+            return new ReadResult(acknowledgedVersions, true, "");
         }
 
         private static ReadResult unusable(String warning) {
-            return new ReadResult(0, false, warning);
+            return new ReadResult(VersionStamp.unacknowledged(), false, warning);
         }
 
         /**
-         * Returns whether this valid state predates the supplied notice version.
+         * Returns whether any accepted version differs from the current fingerprint.
          * Unusable state always returns false so startup fails open.
          */
-        public boolean requiresNotice(int currentNoticeVersion) {
-            return readable && acknowledgedVersion < currentNoticeVersion;
+        public boolean requiresNotice(VersionStamp currentVersions) {
+            return readable && (
+                    acknowledgedVersions.noticeVersion() < currentVersions.noticeVersion()
+                            || acknowledgedVersions.worldSchemaVersion() != currentVersions.worldSchemaVersion()
+                            || !acknowledgedVersions.modpackVersion().equals(currentVersions.modpackVersion())
+            );
         }
     }
 }

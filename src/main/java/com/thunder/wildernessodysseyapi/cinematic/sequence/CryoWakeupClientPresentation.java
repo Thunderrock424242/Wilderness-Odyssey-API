@@ -1,10 +1,10 @@
 package com.thunder.wildernessodysseyapi.cinematic.sequence;
 
-import com.thunder.wildernessodysseyapi.ai.voice.VoiceEmotion;
 import com.thunder.wildernessodysseyapi.cinematic.client.AetherCinematicVoice;
 import com.thunder.wildernessodysseyapi.cinematic.client.CinematicClientController;
 import com.thunder.wildernessodysseyapi.cinematic.client.CinematicPostEffectController;
 import com.thunder.wildernessodysseyapi.cinematic.client.ClientCinematicPresentation;
+import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -245,8 +245,18 @@ public final class CryoWakeupClientPresentation implements ClientCinematicPresen
     }
 
     @Override
+    public void onStarted(CinematicClientController state) {
+        AetherCinematicVoice.preloadAuthoredClips(
+                NARRATION_KEYS.values().stream().map(CryoWakeupClientPresentation::voiceClip).toList()
+        );
+    }
+
+    @Override
     public void onNarration(CinematicClientController state, ResourceLocation cueId, Component text) {
-        AetherCinematicVoice.speak(text, narrationEmotion(cueId), narrationRadioEffect(cueId));
+        String key = NARRATION_KEYS.get(cueId);
+        if (key != null) {
+            AetherCinematicVoice.playAuthoredClip(voiceClip(key));
+        }
     }
 
     @Override
@@ -267,35 +277,6 @@ public final class CryoWakeupClientPresentation implements ClientCinematicPresen
     /** Used by the cryo renderer to show the presentation-only local-player proxy. */
     public static boolean shouldRenderOccupant(ResourceLocation stage) {
         return CryoWakeupPresentationModel.isExteriorStage(stage);
-    }
-
-    /** Resolves only registered authored cues to bounded local voice delivery moods. */
-    static VoiceEmotion narrationEmotion(ResourceLocation cueId) {
-        if (CryoWakeupSequence.NARRATION_CONTAMINATION.equals(cueId)
-                || CryoWakeupSequence.NARRATION_FILTRATION_OFFLINE.equals(cueId)
-                || CryoWakeupSequence.NARRATION_CARDIAC_LOW.equals(cueId)) {
-            return VoiceEmotion.CONCERNED;
-        }
-        if (CryoWakeupSequence.NARRATION_REVIVAL_AUTHORIZED.equals(cueId)
-                || CryoWakeupSequence.NARRATION_PACING.equals(cueId)) {
-            return VoiceEmotion.CONCERNED;
-        }
-        if (CryoWakeupSequence.NARRATION_AETHER_IDENTITY.equals(cueId)
-                || CryoWakeupSequence.NARRATION_AETHER_LIMITS.equals(cueId)) {
-            return VoiceEmotion.DAMAGED;
-        }
-        return VoiceEmotion.CALM;
-    }
-
-    /** Adds restrained corruption only to A.E.T.H.E.R's damaged self-disclosure. */
-    static float narrationRadioEffect(ResourceLocation cueId) {
-        if (CryoWakeupSequence.NARRATION_AETHER_IDENTITY.equals(cueId)) {
-            return 0.08F;
-        }
-        if (CryoWakeupSequence.NARRATION_AETHER_LIMITS.equals(cueId)) {
-            return 0.06F;
-        }
-        return 0.015F;
     }
 
     private static void renderSubtitle(
@@ -573,6 +554,13 @@ public final class CryoWakeupClientPresentation implements ClientCinematicPresen
 
     private static Map.Entry<ResourceLocation, String> cue(ResourceLocation id, String key) {
         return Map.entry(id, key);
+    }
+
+    private static ResourceLocation voiceClip(String key) {
+        return ResourceLocation.fromNamespaceAndPath(
+                ModConstants.MOD_ID,
+                "voice/cryo/" + key + ".wav"
+        );
     }
 
     private static float gameTime(float partialTick) {

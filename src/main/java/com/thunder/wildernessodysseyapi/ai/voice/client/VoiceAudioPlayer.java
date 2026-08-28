@@ -12,8 +12,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-/** Plays one generated in-memory WAV without touching the render thread or permanent files. */
-final class VoiceAudioPlayer {
+/** Plays one bounded generated or bundled WAV without touching the render thread. */
+public final class VoiceAudioPlayer {
     private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "Aether-Voice-Playback");
         thread.setDaemon(true);
@@ -21,11 +21,13 @@ final class VoiceAudioPlayer {
     });
     private volatile Clip activeClip;
 
-    CompletableFuture<Void> play(byte[] wav, float volume) {
+    /** Replaces any active clip and plays one complete in-memory WAV. */
+    public CompletableFuture<Void> play(byte[] wav, float volume) {
         return CompletableFuture.runAsync(() -> playBlocking(wav, volume), executor);
     }
 
-    void stop() {
+    /** Stops the active clip immediately; safe to call from cinematic cleanup. */
+    public void stop() {
         Clip clip = activeClip;
         activeClip = null;
         if (clip != null) {
