@@ -27,12 +27,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
  * Single-player cryogenic revival followed by an unlocked A.E.T.H.E.R recovery briefing.
  *
- * <p>The first forty-four seconds are a controlled cinematic. The final twenty
+ * <p>The first sixty-three seconds are a controlled cinematic. The final twenty
  * seconds retain only presentation and recovery effects, allowing the player
  * to walk while A.E.T.H.E.R completes the introduction.</p>
  */
@@ -83,19 +84,57 @@ public final class CryoWakeupSequence implements CinematicSequence {
     public static final ResourceLocation NARRATION_AETHER_LIMITS = narration("aether_limits");
     public static final ResourceLocation NARRATION_FIND_EXIT = narration("find_exit");
 
-    private static final int NARRATION_TICKS = 70;
+    private static final Map<ResourceLocation, Integer> NARRATION_DURATIONS = Map.ofEntries(
+            Map.entry(NARRATION_MEDICAL_ONLINE, 112),
+            Map.entry(NARRATION_OCCUPANT_DETECTED, 93),
+            Map.entry(NARRATION_CONTAMINATION, 117),
+            Map.entry(NARRATION_FILTRATION_OFFLINE, 95),
+            Map.entry(NARRATION_REVIVAL_AUTHORIZED, 98),
+            Map.entry(NARRATION_THERMAL_RESTORATION, 56),
+            Map.entry(NARRATION_CIRCULATORY_ASSIST, 65),
+            Map.entry(NARRATION_CRYOPROTECTANT_PURGE, 62),
+            Map.entry(NARRATION_REANIMATION_COMPOUND, 92),
+            Map.entry(NARRATION_CARDIAC_LOW, 95),
+            Map.entry(NARRATION_PACING, 107),
+            Map.entry(NARRATION_RHYTHM_RESTORED, 53),
+            Map.entry(NARRATION_RESPIRATORY_RESPONSE, 52),
+            Map.entry(NARRATION_DRAINING, 126),
+            Map.entry(NARRATION_MASK_RELEASING, 84),
+            Map.entry(NARRATION_MOVE_SLOWLY, 77),
+            Map.entry(NARRATION_AWAKE, 89),
+            Map.entry(NARRATION_AETHER_IDENTITY, 109),
+            Map.entry(NARRATION_AETHER_LIMITS, 92),
+            Map.entry(NARRATION_FIND_EXIT, 106)
+    );
+    private static final Map<ResourceLocation, List<NarrationCue>> STAGE_NARRATION = Map.ofEntries(
+            Map.entry(EXTERIOR_REVEAL, List.of(cueAt(4, NARRATION_MEDICAL_ONLINE))),
+            Map.entry(MEDICAL_DIAGNOSTIC, List.of(
+                    cueAt(0, NARRATION_OCCUPANT_DETECTED),
+                    cueAt(105, NARRATION_CONTAMINATION)
+            )),
+            Map.entry(REVIVAL_PROTOCOL, List.of(
+                    cueAt(0, NARRATION_REVIVAL_AUTHORIZED),
+                    cueAt(110, NARRATION_CRYOPROTECTANT_PURGE),
+                    cueAt(180, NARRATION_REANIMATION_COMPOUND)
+            )),
+            Map.entry(CARDIAC_PACING, List.of(cueAt(0, NARRATION_PACING))),
+            Map.entry(SUSPENSION_DRAIN, List.of(cueAt(0, NARRATION_DRAINING))),
+            Map.entry(EYES_REOPENING, List.of(cueAt(4, NARRATION_AWAKE))),
+            Map.entry(MASK_RELEASE, List.of(cueAt(0, NARRATION_MASK_RELEASING))),
+            Map.entry(BALANCE_CHECK, List.of(cueAt(0, NARRATION_MOVE_SLOWLY)))
+    );
     private static final List<CinematicStage> STAGES = List.of(
             stage(BLACK_SCREEN, 20, CinematicControlPolicy.LOCKED),
-            stage(EXTERIOR_REVEAL, 80, CinematicControlPolicy.LOCKED),
-            stage(MEDICAL_DIAGNOSTIC, 150, CinematicControlPolicy.LOCKED),
-            stage(REVIVAL_PROTOCOL, 220, CinematicControlPolicy.LOCKED),
-            stage(CARDIAC_PACING, 80, CinematicControlPolicy.LOCKED),
-            stage(SUSPENSION_DRAIN, 100, CinematicControlPolicy.LOCKED),
+            stage(EXTERIOR_REVEAL, 120, CinematicControlPolicy.LOCKED),
+            stage(MEDICAL_DIAGNOSTIC, 230, CinematicControlPolicy.LOCKED),
+            stage(REVIVAL_PROTOCOL, 280, CinematicControlPolicy.LOCKED),
+            stage(CARDIAC_PACING, 120, CinematicControlPolicy.LOCKED),
+            stage(SUSPENSION_DRAIN, 130, CinematicControlPolicy.LOCKED),
             stage(BLACKOUT_TRANSITION, 20, CinematicControlPolicy.LOCKED),
-            stage(EYES_REOPENING, 80, CinematicControlPolicy.LOCKED),
-            stage(MASK_RELEASE, 40, CinematicControlPolicy.LOCKED),
+            stage(EYES_REOPENING, 100, CinematicControlPolicy.LOCKED),
+            stage(MASK_RELEASE, 90, CinematicControlPolicy.LOCKED),
             stage(CRYO_OPENING, 60, CinematicControlPolicy.LOCKED),
-            stage(BALANCE_CHECK, 40, CinematicControlPolicy.LOCKED),
+            stage(BALANCE_CHECK, 90, CinematicControlPolicy.LOCKED),
             stage(RECOVERY_WALK, 400, CinematicControlPolicy.PRESENTATION_ONLY)
     );
 
@@ -216,7 +255,6 @@ public final class CryoWakeupSequence implements CinematicSequence {
             context.cueActor(CUE_OPEN);
             releasePlayer(context);
             applyRecoveryEffects(context.player());
-            context.narrateOnce(NARRATION_AWAKE, NARRATION_TICKS);
         }
     }
 
@@ -225,32 +263,11 @@ public final class CryoWakeupSequence implements CinematicSequence {
         ResourceLocation stage = context.stage().id();
         int elapsed = context.stageElapsedTicks();
         tickMedicalSounds(context, stage, elapsed);
-        if (stage.equals(EXTERIOR_REVEAL) && elapsed == 8) {
-            context.narrateOnce(NARRATION_MEDICAL_ONLINE, NARRATION_TICKS);
-        } else if (stage.equals(MEDICAL_DIAGNOSTIC)) {
-            narrateAt(context, elapsed, 0, NARRATION_OCCUPANT_DETECTED);
-            narrateAt(context, elapsed, 50, NARRATION_CONTAMINATION);
-            narrateAt(context, elapsed, 100, NARRATION_FILTRATION_OFFLINE);
-        } else if (stage.equals(REVIVAL_PROTOCOL)) {
-            narrateAt(context, elapsed, 0, NARRATION_REVIVAL_AUTHORIZED);
-            narrateAt(context, elapsed, 44, NARRATION_THERMAL_RESTORATION);
-            narrateAt(context, elapsed, 88, NARRATION_CIRCULATORY_ASSIST);
-            narrateAt(context, elapsed, 132, NARRATION_CRYOPROTECTANT_PURGE);
-            narrateAt(context, elapsed, 176, NARRATION_REANIMATION_COMPOUND);
-        } else if (stage.equals(CARDIAC_PACING)) {
-            narrateAt(context, elapsed, 0, NARRATION_CARDIAC_LOW);
-            narrateAt(context, elapsed, 40, NARRATION_PACING);
-            if (elapsed == 48) {
+        tickStageNarration(context, stage, elapsed);
+        if (stage.equals(CARDIAC_PACING)) {
+            if (elapsed == 94) {
                 sound(context, SoundEvents.LIGHTNING_BOLT_IMPACT, 0.38F, 1.35F);
             }
-        } else if (stage.equals(SUSPENSION_DRAIN)) {
-            narrateAt(context, elapsed, 0, NARRATION_RHYTHM_RESTORED);
-            narrateAt(context, elapsed, 34, NARRATION_RESPIRATORY_RESPONSE);
-            narrateAt(context, elapsed, 68, NARRATION_DRAINING);
-        } else if (stage.equals(MASK_RELEASE)) {
-            narrateAt(context, elapsed, 0, NARRATION_MASK_RELEASING);
-        } else if (stage.equals(BALANCE_CHECK)) {
-            narrateAt(context, elapsed, 0, NARRATION_MOVE_SLOWLY);
         } else if (stage.equals(RECOVERY_WALK)) {
             tickRecoveryNarration(context, elapsed);
         }
@@ -287,16 +304,34 @@ public final class CryoWakeupSequence implements CinematicSequence {
         return 0;
     }
 
+    /** Returns the measured authored clip length, including a short subtitle fade tail. */
+    public static int narrationDurationTicks(ResourceLocation cueId) {
+        return NARRATION_DURATIONS.getOrDefault(cueId, 100);
+    }
+
+    static List<NarrationCue> narrationCues(ResourceLocation stageId) {
+        return STAGE_NARRATION.getOrDefault(stageId, List.of());
+    }
+
     private static void tickRecoveryNarration(CinematicSequenceContext context, int elapsed) {
         double distanceSquared = context.player().position().distanceToSqr(Vec3.atCenterOf(context.anchor()));
-        if (elapsed >= 40 && distanceSquared >= 2.25D) {
-            context.narrateOnce(NARRATION_AETHER_IDENTITY, 90);
+        if (elapsed >= 20 && (distanceSquared >= 2.25D || elapsed >= 40)) {
+            context.narrateOnce(
+                    NARRATION_AETHER_IDENTITY,
+                    narrationDurationTicks(NARRATION_AETHER_IDENTITY)
+            );
         }
-        if (elapsed >= 140 && (distanceSquared >= 9.0D || elapsed >= 220)) {
-            context.narrateOnce(NARRATION_AETHER_LIMITS, 110);
+        if (elapsed >= 165 && (distanceSquared >= 9.0D || elapsed >= 180)) {
+            context.narrateOnce(
+                    NARRATION_AETHER_LIMITS,
+                    narrationDurationTicks(NARRATION_AETHER_LIMITS)
+            );
         }
-        if (elapsed >= 280 && (distanceSquared >= 25.0D || elapsed >= 360)) {
-            context.narrateOnce(NARRATION_FIND_EXIT, 100);
+        if (elapsed >= 280 && (distanceSquared >= 25.0D || elapsed >= 290)) {
+            context.narrateOnce(
+                    NARRATION_FIND_EXIT,
+                    narrationDurationTicks(NARRATION_FIND_EXIT)
+            );
         }
     }
 
@@ -337,14 +372,15 @@ public final class CryoWakeupSequence implements CinematicSequence {
         ));
     }
 
-    private static void narrateAt(
+    private static void tickStageNarration(
             CinematicSequenceContext context,
-            int elapsed,
-            int cueTick,
-            ResourceLocation cueId
+            ResourceLocation stage,
+            int elapsed
     ) {
-        if (elapsed == cueTick) {
-            context.narrateOnce(cueId, NARRATION_TICKS);
+        for (NarrationCue cue : narrationCues(stage)) {
+            if (elapsed == cue.tick()) {
+                context.narrateOnce(cue.id(), narrationDurationTicks(cue.id()));
+            }
         }
     }
 
@@ -458,5 +494,17 @@ public final class CryoWakeupSequence implements CinematicSequence {
 
     private static ResourceLocation narration(String path) {
         return id("cinematic/cryo_wakeup/narration/" + path);
+    }
+
+    private static NarrationCue cueAt(int tick, ResourceLocation id) {
+        return new NarrationCue(tick, id);
+    }
+
+    record NarrationCue(int tick, ResourceLocation id) {
+        NarrationCue {
+            if (tick < 0 || id == null) {
+                throw new IllegalArgumentException("Narration cue requires a non-negative tick and id");
+            }
+        }
     }
 }

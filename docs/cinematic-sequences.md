@@ -19,22 +19,22 @@ The cryo origin is private single-player story content. The spawn handler leaves
 
 In a private integrated world, the existing spawn handler starts `wildernessodysseyapi:cryo_wakeup` only after a new player has been successfully assigned to a real cryo tube. The first automatic request records `automatic_started`; normal completion records the sequence id in `completed`. An interrupted started-but-incomplete intro is eligible for replay on the next login. Existing players who already had a cryo assignment before this feature are not enrolled automatically.
 
-The normal timeline lasts 1,290 ticks (64.5 seconds):
+The normal timeline lasts 1,660 ticks (83 seconds). The first 63 seconds remain locked; the final 20 seconds return movement for the briefing:
 
 | Start | Stage | Presentation and authority |
 | ---: | --- | --- |
 | 0 | Black screen | Controls locked; tube occupant established |
 | 20 | Exterior reveal | Detached camera reveals the local-player proxy floating in the tube |
-| 100 | Medical diagnostic | Contamination and filtration warnings |
-| 250 | Revival protocol | Rewarming, circulation, cryoprotectant purge, and authored injection cue |
-| 470 | Cardiac pacing | Electrical pacing jolt and warning pulse |
-| 550 | Suspension drain | Contaminated-fluid tint clears and a bounded mist burst fires |
-| 650 | Black transition | Exterior view cuts to black before first person |
-| 670 | Eyes reopening | Lower occupant-relative camera, eyelids, and strong blur |
-| 750 | Mask release | Breathing-assistance release cue and mechanical sound |
-| 790 | Tube opening | Opening machinery cue while blur and mechanical shake ease |
-| 850 | Balance check | Camera levels and A.E.T.H.E.R warns the player to move slowly |
-| 890 | Recovery walk | Controls return for a twenty-second, movement-aware briefing |
+| 140 | Medical diagnostic | Patient acquisition, contamination, and filtration status |
+| 370 | Revival protocol | Rewarming, cryoprotectant washout, and vasopressor response |
+| 650 | Cardiac pacing | Female countdown aligns with the electrical pacing jolt |
+| 770 | Suspension drain | Circulation report, contaminated-fluid drain, and mist burst |
+| 900 | Black transition | Exterior view cuts to black before first person |
+| 920 | Eyes reopening | Lower occupant-relative camera, eyelids, strong blur, and consciousness report |
+| 1,020 | Mask release | Breathing-mask release cue and mechanical sound |
+| 1,110 | Tube opening | Opening machinery cue while blur and mechanical shake ease |
+| 1,170 | Balance check | Camera levels and A.E.T.H.E.R calmly tells the player to remain still |
+| 1,260 | Recovery walk | Controls return for a twenty-second, movement-aware briefing |
 
 Completion shows the temporary objective text, “Find a way out of the facility.” There is currently no separate quest/objective owner in the project, so this message is not persisted as quest state.
 
@@ -46,7 +46,7 @@ Every completion, manual cancellation, death, logout, dimension change, LAN publ
 
 The original Blockbench-authored `models/block/cryo_tube.json` and its original item model remain the rendering source of truth. The cinematic does not replace that geometry with a simplified GeckoLib model. `CryoTubeBlockEntity` may retain synchronized high-level cue state, but the static tube geometry is unchanged and those cues do not claim model-part animation.
 
-An additive block-entity renderer draws only a presentation-time copy of the local player inside the tube; Minecraft still renders the original baked cryo model normally. The proxy never creates a second entity and never changes server gameplay authority. Strict single-player scope makes the tube anchor sufficient to identify the occupant. The real player remains at the server-owned safe position until control return.
+An additive block-entity renderer draws only presentation-time content around the original tube: a softly lit and gently floating copy of the local player, a translucent assisted-breathing mask, bounded life-support routing, suspension volume, deterministic microbubbles, and a stage-colored diagnostic sweep. Minecraft still renders the original baked cryo model normally. The proxy never creates a second entity and never changes server gameplay authority. Strict single-player scope makes the tube anchor sufficient to identify the occupant. The real player remains at the server-owned safe position until control return.
 
 The detached camera position is anchored to the tube and follows its facing. The later first-person position is a separate lower eye anchor inside the chamber, which avoids inheriting the standing player's eye height that previously placed the view near the top of the model. NeoForge exposes camera-angle events but no world-position event in this version, so one narrow client-only `Camera.setup` tail injection applies a position only while an active presentation supplies it.
 
@@ -54,9 +54,11 @@ Blur uses Minecraft's native transient blur pass and respects the screen-effect 
 
 ## A.E.T.H.E.R narration
 
-All medical and recovery lines are authored cue ids. They do not call Ollama and cannot invent a procedure, observation, or capability. The client always shows translated subtitles. When the optional local A.E.T.H.E.R voice service is enabled, the same authored text uses Kokoro's warm feminine `af_heart` voice with a calm, deliberate baseline; warnings become concerned rather than frantic, and only damaged self-disclosure receives a faint synthetic artifact. When the master local voice service is not enabled, cinematic narration uses the operating system's offline narrator as a zero-setup fallback, whose installed voice is selected by Windows rather than by the mod. Both paths recheck the private unpublished single-player boundary and are cleared when the cinematic stops. Set `aether_voice.cinematicNarration` to false in the client config to silence authored cinematic speech while retaining subtitles.
+All medical and recovery lines are authored cue ids. They do not call Ollama and cannot invent a procedure, observation, or capability. The cryo awakening packages deterministic offline PCM WAV clips generated with the installed feminine Microsoft Zira voice. The client preloads those bounded assets during the black-screen lead-in and plays them through the existing A.E.T.H.E.R JavaSound owner, bypassing both live synthesis latency and Windows Narrator. Subtitle durations are the measured clip lengths plus a short fade tail, and the stage cue sheet has a regression test that rejects overlaps. Both text and audio start from the same client cue callback and cleanup stops the active clip. Set `aether_voice.cinematicNarration` to false in the client config to silence authored cinematic speech while retaining subtitles. The optional Kokoro `af_heart` service remains the voice path for ordinary A.E.T.H.E.R conversation and other dynamically produced lines.
 
-The machinery, pacing, drain, mask, and opening stages layer sparse vanilla sound events at exact cue ticks: monitor chirps, pump and valve movement, fluid circulation, low cardiac pulses, the pacing discharge, breathing, and the chamber mechanism. There is no continuous per-tick sound loop, and no fake `.ogg` asset or nonexistent sound registration is included. These layers can be replaced later with professionally produced Wilderness Odyssey effects without changing sequence timing. Mist uses one bounded vanilla cloud-particle burst during drain.
+The checked-in generator is `tools/aether_voice_service/generate_cryo_voice.ps1`. It reads the authoritative English translation strings, selects `Microsoft Zira Desktop`, regenerates only the cryo voice directory, and writes a measured manifest. Regenerating clips after text changes is deliberate source authoring; it is not performed at game runtime.
+
+The machinery, pacing, drain, mask, and opening stages layer sparse vanilla sound events at exact cue ticks: monitor chirps, pump and valve movement, fluid circulation, low cardiac pulses, the pacing discharge, breathing, and the chamber mechanism. There is no continuous per-tick sound loop. Authored voice uses packaged WAVs through the shared bounded player; machinery can still be replaced later with professionally produced Wilderness Odyssey effects without changing sequence timing. Mist uses one bounded vanilla cloud-particle burst during drain.
 
 ## Developer commands
 
@@ -72,6 +74,6 @@ The play command finds the nearest compatible cryo tube within three horizontal 
 
 ## In-game verification
 
-Use a development client and verify both automatic first login and the developer command. During the first 44.5 seconds, attempt walking, jumping, sprinting, attacking, mining, using the tube, opening inventory, and changing perspective. Confirm none disrupt the sequence; chat and the pause menu intentionally remain available. Confirm the original cryo-tube shape and UV layout are unchanged and the opening exterior view sees the local-player proxy inside it rather than the tube ceiling; the black cut then enters the lower first-person view. Check that the contaminated-fluid screen tint clears, blur fades, subtitles stay synchronized, and controls return for the walking briefing. The restored static model is not expected to animate its door, mask, fluid, or conduits.
+Use a development client and verify both automatic first login and the developer command. During the first 63 seconds, attempt walking, jumping, sprinting, attacking, mining, using the tube, opening inventory, and changing perspective. Confirm none disrupt the sequence; chat and the pause menu intentionally remain available. Confirm the original cryo-tube shape and UV layout are unchanged and the opening exterior view sees the softly lit local-player proxy, breathing mask, suspension volume, bubbles, diagnostic sweep, and life-support routing inside it rather than the tube ceiling; the black cut then enters the lower first-person view. Check that every subtitle begins with its matching feminine voice clip, no line overlaps the next, the pacing flash lands after the spoken countdown, the contaminated-fluid screen tint clears, blur fades, and controls return for the walking briefing. The restored static model is not expected to animate its door, fluid, or conduits; those cinematic details are temporary renderer layers.
 
 Disconnect, die, change dimension through an external command, use `/wo sequence stop`, and publish to LAN during separate replays. Confirm normal movement, gravity, HUD visibility, perspective, attacks, interaction, blur, and speech cleanup all return. On a dedicated server and LAN-published integrated world, confirm automatic cryo assignment is skipped and the developer play command is rejected.

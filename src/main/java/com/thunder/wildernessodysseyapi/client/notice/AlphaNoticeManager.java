@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.client.notice;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.worldupgrade.WorldUpgradeManager;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -61,7 +62,7 @@ public final class AlphaNoticeManager {
                 );
                 return;
             }
-            if (state.requiresNotice(CURRENT_NOTICE_VERSION)) {
+            if (state.requiresNotice(currentVersions())) {
                 event.setNewScreen(new AlphaNoticeScreen(newScreen));
             }
         } catch (RuntimeException exception) {
@@ -75,7 +76,7 @@ public final class AlphaNoticeManager {
     /** Persists acceptance when possible and always continues to the preserved main menu. */
     public static void acknowledgeAndContinue(Minecraft minecraft, Screen mainMenu) {
         try {
-            AlphaNoticeState.write(stateFile(FMLPaths.CONFIGDIR.get()), CURRENT_NOTICE_VERSION);
+            AlphaNoticeState.write(stateFile(FMLPaths.CONFIGDIR.get()), currentVersions());
         } catch (IOException | RuntimeException exception) {
             ModConstants.LOGGER.warn(
                     "Unable to save alpha notice acknowledgment; continuing to the main menu",
@@ -96,5 +97,13 @@ public final class AlphaNoticeManager {
 
     static Path stateFile(Path configDirectory) {
         return configDirectory.resolve(ModConstants.MOD_ID).resolve(STATE_FILE_NAME);
+    }
+
+    private static AlphaNoticeState.VersionStamp currentVersions() {
+        return new AlphaNoticeState.VersionStamp(
+                CURRENT_NOTICE_VERSION,
+                WorldUpgradeManager.TARGET_VERSION,
+                ModConstants.currentVersion()
+        );
     }
 }
