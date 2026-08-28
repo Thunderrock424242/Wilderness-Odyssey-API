@@ -24,7 +24,11 @@ class CryoWakeupVoiceAssetsTest {
             JsonObject manifest = JsonParser.parseReader(
                     new InputStreamReader(input, StandardCharsets.UTF_8)
             ).getAsJsonObject();
-            assertEquals("Microsoft Zira Desktop", manifest.get("voice").getAsString());
+            assertEquals("Kokoro-82M 0.9.4", manifest.get("engine").getAsString());
+            assertEquals("af_nicole", manifest.get("voice").getAsString());
+            assertEquals("subdued_human_caretaker", manifest.get("style").getAsString());
+            assertEquals(0.95D, manifest.get("speed").getAsDouble());
+            assertEquals(24_000, manifest.get("sample_rate").getAsInt());
             JsonObject clips = manifest.getAsJsonObject("clips");
             assertEquals(20, clips.size());
             for (String key : clips.keySet()) {

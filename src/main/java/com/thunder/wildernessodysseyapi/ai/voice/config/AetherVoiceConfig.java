@@ -29,7 +29,7 @@ public final class AetherVoiceConfig {
         builder.comment("Optional local-only Aether speech, push-to-talk, cinematic narration, and lore reading.")
                 .push("aether_voice");
         VOICE_ENABLED = builder
-                .comment("Enable local speech playback. Text chat remains available when this is false or the service is unavailable.")
+                .comment("Enable dynamically generated local speech playback. Text chat remains available when this is false or the service is unavailable; bundled cinematic narration has its own setting.")
                 .define("enabled", false);
         INPUT_MODE = builder
                 .comment("TEXT disables microphone capture. PUSH_TO_TALK uses the configurable Controls key. ALWAYS_LISTENING is reserved and currently behaves as TEXT.")
@@ -41,8 +41,8 @@ public final class AetherVoiceConfig {
                 .comment("Optional bearer token shared with AETHER_VOICE_TOKEN. Leave blank only when local process isolation is sufficient.")
                 .define("serviceToken", "");
         VOICE_NAME = builder
-                .comment("Kokoro voice id requested from the local service. The default is a warm feminine voice selected for Aether.")
-                .define("voiceName", "af_heart");
+                .comment("Kokoro voice id requested from the local service. The default is Aether's subdued, intimate caretaker voice.")
+                .define("voiceName", "af_nicole");
         VOICE_VOLUME = builder
                 .comment("Client-local generated voice volume, where 1.0 is full configured volume.")
                 .defineInRange("volume", 0.85D, 0.0D, 1.0D);
@@ -53,10 +53,10 @@ public final class AetherVoiceConfig {
                 .comment("Show the spoken form as a temporary subtitle without creating another chat message.")
                 .define("subtitles", true);
         RADIO_PROCESSING = builder
-                .comment("Allow subtle service-side radio/corruption processing requested by authored metadata.")
-                .define("radioProcessing", true);
+                .comment("Allow service-side radio/corruption processing requested by authored metadata. Disabled by default to preserve Aether's natural delivery.")
+                .define("radioProcessing", false);
         CINEMATIC_NARRATION = builder
-                .comment("Allow registered authored cinematic narration cues to use the shared local voice service.")
+                .comment("Allow registered authored cinematic narration cues to play bundled speech through the shared audio owner.")
                 .define("cinematicNarration", true);
         LORE_READ_ALOUD = builder
                 .comment("Show the Read Aloud action for recovered Codex lore pages.")

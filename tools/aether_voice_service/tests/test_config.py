@@ -17,6 +17,7 @@ class ServiceSettingsTest(unittest.TestCase):
         self.assertEqual(8765, settings.port)
         self.assertFalse(settings.allow_model_downloads)
         self.assertEqual("small.en", settings.whisper_model)
+        self.assertEqual("af_nicole", settings.default_voice)
 
     def test_rejects_remote_bind_addresses(self) -> None:
         with patch.dict(os.environ, {}, clear=False):

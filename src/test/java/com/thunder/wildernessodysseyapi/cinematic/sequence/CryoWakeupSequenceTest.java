@@ -11,17 +11,17 @@ class CryoWakeupSequenceTest {
     void timelineMatchesTheRevivalAndRecoveryCueSheet() {
         assertEquals(0, CryoWakeupSequence.startTick(CryoWakeupSequence.BLACK_SCREEN));
         assertEquals(20, CryoWakeupSequence.startTick(CryoWakeupSequence.EXTERIOR_REVEAL));
-        assertEquals(140, CryoWakeupSequence.startTick(CryoWakeupSequence.MEDICAL_DIAGNOSTIC));
-        assertEquals(370, CryoWakeupSequence.startTick(CryoWakeupSequence.REVIVAL_PROTOCOL));
-        assertEquals(650, CryoWakeupSequence.startTick(CryoWakeupSequence.CARDIAC_PACING));
-        assertEquals(770, CryoWakeupSequence.startTick(CryoWakeupSequence.SUSPENSION_DRAIN));
-        assertEquals(900, CryoWakeupSequence.startTick(CryoWakeupSequence.BLACKOUT_TRANSITION));
-        assertEquals(920, CryoWakeupSequence.startTick(CryoWakeupSequence.EYES_REOPENING));
-        assertEquals(1_020, CryoWakeupSequence.startTick(CryoWakeupSequence.MASK_RELEASE));
-        assertEquals(1_110, CryoWakeupSequence.startTick(CryoWakeupSequence.CRYO_OPENING));
-        assertEquals(1_170, CryoWakeupSequence.startTick(CryoWakeupSequence.BALANCE_CHECK));
-        assertEquals(1_260, CryoWakeupSequence.startTick(CryoWakeupSequence.RECOVERY_WALK));
-        assertEquals(1_660, CryoWakeupSequence.totalDurationTicks());
+        assertEquals(190, CryoWakeupSequence.startTick(CryoWakeupSequence.MEDICAL_DIAGNOSTIC));
+        assertEquals(560, CryoWakeupSequence.startTick(CryoWakeupSequence.REVIVAL_PROTOCOL));
+        assertEquals(950, CryoWakeupSequence.startTick(CryoWakeupSequence.CARDIAC_PACING));
+        assertEquals(1_130, CryoWakeupSequence.startTick(CryoWakeupSequence.SUSPENSION_DRAIN));
+        assertEquals(1_350, CryoWakeupSequence.startTick(CryoWakeupSequence.BLACKOUT_TRANSITION));
+        assertEquals(1_370, CryoWakeupSequence.startTick(CryoWakeupSequence.EYES_REOPENING));
+        assertEquals(1_500, CryoWakeupSequence.startTick(CryoWakeupSequence.MASK_RELEASE));
+        assertEquals(1_630, CryoWakeupSequence.startTick(CryoWakeupSequence.CRYO_OPENING));
+        assertEquals(1_690, CryoWakeupSequence.startTick(CryoWakeupSequence.BALANCE_CHECK));
+        assertEquals(1_810, CryoWakeupSequence.startTick(CryoWakeupSequence.RECOVERY_WALK));
+        assertEquals(2_310, CryoWakeupSequence.totalDurationTicks());
     }
 
     @Test
@@ -31,7 +31,7 @@ class CryoWakeupSequenceTest {
             assertEquals(CinematicControlPolicy.LOCKED, stages.get(i).controlPolicy());
         }
         assertEquals(CinematicControlPolicy.PRESENTATION_ONLY, stages.getLast().controlPolicy());
-        assertEquals(400, stages.getLast().durationTicks());
+        assertEquals(500, stages.getLast().durationTicks());
     }
 
     @Test
@@ -44,11 +44,28 @@ class CryoWakeupSequenceTest {
             }
             assertTrue(previousEnd <= stage.durationTicks(), () -> "narration exceeds " + stage.id());
         }
-        assertEquals(117, CryoWakeupSequence.narrationDurationTicks(
+        assertEquals(191, CryoWakeupSequence.narrationDurationTicks(
                 CryoWakeupSequence.NARRATION_CONTAMINATION
         ));
-        assertEquals(107, CryoWakeupSequence.narrationDurationTicks(
+        assertEquals(158, CryoWakeupSequence.narrationDurationTicks(
                 CryoWakeupSequence.NARRATION_PACING
         ));
+    }
+
+    @Test
+    void recoveryBriefingPreservesCaretakerPausesAtTheLatestFallbackTicks() {
+        int identityEnd = 40 + CryoWakeupSequence.narrationDurationTicks(
+                CryoWakeupSequence.NARRATION_AETHER_IDENTITY
+        );
+        int limitsEnd = 190 + CryoWakeupSequence.narrationDurationTicks(
+                CryoWakeupSequence.NARRATION_AETHER_LIMITS
+        );
+        int exitEnd = 350 + CryoWakeupSequence.narrationDurationTicks(
+                CryoWakeupSequence.NARRATION_FIND_EXIT
+        );
+
+        assertTrue(identityEnd <= 180);
+        assertTrue(limitsEnd <= 345);
+        assertEquals(500, exitEnd);
     }
 }

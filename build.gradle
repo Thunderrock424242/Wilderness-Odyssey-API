@@ -386,7 +386,12 @@ def structureGenCatalogFile = layout.buildDirectory.file('generated/structuregen
 // local run/mods content without relying on guessed namespace ownership.
 def structureGenProjectFingerprintFiles = files(
         fileTree('src/main/java') { include '**/*.java' },
-        fileTree('src/main/resources') { include '**/*' },
+        fileTree('src/main/resources') {
+            include '**/*'
+            // Authored voice output cannot affect the block/state registry catalog.
+            // Excluding it also keeps audio replacement from racing this fingerprint.
+            exclude 'assets/**/voice/**'
+        },
         fileTree('src/main/templates') { include '**/*' },
         file('build.gradle'),
         file('settings.gradle'),
