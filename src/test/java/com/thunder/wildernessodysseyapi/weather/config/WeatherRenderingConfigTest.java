@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.weather.config;
 
+import com.thunder.wildernessodysseyapi.rendering.RenderingQuality;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -141,5 +142,18 @@ class WeatherRenderingConfigTest {
         assertEquals(300, settings.minimumThunderInterval());
         assertEquals(300, settings.maximumThunderInterval());
         assertEquals(0.0, settings.volumeMultiplier(), 1.0E-12);
+    }
+
+    @Test
+    void adaptiveVariantOnlyReducesEnabledExpensiveEffects() {
+        WeatherRenderingConfig.Settings defaults = WeatherRenderingConfig.settings();
+        WeatherRenderingConfig.Settings low = defaults.adaptedTo(RenderingQuality.LOW);
+
+        assertFalse(low.raymarchedClouds());
+        assertFalse(low.volumetricClouds());
+        assertFalse(low.distantRainShafts());
+        assertTrue(low.maximumCloudTiles() < defaults.maximumCloudTiles());
+        assertTrue(low.precipitationStreakDensity() < defaults.precipitationStreakDensity());
+        assertTrue(low.distantThunderEnabled());
     }
 }

@@ -33,7 +33,7 @@ import java.util.Optional;
 /**
  * Single-player cryogenic revival followed by an unlocked A.E.T.H.E.R recovery briefing.
  *
- * <p>The first ninety-one seconds are a controlled cinematic. The final twenty-five
+ * <p>The first seventy-one seconds are a controlled cinematic. The final eighteen
  * seconds retain only presentation and recovery effects, allowing the player
  * to walk while A.E.T.H.E.R completes the introduction.</p>
  */
@@ -85,57 +85,63 @@ public final class CryoWakeupSequence implements CinematicSequence {
     public static final ResourceLocation NARRATION_FIND_EXIT = narration("find_exit");
 
     private static final Map<ResourceLocation, Integer> NARRATION_DURATIONS = Map.ofEntries(
-            Map.entry(NARRATION_MEDICAL_ONLINE, 160),
-            Map.entry(NARRATION_OCCUPANT_DETECTED, 159),
-            Map.entry(NARRATION_CONTAMINATION, 191),
-            Map.entry(NARRATION_FILTRATION_OFFLINE, 117),
-            Map.entry(NARRATION_REVIVAL_AUTHORIZED, 136),
-            Map.entry(NARRATION_THERMAL_RESTORATION, 122),
-            Map.entry(NARRATION_CIRCULATORY_ASSIST, 95),
-            Map.entry(NARRATION_CRYOPROTECTANT_PURGE, 98),
-            Map.entry(NARRATION_REANIMATION_COMPOUND, 122),
-            Map.entry(NARRATION_CARDIAC_LOW, 165),
-            Map.entry(NARRATION_PACING, 158),
+            Map.entry(NARRATION_MEDICAL_ONLINE, 110),
+            Map.entry(NARRATION_OCCUPANT_DETECTED, 116),
+            Map.entry(NARRATION_CONTAMINATION, 133),
+            Map.entry(NARRATION_FILTRATION_OFFLINE, 87),
+            Map.entry(NARRATION_REVIVAL_AUTHORIZED, 106),
+            Map.entry(NARRATION_THERMAL_RESTORATION, 91),
+            Map.entry(NARRATION_CIRCULATORY_ASSIST, 69),
+            Map.entry(NARRATION_CRYOPROTECTANT_PURGE, 72),
+            Map.entry(NARRATION_REANIMATION_COMPOUND, 88),
+            Map.entry(NARRATION_CARDIAC_LOW, 103),
+            Map.entry(NARRATION_PACING, 99),
             Map.entry(NARRATION_RHYTHM_RESTORED, 53),
             Map.entry(NARRATION_RESPIRATORY_RESPONSE, 57),
-            Map.entry(NARRATION_DRAINING, 211),
-            Map.entry(NARRATION_MASK_RELEASING, 124),
-            Map.entry(NARRATION_MOVE_SLOWLY, 107),
-            Map.entry(NARRATION_AWAKE, 113),
-            Map.entry(NARRATION_AETHER_IDENTITY, 124),
-            Map.entry(NARRATION_AETHER_LIMITS, 141),
-            Map.entry(NARRATION_FIND_EXIT, 150)
+            Map.entry(NARRATION_DRAINING, 145),
+            Map.entry(NARRATION_MASK_RELEASING, 88),
+            Map.entry(NARRATION_MOVE_SLOWLY, 78),
+            Map.entry(NARRATION_AWAKE, 94),
+            Map.entry(NARRATION_AETHER_IDENTITY, 92),
+            Map.entry(NARRATION_AETHER_LIMITS, 107),
+            Map.entry(NARRATION_FIND_EXIT, 99)
     );
     private static final Map<ResourceLocation, List<NarrationCue>> STAGE_NARRATION = Map.ofEntries(
             Map.entry(EXTERIOR_REVEAL, List.of(cueAt(4, NARRATION_MEDICAL_ONLINE))),
             Map.entry(MEDICAL_DIAGNOSTIC, List.of(
                     cueAt(0, NARRATION_OCCUPANT_DETECTED),
-                    cueAt(170, NARRATION_CONTAMINATION)
+                    cueAt(126, NARRATION_CONTAMINATION)
             )),
             Map.entry(REVIVAL_PROTOCOL, List.of(
                     cueAt(0, NARRATION_REVIVAL_AUTHORIZED),
-                    cueAt(148, NARRATION_CRYOPROTECTANT_PURGE),
-                    cueAt(258, NARRATION_REANIMATION_COMPOUND)
+                    cueAt(116, NARRATION_CRYOPROTECTANT_PURGE),
+                    cueAt(198, NARRATION_REANIMATION_COMPOUND)
             )),
-            Map.entry(CARDIAC_PACING, List.of(cueAt(0, NARRATION_PACING))),
-            Map.entry(SUSPENSION_DRAIN, List.of(cueAt(0, NARRATION_DRAINING))),
+            Map.entry(CARDIAC_PACING, List.of(
+                    cueAt(0, NARRATION_PACING),
+                    cueAt(105, NARRATION_RHYTHM_RESTORED)
+            )),
+            Map.entry(SUSPENSION_DRAIN, List.of(
+                    cueAt(0, NARRATION_RESPIRATORY_RESPONSE),
+                    cueAt(57, NARRATION_DRAINING)
+            )),
             Map.entry(EYES_REOPENING, List.of(cueAt(4, NARRATION_AWAKE))),
             Map.entry(MASK_RELEASE, List.of(cueAt(0, NARRATION_MASK_RELEASING))),
             Map.entry(BALANCE_CHECK, List.of(cueAt(0, NARRATION_MOVE_SLOWLY)))
     );
     private static final List<CinematicStage> STAGES = List.of(
             stage(BLACK_SCREEN, 20, CinematicControlPolicy.LOCKED),
-            stage(EXTERIOR_REVEAL, 170, CinematicControlPolicy.LOCKED),
-            stage(MEDICAL_DIAGNOSTIC, 370, CinematicControlPolicy.LOCKED),
-            stage(REVIVAL_PROTOCOL, 390, CinematicControlPolicy.LOCKED),
-            stage(CARDIAC_PACING, 180, CinematicControlPolicy.LOCKED),
-            stage(SUSPENSION_DRAIN, 220, CinematicControlPolicy.LOCKED),
+            stage(EXTERIOR_REVEAL, 116, CinematicControlPolicy.LOCKED),
+            stage(MEDICAL_DIAGNOSTIC, 270, CinematicControlPolicy.LOCKED),
+            stage(REVIVAL_PROTOCOL, 300, CinematicControlPolicy.LOCKED),
+            stage(CARDIAC_PACING, 168, CinematicControlPolicy.LOCKED),
+            stage(SUSPENSION_DRAIN, 202, CinematicControlPolicy.LOCKED),
             stage(BLACKOUT_TRANSITION, 20, CinematicControlPolicy.LOCKED),
-            stage(EYES_REOPENING, 130, CinematicControlPolicy.LOCKED),
-            stage(MASK_RELEASE, 130, CinematicControlPolicy.LOCKED),
+            stage(EYES_REOPENING, 100, CinematicControlPolicy.LOCKED),
+            stage(MASK_RELEASE, 90, CinematicControlPolicy.LOCKED),
             stage(CRYO_OPENING, 60, CinematicControlPolicy.LOCKED),
-            stage(BALANCE_CHECK, 120, CinematicControlPolicy.LOCKED),
-            stage(RECOVERY_WALK, 500, CinematicControlPolicy.PRESENTATION_ONLY)
+            stage(BALANCE_CHECK, 80, CinematicControlPolicy.LOCKED),
+            stage(RECOVERY_WALK, 350, CinematicControlPolicy.PRESENTATION_ONLY)
     );
 
     @Override
@@ -265,7 +271,7 @@ public final class CryoWakeupSequence implements CinematicSequence {
         tickMedicalSounds(context, stage, elapsed);
         tickStageNarration(context, stage, elapsed);
         if (stage.equals(CARDIAC_PACING)) {
-            if (elapsed == 135) {
+            if (elapsed == 92) {
                 sound(context, SoundEvents.LIGHTNING_BOLT_IMPACT, 0.38F, 1.35F);
             }
         } else if (stage.equals(RECOVERY_WALK)) {
@@ -315,19 +321,19 @@ public final class CryoWakeupSequence implements CinematicSequence {
 
     private static void tickRecoveryNarration(CinematicSequenceContext context, int elapsed) {
         double distanceSquared = context.player().position().distanceToSqr(Vec3.atCenterOf(context.anchor()));
-        if (elapsed >= 20 && (distanceSquared >= 2.25D || elapsed >= 40)) {
+        if (elapsed >= 20 && (distanceSquared >= 2.25D || elapsed >= 30)) {
             context.narrateOnce(
                     NARRATION_AETHER_IDENTITY,
                     narrationDurationTicks(NARRATION_AETHER_IDENTITY)
             );
         }
-        if (elapsed >= 180 && (distanceSquared >= 9.0D || elapsed >= 190)) {
+        if (elapsed >= 125 && (distanceSquared >= 9.0D || elapsed >= 130)) {
             context.narrateOnce(
                     NARRATION_AETHER_LIMITS,
                     narrationDurationTicks(NARRATION_AETHER_LIMITS)
             );
         }
-        if (elapsed >= 345 && (distanceSquared >= 25.0D || elapsed >= 350)) {
+        if (elapsed >= 240 && (distanceSquared >= 25.0D || elapsed >= 245)) {
             context.narrateOnce(
                     NARRATION_FIND_EXIT,
                     narrationDurationTicks(NARRATION_FIND_EXIT)

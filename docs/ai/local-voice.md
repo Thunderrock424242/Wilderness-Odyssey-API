@@ -43,9 +43,9 @@ The `[aether_voice]` category contains:
 - `inputMode`: `TEXT` or `PUSH_TO_TALK`. `ALWAYS_LISTENING` is reserved but intentionally inactive.
 - `serviceEndpoint`: defaults to `http://127.0.0.1:8765` and is rejected unless it is plain HTTP on a loopback host.
 - `serviceToken`: optional bearer token shared with the service process.
-- `voiceName`: Kokoro voice ID, default `af_nicole`, selected for A.E.T.H.E.R's subdued, intimate caretaker delivery.
+- `voiceName`: Kokoro voice ID, default `af_bella`, selected for A.E.T.H.E.R's grounded, conversational caretaker delivery.
 - `volume`: generated voice volume before Minecraft's Master and Voice sliders.
-- `speechSpeed`: base speech speed before bounded emotion adjustment; fresh configs default to `0.96`, and authored calm lines apply an additional restrained slowdown.
+- `speechSpeed`: base speech speed before bounded emotion adjustment; fresh configs default to normal `1.0` delivery.
 - `subtitles`, `radioProcessing`, `cinematicNarration`, and `loreReadAloud`. Radio processing defaults off so the natural voice is preserved.
 - `requestTimeoutSeconds`: client request timeout; no Minecraft thread waits for it.
 
@@ -80,7 +80,7 @@ In a second terminal:
 Invoke-RestMethod -Method Post http://127.0.0.1:8765/v1/models/load
 ```
 
-The defaults are faster-whisper `small.en` and Kokoro `af_nicole`. The model-load request also preloads that voice. Both Hugging Face/Kokoro files and the separate Whisper cache are directed outside the repository under `%USERPROFILE%\.cache\aether-voice` unless `AETHER_VOICE_MODEL_DIR` or an existing `HF_HOME` overrides the relevant cache location. For another voice, set `AETHER_KOKORO_VOICE` during this deliberate download step and use the same client `voiceName`. After the initial download, stop the service, remove `AETHER_VOICE_ALLOW_MODEL_DOWNLOADS`, and restart in the default cache-only mode.
+The defaults are faster-whisper `small.en` and Kokoro `af_bella`. The model-load request also preloads that voice. Both Hugging Face/Kokoro files and the separate Whisper cache are directed outside the repository under `%USERPROFILE%\.cache\aether-voice` unless `AETHER_VOICE_MODEL_DIR` or an existing `HF_HOME` overrides the relevant cache location. For another voice, set `AETHER_KOKORO_VOICE` during this deliberate download step and use the same client `voiceName`. After the initial download, stop the service, remove `AETHER_VOICE_ALLOW_MODEL_DOWNLOADS`, and restart in the default cache-only mode.
 
 Normal startup is:
 
@@ -104,7 +104,7 @@ The service selects CUDA/float16 for faster-whisper when CTranslate2 reports a u
 - Microphone and generated WAV data live in bounded memory buffers. No recording or generated speech file is written permanently.
 - Push-to-talk is capped at 30 seconds, and clips shorter than 200 ms are ignored.
 - Requests, responses, display strings, speaker names, emotion values, effect strengths, and audio sizes are bounded.
-- No process is launched automatically by the mod and no model is downloaded without the explicit environment opt-in plus model-load request.
+- The Python voice service is never launched automatically, and no speech model is downloaded without the explicit environment opt-in plus model-load request. The separate Ollama text runtime may start an already-installed Windows application as documented in `ollama-autostart.md`.
 - Voice transcripts can contribute the same bounded personal preferences as typed chat, but raw microphone audio is never used as profile data. Say `what do you remember about me?` to inspect the profile or `forget what you know about me` to remove it.
 - A loopback listener can still be called by another local process. Set `AETHER_VOICE_TOKEN` and the matching client `serviceToken` when local process isolation is not enough. Never commit that token.
 
@@ -130,7 +130,7 @@ Ollama remains independently observable through the existing Aether chat path an
 - Always-listening/wake-word capture.
 - Ollama token streaming, sentence boundary detection, and streaming TTS audio.
 - A dedicated in-game settings screen; the feature uses the established client config and Controls UI.
-- Per-character voice presets and per-cue cinematic timing derived from generated audio.
+- Per-character voice presets beyond the shared A.E.T.H.E.R caretaker profile.
 - A second TTS implementation. Minecraft is insulated by the local `/v1/speak` contract, so Piper or another local backend can be added behind that boundary without changing Aether chat.
 
 Streaming should operate on full sentences or natural phrases and retain the existing generation/session checks. Tiny token fragments must never be sent directly to TTS.

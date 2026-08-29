@@ -5,12 +5,12 @@ import numpy as np
 
 EMOTION_SPEED = {
     "normal": 1.00,
-    "calm": 0.93,
-    "concerned": 0.94,
-    "urgent": 1.08,
-    "damaged": 0.97,
-    "weak": 0.92,
-    "mysterious": 0.90,
+    "calm": 0.98,
+    "concerned": 0.99,
+    "urgent": 1.06,
+    "damaged": 0.99,
+    "weak": 0.97,
+    "mysterious": 0.97,
 }
 
 

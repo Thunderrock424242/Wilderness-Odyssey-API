@@ -16,6 +16,9 @@ class AISettingsTest {
         assertTrue(settings.isOllamaEnabled());
         assertEquals("http://127.0.0.1:11434", settings.getEndpoint());
         assertEquals("llama3.2:latest", settings.getModelName());
+        assertTrue(settings.isOllamaAutostartEnabled());
+        assertEquals(20, settings.getOllamaStartupTimeoutSeconds());
+        assertEquals("", settings.getOllamaExecutable());
     }
 
     @Test
@@ -44,9 +47,11 @@ class AISettingsTest {
         settings.setMaxHistoryMessages(0);
         settings.setRequestTimeoutSeconds(999);
         settings.setMaxOutputTokens(1);
+        settings.setOllamaStartupTimeoutSeconds(999);
 
         assertEquals(1, settings.getMaxHistoryMessages());
         assertEquals(18, settings.getRequestTimeoutSeconds());
         assertEquals(32, settings.getMaxOutputTokens());
+        assertEquals(60, settings.getOllamaStartupTimeoutSeconds());
     }
 }

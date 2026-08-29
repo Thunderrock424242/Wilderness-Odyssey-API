@@ -41,14 +41,14 @@ public final class AetherVoiceConfig {
                 .comment("Optional bearer token shared with AETHER_VOICE_TOKEN. Leave blank only when local process isolation is sufficient.")
                 .define("serviceToken", "");
         VOICE_NAME = builder
-                .comment("Kokoro voice id requested from the local service. The default is Aether's subdued, intimate caretaker voice.")
-                .define("voiceName", "af_nicole");
+                .comment("Kokoro voice id requested from the local service. The default is Aether's grounded, conversational caretaker voice.")
+                .define("voiceName", "af_bella");
         VOICE_VOLUME = builder
                 .comment("Client-local generated voice volume, where 1.0 is full configured volume.")
                 .defineInRange("volume", 0.85D, 0.0D, 1.0D);
         SPEECH_SPEED = builder
-                .comment("Base Kokoro speech speed before subtle emotion adjustments. The default favors calm, deliberate delivery.")
-                .defineInRange("speechSpeed", 0.96D, 0.75D, 1.25D);
+                .comment("Base Kokoro speech speed before subtle emotion adjustments. The default preserves a natural conversational pace.")
+                .defineInRange("speechSpeed", 1.0D, 0.75D, 1.25D);
         SUBTITLES = builder
                 .comment("Show the spoken form as a temporary subtitle without creating another chat message.")
                 .define("subtitles", true);

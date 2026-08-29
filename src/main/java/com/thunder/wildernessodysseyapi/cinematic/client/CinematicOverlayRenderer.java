@@ -36,14 +36,20 @@ public final class CinematicOverlayRenderer {
         Component postMessage = state.postMessage();
         float alpha = state.postMessageAlpha(partialTick);
         if (postMessage != null && alpha > 0.0F) {
-            int color = (Mth.clamp(Math.round(alpha * 255.0F), 0, 255) << 24) | 0xE6F3F7;
-            graphics.drawCenteredString(
-                    minecraft.font,
-                    postMessage,
-                    width / 2,
-                    Math.round(height * 0.72F),
-                    color
-            );
+            int textAlpha = Mth.clamp(Math.round(alpha * 255.0F), 0, 255);
+            int panelAlpha = Mth.clamp(Math.round(alpha * 196.0F), 0, 196);
+            int panelWidth = Math.min(width - 32, Math.max(220, minecraft.font.width(postMessage) + 24));
+            int panelHeight = 29;
+            int panelX = (width - panelWidth) / 2;
+            int panelY = Math.min(Math.round(height * 0.72F), height - panelHeight - 14);
+            int color = (textAlpha << 24) | 0xE4F3F0;
+            graphics.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight,
+                    (panelAlpha << 24) | 0x091112);
+            graphics.fill(panelX, panelY, panelX + 2, panelY + panelHeight,
+                    (textAlpha << 24) | 0x65D6CC);
+            graphics.hLine(panelX + 2, panelX + panelWidth - 1, panelY,
+                    (Mth.clamp(Math.round(alpha * 120.0F), 0, 120) << 24) | 0x567774);
+            graphics.drawString(minecraft.font, postMessage, panelX + 11, panelY + 10, color, false);
         }
     }
 }

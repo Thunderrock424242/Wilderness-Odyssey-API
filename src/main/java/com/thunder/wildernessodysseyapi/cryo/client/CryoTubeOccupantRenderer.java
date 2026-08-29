@@ -60,7 +60,7 @@ public final class CryoTubeOccupantRenderer implements BlockEntityRenderer<CryoT
         Direction facing = state.hasProperty(CryoTubeBlock.BlockImpl.FACING)
                 ? state.getValue(CryoTubeBlock.BlockImpl.FACING)
                 : Direction.NORTH;
-        float time = minecraft.level.getGameTime() + partialTick;
+        float time = cinematic.sequenceElapsedTicks(partialTick);
         float progress = cinematic.stageProgress(partialTick);
         double bob = Math.sin(time * 0.075D) * 0.025D;
         float sway = (float) Math.sin(time * 0.045D) * 1.35F;

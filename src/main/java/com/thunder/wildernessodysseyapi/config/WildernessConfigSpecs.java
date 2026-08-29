@@ -14,6 +14,7 @@ import com.thunder.wildernessodysseyapi.performance.background.config.Background
 import com.thunder.wildernessodysseyapi.performance.tickengine.config.TickEngineConfig;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationRelayConfig;
 import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
+import com.thunder.wildernessodysseyapi.rendering.config.RendererConfig;
 import com.thunder.wildernessodysseyapi.structureblock.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryConfig;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryConfig;
@@ -98,6 +99,7 @@ public final class WildernessConfigSpecs {
         defineCategory(builder, "donations", DonationReminderConfig::define);
         AetherVoiceConfig.define(builder);
         DebugOverlayConfig.define(builder);
+        defineCategory(builder, "renderer", RendererConfig::define);
         WaterRenderingConfig.define(builder);
         defineCategory(builder, "weather_rendering", WeatherRenderingConfig::define);
         return builder.build();
@@ -141,6 +143,7 @@ public final class WildernessConfigSpecs {
         DonationReminderConfig.CONFIG_SPEC = clientSpec;
         AetherVoiceConfig.CONFIG_SPEC = clientSpec;
         DebugOverlayConfig.CONFIG_SPEC = clientSpec;
+        RendererConfig.CONFIG_SPEC = clientSpec;
         WaterRenderingConfig.CONFIG_SPEC = clientSpec;
         WeatherRenderingConfig.CONFIG_SPEC = clientSpec;
 

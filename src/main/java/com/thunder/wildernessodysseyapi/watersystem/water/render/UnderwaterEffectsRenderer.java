@@ -9,6 +9,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackend;
+import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.FogRenderer;
 import net.minecraft.client.renderer.ScreenEffectRenderer;
@@ -24,7 +26,6 @@ import net.neoforged.neoforge.client.event.RenderBlockScreenEffectEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 import org.joml.Matrix4f;
-import org.lwjgl.opengl.GL11;
 
 /**
  * Applies Phase 8 fog, transition, distortion, and caustic presentation.
@@ -196,9 +197,7 @@ public final class UnderwaterEffectsRenderer {
                 state
         );
 
-        boolean depthTestWasEnabled = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
-        boolean depthWriteWasEnabled = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
-        boolean blendWasEnabled = GL11.glIsEnabled(GL11.GL_BLEND);
+        RenderBackend.RenderStateSnapshot previousState = RenderBackends.current().captureRenderState();
         try {
             // Screen-space optics replace the completed scene and must not be
             // clipped by hand/HUD depth or write depth into later UI layers.
@@ -222,13 +221,13 @@ public final class UnderwaterEffectsRenderer {
             BufferUploader.drawWithShader(buffer.buildOrThrow());
         } finally {
             RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-            RenderSystem.depthMask(depthWriteWasEnabled);
-            if (depthTestWasEnabled) {
+            RenderSystem.depthMask(previousState.depthWriteEnabled());
+            if (previousState.depthTestEnabled()) {
                 RenderSystem.enableDepthTest();
             } else {
                 RenderSystem.disableDepthTest();
             }
-            if (blendWasEnabled) {
+            if (previousState.blendEnabled()) {
                 RenderSystem.enableBlend();
             } else {
                 RenderSystem.disableBlend();

@@ -104,6 +104,9 @@ settings:
   max_history_messages: 12
   max_response_characters: 800
   max_output_tokens: 180
+  ollama_autostart: true
+  ollama_startup_timeout_seconds: 20
+  ollama_executable: ""
 
 player_memory:
   enabled: true

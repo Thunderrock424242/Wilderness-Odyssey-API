@@ -2,14 +2,16 @@ package com.thunder.wildernessodysseyapi.weather.client.cloud;
 
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterShaders;
+import com.thunder.wildernessodysseyapi.rendering.RenderingQuality;
+import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
+import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
+import com.thunder.wildernessodysseyapi.rendering.performance.RenderQualityState;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.RegisterShadersEvent;
-import org.lwjgl.opengl.GL20;
 
 import java.io.IOException;
 
@@ -57,7 +59,9 @@ public final class RaymarchedCloudShaders {
         return settings != null
                 && settings.raymarchedClouds()
                 && cloudShader != null
-                && !WaterShaders.externalShaderPackOwnsWater();
+                && RenderQualityState.currentQuality().allows(RenderingQuality.HIGH)
+                && RenderBackends.current().capabilities().supportsHighQualityVolumetrics()
+                && !ShaderPackCompatibility.isExternalShaderPackActive();
     }
 
     /** Updates continuous-field mappings, camera-relative rays, motion, and lighting uniforms. */
@@ -141,9 +145,7 @@ public final class RaymarchedCloudShaders {
     }
 
     private static boolean isLinked(ShaderInstance shader) {
-        int programId = shader.getId();
-        return GL20.glIsProgram(programId)
-                && GL20.glGetProgrami(programId, GL20.GL_LINK_STATUS) != 0;
+        return RenderBackends.current().isShaderProgramUsable(shader.getId());
     }
 
     private static final double CLOUD_BASE_OFFSET = 0.33;

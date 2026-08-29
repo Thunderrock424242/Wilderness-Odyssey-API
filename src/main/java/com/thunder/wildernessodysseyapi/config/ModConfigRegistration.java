@@ -13,6 +13,7 @@ import com.thunder.wildernessodysseyapi.performance.background.BackgroundEfficie
 import com.thunder.wildernessodysseyapi.performance.background.config.BackgroundEfficiencyConfig;
 import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
 import com.thunder.wildernessodysseyapi.performance.tickengine.config.TickEngineConfig;
+import com.thunder.wildernessodysseyapi.rendering.config.RendererConfig;
 import com.thunder.wildernessodysseyapi.simulation.core.SimulationEngine;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
@@ -110,6 +111,7 @@ public final class ModConfigRegistration {
                 server.execute(() -> AsyncTaskManager.reload(AsyncThreadingConfig.values()));
             }
         } else if (config.getSpec() == WildernessConfigSpecs.clientSpec()) {
+            RendererConfig.reload();
             WeatherRenderingConfig.reload();
         } else if (config.getSpec() == WildernessConfigSpecs.serverSpec()) {
             applyOnServerThread(() -> {

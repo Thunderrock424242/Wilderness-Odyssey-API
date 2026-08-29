@@ -4,6 +4,7 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
@@ -27,6 +28,9 @@ public final class WaterSceneCapture {
     /** Captures the current main scene once for the given logical render frame. */
     public static Capture capture(long frameKey) {
         RenderSystem.assertOnRenderThread();
+        if (!RenderBackends.current().capabilities().supportsAdvancedReflections()) {
+            return Capture.UNAVAILABLE;
+        }
         Minecraft minecraft = Minecraft.getInstance();
         RenderTarget source = minecraft.getMainRenderTarget();
         ensureTarget(source.viewWidth, source.viewHeight);

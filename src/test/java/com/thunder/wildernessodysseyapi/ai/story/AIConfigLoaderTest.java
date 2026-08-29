@@ -28,6 +28,9 @@ class AIConfigLoaderTest {
             assertEquals(true, config.getPlayerMemory().getEnabled());
             assertEquals(true, config.getPlayerMemory().getNaturalLearningEnabled());
             assertEquals(12, config.getPlayerMemory().getMaxMemoriesPerPlayer());
+            assertEquals(true, config.getSettings().getOllamaAutostart());
+            assertEquals(20, config.getSettings().getOllamaStartupTimeoutSeconds());
+            assertEquals("", config.getSettings().getOllamaExecutable());
         }
     }
 

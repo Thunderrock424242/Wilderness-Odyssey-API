@@ -13,6 +13,7 @@ import java.util.Objects;
 public record CinematicNarrationPayload(
         ResourceLocation sequenceId,
         ResourceLocation cueId,
+        long cueStartGameTime,
         int durationTicks
 ) implements CustomPacketPayload {
     public static final Type<CinematicNarrationPayload> TYPE = new Type<>(
@@ -26,14 +27,15 @@ public record CinematicNarrationPayload(
     public CinematicNarrationPayload {
         sequenceId = Objects.requireNonNull(sequenceId, "sequenceId");
         cueId = Objects.requireNonNull(cueId, "cueId");
-        if (durationTicks <= 0 || durationTicks > 1_200) {
-            throw new DecoderException("Invalid cinematic narration duration");
+        if (cueStartGameTime < 0L || durationTicks <= 0 || durationTicks > 1_200) {
+            throw new DecoderException("Invalid cinematic narration timing");
         }
     }
 
     private static void write(FriendlyByteBuf buffer, CinematicNarrationPayload payload) {
         buffer.writeResourceLocation(payload.sequenceId);
         buffer.writeResourceLocation(payload.cueId);
+        buffer.writeVarLong(payload.cueStartGameTime);
         buffer.writeVarInt(payload.durationTicks);
     }
 
@@ -41,6 +43,7 @@ public record CinematicNarrationPayload(
         return new CinematicNarrationPayload(
                 buffer.readResourceLocation(),
                 buffer.readResourceLocation(),
+                buffer.readVarLong(),
                 buffer.readVarInt()
         );
     }
