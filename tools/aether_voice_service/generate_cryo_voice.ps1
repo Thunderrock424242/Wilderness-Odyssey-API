@@ -1,6 +1,6 @@
 param(
-    [string]$VoiceName = "af_nicole",
-    [double]$Speed = 0.95,
+    [string]$VoiceName = "af_bella",
+    [double]$Speed = 1.0,
     [switch]$AllowModelDownloads
 )
 

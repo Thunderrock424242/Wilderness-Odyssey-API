@@ -113,6 +113,9 @@ public class AIConfig {
         private Integer maxHistoryMessages;
         private Integer maxResponseCharacters;
         private Integer maxOutputTokens;
+        private Boolean ollamaAutostart;
+        private Integer ollamaStartupTimeoutSeconds;
+        private String ollamaExecutable;
 
         public Boolean getAtlasEnabled() {
             return atlasEnabled;
@@ -184,6 +187,30 @@ public class AIConfig {
 
         public void setMaxOutputTokens(Integer maxOutputTokens) {
             this.maxOutputTokens = maxOutputTokens;
+        }
+
+        public Boolean getOllamaAutostart() {
+            return ollamaAutostart;
+        }
+
+        public void setOllamaAutostart(Boolean ollamaAutostart) {
+            this.ollamaAutostart = ollamaAutostart;
+        }
+
+        public Integer getOllamaStartupTimeoutSeconds() {
+            return ollamaStartupTimeoutSeconds;
+        }
+
+        public void setOllamaStartupTimeoutSeconds(Integer ollamaStartupTimeoutSeconds) {
+            this.ollamaStartupTimeoutSeconds = ollamaStartupTimeoutSeconds;
+        }
+
+        public String getOllamaExecutable() {
+            return ollamaExecutable;
+        }
+
+        public void setOllamaExecutable(String ollamaExecutable) {
+            this.ollamaExecutable = ollamaExecutable;
         }
     }
 

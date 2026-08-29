@@ -211,7 +211,7 @@ public final class CryoWakeupPresentationModel {
         if (!CryoWakeupSequence.CARDIAC_PACING.equals(stage)) {
             return 0.0F;
         }
-        float distance = Math.abs(progress - 135.0F / 180.0F);
+        float distance = Math.abs(progress - 92.0F / 168.0F);
         return smooth(Mth.clamp(1.0F - distance / 0.075F, 0.0F, 1.0F));
     }
 

@@ -13,6 +13,7 @@ import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
 import com.thunder.wildernessodysseyapi.performance.background.config.BackgroundEfficiencyConfig;
 import com.thunder.wildernessodysseyapi.performance.tickengine.config.TickEngineConfig;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationRelayConfig;
+import com.thunder.wildernessodysseyapi.rendering.config.RendererConfig;
 import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
 import com.thunder.wildernessodysseyapi.structureblock.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryConfig;
@@ -46,6 +47,7 @@ class WildernessConfigSpecsTest {
         assertSame(WildernessConfigSpecs.clientSpec(), DonationReminderConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.clientSpec(), AetherVoiceConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.clientSpec(), DebugOverlayConfig.CONFIG_SPEC);
+        assertSame(WildernessConfigSpecs.clientSpec(), RendererConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.clientSpec(), WaterRenderingConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.clientSpec(), WeatherRenderingConfig.CONFIG_SPEC);
 
@@ -84,6 +86,10 @@ class WildernessConfigSpecsTest {
         assertEquals(
                 List.of("aether_voice", "enabled"),
                 AetherVoiceConfig.VOICE_ENABLED.getPath()
+        );
+        assertEquals(
+                List.of("renderer", "adaptiveQuality"),
+                RendererConfig.ADAPTIVE_QUALITY.getPath()
         );
         assertEquals(
                 List.of("weather_rendering", "localized_clouds", "enabled"),

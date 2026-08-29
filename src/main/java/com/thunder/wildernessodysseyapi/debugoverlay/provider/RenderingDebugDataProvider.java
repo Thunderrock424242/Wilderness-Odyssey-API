@@ -1,12 +1,13 @@
 package com.thunder.wildernessodysseyapi.debugoverlay.provider;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.GlUtil;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugContext;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugPageContributorRegistry;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugSection;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugValue;
 import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuProfiler;
+import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
+import com.thunder.wildernessodysseyapi.rendering.client.WildernessRenderingFramework;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.client.ClientDistantWildlifeState;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderDiagnostics;
 import com.thunder.wildernessodysseyapi.weather.client.WeatherClientEvents;
@@ -48,7 +49,7 @@ public final class RenderingDebugDataProvider implements DebugDataProvider {
                 .add("GPU", graphics.renderer())
                 .add("Vendor", graphics.vendor())
                 .add("OpenGL", graphics.openGlVersion())
-                .add("Backend", "Blaze3D / OpenGL")
+                .add("Backend", graphics.backend())
                 .add("Graphics mode", minecraft.options.graphicsMode().get())
                 .add("VSync", minecraft.options.enableVsync().get()
                         ? DebugValue.good("Enabled")
@@ -68,6 +69,7 @@ public final class RenderingDebugDataProvider implements DebugDataProvider {
         // These diagnostics previously lived in the unbounded vanilla right
         // column. Keeping them here preserves the information while limiting
         // their collection to the cached Rendering page refresh.
+        addRawSection(sections, "WILDERNESS RENDERING", WildernessRenderingFramework.debugLines());
         addRawSection(sections, "WILDERNESS GPU PROFILER", GpuProfiler.debugLines());
         addRawSection(sections, "WILDERNESS WATER", WaterRenderDiagnostics.debugLines());
         addRawSection(sections, "WILDERNESS WEATHER", WeatherClientEvents.debugLines());
@@ -99,13 +101,17 @@ public final class RenderingDebugDataProvider implements DebugDataProvider {
             return graphicsSnapshot;
         }
         try {
+            var capabilities = RenderBackends.current().capabilities();
             graphicsSnapshot = new GraphicsSnapshot(
-                    available(GlUtil.getRenderer()),
-                    available(GlUtil.getVendor()),
-                    available(GlUtil.getOpenGLVersion())
+                    available(capabilities.renderer()),
+                    available(capabilities.vendor()),
+                    available(capabilities.driverVersion()),
+                    "Blaze3D / " + capabilities.api()
             );
         } catch (RuntimeException exception) {
-            graphicsSnapshot = new GraphicsSnapshot("Unavailable", "Unavailable", "Unavailable");
+            graphicsSnapshot = new GraphicsSnapshot(
+                    "Unavailable", "Unavailable", "Unavailable", "Unavailable"
+            );
         }
         return graphicsSnapshot;
     }
@@ -114,6 +120,6 @@ public final class RenderingDebugDataProvider implements DebugDataProvider {
         return value == null || value.isBlank() ? "Unavailable" : value;
     }
 
-    private record GraphicsSnapshot(String renderer, String vendor, String openGlVersion) {
+    private record GraphicsSnapshot(String renderer, String vendor, String openGlVersion, String backend) {
     }
 }

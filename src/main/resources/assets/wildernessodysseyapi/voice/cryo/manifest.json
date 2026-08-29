@@ -1,110 +1,130 @@
 {
   "engine": "Kokoro-82M 0.9.4",
   "model": "hexgrad/Kokoro-82M",
-  "voice": "af_nicole",
-  "style": "subdued_human_caretaker",
-  "speed": 0.95,
+  "voice": "af_bella",
+  "style": "grounded_conversational_caretaker",
+  "speed": 1.0,
   "sample_rate": 24000,
   "clips": {
     "medical_online": {
       "file": "medical_online.wav",
-      "duration_ticks": 160,
-      "duration_seconds": 7.7
+      "source_text": "I'm here. Medical systems are coming back online on emergency power.",
+      "duration_ticks": 110,
+      "duration_seconds": 5.175
     },
     "occupant_detected": {
       "file": "occupant_detected.wav",
-      "duration_ticks": 159,
-      "duration_seconds": 7.65
+      "source_text": "I've got you. Your metabolic activity is dangerously low, but you're stable.",
+      "duration_ticks": 116,
+      "duration_seconds": 5.5
     },
     "contamination": {
       "file": "contamination.wav",
-      "duration_ticks": 191,
-      "duration_seconds": 9.25
+      "source_text": "The suspension fluid is contaminated. Filtration has failed. I need to get you out.",
+      "duration_ticks": 133,
+      "duration_seconds": 6.35
     },
     "filtration_offline": {
       "file": "filtration_offline.wav",
-      "duration_ticks": 117,
-      "duration_seconds": 5.55
+      "source_text": "The filters aren't responding. We can't wait any longer.",
+      "duration_ticks": 87,
+      "duration_seconds": 4.05
     },
     "revival_authorized": {
       "file": "revival_authorized.wav",
-      "duration_ticks": 136,
-      "duration_seconds": 6.475
+      "source_text": "I'm starting an emergency revival. Bringing your temperature up slowly.",
+      "duration_ticks": 106,
+      "duration_seconds": 5.0
     },
     "thermal_restoration": {
       "file": "thermal_restoration.wav",
-      "duration_ticks": 122,
-      "duration_seconds": 5.8
+      "source_text": "Core temperature is rising. That's it. Nice and steady.",
+      "duration_ticks": 91,
+      "duration_seconds": 4.25
     },
     "circulatory_assist": {
       "file": "circulatory_assist.wav",
-      "duration_ticks": 95,
-      "duration_seconds": 4.45
+      "source_text": "Restoring blood flow to your brain and heart.",
+      "duration_ticks": 69,
+      "duration_seconds": 3.125
     },
     "cryoprotectant_purge": {
       "file": "cryoprotectant_purge.wav",
-      "duration_ticks": 98,
-      "duration_seconds": 4.575
+      "source_text": "Clearing the cryoprotectant from your bloodstream.",
+      "duration_ticks": 72,
+      "duration_seconds": 3.3
     },
     "reanimation_compound": {
       "file": "reanimation_compound.wav",
-      "duration_ticks": 122,
-      "duration_seconds": 5.8
+      "source_text": "Administering a circulatory stimulant. Stay with me.",
+      "duration_ticks": 88,
+      "duration_seconds": 4.075
     },
     "cardiac_low": {
       "file": "cardiac_low.wav",
-      "duration_ticks": 165,
-      "duration_seconds": 7.95
+      "source_text": "I have electrical activity, but your heart isn't moving enough blood.",
+      "duration_ticks": 103,
+      "duration_seconds": 4.825
     },
     "pacing": {
       "file": "pacing.wav",
-      "duration_ticks": 158,
-      "duration_seconds": 7.6
+      "source_text": "Your heart isn't responding. I'm going to pace it. Three, two, one.",
+      "duration_ticks": 99,
+      "duration_seconds": 4.65
     },
     "rhythm_restored": {
       "file": "rhythm_restored.wav",
+      "source_text": "There. Your pulse is back.",
       "duration_ticks": 53,
       "duration_seconds": 2.35
     },
     "respiratory_response": {
       "file": "respiratory_response.wav",
+      "source_text": "Good. You're breathing on your own.",
       "duration_ticks": 57,
-      "duration_seconds": 2.55
+      "duration_seconds": 2.525
     },
     "draining": {
       "file": "draining.wav",
-      "duration_ticks": 211,
-      "duration_seconds": 10.225
+      "source_text": "Circulation is returning. I'm draining the contaminated fluid now. Keep breathing through the mask.",
+      "duration_ticks": 145,
+      "duration_seconds": 6.95
     },
     "mask_releasing": {
       "file": "mask_releasing.wav",
-      "duration_ticks": 124,
-      "duration_seconds": 5.875
+      "source_text": "Your oxygen is stable. I'm releasing the breathing mask.",
+      "duration_ticks": 88,
+      "duration_seconds": 4.1
     },
     "move_slowly": {
       "file": "move_slowly.wav",
-      "duration_ticks": 107,
-      "duration_seconds": 5.025
+      "source_text": "Your balance will be poor. Stay still for a moment.",
+      "duration_ticks": 78,
+      "duration_seconds": 3.6
     },
     "awake": {
       "file": "awake.wav",
-      "duration_ticks": 113,
-      "duration_seconds": 5.325
+      "source_text": "Your pupils are responding. You're waking up. Take it slowly.",
+      "duration_ticks": 94,
+      "duration_seconds": 4.4
     },
     "aether_identity": {
       "file": "aether_identity.wav",
-      "duration_ticks": 124,
-      "duration_seconds": 5.9
+      "source_text": "I'm A.E.T.H.E.R. I was built to take care of this facility, and of you.",
+      "duration_ticks": 92,
+      "duration_seconds": 4.3
     },
     "aether_limits": {
       "file": "aether_limits.wav",
-      "duration_ticks": 141,
-      "duration_seconds": 6.75
+      "source_text": "Some of my memory is damaged. A lot of the facility is still offline.",
+      "duration_ticks": 107,
+      "duration_seconds": 5.025
     },
     "find_exit": {
       "file": "find_exit.wav",
-      "duration_ticks": 150,
-      "duration_seconds": 7.175
+      "source_text": "This chamber isn't safe anymore. Find the exit. I'll guide you.",
+      "duration_ticks": 99,
+      "duration_seconds": 4.625
     }
   }
 }

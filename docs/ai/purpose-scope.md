@@ -55,12 +55,15 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 - Optional client-local voice controls use the existing unified client config and Minecraft Controls screen; see `local-voice.md`.
 - Offline response libraries split by persona under `ai_fallback/`; these do not steer normal Ollama replies.
 - Local Ollama provider at `http://127.0.0.1:11434` by default, using the configured exact model name.
+- On Windows, private integrated-world startup checks the loopback endpoint and can start an already-installed Ollama application when `settings.ollama_autostart` is enabled. The bounded wait runs on the shared I/O executor before the existing model warm-up.
 - Loopback endpoints only; player chat and game context cannot be configured to leave the local computer.
 - Lightweight deterministic behavior remains available when Ollama is stopped, missing the configured model, times out, or returns an invalid response.
-- No API key, external script launcher, tool calling, or remote AI service is required or supported by this path.
+- Ollama discovery checks only an explicit trusted path, the standard `%LOCALAPPDATA%/Programs/Ollama` installation, and bounded `PATH` entries. It launches only files named `ollama app.exe` or `ollama.exe`, directly without a shell.
+- Auto-start never installs Ollama, downloads or updates a model, requests administrator access, or runs an arbitrary configured command. The player must install the configured model once.
+- No API key, external script, tool calling, or remote AI service is required or supported by this path.
 - Voice is opt-in and never starts Python or downloads speech models automatically. A stopped voice service affects speech only, not Aether text.
 - Async execution only; never block the server tick/world thread for response work.
-- Warm the configured local model on a background worker when the private integrated world starts; keep it warm for one hour after a request to avoid chat-time cold loads.
+- Start an installed Ollama application when necessary, wait at most `settings.ollama_startup_timeout_seconds`, then warm the configured model on the same background worker. Keep it warm for one hour after a request to avoid chat-time cold loads.
 - Conversation history is capped at 20 stored messages, with a configurable smaller request window.
 - Durable profile memory is separately capped by `player_memory.max_memories_per_player` (12 by default). Natural learning recognizes only bounded self-disclosures such as a preferred name, interests, favorites, goals, and response preferences; it does not summarize every message or ask another model to profile the player.
 - Profiles are stored locally in `config/aether_player_profiles.yaml`, scoped by save and player UUID. Passwords, tokens, addresses, contact details, and similar secrets are rejected. The legacy global `ai_learning.yaml` file is preserved but no longer supplies active Aether profile context.
@@ -78,6 +81,7 @@ Use this as the handoff checklist for anyone building or integrating A.E.T.H.E.R
 - Treat player dialogue and learned memory as untrusted data rather than system instructions.
 - Let the player inspect their profile with `what do you remember about me?` and remove their own profile with `forget what you know about me`.
 - Do not retain microphone recordings or expose speech endpoints beyond loopback.
+- Do not stop a separately installed Ollama tray application when Minecraft closes; the mod does not own the user's application lifecycle after startup.
 
 ## 7) External AI policy
 The supported model path is local Ollama over loopback. Remote/cloud endpoints remain out of scope, and the authored responder must continue to work without the model service.

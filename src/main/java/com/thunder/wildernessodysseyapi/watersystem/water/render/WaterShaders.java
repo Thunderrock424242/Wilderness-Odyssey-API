@@ -3,24 +3,23 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.rendering.EnvironmentState;
+import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
+import com.thunder.wildernessodysseyapi.rendering.client.WildernessRenderingFramework;
+import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
-import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
-import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.client.event.RegisterShadersEvent;
-import org.lwjgl.opengl.GL20;
 import org.joml.Matrix4f;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 
 /**
  * Owns the optional built-in ocean shader and its frame uniforms.
@@ -34,10 +33,6 @@ public final class WaterShaders {
     private static ShaderInstance oceanShader;
     private static ShaderInstance underwaterShader;
     private static boolean sceneCaptureFailureLogged;
-    private static volatile boolean externalShaderApiResolved;
-    private static Method externalShaderApiGetInstance;
-    private static Method externalShaderApiIsPackInUse;
-    private static boolean externalShaderApiFailureLogged;
     private static final Matrix4f CAPTURED_INVERSE_PROJECTION = new Matrix4f();
     private static final Matrix4f CAPTURED_VIEW_TO_WORLD = new Matrix4f();
     private static final Matrix4f REGIONAL_SEA_STATE_CORNERS = new Matrix4f();
@@ -260,24 +255,13 @@ public final class WaterShaders {
         oceanShader.safeGetUniform("InverseProjMat").set(inverseProjection);
         var cameraPosition = minecraft.gameRenderer.getMainCamera().getPosition();
 
-        float rain;
-        float thunder;
-        float frozen;
-        if (ClientWeatherCoordinator.controls(minecraft.level)) {
-            // Water remains read-only from weather's perspective; only these
-            // client shader uniforms consume the local immutable snapshot.
-            WeatherSample localWeather = ClientWeatherCoordinator.sampleAt(
-                    minecraft.level,
-                    cameraPosition
-            );
-            rain = (float) localWeather.precipitationIntensity();
-            thunder = ClientWeatherCoordinator.thunderContribution(localWeather);
-            frozen = (float) localWeather.surface().frozenFraction();
-        } else {
-            rain = minecraft.level.getRainLevel(framePartialTick);
-            thunder = minecraft.level.getThunderLevel(framePartialTick);
-            frozen = 0.0f;
-        }
+        // The framework samples localized weather and wind once per frame.
+        // Water consumes that immutable presentation state rather than
+        // querying weather ownership again for every optical pass.
+        EnvironmentState environment = WildernessRenderingFramework.currentFrame().environment();
+        float rain = Math.min(1.0F, environment.rainIntensity() + environment.snowIntensity());
+        float thunder = environment.lightningActivity();
+        float frozen = environment.frozenFraction();
         float skyBrightness = Math.max(0.12f, 1.0f - rain * 0.32f - thunder * 0.38f);
         oceanShader.safeGetUniform("Weather").set(rain, thunder, skyBrightness, frozen);
         var sky = minecraft.level.getSkyColor(cameraPosition, framePartialTick);
@@ -738,61 +722,10 @@ public final class WaterShaders {
      * the pack expects to shade.</p>
      */
     public static boolean externalShaderPackOwnsWater() {
-        ModList mods = ModList.get();
-        if (!mods.isLoaded("iris") && !mods.isLoaded("oculus")) {
-            return false;
-        }
-        resolveExternalShaderApi();
-        if (externalShaderApiGetInstance == null || externalShaderApiIsPackInUse == null) {
-            // An installed renderer with an unknown API is safer on its tagged
-            // fluid path than behind an un-displaced duplicate snapshot mesh.
-            return true;
-        }
-        try {
-            Object api = externalShaderApiGetInstance.invoke(null);
-            return Boolean.TRUE.equals(externalShaderApiIsPackInUse.invoke(api));
-        } catch (ReflectiveOperationException | RuntimeException exception) {
-            if (!externalShaderApiFailureLogged) {
-                ModConstants.LOGGER.warn(
-                        "Unable to query the active Iris/Oculus shader pack; preserving tagged-fluid water fallback",
-                        exception
-                );
-                externalShaderApiFailureLogged = true;
-            }
-            return true;
-        }
-    }
-
-    private static void resolveExternalShaderApi() {
-        if (externalShaderApiResolved) {
-            return;
-        }
-        synchronized (WaterShaders.class) {
-            if (externalShaderApiResolved) {
-                return;
-            }
-            for (String className : new String[] {
-                    "net.irisshaders.iris.api.v0.IrisApi",
-                    "net.coderbot.iris.api.v0.IrisApi"
-            }) {
-                try {
-                    Class<?> apiClass = Class.forName(className, false, WaterShaders.class.getClassLoader());
-                    Method getInstance = apiClass.getMethod("getInstance");
-                    Method isPackInUse = apiClass.getMethod("isShaderPackInUse");
-                    externalShaderApiGetInstance = getInstance;
-                    externalShaderApiIsPackInUse = isPackInUse;
-                    break;
-                } catch (ClassNotFoundException | NoSuchMethodException ignored) {
-                    // Try the next API package used by modern/legacy Iris and Oculus.
-                }
-            }
-            externalShaderApiResolved = true;
-        }
+        return ShaderPackCompatibility.isExternalShaderPackActive();
     }
 
     private static boolean isLinked(ShaderInstance shader) {
-        int programId = shader.getId();
-        return GL20.glIsProgram(programId)
-                && GL20.glGetProgrami(programId, GL20.GL_LINK_STATUS) != 0;
+        return RenderBackends.current().isShaderProgramUsable(shader.getId());
     }
 }

@@ -23,8 +23,8 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate version-pinned neural A.E.T.H.E.R cryo narration assets."
     )
-    parser.add_argument("--voice", default="af_nicole")
-    parser.add_argument("--speed", type=float, default=0.95)
+    parser.add_argument("--voice", default="af_bella")
+    parser.add_argument("--speed", type=float, default=1.0)
     parser.add_argument("--allow-downloads", action="store_true")
     return parser.parse_args()
 
@@ -133,10 +133,11 @@ def main() -> None:
     staging_directory = create_staging_directory(repo_root)
     try:
         for cue, subtitle in narration.items():
+            source_text = str(subtitle)
             chunks = [
                 np.asarray(audio, dtype=np.float32)
                 for _, _, audio in pipeline(
-                    spoken_version(str(subtitle)),
+                    spoken_version(source_text),
                     voice=arguments.voice,
                     speed=arguments.speed,
                 )
@@ -147,6 +148,7 @@ def main() -> None:
             duration_seconds = audio.size / SAMPLE_RATE
             clips[cue] = {
                 "file": staged_path.name,
+                "source_text": source_text,
                 "duration_ticks": math.ceil(duration_seconds * 20.0)
                 + SUBTITLE_FADE_TICKS,
                 "duration_seconds": round(duration_seconds, 3),
@@ -167,7 +169,7 @@ def main() -> None:
         "engine": f"Kokoro-82M {installed_kokoro}",
         "model": "hexgrad/Kokoro-82M",
         "voice": arguments.voice,
-        "style": "subdued_human_caretaker",
+        "style": "grounded_conversational_caretaker",
         "speed": arguments.speed,
         "sample_rate": SAMPLE_RATE,
         "clips": clips,

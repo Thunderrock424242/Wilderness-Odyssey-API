@@ -2,7 +2,8 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.mojang.blaze3d.platform.GlUtil;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuHardwareProbe;
+import com.thunder.wildernessodysseyapi.rendering.GPUCapabilities;
+import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
@@ -41,8 +42,8 @@ public final class WaterHardwareAutoDetector {
             return;
         }
 
-        GpuHardwareProbe.Snapshot gpu = GpuHardwareProbe.capture();
-        if (!gpu.rendererAvailable() && ++probeAttempts < MAX_GPU_PROBE_ATTEMPTS) {
+        GPUCapabilities gpu = RenderBackends.current().capabilities();
+        if (!gpu.available() && ++probeAttempts < MAX_GPU_PROBE_ATTEMPTS) {
             return;
         }
 
@@ -50,8 +51,7 @@ public final class WaterHardwareAutoDetector {
         long physicalMemory = totalPhysicalMemoryBytes();
         WaterHardwareQualitySelector.HardwareProfile hardware =
                 new WaterHardwareQualitySelector.HardwareProfile(
-                        gpu.renderer(),
-                        gpu.reportedVideoMemoryBytes(),
+                        gpu,
                         runtime.availableProcessors(),
                         physicalMemory,
                         runtime.maxMemory(),
@@ -74,10 +74,13 @@ public final class WaterHardwareAutoDetector {
         detected = true;
 
         ModConstants.LOGGER.info(
-                "[Water] Automatic quality selected {} ({}) from GPU '{}', CPU '{}', {} logical processors, physical RAM {}, max heap {}, framebuffer {}x{}.",
+                "[Water] Capability-based automatic quality selected {} ({}) from {} GPU '{}' (memory {} via {}), CPU '{}', {} logical processors, physical RAM {}, max heap {}, framebuffer {}x{}.",
                 selection.quality(),
                 selection.summary(),
+                gpu.api(),
                 available(gpu.renderer()),
+                formatMemory(gpu.reportedVideoMemoryBytes()),
+                gpu.memoryEvidence(),
                 cpuDescription(),
                 runtime.availableProcessors(),
                 formatMemory(physicalMemory),

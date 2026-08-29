@@ -393,7 +393,12 @@ public final class CinematicManager {
             }
             PacketDistributor.sendToPlayer(
                     player,
-                    new CinematicNarrationPayload(sequence.id(), cueId, durationTicks)
+                    new CinematicNarrationPayload(
+                            sequence.id(),
+                            cueId,
+                            player.level().getGameTime(),
+                            durationTicks
+                    )
             );
             return true;
         }

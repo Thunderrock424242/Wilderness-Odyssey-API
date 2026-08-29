@@ -42,6 +42,7 @@ public final class CinematicClientController {
     private ResourceLocation sequenceId;
     private ResourceLocation stageId;
     private ClientCinematicPresentation presentation;
+    private long sequenceStartGameTime;
     private long stageStartGameTime;
     private int stageDurationTicks;
     private boolean controlsLocked;
@@ -60,8 +61,8 @@ public final class CinematicClientController {
     private int postMessageTicks;
     private int postMessageTotalTicks;
     private Component subtitle;
-    private int subtitleTicks;
-    private int subtitleTotalTicks;
+    private long subtitleStartGameTime;
+    private int subtitleDurationTicks;
 
     private CinematicClientController() {
     }
@@ -132,13 +133,33 @@ public final class CinematicClientController {
     }
 
     public float subtitleAlpha(float partialTick) {
-        if (subtitle == null || subtitleTotalTicks <= 0) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (subtitle == null || minecraft.level == null) {
             return 0.0F;
         }
-        float remaining = Math.max(0.0F, subtitleTicks - partialTick);
-        float fadeIn = Math.min(1.0F, (subtitleTotalTicks - remaining) / 5.0F);
-        float fadeOut = Math.min(1.0F, remaining / 10.0F);
-        return Math.min(fadeIn, fadeOut);
+        return CinematicCueClock.subtitleAlpha(
+                minecraft.level.getGameTime() + partialTick,
+                subtitleStartGameTime,
+                subtitleDurationTicks
+        );
+    }
+
+    /** Returns continuous sequence time from the same server clock used by stage packets. */
+    public float sequenceElapsedTicks(float partialTick) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!isActive() || minecraft.level == null) {
+            return 0.0F;
+        }
+        return Math.max(0.0F, minecraft.level.getGameTime() - sequenceStartGameTime + partialTick);
+    }
+
+    /** Returns continuous stage time from the authoritative stage boundary. */
+    public float stageElapsedTicks(float partialTick) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!isActive() || minecraft.level == null) {
+            return 0.0F;
+        }
+        return Math.max(0.0F, minecraft.level.getGameTime() - stageStartGameTime + partialTick);
     }
 
     /** Returns smooth stage progress derived from synchronized level time, without tick packets. */
@@ -147,8 +168,7 @@ public final class CinematicClientController {
         if (!isActive() || minecraft.level == null || stageDurationTicks <= 0) {
             return 0.0F;
         }
-        double elapsed = minecraft.level.getGameTime() - stageStartGameTime + partialTick;
-        return Mth.clamp((float) (elapsed / stageDurationTicks), 0.0F, 1.0F);
+        return Mth.clamp(stageElapsedTicks(partialTick) / stageDurationTicks, 0.0F, 1.0F);
     }
 
     public Component postMessage() {
@@ -184,6 +204,7 @@ public final class CinematicClientController {
         sequenceId = payload.sequenceId();
         stageId = payload.stageId();
         this.presentation = presentation;
+        sequenceStartGameTime = payload.stageStartGameTime();
         stageStartGameTime = payload.stageStartGameTime();
         stageDurationTicks = payload.stageDurationTicks();
         controlsLocked = payload.controlsLocked();
@@ -233,10 +254,25 @@ public final class CinematicClientController {
             ModConstants.LOGGER.warn("Ignoring unknown narration cue {} for {}", payload.cueId(), sequenceId);
             return;
         }
+        Minecraft minecraft = Minecraft.getInstance();
+        long currentGameTime = minecraft.level == null
+                ? payload.cueStartGameTime()
+                : minecraft.level.getGameTime();
+        int elapsedTicks = CinematicCueClock.elapsedTicks(
+                currentGameTime,
+                payload.cueStartGameTime(),
+                payload.durationTicks()
+        );
+        if (elapsedTicks >= payload.durationTicks()) {
+            return;
+        }
         subtitle = text;
-        subtitleTicks = payload.durationTicks();
-        subtitleTotalTicks = payload.durationTicks();
-        invokePresentation(() -> presentation.onNarration(this, payload.cueId(), text), "narration");
+        subtitleStartGameTime = payload.cueStartGameTime();
+        subtitleDurationTicks = payload.durationTicks();
+        invokePresentation(
+                () -> presentation.onNarration(this, payload.cueId(), text, elapsedTicks),
+                "narration"
+        );
     }
 
     private void end(EndCinematicPayload payload) {
@@ -296,6 +332,7 @@ public final class CinematicClientController {
         sequenceId = null;
         stageId = null;
         presentation = null;
+        sequenceStartGameTime = 0L;
         stageStartGameTime = 0L;
         stageDurationTicks = 0;
         controlsLocked = false;
@@ -309,8 +346,8 @@ public final class CinematicClientController {
         previousHideGui = false;
         clientSettingsCaptured = false;
         subtitle = null;
-        subtitleTicks = 0;
-        subtitleTotalTicks = 0;
+        subtitleStartGameTime = 0L;
+        subtitleDurationTicks = 0;
         clearInput(LOCKED_INPUT);
         if (clearPostMessage) {
             postMessage = null;
@@ -336,11 +373,15 @@ public final class CinematicClientController {
                 INSTANCE.postMessageTotalTicks = 0;
             }
         }
-        if (INSTANCE.subtitleTicks > 0) {
-            INSTANCE.subtitleTicks--;
-            if (INSTANCE.subtitleTicks == 0) {
+        if (INSTANCE.subtitle != null) {
+            if (minecraft.level == null || CinematicCueClock.elapsedTicks(
+                    minecraft.level.getGameTime(),
+                    INSTANCE.subtitleStartGameTime,
+                    INSTANCE.subtitleDurationTicks
+            ) >= INSTANCE.subtitleDurationTicks) {
                 INSTANCE.subtitle = null;
-                INSTANCE.subtitleTotalTicks = 0;
+                INSTANCE.subtitleStartGameTime = 0L;
+                INSTANCE.subtitleDurationTicks = 0;
             }
         }
     }

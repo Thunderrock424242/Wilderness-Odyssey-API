@@ -23,7 +23,16 @@ public final class VoiceAudioPlayer {
 
     /** Replaces any active clip and plays one complete in-memory WAV. */
     public CompletableFuture<Void> play(byte[] wav, float volume) {
-        return CompletableFuture.runAsync(() -> playBlocking(wav, volume), executor);
+        return CompletableFuture.runAsync(() -> playBlocking(wav, volume, 0L, 0L), executor);
+    }
+
+    /** Plays authored audio from a synchronized offset and includes queue/setup latency. */
+    public CompletableFuture<Void> playAtOffset(byte[] wav, float volume, long offsetMicroseconds) {
+        long queuedAtNanos = System.nanoTime();
+        return CompletableFuture.runAsync(
+                () -> playBlocking(wav, volume, Math.max(0L, offsetMicroseconds), queuedAtNanos),
+                executor
+        );
     }
 
     /** Stops the active clip immediately; safe to call from cinematic cleanup. */
@@ -37,7 +46,7 @@ public final class VoiceAudioPlayer {
         }
     }
 
-    private void playBlocking(byte[] wav, float volume) {
+    private void playBlocking(byte[] wav, float volume, long offsetMicroseconds, long queuedAtNanos) {
         stop();
         try (AudioInputStream stream = AudioSystem.getAudioInputStream(new ByteArrayInputStream(wav))) {
             Clip clip = AudioSystem.getClip();
@@ -50,6 +59,17 @@ public final class VoiceAudioPlayer {
             });
             clip.open(stream);
             applyVolume(clip, volume);
+            long synchronizedOffset = offsetMicroseconds;
+            if (queuedAtNanos > 0L) {
+                synchronizedOffset += TimeUnit.NANOSECONDS.toMicros(System.nanoTime() - queuedAtNanos);
+            }
+            if (synchronizedOffset >= clip.getMicrosecondLength()) {
+                clip.close();
+                return;
+            }
+            if (synchronizedOffset > 0L) {
+                clip.setMicrosecondPosition(synchronizedOffset);
+            }
             long maximumSeconds = Math.max(5L, Math.min(120L, clip.getMicrosecondLength() / 1_000_000L + 5L));
             clip.start();
             completed.await(maximumSeconds, TimeUnit.SECONDS);

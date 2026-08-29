@@ -87,7 +87,7 @@ class CryoWakeupPresentationModelTest {
                 CryoWakeupSequence.MEDICAL_DIAGNOSTIC, 0.0F
         ));
         assertTrue(CryoWakeupPresentationModel.pacingFlash(
-                CryoWakeupSequence.CARDIAC_PACING, 135.0F / 180.0F
+                CryoWakeupSequence.CARDIAC_PACING, 92.0F / 168.0F
         ) > 0.9F);
         assertEquals(0.0F, CryoWakeupPresentationModel.pacingFlash(
                 CryoWakeupSequence.REVIVAL_PROTOCOL, 0.60F

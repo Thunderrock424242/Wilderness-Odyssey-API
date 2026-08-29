@@ -17,6 +17,9 @@ public class AISettings {
     private int maxHistoryMessages = 12;
     private int maxResponseCharacters = 800;
     private int maxOutputTokens = 180;
+    private boolean ollamaAutostartEnabled = true;
+    private int ollamaStartupTimeoutSeconds = 20;
+    private String ollamaExecutable = "";
     private String wakeWord = "atlas";
     private String personaName = "Atlas";
     private String personalityTone = "warm and conversational";
@@ -102,6 +105,30 @@ public class AISettings {
 
     public void setMaxOutputTokens(int maxOutputTokens) {
         this.maxOutputTokens = Math.max(32, Math.min(512, maxOutputTokens));
+    }
+
+    public boolean isOllamaAutostartEnabled() {
+        return ollamaAutostartEnabled;
+    }
+
+    public void setOllamaAutostartEnabled(boolean ollamaAutostartEnabled) {
+        this.ollamaAutostartEnabled = ollamaAutostartEnabled;
+    }
+
+    public int getOllamaStartupTimeoutSeconds() {
+        return ollamaStartupTimeoutSeconds;
+    }
+
+    public void setOllamaStartupTimeoutSeconds(int ollamaStartupTimeoutSeconds) {
+        this.ollamaStartupTimeoutSeconds = Math.max(5, Math.min(60, ollamaStartupTimeoutSeconds));
+    }
+
+    public String getOllamaExecutable() {
+        return ollamaExecutable;
+    }
+
+    public void setOllamaExecutable(String ollamaExecutable) {
+        this.ollamaExecutable = ollamaExecutable == null ? "" : ollamaExecutable.trim();
     }
 
     public String getWakeWord() {

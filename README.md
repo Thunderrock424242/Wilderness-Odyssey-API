@@ -76,7 +76,7 @@ A.E.T.H.E.R local companion:
 ----------------------------
 See `docs/ai/purpose-scope.md` for A.E.T.H.E.R's core boundaries and `docs/ai/local-voice.md` for optional faster-whisper/Kokoro setup.
 
-A.E.T.H.E.R uses a private loopback Ollama model for normal single-player chat, one grounded conversation history, six bounded specialist personalities, and a factual verification pass. The scripted response banks below are retained for local-provider outages; they are not the normal conversation authority. No relay item, wake word, command, cloud service, or multiplayer connection is required or accepted.
+A.E.T.H.E.R uses a private loopback Ollama model for normal single-player chat, one grounded conversation history, six bounded specialist personalities, and a factual verification pass. On Windows it can start an already-installed Ollama application when a private world opens; see `docs/ai/ollama-autostart.md`. The scripted response banks below are retained for local-provider outages; they are not the normal conversation authority. No relay item, wake word, command, cloud service, or multiplayer connection is required or accepted.
 
 Scripted response data lives in:
 - `src/main/resources/ai_config.yaml`

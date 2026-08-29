@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
+import com.thunder.wildernessodysseyapi.rendering.RenderingQuality;
+import com.thunder.wildernessodysseyapi.rendering.performance.RenderQualityState;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.world.level.Level;
@@ -294,6 +296,15 @@ public final class WaterRenderingConfig {
 
     /** Returns the active top-level water quality target. */
     public static WaterQuality waterQuality() {
+        WaterQuality preferred = configuredWaterQuality();
+        RenderingQuality adaptiveCeiling = RenderQualityState.currentQuality();
+        return preferred.ordinal() > adaptiveCeiling.ordinal()
+                ? WaterQuality.values()[adaptiveCeiling.ordinal()]
+                : preferred;
+    }
+
+    /** Returns the saved or one-time hardware-selected preference before adaptive clamping. */
+    private static WaterQuality configuredWaterQuality() {
         if (automaticallyDetectWaterQuality()) {
             WaterQuality detected = autoDetectedWaterQuality;
             // Use a stable balanced profile during the first startup ticks
@@ -322,14 +333,19 @@ public final class WaterRenderingConfig {
 
     /** Returns the source and limiting component tiers for F3 diagnostics. */
     public static String qualitySelectionSummary() {
+        WaterQuality effective = waterQuality();
+        String adaptive = RenderQualityState.snapshot().enabled()
+                ? " | adaptive " + effective.name().toLowerCase(java.util.Locale.ROOT)
+                : "";
         if (!automaticallyDetectWaterQuality()) {
-            return "manual " + WATER_QUALITY.get().name().toLowerCase();
+            return "manual " + WATER_QUALITY.get().name().toLowerCase() + adaptive;
         }
         WaterQuality detected = autoDetectedWaterQuality;
         if (detected == null) {
             return "auto pending; temporary high";
         }
-        return "auto " + detected.name().toLowerCase() + " | " + autoDetectedWaterQualitySummary;
+        return "auto " + detected.name().toLowerCase() + " | " + autoDetectedWaterQualitySummary
+                + adaptive;
     }
 
     /** Returns the bounded SSR march count for the active quality tier. */

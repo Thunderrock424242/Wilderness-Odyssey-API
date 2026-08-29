@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.ai.story;
 
 import com.thunder.wildernessodysseyapi.ai.perf.MemoryStore;
 import com.thunder.wildernessodysseyapi.ai.story.provider.OllamaChatClient;
+import com.thunder.wildernessodysseyapi.ai.story.provider.OllamaLocalRuntime;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 
 import java.util.ArrayList;
@@ -30,6 +31,7 @@ public class AIClient {
     private final AIOnboardingStore onboardingStore = new AIOnboardingStore();
     private final AIFallbackResponder fallbackResponder = new AIFallbackResponder();
     private final OllamaChatClient ollamaChatClient = new OllamaChatClient();
+    private final OllamaLocalRuntime ollamaLocalRuntime = new OllamaLocalRuntime();
     private AISubsystemRegistry subsystemRegistry = new AISubsystemRegistry("Aether", List.of());
     private boolean onboardingEnabled;
     private String onboardingCompletionMessage = "You're all set. You can ask me anything now.";
@@ -85,7 +87,12 @@ public class AIClient {
         if (!AIChatAccessPolicy.isAvailable(server) || !settings.isOllamaEnabled()) {
             return;
         }
-        AsyncTaskManager.trySubmitIoWork("Aether_Ollama_Warmup", () -> ollamaChatClient.warmUp(settings));
+        AsyncTaskManager.trySubmitIoWork("Aether_Ollama_Warmup", () -> {
+            OllamaLocalRuntime.StartupResult startup = ollamaLocalRuntime.ensureAvailable(settings);
+            if (startup.isAvailable()) {
+                ollamaChatClient.warmUp(settings);
+            }
+        });
     }
 
     private void applySettings(AIConfig config) {
@@ -119,6 +126,15 @@ public class AIClient {
         }
         if (configSettings.getMaxOutputTokens() != null) {
             settings.setMaxOutputTokens(configSettings.getMaxOutputTokens());
+        }
+        if (configSettings.getOllamaAutostart() != null) {
+            settings.setOllamaAutostartEnabled(configSettings.getOllamaAutostart());
+        }
+        if (configSettings.getOllamaStartupTimeoutSeconds() != null) {
+            settings.setOllamaStartupTimeoutSeconds(configSettings.getOllamaStartupTimeoutSeconds());
+        }
+        if (configSettings.getOllamaExecutable() != null) {
+            settings.setOllamaExecutable(configSettings.getOllamaExecutable());
         }
 
         AIConfig.Personality personality = config.getPersonality();

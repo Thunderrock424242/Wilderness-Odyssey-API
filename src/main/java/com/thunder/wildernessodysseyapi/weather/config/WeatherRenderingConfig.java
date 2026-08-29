@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.weather.config;
 
 import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
+import com.thunder.wildernessodysseyapi.rendering.RenderingQuality;
+import com.thunder.wildernessodysseyapi.rendering.performance.RenderQualityState;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
@@ -86,6 +88,7 @@ public final class WeatherRenderingConfig {
             1.0
     );
     private static volatile Settings activeSettings = DEFAULTS;
+    private static volatile Settings[] qualitySettings = qualityVariants(DEFAULTS);
 
     static {
         WildernessConfigSpecs.initialize();
@@ -220,12 +223,12 @@ public final class WeatherRenderingConfig {
 
     /** Returns the immutable settings snapshot used by the render thread. */
     public static Settings settings() {
-        return activeSettings;
+        return qualitySettings[RenderQualityState.currentQuality().ordinal()];
     }
 
     /** Refreshes the render-thread snapshot after the client config loads or reloads. */
     public static void reload() {
-        activeSettings = new Settings(
+        Settings reloaded = new Settings(
                 ENABLE_LOCALIZED_CLOUDS.get(),
                 ENABLE_VOLUMETRIC_CLOUDS.get(),
                 ENABLE_RAYMARCHED_CLOUDS.get(),
@@ -262,6 +265,16 @@ public final class WeatherRenderingConfig {
                 DISTANT_THUNDER_MAXIMUM_INTERVAL.get(),
                 DISTANT_THUNDER_VOLUME_MULTIPLIER.get()
         );
+        activeSettings = reloaded;
+        qualitySettings = qualityVariants(reloaded);
+    }
+
+    private static Settings[] qualityVariants(Settings settings) {
+        Settings[] variants = new Settings[RenderingQuality.values().length];
+        for (RenderingQuality quality : RenderingQuality.values()) {
+            variants[quality.ordinal()] = settings.adaptedTo(quality);
+        }
+        return variants;
     }
 
     /** Immutable and defensively bounded renderer settings. */
@@ -302,6 +315,86 @@ public final class WeatherRenderingConfig {
             int maximumThunderInterval,
             double volumeMultiplier
     ) {
+        /**
+         * Applies a transient shared ceiling while preserving every explicit
+         * disabled toggle. Variants are built only on config reload, not per frame.
+         */
+        public Settings adaptedTo(RenderingQuality quality) {
+            RenderingQuality safeQuality = quality == null ? RenderingQuality.CINEMATIC : quality;
+            if (safeQuality == RenderingQuality.CINEMATIC) {
+                return this;
+            }
+            double scale = switch (safeQuality) {
+                case LOW -> 0.45;
+                case MEDIUM -> 0.68;
+                case HIGH -> 0.88;
+                case CINEMATIC -> 1.0;
+            };
+            boolean allowDistant = safeQuality != RenderingQuality.LOW;
+            return new Settings(
+                    enabled,
+                    volumetricClouds && safeQuality.allows(RenderingQuality.MEDIUM),
+                    raymarchedClouds && safeQuality.allows(RenderingQuality.HIGH),
+                    Math.min(raymarchSteps, switch (safeQuality) {
+                        case LOW -> 16;
+                        case MEDIUM -> 24;
+                        case HIGH -> 40;
+                        case CINEMATIC -> raymarchSteps;
+                    }),
+                    scaleInt(renderDistanceBlocks, scale, 96),
+                    Math.max(rebuildIntervalTicks, switch (safeQuality) {
+                        case LOW -> 10;
+                        case MEDIUM -> 7;
+                        case HIGH -> 5;
+                        case CINEMATIC -> rebuildIntervalTicks;
+                    }),
+                    windDetailSpeedBlocksPerSecond,
+                    scaleInt(maximumCloudTiles, scale, 256),
+                    opacityMultiplier,
+                    Math.min(volumetricLayerCount, switch (safeQuality) {
+                        case LOW -> 4;
+                        case MEDIUM -> 6;
+                        case HIGH -> 10;
+                        case CINEMATIC -> volumetricLayerCount;
+                    }),
+                    volumetricDetailStrength,
+                    distantRainShafts && allowDistant,
+                    windDrivenPrecipitation,
+                    precipitationWindSlantBlocks,
+                    scaleInt(distantRainDistanceBlocks, scale, 32),
+                    Math.max(distantRainSpacingBlocks, switch (safeQuality) {
+                        case LOW -> 10;
+                        case MEDIUM -> 8;
+                        case HIGH -> 6;
+                        case CINEMATIC -> distantRainSpacingBlocks;
+                    }),
+                    scaleInt(maximumDistantRainShafts, scale, 64),
+                    Math.max(0.10, precipitationStreakDensity * scale),
+                    precipitationOpacity,
+                    precipitationImpactDensity * scale,
+                    scaleInt(maximumPrecipitationImpacts, scale, 32),
+                    distantCloudLayer && allowDistant,
+                    scaleInt(distantCloudDistanceBlocks, scale, 384),
+                    Math.max(distantCloudSpacingBlocks, switch (safeQuality) {
+                        case LOW -> 72;
+                        case MEDIUM -> 60;
+                        case HIGH -> 48;
+                        case CINEMATIC -> distantCloudSpacingBlocks;
+                    }),
+                    scaleInt(maximumDistantCloudTiles, scale, 64),
+                    cloudShadowStrength,
+                    surfaceOverlays,
+                    scaleInt(surfaceOverlayRadiusBlocks, Math.max(0.5, scale), 8),
+                    scaleInt(maximumSurfacePatches, scale, 32),
+                    distantThunderEnabled,
+                    minimumStormIntensity,
+                    maximumAudibleDistance,
+                    minimumThunderInterval,
+                    maximumThunderInterval,
+                    volumeMultiplier
+            );
+        }
+
         /** Preserves the weather-v3 rendering shape for compatibility callers. */
         public Settings(
                 boolean enabled,
@@ -469,6 +562,10 @@ public final class WeatherRenderingConfig {
         private static double clamp(double value, double minimum, double maximum) {
             double finite = Double.isFinite(value) ? value : minimum;
             return Math.max(minimum, Math.min(maximum, finite));
+        }
+
+        private static int scaleInt(int value, double scale, int minimum) {
+            return Math.max(minimum, (int) Math.round(value * scale));
         }
     }
 }

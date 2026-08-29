@@ -50,7 +50,12 @@ public interface ClientCinematicPresentation {
     default void onStageChanged(CinematicClientController state) {
     }
 
-    default void onNarration(CinematicClientController state, ResourceLocation cueId, Component text) {
+    default void onNarration(
+            CinematicClientController state,
+            ResourceLocation cueId,
+            Component text,
+            int elapsedTicks
+    ) {
     }
 
     default void onStopped(CinematicClientController state) {

@@ -112,6 +112,9 @@ public final class AIConfigLoader {
         config.getSettings().setMaxHistoryMessages(readInteger(settings.get("max_history_messages")));
         config.getSettings().setMaxResponseCharacters(readInteger(settings.get("max_response_characters")));
         config.getSettings().setMaxOutputTokens(readInteger(settings.get("max_output_tokens")));
+        config.getSettings().setOllamaAutostart(readBoolean(settings.get("ollama_autostart")));
+        config.getSettings().setOllamaStartupTimeoutSeconds(readInteger(settings.get("ollama_startup_timeout_seconds")));
+        config.getSettings().setOllamaExecutable(readStringValue(settings.get("ollama_executable")));
 
         Map<String, Object> playerMemory = readStringObjectMap(root.get("player_memory"));
         config.getPlayerMemory().setEnabled(readBoolean(playerMemory.get("enabled")));

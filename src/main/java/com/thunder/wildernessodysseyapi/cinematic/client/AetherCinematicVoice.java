@@ -86,7 +86,7 @@ public final class AetherCinematicVoice {
     }
 
     /** Plays one bundled authored clip immediately, bypassing live synthesis and OS Narrator. */
-    public static void playAuthoredClip(ResourceLocation clipId) {
+    public static void playAuthoredClip(ResourceLocation clipId, int elapsedTicks) {
         if (!AetherVoiceConfig.CINEMATIC_NARRATION.get() || !isPrivateSingleplayer() || clipId == null) {
             stop();
             return;
@@ -101,7 +101,8 @@ public final class AetherCinematicVoice {
         float volume = AetherVoiceConfig.VOICE_VOLUME.get().floatValue()
                 * minecraft.options.getSoundSourceVolume(SoundSource.VOICE)
                 * minecraft.options.getSoundSourceVolume(SoundSource.MASTER);
-        AUTHORED_CLIP_PLAYER.play(wav, volume).whenComplete((ignored, failure) -> {
+        long offsetMicroseconds = CinematicCueClock.audioOffsetMicroseconds(elapsedTicks);
+        AUTHORED_CLIP_PLAYER.playAtOffset(wav, volume, offsetMicroseconds).whenComplete((ignored, failure) -> {
             if (failure != null) {
                 ModConstants.LOGGER.warn("[Aether Voice] Authored cinematic clip {} failed: {}",
                         clipId, failure.getClass().getSimpleName());
