@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.weather.client.audio.DistantThunderAudio
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudLightingModel;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.LocalizedCloudRenderer;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.WeatherLightningIllumination;
 import com.thunder.wildernessodysseyapi.weather.client.precipitation.LocalizedPrecipitationRenderer;
 import com.thunder.wildernessodysseyapi.weather.client.precipitation.WeatherImpactRenderer;
 import com.thunder.wildernessodysseyapi.weather.client.surface.WeatherSurfaceRenderer;
@@ -17,6 +18,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.material.FogType;
+import net.minecraft.world.entity.LightningBolt;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -25,6 +27,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import com.thunder.wildernessodysseyapi.weather.simulation.WeatherHazardModel;
 
 import java.util.List;
@@ -71,6 +74,7 @@ public final class WeatherClientEvents {
         WeatherImpactRenderer.clear();
         WeatherSurfaceRenderer.clear();
         DistantThunderAudioManager.clearAll();
+        WeatherLightningIllumination.clear();
         ClientWeatherCoordinator.clearAll();
     }
 
@@ -82,6 +86,7 @@ public final class WeatherClientEvents {
         WeatherImpactRenderer.clear();
         WeatherSurfaceRenderer.clear();
         DistantThunderAudioManager.clearAll();
+        WeatherLightningIllumination.clear();
         ClientWeatherCoordinator.clearAll();
     }
 
@@ -94,7 +99,17 @@ public final class WeatherClientEvents {
             WeatherImpactRenderer.clear();
             WeatherSurfaceRenderer.clear();
             DistantThunderAudioManager.clearLevel(clientLevel);
+            WeatherLightningIllumination.clear();
             ClientWeatherCoordinator.clearLevel(clientLevel);
+        }
+    }
+
+    /** Captures only actual server-synchronized lightning; no synthetic flashes are scheduled. */
+    @SubscribeEvent
+    public static void onEntityJoin(EntityJoinLevelEvent event) {
+        if (event.getLevel() instanceof ClientLevel clientLevel
+                && event.getEntity() instanceof LightningBolt lightning) {
+            WeatherLightningIllumination.strike(clientLevel, lightning.position());
         }
     }
 
@@ -218,18 +233,24 @@ public final class WeatherClientEvents {
         LocalizedCloudRenderer.Diagnostics clouds = LocalizedCloudRenderer.diagnostics();
         LocalizedPrecipitationRenderer.Diagnostics precipitation =
                 LocalizedPrecipitationRenderer.diagnostics();
+        WeatherSurfaceRenderer.Diagnostics surfaces = WeatherSurfaceRenderer.diagnostics();
+        PrecipitationBlend precipitationBlend = PrecipitationBlend.from(sample);
         WeatherHazardModel.HazardProfile hazards = WeatherHazardModel.evaluate(sample);
         DistantThunderAudioManager.Diagnostics thunderAudio = DistantThunderAudioManager.diagnostics();
 
         return List.of(
                 String.format(
                         Locale.ROOT,
-                        "WO Atmosphere: cell %d,%d | seq %d | %d cells | blend %.0f%%",
+                        "WO Atmosphere: cell %d,%d | seq %d | tick %d -> %.1f | %d cells | blend %.0f%% + %.0f%% | age %.2fs",
                         cellX,
                         cellZ,
                         state.sequence(),
+                        state.serverTick(),
+                        state.estimatedServerTick(),
                         state.cellCount(),
-                        state.interpolationProgress() * 100.0D
+                        state.interpolationProgress() * 100.0D,
+                        state.extrapolationAmount() * 100.0D,
+                        state.snapshotAgeSeconds()
                 ),
                 String.format(
                         Locale.ROOT,
@@ -272,9 +293,12 @@ public final class WeatherClientEvents {
                 ),
                 String.format(
                         Locale.ROOT,
-                        "Precip %s %.3f | thunder %.3f | fog %.3f",
+                        "Precip %s %.3f | visual rain %.2f snow %.2f hail %.2f | thunder %.3f | fog %.3f",
                         sample.precipitationType(),
                         sample.precipitationIntensity(),
+                        precipitationBlend.rain(),
+                        precipitationBlend.snow(),
+                        precipitationBlend.hail(),
                         thunder,
                         fog
                 ),
@@ -319,12 +343,21 @@ public final class WeatherClientEvents {
                 ),
                 String.format(
                         Locale.ROOT,
-                        "Precip mesh %s | %d near | %d shafts | %d vertices | %d impacts",
+                        "Precip mesh %s | %d near | %d mid | %d far curtains | %d vertices | %d impacts",
                         precipitation.active() ? "active" : "inactive",
                         precipitation.nearColumns(),
-                        precipitation.distantShafts(),
+                        precipitation.midStreaks(),
+                        precipitation.farCurtains(),
                         precipitation.vertices(),
                         WeatherImpactRenderer.activeImpactCount()
+                ),
+                String.format(
+                        Locale.ROOT,
+                        "Surface mesh %s | %d wet cells | %d puddle cells | %d triangles",
+                        surfaces.active() ? "connected-noise" : "inactive",
+                        surfaces.wetCells(),
+                        surfaces.puddleCells(),
+                        surfaces.triangles()
                 ),
                 distantThunderSelectionLine(thunderAudio),
                 distantThunderTimerLine(thunderAudio)

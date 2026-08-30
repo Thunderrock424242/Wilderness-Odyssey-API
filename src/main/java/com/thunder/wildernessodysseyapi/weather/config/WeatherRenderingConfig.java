@@ -87,7 +87,6 @@ public final class WeatherRenderingConfig {
             75,
             1.0
     );
-    private static volatile Settings activeSettings = DEFAULTS;
     private static volatile Settings[] qualitySettings = qualityVariants(DEFAULTS);
 
     static {
@@ -151,25 +150,25 @@ public final class WeatherRenderingConfig {
         builder.comment("Client-side presentation of localized precipitation.")
                 .push("localized_precipitation");
         ENABLE_DISTANT_RAIN_SHAFTS = builder
-                .comment("Render sparse vanilla-style rain curtains beyond Minecraft's near weather radius.")
+                .comment("Render sparse loaded-column precipitation curtains beyond the middle weather zone.")
                 .define("distantRainShafts", true);
         ENABLE_WIND_DRIVEN_PRECIPITATION = builder
-                .comment("Lean rain and snow columns downwind using the synchronized surface wind.")
+                .comment("Lean rain, snow, and hail elements downwind using synchronized surface wind.")
                 .define("windDrivenPrecipitation", true);
         PRECIPITATION_WIND_SLANT_BLOCKS = builder
-                .comment("Maximum horizontal displacement between the bottom and top of a precipitation column.")
+                .comment("Maximum horizontal displacement across a falling precipitation path.")
                 .defineInRange("precipitationWindSlantBlocks", 10.0, 0.0, 24.0);
         DISTANT_RAIN_DISTANCE_BLOCKS = builder
-                .comment("Maximum horizontal distance of distant rain curtains.")
+                .comment("Maximum horizontal distance of distant precipitation curtains.")
                 .defineInRange("distantRainDistanceBlocks", 96, 32, 192);
         DISTANT_RAIN_SPACING_BLOCKS = builder
-                .comment("World-space spacing between distant rain curtains. Larger values improve performance.")
+                .comment("World-space spacing between distant precipitation curtains. Larger values improve performance.")
                 .defineInRange("distantRainSpacingBlocks", 6, 4, 16);
         MAXIMUM_DISTANT_RAIN_SHAFTS = builder
-                .comment("Hard cap on loaded distant rain columns sampled during one cache rebuild.")
+                .comment("Hard cap on loaded distant precipitation columns sampled during one cache rebuild.")
                 .defineInRange("maximumDistantRainShafts", 768, 64, 2_048);
         PRECIPITATION_STREAK_DENSITY = builder
-                .comment("Fraction of nearby rain and snow columns drawn. Lower values create finer, less curtain-like precipitation.")
+                .comment("Element-count scale for near and middle rain, snow, and hail. Opacity remains secondary.")
                 .defineInRange("streakDensity", 0.82, 0.10, 1.0);
         PRECIPITATION_OPACITY = builder
                 .comment("Opacity multiplier for localized rain, snow, hail, and distant precipitation.")
@@ -207,7 +206,7 @@ public final class WeatherRenderingConfig {
         builder.comment("Cosmetic wet-ground and puddle overlays.")
                 .push("surface_overlays");
         ENABLE_SURFACE_OVERLAYS = builder
-                .comment("Draw bounded translucent wetness and puddle patches from synchronized surface state.")
+                .comment("Draw bounded connected wetness and flat-terrain puddle contours from synchronized surface state.")
                 .define("enabled", true);
         SURFACE_OVERLAY_RADIUS_BLOCKS = builder
                 .comment("Horizontal radius sampled around the camera for wet-ground overlays.")
@@ -265,7 +264,6 @@ public final class WeatherRenderingConfig {
                 DISTANT_THUNDER_MAXIMUM_INTERVAL.get(),
                 DISTANT_THUNDER_VOLUME_MULTIPLIER.get()
         );
-        activeSettings = reloaded;
         qualitySettings = qualityVariants(reloaded);
     }
 

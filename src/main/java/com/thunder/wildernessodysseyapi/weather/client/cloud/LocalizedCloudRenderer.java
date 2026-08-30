@@ -27,8 +27,8 @@ import java.util.Map;
  *
  * <p>Fancy clouds use a double-buffered world-space field atlas and one carrier
  * volume for every altitude band. The fragment shader reconstructs smooth
- * silhouettes and density inside those volumes, while the older slice, voxel,
- * and fast paths remain available when the custom shader cannot own the pass.
+ * silhouettes and density inside those volumes, while the slice and
+ * density-derived lobe paths remain available when the custom shader cannot own the pass.
  * All GPU resources are owned and replaced on the client render thread.</p>
  */
 public final class LocalizedCloudRenderer {
@@ -174,11 +174,13 @@ public final class LocalizedCloudRenderer {
         cloudBuffer.bind();
         if (builtVolumetric) {
             VolumetricCloudShaders.updateUniforms(
+                    level,
                     (float) (renderTicks / 20.0),
                     windDetailOffsetX,
                     windDetailOffsetZ,
                     builtOriginTileX,
                     builtOriginTileZ,
+                    cloudHeight,
                     level.getSunAngle(partialTick),
                     settings.volumetricDetailStrength()
             );
@@ -283,6 +285,7 @@ public final class LocalizedCloudRenderer {
         RenderType renderType = RaymarchedCloudRenderTypes.raymarchedClouds();
         renderType.setupRenderState();
         RaymarchedCloudShaders.updateUniforms(
+                level,
                 (float) (renderTicks / 20.0),
                 windDetailOffsetX,
                 windDetailOffsetZ,
@@ -526,12 +529,10 @@ public final class LocalizedCloudRenderer {
     ) {
         int radius = boundedRadius(settings);
         int diameter = radius * 2 + 1;
-        byte[] heights = new byte[diameter * diameter];
-        float[] baseOffsets = new float[diameter * diameter];
-        CloudFieldSample[] fields = new CloudFieldSample[heights.length];
-        CloudLayerProfile[] profiles = new CloudLayerProfile[heights.length];
-        float[] darkness = new float[heights.length];
-        float[] opacity = new float[heights.length];
+        CloudFieldSample[] fields = new CloudFieldSample[diameter * diameter];
+        CloudLayerProfile[] profiles = new CloudLayerProfile[fields.length];
+        float[] darkness = new float[fields.length];
+        float[] opacity = new float[fields.length];
         Map<CloudType, Double> cloudTypeWeights = new EnumMap<>(CloudType.class);
         double coverageSum = 0.0;
         int visibleTiles = 0;
@@ -543,7 +544,7 @@ public final class LocalizedCloudRenderer {
                         blockZ
                 );
 
-        // Sample each voxel's center for its shape, then prove precipitation
+        // Sample each field tile's center for its shape, then prove precipitation
         // overlap across bilinear sub-rectangles so thin rainy edges stay covered.
         for (int localZ = -radius; localZ <= radius; localZ++) {
             for (int localX = -radius; localX <= radius; localX++) {
@@ -584,9 +585,6 @@ public final class LocalizedCloudRenderer {
                 fields[index] = field;
                 CloudLayerProfile profile = CloudLayerProfile.evaluate(field);
                 profiles[index] = profile;
-                CloudLayerProfile.BandProfile dominantBand = profile.dominantBand();
-                baseOffsets[index] = (float) dominantBand.baseOffsetBlocks();
-                heights[index] = (byte) CloudCoverageModel.thickness(field);
                 darkness[index] = (float) CloudCoverageModel.darkness(field);
                 opacity[index] = (float) CloudCoverageModel.opacity(field, settings.opacityMultiplier());
                 coverageSum += coverage;
@@ -614,13 +612,19 @@ public final class LocalizedCloudRenderer {
                     baseColor,
                     settings.volumetricLayerCount()
             );
-        } else if (cloudStatus == CloudStatus.FANCY) {
-            vertices = emitFancyClouds(
-                    builder, heights, baseOffsets, darkness, opacity, diameter, radius, baseColor
-            );
         } else {
-            vertices = emitFastClouds(
-                    builder, heights, baseOffsets, darkness, opacity, diameter, radius, baseColor
+            vertices = emitFallbackCloudLobes(
+                    builder,
+                    fields,
+                    profiles,
+                    darkness,
+                    opacity,
+                    diameter,
+                    radius,
+                    originTileX,
+                    originTileZ,
+                    baseColor,
+                    cloudStatus == CloudStatus.FANCY
             );
         }
         DistantCloudResult distant = emitDistantCloudLayer(
@@ -662,8 +666,8 @@ public final class LocalizedCloudRenderer {
                 visibleTiles == 0 ? 0.0 : coverageSum / visibleTiles,
                 windDetailOffsetX,
                 windDetailOffsetZ,
-                volumetric ? "volume" : cloudStatus == CloudStatus.FANCY ? "voxel" : "fast",
-                volumetric ? settings.volumetricLayerCount() : 1,
+                volumetric ? "volume" : cloudStatus == CloudStatus.FANCY ? "shells" : "lobes",
+                volumetric ? settings.volumetricLayerCount() : cloudStatus == CloudStatus.FANCY ? 3 : 2,
                 dominantCloudType(cloudTypeWeights).displayName(),
                 0,
                 0,
@@ -821,7 +825,7 @@ public final class LocalizedCloudRenderer {
                 }
                 if (!volumetric && storm >= 0.42F) {
                     // A dark vertical rim makes an approaching squall line
-                    // legible at the horizon without expensive distant voxels.
+                    // legible at the horizon without expensive distant volumes.
                     vertices += emitWestSide(builder, x0, z0, z1, Float.NEGATIVE_INFINITY,
                             base, top, baseColor, storm, alpha * 0.85F);
                     vertices += emitEastSide(builder, x1, z0, z1, Float.NEGATIVE_INFINITY,
@@ -868,142 +872,85 @@ public final class LocalizedCloudRenderer {
                 .setNormal(unit(packedLayer), unit(coverage), unit(packedShape));
     }
 
-    private static int emitFastClouds(
+    /**
+     * Density-derived compatibility representation shared by Fancy and Fast.
+     *
+     * <p>Overlapping offset shells preserve the same sampled storm footprint,
+     * base, and thickness without exposing one rigid 12-block voxel per sample.</p>
+     */
+    private static int emitFallbackCloudLobes(
             BufferBuilder builder,
-            byte[] heights,
-            float[] baseOffsets,
+            CloudFieldSample[] fields,
+            CloudLayerProfile[] profiles,
             float[] darkness,
             float[] opacity,
             int diameter,
             int radius,
-            Vec3 baseColor
+            int originTileX,
+            int originTileZ,
+            Vec3 baseColor,
+            boolean fancy
     ) {
         int vertices = 0;
+        int shellCount = fancy ? 3 : 2;
+        float tileSize = CloudCoverageModel.CLOUD_TILE_SIZE;
         for (int gridZ = 0; gridZ < diameter; gridZ++) {
             for (int gridX = 0; gridX < diameter; gridX++) {
                 int cell = index(gridX, gridZ, diameter);
-                if (heights[cell] == 0) {
+                CloudFieldSample field = fields[cell];
+                CloudLayerProfile profile = profiles[cell];
+                if (field == null || profile == null) {
                     continue;
                 }
-                float x0 = (gridX - radius) * CloudCoverageModel.CLOUD_TILE_SIZE;
-                float z0 = (gridZ - radius) * CloudCoverageModel.CLOUD_TILE_SIZE;
-                float x1 = x0 + CloudCoverageModel.CLOUD_TILE_SIZE;
-                float z1 = z0 + CloudCoverageModel.CLOUD_TILE_SIZE;
-                float light = (float) (1.0 - darkness[cell] * 0.38);
-                emitHorizontalQuad(
-                        builder, x0, x1, baseOffsets[cell], z0, z1,
-                        baseColor, light, opacity[cell], 1.0F
-                );
-                vertices += 4;
+                int worldTileX = originTileX + gridX - radius;
+                int worldTileZ = originTileZ + gridZ - radius;
+                float coverage = (float) CloudCoverageModel.coverage(field);
+                CloudLayerProfile.BandProfile band = profile.dominantBand();
+                float base = (float) band.baseOffsetBlocks();
+                float depth = (float) Math.max(2.0D, band.depthBlocks());
+                float light = Math.max(0.28F, 0.90F - darkness[cell] * 0.50F);
+                float shellAlpha = (float) CloudColumnModel.sliceOpacity(opacity[cell], shellCount);
+                for (int shell = 0; shell < shellCount; shell++) {
+                    long salt = 0xD6E8FEB86659FD93L + (long) shell * 0x9E3779B97F4A7C15L;
+                    float offsetX = (float) ((lobeNoise(worldTileX, worldTileZ, salt) - 0.5D)
+                            * tileSize * 0.54D);
+                    float offsetZ = (float) ((lobeNoise(worldTileX, worldTileZ, salt ^ 0x94D049BB133111EBL) - 0.5D)
+                            * tileSize * 0.54D);
+                    float shellAmount = (shell + 0.35F) / shellCount;
+                    float halfSize = tileSize * (0.36F + coverage * 0.20F)
+                            * (1.0F - shell * 0.055F);
+                    float centerX = (gridX - radius + 0.5F) * tileSize + offsetX;
+                    float centerZ = (gridZ - radius + 0.5F) * tileSize + offsetZ;
+                    float y = base + depth * shellAmount;
+                    emitHorizontalQuad(
+                            builder,
+                            centerX - halfSize,
+                            centerX + halfSize,
+                            y,
+                            centerZ - halfSize,
+                            centerZ + halfSize,
+                            baseColor,
+                            light + shellAmount * 0.07F,
+                            shellAlpha,
+                            1.0F
+                    );
+                    vertices += 4;
+                }
             }
         }
         return vertices;
     }
 
-    private static int emitFancyClouds(
-            BufferBuilder builder,
-            byte[] heights,
-            float[] baseOffsets,
-            float[] darkness,
-            float[] opacity,
-            int diameter,
-            int radius,
-            Vec3 baseColor
-    ) {
-        int vertices = 0;
-        for (int gridZ = 0; gridZ < diameter; gridZ++) {
-            for (int gridX = 0; gridX < diameter; gridX++) {
-                int cell = index(gridX, gridZ, diameter);
-                int height = heights[cell];
-                if (height == 0) {
-                    continue;
-                }
-                float x0 = (gridX - radius) * CloudCoverageModel.CLOUD_TILE_SIZE;
-                float z0 = (gridZ - radius) * CloudCoverageModel.CLOUD_TILE_SIZE;
-                float x1 = x0 + CloudCoverageModel.CLOUD_TILE_SIZE;
-                float z1 = z0 + CloudCoverageModel.CLOUD_TILE_SIZE;
-                float alpha = opacity[cell];
-                float stormDarkness = darkness[cell];
-                float base = baseOffsets[cell];
-                float top = base + height;
-
-                emitHorizontalQuad(
-                        builder,
-                        x0,
-                        x1,
-                        top - 9.765625E-4F,
-                        z0,
-                        z1,
-                        baseColor,
-                        (float) (1.0 - stormDarkness * 0.34),
-                        alpha,
-                        1.0F
-                );
-                emitHorizontalQuad(
-                        builder,
-                        x0,
-                        x1,
-                        base,
-                        z0,
-                        z1,
-                        baseColor,
-                        (float) Math.max(0.22, 0.70 - stormDarkness * 0.42),
-                        alpha,
-                        -1.0F
-                );
-                vertices += 8;
-
-                vertices += emitWestSide(
-                        builder,
-                        x0,
-                        z0,
-                        z1,
-                        neighborTop(heights, baseOffsets, diameter, gridX - 1, gridZ),
-                        base,
-                        top,
-                        baseColor,
-                        stormDarkness,
-                        alpha
-                );
-                vertices += emitEastSide(
-                        builder,
-                        x1 - 9.765625E-4F,
-                        z0,
-                        z1,
-                        neighborTop(heights, baseOffsets, diameter, gridX + 1, gridZ),
-                        base,
-                        top,
-                        baseColor,
-                        stormDarkness,
-                        alpha
-                );
-                vertices += emitNorthSide(
-                        builder,
-                        x0,
-                        x1,
-                        z0,
-                        neighborTop(heights, baseOffsets, diameter, gridX, gridZ - 1),
-                        base,
-                        top,
-                        baseColor,
-                        stormDarkness,
-                        alpha
-                );
-                vertices += emitSouthSide(
-                        builder,
-                        x0,
-                        x1,
-                        z1 - 9.765625E-4F,
-                        neighborTop(heights, baseOffsets, diameter, gridX, gridZ + 1),
-                        base,
-                        top,
-                        baseColor,
-                        stormDarkness,
-                        alpha
-                );
-            }
-        }
-        return vertices;
+    private static double lobeNoise(int x, int z, long salt) {
+        long value = salt;
+        value ^= (long) x * 0x9E3779B97F4A7C15L;
+        value ^= (long) z * 0xC2B2AE3D27D4EB4FL;
+        value ^= value >>> 30;
+        value *= 0xBF58476D1CE4E5B9L;
+        value ^= value >>> 27;
+        value *= 0x94D049BB133111EBL;
+        value ^= value >>> 31;
+        return (double) (value >>> 11) * 0x1.0p-53;
     }
 
     private static void emitHorizontalQuad(
@@ -1134,7 +1081,7 @@ public final class LocalizedCloudRenderer {
     ) {
         builder.addVertex(x, y, z)
                 // Sampling one known opaque vanilla cloud texel makes occupancy
-                // authoritative; shape still comes from block geometry and the
+                // authoritative; shape still comes from bounded lobe geometry and the
                 // active minecraft:clouds texture/render pipeline.
                 .setUv(CLOUD_U, CLOUD_V)
                 .setColor(
@@ -1164,22 +1111,6 @@ public final class LocalizedCloudRenderer {
                 (int) Math.floor(Math.sqrt(settings.maximumCloudTiles() / Math.PI))
         );
         return Math.min(requested, tileCapRadius);
-    }
-
-    private static float neighborTop(
-            byte[] heights,
-            float[] baseOffsets,
-            int diameter,
-            int x,
-            int z
-    ) {
-        if (x < 0 || z < 0 || x >= diameter || z >= diameter) {
-            return Float.NEGATIVE_INFINITY;
-        }
-        int cell = index(x, z, diameter);
-        return heights[cell] == 0
-                ? Float.NEGATIVE_INFINITY
-                : baseOffsets[cell] + Byte.toUnsignedInt(heights[cell]);
     }
 
     private static CloudType dominantCloudType(Map<CloudType, Double> weights) {

@@ -55,6 +55,7 @@ class WeatherRegionSyncPayloadTest {
                 OVERWORLD,
                 WeatherRegionSyncPayload.DATA_VERSION,
                 19L,
+                12_345L,
                 true,
                 true,
                 256,
@@ -73,6 +74,7 @@ class WeatherRegionSyncPayloadTest {
             assertEquals(OVERWORLD, decoded.dimension());
             assertEquals(WeatherRegionSyncPayload.DATA_VERSION, decoded.dataVersion());
             assertEquals(19L, decoded.sequence());
+            assertEquals(12_345L, decoded.serverTick());
             assertEquals(true, decoded.enabled());
             assertEquals(true, decoded.replaceRegion());
             assertEquals(256, decoded.cellSize());
@@ -238,6 +240,7 @@ class WeatherRegionSyncPayloadTest {
             buffer.writeResourceLocation(OVERWORLD);
             buffer.writeVarInt(WeatherRegionSyncPayload.DATA_VERSION);
             buffer.writeVarLong(1L);
+            buffer.writeVarLong(600L);
             buffer.writeByte(1); // enabled, delta payload
             buffer.writeVarInt(256);
             buffer.writeVarInt(0); // zig-zag encoded center X

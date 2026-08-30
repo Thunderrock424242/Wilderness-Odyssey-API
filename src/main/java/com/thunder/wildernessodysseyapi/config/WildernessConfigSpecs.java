@@ -4,7 +4,6 @@ import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.ai.voice.config.AetherVoiceConfig;
 import com.thunder.wildernessodysseyapi.dataengine.config.DataEngineConfig;
 import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
-import com.thunder.wildernessodysseyapi.developmentstudio.config.StudioConfig;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
@@ -109,7 +108,6 @@ public final class WildernessConfigSpecs {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         StructureBlockConfig.define(builder);
         PerformanceServerConfig.define(builder);
-        defineCategory(builder, "development_studio", StudioConfig::define);
         MinecraftVerificationRelayConfig.define(builder);
         TelemetryConfig.define(builder);
         PlayerTelemetryConfig.define(builder);
@@ -149,7 +147,6 @@ public final class WildernessConfigSpecs {
 
         StructureBlockConfig.CONFIG_SPEC = serverSpec;
         PerformanceServerConfig.attachSpec(serverSpec);
-        StudioConfig.CONFIG_SPEC = serverSpec;
         MinecraftVerificationRelayConfig.CONFIG_SPEC = serverSpec;
         TelemetryConfig.CONFIG_SPEC = serverSpec;
         PlayerTelemetryConfig.CONFIG_SPEC = serverSpec;

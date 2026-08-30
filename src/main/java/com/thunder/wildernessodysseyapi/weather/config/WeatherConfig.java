@@ -215,7 +215,7 @@ public final class WeatherConfig {
         builder.comment("Optional read-only influence from installed season mods.")
                 .push("seasons");
         SEASON_INTEGRATION_ENABLED = builder
-                .comment("Allow Homeostatic Seasons or Serene Seasons to shift atmospheric temperature, humidity, and storm potential.")
+                .comment("Allow Ecliptic Seasons or Serene Seasons to shift atmospheric temperature, humidity, and storm potential.")
                 .define("enabled", true);
         SEASON_TEMPERATURE_AMPLITUDE_CELSIUS = builder
                 .comment("Maximum temperate seasonal temperature shift in degrees Celsius.")
@@ -484,7 +484,7 @@ public final class WeatherConfig {
         }
     }
 
-    /** Returns bounded controls for optional Homeostatic/Serene season adapters. */
+    /** Returns bounded controls for optional Ecliptic/Serene season adapters. */
     public static SeasonSettings seasons() {
         try {
             return new SeasonSettings(

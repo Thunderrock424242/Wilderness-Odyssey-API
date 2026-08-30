@@ -34,7 +34,6 @@ public final class UnifiedConfigMigration {
             new FilePlan(WildernessConfigSpecs.SERVER_FILE, List.of(
                     source("wildernessodysseyapi-structureblocks-server.toml"),
                     source(PerformanceServerConfig.FILE_NAME),
-                    source("wildernessodysseyapi-development-studio-server.toml", "development_studio"),
                     source("wildernessodysseyapi-verification-relay-server.toml"),
                     source("wildernessodysseyapi-telemetry-master-server.toml"),
                     source("wildernessodysseyapi-telemetry-server.toml"),

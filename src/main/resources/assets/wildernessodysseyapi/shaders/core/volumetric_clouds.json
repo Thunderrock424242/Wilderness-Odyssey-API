@@ -16,6 +16,8 @@
     { "name": "WorldOrigin", "type": "float", "count": 2, "values": [0, 0] },
     { "name": "WindOffset", "type": "float", "count": 2, "values": [0, 0] },
     { "name": "DetailStrength", "type": "float", "count": 1, "values": [0.65] },
-    { "name": "SunDirection", "type": "float", "count": 3, "values": [0, 1, 0.25] }
+    { "name": "SunDirection", "type": "float", "count": 3, "values": [0, 1, 0.25] },
+    { "name": "LightningPosition", "type": "float", "count": 3, "values": [0, 0, 0] },
+    { "name": "LightningIllumination", "type": "float", "count": 1, "values": [0] }
   ]
 }

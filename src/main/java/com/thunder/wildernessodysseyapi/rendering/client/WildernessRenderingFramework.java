@@ -7,13 +7,14 @@ import com.thunder.wildernessodysseyapi.rendering.RenderingQuality;
 import com.thunder.wildernessodysseyapi.rendering.TemporalFrameData;
 import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackend;
 import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
+import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
 import com.thunder.wildernessodysseyapi.rendering.config.RendererConfig;
 import com.thunder.wildernessodysseyapi.rendering.performance.AdaptiveQualityController;
 import com.thunder.wildernessodysseyapi.rendering.performance.RenderQualityState;
-import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindManager;
 import com.thunder.wildernessodysseyapi.weather.api.WindSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
+import com.thunder.wildernessodysseyapi.weather.client.WeatherVisualState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.neoforged.api.distmarker.Dist;
@@ -48,6 +49,8 @@ public final class WildernessRenderingFramework {
     @SubscribeEvent
     public static void onFrameStart(RenderFrameEvent.Pre event) {
         frameStartedNanos = System.nanoTime();
+        long nextFrameIndex = ++frameIndex;
+        ShaderPackCompatibility.sampleFrame(nextFrameIndex);
         Minecraft minecraft = Minecraft.getInstance();
         RenderBackend backend = RenderBackends.current();
         TemporalFrameData.Resolution resolution = new TemporalFrameData.Resolution(
@@ -56,11 +59,13 @@ public final class WildernessRenderingFramework {
         );
         RenderQualityState.Snapshot quality = RenderQualityState.snapshot();
         RenderFrameContext.FrameTiming previousTiming = currentFrame.timing();
+        WeatherVisualState weatherVisual = sampleWeatherVisual(minecraft, nextFrameIndex);
         currentFrame = new RenderFrameContext(
-                ++frameIndex,
+                nextFrameIndex,
                 backend,
                 backend.capabilities(),
-                sampleEnvironment(minecraft),
+                sampleEnvironment(minecraft, weatherVisual),
+                weatherVisual,
                 quality.quality(),
                 previousTiming,
                 TemporalFrameData.unavailable(
@@ -115,6 +120,7 @@ public final class WildernessRenderingFramework {
                 before.backend(),
                 before.gpuCapabilities(),
                 before.environment(),
+                before.weatherVisualState(),
                 quality,
                 new RenderFrameContext.FrameTiming(elapsed, -1L, movingAverage),
                 temporal
@@ -171,21 +177,35 @@ public final class WildernessRenderingFramework {
         }
     }
 
-    private static EnvironmentState sampleEnvironment(Minecraft minecraft) {
+    private static EnvironmentState sampleEnvironment(
+            Minecraft minecraft,
+            WeatherVisualState weatherVisual
+    ) {
         ClientLevel level = minecraft.level;
         if (level == null) {
             return EnvironmentState.CLEAR;
         }
+        if (ClientWeatherCoordinator.controls(level)) {
+            return EnvironmentState.from(weatherVisual);
+        }
         var position = minecraft.gameRenderer.getMainCamera().getPosition();
         WindSample wind = WindManager.getWind(level, position);
-        if (ClientWeatherCoordinator.controls(level)) {
-            WeatherSample weather = ClientWeatherCoordinator.sampleAt(level, position);
-            return EnvironmentState.from(weather, wind);
-        }
         return EnvironmentState.vanilla(
                 level.getRainLevel(0.0F),
                 level.getThunderLevel(0.0F),
                 wind
+        );
+    }
+
+    private static WeatherVisualState sampleWeatherVisual(Minecraft minecraft, long nextFrameIndex) {
+        ClientLevel level = minecraft.level;
+        if (level == null || !ClientWeatherCoordinator.controls(level)) {
+            return WeatherVisualState.CLEAR;
+        }
+        return ClientWeatherCoordinator.visualState(
+                level,
+                minecraft.gameRenderer.getMainCamera().getPosition(),
+                nextFrameIndex
         );
     }
 

@@ -61,9 +61,6 @@ layers current configuration onto it:
 | The Before | no | no | no | no |
 | Other ordinary dimensions | yes by default | no | yes | no |
 
-The Development Studio remains a normal Overworld consumer. The profile does
-not replace the real Overworld, water APIs, or weather APIs with preview data.
-
 ## Phase 3: typed world disturbances
 
 `WorldDisturbanceService` is the successful-event handoff. Lightning, severe

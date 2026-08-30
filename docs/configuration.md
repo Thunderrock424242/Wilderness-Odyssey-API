@@ -29,7 +29,7 @@ heap, and display resolution. Set it to `false` when the explicit
 remain authoritative.
 
 The server file contains the feature roots `[structure_blocks]`, `[performance]`,
-`[development_studio]`, `[verificationRelay]`, `[telemetry]`,
+`[verificationRelay]`, `[telemetry]`,
 `[playerTelemetry]`, `[eventTelemetry]`, `[feedback]`, `[riftfall]`,
 `[meteor_event]`, `[temporal_rift]`, `[water_simulation]`, `[weather]`,
 `[ecosystem]`, and `[reactiveVegetation]`. Existing feature-specific subsections remain nested under

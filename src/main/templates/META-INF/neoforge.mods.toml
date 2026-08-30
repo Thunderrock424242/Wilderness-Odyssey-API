@@ -115,7 +115,7 @@ ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
-modId="homeostaticseasons"
+modId="eclipticseasons"
 type="optional"
 versionRange=""
 ordering="AFTER"

@@ -726,6 +726,6 @@ public final class WaterShaders {
     }
 
     private static boolean isLinked(ShaderInstance shader) {
-        return RenderBackends.current().isShaderProgramUsable(shader.getId());
+        return RenderBackends.current().isShaderUsable(shader);
     }
 }

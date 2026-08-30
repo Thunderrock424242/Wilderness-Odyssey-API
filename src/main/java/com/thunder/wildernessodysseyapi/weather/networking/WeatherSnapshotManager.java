@@ -158,6 +158,7 @@ public final class WeatherSnapshotManager {
                 dimension.location(),
                 WeatherRegionSyncPayload.DATA_VERSION,
                 reserveSequence(),
+                player.level().getGameTime(),
                 true,
                 replaceRegion,
                 cellSize,
@@ -240,6 +241,7 @@ public final class WeatherSnapshotManager {
         PacketDistributor.sendToPlayer(player, WeatherRegionSyncPayload.disabled(
                 state.dimension.location(),
                 reserveSequence(),
+                player.level().getGameTime(),
                 state.cellSize,
                 center.x(),
                 center.z()

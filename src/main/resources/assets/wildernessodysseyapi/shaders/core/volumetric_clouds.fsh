@@ -6,10 +6,13 @@ uniform vec2 WorldOrigin;
 uniform vec2 WindOffset;
 uniform float DetailStrength;
 uniform vec3 SunDirection;
+uniform vec3 LightningPosition;
+uniform float LightningIllumination;
 
 in vec2 localNoisePosition;
 in vec4 vertexColor;
 in vec3 columnData;
+in vec3 localPosition;
 
 out vec4 fragColor;
 
@@ -55,23 +58,32 @@ void main() {
     float packedShape = min(clamp(columnData.z, 0.0, 1.0) * 4.0, 3.999);
     float morphology = floor(packedShape);
     float storm = clamp((fract(packedShape) - 0.10) / 0.80, 0.0, 1.0);
-    vec2 wind = WindOffset + vec2(GameTime * 0.006, GameTime * 0.002);
-    vec2 world = localNoisePosition + WorldOrigin + wind;
+    vec2 baseWorld = localNoisePosition + WorldOrigin;
+    vec2 macroWorld = baseWorld - WindOffset * 0.78;
+    vec2 mediumWorld = baseWorld - WindOffset;
+    vec2 fineWorld = baseWorld - WindOffset * 1.16;
 
     // Meteorological families use distinct spatial scales: stretched high
     // wisps, broad sheets, cauliflower cells, and vertically varied towers.
-    vec2 shapedWorld = world;
-    shapedWorld = mix(shapedWorld, vec2(world.x * 0.34 + world.y * 0.08, world.y * 2.45),
+    vec2 shapedMacro = macroWorld;
+    shapedMacro = mix(shapedMacro, vec2(macroWorld.x * 0.34 + macroWorld.y * 0.08, macroWorld.y * 2.45),
             1.0 - step(0.5, morphology));
-    shapedWorld = mix(shapedWorld, world * 0.62, step(0.5, morphology) * (1.0 - step(1.5, morphology)));
-    shapedWorld = mix(shapedWorld, world * 1.18, step(1.5, morphology) * (1.0 - step(2.5, morphology)));
-    shapedWorld = mix(shapedWorld, world * (0.82 + layer * 0.58), step(2.5, morphology));
+    shapedMacro = mix(shapedMacro, macroWorld * 0.62, step(0.5, morphology) * (1.0 - step(1.5, morphology)));
+    shapedMacro = mix(shapedMacro, macroWorld * 1.18, step(1.5, morphology) * (1.0 - step(2.5, morphology)));
+    shapedMacro = mix(shapedMacro, macroWorld * (0.82 + layer * 0.58), step(2.5, morphology));
+    vec2 shapedMedium = shapedMacro + (mediumWorld - macroWorld);
+    vec2 shapedFine = shapedMacro + (fineWorld - macroWorld);
 
     float verticalFrequency = mix(2.2, 5.2, step(1.5, morphology));
     verticalFrequency = mix(verticalFrequency, 7.0, step(2.5, morphology));
-    float detail = cloudNoise(vec3(shapedWorld * 1.32,
-            layer * verticalFrequency - GameTime * (0.004 + band * 0.0015)));
-    detail = mix(0.58, detail, clamp(DetailStrength, 0.0, 1.0));
+    float macro = cloudNoise(vec3(shapedMacro * 0.72,
+            layer * verticalFrequency - GameTime * 0.0008));
+    float medium = cloudNoise(vec3(shapedMedium * 1.32,
+            layer * verticalFrequency - GameTime * (0.0018 + band * 0.0004)));
+    float fine = cloudNoise(vec3(shapedFine * 2.36 + 9.7,
+            layer * (verticalFrequency + 2.1) + GameTime * 0.0012));
+    float translatedDetail = macro * 0.34 + medium * 0.48 + fine * 0.18;
+    float detail = mix(0.58, translatedDetail, clamp(DetailStrength, 0.0, 1.0));
 
     float cellularShape = pow(max(0.0, sin(layer * 3.14159265)), 0.42);
     float sheetShape = smoothstep(0.02, 0.18, layer) * (1.0 - smoothstep(0.82, 0.98, layer));
@@ -101,6 +113,10 @@ void main() {
     vec3 color = vertexColor.rgb * daylight;
     color += vec3(0.10, 0.11, 0.13) * silverEdge * max(0.0, sun.y);
     color *= 1.0 - storm * (0.20 + (1.0 - layer) * 0.20);
+    float lightningDistance = distance(localPosition, LightningPosition);
+    float lightning = LightningIllumination
+            * pow(max(0.0, 1.0 - lightningDistance / 320.0), 2.0);
+    color += vec3(0.48, 0.62, 0.82) * lightning * density * (0.58 + storm * 0.42);
 
     float alpha = vertexColor.a * density * (0.72 + verticalShape * 0.28);
     fragColor = vec4(color, alpha) * ColorModulator;

@@ -3,11 +3,11 @@ package com.thunder.wildernessodysseyapi.weather.client.cloud;
 import com.thunder.wildernessodysseyapi.weather.api.CloudType;
 
 /**
- * Converts authoritative atmospheric fields into Minecraft-style cloud voxels.
+ * Converts authoritative atmospheric fields into bounded cloud-tile coverage.
  *
- * <p>The weather envelope is sampled at the voxel's real world position. Wind
- * only shifts deterministic small-scale morphology, so visible cloud detail
- * moves without letting the entire cloud mass drift away from its rain cell.</p>
+ * <p>The weather envelope is sampled at the tile's real world position. Wind
+ * advects deterministic morphology through that bounded support, so clouds
+ * evolve without inventing coverage outside server-owned weather.</p>
  */
 public final class CloudCoverageModel {
 
@@ -39,7 +39,7 @@ public final class CloudCoverageModel {
                 precipitationFloor * field.support()));
     }
 
-    /** Returns whether one 12-block cloud voxel should be occupied. */
+    /** Returns whether one 12-block field tile contributes fallback cloud coverage. */
     public static boolean isPresent(
             CloudFieldSample field,
             int worldTileX,
@@ -66,7 +66,7 @@ public final class CloudCoverageModel {
         ) < coverage;
     }
 
-    /** Returns a blocky 4, 8, or 12 block cloud height. */
+    /** Returns a coarse legacy depth classifier retained for compatibility callers. */
     public static int thickness(CloudFieldSample field) {
         if (field == null) {
             return BASE_THICKNESS;
@@ -82,7 +82,7 @@ public final class CloudCoverageModel {
         return BASE_THICKNESS;
     }
 
-    /** Returns normalized storm shading applied independently to each voxel. */
+    /** Returns normalized storm shading for one sampled cloud field. */
     public static double darkness(CloudFieldSample field) {
         if (field == null) {
             return 0.0;
@@ -92,7 +92,7 @@ public final class CloudCoverageModel {
                 + field.stormEnergy() * 0.34) * field.support());
     }
 
-    /** Returns the translucent alpha for one occupied voxel. */
+    /** Returns translucent alpha for one occupied compatibility sample. */
     public static double opacity(CloudFieldSample field, double multiplier) {
         double coverage = coverage(field);
         double precipitation = field == null ? 0.0 : field.effectivePrecipitation();
@@ -133,8 +133,10 @@ public final class CloudCoverageModel {
             double windDetailOffsetZ,
             CloudType type
     ) {
-        double x = worldTileX + windDetailOffsetX / CLOUD_TILE_SIZE;
-        double z = worldTileZ + windDetailOffsetZ / CLOUD_TILE_SIZE;
+        // Sampling behind the integrated offset moves a stable feature in the
+        // positive wind direction as the offset advances.
+        double x = worldTileX - windDetailOffsetX / CLOUD_TILE_SIZE;
+        double z = worldTileZ - windDetailOffsetZ / CLOUD_TILE_SIZE;
         CloudType.Shape shape = type == null ? CloudType.Shape.CELLULAR : type.shape();
         return switch (shape) {
             case CLEAR -> 1.0;

@@ -9,10 +9,12 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
+import com.thunder.wildernessodysseyapi.weather.client.PrecipitationBlend;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudAltitudeModel;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import com.thunder.wildernessodysseyapi.weather.client.precipitation.PrecipitationImpactModel.ImpactSurface;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
+import com.thunder.wildernessodysseyapi.rendering.client.WildernessRenderingFramework;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.ParticleStatus;
@@ -41,11 +43,10 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 /**
  * Renders and ticks server-authored precipitation through Minecraft's weather pipeline.
  *
- * <p>Near columns retain restrained vanilla rain and snow textures, while hail
- * uses small geometry pellets instead of repeating the bright snow texture.
- * Each column reads its own atmospheric intensity. A bounded loaded-only
- * lattice adds distant precipitation without scanning terrain or forcing
- * chunks outside the player's view.</p>
+ * <p>Near and mid fields use short batched world-space streaks, flakes, and
+ * hail pellets. Only the far field retains broad atmospheric curtains. Each
+ * sample reads its own intensity and visual phase blend from the synchronized
+ * region; no Minecraft particle entities are created for falling weather.</p>
  */
 public final class LocalizedPrecipitationRenderer {
 
@@ -53,16 +54,18 @@ public final class LocalizedPrecipitationRenderer {
             ResourceLocation.withDefaultNamespace("textures/environment/rain.png");
     private static final ResourceLocation SNOW_LOCATION =
             ResourceLocation.withDefaultNamespace("textures/environment/snow.png");
-    private static final int FANCY_NEAR_RADIUS = 10;
-    private static final int FAST_NEAR_RADIUS = 5;
-    private static final int MAX_NEAR_COLUMNS = 21 * 21;
+    private static final int FANCY_NEAR_RADIUS = 20;
+    private static final int FAST_NEAR_RADIUS = 12;
+    private static final int MID_FIELD_RADIUS = 80;
+    private static final int MAX_NEAR_COLUMNS = 41 * 41;
     private static final int MAX_DISTANT_SHAFTS = 2_048;
-    private static final int MAX_RENDER_COLUMNS = MAX_NEAR_COLUMNS + MAX_DISTANT_SHAFTS;
+    private static final int MAX_RENDER_COLUMNS = (MAX_NEAR_COLUMNS + MAX_DISTANT_SHAFTS) * 2;
     private static final byte RAIN = 1;
     private static final byte SNOW = 2;
     private static final byte HAIL = 3;
     private static final byte NEAR = 0;
-    private static final byte DISTANT = 1;
+    private static final byte MID = 1;
+    private static final byte FAR = 2;
 
     private static final int[] RENDER_X = new int[MAX_RENDER_COLUMNS];
     private static final int[] RENDER_Z = new int[MAX_RENDER_COLUMNS];
@@ -78,6 +81,9 @@ public final class LocalizedPrecipitationRenderer {
     private static final int[] DISTANT_BOTTOM_Y = new int[MAX_DISTANT_SHAFTS];
     private static final int[] DISTANT_TOP_Y = new int[MAX_DISTANT_SHAFTS];
     private static final float[] DISTANT_INTENSITY = new float[MAX_DISTANT_SHAFTS];
+    private static final float[] DISTANT_TEMPERATURE = new float[MAX_DISTANT_SHAFTS];
+    private static final float[] DISTANT_STORM = new float[MAX_DISTANT_SHAFTS];
+    private static final float[] DISTANT_INSTABILITY = new float[MAX_DISTANT_SHAFTS];
     private static final byte[] DISTANT_TYPE = new byte[MAX_DISTANT_SHAFTS];
 
     private static ClientLevel renderedLevel;
@@ -98,7 +104,7 @@ public final class LocalizedPrecipitationRenderer {
     }
 
     /**
-     * Draws localized near precipitation and cached distant rain shafts.
+     * Draws localized near/middle precipitation and cached distant curtains.
      *
      * <p>This method is called from vanilla's dimension-weather ownership
      * boundary, while the Fabulous weather target is already active.</p>
@@ -148,16 +154,15 @@ public final class LocalizedPrecipitationRenderer {
             drawColumns(level, ticks, partialTick, lightTexture, camX, camY, camZ, settings);
             lastVisiblePrecipitationTick = level.getGameTime();
         }
-        int distantColumns = countStyledColumns(DISTANT);
+        int midColumns = countStyledColumns(MID);
+        int farColumns = countStyledColumns(FAR);
         diagnostics = new Diagnostics(
                 true,
-                renderColumnCount - distantColumns,
-                distantColumns,
-                (rainColumns + snowColumns) * 4
-                        + countColumns(HAIL, NEAR)
-                        * PrecipitationVisualModel.hailPelletCount(false) * 4
-                        + countColumns(HAIL, DISTANT)
-                        * PrecipitationVisualModel.hailPelletCount(true) * 4
+                renderColumnCount - midColumns - farColumns,
+                midColumns + farColumns,
+                midColumns,
+                farColumns,
+                estimatedVertices(settings)
         );
     }
 
@@ -411,8 +416,13 @@ public final class LocalizedPrecipitationRenderer {
                     continue;
                 }
                 double distance = Math.hypot(blockX + 0.5 - camX, blockZ + 0.5 - camZ);
-                boolean snow = type == PrecipitationType.SNOW;
-                boolean hail = type == PrecipitationType.HAIL;
+                PrecipitationBlend blend = PrecipitationBlend.fromPhase(
+                        type,
+                        cloudField.temperature(),
+                        cloudField.stormEnergy(),
+                        cloudField.instability()
+                );
+                boolean snow = blend.snow() > blend.rain() + blend.hail();
                 float alpha = PrecipitationVisualModel.scaledAlpha(
                         PrecipitationVisualModel.nearAlpha(intensity, distance, radius, snow),
                         settings.precipitationOpacity()
@@ -420,14 +430,14 @@ public final class LocalizedPrecipitationRenderer {
                 if (alpha <= 0.001F) {
                     continue;
                 }
-                addRenderColumn(
+                addRenderBlend(
                         blockX,
                         blockZ,
                         bottomY,
                         topY,
                         Math.max(surfaceY, cameraY),
                         alpha,
-                        hail ? HAIL : snow ? SNOW : RAIN,
+                        blend,
                         NEAR
                 );
             }
@@ -473,7 +483,7 @@ public final class LocalizedPrecipitationRenderer {
 
         distantShaftCount = 0;
         int radiusCells = spacing == 0 ? 0 : radius / spacing;
-        int minimumDistance = nearRadius + spacing;
+        int minimumDistance = Math.max(0, nearRadius - 4);
         long minimumDistanceSquared = (long) minimumDistance * minimumDistance;
         long radiusSquared = (long) radius * radius;
         int cameraY = Mth.floor(camY);
@@ -500,7 +510,7 @@ public final class LocalizedPrecipitationRenderer {
                 );
                 PrecipitationType type = ClientWeatherCoordinator.precipitationTypeAt(level, queryPos);
                 if (intensity <= PrecipitationVisualModel.PRECIPITATION_EPSILON
-                        || (type != PrecipitationType.RAIN && type != PrecipitationType.HAIL)) {
+                        || type == PrecipitationType.NONE) {
                     continue;
                 }
 
@@ -527,7 +537,12 @@ public final class LocalizedPrecipitationRenderer {
                 DISTANT_BOTTOM_Y[index] = surfaceY;
                 DISTANT_TOP_Y[index] = topY;
                 DISTANT_INTENSITY[index] = (float) intensity;
-                DISTANT_TYPE[index] = type == PrecipitationType.HAIL ? HAIL : RAIN;
+                DISTANT_TEMPERATURE[index] = (float) cloudField.temperature();
+                DISTANT_STORM[index] = (float) cloudField.stormEnergy();
+                DISTANT_INSTABILITY[index] = (float) cloudField.instability();
+                DISTANT_TYPE[index] = type == PrecipitationType.HAIL
+                        ? HAIL
+                        : type == PrecipitationType.SNOW ? SNOW : RAIN;
             }
         }
 
@@ -566,16 +581,60 @@ public final class LocalizedPrecipitationRenderer {
             if (alpha <= 0.001F) {
                 continue;
             }
-            addRenderColumn(
-                    DISTANT_X[index],
-                    DISTANT_Z[index],
-                    DISTANT_BOTTOM_Y[index],
-                    DISTANT_TOP_Y[index],
-                    Math.max(DISTANT_BOTTOM_Y[index], cameraY),
-                    alpha,
-                    DISTANT_TYPE[index],
-                    DISTANT
+            PrecipitationType type = DISTANT_TYPE[index] == HAIL
+                    ? PrecipitationType.HAIL
+                    : DISTANT_TYPE[index] == SNOW ? PrecipitationType.SNOW : PrecipitationType.RAIN;
+            PrecipitationBlend blend = PrecipitationBlend.fromPhase(
+                    type,
+                    DISTANT_TEMPERATURE[index],
+                    DISTANT_STORM[index],
+                    DISTANT_INSTABILITY[index]
             );
+            double transitionCenter = Math.min(MID_FIELD_RADIUS, Math.max(nearRadius + 12, farRadius - 12));
+            double farWeight = smoothstep(transitionCenter - 8.0, transitionCenter + 8.0, distance);
+            if (farWeight < 0.999D) {
+                addRenderBlend(
+                        DISTANT_X[index], DISTANT_Z[index],
+                        DISTANT_BOTTOM_Y[index], DISTANT_TOP_Y[index],
+                        Math.max(DISTANT_BOTTOM_Y[index], cameraY),
+                        (float) (alpha * (1.0D - farWeight)), blend, MID
+                );
+            }
+            if (farWeight > 0.001D) {
+                addRenderBlend(
+                        DISTANT_X[index], DISTANT_Z[index],
+                        DISTANT_BOTTOM_Y[index], DISTANT_TOP_Y[index],
+                        Math.max(DISTANT_BOTTOM_Y[index], cameraY),
+                        (float) (alpha * farWeight), blend, FAR
+                );
+            }
+        }
+    }
+
+    private static void addRenderBlend(
+            int blockX,
+            int blockZ,
+            int bottomY,
+            int topY,
+            int lightY,
+            float alpha,
+            PrecipitationBlend blend,
+            byte style
+    ) {
+        if (blend == null || !blend.visible()) {
+            return;
+        }
+        if (blend.rain() > 0.01F) {
+            addRenderColumn(blockX, blockZ, bottomY, topY, lightY,
+                    alpha * blend.rain(), RAIN, style);
+        }
+        if (blend.snow() > 0.01F) {
+            addRenderColumn(blockX, blockZ, bottomY, topY, lightY,
+                    alpha * blend.snow(), SNOW, style);
+        }
+        if (blend.hail() > 0.01F) {
+            addRenderColumn(blockX, blockZ, bottomY, topY, lightY,
+                    alpha * blend.hail(), HAIL, style);
         }
     }
 
@@ -658,6 +717,9 @@ public final class LocalizedPrecipitationRenderer {
         BlockPos.MutableBlockPos lightPos = new BlockPos.MutableBlockPos();
         double renderTicks = ticks + partialTick;
         WeatherSample localWeather = ClientWeatherCoordinator.localSample(level);
+        float gustStrength = WildernessRenderingFramework.currentFrame()
+                .weatherVisualState()
+                .gustStrength();
         for (int index = 0; index < renderColumnCount; index++) {
             if (RENDER_TYPE[index] != type) {
                 continue;
@@ -667,7 +729,7 @@ public final class LocalizedPrecipitationRenderer {
             double deltaX = blockX + 0.5 - camX;
             double deltaZ = blockZ + 0.5 - camZ;
             double length = Math.hypot(deltaX, deltaZ);
-            double halfWidth = RENDER_STYLE[index] == DISTANT
+            double halfWidth = RENDER_STYLE[index] == FAR
                     ? Math.min(3.0, settings.distantRainSpacingBlocks() * 0.34)
                     : 0.28 + PrecipitationVisualModel.columnNoise(
                             blockX,
@@ -701,6 +763,29 @@ public final class LocalizedPrecipitationRenderer {
                     : 0.0F;
             lightPos.set(blockX, RENDER_LIGHT_Y[index], blockZ);
             int light = LevelRenderer.getLightColor(level, lightPos);
+
+            if (RENDER_STYLE[index] != FAR) {
+                emitWeatherElements(
+                        builder,
+                        blockX,
+                        blockZ,
+                        renderTicks,
+                        camX,
+                        camY,
+                        camZ,
+                        top,
+                        bottom,
+                        topOffsetX,
+                        topOffsetZ,
+                        RENDER_ALPHA[index],
+                        light,
+                        type,
+                        RENDER_STYLE[index],
+                        gustStrength,
+                        settings.precipitationStreakDensity()
+                );
+                continue;
+            }
 
             if (type == RAIN) {
                 emitRainQuad(
@@ -788,7 +873,7 @@ public final class LocalizedPrecipitationRenderer {
                             false
                     )
                     : 0.0F;
-            boolean distant = RENDER_STYLE[index] == DISTANT;
+            boolean distant = RENDER_STYLE[index] != NEAR;
             int pelletCount = PrecipitationVisualModel.hailPelletCount(distant);
             double spread = distant
                     ? Math.min(1.5, settings.distantRainSpacingBlocks() * 0.12)
@@ -843,6 +928,116 @@ public final class LocalizedPrecipitationRenderer {
             }
         }
         BufferUploader.drawWithShader(builder.buildOrThrow());
+    }
+
+    /** Emits many short world-space elements into one texture batch. */
+    private static void emitWeatherElements(
+            BufferBuilder builder,
+            int blockX,
+            int blockZ,
+            double renderTicks,
+            double camX,
+            double camY,
+            double camZ,
+            float top,
+            float bottom,
+            float topOffsetX,
+            float topOffsetZ,
+            float alpha,
+            int light,
+            byte type,
+            byte zone,
+            float gustStrength,
+            double configuredDensity
+    ) {
+        boolean snow = type == SNOW;
+        int count = PrecipitationVisualModel.elementCount(
+                zone,
+                snow,
+                alpha,
+                configuredDensity
+        );
+        float span = Math.max(0.5F, top - bottom);
+        double scatterRadius = zone == NEAR ? 0.58D : 1.75D;
+        double normalizedGust = Math.min(1.0D, Math.max(0.0D, gustStrength / 12.0D));
+        for (int element = 0; element < count; element++) {
+            float progress = PrecipitationVisualModel.fallProgress(
+                    blockX,
+                    blockZ,
+                    element,
+                    renderTicks,
+                    snow,
+                    normalizedGust
+            );
+            float heightFraction = 1.0F - progress;
+            long salt = 0x8CB92BA72F3D8DD7L + (long) element * 0x9E3779B97F4A7C15L;
+            double scatterX = (PrecipitationVisualModel.columnNoise(blockX, blockZ, salt) * 2.0D - 1.0D)
+                    * scatterRadius;
+            double scatterZ = (PrecipitationVisualModel.columnNoise(
+                    blockX,
+                    blockZ,
+                    salt ^ 0xD1B54A32D192ED03L
+            ) * 2.0D - 1.0D) * scatterRadius;
+            double swirlPhase = PrecipitationVisualModel.columnNoise(
+                    blockX,
+                    blockZ,
+                    salt ^ 0x94D049BB133111EBL
+            ) * Math.PI * 2.0D;
+            double turbulence = snow
+                    ? Math.sin(renderTicks * (0.07D + normalizedGust * 0.05D) + swirlPhase)
+                    * (0.10D + normalizedGust * 0.32D)
+                    : 0.0D;
+            float centerX = (float) (blockX + 0.5D + scatterX + turbulence - camX)
+                    + topOffsetX * heightFraction;
+            float centerZ = (float) (blockZ + 0.5D + scatterZ
+                    + Math.cos(renderTicks * 0.055D + swirlPhase) * turbulence - camZ)
+                    + topOffsetZ * heightFraction;
+            float centerY = bottom + span * heightFraction;
+            float streakLength = Math.min(
+                    span,
+                    PrecipitationVisualModel.streakLength(blockX, blockZ, element, zone, snow)
+            );
+            float halfLength = streakLength * 0.5F;
+            float elementTop = Math.min(top, centerY + halfLength);
+            float elementBottom = Math.max(bottom, centerY - halfLength);
+            float segmentFraction = (elementTop - elementBottom) / span;
+            float segmentWindX = topOffsetX * segmentFraction * 0.5F;
+            float segmentWindZ = topOffsetZ * segmentFraction * 0.5F;
+            float halfWidth = PrecipitationVisualModel.streakHalfWidth(
+                    blockX,
+                    blockZ,
+                    element,
+                    zone,
+                    snow
+            );
+            double horizontalDistance = Math.hypot(centerX, centerZ);
+            float sideX = horizontalDistance <= 1.0E-6D
+                    ? halfWidth
+                    : (float) (-centerZ / horizontalDistance * halfWidth);
+            float sideZ = horizontalDistance <= 1.0E-6D
+                    ? 0.0F
+                    : (float) (centerX / horizontalDistance * halfWidth);
+            float elementAlpha = PrecipitationVisualModel.elementAlpha(
+                    blockX,
+                    blockZ,
+                    element,
+                    alpha,
+                    snow
+            );
+            float red = snow ? 0.94F : 0.82F;
+            float green = snow ? 0.97F : 0.89F;
+            float blue = snow ? 1.0F : 0.98F;
+            int elementLight = snow ? PrecipitationVisualModel.softenedSnowLight(light) : light;
+
+            builder.addVertex(centerX - sideX + segmentWindX, elementTop, centerZ - sideZ + segmentWindZ)
+                    .setUv(0.0F, 0.0F).setColor(red, green, blue, elementAlpha).setLight(elementLight);
+            builder.addVertex(centerX + sideX + segmentWindX, elementTop, centerZ + sideZ + segmentWindZ)
+                    .setUv(1.0F, 0.0F).setColor(red, green, blue, elementAlpha).setLight(elementLight);
+            builder.addVertex(centerX + sideX - segmentWindX, elementBottom, centerZ + sideZ - segmentWindZ)
+                    .setUv(1.0F, 1.0F).setColor(red, green, blue, elementAlpha).setLight(elementLight);
+            builder.addVertex(centerX - sideX - segmentWindX, elementBottom, centerZ - sideZ - segmentWindZ)
+                    .setUv(0.0F, 1.0F).setColor(red, green, blue, elementAlpha).setLight(elementLight);
+        }
     }
 
     private static void emitRainQuad(
@@ -973,6 +1168,35 @@ public final class LocalizedPrecipitationRenderer {
         return count;
     }
 
+    private static int estimatedVertices(WeatherRenderingConfig.Settings settings) {
+        int vertices = 0;
+        for (int index = 0; index < renderColumnCount; index++) {
+            byte type = RENDER_TYPE[index];
+            byte style = RENDER_STYLE[index];
+            if (type == HAIL) {
+                vertices += PrecipitationVisualModel.hailPelletCount(style != NEAR) * 4;
+            } else if (style == FAR) {
+                vertices += 4;
+            } else {
+                vertices += PrecipitationVisualModel.elementCount(
+                        style,
+                        type == SNOW,
+                        RENDER_ALPHA[index],
+                        settings.precipitationStreakDensity()
+                ) * 4;
+            }
+        }
+        return vertices;
+    }
+
+    private static double smoothstep(double edge0, double edge1, double value) {
+        if (edge1 <= edge0) {
+            return value >= edge1 ? 1.0D : 0.0D;
+        }
+        double amount = Math.max(0.0D, Math.min(1.0D, (value - edge0) / (edge1 - edge0)));
+        return amount * amount * (3.0D - 2.0D * amount);
+    }
+
     private static void clearDistantCache() {
         distantShaftCount = 0;
         cachedDistantOriginX = Integer.MIN_VALUE;
@@ -985,7 +1209,19 @@ public final class LocalizedPrecipitationRenderer {
     }
 
     /** Compact precipitation renderer values displayed on the F3 overlay. */
-    public record Diagnostics(boolean active, int nearColumns, int distantShafts, int vertices) {
-        public static final Diagnostics INACTIVE = new Diagnostics(false, 0, 0, 0);
+    public record Diagnostics(
+            boolean active,
+            int nearColumns,
+            int distantShafts,
+            int midStreaks,
+            int farCurtains,
+            int vertices
+    ) {
+        public static final Diagnostics INACTIVE = new Diagnostics(false, 0, 0, 0, 0, 0);
+
+        /** Retains the original diagnostics shape for focused callers. */
+        public Diagnostics(boolean active, int nearColumns, int distantShafts, int vertices) {
+            this(active, nearColumns, distantShafts, distantShafts, 0, vertices);
+        }
     }
 }

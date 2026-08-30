@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.rendering.performance.RenderQualityState
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.RegisterShadersEvent;
@@ -66,6 +67,7 @@ public final class RaymarchedCloudShaders {
 
     /** Updates continuous-field mappings, camera-relative rays, motion, and lighting uniforms. */
     public static void updateUniforms(
+            ClientLevel level,
             float timeSeconds,
             double windOffsetX,
             double windOffsetZ,
@@ -142,10 +144,17 @@ public final class RaymarchedCloudShaders {
                 (float) Math.sin(sunAngle),
                 0.25F
         );
+        WeatherLightningIllumination.State lightning = WeatherLightningIllumination.current(level);
+        cloudShader.safeGetUniform("LightningPosition").set(
+                (float) (lightning.position().x - renderCenterX),
+                (float) (lightning.position().y - cloudHeight - CLOUD_BASE_OFFSET),
+                (float) (lightning.position().z - renderCenterZ)
+        );
+        cloudShader.safeGetUniform("LightningIllumination").set(lightning.illumination());
     }
 
     private static boolean isLinked(ShaderInstance shader) {
-        return RenderBackends.current().isShaderProgramUsable(shader.getId());
+        return RenderBackends.current().isShaderUsable(shader);
     }
 
     private static final double CLOUD_BASE_OFFSET = 0.33;

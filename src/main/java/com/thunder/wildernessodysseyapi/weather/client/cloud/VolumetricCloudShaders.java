@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.rendering.performance.RenderQualityState
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.client.event.RegisterShadersEvent;
 
@@ -18,8 +19,8 @@ import java.io.IOException;
  * Owns the optional procedural shader used by layered 3D cloud columns.
  *
  * <p>Resource reload or shader-link failure is deliberately non-fatal. Fancy
- * clouds then fall back to the existing voxel mesh, while Fast clouds retain
- * the inexpensive flat path. External Iris/Oculus packs remain authoritative.</p>
+ * clouds then fall back to density-derived lobe shells, while Fast clouds retain
+ * the cheaper lobe path. External Iris/Oculus packs remain authoritative.</p>
  */
 public final class VolumetricCloudShaders {
 
@@ -43,7 +44,7 @@ public final class VolumetricCloudShaders {
 
     private static void acceptShader(ShaderInstance shader) {
         if (!isLinked(shader)) {
-            ModConstants.LOGGER.error("Volumetric cloud shader failed to link; using voxel cloud fallback");
+            ModConstants.LOGGER.error("Volumetric cloud shader failed to link; using cloud-lobe fallback");
             cloudShader = null;
             return;
         }
@@ -67,11 +68,13 @@ public final class VolumetricCloudShaders {
 
     /** Updates per-frame motion, lighting, and world-origin uniforms. */
     public static void updateUniforms(
+            ClientLevel level,
             float timeSeconds,
             double windOffsetX,
             double windOffsetZ,
             int originTileX,
             int originTileZ,
+            float cloudHeight,
             float sunAngle,
             double detailStrength
     ) {
@@ -92,6 +95,15 @@ public final class VolumetricCloudShaders {
                 (float) Math.sin(sunAngle),
                 0.25F
         );
+        WeatherLightningIllumination.State lightning = WeatherLightningIllumination.current(level);
+        cloudShader.safeGetUniform("LightningPosition").set(
+                (float) (lightning.position().x
+                        - originTileX * (double) CloudCoverageModel.CLOUD_TILE_SIZE),
+                (float) (lightning.position().y - CloudAltitudeModel.dimensionBaseY(cloudHeight)),
+                (float) (lightning.position().z
+                        - originTileZ * (double) CloudCoverageModel.CLOUD_TILE_SIZE)
+        );
+        cloudShader.safeGetUniform("LightningIllumination").set(lightning.illumination());
     }
 
     /** Scale shared by mesh UV coordinates and the world-origin uniform. */
@@ -100,6 +112,6 @@ public final class VolumetricCloudShaders {
     }
 
     private static boolean isLinked(ShaderInstance shader) {
-        return RenderBackends.current().isShaderProgramUsable(shader.getId());
+        return RenderBackends.current().isShaderUsable(shader);
     }
 }

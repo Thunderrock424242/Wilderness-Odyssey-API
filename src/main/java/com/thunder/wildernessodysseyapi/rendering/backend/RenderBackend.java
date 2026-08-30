@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.rendering.backend;
 
 import com.thunder.wildernessodysseyapi.rendering.GPUCapabilities;
+import net.minecraft.client.renderer.ShaderInstance;
 
 /**
  * Narrow boundary around backend operations used by Wilderness renderers.
@@ -23,8 +24,8 @@ public interface RenderBackend {
         }
 
         @Override
-        public boolean isShaderProgramUsable(int nativeProgramHandle) {
-            return nativeProgramHandle > 0;
+        public boolean isShaderUsable(ShaderInstance shader) {
+            return shader != null;
         }
 
         @Override
@@ -39,8 +40,8 @@ public interface RenderBackend {
     /** Creates a non-blocking timer when the backend supports timestamp queries. */
     GpuTimer createGpuTimer(int bufferedFrames);
 
-    /** Validates one backend-native program handle supplied by Minecraft. */
-    boolean isShaderProgramUsable(int nativeProgramHandle);
+    /** Validates one shader object supplied and owned by Minecraft. */
+    boolean isShaderUsable(ShaderInstance shader);
 
     /** Captures the small state subset a scoped fullscreen pass must restore. */
     RenderStateSnapshot captureRenderState();
