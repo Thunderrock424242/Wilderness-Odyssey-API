@@ -413,8 +413,7 @@ submissions/rejections, applied/discarded/timed-out batches, stale owner
 validations, population additions/removals, and current in-flight work.
 
 `/wo simulation map` opens the development animal ecosystem map for an
-authorized player. The same map is available from Development Studio's
-Ecosystem page. It displays a fixed 17 by 17 window of the existing 64 by 64
+authorized player. It displays a fixed 17 by 17 window of the existing 64 by 64
 ecosystem cells with switchable animal-population, LOD, food, water, food
 pressure, disturbance, and weather-impact layers. Persisted group markers show
 species, population, location, and movement direction; hovering or selecting a

@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.client.cloud;
 
 /**
- * Proves whether a blocky cloud tile overlaps a continuous precipitation field.
+ * Proves whether one bounded cloud sample tile overlaps a continuous precipitation field.
  *
  * <p>Atmospheric values are bilinear between cell centers. A 12-block cloud
  * tile can cross a cell-center boundary when the configured atmosphere cells

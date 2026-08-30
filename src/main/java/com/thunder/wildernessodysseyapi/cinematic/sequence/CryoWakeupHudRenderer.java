@@ -1,8 +1,8 @@
 package com.thunder.wildernessodysseyapi.cinematic.sequence;
 
 import com.thunder.wildernessodysseyapi.cinematic.client.CinematicClientController;
-import net.minecraft.client.Font;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;

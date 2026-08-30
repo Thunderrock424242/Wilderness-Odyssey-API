@@ -10,15 +10,6 @@ import com.thunder.wildernessodysseyapi.cinematic.network.StartCinematicPayload;
 import com.thunder.wildernessodysseyapi.cloak.item.CloakState;
 import com.thunder.wildernessodysseyapi.cloak.item.CloakTickHandler;
 import com.thunder.wildernessodysseyapi.cloak.network.CloakInputPayload;
-import com.thunder.wildernessodysseyapi.developmentstudio.StudioServerService;
-import com.thunder.wildernessodysseyapi.developmentstudio.client.StudioClientState;
-import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioPayload;
-import com.thunder.wildernessodysseyapi.developmentstudio.network.OpenStudioRequestPayload;
-import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioBookmarkActionPayload;
-import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioCampusUpgradePayload;
-import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioLocationTeleportPayload;
-import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioStructureActionPayload;
-import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEntityActionPayload;
 import com.thunder.wildernessodysseyapi.dataengine.network.DataEnginePayloads;
 import com.thunder.wildernessodysseyapi.ecosystem.client.EnvironmentalMemoryClientState;
 import com.thunder.wildernessodysseyapi.ecosystem.debug.map.EcosystemDebugMapPayload;
@@ -30,10 +21,6 @@ import com.thunder.wildernessodysseyapi.ecosystem.distant.network.DistantWildlif
 import com.thunder.wildernessodysseyapi.ecosystem.network.EnvironmentalMemoryDebugPayload;
 import com.thunder.wildernessodysseyapi.environment.client.ClientEnvironmentState;
 import com.thunder.wildernessodysseyapi.environment.network.EnvironmentSyncPayload;
-import com.thunder.wildernessodysseyapi.developmentstudio.structure.StudioStructureService;
-import com.thunder.wildernessodysseyapi.developmentstudio.entity.StudioEntityService;
-import com.thunder.wildernessodysseyapi.developmentstudio.environment.StudioEnvironmentService;
-import com.thunder.wildernessodysseyapi.developmentstudio.network.StudioEnvironmentActionPayload;
 import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookManager;
 import com.thunder.wildernessodysseyapi.lorebook.network.OpenCodexPayload;
@@ -68,7 +55,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class ModPayloads {
 
     // This channel version covers every payload registered below; bump it for wire-shape changes.
-    private static final String NETWORK_VERSION = "27";
+    private static final String NETWORK_VERSION = "28";
 
     private ModPayloads() {
     }
@@ -134,53 +121,6 @@ public final class ModPayloads {
                         LoreBookManager.saveJournalText(serverPlayer, payload.text());
                     }
                 }));
-
-        // Studio payloads are requests only. Every handler rechecks world scope,
-        // player authority, registered ids, and bounded server-owned state.
-        registrar.playToServer(OpenStudioRequestPayload.TYPE, OpenStudioRequestPayload.STREAM_CODEC, (payload, context) ->
-                context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer serverPlayer) {
-                        StudioServerService.open(serverPlayer);
-                    }
-                }));
-        registrar.playToServer(StudioBookmarkActionPayload.TYPE, StudioBookmarkActionPayload.STREAM_CODEC, (payload, context) ->
-                context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer serverPlayer) {
-                        StudioServerService.handleBookmarkAction(serverPlayer, payload);
-                    }
-                }));
-        registrar.playToServer(StudioCampusUpgradePayload.TYPE, StudioCampusUpgradePayload.STREAM_CODEC, (payload, context) ->
-                context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer serverPlayer) {
-                        StudioServerService.handleCampusUpgrade(serverPlayer, payload);
-                    }
-                }));
-        registrar.playToServer(StudioLocationTeleportPayload.TYPE, StudioLocationTeleportPayload.STREAM_CODEC, (payload, context) ->
-                context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer serverPlayer) {
-                        StudioServerService.teleportToCampusLocation(serverPlayer, payload.locationId());
-                    }
-                }));
-        registrar.playToServer(StudioStructureActionPayload.TYPE, StudioStructureActionPayload.STREAM_CODEC, (payload, context) ->
-                context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer serverPlayer) {
-                        StudioStructureService.handle(serverPlayer, payload);
-                    }
-                }));
-        registrar.playToServer(StudioEntityActionPayload.TYPE, StudioEntityActionPayload.STREAM_CODEC, (payload, context) ->
-                context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer serverPlayer) {
-                        StudioEntityService.handle(serverPlayer, payload);
-                    }
-                }));
-        registrar.playToServer(StudioEnvironmentActionPayload.TYPE, StudioEnvironmentActionPayload.STREAM_CODEC, (payload, context) ->
-                context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer serverPlayer) {
-                        StudioEnvironmentService.handle(serverPlayer, payload);
-                    }
-                }));
-        registrar.playToClient(OpenStudioPayload.TYPE, OpenStudioPayload.STREAM_CODEC, (payload, context) ->
-                context.enqueueWork(() -> StudioClientState.accept(payload)));
 
         registrar.playToClient(
                 EnvironmentalMemoryDebugPayload.TYPE,

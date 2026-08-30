@@ -20,6 +20,8 @@ import java.lang.reflect.Method;
  */
 final class EclipticSeasonsWeatherInfluence implements SeasonalWeatherInfluence {
 
+    private static final int SOLAR_TERMS_PER_YEAR = 24;
+
     private final Object api;
     private final Method isSeasonEnabled;
     private final Method getSolarTerm;
@@ -82,15 +84,26 @@ final class EclipticSeasonsWeatherInfluence implements SeasonalWeatherInfluence 
             if (!(solarTerm instanceof Enum<?> term) || "NONE".equals(term.name())) {
                 return SeasonalOffset.NONE;
             }
-            int lastingDays = Math.max(1, ((Number) getLastingDaysOfEachTerm.invoke(api, level)).intValue());
-            int dayInTerm = Math.max(0, ((Number) getDayInTerm.invoke(api, level)).intValue());
-            double termProgress = Math.min(0.999, dayInTerm / (double) lastingDays);
-            double cyclePhase = (term.ordinal() + termProgress) / 24.0;
+            int lastingDays = ((Number) getLastingDaysOfEachTerm.invoke(api, level)).intValue();
+            int dayInTerm = ((Number) getDayInTerm.invoke(api, level)).intValue();
+            double cyclePhase = cyclePhase(term.ordinal(), dayInTerm, lastingDays);
             return SeasonCycleProfile.temperate(cyclePhase, settings);
         } catch (IllegalAccessException | InvocationTargetException | RuntimeException exception) {
             logFailureOnce(exception);
             return SeasonalOffset.NONE;
         }
+    }
+
+    /** Converts one of Ecliptic's 24 solar terms into a normalized weather year. */
+    static double cyclePhase(int solarTermOrdinal, int dayInTerm, int lastingDays) {
+        if (solarTermOrdinal < 0 || solarTermOrdinal >= SOLAR_TERMS_PER_YEAR) {
+            throw new IllegalArgumentException("Ecliptic solar-term ordinal is outside its documented 24-term year");
+        }
+        if (lastingDays <= 0 || dayInTerm < 0 || dayInTerm >= lastingDays) {
+            throw new IllegalArgumentException("Ecliptic returned invalid day-within-term timing");
+        }
+        double termProgress = dayInTerm / (double) lastingDays;
+        return (solarTermOrdinal + termProgress) / SOLAR_TERMS_PER_YEAR;
     }
 
     private void logFailureOnce(Exception exception) {

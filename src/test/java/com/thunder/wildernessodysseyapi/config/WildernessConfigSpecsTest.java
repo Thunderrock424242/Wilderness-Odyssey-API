@@ -4,7 +4,6 @@ import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.ai.voice.config.AetherVoiceConfig;
 import com.thunder.wildernessodysseyapi.dataengine.config.DataEngineConfig;
 import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
-import com.thunder.wildernessodysseyapi.developmentstudio.config.StudioConfig;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
@@ -56,7 +55,6 @@ class WildernessConfigSpecsTest {
         assertSame(WildernessConfigSpecs.serverSpec(), BackgroundEfficiencyConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), TickEngineConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), DataEngineConfig.CONFIG_SPEC);
-        assertSame(WildernessConfigSpecs.serverSpec(), StudioConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), MinecraftVerificationRelayConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), TelemetryConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), PlayerTelemetryConfig.CONFIG_SPEC);
@@ -94,10 +92,6 @@ class WildernessConfigSpecsTest {
         assertEquals(
                 List.of("weather_rendering", "localized_clouds", "enabled"),
                 WeatherRenderingConfig.ENABLE_LOCALIZED_CLOUDS.getPath()
-        );
-        assertEquals(
-                List.of("development_studio", "access", "allowInNormalWorlds"),
-                StudioConfig.ALLOW_IN_NORMAL_WORLDS.getPath()
         );
         assertEquals(
                 List.of("meteor_event", "enableNaturalMeteorEvents"),

@@ -22,6 +22,34 @@ class PrecipitationVisualModelTest {
     void nearOpacityUsesTheSampledColumnInsteadOfCameraWeather() {
         assertEquals(0.0F, PrecipitationVisualModel.nearAlpha(0.0, 3.0, 10, false));
         assertTrue(PrecipitationVisualModel.nearAlpha(0.8, 3.0, 10, false) > 0.5F);
+        assertEquals(0.0F, PrecipitationVisualModel.nearAlpha(0.8, 10.0, 10, false));
+    }
+
+    @Test
+    void densityControlsElementCountAcrossBoundedNearMidAndFarZones() {
+        int sparseNear = PrecipitationVisualModel.elementCount((byte) 0, false, 0.2, 0.2);
+        int denseNear = PrecipitationVisualModel.elementCount((byte) 0, false, 1.0, 1.0);
+        int denseMid = PrecipitationVisualModel.elementCount((byte) 1, false, 1.0, 1.0);
+        int far = PrecipitationVisualModel.elementCount((byte) 2, false, 1.0, 1.0);
+
+        assertTrue(denseNear > sparseNear);
+        assertTrue(denseNear > denseMid);
+        assertEquals(1, far);
+    }
+
+    @Test
+    void worldSpaceStreakMotionAndShapeAreStableAndPhaseSpecific() {
+        float rainProgress = PrecipitationVisualModel.fallProgress(14, -22, 2, 81.5, false, 0.6);
+        float repeated = PrecipitationVisualModel.fallProgress(14, -22, 2, 81.5, false, 0.6);
+        float rainLength = PrecipitationVisualModel.streakLength(14, -22, 2, (byte) 0, false);
+        float snowLength = PrecipitationVisualModel.streakLength(14, -22, 2, (byte) 0, true);
+        float rainWidth = PrecipitationVisualModel.streakHalfWidth(14, -22, 2, (byte) 0, false);
+        float snowWidth = PrecipitationVisualModel.streakHalfWidth(14, -22, 2, (byte) 0, true);
+
+        assertEquals(rainProgress, repeated, 0.0F);
+        assertTrue(rainProgress >= 0.0F && rainProgress < 1.0F);
+        assertTrue(rainLength > snowLength);
+        assertTrue(rainWidth < snowWidth);
     }
 
     @Test

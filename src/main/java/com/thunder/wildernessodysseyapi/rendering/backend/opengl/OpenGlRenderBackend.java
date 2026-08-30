@@ -3,10 +3,10 @@ package com.thunder.wildernessodysseyapi.rendering.backend.opengl;
 import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuHardwareProbe;
 import com.thunder.wildernessodysseyapi.rendering.GPUCapabilities;
 import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackend;
+import net.minecraft.client.renderer.ShaderInstance;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
-import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GLCapabilities;
 
 import java.util.EnumSet;
@@ -85,7 +85,11 @@ public final class OpenGlRenderBackend implements RenderBackend {
     }
 
     @Override
-    public boolean isShaderProgramUsable(int nativeProgramHandle) {
+    public boolean isShaderUsable(ShaderInstance shader) {
+        if (shader == null) {
+            return false;
+        }
+        int nativeProgramHandle = shader.getId();
         return nativeProgramHandle > 0
                 && GL20.glIsProgram(nativeProgramHandle)
                 && GL20.glGetProgrami(nativeProgramHandle, GL20.GL_LINK_STATUS) != 0;

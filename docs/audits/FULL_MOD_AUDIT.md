@@ -29,7 +29,6 @@ Important strengths should be preserved:
 - renderer compatibility mixins for Sodium, Embeddium, and Iris are selected by a mixin plugin;
 - the replacement water mesh path uses budgets and stable buffers instead of unbounded rebuilds;
 - Data Engine submissions are bounded and non-blocking;
-- Studio/network mutation handlers re-check server access policy and bound client-provided input;
 - configuration values are generally range-validated and published as immutable snapshots;
 - the StructureGen route validates source JSON and publishes generated NBT rather than hand-editing `bunker.nbt`.
 
@@ -995,7 +994,6 @@ No duplicate registry entry or duplicate event-bus registration was proven. The 
 ### Probably incomplete
 
 - [AUDIT-DEAD-002](#audit-dead-002--meteor-biome-modifier-and-impact-zone-data-are-orphaned): comments describe a nonexistent `meteormod` path and a fallback that never registers.
-- The Studio snapshot documentation lists weather and meteor-surge coverage gaps. These are declared limitations rather than hidden failures, but they should be resolved or explicitly excluded from the release contract.
 
 ### Potentially intentional placeholders
 
@@ -1003,7 +1001,7 @@ No duplicate registry entry or duplicate event-bus registration was proven. The 
 - Deprecated Gerstner/water API surfaces may exist for external compatibility even when internal callers moved. Retain them until an API compatibility scan and deprecation window.
 - `ElapsedTimeSimulation`, `AdaptiveBlockEntityTicker`, and `AdaptiveEntityWork` have no production callers, but current documentation and tests identify them as opt-in framework contracts. Label them “not yet integrated,” not dead.
 
-No missing packet handler was found among registered payloads. Server-bound Studio, Codex, weather/water debug, and Data Engine routes have receivers and direction-appropriate registration in the inspected payload registrar.
+No missing packet handler was found among registered payloads. Server-bound Codex, weather/water debug, and Data Engine routes have receivers and direction-appropriate registration in the inspected payload registrar.
 
 ## Potential Bugs
 
@@ -1047,7 +1045,7 @@ Positive bounds include staggered environment sync, once-per-second radiation wo
 - `LevelRendererLocalizedWeatherMixin` wraps clouds, rain rendering, and rain ticking; the client weather coordinator prevents independent per-player simulation, but particle/cloud cost still needs representative weather captures.
 - No unbounded client world/entity scan was identified in the main render-frame paths.
 
-Recommended measurement set: RenderDoc or built-in frame profiling for water-heavy shoreline, Sodium and Embeddium separately, Iris modern and legacy target matrices, active/inactive GPU diagnostics, maximum local rain/hail, and high GUI scale Codex/Studio screens.
+Recommended measurement set: RenderDoc or built-in frame profiling for water-heavy shoreline, Sodium and Embeddium separately, Iris modern and legacy target matrices, active/inactive GPU diagnostics, maximum local rain/hail, and high GUI scale Codex screens.
 
 ### Memory
 
@@ -1062,7 +1060,6 @@ Recommended measurement set: RenderDoc or built-in frame profiling for water-hea
 Positive findings:
 
 - Data packet batches cap entry count and total encoded body size.
-- Studio payloads bound strings/counts and re-check `StudioAccessPolicy` on the server.
 - Codex journal text is sanitized and size-bounded server-side.
 - Water, watershed, and weather snapshots have explicit region/cell bounds; the regular sea-water handoff is a bounded 9×9 area rather than a whole-world dump.
 - Debug/control payloads require appropriate server permissions in the inspected handlers.
@@ -1285,19 +1282,19 @@ No registered block, item, entity, payload, codec, event subscriber, or mixin wa
     │   └── radiation / tides / vegetation
     ├── Worldgen and structures
     │   ├── registered features/biome modifiers
-    │   ├── spawn bunker and Development Studio
+    │   ├── spawn bunker
     │   ├── StructureGen source-to-NBT pipeline
     │   └── expanded structure-block tooling
     ├── Networking
     │   ├── water/weather bounded state
-    │   ├── Studio and Codex server-authorized mutations
+    │   ├── Codex server-authorized mutations
     │   ├── cloak/gameplay state
     │   └── diagnostics/Data Engine
     ├── Client
     │   ├── water meshes/waves and renderer bridges
     │   ├── localized clouds/precipitation/sky
     │   ├── entity renderers and effects
-    │   └── Codex, Studio, debug, donation/loading UI
+    │   └── Codex, debug, donation/loading UI
     └── Compatibility mixins
         ├── Create and WorldEdit
         ├── Sodium / Embeddium / Iris
@@ -1347,7 +1344,7 @@ Incremental direction: create lifecycle-owned server contexts, separate pure com
     ├── SPH/water interpolation
     ├── localized weather/Riftfall visuals
     ├── cloak/input/effects/music
-    ├── Codex/Studio/debug
+    ├── Codex/debug
     └── loading/donation/client-save state
 
     RENDER FRAME / CHUNK MESH
@@ -1401,7 +1398,7 @@ Incremental direction: create lifecycle-owned server contexts, separate pure com
 - [AUDIT-DEAD-002](#audit-dead-002--meteor-biome-modifier-and-impact-zone-data-are-orphaned) identifies orphan/misdocumented meteor data.
 - Registered sounds match `sounds.json` entries; two OGG files are intentionally reused for multiple events rather than missing.
 - The meteor configured feature, placed feature, and biome modifier identifiers are coherent with `ModRegistries`.
-- `src/generated/resources/data/wildernessodysseyapi/worldgen/noise_settings/development_studio.json` follows the generated-resource convention.
+- `src/main/resources/data/wildernessodysseyapi/worldgen/noise_settings/development_studio.json` is retained only as an inert legacy-save compatibility record; no selectable preset or runtime tooling uses it.
 - `src/main/resources/data/wildernessodysseyapi/structures/bunker.nbt` is an immutable source/validation fixture for StructureGen. Its plural directory is intentional; do not “fix” it with the runtime recipes/tags.
 - Final Rift Maw/Listener textures are missing as product-quality assets ([AUDIT-VIS-001](#audit-vis-001--two-rift-entity-renderers-still-use-placeholder-textures)).
 
@@ -1452,7 +1449,6 @@ No access transformer or access widener file was found. Private vanilla/external
 
 No critical arbitrary-client world mutation was found in the inspected payload handlers:
 
-- Studio mutations re-check server-side access policy.
 - Codex journal input is length-bounded/sanitized.
 - Data Engine debug operations require elevated permission.
 - Batched data payloads cap entries/body size.

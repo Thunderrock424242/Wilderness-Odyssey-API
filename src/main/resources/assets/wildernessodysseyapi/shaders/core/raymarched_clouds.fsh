@@ -20,6 +20,8 @@ uniform int RaymarchSteps;
 uniform int LightingSteps;
 uniform vec3 CloudColor;
 uniform vec3 SunDirection;
+uniform vec3 LightningPosition;
+uniform float LightningIllumination;
 
 in vec3 surfacePosition;
 in vec2 localNoisePosition;
@@ -233,21 +235,35 @@ float densityAt(vec3 localPoint, bool distant, int band, out float stormAmount) 
     layered /= weightSum;
     cellular /= weightSum;
 
-    vec2 windWorld = (worldXZ + WindOffset) / 64.0;
-    vec2 wispyWorld = vec2(windWorld.x * 0.32 + windWorld.y * 0.10, windWorld.y * 2.65);
-    vec2 layeredWorld = windWorld * 0.58;
-    vec2 cellularWorld = windWorld * 1.08;
-    vec2 towerWorld = windWorld * (0.76 + vertical * 0.62);
-    vec2 shapedWorld = wispyWorld * wispy + layeredWorld * layered
-            + cellularWorld * cellular + towerWorld * tower;
+    // Every procedural scale translates with the synchronized cloud wind.
+    // Different rates model shear while retaining one coherent storm mass.
+    vec2 macroWindWorld = (worldXZ - WindOffset * 0.78) / 64.0;
+    vec2 mediumWindWorld = (worldXZ - WindOffset) / 64.0;
+    vec2 fineWindWorld = (worldXZ - WindOffset * 1.16) / 64.0;
+    vec2 macroWorld = vec2(macroWindWorld.x * 0.32 + macroWindWorld.y * 0.10,
+            macroWindWorld.y * 2.65) * wispy
+            + macroWindWorld * 0.58 * layered
+            + macroWindWorld * 1.08 * cellular
+            + macroWindWorld * (0.76 + vertical * 0.62) * tower;
+    vec2 mediumWorld = vec2(mediumWindWorld.x * 0.32 + mediumWindWorld.y * 0.10,
+            mediumWindWorld.y * 2.65) * wispy
+            + mediumWindWorld * 0.58 * layered
+            + mediumWindWorld * 1.08 * cellular
+            + mediumWindWorld * (0.76 + vertical * 0.62) * tower;
+    vec2 fineWorld = vec2(fineWindWorld.x * 0.32 + fineWindWorld.y * 0.10,
+            fineWindWorld.y * 2.65) * wispy
+            + fineWindWorld * 0.58 * layered
+            + fineWindWorld * 1.08 * cellular
+            + fineWindWorld * (0.76 + vertical * 0.62) * tower;
 
     // A slow world-scale mask rounds the outer silhouette independently from
     // the finer erosion, removing atlas-cell-shaped edges.
-    float broadShape = valueNoise(vec3(worldXZ / 210.0, float(band) * 1.7));
-    float mediumShape = fractalNoise(vec3(shapedWorld * 0.88,
-            vertical * (3.2 + tower * 3.8) - GameTime * 0.006));
-    float fineShape = fractalNoise(vec3(shapedWorld * 1.92 + 13.0,
-            vertical * 7.4 + GameTime * 0.003));
+    float broadShape = valueNoise(vec3(macroWorld * (64.0 / 210.0),
+            float(band) * 1.7 - GameTime * 0.0008));
+    float mediumShape = fractalNoise(vec3(mediumWorld * 0.88,
+            vertical * (3.2 + tower * 3.8) - GameTime * 0.0022));
+    float fineShape = fractalNoise(vec3(fineWorld * 1.92 + 13.0,
+            vertical * 7.4 + GameTime * 0.0015));
     float detail = mix(mediumShape, mediumShape * 0.76 + fineShape * 0.24,
             clamp(DetailStrength, 0.0, 1.0));
     float shape = verticalProfile(vertical, wispy, layered, cellular, tower);
@@ -312,6 +328,7 @@ void main() {
     float accumulated = 0.0;
     float lightAccumulation = 0.0;
     float stormAccumulation = 0.0;
+    float lightningAccumulation = 0.0;
     float cachedSunlight = 1.0;
     vec3 sun = normalize(SunDirection);
     for (int sampleIndex = 0; sampleIndex < 64; sampleIndex++) {
@@ -342,6 +359,10 @@ void main() {
         accumulated += contribution;
         lightAccumulation += contribution * cachedSunlight;
         stormAccumulation += contribution * storm;
+        float lightningDistance = distance(point, LightningPosition);
+        float localLightning = LightningIllumination
+                * pow(max(0.0, 1.0 - lightningDistance / 360.0), 2.0);
+        lightningAccumulation += contribution * localLightning;
         transmittance *= 1.0 - sampleAlpha;
     }
     if (accumulated < 0.012) {
@@ -350,11 +371,13 @@ void main() {
 
     float meanLight = lightAccumulation / max(accumulated, 0.001);
     float meanStorm = stormAccumulation / max(accumulated, 0.001);
+    float meanLightning = lightningAccumulation / max(accumulated, 0.001);
     float forwardScatter = pow(max(0.0, dot(rayDirection, sun)), 8.0) * (1.0 - meanStorm);
     float daylight = 0.62 + max(0.0, sun.y) * 0.28;
     vec3 color = CloudColor * daylight * (0.48 + meanLight * 0.52);
     color += vec3(0.13, 0.14, 0.16) * forwardScatter * (1.0 - transmittance);
     color *= 1.0 - meanStorm * 0.30;
+    color += vec3(0.48, 0.62, 0.82) * meanLightning * (0.55 + meanStorm * 0.45);
     float distanceFade = distant ? 0.84 : 1.0;
     fragColor = vec4(color, min(0.985, accumulated * distanceFade)) * ColorModulator;
 }

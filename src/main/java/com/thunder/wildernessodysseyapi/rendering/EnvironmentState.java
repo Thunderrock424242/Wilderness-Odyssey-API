@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.rendering;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindSample;
+import com.thunder.wildernessodysseyapi.weather.client.WeatherVisualState;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -79,6 +80,28 @@ public record EnvironmentState(
                 (float) safeWeather.temperature(),
                 (float) safeWeather.humidity(),
                 thunder
+        );
+    }
+
+    /** Creates shared renderer state from the unified per-frame weather interpretation. */
+    public static EnvironmentState from(WeatherVisualState visual) {
+        WeatherVisualState state = visual == null ? WeatherVisualState.CLEAR : visual;
+        float speed = (float) state.surfaceWind().length();
+        Vec3 direction = speed <= 1.0E-5F ? Vec3.ZERO : state.surfaceWind().normalize();
+        return new EnvironmentState(
+                state.precipitationIntensity()
+                        * (state.precipitationBlend().rain() + state.precipitationBlend().hail()),
+                state.precipitationIntensity() * state.precipitationBlend().snow(),
+                state.stormSeverity(),
+                speed,
+                (float) direction.x,
+                (float) direction.y,
+                (float) direction.z,
+                state.wetness(),
+                (float) state.weather().surface().frozenFraction(),
+                (float) state.weather().temperature(),
+                (float) state.weather().humidity(),
+                Math.max(state.lightningIllumination(), (float) state.weather().thunderIntensity())
         );
     }
 

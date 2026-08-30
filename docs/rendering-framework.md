@@ -51,7 +51,7 @@ The systems were already modular but had several cross-cutting leaks:
 
 ### Backend and capabilities
 
-`RenderBackend` exposes only cached capabilities, program validation, and an
+`RenderBackend` exposes only cached capabilities, Minecraft shader validation, and an
 asynchronous GPU timer factory. `OpenGlRenderBackend` is today's adapter.
 `RenderBackends.install(...)` is the handoff for a future Minecraft-supported
 backend adapter; water and weather must not choose a backend themselves.
@@ -179,7 +179,8 @@ user's shader-pack archive. Risks that still require live compatibility tests:
 ## Performance characteristics
 
 - backend capability discovery is cached;
-- optional API reflection is resolved once;
+- optional API reflection is resolved once and active-pack ownership is sampled
+  once per render frame for all water/cloud consumers;
 - environmental state is one constant-time camera sample per frame;
 - adaptive weather settings allocate only on config reload;
 - GPU timestamps remain asynchronous and never wait for an unfinished query;

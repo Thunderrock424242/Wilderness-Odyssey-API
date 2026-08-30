@@ -99,7 +99,7 @@ Decay does not run every tick. A read at game time `T` calculates the effective 
 
 Movement sampling uses the existing per-player NeoForge tick event but performs only a UUID lookup and timestamp comparison on most ticks. It samples at most once every 40 ticks and records only after at least four blocks of movement. It never scans players, entities, loaded chunks, or blocks.
 
-Natural and chunk-generation spawns for profiled wildlife use configurable response bands:
+Natural runtime spawns for profiled wildlife use configurable response bands:
 
 | Disturbance | Default response |
 |---|---|
@@ -108,7 +108,7 @@ Natural and chunk-generation spawns for profiled wildlife use configurable respo
 | `0.50-0.75` | Reduced activity; default spawn multiplier `0.55`. |
 | `0.75-1.00` | Strong avoidance; default spawn multiplier `0.25`. |
 
-Spawn eggs, commands, breeding, spawners, and other non-natural sources are unchanged. The strong multiplier is constrained above zero, so memory never completely disables wildlife. Profiled wild animals already in a strongly disturbed cell select a bounded retreat target, and water, shelter, or herd destinations in strongly disturbed cells are skipped. Tamed animals keep their normal owner-directed behavior.
+Chunk-generation spawns, spawn eggs, commands, breeding, spawners, and other non-natural sources are unchanged. Chunk generation runs on worldgen workers and therefore cannot consult the mutable environmental-memory saved data owned by the server thread. The strong multiplier is constrained above zero, so memory never completely disables wildlife. Profiled wild animals already in a strongly disturbed cell select a bounded retreat target, and water, shelter, or herd destinations in strongly disturbed cells are skipped. Tamed animals keep their normal owner-directed behavior.
 
 Water detection first calls `WaterServices.access()`, which is the stable public boundary for Wilderness-owned water. The normal water fluid tag is checked second for vanilla and compatible modded fluids. Ecosystem code does not read or mutate generated-water spans, canonical volume chunks, projection blocks, synchronization snapshots, or renderer state.
 
@@ -357,7 +357,7 @@ Diagnostics are disabled by default. After enabling `debugCommandsEnabled`, oper
 - `/woecosystem memory clear` to remove the executing player's current chunk cell.
 - `/woecosystem distant` for distant groups, represented population/remainder/reference time, actual entities avoided, LOD state, transition distances, update frequency, and recent conversion/packet work.
 - `/wo simulation population` for population-region requests, async batches, stale validation, additions/removals, in-flight work, cadence, and regional carrying capacity.
-- `/wo simulation map` for a bounded, on-demand 17 by 17 regional view of abstract groups, population, simulation LOD, food, water, food pressure, disturbance, weather impact, and migration direction. The same read-only map is available from the Development Studio Ecosystem page.
+- `/wo simulation map` for a bounded, on-demand 17 by 17 regional view of abstract groups, population, simulation LOD, food, water, food pressure, disturbance, weather impact, and migration direction.
 
 When `debugCommandsEnabled` is true, the existing categorized F3 **World** page also shows the current chunk's server-owned environmental-memory snapshot. Synchronization is limited to one small current-cell packet per player per second and is completely absent while diagnostics are disabled.
 
@@ -388,4 +388,3 @@ When `debugCommandsEnabled` is true, the existing categorized F3 **World** page 
 9. Materialize or absorb a group while an ecology batch is pending. Confirm the owner reports a stale group rather than overwriting the newer real/abstract transition, and that a later bounded pass retries normally.
 10. Save and restart after a fractional update, then advance several intervals. Confirm the population reference and fractional remainder persist, catch-up happens once, and two overlapping players do not duplicate the regional update.
 11. Run `/wo simulation map` and cycle every layer. Confirm the center marker follows the requesting player, LOD bands match configured distances, each abstract group appears in exactly one cell, cell totals match `/woecosystem distant`, and hover/click details show the same population and pressure values.
-12. Open the same map from Development Studio's Ecosystem page, move across a cell boundary, and use Refresh. Confirm the map recenters only on request, does not keep sending packets while left open, and does not create chunk tickets or materialize wildlife.

@@ -31,6 +31,8 @@
     { "name": "RaymarchSteps", "type": "int", "count": 1, "values": [24] },
     { "name": "LightingSteps", "type": "int", "count": 1, "values": [4] },
     { "name": "CloudColor", "type": "float", "count": 3, "values": [1, 1, 1] },
-    { "name": "SunDirection", "type": "float", "count": 3, "values": [0, 1, 0.25] }
+    { "name": "SunDirection", "type": "float", "count": 3, "values": [0, 1, 0.25] },
+    { "name": "LightningPosition", "type": "float", "count": 3, "values": [0, 0, 0] },
+    { "name": "LightningIllumination", "type": "float", "count": 1, "values": [0] }
   ]
 }

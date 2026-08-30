@@ -28,6 +28,7 @@ public final class WeatherSnapshot {
     private final ResourceLocation dimension;
     private final int dataVersion;
     private final long sequence;
+    private final long serverTick;
     private final int cellSize;
     private final Long2ObjectMap<SnapshotCell> cells;
 
@@ -35,12 +36,14 @@ public final class WeatherSnapshot {
             ResourceLocation dimension,
             int dataVersion,
             long sequence,
+            long serverTick,
             int cellSize,
             Map<Long, SnapshotCell> cells
     ) {
         this.dimension = Objects.requireNonNull(dimension, "dimension");
         this.dataVersion = dataVersion;
         this.sequence = sequence;
+        this.serverTick = Math.max(0L, serverTick);
         this.cellSize = cellSize;
         Map<Long, SnapshotCell> sourceCells = Objects.requireNonNull(cells, "cells");
         Long2ObjectOpenHashMap<SnapshotCell> copiedCells = new Long2ObjectOpenHashMap<>(sourceCells.size());
@@ -48,6 +51,17 @@ public final class WeatherSnapshot {
             copiedCells.put(entry.getKey().longValue(), entry.getValue());
         }
         this.cells = Long2ObjectMaps.unmodifiable(copiedCells);
+    }
+
+    /** Retains the weather-v4 snapshot construction shape for focused tests. */
+    WeatherSnapshot(
+            ResourceLocation dimension,
+            int dataVersion,
+            long sequence,
+            int cellSize,
+            Map<Long, SnapshotCell> cells
+    ) {
+        this(dimension, dataVersion, sequence, 0L, cellSize, cells);
     }
 
     /** Returns the dimension whose authoritative cells this snapshot contains. */
@@ -63,6 +77,11 @@ public final class WeatherSnapshot {
     /** Returns the newest accepted server sequence represented by this snapshot. */
     public long sequence() {
         return sequence;
+    }
+
+    /** Returns the authoritative level tick captured with this region. */
+    public long serverTick() {
+        return serverTick;
     }
 
     /** Returns the atmospheric-cell width in blocks. */
@@ -235,17 +254,25 @@ public final class WeatherSnapshot {
      * state even when server updates arrive faster than the visual blend time.</p>
      */
     static WeatherSnapshot blend(WeatherSnapshot from, WeatherSnapshot to, double amount) {
+        return timeline(from, to, clamp01(amount));
+    }
+
+    /** Builds a packet-boundary snapshot from interpolation or bounded extrapolation. */
+    static WeatherSnapshot timeline(WeatherSnapshot from, WeatherSnapshot to, double amount) {
         Objects.requireNonNull(from, "from");
         Objects.requireNonNull(to, "to");
         if (!from.dimension.equals(to.dimension) || from.cellSize != to.cellSize) {
             return to;
         }
 
-        double boundedAmount = clamp01(amount);
+        double boundedAmount = Math.max(
+                0.0D,
+                Math.min(1.0D + ClientWeatherTimeline.MAX_EXTRAPOLATION, amount)
+        );
         if (boundedAmount <= 0.0D) {
             return from;
         }
-        if (boundedAmount >= 1.0D) {
+        if (boundedAmount == 1.0D) {
             return to;
         }
 
@@ -261,7 +288,7 @@ public final class WeatherSnapshot {
                     target.cellX(),
                     target.cellZ(),
                     source == null ? target.revision() : Math.max(source.revision(), target.revision()),
-                    interpolateSamples(sourceSample, target.sample(), boundedAmount)
+                    ClientWeatherTimeline.sample(sourceSample, target.sample(), boundedAmount)
             ));
         }
         for (Long2ObjectMap.Entry<SnapshotCell> entry : from.cells.long2ObjectEntrySet()) {
@@ -274,13 +301,14 @@ public final class WeatherSnapshot {
                     source.cellX(),
                     source.cellZ(),
                     source.revision(),
-                    interpolateSamples(source.sample(), WeatherSample.CLEAR, boundedAmount)
+                    ClientWeatherTimeline.sample(source.sample(), WeatherSample.CLEAR, boundedAmount)
             ));
         }
         return new WeatherSnapshot(
                 to.dimension,
                 to.dataVersion,
                 to.sequence,
+                to.serverTick,
                 to.cellSize,
                 blendedCells
         );
@@ -296,6 +324,20 @@ public final class WeatherSnapshot {
             copy.put(entry.getLongKey(), entry.getValue());
         }
         return copy;
+    }
+
+    /** Returns the fraction of this snapshot's cells also present in another bounded region. */
+    double sharedCellFraction(WeatherSnapshot other) {
+        if (other == null || cells.isEmpty()) {
+            return 0.0D;
+        }
+        int shared = 0;
+        for (long key : cells.keySet()) {
+            if (other.cells.containsKey(key)) {
+                shared++;
+            }
+        }
+        return shared / (double) Math.max(cells.size(), other.cells.size());
     }
 
     SnapshotCell cell(int cellX, int cellZ) {

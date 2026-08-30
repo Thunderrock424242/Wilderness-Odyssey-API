@@ -31,6 +31,7 @@ import java.util.Set;
  * @param dimension authoritative level identifier
  * @param dataVersion atmospheric snapshot schema version
  * @param sequence per-player monotonic server sequence
+ * @param serverTick authoritative level game tick captured for this snapshot
  * @param enabled whether localized weather is enabled in this dimension
  * @param replaceRegion whether the client must discard its previous region first
  * @param cellSize atmospheric cell width in blocks
@@ -43,6 +44,7 @@ public record WeatherRegionSyncPayload(
         ResourceLocation dimension,
         int dataVersion,
         long sequence,
+        long serverTick,
         boolean enabled,
         boolean replaceRegion,
         int cellSize,
@@ -53,7 +55,7 @@ public record WeatherRegionSyncPayload(
 ) implements CustomPacketPayload {
 
     /** Current atmospheric snapshot schema understood by server and client. */
-    public static final int DATA_VERSION = 4;
+    public static final int DATA_VERSION = 5;
     /** Descriptive alias used by payload construction and validation code. */
     public static final int CURRENT_DATA_VERSION = DATA_VERSION;
     /** Hard cap for a 17 by 17 region around one player. */
@@ -87,7 +89,7 @@ public record WeatherRegionSyncPayload(
         dimension = Objects.requireNonNull(dimension, "dimension");
         windSettings = Objects.requireNonNullElse(windSettings, WindSettings.DEFAULT);
         cells = List.copyOf(Objects.requireNonNull(cells, "cells"));
-        validateHeader(dataVersion, sequence, cellSize);
+        validateHeader(dataVersion, sequence, serverTick, cellSize);
         if (cells.size() > MAX_CELLS) {
             throw new IllegalArgumentException("Weather region exceeds the network cell limit: " + cells.size());
         }
@@ -108,6 +110,34 @@ public record WeatherRegionSyncPayload(
         }
     }
 
+    /** Retains the weather-v4 construction shape for source-compatible integrations. */
+    public WeatherRegionSyncPayload(
+            ResourceLocation dimension,
+            int dataVersion,
+            long sequence,
+            boolean enabled,
+            boolean replaceRegion,
+            int cellSize,
+            int centerCellX,
+            int centerCellZ,
+            WindSettings windSettings,
+            List<CellSnapshot> cells
+    ) {
+        this(
+                dimension,
+                dataVersion,
+                sequence,
+                0L,
+                enabled,
+                replaceRegion,
+                cellSize,
+                centerCellX,
+                centerCellZ,
+                windSettings,
+                cells
+        );
+    }
+
     /** Retains the weather-v3 construction shape with default wind controls. */
     public WeatherRegionSyncPayload(
             ResourceLocation dimension,
@@ -124,6 +154,7 @@ public record WeatherRegionSyncPayload(
                 dimension,
                 dataVersion,
                 sequence,
+                0L,
                 enabled,
                 replaceRegion,
                 cellSize,
@@ -146,6 +177,31 @@ public record WeatherRegionSyncPayload(
                 dimension,
                 CURRENT_DATA_VERSION,
                 sequence,
+                0L,
+                false,
+                true,
+                cellSize,
+                centerCellX,
+                centerCellZ,
+                WindSettings.DISABLED,
+                List.of()
+        );
+    }
+
+    /** Creates a timed reset for a client changing weather authority or dimension. */
+    public static WeatherRegionSyncPayload disabled(
+            ResourceLocation dimension,
+            long sequence,
+            long serverTick,
+            int cellSize,
+            int centerCellX,
+            int centerCellZ
+    ) {
+        return new WeatherRegionSyncPayload(
+                dimension,
+                CURRENT_DATA_VERSION,
+                sequence,
+                serverTick,
                 false,
                 true,
                 cellSize,
@@ -160,6 +216,7 @@ public record WeatherRegionSyncPayload(
         buffer.writeResourceLocation(payload.dimension);
         buffer.writeVarInt(payload.dataVersion);
         buffer.writeVarLong(payload.sequence);
+        buffer.writeVarLong(payload.serverTick);
         int flags = (payload.enabled ? FLAG_ENABLED : 0)
                 | (payload.replaceRegion ? FLAG_REPLACE_REGION : 0);
         buffer.writeByte(flags);
@@ -220,6 +277,7 @@ public record WeatherRegionSyncPayload(
         ResourceLocation dimension = buffer.readResourceLocation();
         int dataVersion = buffer.readVarInt();
         long sequence = buffer.readVarLong();
+        long serverTick = buffer.readVarLong();
         int flags = buffer.readUnsignedByte();
         if ((flags & ~KNOWN_FLAGS) != 0) {
             throw new IllegalArgumentException("Weather payload contains unknown flags: " + flags);
@@ -227,7 +285,7 @@ public record WeatherRegionSyncPayload(
         boolean enabled = (flags & FLAG_ENABLED) != 0;
         boolean replaceRegion = (flags & FLAG_REPLACE_REGION) != 0;
         int cellSize = buffer.readVarInt();
-        validateHeader(dataVersion, sequence, cellSize);
+        validateHeader(dataVersion, sequence, serverTick, cellSize);
         int centerCellX = readSignedVarInt(buffer);
         int centerCellZ = readSignedVarInt(buffer);
         int cellCount = buffer.readVarInt();
@@ -323,6 +381,7 @@ public record WeatherRegionSyncPayload(
                 dimension,
                 dataVersion,
                 sequence,
+                serverTick,
                 enabled,
                 replaceRegion,
                 cellSize,
@@ -333,12 +392,15 @@ public record WeatherRegionSyncPayload(
         );
     }
 
-    private static void validateHeader(int dataVersion, long sequence, int cellSize) {
+    private static void validateHeader(int dataVersion, long sequence, long serverTick, int cellSize) {
         if (dataVersion != CURRENT_DATA_VERSION) {
             throw new IllegalArgumentException("Unsupported weather snapshot data version: " + dataVersion);
         }
         if (sequence < 0L) {
             throw new IllegalArgumentException("Weather snapshot sequence cannot be negative");
+        }
+        if (serverTick < 0L) {
+            throw new IllegalArgumentException("Weather snapshot server tick cannot be negative");
         }
         if (cellSize < MIN_CELL_SIZE || cellSize > MAX_CELL_SIZE) {
             throw new IllegalArgumentException("Invalid atmospheric cell size: " + cellSize);

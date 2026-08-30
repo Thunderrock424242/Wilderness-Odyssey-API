@@ -252,12 +252,16 @@ public final class EcosystemEvents {
         );
     }
 
-    /** Reduces only natural and chunk-generation spawns for profiled wildlife; chance never reaches zero. */
+    /**
+     * Reduces natural runtime spawns for profiled wildlife; chance never reaches zero.
+     *
+     * <p>Chunk-generation checks run on worldgen workers, so they must not query the
+     * mutable environmental-memory saved data owned by the server thread.</p>
+    */
     @SubscribeEvent
     public static void onWildlifePositionCheck(MobSpawnEvent.PositionCheck event) {
-        if (!EcosystemConfig.ENABLED.get()
-                || (event.getSpawnType() != MobSpawnType.NATURAL
-                && event.getSpawnType() != MobSpawnType.CHUNK_GENERATION)
+        if (event.getSpawnType() != MobSpawnType.NATURAL
+                || !EcosystemConfig.ENABLED.get()
                 || !(event.getEntity() instanceof PathfinderMob animal)
                 || SpeciesBehaviorProfileManager.profileFor(animal).isEmpty()) {
             return;
@@ -266,7 +270,7 @@ public final class EcosystemEvents {
         double disturbance = EnvironmentalMemoryManager.getDisturbance(
                 level, BlockPos.containing(event.getX(), event.getY(), event.getZ()));
         double chance = WildlifeDisturbancePolicy.spawnChance(disturbance);
-        if (level.getRandom().nextDouble() >= chance) {
+        if (animal.getRandom().nextDouble() >= chance) {
             event.setResult(MobSpawnEvent.PositionCheck.Result.FAIL);
         }
     }

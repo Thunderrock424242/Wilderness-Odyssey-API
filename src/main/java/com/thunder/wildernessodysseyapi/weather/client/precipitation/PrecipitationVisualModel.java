@@ -22,7 +22,8 @@ public final class PrecipitationVisualModel {
         }
         double normalized = Math.max(0.0, distance) / radius;
         double radial = (1.0 - normalized * normalized) * (snow ? 0.30 : 0.50) + 0.50;
-        return unit((float) (Math.max(0.0, radial) * intensity));
+        double edgeCrossfade = 1.0 - smoothstep(0.78, 1.0, normalized);
+        return unit((float) (Math.max(0.0, radial) * edgeCrossfade * intensity));
     }
 
     /**
@@ -96,6 +97,70 @@ public final class PrecipitationVisualModel {
     /** Tones down icy pellets so they do not resemble glowing white splash particles. */
     static float hailAlpha(float alpha, boolean distant) {
         return scaledAlpha(alpha, distant ? 0.46 : 0.72);
+    }
+
+    /** Density controls element count; opacity remains a secondary response. */
+    static int elementCount(byte zone, boolean snow, double intensity, double configuredDensity) {
+        double amount = unit(intensity) * unit(configuredDensity);
+        if (zone == 2) {
+            return 1;
+        }
+        int maximum = zone == 0 ? (snow ? 6 : 5) : (snow ? 3 : 2);
+        return Math.max(1, Math.min(maximum, 1 + (int) Math.floor(amount * maximum)));
+    }
+
+    /** Deterministic world-space fall phase with velocity and gust variation. */
+    static float fallProgress(
+            int blockX,
+            int blockZ,
+            int element,
+            double renderTicks,
+            boolean snow,
+            double gustFactor
+    ) {
+        long salt = 0xA24BAED4963EE407L + (long) element * 0x9E3779B97F4A7C15L;
+        double phase = columnNoise(blockX, blockZ, salt);
+        double variation = 0.82 + columnNoise(blockX, blockZ, salt ^ 0x9FB21C651E98DF25L) * 0.36;
+        double gust = 1.0 + unit(gustFactor) * (snow ? 0.10 : 0.24);
+        double speed = (snow ? 0.012 : 0.052) * variation * gust;
+        double progress = phase + finiteOrZero(renderTicks) * speed;
+        return (float) (progress - Math.floor(progress));
+    }
+
+    /** Short world-space streak length; mid-field elements are intentionally cheaper and longer. */
+    static float streakLength(int blockX, int blockZ, int element, byte zone, boolean snow) {
+        double variation = columnNoise(
+                blockX,
+                blockZ,
+                0xD6E8FEB86659FD93L + (long) element * 0x632BE59BD9B4E019L
+        );
+        if (snow) {
+            return (float) ((zone == 0 ? 0.22 : 0.34) + variation * (zone == 0 ? 0.34 : 0.48));
+        }
+        return (float) ((zone == 0 ? 1.25 : 3.5) + variation * (zone == 0 ? 2.75 : 4.5));
+    }
+
+    /** Subtle per-element width variation prevents a repeated transparent-sheet silhouette. */
+    static float streakHalfWidth(int blockX, int blockZ, int element, byte zone, boolean snow) {
+        double variation = columnNoise(
+                blockX,
+                blockZ,
+                0xC13FA9A902A6328FL + (long) element * 0x94D049BB133111EBL
+        );
+        if (snow) {
+            return (float) ((zone == 0 ? 0.055 : 0.09) + variation * (zone == 0 ? 0.07 : 0.08));
+        }
+        return (float) ((zone == 0 ? 0.018 : 0.045) + variation * (zone == 0 ? 0.025 : 0.045));
+    }
+
+    /** Stable alpha variation breaks up uniform repeated streaks. */
+    static float elementAlpha(int blockX, int blockZ, int element, float alpha, boolean snow) {
+        double variation = 0.68 + columnNoise(
+                blockX,
+                blockZ,
+                0x91E10DA5C79E7B1DL + (long) element * 0xBF58476D1CE4E5B9L
+        ) * 0.32;
+        return scaledAlpha(alpha, variation * (snow ? 0.82 : 1.0));
     }
 
     /** Fades sparse distant curtains before the storm-fog far plane. */

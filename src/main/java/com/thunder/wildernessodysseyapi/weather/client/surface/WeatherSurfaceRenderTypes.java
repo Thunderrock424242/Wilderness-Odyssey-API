@@ -12,7 +12,7 @@ public final class WeatherSurfaceRenderTypes extends RenderStateShard {
     private static final RenderType WET_SURFACE = RenderType.create(
             "wildernessodysseyapi_wet_surface",
             DefaultVertexFormat.POSITION_COLOR,
-            VertexFormat.Mode.QUADS,
+            VertexFormat.Mode.TRIANGLES,
             1_024,
             false,
             true,

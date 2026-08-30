@@ -12,6 +12,8 @@ public final class ShaderPackCompatibility {
     private static Method getInstance;
     private static Method isPackInUse;
     private static boolean queryFailureLogged;
+    private static volatile long sampledFrame = Long.MIN_VALUE;
+    private static volatile boolean activeForFrame;
 
     private ShaderPackCompatibility() {
     }
@@ -21,6 +23,27 @@ public final class ShaderPackCompatibility {
      * Unknown installed APIs fail closed to Minecraft's tagged/vanilla paths.
      */
     public static boolean isExternalShaderPackActive() {
+        if (sampledFrame != Long.MIN_VALUE) {
+            return activeForFrame;
+        }
+        return queryActivePack();
+    }
+
+    /** Samples optional shader ownership once for all rendering paths in one frame. */
+    public static void sampleFrame(long frameIndex) {
+        if (sampledFrame == frameIndex) {
+            return;
+        }
+        synchronized (ShaderPackCompatibility.class) {
+            if (sampledFrame == frameIndex) {
+                return;
+            }
+            activeForFrame = queryActivePack();
+            sampledFrame = frameIndex;
+        }
+    }
+
+    private static boolean queryActivePack() {
         ModList mods = ModList.get();
         if (!mods.isLoaded("iris") && !mods.isLoaded("oculus")) {
             return false;

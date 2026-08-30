@@ -2,10 +2,13 @@ package com.thunder.wildernessodysseyapi.weather.client;
 
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.api.WindManager;
+import com.thunder.wildernessodysseyapi.weather.api.WindSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindSettings;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudLightingModel;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudShadowModel;
+import com.thunder.wildernessodysseyapi.weather.client.cloud.WeatherLightningIllumination;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import com.thunder.wildernessodysseyapi.weather.networking.WeatherRegionSyncPayload;
 import net.minecraft.client.Minecraft;
@@ -30,12 +33,12 @@ public final class ClientWeatherCoordinator {
 
     private static final int MIN_CELL_SIZE = 16;
     private static final int MAX_CELL_SIZE = 4_096;
-    private static final long TRANSITION_NANOS = 2_000_000_000L;
     private static final double PRECIPITATION_EPSILON = 1.0E-4D;
     private static final Object UPDATE_LOCK = new Object();
     private static final Map<ResourceLocation, Long> SEQUENCE_WATERMARKS = new HashMap<>();
 
     private static volatile State activeState;
+    private static volatile FrameVisual cachedFrameVisual;
 
     private ClientWeatherCoordinator() {
     }
@@ -69,6 +72,8 @@ public final class ClientWeatherCoordinator {
                 // release localized rendering immediately instead of fading.
                 SEQUENCE_WATERMARKS.put(payload.dimension(), payload.sequence());
                 activeState = null;
+                cachedFrameVisual = null;
+                WeatherLightningIllumination.clear();
                 return true;
             }
             if (!isValidEnabledPayload(payload)) {
@@ -100,14 +105,42 @@ public final class ClientWeatherCoordinator {
                     payload.dimension(),
                     payload.dataVersion(),
                     payload.sequence(),
+                    payload.serverTick(),
                     payload.cellSize(),
                     nextCells
             );
             long now = System.nanoTime();
-            WeatherSnapshot previous = transitionSource(oldState, next, now);
+            boolean spatialDiscontinuity = payload.replaceRegion()
+                    && oldTarget != null
+                    && oldTarget.sharedCellFraction(next) < 0.25D;
+            WeatherSnapshot previous = transitionSource(
+                    spatialDiscontinuity ? null : oldState,
+                    next,
+                    now
+            );
+            if (spatialDiscontinuity) {
+                WeatherLightningIllumination.clear();
+            }
+            long observedArrivalNanos = oldState == null ? 0L : now - oldState.acceptedAtNanos();
+            long transitionDurationNanos = ClientWeatherTimeline.transitionDurationNanos(
+                    oldTarget == null ? -1L : oldTarget.serverTick(),
+                    next.serverTick(),
+                    observedArrivalNanos
+            );
+            if (spatialDiscontinuity) {
+                transitionDurationNanos = 500_000_000L;
+            }
 
             SEQUENCE_WATERMARKS.put(payload.dimension(), payload.sequence());
-            activeState = new State(previous, next, now, payload.windSettings());
+            activeState = new State(
+                    previous,
+                    next,
+                    now,
+                    now,
+                    transitionDurationNanos,
+                    payload.windSettings()
+            );
+            cachedFrameVisual = null;
             return true;
         }
     }
@@ -153,11 +186,8 @@ public final class ClientWeatherCoordinator {
         if (state == null) {
             return CloudFieldSample.CLEAR;
         }
-        double amount = state.progress(System.nanoTime());
-        if (amount >= 1.0D) {
-            return state.current().cloudField(blockX, blockZ);
-        }
-        return CloudFieldSample.interpolate(
+        double amount = state.timelineAmount(System.nanoTime());
+        return ClientWeatherTimeline.cloud(
                 state.previous().cloudField(blockX, blockZ),
                 state.current().cloudField(blockX, blockZ),
                 amount
@@ -180,8 +210,8 @@ public final class ClientWeatherCoordinator {
         if (state == null) {
             return 0.0D;
         }
-        double amount = state.progress(System.nanoTime());
-        return lerp(
+        double amount = state.timelineAmount(System.nanoTime());
+        return ClientWeatherTimeline.scalar(
                 state.previous().precipitationIntensity(blockX, blockZ),
                 state.current().precipitationIntensity(blockX, blockZ),
                 amount
@@ -203,8 +233,8 @@ public final class ClientWeatherCoordinator {
         if (state == null) {
             return 0.0D;
         }
-        double amount = state.progress(System.nanoTime());
-        return lerp(
+        double amount = state.timelineAmount(System.nanoTime());
+        return ClientWeatherTimeline.scalar(
                 state.previous().supportedPrecipitationIntensity(blockX, blockZ),
                 state.current().supportedPrecipitationIntensity(blockX, blockZ),
                 amount
@@ -255,10 +285,10 @@ public final class ClientWeatherCoordinator {
         if (state == null) {
             return PrecipitationType.NONE;
         }
-        double amount = state.progress(System.nanoTime());
+        double amount = state.timelineAmount(System.nanoTime());
         double previousIntensity = state.previous().precipitationIntensity(blockX, blockZ);
         double currentIntensity = state.current().precipitationIntensity(blockX, blockZ);
-        double intensity = lerp(previousIntensity, currentIntensity, amount);
+        double intensity = ClientWeatherTimeline.scalar(previousIntensity, currentIntensity, amount);
         if (intensity <= PRECIPITATION_EPSILON) {
             return PrecipitationType.NONE;
         }
@@ -278,7 +308,11 @@ public final class ClientWeatherCoordinator {
         }
         double previousTemperature = state.previous().temperature(blockX, blockZ);
         double currentTemperature = state.current().temperature(blockX, blockZ);
-        return precipitationTypeForTemperature(lerp(previousTemperature, currentTemperature, amount));
+        return precipitationTypeForTemperature(ClientWeatherTimeline.scalar(
+                previousTemperature,
+                currentTemperature,
+                amount
+        ));
     }
 
     /** Returns the interpolated weather sample at the local player or camera. */
@@ -341,6 +375,44 @@ public final class ClientWeatherCoordinator {
         );
     }
 
+    /**
+     * Returns one immutable camera-local interpretation for the requested render frame.
+     * Repeated weather, water, and diagnostics consumers receive the same value object.
+     */
+    public static WeatherVisualState visualState(ClientLevel level, Vec3 position, long frameIndex) {
+        if (level == null || position == null || !controls(level)) {
+            return WeatherVisualState.CLEAR;
+        }
+        FrameVisual cached = cachedFrameVisual;
+        if (cached != null && cached.level() == level && cached.frameIndex() == frameIndex) {
+            return cached.state();
+        }
+
+        WeatherSample weather = sampleAt(level, position);
+        CloudFieldSample cloud = cloudFieldAt(level, position);
+        WindSample wind = WindManager.getWind(level, position);
+        float fog = (float) CloudLightingModel.fogContribution(
+                weather,
+                cloud,
+                position.y,
+                level.effects().getCloudHeight()
+        );
+        State timeline = matchingState(level);
+        long now = System.nanoTime();
+        double weatherTime = timeline == null ? level.getGameTime() : timeline.estimatedServerTick(now);
+        WeatherVisualState visual = WeatherVisualState.from(
+                weather,
+                cloud,
+                wind,
+                fog,
+                localSkyDarkening(level),
+                WeatherLightningIllumination.cameraIllumination(level, position),
+                weatherTime
+        );
+        cachedFrameVisual = new FrameVisual(level, Math.max(0L, frameIndex), visual);
+        return visual;
+    }
+
     /** Calculates the renderer-facing thunder contribution for any immutable sample. */
     public static float thunderContribution(WeatherSample sample) {
         return (float) sample.thunderIntensity();
@@ -359,12 +431,18 @@ public final class ClientWeatherCoordinator {
                 || !state.current().dimension().equals(level.dimension().location())) {
             return null;
         }
+        long now = System.nanoTime();
+        double amount = state.timelineAmount(now);
         return new ClientStateView(
                 state.current().dimension(),
                 state.current().sequence(),
+                state.current().serverTick(),
                 state.current().cellSize(),
                 state.current().cellCount(),
-                state.progress(System.nanoTime())
+                Math.min(1.0D, amount),
+                ClientWeatherTimeline.extrapolation(amount),
+                Math.max(0.0D, (now - state.acceptedAtNanos()) / 1_000_000_000.0D),
+                state.estimatedServerTick(now)
         );
     }
 
@@ -377,6 +455,8 @@ public final class ClientWeatherCoordinator {
             State state = activeState;
             if (state != null && state.current().dimension().equals(level.dimension().location())) {
                 activeState = null;
+                cachedFrameVisual = null;
+                WeatherLightningIllumination.clear();
             }
         }
     }
@@ -385,7 +465,9 @@ public final class ClientWeatherCoordinator {
     public static void clearAll() {
         synchronized (UPDATE_LOCK) {
             activeState = null;
+            cachedFrameVisual = null;
             SEQUENCE_WATERMARKS.clear();
+            WeatherLightningIllumination.clear();
         }
     }
 
@@ -397,11 +479,8 @@ public final class ClientWeatherCoordinator {
             return WeatherSample.CLEAR;
         }
 
-        double amount = state.progress(System.nanoTime());
-        if (amount >= 1.0D) {
-            return state.current().sample(blockX, blockZ);
-        }
-        return WeatherSnapshot.interpolateSamples(
+        double amount = state.timelineAmount(System.nanoTime());
+        return ClientWeatherTimeline.sample(
                 state.previous().sample(blockX, blockZ),
                 state.current().sample(blockX, blockZ),
                 amount
@@ -472,19 +551,12 @@ public final class ClientWeatherCoordinator {
                     next.dimension(),
                     next.dataVersion(),
                     next.sequence(),
+                    next.serverTick(),
                     next.cellSize(),
                     Map.of()
             );
         }
         return state.displayedSnapshot(now);
-    }
-
-    private static double clamp01(double value) {
-        return Math.max(0.0D, Math.min(1.0D, value));
-    }
-
-    private static double lerp(double from, double to, double amount) {
-        return from + (to - from) * clamp01(amount);
     }
 
     private static PrecipitationType precipitationTypeForTemperature(double temperature) {
@@ -497,18 +569,29 @@ public final class ClientWeatherCoordinator {
             WeatherSnapshot previous,
             WeatherSnapshot current,
             long transitionStartNanos,
+            long acceptedAtNanos,
+            long transitionDurationNanos,
             WindSettings windSettings
     ) {
         private State {
             windSettings = windSettings == null ? WindSettings.DISABLED : windSettings;
         }
 
-        double progress(long now) {
-            return clamp01((double) (now - transitionStartNanos) / TRANSITION_NANOS);
+        double timelineAmount(long now) {
+            return ClientWeatherTimeline.amount(now, transitionStartNanos, transitionDurationNanos);
         }
 
         WeatherSnapshot displayedSnapshot(long now) {
-            return WeatherSnapshot.blend(previous, current, progress(now));
+            return WeatherSnapshot.timeline(previous, current, timelineAmount(now));
+        }
+
+        double estimatedServerTick(long now) {
+            long fromTick = previous.serverTick();
+            long toTick = current.serverTick();
+            if (toTick <= fromTick) {
+                return toTick;
+            }
+            return fromTick + (toTick - fromTick) * timelineAmount(now);
         }
     }
 
@@ -516,9 +599,16 @@ public final class ClientWeatherCoordinator {
     public record ClientStateView(
             ResourceLocation dimension,
             long sequence,
+            long serverTick,
             int cellSize,
             int cellCount,
-            double interpolationProgress
+            double interpolationProgress,
+            double extrapolationAmount,
+            double snapshotAgeSeconds,
+            double estimatedServerTick
     ) {
+    }
+
+    private record FrameVisual(ClientLevel level, long frameIndex, WeatherVisualState state) {
     }
 }

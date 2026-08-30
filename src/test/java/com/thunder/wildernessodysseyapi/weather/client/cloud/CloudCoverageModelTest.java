@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CloudCoverageModelTest {
 
     @Test
-    void precipitationGuaranteesAnOccupiedCloudVoxel() {
+    void precipitationGuaranteesOccupiedCloudCoverage() {
         CloudFieldSample raining = field(0.03, 2.0E-4, 0.05, 0.10, 1.0);
 
         int[][] tiles = {
@@ -36,7 +36,7 @@ class CloudCoverageModelTest {
     }
 
     @Test
-    void rainAndConvectionIncreaseBlockyThicknessAndDarkness() {
+    void rainAndConvectionIncreaseCoarseDepthAndDarkness() {
         CloudFieldSample fairWeather = field(0.25, 0.0, 0.05, 0.10, 1.0);
         CloudFieldSample rain = field(0.65, 0.20, 0.20, 0.20, 1.0);
         CloudFieldSample severeStorm = field(0.95, 0.60, 0.90, 0.85, 1.0);
@@ -59,6 +59,19 @@ class CloudCoverageModelTest {
         assertTrue(first >= 0.0 && first <= 1.0);
         assertTrue(shifted >= 0.0 && shifted <= 1.0);
         assertTrue(Math.abs(first - shifted) > 1.0E-12);
+    }
+
+    @Test
+    void advancingWindOffsetMovesTheSameFeatureDownwind() {
+        double first = CloudCoverageModel.morphologyNoise(27, -14, 8.25, -3.5);
+        double oneTileDownwind = CloudCoverageModel.morphologyNoise(
+                28,
+                -14,
+                8.25 + CloudCoverageModel.CLOUD_TILE_SIZE,
+                -3.5
+        );
+
+        assertEquals(first, oneTileDownwind, 1.0E-12);
     }
 
     @Test
