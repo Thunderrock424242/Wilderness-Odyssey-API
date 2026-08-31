@@ -25,7 +25,7 @@ public final class WaterGpuTimer {
     }
 
     public static void end() {
-        timer().end();
+        timer.end();
     }
 
     public static long latestNanos() {
