@@ -31,7 +31,7 @@ final class OpenGlGpuTimer implements RenderBackend.GpuTimer {
     private long activeSourceFrame = -1L;
     private long nextSequence = 1L;
     private long latestNanos;
-    private GpuTimingSample pendingSample;
+    private RenderBackend.GpuTimingSample pendingSample;
     private boolean available = true;
     private boolean closed;
 
@@ -108,13 +108,13 @@ final class OpenGlGpuTimer implements RenderBackend.GpuTimer {
     }
 
     @Override
-    public Optional<GpuTimingSample> poll() {
+    public Optional<RenderBackend.GpuTimingSample> poll() {
         try {
             pollCompleted();
         } catch (RuntimeException failure) {
             available = false;
         }
-        GpuTimingSample sample = pendingSample;
+        RenderBackend.GpuTimingSample sample = pendingSample;
         pendingSample = null;
         return Optional.ofNullable(sample);
     }
@@ -165,7 +165,7 @@ final class OpenGlGpuTimer implements RenderBackend.GpuTimer {
             long end = queryResult(endQueries[index]);
             if (end >= start) {
                 latestNanos = end - start;
-                GpuTimingSample completed = new GpuTimingSample(
+                RenderBackend.GpuTimingSample completed = new RenderBackend.GpuTimingSample(
                         submissionSequences[index],
                         sourceFrames[index],
                         latestNanos
