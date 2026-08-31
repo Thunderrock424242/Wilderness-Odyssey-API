@@ -49,101 +49,6 @@ public class SPHSimulationManager {
 
     private SPHSimulationManager() {}
 
-    /**
-     * Initializes a new fluid simulation at the designated coordinates.
-     *
-     * @param x      The starting world X coordinate (usually a bucket click location).
-     * @param y      The starting world Y coordinate.
-     * @param z      The starting world Z coordinate.
-     * @param level  The Minecraft block getter, used to calculate collisions.
-     * @param placer The callback function used to generate physical fluid blocks once the water stops moving.
-     * @return The newly created simulator instance.
-     */
-    public SPHSimulator createSimulation(float x, float y, float z, BlockGetter level, SettleBlockPlacer placer) {
-        return createSimulationResult(x, y, z, level, placer,
-                SPHConstants.PARTICLES_PER_BUCKET, 0.0f, 0.0f, 0.0f).simulator();
-    }
-
-    public SPHSimulator createSimulation(float x, float y, float z, BlockGetter level, SettleBlockPlacer placer,
-                                         int requestedCount, float impulseX, float impulseY, float impulseZ) {
-        return createSimulationResult(x, y, z, level, placer,
-                requestedCount, impulseX, impulseY, impulseZ).simulator();
-    }
-
-    /**
-     * Creates water for a successful vanilla bucket placement and reports
-     * whether SPH took ownership of the temporary vanilla source block.
-     *
-     * <p>Under extreme body-budget pressure, the bucket remains canonical at
-     * its placement position instead of being deleted into an invisible body.</p>
-     */
-    public BucketPlacementResult createBucketSimulation(
-            float x,
-            float y,
-            float z,
-            BlockGetter level,
-            SettleBlockPlacer placer
-    ) {
-        return createSimulationResult(x, y, z, level, placer,
-                SPHConstants.PARTICLES_PER_BUCKET, 0.0f, 0.0f, 0.0f);
-    }
-
-    private BucketPlacementResult createSimulationResult(
-            float x,
-            float y,
-            float z,
-            BlockGetter level,
-            SettleBlockPlacer placer,
-            int requestedCount,
-            float impulseX,
-            float impulseY,
-            float impulseZ
-    ) {
-        runPendingSettleCallbacks(level);
-        removeEmptySimulations();
-
-        SPHSimulator existing = findMergeTarget(x, y, z, level, SPHConstants.MERGE_RADIUS);
-        if (existing != null) {
-            existing.spawnPulse(x, y, z, requestedCount, impulseX, impulseY, impulseZ);
-            existing.addCanonicalVolumeUnits(WaterVolumeChunk.UNITS_PER_BLOCK);
-            return new BucketPlacementResult(existing, true);
-        }
-
-        if (countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
-            SPHSimulator overloaded = findMergeTarget(x, y, z, level, SPHConstants.OVERLOAD_MERGE_RADIUS);
-            if (overloaded == null) {
-                boolean madeRoom = removeFirstSettledSimulation(level);
-                overloaded = madeRoom ? null : findClosestReusable(x, y, z, level);
-            }
-
-            if (overloaded != null) {
-                overloaded.spawnPulse(x, y, z, Math.min(requestedCount, SPHConstants.OVERLOAD_PARTICLES_PER_BUCKET),
-                        impulseX, impulseY, impulseZ);
-                overloaded.addCanonicalVolumeUnits(WaterVolumeChunk.UNITS_PER_BLOCK);
-                return new BucketPlacementResult(overloaded, true);
-            }
-
-            if (countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
-                SPHSimulator closest = findClosestSimulation(x, y, z, level);
-                if (level instanceof ServerLevel serverLevel) {
-                    CanonicalWater.placeBucket(serverLevel, BlockPos.containing(x, y, z));
-                }
-                return new BucketPlacementResult(
-                        closest != null ? closest : new SPHSimulator(level),
-                        false
-                );
-            }
-        }
-
-        SPHSimulator sim = new SPHSimulator(level);
-        sim.addCanonicalVolumeUnits(WaterVolumeChunk.UNITS_PER_BLOCK);
-        configureSettlement(sim, level, placer);
-
-        sim.spawnPulse(x, y, z, requestedCount, impulseX, impulseY, impulseZ);
-        active.add(sim);
-        return new BucketPlacementResult(sim, true);
-    }
-
     public SPHSimulator createTransientSimulation(float x, float y, float z, BlockGetter level,
                                                   int requestedCount, float impulseX, float impulseY, float impulseZ,
                                                   int lifetimeTicks) {
@@ -233,29 +138,6 @@ public class SPHSimulationManager {
                 impulseZ,
                 lifetimeTicks,
                 WaterRenderingConfig.maxLocalSphEffects()
-        );
-    }
-
-    /**
-     * Spawns a visual splash for bucket placement after canonical Wilderness
-     * water already owns the real volume at the placed block.
-     *
-     * <p>Bucket water must persist as canonical chunk volume immediately so a
-     * failed or culled SPH body cannot make the player's placed water vanish.
-     * This transient body is intentionally cosmetic and is never saved as
-     * persistent volume.</p>
-     */
-    public SPHSimulator createBucketSplash(float x, float y, float z, BlockGetter level) {
-        return createTransientSimulation(
-                x,
-                y,
-                z,
-                level,
-                SPHConstants.BUCKET_SPLASH_PARTICLES,
-                0.0f,
-                0.0f,
-                0.0f,
-                SPHConstants.BUCKET_SPLASH_LIFETIME_TICKS
         );
     }
 
@@ -350,40 +232,6 @@ public class SPHSimulationManager {
             }
         }
 
-        return best;
-    }
-
-    private SPHSimulator findClosestReusable(float x, float y, float z, BlockGetter level) {
-        SPHSimulator best = null;
-        float bestDistance2 = Float.MAX_VALUE;
-        for (SPHSimulator sim : active) {
-            if (sim.isTransientSimulation() || sim.getLevel() != level || !sim.hasCapacity()) {
-                continue;
-            }
-
-            float distance2 = sim.distanceSquaredTo(x, y, z);
-            if (distance2 < bestDistance2) {
-                bestDistance2 = distance2;
-                best = sim;
-            }
-        }
-        return best;
-    }
-
-    private SPHSimulator findClosestSimulation(float x, float y, float z, BlockGetter level) {
-        SPHSimulator best = null;
-        float bestDistance2 = Float.MAX_VALUE;
-        for (SPHSimulator sim : active) {
-            if (sim.isTransientSimulation() || sim.getLevel() != level) {
-                continue;
-            }
-
-            float distance2 = sim.distanceSquaredTo(x, y, z);
-            if (distance2 < bestDistance2) {
-                bestDistance2 = distance2;
-                best = sim;
-            }
-        }
         return best;
     }
 
@@ -829,10 +677,10 @@ public class SPHSimulationManager {
     }
 
     private static int particleCountForVolume(int volumeUnits) {
-        float bucketFraction = volumeUnits / (float) WaterVolumeChunk.UNITS_PER_BLOCK;
+        float fullBlockFraction = volumeUnits / (float) WaterVolumeChunk.UNITS_PER_BLOCK;
         return Math.max(8, Math.min(
-                SPHConstants.PARTICLES_PER_BUCKET,
-                Math.round(SPHConstants.PARTICLES_PER_BUCKET * bucketFraction)
+                SPHConstants.PARTICLES_PER_FULL_BLOCK,
+                Math.round(SPHConstants.PARTICLES_PER_FULL_BLOCK * fullBlockFraction)
         ));
     }
 
@@ -995,10 +843,6 @@ public class SPHSimulationManager {
             List<SPHParticle> particles,
             SettleBlockPlacer fallbackPlacer
     ) {
-    }
-
-    /** Result of transferring a successful vanilla bucket placement to the replacement system. */
-    public record BucketPlacementResult(SPHSimulator simulator, boolean sphOwnsVolume) {
     }
 
     /**

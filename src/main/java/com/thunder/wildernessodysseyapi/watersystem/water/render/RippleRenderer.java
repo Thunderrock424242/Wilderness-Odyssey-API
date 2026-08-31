@@ -27,13 +27,19 @@ import java.util.*;
  */
 public class RippleRenderer {
 
-    private static final float MAX_RADIUS = 1.8f;
+    private static final float MIN_MAX_RADIUS = 0.75f;
+    private static final float MAX_MAX_RADIUS = 2.60f;
     private static final int LIFETIME_TICKS = 30;
     private static final float FADE_START = 0.6f;     // fraction of life when fading begins
 
     private static final List<Ripple> activeRipples = new ArrayList<>();
 
     public static void spawnRipple(double x, double y, double z) {
+        spawnRipple(x, y, z, 0.55f);
+    }
+
+    /** Adds one impact-scaled ring while retaining the configured hard cap. */
+    public static void spawnRipple(double x, double y, double z, float impactStrength) {
         var level = Minecraft.getInstance().level;
         if (!WaterRenderingConfig.ENABLE_RIPPLES.get()
                 || level == null
@@ -50,7 +56,15 @@ public class RippleRenderer {
             activeRipples.remove(0);
         }
 
-        activeRipples.add(new Ripple(x, y, z, level.getGameTime()));
+        float strength = Math.max(0.0f, Math.min(1.0f, impactStrength));
+        activeRipples.add(new Ripple(
+                x,
+                y,
+                z,
+                level.getGameTime(),
+                MIN_MAX_RADIUS + (MAX_MAX_RADIUS - MIN_MAX_RADIUS) * strength,
+                0.28f + strength * 0.38f
+        ));
     }
 
     public static void onRenderLevel(RenderLevelStageEvent event) {
@@ -87,10 +101,10 @@ public class RippleRenderer {
         for (Ripple ripple : activeRipples) {
             float life = Math.max(0.0f, Math.min(1.0f,
                     (sampleTick - ripple.startTick) / LIFETIME_TICKS));
-            float radius = 0.1f + (MAX_RADIUS - 0.1f) * life;
+            float radius = 0.1f + (ripple.maximumRadius - 0.1f) * life;
             float alpha = life < FADE_START
-                    ? 0.6f
-                    : 0.6f * (1f - (life - FADE_START) / (1f - FADE_START));
+                    ? ripple.maximumAlpha
+                    : ripple.maximumAlpha * (1f - (life - FADE_START) / (1f - FADE_START));
 
             int alphaByte = (int)(alpha * 255);
             if (alphaByte < 4) continue;
@@ -153,12 +167,23 @@ public class RippleRenderer {
     private static class Ripple {
         final double x, y, z;
         final long startTick;
+        final float maximumRadius;
+        final float maximumAlpha;
 
-        Ripple(double x, double y, double z, long startTick) {
+        Ripple(
+                double x,
+                double y,
+                double z,
+                long startTick,
+                float maximumRadius,
+                float maximumAlpha
+        ) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.startTick = startTick;
+            this.maximumRadius = maximumRadius;
+            this.maximumAlpha = maximumAlpha;
         }
     }
 }

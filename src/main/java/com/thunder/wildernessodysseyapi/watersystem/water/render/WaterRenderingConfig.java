@@ -111,7 +111,7 @@ public final class WaterRenderingConfig {
                 .comment("Use the built-in Fresnel/absorption water shader when no external shader pack owns water rendering.")
                 .define("enableWaterCoreShader", true);
         ENABLE_SCREEN_SPACE_REFLECTIONS = builder
-                .comment("Allow bounded screen-space reflections on HIGH and CINEMATIC water quality. Missing screen data always falls back to environment reflection.")
+                .comment("Allow bounded screen-space reflections on MEDIUM, HIGH, and CINEMATIC water quality. Missing screen data always falls back to environment reflection.")
                 .define("enableScreenSpaceReflections", true);
         ENABLE_UNDERWATER_OPTICS = builder
                 .comment("Use canonical volume and the animated surface for underwater fog and camera immersion.")
@@ -208,7 +208,7 @@ public final class WaterRenderingConfig {
                 .comment("Splash particles spawned when an entity enters water.")
                 .defineInRange("splashParticles", 8, 0, 64);
         NORMAL_WAVE_TRAINS = builder
-                .comment("Maximum Gerstner wave trains evaluated per water vertex.")
+                .comment("Legacy wave-train preference retained for config compatibility. The animated surface now evaluates the complete authored spectrum so rendering, immersion, and server boat physics cannot disagree.")
                 .defineInRange("waveTrains", 4, 1, 4);
         NORMAL_OCEAN_RENDER_DISTANCE_BLOCKS = builder
                 .comment("Radius of the per-frame ocean surface around the camera.")
@@ -248,7 +248,7 @@ public final class WaterRenderingConfig {
                 .comment("Splash particles spawned when an entity enters water.")
                 .defineInRange("splashParticles", 4, 0, 64);
         OPTIMIZED_WAVE_TRAINS = builder
-                .comment("Maximum Gerstner wave trains evaluated per water vertex.")
+                .comment("Legacy wave-train preference retained for config compatibility. Renderer optimization changes mesh and optical budgets, not the authoritative wave height.")
                 .defineInRange("waveTrains", 2, 1, 4);
         OPTIMIZED_OCEAN_RENDER_DISTANCE_BLOCKS = builder
                 .comment("Radius of the per-frame ocean surface around the camera.")
@@ -369,7 +369,8 @@ public final class WaterRenderingConfig {
             return 0;
         }
         return switch (quality) {
-            case LOW, MEDIUM -> 0;
+            case LOW -> 0;
+            case MEDIUM -> optimizedProfile ? 4 : 6;
             case HIGH -> optimizedProfile ? 8 : 12;
             case CINEMATIC -> optimizedProfile ? 14 : 20;
         };
@@ -385,10 +386,21 @@ public final class WaterRenderingConfig {
             boolean optimizedProfile
     ) {
         return switch (quality) {
-            case LOW, MEDIUM -> 0.0f;
+            case LOW -> 0.0f;
+            case MEDIUM -> optimizedProfile ? 16.0f : 20.0f;
             case HIGH -> optimizedProfile ? 28.0f : 32.0f;
             case CINEMATIC -> optimizedProfile ? 48.0f : 56.0f;
         };
+    }
+
+    /** Describes the effective built-in reflection budget for F3 diagnostics. */
+    public static String reflectionProfileName() {
+        int steps = screenSpaceReflectionSteps();
+        if (steps <= 0) {
+            return "environment only";
+        }
+        return "SSR " + steps + " steps / "
+                + Math.round(screenSpaceReflectionDistance()) + " blocks";
     }
 
     /** Returns the quality-scaled refraction distortion multiplier. */
@@ -556,7 +568,11 @@ public final class WaterRenderingConfig {
         int configured = usesOptimizedProfile()
                 ? OPTIMIZED_SPLASH_PARTICLES.get()
                 : NORMAL_SPLASH_PARTICLES.get();
-        return waterQuality().splashParticles(configured);
+        return splashParticleBudget(waterQuality(), configured);
+    }
+
+    static int splashParticleBudget(WaterQuality quality, int configured) {
+        return quality.splashParticles(configured);
     }
 
     /** Returns the hard per-emission budget for ambient water particles. */
@@ -609,21 +625,26 @@ public final class WaterRenderingConfig {
         };
     }
 
-    /** Returns the wave-component limit for a classified water body. */
+    /**
+     * Returns the complete authored wave count for a classified water body.
+     *
+     * <p>Wave height is gameplay-visible state: server buoyancy, client
+     * immersion, the replacement mesh, and boat presentation must evaluate the
+     * same components. Quality profiles therefore reduce mesh and optical work
+     * but never remove displacement components from the visible surface.</p>
+     */
     public static int waveTrainLimit(WaterBodyClassifier.WaterType type) {
-        int requested = usesOptimizedProfile()
-                ? OPTIMIZED_WAVE_TRAINS.get()
-                : NORMAL_WAVE_TRAINS.get();
-        requested = Math.min(requested, waterQuality().maxWaveTrains());
+        return authoritativeWaveTrainCount(type);
+    }
 
-        int profileMaximum = switch (type) {
+    static int authoritativeWaveTrainCount(WaterBodyClassifier.WaterType type) {
+        return switch (type) {
             case OCEAN -> 4;
             case RIVER -> 3;
             case POND -> 2;
             case COAST -> 4;
             case LAKE -> 3;
         };
-        return Math.max(1, Math.min(requested, profileMaximum));
     }
 
     /** Returns the active per-frame ocean radius in blocks. */
@@ -741,14 +762,13 @@ public final class WaterRenderingConfig {
      * full-ocean SPH, unbounded patch rebuilds, or heavy distant water meshes.</p>
      */
     public enum WaterQuality {
-        LOW(false, SphLocalEffectQuality.OFF, 1, 0, 8, 0, 0, 0, 3, 48, 64, 2500, 12, 160, 0.55f),
-        MEDIUM(false, SphLocalEffectQuality.OFF, 2, 16, 12, 4, 0, 0, 2, 80, 112, 6000, 18, 450, 0.80f),
-        HIGH(true, SphLocalEffectQuality.HIGH, 3, 48, 24, 8, 12, 128, 1, 128, 160, 12000, 32, 900, 1.00f),
-        CINEMATIC(true, SphLocalEffectQuality.CINEMATIC, 4, 96, 32, 12, 18, 192, 1, 192, 224, 18000, 48, 1400, 1.15f);
+        LOW(false, SphLocalEffectQuality.OFF, 8, 8, 3, 0, 0, 3, 48, 64, 2500, 12, 160, 0.55f),
+        MEDIUM(false, SphLocalEffectQuality.OFF, 16, 12, 4, 0, 0, 2, 80, 112, 6000, 18, 450, 0.80f),
+        HIGH(true, SphLocalEffectQuality.HIGH, 48, 24, 8, 12, 128, 1, 128, 160, 12000, 32, 900, 1.00f),
+        CINEMATIC(true, SphLocalEffectQuality.CINEMATIC, 96, 32, 12, 18, 192, 1, 192, 224, 18000, 48, 1400, 1.15f);
 
         private final boolean localSph;
         private final SphLocalEffectQuality maxSphQuality;
-        private final int maxWaveTrains;
         private final int maxRipples;
         private final int maxRippleSegments;
         private final int maxSplashParticles;
@@ -765,7 +785,6 @@ public final class WaterRenderingConfig {
         WaterQuality(
                 boolean localSph,
                 SphLocalEffectQuality maxSphQuality,
-                int maxWaveTrains,
                 int maxRipples,
                 int maxRippleSegments,
                 int maxSplashParticles,
@@ -781,7 +800,6 @@ public final class WaterRenderingConfig {
         ) {
             this.localSph = localSph;
             this.maxSphQuality = maxSphQuality;
-            this.maxWaveTrains = maxWaveTrains;
             this.maxRipples = maxRipples;
             this.maxRippleSegments = maxRippleSegments;
             this.maxSplashParticles = maxSplashParticles;
@@ -805,10 +823,6 @@ public final class WaterRenderingConfig {
                 return SphLocalEffectQuality.OFF;
             }
             return configured.ordinal() > maxSphQuality.ordinal() ? maxSphQuality : configured;
-        }
-
-        private int maxWaveTrains() {
-            return maxWaveTrains;
         }
 
         private int maxRipples(int configured) {

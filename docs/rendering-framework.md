@@ -51,10 +51,20 @@ The systems were already modular but had several cross-cutting leaks:
 
 ### Backend and capabilities
 
-`RenderBackend` exposes only cached capabilities, Minecraft shader validation, and an
-asynchronous GPU timer factory. `OpenGlRenderBackend` is today's adapter.
+`RenderBackend` exposes only cached capabilities, Minecraft shader validation,
+scoped state restoration, and an asynchronous GPU timer factory.
+`OpenGlRenderBackend` is today's adapter. Timers publish one newly completed
+sample at most once and retain the logical source-frame number so diagnostics do
+not mistake a stale query result for current work.
 `RenderBackends.install(...)` is the handoff for a future Minecraft-supported
 backend adapter; water and weather must not choose a backend themselves.
+
+`RenderBackends` atomically publishes the adapter, a monotonically increasing
+context generation, and discovery/lifecycle status. Adapter replacement,
+explicit release, and context-reset paths close backend-owned resources while
+the graphics context is still valid. OpenGL discovery failures remain
+fail-soft, but their bounded retry state is now visible to diagnostics instead
+of being indistinguishable from a context that has not been discovered yet.
 
 `GPUCapabilities` keeps vendor, renderer, version, and memory-provider evidence
 for diagnostics. Policy uses features such as framebuffer blits, depth textures,
@@ -73,6 +83,13 @@ frame start and completes its CPU timing at frame end. It samples one
 camera-local `EnvironmentState` from the existing synchronized weather and wind
 owners. The state includes rain, snow, storm energy, wind speed/direction,
 wetness, frozen fraction, temperature, humidity, and lightning activity.
+
+The same frame captures one backend adapter and generation for every render-time
+consumer. A non-blocking backend timer spans the NeoForge pre/post frame events
+while a client level is active; completed GPU samples may arrive several frames
+later and retain their source-frame identity. GPU timing is diagnostic for now;
+adaptive quality continues to use its existing smoothed CPU policy until the
+cross-device GPU signal has live validation.
 
 This state is presentation-only. It never ticks weather, mutates water, scans
 blocks, loads chunks, or becomes gameplay authority. `WaterEnvironmentState`
@@ -129,7 +146,8 @@ usable today.
 - core-versus-ARB timer-query selection;
 - static feature/limit discovery; and
 - native shader-program link validation; and
-- the depth/blend state snapshot restored by the fullscreen underwater pass.
+- the scoped depth/blend state, exact blend factors, and shader color restored
+  by the fullscreen underwater pass.
 
 ### Kept in place for now
 
@@ -146,9 +164,13 @@ usable today.
 
 ### Still OpenGL-specific and a future backend-adapter candidate
 
+- the `rendering.backend.opengl` and `gpuprofiler.client` packages are now
+  deprecated for removal. They remain compiled only because Minecraft 1.21.1
+  still requires the OpenGL compatibility path;
 - `WaterSceneCapture` reads framebuffer bindings and blits color/depth using
-  OpenGL IDs. It is guarded by backend capabilities but remains the main water
-  path that a future render-graph/attachment API must replace.
+  OpenGL IDs. The class is deprecated for removal, guarded by backend
+  capabilities, and remains the main water path that a future
+  render-graph/attachment API must replace.
 - the water shader samplers consume integer texture IDs from that capture.
 - `GpuMemoryProbe` and the opt-in `GpuDiagnostics` profiler use OpenGL extensions
   and debug callbacks. They are diagnostics, not water/weather render policy,
@@ -183,12 +205,19 @@ user's shader-pack archive. Risks that still require live compatibility tests:
   once per render frame for all water/cloud consumers;
 - environmental state is one constant-time camera sample per frame;
 - adaptive weather settings allocate only on config reload;
-- GPU timestamps remain asynchronous and never wait for an unfinished query;
+- GPU timestamps remain asynchronous, carry source-frame identity, and never
+  wait for an unfinished query;
+- backend-created timers are closed on owner teardown or adapter replacement;
 - controller state is bounded and changes one tier at a time; and
 - existing mesh caches, hard caps, rebuild budgets, deterministic sampling, and
   no-chunk-load rules remain intact.
 
 ## Future Vulkan adapter work
+
+The concrete OpenGL backend, scene-copy path, profiler implementation, and
+OpenGL instrumentation mixins are legacy compatibility code. Their removal
+criteria and replacement owners are tracked in
+[`rendering-vulkan-migration.md`](rendering-vulkan-migration.md).
 
 When Minecraft exposes the relevant supported renderer hooks:
 
@@ -198,7 +227,9 @@ When Minecraft exposes the relevant supported renderer hooks:
 3. supply typed backend image handles rather than leaking native resources into
    water/weather code;
 4. keep shader/resource creation in Minecraft's supported API; and
-5. retain OpenGL as a graceful backend while it remains supported.
+5. remove the deprecated OpenGL compatibility packages and mixins from the
+   Vulkan-targeted release once its supported replacements pass the migration
+   gates.
 
 No water/weather simulation, mesh ownership, or environment model should need
 to change for those steps.

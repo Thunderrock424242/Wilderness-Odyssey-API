@@ -54,17 +54,29 @@ public final class WaterSurfaceDisplacement {
      * ring. No network data is sent because this is a cosmetic client layer.</p>
      */
     public static void spawnImpact(Entity entity, double x, double z) {
+        Vec3 velocity = entity.getDeltaMovement();
+        float speed = (float) velocity.length();
+        spawnImpact(entity, x, z, clamp(0.10f + speed * 1.8f, 0.10f, 1.0f));
+    }
+
+    /** Adds an impact using pre-contact energy retained by the entry handler. */
+    public static void spawnImpact(Entity entity, double x, double z, float impactStrength) {
         Level level = entity.level();
         if (!shouldRecord(level)) {
             return;
         }
 
-        Vec3 velocity = entity.getDeltaMovement();
-        float speed = (float) velocity.length();
-        float radius = Math.max(1.0f, entity.getBbWidth() * 2.0f);
-        float amplitude = clamp(0.035f + speed * 0.045f + entity.getBbHeight() * 0.008f,
-                0.035f,
-                0.14f);
+        float strength = clamp(impactStrength, 0.0f, 1.0f);
+        float radius = clamp(
+                entity.getBbWidth() * (1.30f + strength * 0.90f),
+                0.70f,
+                3.20f
+        );
+        float amplitude = clamp(
+                0.025f + strength * 0.115f + entity.getBbHeight() * 0.004f,
+                0.025f,
+                0.16f
+        );
         add(level, x, z, amplitude, radius, IMPACT_LIFETIME_TICKS, DisturbanceKind.IMPACT);
     }
 

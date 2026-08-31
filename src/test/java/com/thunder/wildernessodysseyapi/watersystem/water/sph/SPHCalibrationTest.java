@@ -7,13 +7,13 @@ import java.util.Random;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Locks the bucket-scale density calibration and bounded contact correction. */
+/** Locks full-block density calibration and bounded contact correction. */
 class SPHCalibrationTest {
 
     @Test
-    void configuredBucketProducesUsefulPressureDensity() {
-        int count = SPHConstants.PARTICLES_PER_BUCKET;
-        float[][] positions = deterministicBucketPositions(count, 0x5EEDL);
+    void configuredFullBlockProducesUsefulPressureDensity() {
+        int count = SPHConstants.PARTICLES_PER_FULL_BLOCK;
+        float[][] positions = deterministicFullBlockPositions(count, 0x5EEDL);
         float totalDensity = 0.0f;
         int positivePressureParticles = 0;
 
@@ -61,7 +61,7 @@ class SPHCalibrationTest {
                 SPHEquationOfState.groundAssistFactor(1_200.0f, Float.NaN), 1.0e-6f);
     }
 
-    private static float[][] deterministicBucketPositions(int count, long seed) {
+    private static float[][] deterministicFullBlockPositions(int count, long seed) {
         Random random = new Random(seed);
         float[][] positions = new float[count][3];
         float radius = SPHConstants.SPAWN_RADIUS;

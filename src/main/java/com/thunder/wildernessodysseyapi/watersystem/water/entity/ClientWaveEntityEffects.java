@@ -38,6 +38,9 @@ import net.neoforged.neoforge.event.tick.EntityTickEvent;
 public final class ClientWaveEntityEffects {
 
     private static final float TICKS_PER_SECOND = 20.0f;
+    private static final float MAX_BOAT_PITCH_DEGREES = 16.0f;
+    private static final float MAX_BOAT_ROLL_DEGREES = 14.0f;
+    private static final float MAX_BOAT_BOB_BLOCKS = 0.38f;
 
     private ClientWaveEntityEffects() {
     }
@@ -139,8 +142,16 @@ public final class ClientWaveEntityEffects {
         float leftHeight = (bowPortHeight + sternPortHeight) * 0.5f;
         float forwardSlope = (frontHeight - backHeight) / hullLength;
         float rightSlope = (rightHeight - leftHeight) / hullWidth;
-        float pitch = clamp((float) Math.toDegrees(Math.atan(forwardSlope)), -25.0f, 25.0f);
-        float roll = clamp((float) Math.toDegrees(Math.atan(rightSlope)), -20.0f, 20.0f);
+        float pitch = clamp(
+                (float) Math.toDegrees(Math.atan(forwardSlope)),
+                -MAX_BOAT_PITCH_DEGREES,
+                MAX_BOAT_PITCH_DEGREES
+        );
+        float roll = clamp(
+                (float) Math.toDegrees(Math.atan(rightSlope)),
+                -MAX_BOAT_ROLL_DEGREES,
+                MAX_BOAT_ROLL_DEGREES
+        );
         float averageHullHeight = (
                 bowPortHeight
                         + bowStarboardHeight
@@ -148,7 +159,11 @@ public final class ClientWaveEntityEffects {
                         + sternStarboardHeight
         ) * 0.25f;
         float bobTarget = centerHeight * 0.35f + averageHullHeight * 0.65f;
-        float bob = clamp(bobTarget * profile.boatBobStrength, -0.55f, 0.55f);
+        float bob = clamp(
+                bobTarget * profile.boatBobStrength,
+                -MAX_BOAT_BOB_BLOCKS,
+                MAX_BOAT_BOB_BLOCKS
+        );
         BoatTiltStore.set(boat.getId(), pitch, roll, bob);
     }
 

@@ -13,7 +13,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * <p>RenderSystem is the narrow common point where Minecraft and most mods submit
  * indexed OpenGL work. NeoForge does not expose an event around each draw, so a
  * mixin is required to pair asynchronous timestamp queries with the Java caller.</p>
+ *
+ * @deprecated The Vulkan-targeted profiler must time work through supported
+ * backend instrumentation rather than the OpenGL draw-elements entry point.
  */
+@Deprecated(forRemoval = true)
 @Mixin(RenderSystem.class)
 public abstract class RenderSystemGpuDiagnosticsMixin {
 

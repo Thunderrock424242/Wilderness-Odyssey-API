@@ -7,23 +7,42 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL33;
 
-/** Non-blocking timestamp-query ring owned entirely by the OpenGL adapter. */
+import java.util.Optional;
+import java.util.function.Consumer;
+
+/**
+ * Non-blocking timestamp-query ring owned entirely by the OpenGL adapter.
+ *
+ * @deprecated OpenGL query objects are unavailable on the planned Vulkan
+ * renderer. Future timing must be supplied by its {@link RenderBackend}.
+ */
+@Deprecated(forRemoval = true)
 final class OpenGlGpuTimer implements RenderBackend.GpuTimer {
 
     private final int[] startQueries;
     private final int[] endQueries;
     private final boolean[] inFlight;
+    private final long[] sourceFrames;
+    private final long[] submissionSequences;
     private final boolean coreQueries;
+    private final Consumer<OpenGlGpuTimer> closeListener;
     private int writeIndex;
     private int activeIndex = -1;
+    private long activeSourceFrame = -1L;
+    private long nextSequence = 1L;
     private long latestNanos;
+    private GpuTimingSample pendingSample;
     private boolean available = true;
+    private boolean closed;
 
-    OpenGlGpuTimer(int bufferedFrames) {
+    OpenGlGpuTimer(int bufferedFrames, Consumer<OpenGlGpuTimer> closeListener) {
         this.startQueries = new int[bufferedFrames];
         this.endQueries = new int[bufferedFrames];
         this.inFlight = new boolean[bufferedFrames];
+        this.sourceFrames = new long[bufferedFrames];
+        this.submissionSequences = new long[bufferedFrames];
         this.coreQueries = GL.getCapabilities().OpenGL33;
+        this.closeListener = closeListener;
     }
 
     @Override
@@ -33,6 +52,11 @@ final class OpenGlGpuTimer implements RenderBackend.GpuTimer {
 
     @Override
     public void begin() {
+        begin(-1L);
+    }
+
+    @Override
+    public void begin(long sourceFrame) {
         RenderSystem.assertOnRenderThread();
         if (!available) {
             return;
@@ -45,9 +69,11 @@ final class OpenGlGpuTimer implements RenderBackend.GpuTimer {
             }
             queryCounter(startQueries[writeIndex]);
             activeIndex = writeIndex;
+            activeSourceFrame = Math.max(-1L, sourceFrame);
         } catch (RuntimeException failure) {
             available = false;
             activeIndex = -1;
+            activeSourceFrame = -1L;
         }
     }
 
@@ -60,11 +86,14 @@ final class OpenGlGpuTimer implements RenderBackend.GpuTimer {
         try {
             queryCounter(endQueries[activeIndex]);
             inFlight[activeIndex] = true;
+            sourceFrames[activeIndex] = activeSourceFrame;
+            submissionSequences[activeIndex] = nextSequence++;
             writeIndex = (activeIndex + 1) % inFlight.length;
         } catch (RuntimeException failure) {
             available = false;
         } finally {
             activeIndex = -1;
+            activeSourceFrame = -1L;
         }
     }
 
@@ -79,19 +108,38 @@ final class OpenGlGpuTimer implements RenderBackend.GpuTimer {
     }
 
     @Override
+    public Optional<GpuTimingSample> poll() {
+        try {
+            pollCompleted();
+        } catch (RuntimeException failure) {
+            available = false;
+        }
+        GpuTimingSample sample = pendingSample;
+        pendingSample = null;
+        return Optional.ofNullable(sample);
+    }
+
+    @Override
     public void close() {
-        if (!RenderSystem.isOnRenderThread()) {
+        RenderSystem.assertOnRenderThread();
+        if (closed) {
             return;
         }
+        closed = true;
         activeIndex = -1;
+        activeSourceFrame = -1L;
         for (int index = 0; index < inFlight.length; index++) {
             delete(startQueries, index);
             delete(endQueries, index);
             inFlight[index] = false;
+            sourceFrames[index] = -1L;
+            submissionSequences[index] = 0L;
         }
         writeIndex = 0;
         latestNanos = 0L;
+        pendingSample = null;
         available = false;
+        closeListener.accept(this);
     }
 
     private void ensureQueries() {
@@ -117,8 +165,18 @@ final class OpenGlGpuTimer implements RenderBackend.GpuTimer {
             long end = queryResult(endQueries[index]);
             if (end >= start) {
                 latestNanos = end - start;
+                GpuTimingSample completed = new GpuTimingSample(
+                        submissionSequences[index],
+                        sourceFrames[index],
+                        latestNanos
+                );
+                if (pendingSample == null || completed.sequence() > pendingSample.sequence()) {
+                    pendingSample = completed;
+                }
             }
             inFlight[index] = false;
+            sourceFrames[index] = -1L;
+            submissionSequences[index] = 0L;
         }
     }
 

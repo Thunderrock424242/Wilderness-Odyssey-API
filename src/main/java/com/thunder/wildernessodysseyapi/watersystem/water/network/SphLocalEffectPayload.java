@@ -25,7 +25,7 @@ import java.util.WeakHashMap;
  * particle request, and lifetime. Each receiving client applies its own SPH
  * quality settings and simulates the short-lived visual body locally. This keeps
  * SPH out of permanent water storage and avoids particle-by-particle network
- * traffic for splashes, shore wash, and bucket effects.</p>
+ * traffic for bounded shoreline wash.</p>
  */
 public record SphLocalEffectPayload(
         int effectType,
@@ -39,7 +39,8 @@ public record SphLocalEffectPayload(
         int requestedLifetimeTicks
 ) implements CustomPacketPayload {
 
-    public static final int EFFECT_BUCKET_SPLASH = 0;
+    // Keep the existing wire value so a same-version rolling client never
+    // reinterprets a shoreline event as the removed bucket effect.
     public static final int EFFECT_SHORE_WASH = 1;
     public static final double TRACKING_DISTANCE = 64.0;
     private static final Map<ServerLevel, EventBudget> EVENT_BUDGETS =
@@ -62,21 +63,6 @@ public record SphLocalEffectPayload(
         impulseZ = finiteOrZero(impulseZ);
         requestedParticles = Math.max(0, Math.min(SPHConstants.MAX_PARTICLES, requestedParticles));
         requestedLifetimeTicks = Math.max(0, Math.min(200, requestedLifetimeTicks));
-    }
-
-    /** Creates the visual effect fired after a bucket becomes Wilderness water. */
-    public static SphLocalEffectPayload bucketSplash(float x, float y, float z) {
-        return new SphLocalEffectPayload(
-                EFFECT_BUCKET_SPLASH,
-                x,
-                y,
-                z,
-                0.0f,
-                0.0f,
-                0.0f,
-                SPHConstants.BUCKET_SPLASH_PARTICLES,
-                SPHConstants.BUCKET_SPLASH_LIFETIME_TICKS
-        );
     }
 
     /** Creates the visual wash effect fired by shore/tide events. */
@@ -124,6 +110,9 @@ public record SphLocalEffectPayload(
 
     /** Spawns the short-lived client-owned SPH body for this effect. */
     public void spawnClientEffect(net.minecraft.world.level.BlockGetter level) {
+        if (effectType != EFFECT_SHORE_WASH) {
+            return;
+        }
         if (level instanceof Level concreteLevel && !WildernessWaterRules.isEnabled(concreteLevel)) {
             return;
         }

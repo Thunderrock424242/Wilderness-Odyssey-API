@@ -82,7 +82,7 @@ class WaterSurfaceOpticsShaderContractTest {
         assertTrue(fragment.contains("distanceConfidence"));
         assertTrue(fragment.contains("screenEdgeConfidence(hitUv)"));
         assertTrue(fragment.contains("clamp(hitConfidence, 0.0, 1.0)"));
-        assertTrue(fragment.contains("fresnel > 0.024"));
+        assertTrue(fragment.contains("fresnel > 0.0205"));
         assertTrue(fragment.contains("-reconstructViewPosition"));
         assertFalse(fragment.contains("return vec4(texture(SceneColor, uv).rgb, 1.0)"),
                 "A raw binary SSR hit reintroduces edge popping and depth leaks");

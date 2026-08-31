@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.watersystem.water.network.SphLocalEffectPayload;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla.CanonicalWaterBucketTransactions;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
@@ -27,8 +26,8 @@ import javax.annotation.Nullable;
  * <p>Vanilla remains responsible for inventory, sounds, game events, and
  * permissions. Once placement succeeds, the temporary vanilla source is
  * immediately rewritten through {@link CanonicalWater} so the durable block is
- * the mod's namespaced Wilderness water. SPH is only a visual splash here; it
- * must not be the sole owner of player-placed bucket volume.</p>
+ * the mod's namespaced Wilderness water. Bucket placement never creates an SPH
+ * body; finite canonical flow owns the complete conserved bucket volume.</p>
  */
 @Mixin(BucketItem.class)
 public abstract class BucketPlaceMixin {
@@ -62,7 +61,7 @@ public abstract class BucketPlaceMixin {
     }
 
     /**
-     * Spawns authoritative SPH only after vanilla confirms that placement worked.
+     * Commits canonical Wilderness water after vanilla confirms placement.
      */
     @Inject(
             method = "emptyContents(Lnet/minecraft/world/entity/player/Player;"
@@ -95,20 +94,6 @@ public abstract class BucketPlaceMixin {
         // source to wildernessodysseyapi:wilderness_water_block for tag
         // compatibility and future bucket pickup.
         CanonicalWater.placeBucket(serverLevel, pos);
-
-        // SPH still gives the bucket a nice splash, but as a compact client
-        // event rather than a server-owned particle stream. The canonical cell
-        // above remains after the local particles expire.
-        float splashX = pos.getX() + 0.5f;
-        float splashY = pos.getY() + 0.65f;
-        float splashZ = pos.getZ() + 0.5f;
-        SphLocalEffectPayload.sendToNearby(
-                serverLevel,
-                splashX,
-                splashY,
-                splashZ,
-                SphLocalEffectPayload.bucketSplash(splashX, splashY, splashZ)
-        );
     }
 
     private static boolean isCanonicalBucketWater(Fluid fluid) {

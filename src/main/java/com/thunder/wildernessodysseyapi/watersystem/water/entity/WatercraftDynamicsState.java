@@ -18,7 +18,7 @@ import java.util.WeakHashMap;
 final class WatercraftDynamicsState {
 
     private static final double YAW_DAMPING = 0.86;
-    private static final double MAX_YAW_VELOCITY_DEGREES_PER_TICK = 1.6;
+    private static final double MAX_YAW_VELOCITY_DEGREES_PER_TICK = 0.6;
     private static final Map<Entity, State> STATES = new WeakHashMap<>();
 
     private WatercraftDynamicsState() {
@@ -62,9 +62,19 @@ final class WatercraftDynamicsState {
         return new Response(velocityDelta, state.yawVelocityDegreesPerTick);
     }
 
-    /** Removes stale momentum as soon as a craft is no longer water-supported. */
+    /**
+     * Marks a craft dry while retaining the observed transition for its next
+     * entry.
+     *
+     * <p>Deleting the state here made the next wet sample indistinguishable
+     * from a boat loaded while already floating. Retaining a zero fraction lets
+     * real dry-to-wet entries produce a bounded slam, while a newly observed
+     * already-wet boat starts without a false impulse.</p>
+     */
     static synchronized void leaveWater(Entity entity) {
-        STATES.remove(entity);
+        State state = STATES.computeIfAbsent(entity, ignored -> new State());
+        state.previousSubmergedFraction = 0.0;
+        state.yawVelocityDegreesPerTick = 0.0;
     }
 
     /** Clears all transient server state during shutdown or test teardown. */
@@ -97,7 +107,7 @@ final class WatercraftDynamicsState {
     }
 
     private static final class State {
-        private double previousSubmergedFraction;
+        private double previousSubmergedFraction = Double.NaN;
         private double yawVelocityDegreesPerTick;
     }
 }

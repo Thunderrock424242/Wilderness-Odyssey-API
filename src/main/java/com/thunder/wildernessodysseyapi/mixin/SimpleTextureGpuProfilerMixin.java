@@ -11,6 +11,13 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
+/**
+ * Attributes OpenGL simple-texture allocations to their Minecraft resources.
+ *
+ * @deprecated Replace with backend-neutral texture-allocation telemetry in the
+ * Vulkan-targeted version.
+ */
+@Deprecated(forRemoval = true)
 @Mixin(SimpleTexture.class)
 public abstract class SimpleTextureGpuProfilerMixin {
 

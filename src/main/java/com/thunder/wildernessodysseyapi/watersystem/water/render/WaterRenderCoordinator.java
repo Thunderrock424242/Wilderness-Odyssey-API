@@ -3,6 +3,9 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.rendering.RenderFrameContext;
+import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackend;
+import com.thunder.wildernessodysseyapi.rendering.client.WildernessRenderingFramework;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
@@ -62,6 +65,7 @@ public final class WaterRenderCoordinator {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
+        RenderFrameContext renderFrame = WildernessRenderingFramework.currentFrame();
         ClientLevel level = minecraft.level;
         if (level == null || !WaterRenderingConfig.replacementWaterRenderingEnabled(level)) {
             clear();
@@ -85,7 +89,7 @@ public final class WaterRenderCoordinator {
                 externalPackOwnedLastFrame = true;
             }
             renderDetailSubpasses(minecraft, event);
-            WaterRenderDiagnostics.publishFrame(0, 0, 0, 0, 0L, 0L);
+            WaterRenderDiagnostics.publishFrame(0, 0, 0, 0, 0L, -1L);
             return;
         }
         if (externalPackOwnedLastFrame) {
@@ -108,7 +112,7 @@ public final class WaterRenderCoordinator {
         int totalGroups = MESHES.size();
         int vertices = 0;
         int triangles = 0;
-        long ssrNanos = 0L;
+        long ssrNanos = -1L;
 
         float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
         boolean submergedOpticsNeedCapture = WaterShaders.shouldUseUnderwaterShader()
@@ -130,12 +134,14 @@ public final class WaterRenderCoordinator {
             boolean timeSsrPass = WaterShaders.shouldUseCoreShader()
                     && WaterRenderingConfig.screenSpaceReflectionSteps() > 0;
             if (timeSsrPass) {
-                WaterGpuTimer.begin();
+                WaterGpuTimer.begin(renderFrame.backend(), renderFrame.frameIndex());
             }
             renderSurfaceGroups(event, visible, level, partialTick);
             if (timeSsrPass) {
                 WaterGpuTimer.end();
-                ssrNanos = WaterGpuTimer.latestNanos();
+                ssrNanos = WaterGpuTimer.poll()
+                        .map(RenderBackend.GpuTimingSample::durationNanos)
+                        .orElse(-1L);
             }
             for (WaterChunkMeshCache.MeshGroup group : visible) {
                 vertices += group.vertices();
@@ -231,6 +237,7 @@ public final class WaterRenderCoordinator {
 
     /** Releases mesh state on client level teardown. */
     @SubscribeEvent
+    @SuppressWarnings("removal") // Releases the temporary OpenGL scene-copy target.
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel().isClientSide()) {
             clear();

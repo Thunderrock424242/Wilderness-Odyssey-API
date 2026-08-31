@@ -89,6 +89,44 @@ public final class CanonicalWaterFlowGameTests {
         helper.succeed();
     }
 
+    /** A placed bucket immediately enters finite lateral flow on supported ground. */
+    @GameTest(template = "empty")
+    public static void bucketPlacementSpreadsAsConservedWildernessWater(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos source = helper.absolutePos(new BlockPos(4, 3, 4));
+        level.setBlock(source.below(), Blocks.STONE.defaultBlockState(), 3);
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            level.setBlock(source.relative(direction).below(), Blocks.STONE.defaultBlockState(), 3);
+        }
+
+        CanonicalWater.placeBucket(level, source);
+        WildernessFluidRegistry.tickCell(level, source);
+
+        int total = CanonicalWater.get(level, source).volumeUnits();
+        int wetNeighbours = 0;
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            int neighbourVolume = CanonicalWater.get(
+                    level,
+                    source.relative(direction)
+            ).volumeUnits();
+            total += neighbourVolume;
+            if (neighbourVolume > 0) {
+                wetNeighbours++;
+            }
+        }
+        helper.assertTrue(
+                wetNeighbours == 4
+                        && CanonicalWater.get(level, source).volumeUnits()
+                        < WaterVolumeChunk.UNITS_PER_BLOCK,
+                "Bucket water stayed as one sleeping source instead of entering finite flow"
+        );
+        helper.assertTrue(
+                total == WaterVolumeChunk.UNITS_PER_BLOCK,
+                "Bucket flow did not conserve exactly one canonical bucket"
+        );
+        helper.succeed();
+    }
+
     private static void setCanonical(ServerLevel level, BlockPos position, int volumeUnits) {
         level.setBlock(position, Blocks.AIR.defaultBlockState(), 3);
         CanonicalWater.set(

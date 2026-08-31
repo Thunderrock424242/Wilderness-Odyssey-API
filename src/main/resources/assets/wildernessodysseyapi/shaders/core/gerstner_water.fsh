@@ -481,11 +481,14 @@ void main() {
     vec3 reflectedRay = normalize(reflect(incidentRay, normal));
     vec3 reflectedColor = environmentReflection(reflectedRay, fresnel, sea);
     int ssrSteps = int(clamp(OpticalQuality.z, 0.0, 24.0));
-    if (ssrSteps > 0 && capturedScene && fresnel > 0.024) {
+    // Trace just above physical water F0. Reflected energy is still multiplied
+    // by Fresnel below, so this improves scene identity without turning a
+    // face-on clear surface into a mirror.
+    if (ssrSteps > 0 && capturedScene && fresnel > 0.0205) {
         vec4 ssr = traceScreenReflection(
             viewPosition, reflectedRay, ssrSteps, OpticalQuality.w);
         reflectedColor = mix(
-            reflectedColor, ssr.rgb, ssr.a * (0.58 + fresnel * 0.32));
+            reflectedColor, ssr.rgb, ssr.a * (0.66 + fresnel * 0.30));
     }
 
     float slope = clamp(1.0 - combinedWorldNormal.y, 0.0, 1.0);

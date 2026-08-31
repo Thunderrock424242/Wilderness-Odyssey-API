@@ -134,7 +134,7 @@ public class SPHSimulator {
     public boolean isRemoteMirror()                  { return remoteMirror; }
     public int getCanonicalVolumeUnits()              { return canonicalVolumeUnits; }
 
-    /** Adds conserved volume represented by a newly merged bucket pour. */
+    /** Adds conserved canonical volume represented by a newly merged mobile slice. */
     public void addCanonicalVolumeUnits(int volumeUnits) {
         canonicalVolumeUnits = (int) Math.min(
                 Integer.MAX_VALUE,
@@ -169,21 +169,6 @@ public class SPHSimulator {
      */
     public List<SPHParticle> getRenderParticles() {
         return renderParticles;
-    }
-
-    /**
-     * Spawns a cluster of fluid particles in a spherical shape at the target coordinates.
-     *
-     * @param cx The center X coordinate.
-     * @param cy The center Y coordinate.
-     * @param cz The center Z coordinate.
-     */
-    public void spawnBucket(float cx, float cy, float cz) {
-        spawnPulse(cx, cy, cz, SPHConstants.PARTICLES_PER_BUCKET, 0.0f, 0.0f, 0.0f);
-    }
-
-    public void spawnBucket(float cx, float cy, float cz, int requestedCount) {
-        spawnPulse(cx, cy, cz, requestedCount, 0.0f, 0.0f, 0.0f);
     }
 
     public void spawnPulse(float cx, float cy, float cz, int requestedCount,

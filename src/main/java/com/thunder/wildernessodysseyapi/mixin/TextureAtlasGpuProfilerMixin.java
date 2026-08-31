@@ -15,6 +15,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * Attributes OpenGL texture-atlas allocations to their Minecraft resources.
+ *
+ * @deprecated Replace with backend-neutral texture-allocation telemetry in the
+ * Vulkan-targeted version.
+ */
+@Deprecated(forRemoval = true)
 @Mixin(TextureAtlas.class)
 public abstract class TextureAtlasGpuProfilerMixin extends AbstractTexture {
 

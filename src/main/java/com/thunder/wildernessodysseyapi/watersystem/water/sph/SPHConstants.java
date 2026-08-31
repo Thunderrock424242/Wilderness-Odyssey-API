@@ -18,9 +18,9 @@ public final class SPHConstants {
     /**
      * Mass of each particle (kg equivalent).
      *
-     * <p>The raw bucket spawn density is about 1,393 kg/m3. Kernel-boundary
+     * <p>The raw full-block spawn density is about 1,393 kg/m3. Kernel-boundary
      * loss lowers the deterministic mean to roughly 1,100 kg/m3, keeping the
-     * median pour near the 1,000 kg/m3 rest target with useful positive
+     * median mobile slice near the 1,000 kg/m3 rest target with useful positive
      * pressure instead of requiring a large artificial spreading force.</p>
      */
     public static final float PARTICLE_MASS       = 4.0f;
@@ -128,43 +128,34 @@ public final class SPHConstants {
     /** Maximum number of particles in a single fluid body. */
     public static final int MAX_PARTICLES         = 720;
 
-    /** Nearby bucket pours are merged into one sim instead of creating more bodies. */
+    /** Nearby canonical falling slices merge instead of creating more bodies. */
     public static final float MERGE_RADIUS        = 5.0f;
 
     /** Wider merge radius used only once the normal active-body budget is full. */
     public static final float OVERLOAD_MERGE_RADIUS = 10.0f;
 
-    /** Hard cap for separate SPH bodies in one level. Extra pours merge into existing SPH. */
+    /** Hard cap for separate SPH bodies in one level. Extra slices merge into existing SPH. */
     public static final int MAX_ACTIVE_SIMULATIONS = 24;
 
     /** Keep settled water as SPH mesh instead of converting it into vanilla source blocks. */
     public static final boolean CONVERT_SETTLED_TO_BLOCKS = false;
 
     /**
-     * Radius around the bucket placement point in which particles
-     * are initially spawned (blocks).
+     * Radius around a full-block mobile-water pulse in which particles are
+     * initially spawned (blocks).
      */
     public static final float SPAWN_RADIUS        = 0.4f;
 
-    /** Vertical extent of a bucket's initial three-dimensional particle volume. */
+    /** Vertical extent of a full-block three-dimensional particle volume. */
     public static final float SPAWN_HEIGHT        = 0.8f;
 
-    /** Number of particles spawned per bucket placement. */
-    public static final int   PARTICLES_PER_BUCKET = 140;
-
-    /** Visual-only splash particles spawned after bucket water becomes canonical Wilderness water. */
-    public static final int   BUCKET_SPLASH_PARTICLES = 96;
-
-    /** Lifetime for bucket splash particles; canonical volume remains after this visual expires. */
-    public static final int   BUCKET_SPLASH_LIFETIME_TICKS = 45;
-
-    /** Smaller pour size when a bucket has to merge into an overloaded sim. */
-    public static final int   OVERLOAD_PARTICLES_PER_BUCKET = 72;
+    /** Particle calibration for one full canonical block of mobile water. */
+    public static final int   PARTICLES_PER_FULL_BLOCK = 140;
 
     /** Small SPH pulse used for shoreline wave wash and tide surge visuals. */
     public static final int   SHORE_WAVE_PARTICLES = 14;
 
-    /** Hard cap for automatic shore wash so bucket water keeps priority. */
+    /** Hard cap for automatic shoreline wash effects. */
     public static final int   MAX_TRANSIENT_SHORE_SIMULATIONS = 4;
 
     /** Lifetime for automatic shore wash pulses before they are removed. */
