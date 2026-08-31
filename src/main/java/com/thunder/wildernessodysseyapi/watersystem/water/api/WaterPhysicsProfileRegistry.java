@@ -31,7 +31,7 @@ public final class WaterPhysicsProfileRegistry {
             0.62,
             0.24, 0.90, 0.25,
             0.42, 0.95, 0.75,
-            0.018, 0.72, 0.020,
+            0.018, 0.52, 0.012,
             0.040,
             true
     );

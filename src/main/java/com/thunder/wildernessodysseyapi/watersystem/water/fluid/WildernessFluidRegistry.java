@@ -189,10 +189,10 @@ public final class WildernessFluidRegistry {
     /**
      * Wakes nearby canonical water after terrain changes.
      *
-     * <p>Flat bucket water is allowed to sleep so it does not smear itself into
-     * invisible film, but a later block break or placement can create a real
-     * outlet. Only already-tracked cells are queued, which avoids turning normal
-     * block edits into chunk-wide water imports.</p>
+     * <p>Placed buckets enter finite flow immediately, while settled canonical
+     * water may later sleep after pressure equalizes. A block edit can create a
+     * new outlet, so only already-tracked nearby cells are queued; normal block
+     * edits never trigger chunk-wide water imports.</p>
      */
     @SubscribeEvent
     public static void onBlockBroken(BlockEvent.BreakEvent event) {

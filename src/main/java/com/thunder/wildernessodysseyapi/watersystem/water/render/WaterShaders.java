@@ -28,6 +28,7 @@ import java.io.IOException;
  * pack remains the final authority over water shading. Installing either mod
  * without enabling a pack still permits the built-in GPU-wave renderer.</p>
  */
+@SuppressWarnings("removal") // Owns the temporary 1.21.1 WaterSceneCapture compatibility path.
 public final class WaterShaders {
 
     private static ShaderInstance oceanShader;

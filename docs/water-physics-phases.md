@@ -10,8 +10,9 @@ source of truth.
 - `CanonicalWater` and `WaterVolumeChunk` own conserved fixed-point water.
 - `WildernessFluidRegistry` advances only disturbed canonical cells through a
   bounded active queue.
-- `SPHSimulationManager` owns short-range mobile pours and splashes. SPH does
-  not replace generated oceans, rivers, or lakes.
+- `SPHSimulationManager` owns short-range mobile falling slices and bounded
+  shoreline wash. Buckets enter canonical finite flow directly; SPH does not
+  replace bucket water, generated oceans, rivers, or lakes.
 - `GeneratedWaterChunk` owns compact generated-body metadata.
 - `WildernessWaterAuthority` composes generated metadata, sparse overrides,
   waves, tide, watershed flow, and local disturbance for read-only consumers.
@@ -35,7 +36,7 @@ produces no invented global-axis current.
 
 ## Phase 2: SPH Calibration and Meshes
 
-The particle mass is calibrated against the actual three-dimensional bucket
+The particle mass is calibrated against one full-block three-dimensional
 spawn distribution and smoothing kernel. Pressure uses a bounded Tait equation
 of state. The small floor-contact assist is allowed only for compressed,
 slow-moving particles and follows horizontal pressure acceleration; a radial
@@ -70,7 +71,11 @@ slamming, and bounded angular response without a competing water state.
 
 The client samples the same corner layout for pitch and roll. `BoatTiltStore`
 integrates pitch, roll, and heave with a spring-damper response and never moves
-the authoritative entity position.
+the authoritative entity position. Every presentation tier evaluates the full
+authored displacement spectrum used by server buoyancy; quality settings reduce
+mesh and optical work without removing wave components from the surface a boat
+appears to occupy. Hull-entry slamming requires an observed dry-to-wet
+transition, filters gentle crest contact, and remains acceleration-capped.
 
 ## Phase 5: Optical Surface
 
@@ -119,7 +124,7 @@ Automated checks should cover:
 1. Exact vertical capacity, symmetric lateral flow, rejected destinations, and
    hundreds of conserved planning steps.
 2. Spring/neap lunar phases plus coastline-relative flood and ebb.
-3. Bucket density range, positive-pressure fraction, bounded Tait pressure,
+3. Full-volume density range, positive-pressure fraction, bounded Tait pressure,
    and ground-assist gating.
 4. Smooth outward density normals and non-degenerate fallback normals.
 5. Gerstner dispersion, period, velocity derivative, unit normal, fold budget,

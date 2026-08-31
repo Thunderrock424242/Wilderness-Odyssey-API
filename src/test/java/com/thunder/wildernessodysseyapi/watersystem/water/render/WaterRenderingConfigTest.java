@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -49,15 +50,21 @@ class WaterRenderingConfigTest {
     }
 
     @Test
-    void disabledOrLowerQualityProfilesNeverMarchScreenReflections() {
+    void disabledOrLowQualityProfilesNeverMarchScreenReflections() {
         assertEquals(0, WaterRenderingConfig.screenSpaceReflectionSteps(
                 WaterRenderingConfig.WaterQuality.CINEMATIC, false, false));
         assertEquals(0, WaterRenderingConfig.screenSpaceReflectionSteps(
+                WaterRenderingConfig.WaterQuality.LOW, false, true));
+        assertEquals(6, WaterRenderingConfig.screenSpaceReflectionSteps(
                 WaterRenderingConfig.WaterQuality.MEDIUM, false, true));
     }
 
     @Test
     void optimizedProfileAlsoBoundsReflectionTravelDistance() {
+        assertEquals(20.0f, WaterRenderingConfig.screenSpaceReflectionDistance(
+                WaterRenderingConfig.WaterQuality.MEDIUM, false));
+        assertEquals(16.0f, WaterRenderingConfig.screenSpaceReflectionDistance(
+                WaterRenderingConfig.WaterQuality.MEDIUM, true));
         assertEquals(32.0f, WaterRenderingConfig.screenSpaceReflectionDistance(
                 WaterRenderingConfig.WaterQuality.HIGH, false));
         assertEquals(28.0f, WaterRenderingConfig.screenSpaceReflectionDistance(
@@ -92,5 +99,27 @@ class WaterRenderingConfigTest {
                 WaterRenderingConfig.WaterQuality.HIGH, true));
         assertEquals(3, WaterRenderingConfig.sphMeshRebuildsPerFrame(
                 WaterRenderingConfig.WaterQuality.CINEMATIC, false));
+    }
+
+    @Test
+    void waveDisplacementNeverChangesWithPresentationQuality() {
+        assertEquals(4, WaterRenderingConfig.authoritativeWaveTrainCount(
+                WaterBodyClassifier.WaterType.OCEAN));
+        assertEquals(4, WaterRenderingConfig.authoritativeWaveTrainCount(
+                WaterBodyClassifier.WaterType.COAST));
+        assertEquals(3, WaterRenderingConfig.authoritativeWaveTrainCount(
+                WaterBodyClassifier.WaterType.RIVER));
+        assertEquals(3, WaterRenderingConfig.authoritativeWaveTrainCount(
+                WaterBodyClassifier.WaterType.LAKE));
+        assertEquals(2, WaterRenderingConfig.authoritativeWaveTrainCount(
+                WaterBodyClassifier.WaterType.POND));
+    }
+
+    @Test
+    void lowQualityRetainsABoundedEntrySplash() {
+        assertEquals(3, WaterRenderingConfig.splashParticleBudget(
+                WaterRenderingConfig.WaterQuality.LOW, 8));
+        assertEquals(0, WaterRenderingConfig.splashParticleBudget(
+                WaterRenderingConfig.WaterQuality.LOW, 0));
     }
 }

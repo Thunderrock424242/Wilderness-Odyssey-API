@@ -32,6 +32,9 @@ final class HydrodynamicForces {
     private static final double GRAVITY_BLOCKS_PER_SECOND_SQUARED = 9.81;
     private static final double MINIMUM_AREA = 0.01;
     private static final double MINIMUM_MASS = 0.01;
+    private static final double MINIMUM_SLAM_ENTRY_SPEED = 0.75;
+    private static final double MAXIMUM_SLAM_FRACTION_RATE = 4.0;
+    private static final double MAXIMUM_SLAM_ACCELERATION = 10.0;
 
     private HydrodynamicForces() {
     }
@@ -296,15 +299,14 @@ final class HydrodynamicForces {
                 * planingWindow
                 / mass;
 
-        double entryFraction = Math.max(
-                0.0,
-                fraction - clamp(previousSubmergedFraction, 0.0, 1.0)
+        double slamAcceleration = watercraftSlammingAcceleration(
+                fraction,
+                previousSubmergedFraction,
+                velocityPerSecond.y,
+                profile.slammingCoefficient(),
+                tuning.slammingScale(),
+                deltaSeconds
         );
-        double entrySpeed = Math.max(0.0, -velocityPerSecond.y);
-        double slamAcceleration = entrySpeed
-                * (entryFraction / deltaSeconds)
-                * profile.slammingCoefficient()
-                * tuning.slammingScale();
 
         Vec3 acceleration = forward.scale(accelerationForward)
                 .add(starboard.scale(accelerationLateral))
@@ -366,6 +368,48 @@ final class HydrodynamicForces {
                 * Math.min(1.0, 0.25 + forwardSpeed * 0.10);
         double torque = stabilizingForce * hullLength * 0.25;
         return clamp(torque / momentOfInertia, -2.5, 2.5);
+    }
+
+    /**
+     * Returns the bounded normal acceleration for an observed hull entry.
+     *
+     * <p>An unknown previous fraction means the craft was first observed while
+     * already wet and must not receive an artificial loading impulse. Small
+     * downward motion and abrupt sample-fraction changes are also filtered so
+     * a moving crest cannot repeatedly kick a nearly stationary boat.</p>
+     */
+    static double watercraftSlammingAcceleration(
+            double submergedFraction,
+            double previousSubmergedFraction,
+            double verticalVelocityPerSecond,
+            double slammingCoefficient,
+            double slammingScale,
+            double deltaSeconds
+    ) {
+        if (!Double.isFinite(previousSubmergedFraction)
+                || !Double.isFinite(verticalVelocityPerSecond)
+                || !(deltaSeconds > 0.0)) {
+            return 0.0;
+        }
+        double entryFraction = Math.max(
+                0.0,
+                clamp(submergedFraction, 0.0, 1.0)
+                        - clamp(previousSubmergedFraction, 0.0, 1.0)
+        );
+        double entrySpeed = Math.max(0.0, -verticalVelocityPerSecond);
+        if (entryFraction <= 0.0 || entrySpeed <= MINIMUM_SLAM_ENTRY_SPEED) {
+            return 0.0;
+        }
+
+        double fractionRate = Math.min(
+                MAXIMUM_SLAM_FRACTION_RATE,
+                entryFraction / deltaSeconds
+        );
+        double acceleration = (entrySpeed - MINIMUM_SLAM_ENTRY_SPEED)
+                * fractionRate
+                * Math.max(0.0, slammingCoefficient)
+                * Math.max(0.0, slammingScale);
+        return Math.min(MAXIMUM_SLAM_ACCELERATION, acceleration);
     }
 
     private static double dragAcceleration(

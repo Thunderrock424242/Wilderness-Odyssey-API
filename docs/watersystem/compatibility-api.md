@@ -120,7 +120,9 @@ refuses to consume a full bucket into a cell that already contains finite
 authority-owned water, preventing hidden volume loss. Disabling the translation
 flag still rejects pickup and overwriting placement for owned projections; it
 never turns off conservation protection, and unowned vanilla water remains on
-the normal path.
+the normal path. Plain-world placement enters the canonical finite-flow queue
+immediately and conserves one exact bucket while spreading across available
+Wilderness cells. Bucket placement does not create an SPH visual body.
 
 ## Machine-fluid integration
 

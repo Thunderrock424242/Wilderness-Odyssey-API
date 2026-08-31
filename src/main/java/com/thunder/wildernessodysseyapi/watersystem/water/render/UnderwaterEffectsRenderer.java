@@ -10,7 +10,7 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackend;
-import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
+import com.thunder.wildernessodysseyapi.rendering.client.WildernessRenderingFramework;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.FogRenderer;
 import net.minecraft.client.renderer.ScreenEffectRenderer;
@@ -197,8 +197,8 @@ public final class UnderwaterEffectsRenderer {
                 state
         );
 
-        RenderBackend.RenderStateSnapshot previousState = RenderBackends.current().captureRenderState();
-        try {
+        RenderBackend backend = WildernessRenderingFramework.currentFrame().backend();
+        try (RenderBackend.RenderStateScope ignored = backend.captureRenderStateScope()) {
             // Screen-space optics replace the completed scene and must not be
             // clipped by hand/HUD depth or write depth into later UI layers.
             RenderSystem.disableDepthTest();
@@ -219,19 +219,6 @@ public final class UnderwaterEffectsRenderer {
             buffer.addVertex(matrix, 1.0f, 1.0f, -0.5f).setUv(0.0f, 0.0f);
             buffer.addVertex(matrix, -1.0f, 1.0f, -0.5f).setUv(4.0f, 0.0f);
             BufferUploader.drawWithShader(buffer.buildOrThrow());
-        } finally {
-            RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-            RenderSystem.depthMask(previousState.depthWriteEnabled());
-            if (previousState.depthTestEnabled()) {
-                RenderSystem.enableDepthTest();
-            } else {
-                RenderSystem.disableDepthTest();
-            }
-            if (previousState.blendEnabled()) {
-                RenderSystem.enableBlend();
-            } else {
-                RenderSystem.disableBlend();
-            }
         }
     }
 

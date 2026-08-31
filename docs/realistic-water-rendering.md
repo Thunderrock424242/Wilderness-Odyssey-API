@@ -223,7 +223,9 @@ buried or otherwise unclaimed fluid faces.
 ## Quality tiers
 
 All tiers retain snapshot culling, cached geometry, and the environment
-reflection fallback.
+reflection fallback. All tiers also evaluate the complete authored displacement
+spectrum, because surface height is shared with server buoyancy, camera
+immersion, and boat presentation rather than being a cosmetic quality choice.
 
 `autoDetectWaterQuality` defaults to enabled. Once the client OpenGL context is
 available, a one-time render-thread probe selects the effective tier from the
@@ -236,9 +238,10 @@ changes only the effective client presentation tier and never rewrites the
 user's config.
 Disable `autoDetectWaterQuality` to restore the manual `waterQuality` value.
 
-- `LOW` uses reduced refraction, no SSR, and no ambient particle layer.
-- `MEDIUM` adds stronger optical detail, one capped ambient particle sample,
-  and reduced wake foam while keeping SSR disabled.
+- `LOW` uses reduced refraction, no SSR, no ambient particle layer, and retains
+  a very small capped entry-splash/ripple cue.
+- `MEDIUM` adds stronger optical detail, a short bounded SSR march, one capped
+  ambient particle sample, and reduced wake foam.
 - `HIGH` enables a bounded SSR march, up to two ambient particles per emission,
   and a longer wake-foam tail.
 - `CINEMATIC` raises the bounded optical/rebuild budgets and permits up to three
@@ -292,9 +295,13 @@ pass runs every two ticks under a quality and renderer-aware hard budget.
 
 Impact rings and boat wakes now carry two lifetimes in the same capped eight
 GPU impulse slots. Geometry settles quickly, while a slower foam envelope keeps
-the disturbed ring visible for several seconds before a smooth release. This
-adds persistent-looking wake and impact foam without a new framebuffer, an
-unbounded trail buffer, canonical-water mutations, or extra network traffic.
+the disturbed ring visible for several seconds before a smooth release. Entry
+spray is placed at the animated authority surface and scales from retained
+pre-contact velocity, fall distance, body size, and watercraft footprint. Slow
+wading therefore keeps a small cue while a real fall or hull impact produces a
+wider, faster burst. This adds persistent-looking wake and impact foam without
+a new framebuffer, an unbounded trail buffer, canonical-water mutations, or
+extra network traffic.
 
 ## Clock tide information
 

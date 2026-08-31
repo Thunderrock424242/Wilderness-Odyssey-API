@@ -22,6 +22,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.lwjgl.opengl.GL11;
 
+/**
+ * Preserves structure-overlay depth state on the current OpenGL renderer.
+ *
+ * @deprecated Direct OpenGL state reads must be replaced by a supported
+ * renderer-state scope in the Vulkan-targeted version.
+ */
+@Deprecated(forRemoval = true)
 @Mixin(StructureBlockRenderer.class)
 public abstract class StructureBlockRendererMixin {
 

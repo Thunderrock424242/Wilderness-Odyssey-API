@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies the narrow vanilla identity-check mixins remain wired to their exact 1.21.1 call sites. */
@@ -37,6 +38,15 @@ class WaterBucketMixinContractTest {
         assertTrue(source.contains("Lnet/minecraft/world/item/ItemStack;getItem()"));
         assertTrue(source.contains("WILDERNESS_WATER_BUCKET.get()"));
         assertTrue(source.contains("? Items.WATER_BUCKET"));
+    }
+
+    @Test
+    void bucketPlacementUsesCanonicalFlowWithoutSphEffects() throws IOException {
+        String source = readMixin("BucketPlaceMixin.java");
+
+        assertTrue(source.contains("CanonicalWater.placeBucket(serverLevel, pos);"));
+        assertFalse(source.contains("SphLocalEffectPayload"));
+        assertFalse(source.contains("createBucketSplash"));
     }
 
     @Test

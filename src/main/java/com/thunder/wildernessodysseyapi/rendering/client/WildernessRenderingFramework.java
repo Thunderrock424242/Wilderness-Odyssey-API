@@ -41,6 +41,8 @@ public final class WildernessRenderingFramework {
     private static volatile RenderFrameContext currentFrame = RenderFrameContext.EMPTY;
     private static long frameIndex;
     private static long frameStartedNanos;
+    private static RenderBackend frameTimerBackend = RenderBackend.UNAVAILABLE;
+    private static RenderBackend.GpuTimer frameTimer = RenderBackend.GpuTimer.UNAVAILABLE;
 
     private WildernessRenderingFramework() {
     }
@@ -52,7 +54,11 @@ public final class WildernessRenderingFramework {
         long nextFrameIndex = ++frameIndex;
         ShaderPackCompatibility.sampleFrame(nextFrameIndex);
         Minecraft minecraft = Minecraft.getInstance();
-        RenderBackend backend = RenderBackends.current();
+        RenderBackends.Selection selection = RenderBackends.selection();
+        RenderBackend backend = selection.backend();
+        if (minecraft.level != null) {
+            frameTimer(backend).begin(nextFrameIndex);
+        }
         TemporalFrameData.Resolution resolution = new TemporalFrameData.Resolution(
                 minecraft.getWindow().getWidth(),
                 minecraft.getWindow().getHeight()
@@ -72,7 +78,8 @@ public final class WildernessRenderingFramework {
                         resolution,
                         resolution,
                         previousTiming.cpuFrameNanos()
-                )
+                ),
+                selection.generation()
         );
     }
 
@@ -85,6 +92,8 @@ public final class WildernessRenderingFramework {
         long now = System.nanoTime();
         long elapsed = Math.max(0L, now - frameStartedNanos);
         frameStartedNanos = 0L;
+        frameTimer.end();
+        RenderBackend.GpuTimingSample gpuSample = frameTimer.poll().orElse(null);
 
         RendererConfig.Settings settings = RendererConfig.settings();
         RenderingQuality quality = RenderingQuality.CINEMATIC;
@@ -122,8 +131,14 @@ public final class WildernessRenderingFramework {
                 before.environment(),
                 before.weatherVisualState(),
                 quality,
-                new RenderFrameContext.FrameTiming(elapsed, -1L, movingAverage),
-                temporal
+                new RenderFrameContext.FrameTiming(
+                        elapsed,
+                        gpuSample == null ? -1L : gpuSample.durationNanos(),
+                        movingAverage,
+                        gpuSample == null ? -1L : gpuSample.sourceFrame()
+                ),
+                temporal,
+                before.backendGeneration()
         );
     }
 
@@ -137,16 +152,20 @@ public final class WildernessRenderingFramework {
         RenderFrameContext frame = currentFrame;
         RenderQualityState.Snapshot quality = RenderQualityState.snapshot();
         EnvironmentState environment = frame.environment();
+        RenderBackends.BackendStatus backendStatus = RenderBackends.status();
         return List.of(
                 "WO backend: " + frame.gpuCapabilities().api().name().toLowerCase(Locale.ROOT)
+                        + " #" + frame.backendGeneration()
+                        + " | " + backendStatus.state().name().toLowerCase(Locale.ROOT)
                         + " | compute " + yesNo(frame.gpuCapabilities().supportsComputeShaders())
                         + " | GPU timing " + yesNo(frame.gpuCapabilities().supportsGpuTiming()),
                 "WO capability paths: reflections " + yesNo(frame.gpuCapabilities().supportsAdvancedReflections())
                         + " | high volumetrics " + yesNo(frame.gpuCapabilities().supportsHighQualityVolumetrics()),
                 String.format(
                         Locale.ROOT,
-                        "WO frame: CPU %.3f ms | average %.3f ms | adaptive %s/%s",
+                        "WO frame: CPU %.3f ms | GPU %s | average %.3f ms | adaptive %s/%s",
                         frame.timing().cpuFrameNanos() / 1_000_000.0,
+                        formatGpuTiming(frame),
                         quality.averageFrameNanos() / 1_000_000.0,
                         quality.enabled() ? "on" : "off",
                         quality.quality().name().toLowerCase(Locale.ROOT)
@@ -172,6 +191,7 @@ public final class WildernessRenderingFramework {
     @SubscribeEvent
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel() instanceof ClientLevel) {
+            releaseFrameTimer();
             currentFrame = RenderFrameContext.EMPTY;
             frameStartedNanos = 0L;
         }
@@ -211,5 +231,37 @@ public final class WildernessRenderingFramework {
 
     private static String yesNo(boolean value) {
         return value ? "yes" : "no";
+    }
+
+    private static RenderBackend.GpuTimer frameTimer(RenderBackend backend) {
+        if (backend == frameTimerBackend) {
+            return frameTimer;
+        }
+        frameTimer.close();
+        frameTimerBackend = backend;
+        frameTimer = backend.createGpuTimer(4);
+        return frameTimer;
+    }
+
+    private static void releaseFrameTimer() {
+        frameTimer.close();
+        frameTimer = RenderBackend.GpuTimer.UNAVAILABLE;
+        frameTimerBackend = RenderBackend.UNAVAILABLE;
+    }
+
+    private static String formatGpuTiming(RenderFrameContext frame) {
+        RenderFrameContext.FrameTiming timing = frame.timing();
+        if (timing.gpuFrameNanos() < 0L) {
+            return "pending/unavailable";
+        }
+        long age = timing.gpuSampleFrame() < 0L
+                ? -1L
+                : Math.max(0L, frame.frameIndex() - timing.gpuSampleFrame());
+        return String.format(
+                Locale.ROOT,
+                age < 0L ? "%.3f ms" : "%.3f ms (%d frames old)",
+                timing.gpuFrameNanos() / 1_000_000.0,
+                age
+        );
     }
 }

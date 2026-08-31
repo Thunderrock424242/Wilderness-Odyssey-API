@@ -111,7 +111,10 @@ public final class WaterRenderDiagnostics {
                 "WO Water SSR optical GPU: " + formatMillis(frame.ssrNanos()),
                 "WO Water path: " + snapshot.renderPath().label + " | scene capture "
                         + (snapshot.sceneCaptureAvailable() ? "ready" : "fallback") + " | "
-                        + WaterRenderingConfig.profileName(),
+                        + WaterRenderingConfig.profileName() + " | reflections "
+                        + (snapshot.sceneCaptureAvailable()
+                        ? WaterRenderingConfig.reflectionProfileName()
+                        : "environment fallback"),
                 "WO Water quality: " + WaterRenderingConfig.qualitySelectionSummary(),
                 "WO Water shader-pack alias: "
                         + ExternalShaderWaterMaterialBridge.status().label()
@@ -122,6 +125,9 @@ public final class WaterRenderDiagnostics {
 
     // Keep the overlay compact while retaining enough precision for frame-cost regressions.
     private static String formatMillis(long nanos) {
+        if (nanos < 0L) {
+            return "pending/unavailable";
+        }
         return String.format(Locale.ROOT, "%.3f ms", nanos / 1_000_000.0);
     }
 
@@ -138,7 +144,7 @@ public final class WaterRenderDiagnostics {
     /** Per-frame geometry and timing counters. */
     public record FrameStats(int visibleGroups, int culledGroups, int vertices, int triangles,
                              long waterRenderNanos, long ssrNanos) {
-        private static final FrameStats EMPTY = new FrameStats(0, 0, 0, 0, 0L, 0L);
+        private static final FrameStats EMPTY = new FrameStats(0, 0, 0, 0, 0L, -1L);
     }
 
     /** Pixel owner selected by the coordinator for the current client frame. */

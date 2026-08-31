@@ -149,13 +149,31 @@ class HydrodynamicForcesTest {
     }
 
     @Test
+    void slammingIgnoresUnknownLoadedStateAndGentleWaveContact() {
+        assertEquals(0.0, HydrodynamicForces.watercraftSlammingAcceleration(
+                0.55, Double.NaN, -4.0, 0.72, 1.0, 0.05));
+        assertEquals(0.0, HydrodynamicForces.watercraftSlammingAcceleration(
+                0.55, 0.40, -0.50, 0.72, 1.0, 0.05));
+        assertEquals(0.0, HydrodynamicForces.watercraftSlammingAcceleration(
+                0.40, 0.55, -4.0, 0.72, 1.0, 0.05));
+    }
+
+    @Test
+    void slammingCapsAbruptSurfaceTransitions() {
+        double acceleration = HydrodynamicForces.watercraftSlammingAcceleration(
+                1.0, 0.0, -40.0, 4.0, 2.0, 0.05);
+
+        assertEquals(10.0, acceleration);
+    }
+
+    @Test
     void angularMomentumIsDampedAndBounded() {
         double yawVelocity = 0.0;
         for (int tick = 0; tick < 100; tick++) {
             yawVelocity = WatercraftDynamicsState.integrateYawVelocity(yawVelocity, 2.5, 0.05);
         }
         assertTrue(yawVelocity > 0.0);
-        assertTrue(yawVelocity <= 1.6);
+        assertTrue(yawVelocity <= 0.6);
 
         double damped = WatercraftDynamicsState.integrateYawVelocity(yawVelocity, 0.0, 0.05);
         assertTrue(damped < yawVelocity);

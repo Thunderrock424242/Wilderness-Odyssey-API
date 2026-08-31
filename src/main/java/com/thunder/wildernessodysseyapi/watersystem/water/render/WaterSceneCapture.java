@@ -4,7 +4,7 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
+import com.thunder.wildernessodysseyapi.rendering.client.WildernessRenderingFramework;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
@@ -16,7 +16,12 @@ import org.lwjgl.opengl.GL30;
  * undefined OpenGL feedback loop. This class instead blits color and depth into
  * an isolated texture target once for a supplied frame key and restores both
  * framebuffer bindings before returning.</p>
+ *
+ * @deprecated This raw OpenGL framebuffer-copy path exists only for Minecraft
+ * 1.21.1. Replace it with backend-provided scene color/depth inputs before the
+ * Vulkan-targeted version ships.
  */
+@Deprecated(forRemoval = true)
 public final class WaterSceneCapture {
 
     private static TextureTarget sceneTarget;
@@ -28,7 +33,8 @@ public final class WaterSceneCapture {
     /** Captures the current main scene once for the given logical render frame. */
     public static Capture capture(long frameKey) {
         RenderSystem.assertOnRenderThread();
-        if (!RenderBackends.current().capabilities().supportsAdvancedReflections()) {
+        if (!WildernessRenderingFramework.currentFrame()
+                .gpuCapabilities().supportsAdvancedReflections()) {
             return Capture.UNAVAILABLE;
         }
         Minecraft minecraft = Minecraft.getInstance();

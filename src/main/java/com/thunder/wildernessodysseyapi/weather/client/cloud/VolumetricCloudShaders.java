@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.rendering.RenderingQuality;
 import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
+import com.thunder.wildernessodysseyapi.rendering.client.WildernessRenderingFramework;
 import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
 import com.thunder.wildernessodysseyapi.rendering.performance.RenderQualityState;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
@@ -62,7 +63,7 @@ public final class VolumetricCloudShaders {
                 && settings.volumetricClouds()
                 && cloudShader != null
                 && RenderQualityState.currentQuality().allows(RenderingQuality.MEDIUM)
-                && RenderBackends.current().capabilities().available()
+                && WildernessRenderingFramework.currentFrame().gpuCapabilities().available()
                 && !ShaderPackCompatibility.isExternalShaderPackActive();
     }
 

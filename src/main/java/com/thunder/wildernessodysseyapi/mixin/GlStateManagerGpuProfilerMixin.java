@@ -10,6 +10,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 
+/**
+ * Tracks allocations made through Minecraft's OpenGL state manager.
+ *
+ * @deprecated The Vulkan-targeted profiler must use backend resource telemetry
+ * instead of intercepting {@link GlStateManager} calls.
+ */
+@Deprecated(forRemoval = true)
 @Mixin(GlStateManager.class)
 public abstract class GlStateManagerGpuProfilerMixin {
 

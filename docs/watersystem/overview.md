@@ -139,7 +139,9 @@ uploaded and owned by the coordinator.
 stage. The Gerstner water shader uses those shared textures for depth-aware
 refraction, thickness reconstruction, Beer-Lambert absorption/transmission,
 Fresnel reflection, environment lighting, weather response, and bounded
-screen-space reflections at higher quality tiers.
+screen-space reflections from Medium through Cinematic quality. Low retains the
+environment and sky reflection fallback. F3 reports the effective reflection
+step and distance budget together with scene-capture readiness.
 
 Continuous Gerstner displacement and surface-normal distortion run on the GPU
 over cached topology. World-space wave inputs, synchronized tides, sea state,
@@ -149,6 +151,14 @@ anchors; the first inland row eases to half displacement and the second restores
 full motion. `WaterSurfaceEquation` mirrors the visible surface calculation for
 `ClientWaterImmersion`, while `UnderwaterOpticsModel` smooths near-plane entry
 and exit transitions.
+
+Tides are active rather than decorative metadata. `TideSystem` derives a
+deterministic semidiurnal spring/neap cycle from vanilla-synchronized world time
+and moon phase, so no competing tide packet or saved state is required. The
+shared sample shifts ocean/coast surface height, adds coastline-oriented flood
+and ebb current, drives the bounded server shoreline grid and shore wash, and
+feeds the contextual vanilla-clock display. It never creates or removes water
+blocks to fake a changing coastline.
 
 The active vertex shader applies horizontal as well as vertical Gerstner
 displacement with analytic tangents. Sparse canonical currents advect surface
@@ -315,7 +325,10 @@ award a vanilla water bucket only after an exact 4,096-unit authority drain;
 partial finite cells remain unchanged. The namespaced bucket supports dispenser
 placement, cauldrons, waterlogging, bucketable fish, and the common
 `c:buckets/water` item tag, while waterlogged host blocks continue to store
-ordinary vanilla water for broad mod compatibility.
+ordinary vanilla water for broad mod compatibility. A successful plain-world
+placement writes one exact canonical bucket and immediately schedules the
+bounded finite-flow solver; it does not spawn a bucket-specific SPH body or
+remain permanently asleep as a single source block.
 
 Vanilla structures can opt in with the exact
 `wildernessodysseyapi:water` DATA marker. Existing worlds can be upgraded only
@@ -331,7 +344,7 @@ The production GameTests exercise real noise generation, `ProtoChunk` writes,
 flowing-state preservation, waterlogged-host exclusion, spring placement,
 generated metadata, attachment serialization, fluid-handler transactions,
 guarded projection writes, exact player/dispenser bucket transactions, custom
-bucket waterlogging/cauldron/fish parity, vanilla gameplay parity, bubble
+bucket finite spreading, waterlogging/cauldron/fish parity, vanilla gameplay parity, bubble
 columns, and structure markers. Unit tests cover compact span editing, conserved solid
 displacement, staged authority activation, strict persistence and paged/delta
 network decoding, shoreline scheduler fairness, multi-point buoyancy and hull
