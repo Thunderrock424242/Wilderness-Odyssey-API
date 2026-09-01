@@ -65,6 +65,7 @@ public final class WildernessOdysseyAPIMainModClass {
         WildernessWaterRules.bootstrap();
         WaterCompatibilityRegistry.bootstrap(modEventBus);
         CinematicSequences.bootstrap();
+        BiomeCompatibilityBootstrap.registerWorldgen();
 
         // Mod-bus listeners handle lifecycle work that NeoForge runs during startup.
         modEventBus.addListener(this::commonSetup);
@@ -84,11 +85,11 @@ public final class WildernessOdysseyAPIMainModClass {
         DonationReminderConfig.validateVersion();
     }
 
-    // Common setup is queued because biome compatibility touches registries after construction.
+    // Common setup is queued for runtime services that depend on completed registrations.
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             VanillaWaterBucketCompatibility.bootstrap();
-            BiomeCompatibilityBootstrap.initialize();
+            BiomeCompatibilityBootstrap.initializeRuntime();
             ReactivePlantDefaults.bootstrap();
             LOGGER.info("Wilderness Odyssey API setup complete");
         });

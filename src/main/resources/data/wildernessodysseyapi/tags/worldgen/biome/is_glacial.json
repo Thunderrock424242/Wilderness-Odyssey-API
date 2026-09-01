@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "wildernessodysseyapi:iceberg_coast",
+    "wildernessodysseyapi:glacial_meltwater_valley",
+    "wildernessodysseyapi:polar_glacial_basin",
+    "wildernessodysseyapi:glacial_highlands",
+    "wildernessodysseyapi:polar_ice_sheet"
+  ]
+}

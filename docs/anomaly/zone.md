@@ -63,8 +63,10 @@ Client effects are cosmetic and side-safe:
 - Anomaly biome music takes priority while the biome owns the player location.
 
 The biome is exposed through both `anomaly_forest` and `is_anomaly_forest`
-Wilderness Odyssey tags. The existing Overworld/common compatibility tags are
-retained for TerraBlender, Biolith, and Lithostitched integrations.
+Wilderness Odyssey tags. A small data-driven Lithostitched region injects the
+biome into related Overworld forest outcomes without replacing the global
+biome source. The existing Overworld/common compatibility tags remain available
+to Biolith and other tag-aware integrations.
 
 ## In-game verification
 

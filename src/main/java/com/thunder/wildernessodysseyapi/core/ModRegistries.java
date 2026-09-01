@@ -3,6 +3,12 @@ package com.thunder.wildernessodysseyapi.core;
 import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
 import com.thunder.wildernessodysseyapi.cryo.block.CryoTubeBlock;
 import com.thunder.wildernessodysseyapi.effect.SimpleStatusEffect;
+import com.thunder.wildernessodysseyapi.environment.glacial.worldgen.GlacialCrevasseFeature;
+import com.thunder.wildernessodysseyapi.environment.glacial.worldgen.GlacialIceCaveFeature;
+import com.thunder.wildernessodysseyapi.environment.glacial.worldgen.GlacialRiverFeature;
+import com.thunder.wildernessodysseyapi.environment.glacial.worldgen.GlacialTerrainFeature;
+import com.thunder.wildernessodysseyapi.environment.glacial.worldgen.GlacialWaterfallFeature;
+import com.thunder.wildernessodysseyapi.environment.glacial.worldgen.IcebergFormationFeature;
 import com.thunder.wildernessodysseyapi.item.ModCreativeTabs;
 import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
@@ -14,6 +20,7 @@ import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockE
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftWorldgen;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
+import com.thunder.wildernessodysseyapi.worldgen.coast.CoastalTerrainFeature;
 import com.thunder.wildernessodysseyapi.worldgen.processor.ModProcessors;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.effect.MobEffect;
@@ -52,6 +59,27 @@ public final class ModRegistries {
     /** Meteor feature type referenced by the configured and placed feature data. */
     public static final DeferredHolder<Feature<?>, MeteorFeature> METEOR_IMPACT_FEATURE =
             FEATURES.register("meteor_impact", MeteorFeature::new);
+    /** Per-chunk ice-cap layering and glacial relief pass. */
+    public static final DeferredHolder<Feature<?>, GlacialTerrainFeature> GLACIAL_TERRAIN_FEATURE =
+            FEATURES.register("glacial_terrain", GlacialTerrainFeature::new);
+    /** Bounded terrain-following meltwater channel pass. */
+    public static final DeferredHolder<Feature<?>, GlacialRiverFeature> GLACIAL_RIVER_FEATURE =
+            FEATURES.register("glacial_river", GlacialRiverFeature::new);
+    /** Structure-aware surface fissure pass. */
+    public static final DeferredHolder<Feature<?>, GlacialCrevasseFeature> GLACIAL_CREVASSE_FEATURE =
+            FEATURES.register("glacial_crevasse", GlacialCrevasseFeature::new);
+    /** Structure-aware ice chamber and tunnel pass. */
+    public static final DeferredHolder<Feature<?>, GlacialIceCaveFeature> GLACIAL_ICE_CAVE_FEATURE =
+            FEATURES.register("glacial_ice_cave", GlacialIceCaveFeature::new);
+    /** Frozen cliff curtain that may thaw gradually at runtime. */
+    public static final DeferredHolder<Feature<?>, GlacialWaterfallFeature> GLACIAL_WATERFALL_FEATURE =
+            FEATURES.register("glacial_waterfall", GlacialWaterfallFeature::new);
+    /** Variable-size coastal iceberg and ice-shelf pass. */
+    public static final DeferredHolder<Feature<?>, IcebergFormationFeature> ICEBERG_FORMATION_FEATURE =
+            FEATURES.register("iceberg_formation", IcebergFormationFeature::new);
+    /** Bounded strandline, beach, dune/rock, and coastal-interior surface pass. */
+    public static final DeferredHolder<Feature<?>, CoastalTerrainFeature> COASTAL_TERRAIN_FEATURE =
+            FEATURES.register("coastal_terrain", CoastalTerrainFeature::new);
 
     private ModRegistries() {
     }

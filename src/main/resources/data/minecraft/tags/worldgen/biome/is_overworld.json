@@ -1,6 +1,17 @@
 {
   "replace": false,
   "values": [
-    "wildernessodysseyapi:anomaly_forest"
+    "wildernessodysseyapi:anomaly_forest",
+    "wildernessodysseyapi:iceberg_coast",
+    "wildernessodysseyapi:temperate_beach",
+    "wildernessodysseyapi:dune_beach",
+    "wildernessodysseyapi:rocky_coast",
+    "wildernessodysseyapi:cold_beach",
+    "wildernessodysseyapi:glacial_beach",
+    "wildernessodysseyapi:tropical_beach",
+    "wildernessodysseyapi:glacial_meltwater_valley",
+    "wildernessodysseyapi:polar_glacial_basin",
+    "wildernessodysseyapi:glacial_highlands",
+    "wildernessodysseyapi:polar_ice_sheet"
   ]
 }

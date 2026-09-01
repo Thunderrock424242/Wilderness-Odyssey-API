@@ -73,6 +73,13 @@ ordering="NONE"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
+modId="lithostitched"
+type="required"
+versionRange="[1.6.5,)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
 modId="ticktoklib"
 type="required"
 versionRange="[1.4.0,)"

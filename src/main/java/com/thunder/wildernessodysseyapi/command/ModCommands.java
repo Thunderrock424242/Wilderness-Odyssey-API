@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.dataengine.debug.DataEngineCommand;
 import com.thunder.wildernessodysseyapi.ecosystem.debug.EcosystemDebugCommand;
 import com.thunder.wildernessodysseyapi.faq.FaqCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
+import com.thunder.wildernessodysseyapi.environment.glacial.debug.GlacialDebugCommand;
 import com.thunder.wildernessodysseyapi.lorebook.command.LoreBookCommand;
 import com.thunder.wildernessodysseyapi.meteor.command.MeteorCommand;
 import com.thunder.wildernessodysseyapi.modlisttracker.commands.ConfigAuditCommand;
@@ -67,6 +68,7 @@ public final class ModCommands {
         WeatherDebugCommand.register(dispatcher);
         EcosystemDebugCommand.register(dispatcher);
         ReactiveVegetationDebugCommand.register(dispatcher);
+        GlacialDebugCommand.register(dispatcher);
         DataEngineCommand.register(dispatcher);
         SimulationDebugCommand.register(dispatcher);
         CinematicCommand.register(dispatcher);

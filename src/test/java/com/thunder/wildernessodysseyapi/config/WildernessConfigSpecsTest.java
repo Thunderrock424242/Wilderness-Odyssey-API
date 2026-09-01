@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
+import com.thunder.wildernessodysseyapi.environment.glacial.config.GlacialConfig;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
 import com.thunder.wildernessodysseyapi.performance.background.config.BackgroundEfficiencyConfig;
@@ -25,6 +26,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingC
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
+import com.thunder.wildernessodysseyapi.worldgen.coast.config.CoastalWorldgenConfig;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -40,6 +42,8 @@ class WildernessConfigSpecsTest {
         WildernessConfigSpecs.initialize();
 
         assertSame(WildernessConfigSpecs.commonSpec(), StructureConfig.CONFIG_SPEC);
+        assertSame(WildernessConfigSpecs.commonSpec(), GlacialConfig.COMMON_SPEC);
+        assertSame(WildernessConfigSpecs.commonSpec(), CoastalWorldgenConfig.COMMON_SPEC);
         assertSame(WildernessConfigSpecs.commonSpec(), AsyncThreadingConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.commonSpec(), OwnershipConfig.CONFIG_SPEC);
 
@@ -49,6 +53,7 @@ class WildernessConfigSpecsTest {
         assertSame(WildernessConfigSpecs.clientSpec(), RendererConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.clientSpec(), WaterRenderingConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.clientSpec(), WeatherRenderingConfig.CONFIG_SPEC);
+        assertSame(WildernessConfigSpecs.clientSpec(), GlacialConfig.CLIENT_SPEC);
 
         assertSame(WildernessConfigSpecs.serverSpec(), StructureBlockConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), PerformanceServerConfig.CONFIG_SPEC);
@@ -67,6 +72,7 @@ class WildernessConfigSpecsTest {
         assertSame(WildernessConfigSpecs.serverSpec(), WeatherConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), EcosystemConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), VegetationConfig.CONFIG_SPEC);
+        assertSame(WildernessConfigSpecs.serverSpec(), GlacialConfig.SERVER_SPEC);
     }
 
     @Test
@@ -76,6 +82,18 @@ class WildernessConfigSpecsTest {
         assertEquals(
                 List.of("structures", "placement", "enableAutoTerrainBlend"),
                 StructureConfig.ENABLE_AUTO_TERRAIN_BLEND.getPath()
+        );
+        assertEquals(
+                List.of("polarGlacialBiomes", "enablePolarBiomeSystem"),
+                GlacialConfig.ENABLE_POLAR_BIOME_SYSTEM.getPath()
+        );
+        assertEquals(
+                List.of("coastalWorldgen", "enableBeachBiomeFamily"),
+                CoastalWorldgenConfig.ENABLE_BEACH_BIOME_FAMILY.getPath()
+        );
+        assertEquals(
+                List.of("coastalWorldgen", "coastalDetailDensity"),
+                CoastalWorldgenConfig.COASTAL_DETAIL_DENSITY.getPath()
         );
         assertEquals(
                 List.of("donations", "disableReminder"),
@@ -94,6 +112,10 @@ class WildernessConfigSpecsTest {
                 WeatherRenderingConfig.ENABLE_LOCALIZED_CLOUDS.getPath()
         );
         assertEquals(
+                List.of("glacialAmbience", "enableBlowingSnowEffects"),
+                GlacialConfig.ENABLE_BLOWING_SNOW_EFFECTS.getPath()
+        );
+        assertEquals(
                 List.of("meteor_event", "enableNaturalMeteorEvents"),
                 MeteorConfig.NATURAL_EVENTS_ENABLED.getPath()
         );
@@ -104,6 +126,10 @@ class WildernessConfigSpecsTest {
         assertEquals(
                 List.of("weather", "enabled"),
                 WeatherConfig.WEATHER_SYSTEM_ENABLED.getPath()
+        );
+        assertEquals(
+                List.of("seasonalGlaciers", "glacialSeasonUpdateBudget"),
+                GlacialConfig.GLACIAL_SEASON_UPDATE_BUDGET.getPath()
         );
         assertEquals(
                 List.of("ecosystem", "enabled"),

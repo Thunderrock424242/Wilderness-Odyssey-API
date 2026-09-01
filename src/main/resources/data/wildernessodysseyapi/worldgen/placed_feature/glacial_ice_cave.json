@@ -1,0 +1,9 @@
+{
+  "feature": "wildernessodysseyapi:glacial_ice_cave",
+  "placement": [
+    { "type": "minecraft:rarity_filter", "chance": 9 },
+    { "type": "minecraft:in_square" },
+    { "type": "minecraft:heightmap", "heightmap": "OCEAN_FLOOR_WG" },
+    { "type": "minecraft:biome" }
+  ]
+}

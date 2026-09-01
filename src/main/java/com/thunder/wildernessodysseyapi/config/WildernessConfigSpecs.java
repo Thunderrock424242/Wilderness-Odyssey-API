@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
+import com.thunder.wildernessodysseyapi.environment.glacial.config.GlacialConfig;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
 import com.thunder.wildernessodysseyapi.performance.background.config.BackgroundEfficiencyConfig;
@@ -25,6 +26,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingC
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
+import com.thunder.wildernessodysseyapi.worldgen.coast.config.CoastalWorldgenConfig;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.function.Consumer;
@@ -88,6 +90,8 @@ public final class WildernessConfigSpecs {
     private static ModConfigSpec buildCommonSpec() {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         defineCategory(builder, "structures", StructureConfig::define);
+        GlacialConfig.defineCommon(builder);
+        CoastalWorldgenConfig.defineCommon(builder);
         AsyncThreadingConfig.define(builder);
         OwnershipConfig.define(builder);
         return builder.build();
@@ -101,6 +105,7 @@ public final class WildernessConfigSpecs {
         defineCategory(builder, "renderer", RendererConfig::define);
         WaterRenderingConfig.define(builder);
         defineCategory(builder, "weather_rendering", WeatherRenderingConfig::define);
+        GlacialConfig.defineClient(builder);
         return builder.build();
     }
 
@@ -120,6 +125,7 @@ public final class WildernessConfigSpecs {
         WeatherConfig.define(builder);
         EcosystemConfig.define(builder);
         VegetationConfig.define(builder);
+        GlacialConfig.defineServer(builder);
         return builder.build();
     }
 
@@ -135,6 +141,8 @@ public final class WildernessConfigSpecs {
 
     private static void attachCompatibilityAliases() {
         StructureConfig.CONFIG_SPEC = commonSpec;
+        GlacialConfig.attachSpecs(commonSpec, clientSpec, serverSpec);
+        CoastalWorldgenConfig.attachSpec(commonSpec);
         AsyncThreadingConfig.CONFIG_SPEC = commonSpec;
         OwnershipConfig.CONFIG_SPEC = commonSpec;
 

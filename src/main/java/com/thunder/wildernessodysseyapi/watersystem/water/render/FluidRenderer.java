@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import com.thunder.wildernessodysseyapi.environment.glacial.client.GlacialWaterTintManager;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
@@ -334,7 +336,8 @@ public class FluidRenderer {
 
     private static int waterTint(ClientLevel level, float x, float y, float z) {
         BlockPos pos = BlockPos.containing(x, y, z);
-        return IClientFluidTypeExtensions.of(Fluids.WATER).getTintColor(WATER_STATE, level, pos);
+        int baseTint = IClientFluidTypeExtensions.of(Fluids.WATER).getTintColor(WATER_STATE, level, pos);
+        return GlacialWaterTintManager.surfaceTint(level, pos, baseTint);
     }
 
     private static int waterColor(int tint, float nx, float ny, float nz, float alpha) {

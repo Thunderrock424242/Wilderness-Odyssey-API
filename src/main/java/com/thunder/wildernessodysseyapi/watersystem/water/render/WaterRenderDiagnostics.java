@@ -1,5 +1,8 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import net.minecraft.client.Minecraft;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicLong;
@@ -19,6 +22,8 @@ public final class WaterRenderDiagnostics {
     private static final AtomicLong SNAPSHOT_BYTES = new AtomicLong();
     private static final AtomicLong GENERATED_METADATA_BYTES = new AtomicLong();
     private static volatile FrameStats frameStats = FrameStats.EMPTY;
+    private static volatile CoastalStats coastalStats = CoastalStats.EMPTY;
+    private static volatile int coastalDebugBoxes;
     private static volatile RenderPath renderPath = RenderPath.DISABLED;
     private static volatile boolean sceneCaptureAvailable;
     private static volatile boolean externalRendererBridgeObserved;
@@ -75,6 +80,26 @@ public final class WaterRenderDiagnostics {
         );
     }
 
+    /** Publishes bounded coastline-cache and detail geometry counters. */
+    public static void publishCoastalFrame(
+            int cachedSegments,
+            int boundaryCandidates,
+            int renderedSegments,
+            int renderedQuads
+    ) {
+        coastalStats = new CoastalStats(
+                Math.max(0, cachedSegments),
+                Math.max(0, boundaryCandidates),
+                Math.max(0, renderedSegments),
+                Math.max(0, renderedQuads)
+        );
+    }
+
+    /** Publishes the bounded in-world coastal tuning geometry count. */
+    public static void publishCoastalDebug(int debugBoxes) {
+        coastalDebugBoxes = Math.max(0, debugBoxes);
+    }
+
     /** Returns a lock-free immutable diagnostics snapshot. */
     public static Snapshot snapshot() {
         return new Snapshot(
@@ -84,6 +109,7 @@ public final class WaterRenderDiagnostics {
                 SCENE_COPY_NANOS.get(),
                 SCENE_COPY_COUNT.get(),
                 MESH_REBUILDS.get(),
+                coastalStats,
                 renderPath,
                 sceneCaptureAvailable,
                 externalRendererBridgeObserved
@@ -99,7 +125,7 @@ public final class WaterRenderDiagnostics {
     public static List<String> debugLines() {
         Snapshot snapshot = snapshot();
         FrameStats frame = snapshot.frame();
-        return List.of(
+        List<String> lines = new ArrayList<>(List.of(
                 "WO Water mesh: " + frame.visibleGroups() + " visible / " + frame.culledGroups()
                         + " culled | " + frame.vertices() + " vtx / " + frame.triangles()
                         + " tri | " + snapshot.meshRebuildCount() + " rebuilds",
@@ -116,11 +142,28 @@ public final class WaterRenderDiagnostics {
                         ? WaterRenderingConfig.reflectionProfileName()
                         : "environment fallback"),
                 "WO Water quality: " + WaterRenderingConfig.qualitySelectionSummary(),
+                "WO Coast: " + snapshot.coastal().renderedSegments() + "/"
+                        + snapshot.coastal().cachedSegments() + " segments | "
+                        + snapshot.coastal().renderedQuads() + " quads | "
+                        + snapshot.coastal().boundaryCandidates() + " boundaries",
+                "WO Coast debug: " + coastalDebugBoxes
+                        + " boxes | cyan shore, energy arrow, orange breaker, blue depth, "
+                        + "magenta run-up, white foam, navy wetness, green slope, red event",
+                "WO Coast last break: " + CoastalBreakEffects.lastBreak()
+                        .map(event -> event.shoreType().name().toLowerCase(Locale.ROOT)
+                                + " @ " + Math.round(event.x()) + "," + Math.round(event.y())
+                                + "," + Math.round(event.z())
+                                + " | strength " + String.format(Locale.ROOT, "%.2f", event.strength()))
+                        .orElse("none"),
                 "WO Water shader-pack alias: "
                         + ExternalShaderWaterMaterialBridge.status().label()
                         + " | renderer bridge "
                         + (snapshot.externalRendererBridgeObserved() ? "active" : "not observed")
-        );
+        ));
+        if (Minecraft.getInstance().level != null) {
+            lines.addAll(ClientCoastalSegmentStore.debugLines(Minecraft.getInstance().level));
+        }
+        return List.copyOf(lines);
     }
 
     // Keep the overlay compact while retaining enough precision for frame-cost regressions.
@@ -147,6 +190,16 @@ public final class WaterRenderDiagnostics {
         private static final FrameStats EMPTY = new FrameStats(0, 0, 0, 0, 0L, -1L);
     }
 
+    /** Latest bounded client coastline-cache and geometry counters. */
+    public record CoastalStats(
+            int cachedSegments,
+            int boundaryCandidates,
+            int renderedSegments,
+            int renderedQuads
+    ) {
+        private static final CoastalStats EMPTY = new CoastalStats(0, 0, 0, 0);
+    }
+
     /** Pixel owner selected by the coordinator for the current client frame. */
     public enum RenderPath {
         DISABLED("disabled"),
@@ -163,7 +216,7 @@ public final class WaterRenderDiagnostics {
 
     /** Complete client water diagnostics view. */
     public record Snapshot(FrameStats frame, long snapshotBytes, long generatedMetadataBytes, long sceneCopyNanos,
-                           long sceneCopyCount, long meshRebuildCount, RenderPath renderPath,
+                           long sceneCopyCount, long meshRebuildCount, CoastalStats coastal, RenderPath renderPath,
                            boolean sceneCaptureAvailable, boolean externalRendererBridgeObserved) {
     }
 }

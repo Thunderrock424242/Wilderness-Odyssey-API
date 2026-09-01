@@ -33,6 +33,14 @@ public final class WaterRenderingConfig {
     public static ModConfigSpec.BooleanValue ENABLE_RIPPLES;
     public static ModConfigSpec.BooleanValue ENABLE_AMBIENT_WATER_PARTICLES;
     public static ModConfigSpec.BooleanValue ENABLE_PERSISTENT_WAKE_FOAM;
+    public static ModConfigSpec.BooleanValue ENABLE_COASTAL_WAVES;
+    public static ModConfigSpec.BooleanValue ENABLE_COASTAL_RUN_UP;
+    public static ModConfigSpec.BooleanValue ENABLE_COASTAL_FOAM;
+    public static ModConfigSpec.BooleanValue ENABLE_COASTAL_WETNESS;
+    public static ModConfigSpec.BooleanValue ENABLE_COASTAL_SPRAY;
+    public static ModConfigSpec.BooleanValue ENABLE_COASTAL_AUDIO;
+    public static ModConfigSpec.BooleanValue ENABLE_COASTAL_WEATHER_INFLUENCE;
+    public static ModConfigSpec.BooleanValue ENABLE_COASTAL_SEASON_INFLUENCE;
     public static ModConfigSpec.BooleanValue AUTO_OPTIMIZE_WITH_RENDERER_MODS;
     public static ModConfigSpec.BooleanValue AUTO_DETECT_WATER_QUALITY;
     public static ModConfigSpec.BooleanValue MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE;
@@ -52,6 +60,11 @@ public final class WaterRenderingConfig {
     public static ModConfigSpec.IntValue DYNAMIC_OCEAN_MAX_CELL_SIZE;
     public static ModConfigSpec.DoubleValue DYNAMIC_OCEAN_TEXTURE_SCALE;
     public static ModConfigSpec.DoubleValue DYNAMIC_OCEAN_LOD_TEXTURE_SOFTENING;
+    public static ModConfigSpec.IntValue COASTAL_TOPOLOGY_REFRESH_TICKS;
+    public static ModConfigSpec.IntValue COASTAL_MAX_RUN_UP_BLOCKS;
+    public static ModConfigSpec.DoubleValue COASTAL_FOAM_STRENGTH;
+    public static ModConfigSpec.DoubleValue COASTAL_WETNESS_STRENGTH;
+    public static ModConfigSpec.DoubleValue COASTAL_SOUND_VOLUME;
 
     public static ModConfigSpec.IntValue NORMAL_SPH_RENDER_DISTANCE_BLOCKS;
     public static ModConfigSpec.IntValue NORMAL_MAX_RENDERED_SPH_SIMULATIONS;
@@ -131,6 +144,30 @@ public final class WaterRenderingConfig {
         ENABLE_PERSISTENT_WAKE_FOAM = builder
                 .comment("Let impact and wake foam outlive their short surface displacement while remaining bounded by the eight nearest GPU impulses.")
                 .define("enablePersistentWakeFoam", true);
+        ENABLE_COASTAL_WAVES = builder
+                .comment("Enable the cached deterministic beach wave lifecycle: approach, shoal, break, run-up, and retreat. This never places water blocks.")
+                .define("enableCoastalWaves", true);
+        ENABLE_COASTAL_RUN_UP = builder
+                .comment("Render a thin visual water sheet across eligible loaded shoreline terrain during wave run-up and retreat.")
+                .define("enableCoastalRunUp", true);
+        ENABLE_COASTAL_FOAM = builder
+                .comment("Render breaker and run-up foam in the coordinated coastal detail pass.")
+                .define("enableCoastalFoam", true);
+        ENABLE_COASTAL_WETNESS = builder
+                .comment("Darken recently washed shoreline terrain with a short-lived visual overlay.")
+                .define("enableCoastalWetness", true);
+        ENABLE_COASTAL_SPRAY = builder
+                .comment("Allow quality-capped local splash and mist particles at strong breaking waves.")
+                .define("enableCoastalSpray", true);
+        ENABLE_COASTAL_AUDIO = builder
+                .comment("Play sparse local wave-crash accents near strong coastal breakers.")
+                .define("enableCoastalAudio", true);
+        ENABLE_COASTAL_WEATHER_INFLUENCE = builder
+                .comment("Let the synchronized regional sea state scale coastal height, frequency, run-up, foam, spray, and audio.")
+                .define("enableCoastalWeatherInfluence", true);
+        ENABLE_COASTAL_SEASON_INFLUENCE = builder
+                .comment("Let server-synchronized seasonal climate tint warm surf, cool winter wash, and strengthen cold-coast mist without loading an optional season mod on the client.")
+                .define("enableCoastalSeasonInfluence", true);
         AUTO_OPTIMIZE_WITH_RENDERER_MODS = builder
                 .comment("Use the optimized profile automatically when Sodium is loaded.")
                 .define("autoOptimizeWithRendererMods", true);
@@ -168,6 +205,21 @@ public final class WaterRenderingConfig {
         DYNAMIC_OCEAN_LOD_TEXTURE_SOFTENING = builder
                 .comment("Reduces texture repetition on medium/far LOD quads so coarse water cells do not look like separate patch panes.")
                 .defineInRange("dynamicOceanLodTextureSoftening", 0.75, 0.0, 2.0);
+        COASTAL_TOPOLOGY_REFRESH_TICKS = builder
+                .comment("Minimum ticks between bounded shoreline-topology refreshes. Movement and loaded snapshot changes are observed on the next refresh.")
+                .defineInRange("coastalTopologyRefreshTicks", 30, 10, 200);
+        COASTAL_MAX_RUN_UP_BLOCKS = builder
+                .comment("Hard terrain-distance cap for the visual coastal run-up sheet. No fluid or block state is changed.")
+                .defineInRange("coastalMaxRunUpBlocks", 10, 1, 16);
+        COASTAL_FOAM_STRENGTH = builder
+                .comment("Global coastal breaker/run-up foam multiplier.")
+                .defineInRange("coastalFoamStrength", 1.0, 0.0, 2.0);
+        COASTAL_WETNESS_STRENGTH = builder
+                .comment("Global recently-washed shoreline darkening multiplier.")
+                .defineInRange("coastalWetnessStrength", 1.0, 0.0, 2.0);
+        COASTAL_SOUND_VOLUME = builder
+                .comment("Global local wave-crash volume multiplier. Zero mutes coastal accents without disabling visuals.")
+                .defineInRange("coastalSoundVolume", 1.0, 0.0, 2.0);
         UNDERWATER_VISIBILITY_BLOCKS = builder
                 .comment("Maximum clear-water visibility used by the underwater optical model.")
                 .defineInRange("underwaterVisibilityBlocks", 44.0, 8.0, 128.0);
@@ -721,6 +773,154 @@ public final class WaterRenderingConfig {
     /** Returns the user-controlled shoreline overlay strength multiplier. */
     public static float shorelineOverlayStrength() {
         return SHORELINE_OVERLAY_STRENGTH.get().floatValue() * waterQuality().shorelineStrengthScale();
+    }
+
+    /** Returns whether the coordinated coastal lifecycle should render in this world. */
+    public static boolean coastalWavesEnabled(Level level) {
+        return shorelineWaterRenderingEnabled(level) && ENABLE_COASTAL_WAVES.get();
+    }
+
+    /** Returns whether a non-block run-up sheet may cover discovered terrain cells. */
+    public static boolean coastalRunUpEnabled(Level level) {
+        return coastalWavesEnabled(level)
+                && ENABLE_COASTAL_RUN_UP.get()
+                && coastalQuadBudget() > 0;
+    }
+
+    /** Returns whether breaker and run-up foam should be included. */
+    public static boolean coastalFoamEnabled(Level level) {
+        return coastalWavesEnabled(level) && ENABLE_COASTAL_FOAM.get();
+    }
+
+    /** Returns whether recently washed shoreline terrain should stay darkened. */
+    public static boolean coastalWetnessEnabled(Level level) {
+        return coastalWavesEnabled(level) && ENABLE_COASTAL_WETNESS.get();
+    }
+
+    /** Returns whether strong breakers may create bounded local particles. */
+    public static boolean coastalSprayEnabled(Level level) {
+        return coastalWavesEnabled(level)
+                && ENABLE_COASTAL_SPRAY.get()
+                && waterQuality() != WaterQuality.LOW;
+    }
+
+    /** Returns whether strong breakers may play sparse local crash accents. */
+    public static boolean coastalAudioEnabled(Level level) {
+        return coastalWavesEnabled(level)
+                && ENABLE_COASTAL_AUDIO.get()
+                && COASTAL_SOUND_VOLUME.get() > 0.0;
+    }
+
+    /** Returns whether synchronized regional weather scales the coastal model. */
+    public static boolean coastalWeatherInfluenceEnabled() {
+        return ENABLE_COASTAL_WEATHER_INFLUENCE.get();
+    }
+
+    /** Returns whether synchronized seasonal climate may alter coastal presentation. */
+    public static boolean coastalSeasonInfluenceEnabled() {
+        return ENABLE_COASTAL_SEASON_INFLUENCE.get();
+    }
+
+    /** Minimum interval between bounded loaded-shoreline cache refreshes. */
+    public static int coastalTopologyRefreshTicks() {
+        return COASTAL_TOPOLOGY_REFRESH_TICKS.get();
+    }
+
+    /** Hard distance cap for the purely visual terrain run-up sheet. */
+    public static int coastalMaxRunUpBlocks() {
+        return COASTAL_MAX_RUN_UP_BLOCKS.get();
+    }
+
+    /** Quality-capped number of cached shoreline segments. */
+    public static int coastalSegmentBudget() {
+        return coastalSegmentBudget(waterQuality(), usesOptimizedProfile());
+    }
+
+    static int coastalSegmentBudget(WaterQuality quality, boolean optimizedProfile) {
+        return switch (quality) {
+            case LOW -> 8;
+            case MEDIUM -> optimizedProfile ? 12 : 18;
+            case HIGH -> optimizedProfile ? 24 : 32;
+            case CINEMATIC -> optimizedProfile ? 36 : 48;
+        };
+    }
+
+    /** Hard per-frame quad budget shared by run-up, foam, and wetness. */
+    public static int coastalQuadBudget() {
+        return coastalQuadBudget(waterQuality(), usesOptimizedProfile());
+    }
+
+    static int coastalQuadBudget(WaterQuality quality, boolean optimizedProfile) {
+        return switch (quality) {
+            case LOW -> 0;
+            case MEDIUM -> optimizedProfile ? 72 : 128;
+            case HIGH -> optimizedProfile ? 224 : 384;
+            case CINEMATIC -> optimizedProfile ? 448 : 768;
+        };
+    }
+
+    /** Horizontal scan stride used when refreshing shoreline topology. */
+    public static int coastalTopologyStride() {
+        return waterQuality() == WaterQuality.LOW ? 2 : 1;
+    }
+
+    /** Distance at which shoreline crests gain terrain run-up and wetness detail. */
+    public static int coastalRunUpDetailDistanceBlocks() {
+        return coastalRunUpDetailDistanceBlocks(waterQuality(), usesOptimizedProfile());
+    }
+
+    static int coastalRunUpDetailDistanceBlocks(
+            WaterQuality quality,
+            boolean optimizedProfile
+    ) {
+        return switch (quality) {
+            case LOW -> 0;
+            case MEDIUM -> optimizedProfile ? 14 : 18;
+            case HIGH -> optimizedProfile ? 20 : 24;
+            case CINEMATIC -> optimizedProfile ? 28 : 32;
+        };
+    }
+
+    /** Very-near radius in which a breaker may spend direct particle budget. */
+    public static int coastalSprayDistanceBlocks() {
+        return coastalSprayDistanceBlocks(waterQuality(), usesOptimizedProfile());
+    }
+
+    static int coastalSprayDistanceBlocks(
+            WaterQuality quality,
+            boolean optimizedProfile
+    ) {
+        return switch (quality) {
+            case LOW -> 0;
+            case MEDIUM -> optimizedProfile ? 8 : 10;
+            case HIGH -> optimizedProfile ? 14 : 18;
+            case CINEMATIC -> optimizedProfile ? 18 : 22;
+        };
+    }
+
+    /** User-controlled breaker and run-up foam multiplier. */
+    public static float coastalFoamStrength() {
+        return COASTAL_FOAM_STRENGTH.get().floatValue();
+    }
+
+    /** User-controlled recently-washed terrain darkening multiplier. */
+    public static float coastalWetnessStrength() {
+        return COASTAL_WETNESS_STRENGTH.get().floatValue();
+    }
+
+    /** User-controlled local crash sound multiplier. */
+    public static float coastalSoundVolume() {
+        return COASTAL_SOUND_VOLUME.get().floatValue();
+    }
+
+    /** Hard number of direct splash particles emitted by one coastal break. */
+    public static int coastalSprayParticleBudget() {
+        return switch (waterQuality()) {
+            case LOW -> 0;
+            case MEDIUM -> 1;
+            case HIGH -> usesOptimizedProfile() ? 2 : 3;
+            case CINEMATIC -> usesOptimizedProfile() ? 4 : 6;
+        };
     }
 
     /** Returns the depth absorption multiplier used by surface renderers. */

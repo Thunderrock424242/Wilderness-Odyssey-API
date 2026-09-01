@@ -36,11 +36,15 @@ public class ClientTickHandler {
                 SPHSimulationManager.get().clearLevel(mc.level);
                 ClientOceanSeaState.clear(mc.level);
                 ClientWaterVolumeSnapshots.clear(mc.level);
+                ClientCoastalSegmentStore.clear();
+                CoastalBreakEffects.clear();
                 return;
             }
             ClientOceanSeaState.tick(mc.level);
             ClientWaterVolumeSnapshots.tick(mc.level);
             SPHSimulationManager.get().tickLevel(mc.level, CLIENT_TICK_DELTA);
+            ClientCoastalSegmentStore.tick(mc);
+            CoastalBreakEffects.tick(mc);
             WaterAmbientEffects.tick(mc);
             WaterEnvironmentalEffectPool.tick(mc.level);
             RiverSoundscape.tick(mc);
@@ -58,6 +62,8 @@ public class ClientTickHandler {
             OceanSurfaceRenderer.clearLevel(level);
             WaterBodyClassifier.clearCache(level);
             WaveAnimator.reset();
+            ClientCoastalSegmentStore.clear();
+            CoastalBreakEffects.clear();
             WaterEnvironmentalEffectPool.clear();
             RiverSoundscape.clear();
         }
