@@ -1239,7 +1239,7 @@ The following are the most likely “works alone, fails at 200–500 mods” pat
 - [AUDIT-COMPAT-001](#audit-compat-001--create-schematic-directories-are-globally-replaced) and [AUDIT-COMPAT-002](#audit-compat-002--worldedit-entity-copying-is-enabled-for-unrelated-pastes) globally change other mods' user-facing behavior.
 - Renderer mixins depend on exact Sodium 6/Embeddium 5/Iris internal class layouts. Guards prevent absent-class loading but cannot prove method compatibility.
 - Global weather/time command hooks can conflict with seasons, alternate time, localized weather, or dimension-environment mods. Ownership is explicit, but priority/fallback behavior must be documented.
-- Worldgen hooks assume the inspected 1.21.1 generation write paths. Test Lithostitched, Biolith, TerraBlender, Regions Unexplored, and at least one alternate generator together.
+- Worldgen hooks assume the inspected 1.21.1 generation write paths. Test Lithostitched, Biolith, Regions Unexplored, and at least one alternate generator together.
 - The water policy uses tags/services rather than only vanilla IDs, which is a compatibility strength. Preserve data-driven recognition for modded aquatic mobs and features.
 
 ## Dead/Obsolete Code
@@ -1439,9 +1439,9 @@ The prior test HTML under `build/reports/tests/test` already contained an unrela
 
 ### Dependency observations
 
-The build integrates WorldEdit, TickTokLib, Create, Regions Unexplored, Lithostitched, Biolith, TerraBlender, Geckolib, Locate Fixer, Curios, Amendments/Selene/Supplementaries, multipart cooking, and optional renderer/profiling tools. OkHttp/Okio, YAML, resilience4j, and zstd are jar-in-jar dependencies. This is a broad compatibility surface, but unused-dependency removal was not recommended without a successful dependency report and runtime matrix.
+The build integrates WorldEdit, TickTokLib, Create, Regions Unexplored, Lithostitched, Biolith, Geckolib, Locate Fixer, Curios, Amendments/Selene/Supplementaries, multipart cooking, and optional renderer/profiling tools. OkHttp/Okio, YAML, resilience4j, and zstd are jar-in-jar dependencies. This is a broad compatibility surface, but unused-dependency removal was not recommended without a successful dependency report and runtime matrix.
 
-Metadata currently lists TickTokLib, Curios, Geckolib, and Create as intended required dependencies and Spark as intended optional. Correct the schema and explicitly decide WorldEdit's status before release.
+Metadata currently lists Lithostitched, TickTokLib, Curios, Geckolib, and Create as intended required dependencies and Spark as intended optional. Correct the schema and explicitly decide WorldEdit's status before release.
 
 No access transformer or access widener file was found. Private vanilla/external access is handled through mixin accessors/invokers and targeted injections.
 

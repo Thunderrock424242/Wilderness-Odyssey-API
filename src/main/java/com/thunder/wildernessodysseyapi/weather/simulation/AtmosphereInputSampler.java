@@ -98,7 +98,8 @@ public final class AtmosphereInputSampler {
                 water.inlandWaterCoverage() * water.loadedProbeFraction(),
                 season.fireSeasonFactor(),
                 season.snowSeasonFactor(),
-                season.calendarAvailable()
+                season.calendarAvailable(),
+                season.cyclePhase()
         );
     }
 

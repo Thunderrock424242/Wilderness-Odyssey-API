@@ -28,6 +28,7 @@ public interface SeasonalWeatherInfluence {
      * @param fireSeasonFactor normalized temperate-summer or tropical-dry-season strength
      * @param snowSeasonFactor normalized temperate-winter snowfall eligibility
      * @param calendarAvailable whether an external calendar supplied a real season phase
+     * @param cyclePhase normalized temperate calendar position, or {@link Double#NaN} when unavailable
      */
     record SeasonalOffset(
             double temperatureCelsius,
@@ -36,11 +37,34 @@ public interface SeasonalWeatherInfluence {
             double evaporationMultiplier,
             double fireSeasonFactor,
             double snowSeasonFactor,
-            boolean calendarAvailable
+            boolean calendarAvailable,
+            double cyclePhase
     ) {
         public static final SeasonalOffset NONE = new SeasonalOffset(
-                0.0, 0.0, 0.0, 1.0, 0.0, 0.0, false
+                0.0, 0.0, 0.0, 1.0, 0.0, 0.0, false, Double.NaN
         );
+
+        /** Retains the original calendar-aware shape for adapters without a normalized phase. */
+        public SeasonalOffset(
+                double temperatureCelsius,
+                double humidity,
+                double storminess,
+                double evaporationMultiplier,
+                double fireSeasonFactor,
+                double snowSeasonFactor,
+                boolean calendarAvailable
+        ) {
+            this(
+                    temperatureCelsius,
+                    humidity,
+                    storminess,
+                    evaporationMultiplier,
+                    fireSeasonFactor,
+                    snowSeasonFactor,
+                    calendarAvailable,
+                    Double.NaN
+            );
+        }
 
         /** Retains the pre-snow-season construction shape for optional adapters. */
         public SeasonalOffset(
@@ -58,7 +82,8 @@ public interface SeasonalWeatherInfluence {
                     evaporationMultiplier,
                     fireSeasonFactor,
                     0.0,
-                    calendarAvailable
+                    calendarAvailable,
+                    Double.NaN
             );
         }
 
@@ -69,7 +94,16 @@ public interface SeasonalWeatherInfluence {
                 double storminess,
                 double evaporationMultiplier
         ) {
-            this(temperatureCelsius, humidity, storminess, evaporationMultiplier, 0.0, 0.0, false);
+            this(
+                    temperatureCelsius,
+                    humidity,
+                    storminess,
+                    evaporationMultiplier,
+                    0.0,
+                    0.0,
+                    false,
+                    Double.NaN
+            );
         }
 
         public SeasonalOffset {
@@ -85,6 +119,8 @@ public interface SeasonalWeatherInfluence {
                     ? Math.max(0.0, Math.min(1.0, fireSeasonFactor)) : 0.0;
             snowSeasonFactor = Double.isFinite(snowSeasonFactor)
                     ? Math.max(0.0, Math.min(1.0, snowSeasonFactor)) : 0.0;
+            cyclePhase = Double.isFinite(cyclePhase)
+                    ? cyclePhase - Math.floor(cyclePhase) : Double.NaN;
         }
     }
 }

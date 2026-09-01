@@ -7,6 +7,7 @@ import com.thunder.wildernessodysseyapi.entity.client.RiftListenerRenderer;
 import com.thunder.wildernessodysseyapi.entity.client.RiftMawRenderer;
 import com.thunder.wildernessodysseyapi.entity.client.RiftbornRenderer;
 import com.thunder.wildernessodysseyapi.entity.client.RiftboundWraithRenderer;
+import com.thunder.wildernessodysseyapi.environment.glacial.client.GlacialWaterTintManager;
 import com.thunder.wildernessodysseyapi.meteor.renderer.MeteorRenderer;
 import com.thunder.wildernessodysseyapi.temporalrift.client.RiftCoreBlockEntityRenderer;
 import com.thunder.wildernessodysseyapi.temporalrift.client.TemporalRiftShaders;
@@ -15,6 +16,7 @@ import com.thunder.wildernessodysseyapi.vegetation.client.ReactiveVegetationClie
 import com.thunder.wildernessodysseyapi.vegetation.client.ReactiveVegetationDataEngineClient;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterShaders;
+import com.thunder.wildernessodysseyapi.watersystem.water.render.ClientCoastalWaveProfiles;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.VolumetricCloudShaders;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.RaymarchedCloudShaders;
 import net.minecraft.client.renderer.BiomeColors;
@@ -31,6 +33,7 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterShadersEvent;
+import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 
@@ -116,7 +119,9 @@ public class ClientSetup {
 
             @Override
             public int getTintColor(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
-                return 0xFF000000 | BiomeColors.getAverageWaterColor(getter, pos);
+                int tint = GlacialWaterTintManager.surfaceTint(
+                        getter, pos, BiomeColors.getAverageWaterColor(getter, pos));
+                return 0xFF000000 | tint;
             }
         }, WildernessFluidRegistry.WILDERNESS_WATER_TYPE.get());
     }
@@ -151,5 +156,11 @@ public class ClientSetup {
             // remain available after a failed resource reload.
             ModConstants.LOGGER.warn("Unable to load volumetric cloud shader; using voxel cloud fallback", exception);
         }
+    }
+
+    /** Registers resource-pack-driven coastal wave tuning on the client resource manager. */
+    @SubscribeEvent
+    public static void onRegisterClientReloadListeners(RegisterClientReloadListenersEvent event) {
+        event.registerReloadListener(new ClientCoastalWaveProfiles());
     }
 }

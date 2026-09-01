@@ -270,7 +270,6 @@ dependencies {
     implementation "curse.maven:regions-unexplored-659110:7826194"
     implementation "curse.maven:lithostitched-936015:7832789"
     implementation "curse.maven:biolith-852512:7074761"
-    implementation "curse.maven:terrablender-neoforge-940057:6054947"
     implementation "curse.maven:geckolib-388172:7023453"
     implementation "curse.maven:locate-fixer-1301683:6762552"
     implementation "curse.maven:curios-309927:6529130"

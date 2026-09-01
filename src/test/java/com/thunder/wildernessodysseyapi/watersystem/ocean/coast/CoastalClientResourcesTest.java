@@ -1,0 +1,66 @@
+package com.thunder.wildernessodysseyapi.watersystem.ocean.coast;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** Guards resource-pack tuning and stable layered surf sound identities. */
+class CoastalClientResourcesTest {
+
+    private static final List<String> PROFILE_NAMES = List.of(
+            "temperate", "dune", "rocky", "cold", "glacial", "tropical");
+    private static final List<String> PROFILE_FIELDS = List.of(
+            "waveHeightMultiplier",
+            "waveFrequencyMultiplier",
+            "breakerDistanceBlocks",
+            "breakerStrength",
+            "runUpDistanceBlocks",
+            "retreatSpeed",
+            "foamAmount",
+            "crashSoundVolume",
+            "crashSoundRadiusBlocks",
+            "turbulence",
+            "shorelineWetnessDurationTicks"
+    );
+
+    @Test
+    void everyShoreHasACompleteReloadableWaveProfile() throws IOException {
+        JsonObject profiles = readJson("src/main/resources/assets/wildernessodysseyapi/"
+                + "coastal_wave_profiles.json");
+        assertEquals(PROFILE_NAMES, profiles.keySet().stream().toList());
+        for (String profileName : PROFILE_NAMES) {
+            JsonObject profile = profiles.getAsJsonObject(profileName);
+            assertEquals(PROFILE_FIELDS, profile.keySet().stream().toList(), profileName);
+            PROFILE_FIELDS.forEach(field -> assertTrue(
+                    profile.get(field).isJsonPrimitive(), profileName + ":" + field));
+        }
+    }
+
+    @Test
+    void everyCoastalSoundUsesAtLeastOneExistingEventLayer() throws IOException {
+        JsonObject sounds = readJson(
+                "src/main/resources/assets/wildernessodysseyapi/sounds.json");
+        for (String soundName : List.of(
+                "coast_wash_soft", "coast_break", "coast_break_rocky", "coast_break_storm")) {
+            JsonArray layers = sounds.getAsJsonObject(soundName).getAsJsonArray("sounds");
+            assertTrue(layers.size() > 0, soundName);
+            layers.forEach(layer -> assertEquals(
+                    "event", layer.getAsJsonObject().get("type").getAsString(), soundName));
+        }
+    }
+
+    private static JsonObject readJson(String relativePath) throws IOException {
+        Path root = Path.of(System.getProperty(
+                "wildernessodysseyapi.projectDir", System.getProperty("user.dir")));
+        return JsonParser.parseString(Files.readString(root.resolve(relativePath))).getAsJsonObject();
+    }
+}

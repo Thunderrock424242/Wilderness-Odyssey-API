@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import com.thunder.wildernessodysseyapi.environment.glacial.client.GlacialWaterTintManager;
+
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
@@ -135,7 +137,14 @@ public final class ClientWaterImmersion {
                 level.dimensionType(),
                 level.getMaxLocalRawBrightness(new BlockPos(blockX, column.surfaceBlockY(), blockZ))
         );
-        float[] tint = bodyTint(oceanWeight, riverWeight, lakeWeight, column.waterTint());
+        int seasonalTint = GlacialWaterTintManager.underwaterTint(
+                level,
+                new BlockPos(blockX, column.surfaceBlockY(), blockZ),
+                column.waterTint()
+        );
+        boolean glacialWater = GlacialWaterTintManager.isGlacial(
+                level, new BlockPos(blockX, column.surfaceBlockY(), blockZ));
+        float[] tint = bodyTint(oceanWeight, riverWeight, lakeWeight, seasonalTint);
         UnderwaterOpticsModel.OpticalProperties optics = UnderwaterOpticsModel.evaluate(
                 depthBelowSurface,
                 columnDepth,
@@ -147,9 +156,11 @@ public final class ClientWaterImmersion {
                 tint[2],
                 sea.strength() * oceanWeight,
                 WaterRenderingConfig.UNDERWATER_VISIBILITY_BLOCKS.get().floatValue()
-                        * (1.0f - watershed.sediment() * 0.55f),
+                        * (1.0f - watershed.sediment() * 0.55f)
+                        * (glacialWater ? 1.45f : 1.0f),
                 WaterRenderingConfig.UNDERWATER_TURBIDITY_STRENGTH.get().floatValue()
                         * (1.0f + watershed.sediment() * 1.35f)
+                        * (glacialWater ? 0.48f : 1.0f)
         );
         return new ImmersionState(true, surfaceY, depthBelowSurface,
                 sea.strength() * oceanWeight, optics);
@@ -333,11 +344,18 @@ public final class ClientWaterImmersion {
         BlockPos cameraPos = BlockPos.containing(cameraPosition);
         float daylight = LightTexture.getBrightness(
                 level.dimensionType(), level.getMaxLocalRawBrightness(cameraPos));
+        boolean glacialWater = GlacialWaterTintManager.isGlacial(level, cameraPos);
+        int mobileTint = GlacialWaterTintManager.underwaterTint(level, cameraPos, 0x08569E);
         UnderwaterOpticsModel.OpticalProperties optics = UnderwaterOpticsModel.evaluate(
                 0.35f, 1.0f, disturbance, daylight,
-                0.03f, 0.34f, 0.62f, 0.0f,
-                WaterRenderingConfig.UNDERWATER_VISIBILITY_BLOCKS.get().floatValue(),
+                ((mobileTint >>> 16) & 0xFF) / 255.0f,
+                ((mobileTint >>> 8) & 0xFF) / 255.0f,
+                (mobileTint & 0xFF) / 255.0f,
+                0.0f,
+                WaterRenderingConfig.UNDERWATER_VISIBILITY_BLOCKS.get().floatValue()
+                        * (glacialWater ? 1.45f : 1.0f),
                 WaterRenderingConfig.UNDERWATER_TURBIDITY_STRENGTH.get().floatValue()
+                        * (glacialWater ? 0.48f : 1.0f)
         );
         return new ImmersionState(true, (float) cameraPosition.y + 0.35f,
                 0.35f, 0.0f, optics);

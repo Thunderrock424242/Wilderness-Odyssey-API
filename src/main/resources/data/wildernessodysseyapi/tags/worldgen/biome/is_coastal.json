@@ -1,0 +1,12 @@
+{
+  "replace": false,
+  "values": [
+    "wildernessodysseyapi:temperate_beach",
+    "wildernessodysseyapi:dune_beach",
+    "wildernessodysseyapi:rocky_coast",
+    "wildernessodysseyapi:cold_beach",
+    "wildernessodysseyapi:glacial_beach",
+    "wildernessodysseyapi:tropical_beach",
+    "wildernessodysseyapi:iceberg_coast"
+  ]
+}

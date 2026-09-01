@@ -474,6 +474,8 @@ public final class WaterRenderCoordinator {
         WaterSurfaceDisplacement.clear();
         FluidRenderer.clear();
         RippleRenderer.clear();
+        CoastalRunupRenderer.clear();
+        WaterRenderDiagnostics.publishCoastalDebug(0);
     }
 
     private static void renderDetailSubpasses(
@@ -482,6 +484,10 @@ public final class WaterRenderCoordinator {
     ) {
         FluidRenderer.onRenderLevel(event);
         RippleRenderer.onRenderLevel(event);
+        CoastalRunupRenderer.onRenderLevel(event);
         minecraft.renderBuffers().bufferSource().endBatch(RenderType.translucent());
+        if (CoastalDebugRenderer.onRenderLevel(event)) {
+            minecraft.renderBuffers().bufferSource().endBatch(RenderType.lines());
+        }
     }
 }

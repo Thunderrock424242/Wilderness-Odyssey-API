@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import com.thunder.wildernessodysseyapi.environment.glacial.client.GlacialWaterTintManager;
+
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
@@ -338,9 +340,14 @@ public final class WaterChunkMeshCache {
                 velocityX += column.velocityX() + localFlow.currentX();
                 velocityZ += column.velocityZ() + localFlow.currentZ();
                 depth += column.depth();
-                tintRed += ((column.waterTint() >>> 16) & 0xFF) / 255.0f;
-                tintGreen += ((column.waterTint() >>> 8) & 0xFF) / 255.0f;
-                tintBlue += (column.waterTint() & 0xFF) / 255.0f;
+                int seasonalTint = GlacialWaterTintManager.surfaceTint(
+                        level,
+                        new BlockPos(columnX, column.surfaceBlockY(), columnZ),
+                        column.waterTint()
+                );
+                tintRed += ((seasonalTint >>> 16) & 0xFF) / 255.0f;
+                tintGreen += ((seasonalTint >>> 8) & 0xFF) / 255.0f;
+                tintBlue += (seasonalTint & 0xFF) / 255.0f;
                 sediment += conditions.sediment();
                 clarity += conditions.clarity();
                 count++;
@@ -362,9 +369,14 @@ public final class WaterChunkMeshCache {
             velocityX = fallback.velocityX() + localFlow.currentX();
             velocityZ = fallback.velocityZ() + localFlow.currentZ();
             depth = fallback.depth();
-            tintRed = ((fallback.waterTint() >>> 16) & 0xFF) / 255.0f;
-            tintGreen = ((fallback.waterTint() >>> 8) & 0xFF) / 255.0f;
-            tintBlue = (fallback.waterTint() & 0xFF) / 255.0f;
+            int seasonalTint = GlacialWaterTintManager.surfaceTint(
+                    level,
+                    new BlockPos(worldVertexX, fallback.surfaceBlockY(), worldVertexZ),
+                    fallback.waterTint()
+            );
+            tintRed = ((seasonalTint >>> 16) & 0xFF) / 255.0f;
+            tintGreen = ((seasonalTint >>> 8) & 0xFF) / 255.0f;
+            tintBlue = (seasonalTint & 0xFF) / 255.0f;
             sediment = conditions.sediment();
             clarity = conditions.clarity();
             count = 1;

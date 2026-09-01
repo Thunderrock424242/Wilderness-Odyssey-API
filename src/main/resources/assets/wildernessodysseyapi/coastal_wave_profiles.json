@@ -1,0 +1,80 @@
+{
+  "temperate": {
+    "waveHeightMultiplier": 1.0,
+    "waveFrequencyMultiplier": 1.0,
+    "breakerDistanceBlocks": 5.5,
+    "breakerStrength": 0.92,
+    "runUpDistanceBlocks": 5.0,
+    "retreatSpeed": 1.0,
+    "foamAmount": 0.82,
+    "crashSoundVolume": 0.78,
+    "crashSoundRadiusBlocks": 24.0,
+    "turbulence": 0.72,
+    "shorelineWetnessDurationTicks": 180
+  },
+  "dune": {
+    "waveHeightMultiplier": 0.92,
+    "waveFrequencyMultiplier": 0.92,
+    "breakerDistanceBlocks": 7.0,
+    "breakerStrength": 0.76,
+    "runUpDistanceBlocks": 7.5,
+    "retreatSpeed": 0.82,
+    "foamAmount": 0.68,
+    "crashSoundVolume": 0.62,
+    "crashSoundRadiusBlocks": 22.0,
+    "turbulence": 0.48,
+    "shorelineWetnessDurationTicks": 240
+  },
+  "rocky": {
+    "waveHeightMultiplier": 1.1,
+    "waveFrequencyMultiplier": 1.08,
+    "breakerDistanceBlocks": 3.6,
+    "breakerStrength": 1.18,
+    "runUpDistanceBlocks": 2.8,
+    "retreatSpeed": 1.28,
+    "foamAmount": 1.0,
+    "crashSoundVolume": 1.0,
+    "crashSoundRadiusBlocks": 32.0,
+    "turbulence": 1.2,
+    "shorelineWetnessDurationTicks": 120
+  },
+  "cold": {
+    "waveHeightMultiplier": 0.9,
+    "waveFrequencyMultiplier": 0.86,
+    "breakerDistanceBlocks": 5.0,
+    "breakerStrength": 0.88,
+    "runUpDistanceBlocks": 4.2,
+    "retreatSpeed": 0.88,
+    "foamAmount": 0.72,
+    "crashSoundVolume": 0.68,
+    "crashSoundRadiusBlocks": 22.0,
+    "turbulence": 0.62,
+    "shorelineWetnessDurationTicks": 260
+  },
+  "glacial": {
+    "waveHeightMultiplier": 0.76,
+    "waveFrequencyMultiplier": 0.72,
+    "breakerDistanceBlocks": 3.8,
+    "breakerStrength": 0.82,
+    "runUpDistanceBlocks": 2.6,
+    "retreatSpeed": 0.72,
+    "foamAmount": 0.58,
+    "crashSoundVolume": 0.72,
+    "crashSoundRadiusBlocks": 28.0,
+    "turbulence": 0.56,
+    "shorelineWetnessDurationTicks": 320
+  },
+  "tropical": {
+    "waveHeightMultiplier": 1.04,
+    "waveFrequencyMultiplier": 1.04,
+    "breakerDistanceBlocks": 6.5,
+    "breakerStrength": 0.98,
+    "runUpDistanceBlocks": 6.4,
+    "retreatSpeed": 0.94,
+    "foamAmount": 0.94,
+    "crashSoundVolume": 0.82,
+    "crashSoundRadiusBlocks": 26.0,
+    "turbulence": 0.82,
+    "shorelineWetnessDurationTicks": 220
+  }
+}

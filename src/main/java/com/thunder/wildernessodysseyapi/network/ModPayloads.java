@@ -21,6 +21,8 @@ import com.thunder.wildernessodysseyapi.ecosystem.distant.network.DistantWildlif
 import com.thunder.wildernessodysseyapi.ecosystem.network.EnvironmentalMemoryDebugPayload;
 import com.thunder.wildernessodysseyapi.environment.client.ClientEnvironmentState;
 import com.thunder.wildernessodysseyapi.environment.network.EnvironmentSyncPayload;
+import com.thunder.wildernessodysseyapi.environment.glacial.client.ClientGlacialState;
+import com.thunder.wildernessodysseyapi.environment.glacial.network.GlacialSeasonSyncPayload;
 import com.thunder.wildernessodysseyapi.lorebook.CodexClientState;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookManager;
 import com.thunder.wildernessodysseyapi.lorebook.network.OpenCodexPayload;
@@ -55,7 +57,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class ModPayloads {
 
     // This channel version covers every payload registered below; bump it for wire-shape changes.
-    private static final String NETWORK_VERSION = "28";
+    private static final String NETWORK_VERSION = "29";
 
     private ModPayloads() {
     }
@@ -68,6 +70,15 @@ public final class ModPayloads {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(NETWORK_VERSION);
         DataEnginePayloads.register(registrar);
+        registrar.playToClient(
+                GlacialSeasonSyncPayload.TYPE,
+                GlacialSeasonSyncPayload.STREAM_CODEC,
+                (payload, context) -> {
+                    if (context.player().level() instanceof net.minecraft.client.multiplayer.ClientLevel level) {
+                        ClientGlacialState.accept(level, payload);
+                    }
+                }
+        );
 
         registrar.playToClient(AetherVoiceLinePayload.TYPE, AetherVoiceLinePayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() ->

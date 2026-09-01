@@ -27,6 +27,7 @@ import com.thunder.wildernessodysseyapi.weather.api.WindVector;
  * @param fireSeasonFactor normalized temperate-summer or tropical-dry-season strength
  * @param snowSeasonFactor normalized temperate-winter snowfall eligibility
  * @param seasonCalendarAvailable whether an external calendar supplied a season phase
+ * @param seasonalCyclePhase normalized temperate calendar position, or NaN when unavailable
  */
 public record AtmosphereEnvironment(
         double biomeTemperatureCelsius,
@@ -46,7 +47,8 @@ public record AtmosphereEnvironment(
         double inlandWaterCoverage,
         double fireSeasonFactor,
         double snowSeasonFactor,
-        boolean seasonCalendarAvailable
+        boolean seasonCalendarAvailable,
+        double seasonalCyclePhase
 ) {
     public static final AtmosphereEnvironment TEMPERATE = new AtmosphereEnvironment(
             15.0,
@@ -66,8 +68,53 @@ public record AtmosphereEnvironment(
             0.0,
             0.0,
             0.0,
-            false
+            false,
+            Double.NaN
     );
+
+    /** Retains the pre-cycle-phase construction shape for integrations and tests. */
+    public AtmosphereEnvironment(
+            double biomeTemperatureCelsius,
+            double biomeHumidity,
+            double elevationBlocks,
+            double waterCoverage,
+            double daylight,
+            double dimensionTemperatureOffset,
+            double seasonalTemperatureOffset,
+            double atmosphericVariation,
+            double seasonalStorminessOffset,
+            double seasonalEvaporationMultiplier,
+            double terrainGradientX,
+            double terrainGradientZ,
+            double terrainRoughness,
+            double oceanCoverage,
+            double inlandWaterCoverage,
+            double fireSeasonFactor,
+            double snowSeasonFactor,
+            boolean seasonCalendarAvailable
+    ) {
+        this(
+                biomeTemperatureCelsius,
+                biomeHumidity,
+                elevationBlocks,
+                waterCoverage,
+                daylight,
+                dimensionTemperatureOffset,
+                seasonalTemperatureOffset,
+                atmosphericVariation,
+                seasonalStorminessOffset,
+                seasonalEvaporationMultiplier,
+                terrainGradientX,
+                terrainGradientZ,
+                terrainRoughness,
+                oceanCoverage,
+                inlandWaterCoverage,
+                fireSeasonFactor,
+                snowSeasonFactor,
+                seasonCalendarAvailable,
+                Double.NaN
+        );
+    }
 
     /** Retains the pre-snow-season construction shape for integrations and tests. */
     public AtmosphereEnvironment(
@@ -107,7 +154,8 @@ public record AtmosphereEnvironment(
                 inlandWaterCoverage,
                 fireSeasonFactor,
                 0.0,
-                seasonCalendarAvailable
+                seasonCalendarAvailable,
+                Double.NaN
         );
     }
 
@@ -147,7 +195,8 @@ public record AtmosphereEnvironment(
                 inlandWaterCoverage,
                 0.0,
                 0.0,
-                false
+                false,
+                Double.NaN
         );
     }
 
@@ -185,7 +234,8 @@ public record AtmosphereEnvironment(
                 0.0,
                 0.0,
                 0.0,
-                false
+                false,
+                Double.NaN
         );
     }
 
@@ -218,7 +268,8 @@ public record AtmosphereEnvironment(
                 0.0,
                 0.0,
                 0.0,
-                false
+                false,
+                Double.NaN
         );
     }
 
@@ -244,6 +295,8 @@ public record AtmosphereEnvironment(
         inlandWaterCoverage = unit(inlandWaterCoverage);
         fireSeasonFactor = unit(fireSeasonFactor);
         snowSeasonFactor = unit(snowSeasonFactor);
+        seasonalCyclePhase = Double.isFinite(seasonalCyclePhase)
+                ? seasonalCyclePhase - Math.floor(seasonalCyclePhase) : Double.NaN;
     }
 
     /**

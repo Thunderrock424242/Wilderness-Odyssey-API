@@ -50,7 +50,8 @@ public final class SeasonCycleProfile {
                 1.0 + temperatureWave * 0.18,
                 fireSeasonFactor,
                 snowSeasonFactor,
-                true
+                true,
+                phase
         );
     }
 

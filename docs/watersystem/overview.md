@@ -18,6 +18,10 @@ noise, aquifers, carvers, flat layers, springs, and placed features
   -> WaterRenderCoordinator
 ```
 
+The biome-aware shoreline cache, deterministic breaker lifecycle, terrain
+run-up sheet, foam, wetness, local crash effects, and six transition beach
+biomes are documented in [Beach and dynamic coastline system](coastal-system.md).
+
 ## Generation writes
 
 `GenerationWaterStateMapper` maps only standalone `minecraft:water` states at

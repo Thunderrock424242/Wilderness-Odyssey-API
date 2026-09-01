@@ -293,7 +293,8 @@ public final class WeatherAuthority implements WeatherQuery {
                 environment.seasonalEvaporationMultiplier(),
                 environment.fireSeasonFactor(),
                 environment.snowSeasonFactor(),
-                environment.seasonCalendarAvailable()
+                environment.seasonCalendarAvailable(),
+                environment.seasonalCyclePhase()
         );
     }
 

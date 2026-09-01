@@ -15,6 +15,14 @@ class WaterRenderingConfigTest {
         assertTrue(WaterRenderingConfig.SHOW_CONTEXTUAL_CLOCK_TIDE_DISPLAY.getDefault());
         assertTrue(WaterRenderingConfig.ENABLE_AMBIENT_WATER_PARTICLES.getDefault());
         assertTrue(WaterRenderingConfig.ENABLE_PERSISTENT_WAKE_FOAM.getDefault());
+        assertTrue(WaterRenderingConfig.ENABLE_COASTAL_WAVES.getDefault());
+        assertTrue(WaterRenderingConfig.ENABLE_COASTAL_RUN_UP.getDefault());
+        assertTrue(WaterRenderingConfig.ENABLE_COASTAL_FOAM.getDefault());
+        assertTrue(WaterRenderingConfig.ENABLE_COASTAL_WETNESS.getDefault());
+        assertTrue(WaterRenderingConfig.ENABLE_COASTAL_SPRAY.getDefault());
+        assertTrue(WaterRenderingConfig.ENABLE_COASTAL_AUDIO.getDefault());
+        assertTrue(WaterRenderingConfig.ENABLE_COASTAL_WEATHER_INFLUENCE.getDefault());
+        assertTrue(WaterRenderingConfig.ENABLE_COASTAL_SEASON_INFLUENCE.getDefault());
         assertTrue(WaterRenderingConfig.AUTO_DETECT_WATER_QUALITY.getDefault());
     }
 
@@ -121,5 +129,33 @@ class WaterRenderingConfigTest {
                 WaterRenderingConfig.WaterQuality.LOW, 8));
         assertEquals(0, WaterRenderingConfig.splashParticleBudget(
                 WaterRenderingConfig.WaterQuality.LOW, 0));
+    }
+
+    @Test
+    void coastalDetailDegradesByGeometryBudgetWithoutChangingTheWaveClock() {
+        assertEquals(8, WaterRenderingConfig.coastalSegmentBudget(
+                WaterRenderingConfig.WaterQuality.LOW, false));
+        assertEquals(0, WaterRenderingConfig.coastalQuadBudget(
+                WaterRenderingConfig.WaterQuality.LOW, false));
+        assertEquals(384, WaterRenderingConfig.coastalQuadBudget(
+                WaterRenderingConfig.WaterQuality.HIGH, false));
+        assertEquals(224, WaterRenderingConfig.coastalQuadBudget(
+                WaterRenderingConfig.WaterQuality.HIGH, true));
+        assertEquals(24, WaterRenderingConfig.coastalRunUpDetailDistanceBlocks(
+                WaterRenderingConfig.WaterQuality.HIGH, false));
+        assertEquals(14, WaterRenderingConfig.coastalSprayDistanceBlocks(
+                WaterRenderingConfig.WaterQuality.HIGH, true));
+        assertEquals(48, WaterRenderingConfig.coastalSegmentBudget(
+                WaterRenderingConfig.WaterQuality.CINEMATIC, false));
+        assertEquals(768, WaterRenderingConfig.coastalQuadBudget(
+                WaterRenderingConfig.WaterQuality.CINEMATIC, false));
+    }
+
+    @Test
+    void directCliffSprayRemainsVeryNearAndQualityBounded() {
+        assertEquals(0, WaterRenderingConfig.coastalSprayDistanceBlocks(
+                WaterRenderingConfig.WaterQuality.LOW, false));
+        assertEquals(14, WaterRenderingConfig.coastalSprayDistanceBlocks(
+                WaterRenderingConfig.WaterQuality.HIGH, true));
     }
 }
