@@ -271,7 +271,7 @@ dependencies {
     implementation "curse.maven:lithostitched-936015:7832789"
     implementation "curse.maven:biolith-852512:7074761"
     implementation "curse.maven:geckolib-388172:7023453"
-    implementation "curse.maven:locate-fixer-1301683:6762552"
+    implementation "curse.maven:locate-fixer-1301683:8743967"
     implementation "curse.maven:curios-309927:6529130"
     implementation "curse.maven:amendments-896746:7461027"
     implementation "curse.maven:selene-499980:8261785"
