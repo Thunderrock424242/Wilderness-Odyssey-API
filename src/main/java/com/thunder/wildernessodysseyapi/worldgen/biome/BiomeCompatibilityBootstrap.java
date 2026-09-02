@@ -41,6 +41,7 @@ public final class BiomeCompatibilityBootstrap {
     // should win over default-priority global replacements only where they match.
     private static final int REGION_REPLACEMENT_PRIORITY = 500;
     private static final int COASTAL_REPLACEMENT_PRIORITY = 650;
+    private static final double MIN_CLIMATE_PARAMETER = -2.0;
     private static final ResourceKey<Region> ANOMALY_REGION = regionKey("anomaly_overworld");
     private static final ResourceKey<Region> POLAR_GLACIAL_REGION = regionKey("polar_glacial_region");
     private static final ResourceKey<BiomeInjector> DATA_BOOTSTRAP_INJECTOR = ResourceKey.create(
@@ -258,8 +259,11 @@ public final class BiomeCompatibilityBootstrap {
                     ModBiomes.TEMPERATE_BEACH_KEY,
                     Biomes.BEACH,
                     COASTAL_REPLACEMENT_PRIORITY,
-                    ParameterBuilder.create().climateMax(
-                            BiomeInjector.ClimateParameter.TEMPERATURE, 0.35)
+                    climateAtMost(
+                            ParameterBuilder.create(),
+                            BiomeInjector.ClimateParameter.TEMPERATURE,
+                            0.35
+                    )
             );
         }
         if (CoastalWorldgenConfig.ENABLE_DUNE_BEACH.get()) {
@@ -269,9 +273,14 @@ public final class BiomeCompatibilityBootstrap {
                     ModBiomes.DUNE_BEACH_KEY,
                     Biomes.BEACH,
                     COASTAL_REPLACEMENT_PRIORITY,
-                    ParameterBuilder.create()
-                            .climateMin(BiomeInjector.ClimateParameter.TEMPERATURE, 0.35)
-                            .climateMax(BiomeInjector.ClimateParameter.HUMIDITY, 0.10)
+                    climateAtMost(
+                            ParameterBuilder.create().climateMin(
+                                    BiomeInjector.ClimateParameter.TEMPERATURE,
+                                    0.35
+                            ),
+                            BiomeInjector.ClimateParameter.HUMIDITY,
+                            0.10
+                    )
             );
         }
         if (CoastalWorldgenConfig.ENABLE_TROPICAL_BEACH.get()) {
@@ -308,6 +317,16 @@ public final class BiomeCompatibilityBootstrap {
                             BiomeInjector.ClimateParameter.TEMPERATURE, -2.0, 2.0)
             );
         }
+    }
+
+    static ParameterBuilder climateAtMost(
+            ParameterBuilder parameters,
+            BiomeInjector.ClimateParameter climateParameter,
+            double maximum
+    ) {
+        // Lithostitched 1.6.5's climateMax reverses this range by using
+        // Double.MAX_VALUE as the lower bound. The vanilla climate domain is [-2, 2].
+        return parameters.climateRange(climateParameter, MIN_CLIMATE_PARAMETER, maximum);
     }
 
     private static void registerTarget(

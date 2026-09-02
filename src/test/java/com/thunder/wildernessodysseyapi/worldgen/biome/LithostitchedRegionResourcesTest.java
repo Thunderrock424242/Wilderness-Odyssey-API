@@ -2,12 +2,15 @@ package com.thunder.wildernessodysseyapi.worldgen.biome;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import dev.worldgen.lithostitched.api.worldgen.biomeinjector.BiomeInjector;
+import dev.worldgen.lithostitched.api.worldgen.biomeinjector.ParameterBuilder;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** Guards the stable Lithostitched regions and the data entry that activates injector callbacks. */
@@ -33,6 +36,15 @@ class LithostitchedRegionResourcesTest {
         assertEquals("wildernessodysseyapi:anomaly_forest", injector.get("replacement").getAsString(), injectorId);
         assertEquals(0, injector.getAsJsonObject("parameters").size(), injectorId);
         assertEquals("wildernessodysseyapi:anomaly_overworld", injector.get("region").getAsString(), injectorId);
+    }
+
+    @Test
+    void upperBoundedClimateFilterAvoidsLithostitched165ReversedRange() {
+        assertDoesNotThrow(() -> BiomeCompatibilityBootstrap.climateAtMost(
+                ParameterBuilder.create(),
+                BiomeInjector.ClimateParameter.TEMPERATURE,
+                0.35
+        ));
     }
 
     private static void assertRegion(String name, int expectedWeight) throws IOException {
