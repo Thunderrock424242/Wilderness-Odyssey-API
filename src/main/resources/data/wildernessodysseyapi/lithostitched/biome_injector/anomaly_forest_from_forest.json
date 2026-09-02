@@ -1,0 +1,11 @@
+{
+  "type": "lithostitched:replace_partially",
+  "dimension": "minecraft:overworld",
+  "priority": 500,
+  "targets": [
+    "minecraft:forest"
+  ],
+  "replacement": "wildernessodysseyapi:anomaly_forest",
+  "parameters": {},
+  "region": "wildernessodysseyapi:anomaly_overworld"
+}
