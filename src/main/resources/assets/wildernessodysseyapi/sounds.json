@@ -83,31 +83,29 @@
   "coast_wash_soft": {
     "category": "ambient",
     "sounds": [
-      { "name": "minecraft:block.water.ambient", "type": "event", "volume": 0.45, "pitch": 0.92 },
-      { "name": "minecraft:entity.generic.splash", "type": "event", "volume": 0.55, "pitch": 1.08 }
+      { "name": "minecraft:entity.generic.splash", "type": "event", "volume": 1.0, "pitch": 0.98 },
+      { "name": "minecraft:entity.player.splash.high_speed", "type": "event", "volume": 0.90, "pitch": 1.0 }
     ]
   },
   "coast_break": {
     "category": "ambient",
     "sounds": [
       { "name": "minecraft:entity.generic.splash", "type": "event", "volume": 1.0 },
-      { "name": "minecraft:entity.player.splash.high_speed", "type": "event", "volume": 0.70, "pitch": 0.92 }
+      { "name": "minecraft:entity.player.splash.high_speed", "type": "event", "volume": 1.0, "pitch": 0.92 }
     ]
   },
   "coast_break_rocky": {
     "category": "ambient",
     "sounds": [
-      { "name": "minecraft:entity.player.splash.high_speed", "type": "event", "volume": 0.90, "pitch": 0.82 },
-      { "name": "minecraft:entity.generic.splash", "type": "event", "volume": 0.85, "pitch": 0.76 },
-      { "name": "minecraft:entity.generic.explode", "type": "event", "volume": 0.12, "pitch": 0.62 }
+      { "name": "minecraft:entity.player.splash.high_speed", "type": "event", "volume": 1.0, "pitch": 0.82 },
+      { "name": "minecraft:entity.generic.splash", "type": "event", "volume": 1.0, "pitch": 0.86 }
     ]
   },
   "coast_break_storm": {
     "category": "weather",
     "sounds": [
-      { "name": "minecraft:entity.generic.splash", "type": "event", "volume": 1.0, "pitch": 0.72 },
-      { "name": "minecraft:entity.player.splash.high_speed", "type": "event", "volume": 0.95, "pitch": 0.68 },
-      { "name": "minecraft:entity.generic.explode", "type": "event", "volume": 0.18, "pitch": 0.52 }
+      { "name": "minecraft:entity.generic.splash", "type": "event", "volume": 1.0, "pitch": 0.76 },
+      { "name": "minecraft:entity.player.splash.high_speed", "type": "event", "volume": 1.0, "pitch": 0.80 }
     ]
   }
 }

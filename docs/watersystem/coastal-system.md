@@ -40,6 +40,12 @@ synchronized game time, the synchronized regional sea state, shore profile,
 bathymetry, beach slope, and onshore wind produce the same incoming, shoaling,
 breaking, run-up, and retreat phase on every client. The model controls crest
 position, breaker distance, height, foam, run-up distance, wetness, and spray.
+Calm local weather retains a background ocean swell: ordinary sandy-shore
+crests rise roughly one block, while strong storm crests reach several blocks.
+Incoming height eases in, shoaling joins the breaking crest continuously, and
+the crest collapses before run-up instead of disappearing at break onset.
+The game tick is promoted to double before adding frame interpolation, so old
+worlds retain tick and partial-tick motion instead of rounding to a frozen wave.
 It does not own gameplay water volume. Per-shore presentation values are loaded
 from `assets/wildernessodysseyapi/coastal_wave_profiles.json`. Resource packs
 can tune height, frequency, breaker distance and strength, run-up, retreat,
@@ -55,7 +61,12 @@ cosmetic animation.
 
 `CoastalRunupRenderer` is a detail subpass of `WaterRenderCoordinator`. It
 appends nearshore crests, a thin terrain-aware wash sheet, foam tint, and a dark
-wet-surface overlay to the coordinator's shared translucent batch. This avoids
+wet-surface overlay to the coordinator's shared translucent batch. Each crest
+uses three faces: a water-colored seaward slope, a foamy lip, and a landward
+slope that stays visible when viewed from the beach. Height is not attenuated
+again in the renderer. Its position and base height interpolate between cached
+water cells; the feet stay within that sampled strip. All three faces count
+against the existing quad budget, which is not increased. This avoids
 a competing render event or a second water pipeline. `CoastalBreakEffects`
 emits only the strongest nearby breaker under a hard cadence and particle
 budget. Its `CoastalWaveBreakEvent` is a local immutable result for diagnostics
@@ -91,6 +102,14 @@ select strandline, open beach, dune or meadow, rocky slope, cold gravel, or
 glacial ice and snow bands. This affects newly generated chunks; it is not an
 existing-world retrofit.
 
+Tropical beaches use a wider ten-block open-sand band and a green back-beach,
+not the temperate dune band. Low natural banks are graded toward a one-block
+rise per four shoreline-distance blocks, with a configurable maximum cut
+(four blocks by default). This never raises terrain, changes ocean water, cuts
+high cliffs, or enters a cave. The whole cut and its foundation are checked
+before writing; chunks with structure starts or references are conservatively
+excluded. These changes also require new chunks.
+
 After the bands are complete, the same feature evaluates sixteen deterministic
 four-by-four anchors rather than simulating every beach block. Eligible anchors
 can place terrain-aligned driftwood, calcite or dead-coral shell beds, rock
@@ -100,6 +119,13 @@ origin chunk and use vanilla blocks, so no new block registry or texture atlas
 is required. Tide pools are persistent worldgen water; the moving surf itself
 never places or removes fluid blocks.
 
+The tropical back-beach can also receive one small palm-shaped tree per chunk,
+using connected jungle logs and drooping jungle-leaf fronds. The full tree must
+fit within the origin chunk and clear air before any block is placed. Ordinary
+water-edge trees and plains-grass features are not injected into this biome,
+and the coastal detail placer never uses dead bushes on tropical sand. The
+biome supplies explicit lush grass/foliage colors and a turquoise water palette.
+
 ## Configuration
 
 Common world-generation settings live under `coastalWorldgen`:
@@ -107,6 +133,7 @@ Common world-generation settings live under `coastalWorldgen`:
 - the entire family and each individual biome replacement can be disabled;
 - terrain bands can be disabled independently;
 - maximum dune rise is bounded to four blocks.
+- `maximumTropicalBankCutBlocks` controls tropical grading (0 to disable, at most 6).
 - sparse details have a global density control and separate vegetation,
   driftwood, tide-pool, rock/outcrop, and ice-fragment switches.
 
@@ -132,11 +159,18 @@ glacial exploration family and its serialized tag order.
 
 Actual `CoastalWaveBreakEvent` selections choose one of four registered,
 positional sound identities: soft wash, normal break, rocky impact, or storm
-break. Their current sound definitions layer Minecraft water and impact
-samples; resource packs may replace those identities with recorded surf
-without a code or event-model change. Only the strongest nearby unplayed cycle
-wins each cadence window, so long loaded coastlines do not produce an audio
-wall.
+break. Their current sound definitions select among Minecraft splash samples;
+entries in a `sounds.json` list are alternatives, not simultaneous layers.
+`CoastalBreakAudioModel` gives calm surf an audible floor independent of spray,
+and `CoastalBreakEffects` adds a quieter water-wash layer explicitly at the
+same breaker. Crashes use the Ambient/Environment category, with default
+profile selection radii of 34–44 blocks and fixed sound attenuation ranges
+of 40–56 blocks. The existing client volume multiplier and resource-pack mute
+still apply to both layers. The raised breaking phase, not a minimum spray
+amount, triggers sound. Only the strongest nearby unplayed cycle wins, at most
+once per 28–36 ticks, so long loaded coastlines do not produce an audio wall.
+Resource packs can replace the stable crash identities with recorded surf;
+the bundled sounds remain vanilla-sample approximations, not ocean recordings.
 
 ## Diagnostics and performance boundaries
 
@@ -175,9 +209,22 @@ and wetness, and only very-near events spend direct splash-particle budget.
 Positional crash audio keeps its larger profile radius and relies on natural
 attenuation.
 
+### Fallback surface handoff
+
+Water mesh rebuilds that retain the same surface-ownership mask also retain the
+pending upload generation and sections already acknowledged. Refreshing sea
+state or snapshots must not invalidate a build that has already omitted the
+baked water top. A completed section build receives an upload receipt even if
+the renderer skipped some fluid callbacks for occluded cells; rejecting such a
+receipt after suppressing other tops could leave rectangular ocean gaps.
+Changed masks and builds begun before the ownership request still reject stale
+receipts. Nothing in this handshake removes server water or edits terrain.
+
 ## Validation checklist
 
-Automated source tests cover deterministic phases, run-up and retreat,
+Automated source tests cover deterministic phases, calm swell, continuous
+crest transitions, full-height three-face geometry and cached-water bounds,
+spray-independent audio, user mute and gain limits, run-up and retreat,
 bathymetry-sensitive breaker distance, weather scaling, profile differences,
 defensive segment snapshots, terrain zones, biome resources, and config
 defaults. Live testing should still include:
@@ -191,6 +238,12 @@ defaults. Live testing should still include:
 7. compare two clients on a dedicated server at the same shore and game time;
 8. profile topology refreshes and render quads while flying along a long coast;
 9. test shader-pack and renderer compatibility through the existing coordinator.
+
+Wave and audio tuning takes effect on already generated Wilderness ocean
+coastlines after restarting with the new mod JAR; it does not require new
+chunks. Stand on the sand at normal player height as well as viewing from
+above, listen within 8–16 blocks with Ambient/Environment volume enabled, and
+compare calm surf to storms. Terrain and palm changes still require new chunks.
 
 ## Scope boundaries
 

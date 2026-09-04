@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <p>The old baked section remains the sole visible owner while suppression is
  * compiling. Custom geometry becomes visible only after every expected section
- * has uploaded a build that observed the complete owned-top mask.</p>
+ * has uploaded a build that compiled under the current owned-top mask.</p>
  */
 final class WaterSurfaceHandoff {
 
@@ -30,18 +30,22 @@ final class WaterSurfaceHandoff {
     private final ThreadLocal<CompilationObservation> compilation = new ThreadLocal<>();
 
     long beginSuppression(long chunkKey, Map<Long, SectionMask> sections) {
-        long generation = nextGeneration.incrementAndGet();
         Map<Long, SectionMask> immutableSections = Map.copyOf(sections);
-        Phase phase = immutableSections.isEmpty()
-                ? Phase.CUSTOM_VISIBLE
-                : Phase.SUPPRESSION_PENDING;
-        chunks.put(chunkKey, new ChunkState(
-                generation,
-                phase,
-                immutableSections,
-                Set.copyOf(immutableSections.keySet())
-        ));
-        return generation;
+        ChunkState next = chunks.compute(chunkKey, (key, current) -> {
+            // Sea-state/snapshot refreshes can rebuild identical ownership while
+            // the renderer is uploading. Keep those receipts and partial upload
+            // progress valid: the uploaded build has already omitted these tops.
+            if (current != null && current.sections().equals(immutableSections)) {
+                return current;
+            }
+            return new ChunkState(
+                    nextGeneration.incrementAndGet(),
+                    immutableSections.isEmpty() ? Phase.CUSTOM_VISIBLE : Phase.SUPPRESSION_PENDING,
+                    immutableSections,
+                    Set.copyOf(immutableSections.keySet())
+            );
+        });
+        return next.generation();
     }
 
     void keepCustomVisible(long chunkKey, Map<Long, SectionMask> sections) {
@@ -114,18 +118,19 @@ final class WaterSurfaceHandoff {
                 || !observation.expected.contains(columnIndex)) {
             return false;
         }
-        observation.observe(columnIndex);
         return true;
     }
 
     WaterHandoffReceipt finishCompilation(long sectionKey) {
         CompilationObservation observation = compilation.get();
         compilation.remove();
-        if (observation == null
-                || observation.sectionKey != sectionKey
-                || !observation.complete()) {
+        if (observation == null || observation.sectionKey != sectionKey) {
             return WaterHandoffReceipt.NONE;
         }
+        // A successful section build need not call the fluid hook for every
+        // expected column (occluded/hosted water may be skipped by the renderer).
+        // Rejecting it after it suppressed even one top leaves a permanent hole.
+        // The build/upload lifecycle, not callback coverage, is the receipt.
         ChunkState state = chunks.get(observation.chunkKey);
         if (state == null
                 || state.phase() != Phase.SUPPRESSION_PENDING
@@ -196,12 +201,6 @@ final class WaterSurfaceHandoff {
             return (mask & (1L << (columnIndex & 63))) != 0L;
         }
 
-        boolean covers(long[] observed) {
-            return (observed[0] & mask0) == mask0
-                    && (observed[1] & mask1) == mask1
-                    && (observed[2] & mask2) == mask2
-                    && (observed[3] & mask3) == mask3;
-        }
     }
 
     private record ChunkState(
@@ -217,7 +216,6 @@ final class WaterSurfaceHandoff {
         private final long sectionKey;
         private final long generation;
         private final SectionMask expected;
-        private final long[] observed = new long[4];
 
         private CompilationObservation(
                 long chunkKey,
@@ -231,12 +229,5 @@ final class WaterSurfaceHandoff {
             this.expected = expected;
         }
 
-        private void observe(int columnIndex) {
-            observed[columnIndex >>> 6] |= 1L << (columnIndex & 63);
-        }
-
-        private boolean complete() {
-            return expected.covers(observed);
-        }
     }
 }

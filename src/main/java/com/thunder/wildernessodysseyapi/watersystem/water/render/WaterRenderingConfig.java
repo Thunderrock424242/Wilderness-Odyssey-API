@@ -160,7 +160,7 @@ public final class WaterRenderingConfig {
                 .comment("Allow quality-capped local splash and mist particles at strong breaking waves.")
                 .define("enableCoastalSpray", true);
         ENABLE_COASTAL_AUDIO = builder
-                .comment("Play sparse local wave-crash accents near strong coastal breakers.")
+                .comment("Play positional crashes and quieter wash at coastal breakers, including calm-weather swell. Respects Ambient/Environment sound volume.")
                 .define("enableCoastalAudio", true);
         ENABLE_COASTAL_WEATHER_INFLUENCE = builder
                 .comment("Let the synchronized regional sea state scale coastal height, frequency, run-up, foam, spray, and audio.")
@@ -804,7 +804,7 @@ public final class WaterRenderingConfig {
                 && waterQuality() != WaterQuality.LOW;
     }
 
-    /** Returns whether strong breakers may play sparse local crash accents. */
+    /** Returns whether visible breakers may play cadence-limited crash and wash audio. */
     public static boolean coastalAudioEnabled(Level level) {
         return coastalWavesEnabled(level)
                 && ENABLE_COASTAL_AUDIO.get()

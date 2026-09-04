@@ -31,6 +31,10 @@ public final class CoastalTerrainProfile {
             }
             return distance <= 8 ? Zone.COLD_BEACH : Zone.SNOWY_MEADOW;
         }
+        if (type == CoastalWaveProfile.ShoreType.TROPICAL) {
+            return distance <= 2 ? Zone.STRANDLINE
+                    : distance <= 10 ? Zone.OPEN_BEACH : Zone.COASTAL_MEADOW;
+        }
         if (distance <= 2) {
             return Zone.STRANDLINE;
         }
@@ -57,14 +61,29 @@ public final class CoastalTerrainProfile {
                 ? CoastalWaveProfile.ShoreType.TEMPERATE : shoreType;
         int profileMaximum = switch (type) {
             case DUNE -> configuredMaximum;
-            case TEMPERATE, TROPICAL -> Math.min(1, configuredMaximum);
-            case ROCKY, COLD, GLACIAL -> 0;
+            case TEMPERATE -> Math.min(1, configuredMaximum);
+            case TROPICAL, ROCKY, COLD, GLACIAL -> 0;
         };
         if (profileMaximum == 0) {
             return 0;
         }
         double normalized = Math.max(0.0, Math.min(0.999_999, broadNoise * 0.5 + 0.5));
         return Math.min(profileMaximum, (int) Math.floor(normalized * (profileMaximum + 1)));
+    }
+
+    /**
+     * Grades only low tropical shore banks, never high inland terrain or the sea.
+     * The caller must preflight natural blocks and structure/write boundaries.
+     */
+    public static int tropicalSurfaceHeight(
+            int originalY, int seaLevel, int distanceToWater, int maximumCut
+    ) {
+        if (maximumCut <= 0 || distanceToWater < 1 || distanceToWater > 14
+                || originalY < seaLevel - 1 || originalY > seaLevel + 8) {
+            return originalY;
+        }
+        int beachGrade = seaLevel - 1 + distanceToWater / 4;
+        return Math.min(originalY, Math.max(originalY - Math.min(6, maximumCut), beachGrade));
     }
 
     /**
@@ -170,9 +189,8 @@ public final class CoastalTerrainProfile {
         return switch (zone) {
             case STRANDLINE -> variant < 0.22 ? Detail.TIDE_POOL
                     : variant < 0.62 ? Detail.SHELL_PATCH : Detail.DRIFTWOOD;
-            case OPEN_BEACH -> variant < 0.48 ? Detail.SHELL_PATCH
-                    : variant < 0.70 ? Detail.DRIFTWOOD : Detail.BEACH_GRASS;
-            case DUNE, COASTAL_MEADOW -> Detail.BEACH_GRASS;
+            case OPEN_BEACH -> variant < 0.72 ? Detail.SHELL_PATCH : Detail.DRIFTWOOD;
+            case DUNE, COASTAL_MEADOW -> variant < 0.55 ? Detail.PALM : Detail.BEACH_GRASS;
             default -> Detail.SHELL_PATCH;
         };
     }
@@ -201,6 +219,7 @@ public final class CoastalTerrainProfile {
     public enum Detail {
         NONE,
         BEACH_GRASS,
+        PALM,
         DRIFTWOOD,
         SHELL_PATCH,
         ROCK_CLUSTER,

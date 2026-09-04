@@ -65,6 +65,11 @@ public final class CoastalTerrainFeature extends Feature<NoneFeatureConfiguratio
     private static boolean placeChunk(WorldGenLevel level, BlockPos origin) {
         int minimumX = origin.getX() & ~15;
         int minimumZ = origin.getZ() & ~15;
+        var originChunk = level.getChunk(minimumX >> 4, minimumZ >> 4);
+        // Conservative whole-chunk veto: never lower a structure's foundation,
+        // including structures whose start lives in a neighboring chunk.
+        boolean canGrade = originChunk.getAllStarts().isEmpty()
+                && originChunk.getAllReferences().values().stream().allMatch(java.util.Set::isEmpty);
         boolean placed = false;
         if (CoastalWorldgenConfig.ENABLE_COASTAL_TERRAIN_BANDS.get()) {
             for (int localZ = 0; localZ < 16; localZ++) {
@@ -85,6 +90,9 @@ public final class CoastalTerrainFeature extends Feature<NoneFeatureConfiguratio
                     }
 
                     int distanceToWater = nearestWaterDistance(level, x, topY, z);
+                    if (canGrade && shoreType == CoastalWaveProfile.ShoreType.TROPICAL) {
+                        top = gradeTropicalBank(level, top, distanceToWater);
+                    }
                     if (distanceToWater > WATER_SEARCH_DISTANCE) {
                         // Replacement beaches remain transitions even at a chunk
                         // edge where the worldgen region cannot expose the ocean.
@@ -106,6 +114,29 @@ public final class CoastalTerrainFeature extends Feature<NoneFeatureConfiguratio
             placed |= CoastalDetailPlacer.place(level, minimumX, minimumZ);
         }
         return placed;
+    }
+
+    private static BlockPos gradeTropicalBank(WorldGenLevel level, BlockPos top, int distance) {
+        int targetY = CoastalTerrainProfile.tropicalSurfaceHeight(
+                top.getY(), level.getSeaLevel(), distance,
+                CoastalWorldgenConfig.MAX_TROPICAL_BANK_CUT_BLOCKS.get());
+        if (targetY == top.getY()) {
+            return top;
+        }
+        // Verify the cut and its foundation before changing any blocks. Caves,
+        // fluids, block entities, and non-natural construction stop the operation.
+        for (int y = targetY - 3; y <= top.getY(); y++) {
+            BlockPos position = new BlockPos(top.getX(), y, top.getZ());
+            BlockState state = level.getBlockState(position);
+            if (!canWrite(level, position) || !isNaturalSurface(state)
+                    || state.hasBlockEntity() || !state.getFluidState().isEmpty()) {
+                return top;
+            }
+        }
+        for (int y = top.getY(); y > targetY; y--) {
+            level.setBlock(new BlockPos(top.getX(), y, top.getZ()), Blocks.AIR.defaultBlockState(), 2);
+        }
+        return new BlockPos(top.getX(), targetY, top.getZ());
     }
 
     private static boolean resurface(

@@ -34,6 +34,7 @@ final class CoastalDetailPlacer {
     /** Places configured details for one feature origin chunk. */
     static boolean place(WorldGenLevel level, int minimumX, int minimumZ) {
         boolean placed = false;
+        boolean palmPlaced = false;
         long seed = level.getSeed();
         for (int cellZ = 0; cellZ < 16; cellZ += 4) {
             for (int cellX = 0; cellX < 16; cellX += 4) {
@@ -67,6 +68,17 @@ final class CoastalDetailPlacer {
                         CoastalWorldgenConfig.COASTAL_DETAIL_DENSITY.get()
                 );
                 if (enabled(detail)) {
+                    if (detail == CoastalTerrainProfile.Detail.PALM) {
+                        if (!palmPlaced) {
+                            int height = 5 + (int) (hashUnit(seed, anchorX, anchorZ,
+                                    0xD6E8FEB86659FD93L) * 3.0);
+                            palmPlaced = TropicalPalmPlacer.place(
+                                    level, top, minimumX, minimumZ, height,
+                                    water.directionX(), water.directionZ());
+                            placed |= palmPlaced;
+                        }
+                        continue;
+                    }
                     placed |= placeDetail(
                             level, minimumX, minimumZ, top, shoreType, detail, water, seed);
                 }
@@ -78,7 +90,7 @@ final class CoastalDetailPlacer {
     private static boolean enabled(CoastalTerrainProfile.Detail detail) {
         return switch (detail) {
             case NONE -> false;
-            case BEACH_GRASS -> CoastalWorldgenConfig.ENABLE_COASTAL_VEGETATION.get();
+            case BEACH_GRASS, PALM -> CoastalWorldgenConfig.ENABLE_COASTAL_VEGETATION.get();
             case DRIFTWOOD -> CoastalWorldgenConfig.ENABLE_DRIFTWOOD.get();
             case TIDE_POOL -> CoastalWorldgenConfig.ENABLE_TIDE_POOLS.get();
             case ICE_FRAGMENT -> CoastalWorldgenConfig.ENABLE_ICE_FRAGMENTS.get();
@@ -98,7 +110,7 @@ final class CoastalDetailPlacer {
             long seed
     ) {
         return switch (detail) {
-            case NONE -> false;
+            case NONE, PALM -> false; // Palms use the per-chunk cap in place().
             case BEACH_GRASS -> placePlant(level, top, shoreType, seed);
             case DRIFTWOOD -> placeDriftwood(
                     level, minimumX, minimumZ, top, shoreType, water, seed);
@@ -127,6 +139,9 @@ final class CoastalDetailPlacer {
         BlockState ground = level.getBlockState(top);
         BlockState plant;
         if (ground.is(BlockTags.SAND)) {
+            if (shoreType == CoastalWaveProfile.ShoreType.TROPICAL) {
+                return false; // Keep the warm strand open; no desert scrub on tropical sand.
+            }
             plant = Blocks.DEAD_BUSH.defaultBlockState();
         } else if (shoreType == CoastalWaveProfile.ShoreType.TROPICAL
                 && hashUnit(seed, top.getX(), top.getZ(), 0xF1357AEA2E62A9C5L) > 0.58) {

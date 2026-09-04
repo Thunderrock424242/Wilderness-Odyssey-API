@@ -7,8 +7,8 @@
     "runUpDistanceBlocks": 5.0,
     "retreatSpeed": 1.0,
     "foamAmount": 0.82,
-    "crashSoundVolume": 0.78,
-    "crashSoundRadiusBlocks": 24.0,
+    "crashSoundVolume": 1.05,
+    "crashSoundRadiusBlocks": 36.0,
     "turbulence": 0.72,
     "shorelineWetnessDurationTicks": 180
   },
@@ -20,8 +20,8 @@
     "runUpDistanceBlocks": 7.5,
     "retreatSpeed": 0.82,
     "foamAmount": 0.68,
-    "crashSoundVolume": 0.62,
-    "crashSoundRadiusBlocks": 22.0,
+    "crashSoundVolume": 0.95,
+    "crashSoundRadiusBlocks": 34.0,
     "turbulence": 0.48,
     "shorelineWetnessDurationTicks": 240
   },
@@ -33,8 +33,8 @@
     "runUpDistanceBlocks": 2.8,
     "retreatSpeed": 1.28,
     "foamAmount": 1.0,
-    "crashSoundVolume": 1.0,
-    "crashSoundRadiusBlocks": 32.0,
+    "crashSoundVolume": 1.3,
+    "crashSoundRadiusBlocks": 44.0,
     "turbulence": 1.2,
     "shorelineWetnessDurationTicks": 120
   },
@@ -46,8 +46,8 @@
     "runUpDistanceBlocks": 4.2,
     "retreatSpeed": 0.88,
     "foamAmount": 0.72,
-    "crashSoundVolume": 0.68,
-    "crashSoundRadiusBlocks": 22.0,
+    "crashSoundVolume": 1.0,
+    "crashSoundRadiusBlocks": 34.0,
     "turbulence": 0.62,
     "shorelineWetnessDurationTicks": 260
   },
@@ -59,8 +59,8 @@
     "runUpDistanceBlocks": 2.6,
     "retreatSpeed": 0.72,
     "foamAmount": 0.58,
-    "crashSoundVolume": 0.72,
-    "crashSoundRadiusBlocks": 28.0,
+    "crashSoundVolume": 1.05,
+    "crashSoundRadiusBlocks": 40.0,
     "turbulence": 0.56,
     "shorelineWetnessDurationTicks": 320
   },
@@ -72,8 +72,8 @@
     "runUpDistanceBlocks": 6.4,
     "retreatSpeed": 0.94,
     "foamAmount": 0.94,
-    "crashSoundVolume": 0.82,
-    "crashSoundRadiusBlocks": 26.0,
+    "crashSoundVolume": 1.15,
+    "crashSoundRadiusBlocks": 38.0,
     "turbulence": 0.82,
     "shorelineWetnessDurationTicks": 220
   }
