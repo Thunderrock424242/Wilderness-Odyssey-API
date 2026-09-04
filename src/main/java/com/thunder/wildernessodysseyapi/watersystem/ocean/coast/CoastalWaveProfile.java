@@ -24,27 +24,27 @@ public record CoastalWaveProfile(
 
     public static final CoastalWaveProfile TEMPERATE = new CoastalWaveProfile(
             ShoreType.TEMPERATE, 1.00f, 1.00f, 5.5f, 0.92f,
-            5.0f, 1.00f, 0.82f, 0.78f, 24.0f, 0.72f, 180
+            5.0f, 1.00f, 0.82f, 1.05f, 36.0f, 0.72f, 180
     );
     public static final CoastalWaveProfile DUNE = new CoastalWaveProfile(
             ShoreType.DUNE, 0.92f, 0.92f, 7.0f, 0.76f, 7.5f,
-            0.82f, 0.68f, 0.62f, 22.0f, 0.48f, 240
+            0.82f, 0.68f, 0.95f, 34.0f, 0.48f, 240
     );
     public static final CoastalWaveProfile ROCKY = new CoastalWaveProfile(
             ShoreType.ROCKY, 1.10f, 1.08f, 3.6f, 1.18f, 2.8f,
-            1.28f, 1.00f, 1.00f, 32.0f, 1.20f, 120
+            1.28f, 1.00f, 1.30f, 44.0f, 1.20f, 120
     );
     public static final CoastalWaveProfile COLD = new CoastalWaveProfile(
             ShoreType.COLD, 0.90f, 0.86f, 5.0f, 0.88f, 4.2f,
-            0.88f, 0.72f, 0.68f, 22.0f, 0.62f, 260
+            0.88f, 0.72f, 1.00f, 34.0f, 0.62f, 260
     );
     public static final CoastalWaveProfile GLACIAL = new CoastalWaveProfile(
             ShoreType.GLACIAL, 0.76f, 0.72f, 3.8f, 0.82f, 2.6f,
-            0.72f, 0.58f, 0.72f, 28.0f, 0.56f, 320
+            0.72f, 0.58f, 1.05f, 40.0f, 0.56f, 320
     );
     public static final CoastalWaveProfile TROPICAL = new CoastalWaveProfile(
             ShoreType.TROPICAL, 1.04f, 1.04f, 6.5f, 0.98f, 6.4f,
-            0.94f, 0.94f, 0.82f, 26.0f, 0.82f, 220
+            0.94f, 0.94f, 1.15f, 38.0f, 0.82f, 220
     );
 
     public CoastalWaveProfile {

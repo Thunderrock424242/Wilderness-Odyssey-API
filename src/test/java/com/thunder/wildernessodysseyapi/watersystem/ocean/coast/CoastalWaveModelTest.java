@@ -49,6 +49,35 @@ class CoastalWaveModelTest {
     }
 
     @Test
+    void calmLocalWeatherStillHasSubstantialOceanSwellOnEveryShore() {
+        for (CoastalWaveProfile.ShoreType type : CoastalWaveProfile.ShoreType.values()) {
+            CoastalWaveModel.Sample calm = CoastalWaveModel.sampleAtPhase(
+                    3L, 0.50f, 7.4f, CoastalWaveProfile.forType(type),
+                    OceanSeaState.CALM, 0.05f, -1.0f);
+            assertTrue(calm.breakerLift() > 0.80f, type + " should retain ocean swell");
+        }
+        CoastalWaveModel.Sample storm = sample(0.50f);
+        assertTrue(storm.breakerLift() > 2.5f, "storm crests should remain much taller");
+    }
+
+    @Test
+    void crestDoesNotJumpBackwardOrDisappearAtStageBoundaries() {
+        CoastalWaveModel.Sample incomingEnd = sample(0.23999f);
+        CoastalWaveModel.Sample shoalingStart = sample(0.24f);
+        assertEquals(incomingEnd.waveHeight(), shoalingStart.waveHeight(), 0.001f);
+        assertEquals(incomingEnd.crestDistanceFromShoreBlocks(),
+                shoalingStart.crestDistanceFromShoreBlocks(), 0.001f);
+
+        CoastalWaveModel.Sample shoalingEnd = sample(0.42999f);
+        CoastalWaveModel.Sample breakingStart = sample(0.43f);
+        assertEquals(shoalingEnd.waveHeight(), breakingStart.breakerLift(), 0.001f);
+        assertEquals(shoalingEnd.crestDistanceFromShoreBlocks(),
+                breakingStart.crestDistanceFromShoreBlocks(), 0.001f);
+        assertEquals(0.0f, sample(0.0f).waveHeight(), 0.001f);
+        assertEquals(0.0f, sample(0.56999f).breakerLift(), 0.001f);
+    }
+
+    @Test
     void shallowGentleBathymetryMovesTheBreakerFartherOffshore() {
         CoastalWaveModel.Sample gentle = CoastalWaveModel.sampleAtPhase(
                 3L, 0.50f, 7.4f, CoastalWaveProfile.TEMPERATE,
@@ -99,8 +128,13 @@ class CoastalWaveModelTest {
         CoastalWaveModel.Sample next = CoastalWaveModel.sample(
                 0x71B3L, 2_000_000_001L, 0.0f, CoastalWaveProfile.TEMPERATE,
                 STORM, 0.08f, 0.2f);
+        CoastalWaveModel.Sample interpolated = CoastalWaveModel.sample(
+                0x71B3L, 2_000_000_000L, 0.5f, CoastalWaveProfile.TEMPERATE,
+                STORM, 0.08f, 0.2f);
 
         assertTrue(Math.abs(next.normalizedPhase() - first.normalizedPhase()) > 0.0001f);
+        assertTrue(Math.abs(interpolated.normalizedPhase() - first.normalizedPhase()) > 0.0001f);
+        assertTrue(Math.abs(next.normalizedPhase() - interpolated.normalizedPhase()) > 0.0001f);
     }
 
     @Test

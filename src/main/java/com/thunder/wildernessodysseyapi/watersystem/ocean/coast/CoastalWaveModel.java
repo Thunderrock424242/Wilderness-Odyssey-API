@@ -61,7 +61,9 @@ public final class CoastalWaveModel {
         CoastalWaveProfile safeProfile = profile == null
                 ? CoastalWaveProfile.TEMPERATE : profile;
         OceanSeaState.Sample safeSea = seaState == null ? OceanSeaState.CALM : seaState;
-        double frameTick = Math.max(0L, gameTime) + clamp01(partialTick);
+        // Promote before adding the float; otherwise long + float loses ticks
+        // in old worlds even though the final variable is declared double.
+        double frameTick = (double) Math.max(0L, gameTime) + clamp01(partialTick);
         float cycleSeconds = cycleSeconds(safeProfile, safeSea);
         float cycleTicks = cycleSeconds * 20.0f;
         float offset = stableUnitFloat(segmentId) * cycleTicks;
@@ -141,8 +143,10 @@ public final class CoastalWaveModel {
         float maximumRunUp = profile.runUpDistanceBlocks()
                 * (0.30f + coastalEnergy * 0.70f)
                 * slopeRunUpScale;
+        // Ocean swell persists in calm local weather. Wind adds storm energy;
+        // it must not reduce ordinary beach surf to a few centimetres.
         float waveHeight = profile.waveHeightMultiplier()
-                * (0.10f + coastalEnergy * 0.92f)
+                * (0.75f + coastalEnergy * 1.75f)
                 * (1.0f + safeSlope * 0.10f);
         float safeUnderwaterSlope = finiteClamp(underwaterSlope, 0.0f, 4.0f, 0.20f);
         float safeWaterDepth = finiteClamp(averageWaterDepth, 0.0f, 64.0f, 3.0f);
@@ -158,8 +162,8 @@ public final class CoastalWaveModel {
         );
 
         float shoaling = switch (stage) {
-            case INCOMING -> 0.18f + stagePhase * 0.22f;
-            case SHOALING -> 0.40f + smoothStep(stagePhase) * 0.60f;
+            case INCOMING -> smoothStep(stagePhase) * 0.55f;
+            case SHOALING -> 0.55f + smoothStep(stagePhase) * 0.45f;
             case BREAKING -> 1.0f;
             case RUN_UP -> 1.0f - stagePhase * 0.72f;
             case RETREAT -> 0.20f * (1.0f - stagePhase);
@@ -167,8 +171,12 @@ public final class CoastalWaveModel {
         float breakerEnvelope = stage == Stage.BREAKING
                 ? (float) Math.sin(Math.PI * stagePhase)
                 : 0.0f;
-        float breakerLift = waveHeight * breakerEnvelope
-                * profile.breakerStrength() * 0.58f;
+        // Preserve the incoming crest at break onset, curl it upward, then
+        // collapse into wash. A sine-only lift made the crest vanish at onset.
+        float breakerLift = stage == Stage.BREAKING
+                ? waveHeight * (1.0f + breakerEnvelope * profile.breakerStrength() * 0.35f)
+                * (1.0f - smoothStep(clamp01((stagePhase - 0.5f) * 2.0f)))
+                : 0.0f;
         float foam = switch (stage) {
             case INCOMING -> 0.0f;
             case SHOALING -> smoothStep(stagePhase) * 0.14f;
@@ -198,9 +206,9 @@ public final class CoastalWaveModel {
                 * profile.turbulence() * impactScale)
                 : 0.0f;
         float crestDistance = switch (stage) {
-            case INCOMING -> breakerDistance
+            case INCOMING -> breakerDistance + 1.35f
                     + (1.0f - smoothStep(stagePhase))
-                    * Math.max(1.5f, profile.breakerDistanceBlocks() - breakerDistance + 1.5f);
+                    * Math.max(1.5f, profile.breakerDistanceBlocks() - breakerDistance);
             case SHOALING -> breakerDistance + (1.0f - smoothStep(stagePhase)) * 1.35f;
             case BREAKING -> breakerDistance * (1.0f - stagePhase * 0.10f);
             case RUN_UP, RETREAT -> 0.0f;

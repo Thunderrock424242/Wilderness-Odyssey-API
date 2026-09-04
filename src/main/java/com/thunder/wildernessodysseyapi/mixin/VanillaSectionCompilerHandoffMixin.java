@@ -46,7 +46,7 @@ public abstract class VanillaSectionCompilerHandoffMixin {
         WaterRenderCoordinator.beginSectionCompilation(sectionPos.asLong());
     }
 
-    /** Stages a receipt only when every expected owned top was suppressed. */
+    /** Stages a receipt for a completed build under the current ownership mask. */
     @Inject(
             method = "compile("
                     + "Lnet/minecraft/core/SectionPos;"

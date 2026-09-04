@@ -72,17 +72,17 @@ public final class ModSoundEvents {
             )
     );
 
-    // Coastal events layer Minecraft's existing water samples through
+    // Coastal events select Minecraft's existing water samples through
     // sounds.json. The event identities and attenuation ranges stay stable so
     // bespoke recorded surf assets can replace the aliases later without code changes.
     public static final DeferredHolder<SoundEvent, SoundEvent> COAST_WASH_SOFT = fixedRange(
-            "coast_wash_soft", 22.0F);
+            "coast_wash_soft", 40.0F);
     public static final DeferredHolder<SoundEvent, SoundEvent> COAST_BREAK = fixedRange(
-            "coast_break", 28.0F);
+            "coast_break", 44.0F);
     public static final DeferredHolder<SoundEvent, SoundEvent> COAST_BREAK_ROCKY = fixedRange(
-            "coast_break_rocky", 36.0F);
+            "coast_break_rocky", 48.0F);
     public static final DeferredHolder<SoundEvent, SoundEvent> COAST_BREAK_STORM = fixedRange(
-            "coast_break_storm", 48.0F);
+            "coast_break_storm", 56.0F);
 
     private ModSoundEvents() {
     }

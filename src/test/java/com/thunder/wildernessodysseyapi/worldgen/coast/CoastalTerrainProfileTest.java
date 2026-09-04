@@ -56,6 +56,34 @@ class CoastalTerrainProfileTest {
     }
 
     @Test
+    void tropicalBeachHasWideOpenSandAndNoDuneRise() {
+        assertEquals(CoastalTerrainProfile.Zone.OPEN_BEACH,
+                CoastalTerrainProfile.zone(CoastalWaveProfile.ShoreType.TROPICAL, 9));
+        assertEquals(CoastalTerrainProfile.Zone.COASTAL_MEADOW,
+                CoastalTerrainProfile.zone(CoastalWaveProfile.ShoreType.TROPICAL, 12));
+        assertEquals(0, CoastalTerrainProfile.duneRise(
+                CoastalWaveProfile.ShoreType.TROPICAL, CoastalTerrainProfile.Zone.DUNE, 1.0, 4));
+        assertEquals(CoastalTerrainProfile.Detail.DRIFTWOOD, CoastalTerrainProfile.detail(
+                CoastalWaveProfile.ShoreType.TROPICAL, CoastalTerrainProfile.Zone.OPEN_BEACH,
+                0.0, 0.9, 1.0));
+        assertEquals(CoastalTerrainProfile.Detail.PALM, CoastalTerrainProfile.detail(
+                CoastalWaveProfile.ShoreType.TROPICAL, CoastalTerrainProfile.Zone.COASTAL_MEADOW,
+                0.0, 0.2, 1.0));
+    }
+
+    @Test
+    void tropicalGradingIsGentleBoundedAndDoesNotRaiseOrDrainTerrain() {
+        assertEquals(62, CoastalTerrainProfile.tropicalSurfaceHeight(65, 63, 1, 4));
+        assertEquals(64, CoastalTerrainProfile.tropicalSurfaceHeight(67, 63, 8, 4));
+        assertEquals(66, CoastalTerrainProfile.tropicalSurfaceHeight(70, 63, 2, 4));
+        assertEquals(62, CoastalTerrainProfile.tropicalSurfaceHeight(62, 63, 12, 4));
+        assertEquals(61, CoastalTerrainProfile.tropicalSurfaceHeight(61, 63, 1, 4));
+        assertEquals(80, CoastalTerrainProfile.tropicalSurfaceHeight(80, 63, 1, 4));
+        assertEquals(67, CoastalTerrainProfile.tropicalSurfaceHeight(67, 63, 15, 4));
+        assertEquals(67, CoastalTerrainProfile.tropicalSurfaceHeight(67, 63, 1, 0));
+    }
+
+    @Test
     void detailSelectionIsSparseConfigurableAndBiomeAware() {
         assertEquals(CoastalTerrainProfile.Detail.NONE, CoastalTerrainProfile.detail(
                 CoastalWaveProfile.ShoreType.TEMPERATE,

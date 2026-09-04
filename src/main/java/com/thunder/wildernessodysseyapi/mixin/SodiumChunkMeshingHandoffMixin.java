@@ -62,7 +62,7 @@ public class SodiumChunkMeshingHandoffMixin {
         WaterRenderCoordinator.beginSectionCompilation(wildernessOdysseyApi$waterSectionKey);
     }
 
-    /** Attaches a complete-mask receipt to this exact build output. */
+    /** Attaches the current ownership receipt to this exact completed build output. */
     @Inject(
             method = "execute("
                     + "Lnet/caffeinemc/mods/sodium/client/render/chunk/compile/ChunkBuildContext;"

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies the generation-aware fallback-to-custom renderer handoff. */
@@ -39,7 +40,7 @@ class WaterSurfaceHandoffTest {
     }
 
     @Test
-    void partialCompilationCannotRemoveTheFallback() {
+    void skippedFluidCallbacksCannotStrandAlreadySuppressedTops() {
         WaterSurfaceHandoff handoff = new WaterSurfaceHandoff();
         long section = SectionPos.asLong(0, 4, 0);
         long chunk = ChunkPos.asLong(0, 0);
@@ -47,11 +48,54 @@ class WaterSurfaceHandoffTest {
 
         handoff.beginCompilation(section);
         assertTrue(handoff.shouldSuppressTop(section, 4));
-        WaterHandoffReceipt incomplete = handoff.finishCompilation(section);
+        WaterHandoffReceipt receipt = handoff.finishCompilation(section);
 
-        assertFalse(incomplete.valid());
-        assertFalse(handoff.acknowledgeUpload(incomplete));
+        assertTrue(receipt.valid());
         assertFalse(handoff.customVisible(chunk));
+        assertTrue(handoff.acknowledgeUpload(receipt));
+        assertTrue(handoff.customVisible(chunk));
+    }
+
+    @Test
+    void identicalSnapshotRefreshKeepsTheInFlightReceiptValid() {
+        WaterSurfaceHandoff handoff = new WaterSurfaceHandoff();
+        long section = SectionPos.asLong(3, 3, -4);
+        long chunk = ChunkPos.asLong(3, -4);
+        Map<Long, WaterSurfaceHandoff.SectionMask> sections = Map.of(section, mask(1, 2));
+        long generation = handoff.beginSuppression(chunk, sections);
+        WaterHandoffReceipt receipt = compile(handoff, section, 1, 2);
+
+        assertEquals(generation, handoff.beginSuppression(chunk, sections));
+        assertTrue(handoff.acknowledgeUpload(receipt));
+        assertTrue(handoff.customVisible(chunk));
+    }
+
+    @Test
+    void identicalRefreshRetainsSectionsThatAlreadyUploaded() {
+        WaterSurfaceHandoff handoff = new WaterSurfaceHandoff();
+        long lower = SectionPos.asLong(0, 3, 0);
+        long upper = SectionPos.asLong(0, 4, 0);
+        long chunk = ChunkPos.asLong(0, 0);
+        Map<Long, WaterSurfaceHandoff.SectionMask> sections = Map.of(
+                lower, mask(1), upper, mask(2));
+        handoff.beginSuppression(chunk, sections);
+        assertFalse(handoff.acknowledgeUpload(compile(handoff, lower, 1)));
+
+        handoff.beginSuppression(chunk, sections);
+        assertTrue(handoff.acknowledgeUpload(compile(handoff, upper, 2)));
+        assertTrue(handoff.customVisible(chunk));
+    }
+
+    @Test
+    void fullyOccludedSectionStillCompletesItsUploadHandshake() {
+        WaterSurfaceHandoff handoff = new WaterSurfaceHandoff();
+        long section = SectionPos.asLong(0, 3, 0);
+        long chunk = ChunkPos.asLong(0, 0);
+        handoff.beginSuppression(chunk, Map.of(section, mask(1)));
+        handoff.beginCompilation(section);
+
+        assertTrue(handoff.acknowledgeUpload(handoff.finishCompilation(section)));
+        assertTrue(handoff.customVisible(chunk));
     }
 
     @Test

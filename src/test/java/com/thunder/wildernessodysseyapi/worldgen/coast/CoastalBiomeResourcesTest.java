@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Guards the data-pack contract for the six transition beach biomes. */
@@ -47,6 +48,17 @@ class CoastalBiomeResourcesTest {
                 BIOMES.stream().map(name -> "wildernessodysseyapi:" + name).toList(),
                 values.asList().stream().map(element -> element.getAsString()).toList()
         );
+    }
+
+    @Test
+    void tropicalBeachDoesNotBorrowPlainGrassOrTemperateTreeDecoration() throws IOException {
+        JsonObject biome = readJson("src/main/resources/data/wildernessodysseyapi/"
+                + "worldgen/biome/tropical_beach.json");
+        JsonArray features = biome.getAsJsonArray("features");
+        assertFalse(contains(features, "minecraft:trees_water"));
+        assertFalse(contains(features, "minecraft:patch_grass_plain"));
+        assertTrue(biome.getAsJsonObject("effects").has("foliage_color"));
+        assertTrue(biome.getAsJsonObject("effects").has("grass_color"));
     }
 
     @Test

@@ -152,34 +152,29 @@ public final class CoastalRunupRenderer {
     ) {
         int quads = 0;
         boolean foamEnabled = WaterRenderingConfig.coastalFoamEnabled(level);
-        if (remainingBudget > 0
+        if (remainingBudget >= CoastalBreakerGeometry.QUADS_PER_CREST
                 && (wave.stage() == CoastalWaveModel.Stage.INCOMING
                 || wave.stage() == CoastalWaveModel.Stage.SHOALING
                 || wave.stage() == CoastalWaveModel.Stage.BREAKING)
                 && !point.nearshoreCells().isEmpty()) {
-            CoastalSegment.NearshoreCell crestCell = closestNearshoreCell(
-                    point, wave.crestDistanceFromShoreBlocks());
-            int light = waterLight(
-                    level, crestCell.blockX(), crestCell.waterSurfaceY(), crestCell.blockZ());
-            int color;
-            if (foamEnabled && wave.foam() > 0.04f) {
-                color = foamColor(wave.foam()
-                        * WaterRenderingConfig.coastalFoamStrength()
-                        * season.foamMultiplier());
-            } else {
-                int tint = waterTint(
-                        level,
-                        crestCell.blockX(),
-                        (int) Math.floor(crestCell.waterSurfaceY()),
-                        crestCell.blockZ()
-                );
-                color = runUpColor(tint, 0.0f, season);
-            }
+            CoastalBreakerGeometry.Shape shape = CoastalBreakerGeometry.sample(point, wave);
+            float centerX = point.waterX() + 0.5f
+                    - segment.landwardNormalX() * shape.distanceFromShore();
+            float centerZ = point.waterZ() + 0.5f
+                    - segment.landwardNormalZ() * shape.distanceFromShore();
+            int light = waterLight(level, centerX, shape.surfaceY(), centerZ);
+            int tint = waterTint(level, (int) Math.floor(centerX),
+                    (int) Math.floor(shape.surfaceY()), (int) Math.floor(centerZ));
+            float foam = foamEnabled ? wave.foam()
+                    * WaterRenderingConfig.coastalFoamStrength()
+                    * season.foamMultiplier() : 0.0f;
+            int waterColor = breakerColor(tint, foam * 0.30f, season);
+            int lipColor = foam > 0.04f ? foamColor(foam) : waterColor;
             drawBreakerBand(
-                    buffer, pose, waterSprite, light, color,
-                    crestCell, segment, wave, tideOffset
+                    buffer, pose, waterSprite, light, waterColor, lipColor,
+                    centerX, centerZ, shape, segment, tideOffset
             );
-            quads++;
+            quads += CoastalBreakerGeometry.QUADS_PER_CREST;
         }
 
         boolean drawRunUp = detailedRunUp && WaterRenderingConfig.coastalRunUpEnabled(level);
@@ -245,58 +240,62 @@ public final class CoastalRunupRenderer {
             PoseStack.Pose pose,
             TextureAtlasSprite sprite,
             int light,
-            int color,
-            CoastalSegment.NearshoreCell crestCell,
+            int waterColor,
+            int lipColor,
+            float centerX,
+            float centerZ,
+            CoastalBreakerGeometry.Shape shape,
             CoastalSegment segment,
-            CoastalWaveModel.Sample wave,
             float tideOffset
     ) {
-        float centerX = crestCell.blockX() + 0.5f
-                + segment.landwardNormalX() * 0.23f;
-        float centerZ = crestCell.blockZ() + 0.5f
-                + segment.landwardNormalZ() * 0.23f;
-        float tangentX = -segment.landwardNormalZ() * 0.55f;
-        float tangentZ = segment.landwardNormalX() * 0.55f;
-        float baseY = crestCell.waterSurfaceY() + tideOffset + 0.025f;
-        float visibleLift = switch (wave.stage()) {
-            case INCOMING -> wave.waveHeight() * 0.18f;
-            case SHOALING -> wave.waveHeight() * 0.32f;
-            case BREAKING -> wave.breakerLift();
-            case RUN_UP, RETREAT -> 0.0f;
-        };
-        float crestY = baseY + Math.max(0.025f, visibleLift);
-        float curlX = segment.landwardNormalX() * visibleLift * 0.22f;
-        float curlZ = segment.landwardNormalZ() * visibleLift * 0.22f;
-
-        addVertex(buffer, pose, sprite, light, color,
-                -segment.landwardNormalX(), 0.25f, -segment.landwardNormalZ(),
-                centerX - tangentX, baseY, centerZ - tangentZ);
-        addVertex(buffer, pose, sprite, light, color,
-                -segment.landwardNormalX(), 0.25f, -segment.landwardNormalZ(),
-                centerX + tangentX, baseY, centerZ + tangentZ);
-        addVertex(buffer, pose, sprite, light, color,
-                -segment.landwardNormalX(), 0.25f, -segment.landwardNormalZ(),
-                centerX + tangentX + curlX, crestY, centerZ + tangentZ + curlZ);
-        addVertex(buffer, pose, sprite, light, color,
-                -segment.landwardNormalX(), 0.25f, -segment.landwardNormalZ(),
-                centerX - tangentX + curlX, crestY, centerZ - tangentZ + curlZ);
+        float baseY = shape.surfaceY() + tideOffset + 0.025f;
+        // A water-colored back, foamy lip, and land-facing slope form a volume.
+        // The former single seaward-facing quad was culled from the beach.
+        drawSlopeBand(buffer, pose, sprite, light, waterColor, segment, centerX, baseY, centerZ,
+                shape.backOffset(), 0.0f, 0.0f, shape.crestHeight());
+        drawSlopeBand(buffer, pose, sprite, light, lipColor, segment, centerX, baseY, centerZ,
+                0.0f, shape.crestHeight(), shape.lipOffset(), shape.lipHeight());
+        drawSlopeBand(buffer, pose, sprite, light, waterColor, segment, centerX, baseY, centerZ,
+                shape.lipOffset(), shape.lipHeight(), shape.frontOffset(), 0.0f);
     }
 
-    private static CoastalSegment.NearshoreCell closestNearshoreCell(
-            CoastalSegment.ShorelinePoint point,
-            float targetDistance
+    private static void drawSlopeBand(
+            VertexConsumer buffer,
+            PoseStack.Pose pose,
+            TextureAtlasSprite sprite,
+            int light,
+            int color,
+            CoastalSegment segment,
+            float centerX,
+            float baseY,
+            float centerZ,
+            float fromOffset,
+            float fromHeight,
+            float toOffset,
+            float toHeight
     ) {
-        CoastalSegment.NearshoreCell closest = point.nearshoreCells().getFirst();
-        float closestDifference = Math.abs(closest.distanceFromShoreBlocks() - targetDistance);
-        for (int index = 1; index < point.nearshoreCells().size(); index++) {
-            CoastalSegment.NearshoreCell candidate = point.nearshoreCells().get(index);
-            float difference = Math.abs(candidate.distanceFromShoreBlocks() - targetDistance);
-            if (difference < closestDifference) {
-                closest = candidate;
-                closestDifference = difference;
-            }
-        }
-        return closest;
+        float landwardX = segment.landwardNormalX();
+        float landwardZ = segment.landwardNormalZ();
+        float tangentX = -landwardZ * 0.5f;
+        float tangentZ = landwardX * 0.5f;
+        float fromX = centerX + landwardX * fromOffset;
+        float fromZ = centerZ + landwardZ * fromOffset;
+        float toX = centerX + landwardX * toOffset;
+        float toZ = centerZ + landwardZ * toOffset;
+        float rise = toHeight - fromHeight;
+        float run = toOffset - fromOffset;
+        float length = Math.max(0.001f, (float) Math.hypot(rise, run));
+        float normalX = -landwardX * rise / length;
+        float normalY = run / length;
+        float normalZ = -landwardZ * rise / length;
+        addVertex(buffer, pose, sprite, light, color, normalX, normalY, normalZ,
+                fromX - tangentX, baseY + fromHeight, fromZ - tangentZ);
+        addVertex(buffer, pose, sprite, light, color, normalX, normalY, normalZ,
+                fromX + tangentX, baseY + fromHeight, fromZ + tangentZ);
+        addVertex(buffer, pose, sprite, light, color, normalX, normalY, normalZ,
+                toX + tangentX, baseY + toHeight, toZ + tangentZ);
+        addVertex(buffer, pose, sprite, light, color, normalX, normalY, normalZ,
+                toX - tangentX, baseY + toHeight, toZ - tangentZ);
     }
 
     private static void drawTopQuad(
@@ -378,8 +377,13 @@ public final class CoastalRunupRenderer {
         return red << 16 | green << 8 | blue;
     }
 
+    private static int breakerColor(int tint, float foam, CoastalSeasonModel.Sample season) {
+        int rgb = runUpColor(tint, foam, season) & 0xFFFFFF;
+        return channel(0.56f + Math.min(1.0f, foam) * 0.16f) << 24 | rgb;
+    }
+
     private static int foamColor(float strength) {
-        int alpha = channel(0.12f + Math.min(1.0f, strength) * 0.60f);
+        int alpha = channel(0.20f + Math.min(1.0f, strength) * 0.72f);
         return alpha << 24 | 0xEAF7FA;
     }
 

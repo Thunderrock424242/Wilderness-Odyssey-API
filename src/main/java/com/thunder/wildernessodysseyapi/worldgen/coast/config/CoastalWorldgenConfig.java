@@ -23,6 +23,7 @@ public final class CoastalWorldgenConfig {
     public static ModConfigSpec.BooleanValue ENABLE_ROCK_OUTCROPS;
     public static ModConfigSpec.BooleanValue ENABLE_ICE_FRAGMENTS;
     public static ModConfigSpec.IntValue MAX_DUNE_RISE_BLOCKS;
+    public static ModConfigSpec.IntValue MAX_TROPICAL_BANK_CUT_BLOCKS;
     public static ModConfigSpec.DoubleValue COASTAL_DETAIL_DENSITY;
 
     static {
@@ -94,6 +95,9 @@ public final class CoastalWorldgenConfig {
         MAX_DUNE_RISE_BLOCKS = builder
                 .comment("Maximum deterministic sand rise added to dune beach columns during new-chunk generation.")
                 .defineInRange("maximumDuneRiseBlocks", 2, 0, 4);
+        MAX_TROPICAL_BANK_CUT_BLOCKS = builder
+                .comment("Maximum natural bank lowering for a gentle tropical beach, in blocks. New chunks only; zero disables grading. Structure-bearing chunks are skipped.")
+                .defineInRange("maximumTropicalBankCutBlocks", 4, 0, 6);
         COASTAL_DETAIL_DENSITY = builder
                 .comment("Global density multiplier for sparse coastal details. Zero disables detail placement and one uses the authored maximum density.")
                 .defineInRange("coastalDetailDensity", 0.55, 0.0, 1.0);

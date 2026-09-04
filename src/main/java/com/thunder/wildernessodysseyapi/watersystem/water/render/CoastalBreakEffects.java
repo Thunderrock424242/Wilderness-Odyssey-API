@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalBreakAudioModel;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalSegment;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalSeasonModel;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalWaveProfile;
@@ -13,6 +14,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 
 import java.util.HashMap;
@@ -24,7 +26,7 @@ import java.util.Set;
 /** Emits one sparse local particle/audio accent when a cached segment breaks. */
 public final class CoastalBreakEffects {
 
-    private static final int MINIMUM_EFFECT_INTERVAL_TICKS = 16;
+    private static final int MINIMUM_EFFECT_INTERVAL_TICKS = 28;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
     private static final Map<Long, Long> LAST_EMITTED_CYCLE = new HashMap<>();
     private static long nextEffectTick;
@@ -65,10 +67,14 @@ public final class CoastalBreakEffects {
                     segment.underwaterSlope(),
                     segment.averageWaterDepth(),
                     onshoreWind);
-            float minimumEventSpray = WaterRenderingConfig.coastalAudioEnabled(level)
-                    ? 0.055f : 0.12f;
+            boolean audibleBreak = WaterRenderingConfig.coastalAudioEnabled(level)
+                    && segment.profile().crashSoundVolume() > 0.0f
+                    && CoastalBreakAudioModel.isAudibleBreak(wave);
+            boolean sprayBreak = WaterRenderingConfig.coastalSprayEnabled(level)
+                    && CoastalBreakAudioModel.isAudibleBreak(wave)
+                    && wave.spray() >= 0.12f;
             if (wave.stage() != CoastalWaveModel.Stage.BREAKING
-                    || wave.spray() < minimumEventSpray
+                    || (!audibleBreak && !sprayBreak)
                     || LAST_EMITTED_CYCLE.getOrDefault(segment.id(), Long.MIN_VALUE)
                     == wave.cycleIndex()
                     || segment.shoreline().isEmpty()) {
@@ -81,7 +87,7 @@ public final class CoastalBreakEffects {
             if (distanceSquared > radius * radius) {
                 continue;
             }
-            float score = wave.energy() * wave.spray()
+            float score = CoastalBreakAudioModel.impactStrength(wave)
                     / (1.0f + (float) Math.sqrt(distanceSquared) * 0.04f);
             if (best == null || score > best.score()) {
                 best = new Candidate(segment, wave, sea.strength(), distanceSquared, score);
@@ -146,7 +152,7 @@ public final class CoastalBreakEffects {
                 x,
                 y,
                 z,
-                wave.energy() * wave.spray(),
+                CoastalBreakAudioModel.impactStrength(wave),
                 wave.waveHeight(),
                 segment.profile().shoreType(),
                 candidate.weatherIntensity()
@@ -156,6 +162,7 @@ public final class CoastalBreakEffects {
 
         double sprayDistance = WaterRenderingConfig.coastalSprayDistanceBlocks();
         if (WaterRenderingConfig.coastalSprayEnabled(level)
+                && wave.spray() >= 0.055f
                 && candidate.distanceSquared() <= sprayDistance * sprayDistance) {
             int particles = WaterRenderingConfig.coastalSprayParticleBudget();
             float steepImpact = Math.min(1.0f, segment.averageBeachSlope() / 0.85f);
@@ -193,22 +200,28 @@ public final class CoastalBreakEffects {
         }
 
         if (WaterRenderingConfig.coastalAudioEnabled(level)) {
-            long soundSeed = segment.id()
-                    ^ wave.cycleIndex() * 0x9E3779B97F4A7C15L;
-            float volumeVariation = 0.90f + Math.floorMod(soundSeed, 17L) / 100.0f;
-            float volume = segment.profile().crashSoundVolume()
-                    * WaterRenderingConfig.coastalSoundVolume()
-                    * (0.18f + wave.energy() * 0.58f)
-                    * volumeVariation;
-            float pitch = 0.76f + Math.floorMod(soundSeed >>> 8, 23L) / 100.0f;
+            CoastalBreakAudioModel.Mix mix = CoastalBreakAudioModel.mix(
+                    segment.profile(), wave, WaterRenderingConfig.coastalSoundVolume(), segment.id());
             level.playLocalSound(
                     breakEvent.x(),
                     breakEvent.y(),
                     breakEvent.z(),
                     soundFor(segment.profile().shoreType(), wave.energy()),
                     SoundSource.AMBIENT,
-                    Math.min(1.5f, volume),
-                    pitch,
+                    mix.impactVolume(),
+                    mix.pitch(),
+                    false
+            );
+            // sounds.json entries are random alternatives, not simultaneous
+            // layers. Add the quieter water body explicitly at the same crest.
+            level.playLocalSound(
+                    breakEvent.x(),
+                    breakEvent.y(),
+                    breakEvent.z(),
+                    SoundEvents.WATER_AMBIENT,
+                    SoundSource.AMBIENT,
+                    mix.washVolume(),
+                    mix.pitch() * 0.90f,
                     false
             );
         }
