@@ -504,9 +504,15 @@ void main() {
     // only once synchronized wind/sea energy approaches breaking conditions.
     float rawSlopeFoam = smoothstep(0.025, 0.14 + sea * 0.04, slope);
     float slopeFoam = rawSlopeFoam * smoothstep(0.16, 0.70, breakingEnergy);
-    float crestFoam = smoothstep(0.15, 0.72, crestCompression)
-        * smoothstep(0.18, 0.75, breakingEnergy)
-        * smoothstep(0.04, 0.35, normalizedWaveSlope);
+    // Compressed, steep crests can whiten in swell without requiring a storm.
+    // Keep broad slope foam weather-gated so flat calm water remains clear.
+    float crestFoam = smoothstep(0.08, 0.48, crestCompression)
+        * (0.40 + 0.60 * smoothstep(0.12, 0.65, breakingEnergy))
+        * smoothstep(0.025, 0.24, normalizedWaveSlope);
+    float foamPattern = smoothstep(-0.55, 0.60,
+        sin(stableWorldPhase(vec2(2.73, 1.91)) - SurfaceAnimationPhases1.z)
+        * cos(stableWorldPhase(vec2(-1.37, 3.17)) + SurfaceAnimationPhases1.w));
+    crestFoam *= 0.48 + foamPattern * 0.52;
     float currentSpeed = length(localCurrent);
     float shallowWater = 1.0 - clamp(depthFactor, 0.0, 1.0);
     // Shore proximity is a deterministic client snapshot-boundary/depth
@@ -560,7 +566,7 @@ void main() {
     // Foam is a real, optically thick surface layer. It replaces a bounded
     // fraction of both transmitted scene light and the underlying water rather
     // than merely tinting a low-opacity material contribution.
-    float foamCoverage = clamp(foam * (0.16 + sea * 0.30), 0.0, 0.72);
+    float foamCoverage = clamp(foam * (0.58 + sea * 0.24), 0.0, 0.86);
     vec3 foamColor = vec3(0.84, 0.94, 1.0) * waterLighting * ColorModulator.rgb;
     vec3 materialWeight = waterMaterialWeight * (1.0 - foamCoverage)
         + vec3(foamCoverage);

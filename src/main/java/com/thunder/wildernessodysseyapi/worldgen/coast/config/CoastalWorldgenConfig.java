@@ -37,11 +37,10 @@ public final class CoastalWorldgenConfig {
                 "Changes affect only newly generated chunks."
         ).push("coastalWorldgen");
 
-        ENABLE_BEACH_BIOME_FAMILY = toggle(
-                builder,
-                "enableBeachBiomeFamily",
-                "Replace eligible vanilla beach climate slots with the Wilderness coastal family."
-        );
+        ENABLE_BEACH_BIOME_FAMILY = builder.comment(
+                "Opt in to replacing eligible vanilla beach climate slots with the Wilderness coastal family.",
+                "Natural-coast surf works independently of this world-generation option.")
+                .define("enableBeachBiomeFamily", false);
         ENABLE_TEMPERATE_BEACH = toggle(
                 builder,
                 "enableTemperateBeach",

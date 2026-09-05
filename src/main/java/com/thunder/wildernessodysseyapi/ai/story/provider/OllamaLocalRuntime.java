@@ -14,9 +14,12 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -108,12 +111,12 @@ public final class OllamaLocalRuntime {
             return StartupResult.UNSUPPORTED_PLATFORM;
         }
 
-        Optional<Path> executable = resolveExecutable(
+        List<Path> executables = resolveExecutables(
                 settings.getOllamaExecutable(),
                 localAppData,
                 pathEnvironment
         );
-        if (executable.isEmpty()) {
+        if (executables.isEmpty()) {
             ModConstants.LOGGER.warn(
                     "[Aether] Ollama is stopped and no trusted Windows installation was found. "
                             + "Install Ollama or set settings.ollama_executable in ai_config.yaml."
@@ -125,22 +128,51 @@ public final class OllamaLocalRuntime {
         }
 
         try {
-            List<String> command = buildLaunchCommand(executable.get());
-            processStarter.start(command);
-            ModConstants.LOGGER.info(
-                    "[Aether] Started the installed Ollama application; waiting for its loopback endpoint."
-            );
-
-            int polls = Math.max(
+            int remainingPolls = Math.max(
                     1,
                     (int) Math.ceil(settings.getOllamaStartupTimeoutSeconds() * 1000.0D / POLL_INTERVAL_MILLIS)
             );
-            for (int poll = 0; poll < polls; poll++) {
-                sleeper.sleep(POLL_SLEEP_MILLIS);
-                if (endpointProbe.isAvailable(tagsUri.get(), POLL_PROBE_TIMEOUT)) {
-                    ModConstants.LOGGER.info("[Aether] Local Ollama endpoint is ready.");
-                    return StartupResult.STARTED;
+            boolean launchedAnyCandidate = false;
+            for (int candidateIndex = 0; candidateIndex < executables.size(); candidateIndex++) {
+                Path executable = executables.get(candidateIndex);
+                List<String> command = buildLaunchCommand(executable);
+                try {
+                    processStarter.start(command);
+                    launchedAnyCandidate = true;
+                    ModConstants.LOGGER.info(
+                            "[Aether] Started {}; waiting for its loopback endpoint.",
+                            executable.getFileName()
+                    );
+                } catch (IOException | RuntimeException exception) {
+                    ModConstants.LOGGER.warn(
+                            "[Aether] Failed to start {}: {}",
+                            executable.getFileName(),
+                            safeMessage(exception.getMessage())
+                    );
+                    continue;
                 }
+
+                int candidatesRemaining = executables.size() - candidateIndex;
+                int candidatePolls = Math.max(1, remainingPolls / candidatesRemaining);
+                remainingPolls = Math.max(0, remainingPolls - candidatePolls);
+                for (int poll = 0; poll < candidatePolls; poll++) {
+                    sleeper.sleep(POLL_SLEEP_MILLIS);
+                    if (endpointProbe.isAvailable(tagsUri.get(), POLL_PROBE_TIMEOUT)) {
+                        ModConstants.LOGGER.info("[Aether] Local Ollama endpoint is ready.");
+                        return StartupResult.STARTED;
+                    }
+                }
+
+                if (candidateIndex + 1 < executables.size()) {
+                    ModConstants.LOGGER.warn(
+                            "[Aether] {} did not make Ollama ready; trying {}.",
+                            executable.getFileName(),
+                            executables.get(candidateIndex + 1).getFileName()
+                    );
+                }
+            }
+            if (!launchedAnyCandidate) {
+                return StartupResult.START_FAILED;
             }
             ModConstants.LOGGER.warn(
                     "[Aether] Ollama did not become ready within {} seconds; continuing with fallback.",
@@ -150,12 +182,6 @@ public final class OllamaLocalRuntime {
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             return StartupResult.INTERRUPTED;
-        } catch (IOException | RuntimeException exception) {
-            ModConstants.LOGGER.warn(
-                    "[Aether] Failed to start the installed Ollama application: {}",
-                    safeMessage(exception.getMessage())
-            );
-            return StartupResult.START_FAILED;
         } finally {
             startupInProgress.set(false);
         }
@@ -187,49 +213,53 @@ public final class OllamaLocalRuntime {
             String localAppData,
             String pathEnvironment
     ) {
+        return resolveExecutables(configuredExecutable, localAppData, pathEnvironment)
+                .stream()
+                .findFirst();
+    }
+
+    static List<Path> resolveExecutables(
+            String configuredExecutable,
+            String localAppData,
+            String pathEnvironment
+    ) {
         Optional<Path> configured = trustedExecutable(configuredExecutable);
         if (configured.isPresent()) {
-            return configured;
+            return List.of(configured.get());
         }
 
+        Set<Path> discoveredServers = new LinkedHashSet<>();
+        Set<Path> discoveredApplications = new LinkedHashSet<>();
         if (localAppData != null && !localAppData.isBlank()) {
             try {
                 Path installation = Path.of(localAppData).resolve("Programs").resolve("Ollama");
-                Optional<Path> application = trustedExecutable(installation.resolve(WINDOWS_APPLICATION));
-                if (application.isPresent()) {
-                    return application;
-                }
-                Optional<Path> server = trustedExecutable(installation.resolve(WINDOWS_SERVER));
-                if (server.isPresent()) {
-                    return server;
-                }
+                trustedExecutable(installation.resolve(WINDOWS_SERVER)).ifPresent(discoveredServers::add);
+                trustedExecutable(installation.resolve(WINDOWS_APPLICATION)).ifPresent(discoveredApplications::add);
             } catch (InvalidPathException ignored) {
                 // Continue to the bounded PATH lookup.
             }
         }
 
-        if (pathEnvironment == null || pathEnvironment.isBlank()) {
-            return Optional.empty();
-        }
-        for (String entry : pathEnvironment.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
-            String directory = stripQuotes(entry.trim());
-            if (directory.isEmpty()) {
-                continue;
-            }
-            try {
-                Optional<Path> application = trustedExecutable(Path.of(directory).resolve(WINDOWS_APPLICATION));
-                if (application.isPresent()) {
-                    return application;
+        if (pathEnvironment != null && !pathEnvironment.isBlank()) {
+            for (String entry : pathEnvironment.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+                String directory = stripQuotes(entry.trim());
+                if (directory.isEmpty()) {
+                    continue;
                 }
-                Optional<Path> server = trustedExecutable(Path.of(directory).resolve(WINDOWS_SERVER));
-                if (server.isPresent()) {
-                    return server;
+                try {
+                    Path installation = Path.of(directory);
+                    trustedExecutable(installation.resolve(WINDOWS_SERVER)).ifPresent(discoveredServers::add);
+                    trustedExecutable(installation.resolve(WINDOWS_APPLICATION)).ifPresent(discoveredApplications::add);
+                } catch (InvalidPathException ignored) {
+                    // Ignore malformed PATH entries without expanding the search scope.
                 }
-            } catch (InvalidPathException ignored) {
-                // Ignore malformed PATH entries without expanding the search scope.
             }
         }
-        return Optional.empty();
+
+        List<Path> discovered = new ArrayList<>(discoveredServers.size() + discoveredApplications.size());
+        discovered.addAll(discoveredServers);
+        discovered.addAll(discoveredApplications);
+        return List.copyOf(discovered);
     }
 
     static List<String> buildLaunchCommand(Path executable) {

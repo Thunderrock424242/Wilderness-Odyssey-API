@@ -130,6 +130,10 @@ biome supplies explicit lush grass/foliage colors and a turquoise water palette.
 
 Common world-generation settings live under `coastalWorldgen`:
 
+- `enableBeachBiomeFamily` defaults to `false`: custom beaches are opt-in;
+- saved explicit values remain in effect; existing installations with `true`
+  must change that value to `false` and restart to disable future placement;
+- biome registrations remain available for existing worlds;
 - the entire family and each individual biome replacement can be disabled;
 - terrain bands can be disabled independently;
 - maximum dune rise is bounded to four blocks.
@@ -138,6 +142,22 @@ Common world-generation settings live under `coastalWorldgen`:
   driftwood, tide-pool, rock/outcrop, and ice-fragment switches.
 
 Client presentation settings live with the existing water rendering config:
+
+Surf discovers loaded ocean-to-land boundaries independently of beach biome
+tags. Vanilla and modded forest, plains, rocky and other shores can participate;
+biome climate and surface material still choose the presentation profile.
+Cliffs and built obstacles stop run-up, while lakes and rivers remain outside
+the ocean-column eligibility check. Disabling custom beaches does not disable surf.
+
+Crest foam in the built-in water shader responds to steep compressed swell
+even without storm wind. Coastal breakers retain stronger whitewater through
+run-up and retreat. Nearby trails add at most three drifting, expanding patches
+per shoreline point within the existing global quad budget. They use the
+existing wave clock and synchronized current, follow the CPU water surface,
+and create no persistent foam state or new packets. Run-up whitening emphasizes
+its front and varies across terrain. External shader packs still control their
+own water material; the stock translucent coastal geometry remains separate
+from the built-in shader's crest treatment.
 
 - coastal waves, run-up, foam, wetness, spray, audio, regional weather, and
   seasonal presentation influence have independent switches;
