@@ -177,6 +177,17 @@ public final class GerstnerWaveProfile {
             float flowDirectionX,
             float flowDirectionZ
     ) {
+        return sampleAt(worldX, worldZ, timeSeconds, maxWaveTrains, spectrumState,
+                flowDirectionX, flowDirectionZ, 24.0f);
+    }
+
+    /** Samples the existing spectrum with a cached-depth shoaling envelope. */
+    public WaveSurfaceSample sampleAt(
+            double worldX, double worldZ, double timeSeconds, int maxWaveTrains,
+            WaveSpectrumState spectrumState, float flowDirectionX, float flowDirectionZ,
+            float waterDepth
+    ) {
+        float depthScale = DepthWaveResponse.amplitudeScale(waterDepth);
         int count = Math.max(0, Math.min(waveCount, maxWaveTrains));
         if (count == 0) {
             return WaveSurfaceSample.flat();
@@ -218,7 +229,7 @@ public final class GerstnerWaveProfile {
             }
             float energyScale = componentEnergyScale(i, spectrum, directionX, directionZ);
             rawCombinedSteepness += steepness[i] * amplitude[i]
-                    * energyScale * waveNumber[i];
+                    * energyScale * depthScale * waveNumber[i];
         }
         float horizontalBudgetScale = rawCombinedSteepness > MAX_COMBINED_STEEPNESS
                 ? MAX_COMBINED_STEEPNESS / rawCombinedSteepness
@@ -251,7 +262,7 @@ public final class GerstnerWaveProfile {
             float k = waveNumber[i];
             float omega = angularFrequency[i];
             float energyScale = componentEnergyScale(i, spectrum, directionX, directionZ);
-            float waveAmplitude = amplitude[i] * energyScale;
+            float waveAmplitude = amplitude[i] * energyScale * depthScale;
             float horizontalScale = steepness[i] * waveAmplitude * horizontalBudgetScale;
             double phase = Math.IEEEremainder(
                     k * (directionX * safeWorldX + directionZ * safeWorldZ)

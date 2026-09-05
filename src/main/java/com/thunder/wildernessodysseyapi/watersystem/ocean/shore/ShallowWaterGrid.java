@@ -18,6 +18,9 @@ public final class ShallowWaterGrid {
     private static final float MIN_WATER_DEPTH = 0.01f;
     private static final float BOTTOM_FRICTION = 0.85f;
     private static final float BOUNDARY_RELAXATION = 0.12f;
+    private static final float MAX_FLOW_SPEED = 8.0f;
+    private static final float MAX_SURFACE_OFFSET = 4.0f;
+    private static final int MAX_SUBSTEPS = 32;
 
     private final int width;
     private final int height;
@@ -38,10 +41,10 @@ public final class ShallowWaterGrid {
      * @param cellSize cell spacing in blocks
      */
     public ShallowWaterGrid(int width, int height, float cellSize) {
-        if (width < 3 || height < 3) {
-            throw new IllegalArgumentException("A shallow-water grid requires at least 3 x 3 cells");
+        if (width < 3 || height < 3 || width > 257 || height > 257) {
+            throw new IllegalArgumentException("A shallow-water grid requires 3..257 cells per axis");
         }
-        if (!(cellSize > 0.0f)) {
+        if (!Float.isFinite(cellSize) || cellSize < 0.25f) {
             throw new IllegalArgumentException("Cell size must be positive");
         }
 
@@ -67,7 +70,7 @@ public final class ShallowWaterGrid {
      */
     public void setRestDepth(int x, int z, float depth) {
         int index = index(x, z);
-        restDepth[index] = Math.max(0.0f, depth);
+        restDepth[index] = bounded(depth, 0.0f, 64.0f);
         if (restDepth[index] <= MIN_WATER_DEPTH) {
             surface[index] = 0.0f;
             velocityX[index] = 0.0f;
@@ -85,8 +88,8 @@ public final class ShallowWaterGrid {
         if (restDepth[index] <= MIN_WATER_DEPTH) {
             return;
         }
-        velocityX[index] += impulseX;
-        velocityZ[index] += impulseZ;
+        velocityX[index] = bounded(velocityX[index] + finite(impulseX), -MAX_FLOW_SPEED, MAX_FLOW_SPEED);
+        velocityZ[index] = bounded(velocityZ[index] + finite(impulseZ), -MAX_FLOW_SPEED, MAX_FLOW_SPEED);
     }
 
     /**
@@ -97,14 +100,19 @@ public final class ShallowWaterGrid {
      * @param boundarySurface ocean boundary elevation relative to rest level
      */
     public void step(float deltaSeconds, float boundarySurface) {
-        if (!(deltaSeconds > 0.0f)) {
+        if (!Float.isFinite(deltaSeconds) || !(deltaSeconds > 0.0f)) {
             return;
         }
 
+        deltaSeconds = Math.min(deltaSeconds, 0.25f);
+        boundarySurface = bounded(boundarySurface, -MAX_SURFACE_OFFSET, MAX_SURFACE_OFFSET);
         float maxDepth = maximumWaterDepth();
         float maxStableStep = CFL_NUMBER * cellSize
-                / Math.max(0.001f, (float) Math.sqrt(GRAVITY * Math.max(maxDepth, MIN_WATER_DEPTH)));
-        int substeps = Math.max(1, (int) Math.ceil(deltaSeconds / maxStableStep));
+                / Math.max(0.001f, MAX_FLOW_SPEED + (float) Math.sqrt(GRAVITY * Math.max(maxDepth, MIN_WATER_DEPTH)));
+        // If the caller stalled, discard excess cosmetic elapsed time rather
+        // than violating CFL or running unbounded catch-up work on the server.
+        deltaSeconds = Math.min(deltaSeconds, maxStableStep * MAX_SUBSTEPS);
+        int substeps = Math.min(MAX_SUBSTEPS, Math.max(1, (int) Math.ceil(deltaSeconds / maxStableStep)));
         float stepSeconds = deltaSeconds / substeps;
 
         for (int substep = 0; substep < substeps; substep++) {
@@ -164,18 +172,20 @@ public final class ShallowWaterGrid {
 
                 float surfaceGradientX = (surface[right] - surface[left]) * inverseTwoCells;
                 float surfaceGradientZ = (surface[up] - surface[down]) * inverseTwoCells;
-                nextVelocityX[center] = (velocityX[center] - GRAVITY * deltaSeconds * surfaceGradientX) * friction;
-                nextVelocityZ[center] = (velocityZ[center] - GRAVITY * deltaSeconds * surfaceGradientZ) * friction;
+                nextVelocityX[center] = bounded((velocityX[center] - GRAVITY * deltaSeconds * surfaceGradientX) * friction,
+                        -MAX_FLOW_SPEED, MAX_FLOW_SPEED);
+                nextVelocityZ[center] = bounded((velocityZ[center] - GRAVITY * deltaSeconds * surfaceGradientZ) * friction,
+                        -MAX_FLOW_SPEED, MAX_FLOW_SPEED);
 
                 float fluxLeft = wetDepth(left) * velocityX[left];
                 float fluxRight = wetDepth(right) * velocityX[right];
                 float fluxDown = wetDepth(down) * velocityZ[down];
                 float fluxUp = wetDepth(up) * velocityZ[up];
                 float divergence = (fluxRight - fluxLeft + fluxUp - fluxDown) * inverseTwoCells;
-                nextSurface[center] = Math.max(
+                nextSurface[center] = Math.min(MAX_SURFACE_OFFSET, Math.max(
                         -restDepth[center] + MIN_WATER_DEPTH,
                         surface[center] - deltaSeconds * divergence
-                );
+                ));
             }
         }
 
@@ -227,5 +237,10 @@ public final class ShallowWaterGrid {
 
     private int indexUnchecked(int x, int z) {
         return z * width + x;
+    }
+
+    private static float finite(float value) { return Float.isFinite(value) ? value : 0.0f; }
+    private static float bounded(float value, float minimum, float maximum) {
+        return Math.max(minimum, Math.min(maximum, finite(value)));
     }
 }

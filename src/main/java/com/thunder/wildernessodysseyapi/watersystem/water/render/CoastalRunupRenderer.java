@@ -109,6 +109,8 @@ public final class CoastalRunupRenderer {
                     onshoreWind
             );
             CoastalSeasonModel.Sample season = ClientCoastalClimate.sample(level, segment);
+            wave = CoastalWaveModel.withTide(wave, TideSystem.getTideOffset(level),
+                    TideSystem.getTideRate(level), segment.averageBeachSlope());
             double deltaX = segment.centerX() + 0.5 - camera.x;
             double deltaZ = segment.centerZ() + 0.5 - camera.z;
             boolean detailedRunUp = deltaX * deltaX + deltaZ * deltaZ

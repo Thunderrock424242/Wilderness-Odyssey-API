@@ -29,6 +29,7 @@ public final class CoastalBreakEffects {
     private static final int MINIMUM_EFFECT_INTERVAL_TICKS = 28;
     private static final float VISUAL_TIDE_SCALE = 0.18f;
     private static final Map<Long, Long> LAST_EMITTED_CYCLE = new HashMap<>();
+    private static final Map<Long, Long> LAST_RETREAT_CYCLE = new HashMap<>();
     private static long nextEffectTick;
     private static long nextCleanupTick;
     private static volatile CoastalWaveBreakEvent lastBreak;
@@ -55,6 +56,7 @@ public final class CoastalBreakEffects {
         }
 
         Candidate best = null;
+        Candidate retreat = null;
         for (CoastalSegment segment : ClientCoastalSegmentStore.segments(level)) {
             OceanSeaState.Sample sea = WaterRenderingConfig.coastalWeatherInfluenceEnabled()
                     ? ClientOceanSeaState.sampleAt(level, segment.centerX(), segment.centerZ())
@@ -67,6 +69,15 @@ public final class CoastalBreakEffects {
                     segment.underwaterSlope(),
                     segment.averageWaterDepth(),
                     onshoreWind);
+            wave = CoastalWaveModel.withTide(wave, TideSystem.getTideOffset(level),
+                    TideSystem.getTideRate(level), segment.averageBeachSlope());
+            if (retreat == null && wave.stage() == CoastalWaveModel.Stage.RETREAT && wave.stagePhase() < 0.60f
+                    && WaterRenderingConfig.coastalAudioEnabled(level)
+                    && wave.maximumRunUpDistanceBlocks() > 0.8f
+                    && LAST_RETREAT_CYCLE.getOrDefault(segment.id(), Long.MIN_VALUE) != wave.cycleIndex()
+                    && minecraft.player.distanceToSqr(segment.centerX() + 0.5, segment.surfaceY(), segment.centerZ() + 0.5) < 16.0 * 16.0) {
+                retreat = new Candidate(segment, wave, sea.strength(), 0.0, 0.0f);
+            }
             boolean audibleBreak = WaterRenderingConfig.coastalAudioEnabled(level)
                     && segment.profile().crashSoundVolume() > 0.0f
                     && CoastalBreakAudioModel.isAudibleBreak(wave);
@@ -95,6 +106,16 @@ public final class CoastalBreakEffects {
         }
 
         if (best == null) {
+            if (retreat != null) {
+                // A quiet retreat fills a gap; it never steals a breaking-wave accent.
+                CoastalSegment segment = retreat.segment();
+                CoastalWaveModel.Sample wave = retreat.wave();
+                level.playLocalSound(segment.centerX() + 0.5, segment.surfaceY(), segment.centerZ() + 0.5,
+                        ModSoundEvents.COAST_WASH_SOFT.get(), SoundSource.AMBIENT,
+                        0.08f + wave.energy() * 0.10f, 0.80f + wave.energy() * 0.08f, false);
+                LAST_RETREAT_CYCLE.put(segment.id(), wave.cycleIndex());
+                nextEffectTick = gameTime + MINIMUM_EFFECT_INTERVAL_TICKS;
+            }
             return;
         }
         emit(level, best);
@@ -107,6 +128,7 @@ public final class CoastalBreakEffects {
     /** Clears per-level cosmetic cadence state. */
     public static void clear() {
         LAST_EMITTED_CYCLE.clear();
+        LAST_RETREAT_CYCLE.clear();
         nextEffectTick = 0L;
         nextCleanupTick = 0L;
         lastBreak = null;
@@ -249,6 +271,7 @@ public final class CoastalBreakEffects {
             active.add(segment.id());
         }
         LAST_EMITTED_CYCLE.keySet().retainAll(active);
+        LAST_RETREAT_CYCLE.keySet().retainAll(active);
     }
 
     private static CoastalSegment.NearshoreCell closestNearshoreCell(

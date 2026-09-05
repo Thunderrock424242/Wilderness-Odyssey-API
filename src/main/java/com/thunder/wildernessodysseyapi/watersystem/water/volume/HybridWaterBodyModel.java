@@ -133,7 +133,8 @@ final class HybridWaterBodyModel {
                 partialTick,
                 canonicalCurrentX,
                 canonicalCurrentZ,
-                environment.waveSpectrum()
+                environment.waveSpectrum(),
+                column.depth()
         );
         float localDisturbance = sampleLocalDisturbance(
                 level,
@@ -203,6 +204,11 @@ final class HybridWaterBodyModel {
         }
 
         int floorY = generated.snapshot().floorY(x & 15, z & 15);
+        WaterVolumeChunk runtimeVolume = chunk.getExistingData(ModAttachments.WATER_VOLUME).orElse(null);
+        if (level instanceof net.minecraft.server.level.ServerLevel serverLevel && runtimeVolume != null) {
+            floorY = com.thunder.wildernessodysseyapi.watersystem.water.surface.WaterDepthSampler.floor(
+                    serverLevel, x, z, surfaceY, floorY, runtimeVolume.revision());
+        }
         float baseSurfaceFill = Math.max(0.05f, Math.min(1.0f, cell.surfaceFillHeight()));
         float baseSurfaceHeight = surfaceY + baseSurfaceFill;
         float depth = Math.max(0.0f, baseSurfaceHeight - (floorY + 1.0f));
@@ -297,7 +303,8 @@ final class HybridWaterBodyModel {
             float partialTick,
             float canonicalCurrentX,
             float canonicalCurrentZ,
-            WaveSpectrumState spectrum
+            WaveSpectrumState spectrum,
+            float waterDepth
     ) {
         GerstnerWaveProfile profile = profileFor(type);
         double timeSeconds = (level.getGameTime() + (double) partialTick) / TICKS_PER_SECOND;
@@ -308,7 +315,8 @@ final class HybridWaterBodyModel {
                 profile.waveCount,
                 spectrum,
                 type == WaterBodyClassifier.WaterType.RIVER ? canonicalCurrentX : 0.0f,
-                type == WaterBodyClassifier.WaterType.RIVER ? canonicalCurrentZ : 0.0f
+                type == WaterBodyClassifier.WaterType.RIVER ? canonicalCurrentZ : 0.0f,
+                waterDepth
         );
     }
 

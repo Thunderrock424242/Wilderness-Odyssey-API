@@ -38,6 +38,8 @@ public class ClientTickHandler {
                 ClientWaterVolumeSnapshots.clear(mc.level);
                 ClientCoastalSegmentStore.clear();
                 CoastalBreakEffects.clear();
+                WaterEnvironmentalEffectPool.clear();
+                RiverSoundscape.clear();
                 return;
             }
             ClientOceanSeaState.tick(mc.level);

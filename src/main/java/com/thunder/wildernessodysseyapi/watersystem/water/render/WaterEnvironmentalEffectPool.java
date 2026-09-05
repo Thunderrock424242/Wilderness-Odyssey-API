@@ -33,6 +33,8 @@ public final class WaterEnvironmentalEffectPool {
         if (kind == null || !Float.isFinite(intensity) || intensity <= 0.02f) {
             return;
         }
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)
+                || !Double.isFinite(velocityX) || !Double.isFinite(velocityZ)) return;
         int slot = -1;
         float weakest = Float.MAX_VALUE;
         for (int index = 0; index < EMITTERS.length; index++) {
@@ -72,8 +74,13 @@ public final class WaterEnvironmentalEffectPool {
                 EMITTERS[index] = null;
                 continue;
             }
+            if (!advect(level, emitter)) {
+                EMITTERS[index] = null;
+                continue;
+            }
+            float remaining = Math.min(1.0f, (emitter.expiresAt - gameTime) / (float) emitter.kind.lifetimeTicks);
             if (Math.floorMod(gameTime + index, emitter.kind.intervalTicks) != 0L
-                    || level.getRandom().nextFloat() > emitter.intensity) {
+                    || level.getRandom().nextFloat() > emitter.intensity * remaining) {
                 continue;
             }
             double spread = 0.10 + emitter.intensity * 0.24;
@@ -98,7 +105,7 @@ public final class WaterEnvironmentalEffectPool {
 
     /** Bounded environmental presentation categories. */
     public enum Kind {
-        FOAM(ParticleTypes.SPLASH, 12, 2, 0.035, 0.70, 0.03),
+        FOAM(ParticleTypes.SPLASH, 80, 4, 0.035, 0.70, 0.03),
         DEBRIS(ParticleTypes.COMPOSTER, 20, 4, 0.015, 0.50, 0.05),
         MIST(ParticleTypes.CLOUD, 16, 3, 0.025, 0.24, 0.20);
 
@@ -126,15 +133,62 @@ public final class WaterEnvironmentalEffectPool {
         }
     }
 
-    private record Emitter(
-            Kind kind,
-            double x,
-            double y,
-            double z,
-            double velocityX,
-            double velocityZ,
-            float intensity,
-            long expiresAt
-    ) {
+    // Move emitter metadata through the existing immutable water snapshots.
+    // No block scans occur, and dry obstacles stop the sheet rather than
+    // allowing persistent foam to travel through a wall or unloaded chunk.
+    private static boolean advect(ClientLevel level, Emitter emitter) {
+        net.minecraft.core.BlockPos position = net.minecraft.core.BlockPos.containing(emitter.x, emitter.y, emitter.z);
+        if (!level.hasChunkAt(position)) return false;
+        if (emitter.kind == Kind.MIST) return true;
+        var snapshot = com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore
+                .getAtBlock(level, position.getX(), position.getZ());
+        if (snapshot == null) return false;
+        var column = snapshot.column(position.getX() & 15, position.getZ() & 15);
+        if (!column.wet()) return false;
+        double targetX = column.velocityX() / 20.0;
+        double targetZ = column.velocityZ() / 20.0;
+        emitter.velocityX += (targetX - emitter.velocityX) * 0.08;
+        emitter.velocityZ += (targetZ - emitter.velocityZ) * 0.08;
+        double nextX = emitter.x + Math.max(-0.15, Math.min(0.15, emitter.velocityX));
+        double nextZ = emitter.z + Math.max(-0.15, Math.min(0.15, emitter.velocityZ));
+        int blockX = (int) Math.floor(nextX);
+        int blockZ = (int) Math.floor(nextZ);
+        var next = com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore.getAtBlock(level, blockX, blockZ);
+        if (next == null) return false;
+        if (next.column(blockX & 15, blockZ & 15).wet()) {
+            emitter.x = nextX;
+            emitter.z = nextZ;
+            emitter.y = next.column(blockX & 15, blockZ & 15).baseSurfaceY();
+        } else {
+            emitter.velocityX *= -0.25;
+            emitter.velocityZ *= -0.25;
+        }
+        return true;
+    }
+
+    /** Returns the bounded active emitter count for profiling. */
+    public static int activeCount() {
+        int count = 0;
+        for (Emitter emitter : EMITTERS) if (emitter != null) count++;
+        return count;
+    }
+
+    private static final class Emitter {
+        private final Kind kind;
+        private double x, y, z, velocityX, velocityZ;
+        private final float intensity;
+        private final long expiresAt;
+
+        private Emitter(Kind kind, double x, double y, double z, double velocityX, double velocityZ,
+                        float intensity, long expiresAt) {
+            this.kind = kind;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.velocityX = velocityX;
+            this.velocityZ = velocityZ;
+            this.intensity = intensity;
+            this.expiresAt = expiresAt;
+        }
     }
 }

@@ -14,6 +14,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ClientWaterChunkSnapshotTest {
 
     @Test
+    void submergedDepositRaisesResolvedBedWithoutChangingGeneratedBaseline() {
+        GeneratedWaterChunk generated = generatedColumn();
+        WaterVolumeChunk sparse = new WaterVolumeChunk();
+        sparse.set(new BlockPos(2, 60, 3), WaterVolumeChunk.WaterCell.still(0,
+                WaterVolumeChunk.FLAG_GENERATED_OVERRIDE | WaterVolumeChunk.FLAG_DRY_OVERRIDE));
+        ClientWaterChunkSnapshot snapshot = new ClientWaterChunkSnapshot(
+                0, 0, generated.snapshot(), sparse.revision(), sparse.toNetworkArray());
+        assertEquals(60, snapshot.column(2, 3).floorY());
+        assertEquals(57, generated.snapshot().floorY(2, 3));
+    }
+
+    @Test
+    void waterFillingErodedBedExtendsResolvedDepth() {
+        GeneratedWaterChunk generated = generatedColumn();
+        WaterVolumeChunk sparse = new WaterVolumeChunk();
+        sparse.set(new BlockPos(2, 57, 3), WaterVolumeChunk.WaterCell.still(
+                WaterVolumeChunk.UNITS_PER_BLOCK, WaterVolumeChunk.FLAG_GENERATED_OVERRIDE));
+        ClientWaterChunkSnapshot snapshot = new ClientWaterChunkSnapshot(
+                0, 0, generated.snapshot(), sparse.revision(), sparse.toNetworkArray());
+        assertEquals(56, snapshot.column(2, 3).floorY());
+        assertEquals(63, snapshot.column(2, 3).surfaceBlockY());
+    }
+
+    @Test
     void drySparseOverrideWinsOverGeneratedSurface() {
         GeneratedWaterChunk generated = generatedColumn();
         BlockPos top = new BlockPos(2, 63, 3);

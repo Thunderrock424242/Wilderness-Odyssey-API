@@ -76,6 +76,8 @@ public final class CoastalDebugRenderer {
                     segment.id(), level.getGameTime(), partialTick, segment.profile(), sea,
                     segment.averageBeachSlope(), segment.underwaterSlope(),
                     segment.averageWaterDepth(), onshoreWind);
+            wave = CoastalWaveModel.withTide(wave, TideSystem.getTideOffset(level),
+                    TideSystem.getTideRate(level), segment.averageBeachSlope());
             float energyRed = 0.25f + wave.energy() * 0.75f;
             float energyGreen = 0.90f - wave.energy() * 0.58f;
 

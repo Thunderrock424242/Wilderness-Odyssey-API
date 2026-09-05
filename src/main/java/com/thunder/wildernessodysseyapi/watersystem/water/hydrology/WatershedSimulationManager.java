@@ -111,7 +111,10 @@ public final class WatershedSimulationManager {
                 boolean changed = state.apply(
                         result,
                         WaterSimulationConfig.watershedFloodThreshold(),
-                        gameTime
+                        gameTime,
+                        WaterSimulationConfig.watershedSedimentEffectsEnabled()
+                                ? com.thunder.wildernessodysseyapi.watersystem.water.erosion.ErosionSavedData
+                                .get(level).units(chunkKey) / 32.0f : 0.0f
                 );
                 if (downstream.state != null && result.downstreamTransfer() > 0.0f) {
                     changed |= downstream.state.addIncomingRunoff(result.downstreamTransfer());
