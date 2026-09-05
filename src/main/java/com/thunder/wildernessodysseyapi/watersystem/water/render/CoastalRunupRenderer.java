@@ -9,6 +9,8 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalSegment;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalSeasonModel;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalWaveModel;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalFoamModel;
+import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -123,7 +125,7 @@ public final class CoastalRunupRenderer {
                 quads += drawPoint(
                         level, poseStack.last(), buffer, waterSprite,
                         segment, point, wave, season, tideOffset,
-                        detailedRunUp, quadBudget - quads);
+                        detailedRunUp, partialTick, quadBudget - quads);
             }
             if (quads > before) {
                 renderedSegments++;
@@ -150,6 +152,7 @@ public final class CoastalRunupRenderer {
             CoastalSeasonModel.Sample season,
             float tideOffset,
             boolean detailedRunUp,
+            float partialTick,
             int remainingBudget
     ) {
         int quads = 0;
@@ -177,6 +180,42 @@ public final class CoastalRunupRenderer {
                     centerX, centerZ, shape, segment, tideOffset
             );
             quads += CoastalBreakerGeometry.QUADS_PER_CREST;
+        }
+
+        // Reuse the wave lifecycle for a bounded whitewater trail. No new
+        // particle simulation, render pass or synchronized foam field is needed.
+        if (foamEnabled && detailedRunUp) {
+            int patches = 0;
+            for (CoastalSegment.NearshoreCell cell : point.nearshoreCells()) {
+                if (quads >= remainingBudget || patches >= 3) break;
+                float strength = CoastalFoamModel.trail(wave, cell.distanceFromShoreBlocks())
+                        * WaterRenderingConfig.coastalFoamStrength() * season.foamMultiplier();
+                if (strength <= 0.02f) continue;
+                if (!level.hasChunkAt(new BlockPos(cell.blockX(), (int) cell.waterSurfaceY(), cell.blockZ()))) continue;
+                var snapshot = ClientWaterSnapshotStore.getAtBlock(level, cell.blockX(), cell.blockZ());
+                if (snapshot == null) continue;
+                var column = snapshot.column(cell.blockX() & 15, cell.blockZ() & 15);
+                if (!column.wet() || column.surfaceCovered()) continue;
+                float phase = wave.normalizedPhase();
+                float driftX = Math.max(-0.15f, Math.min(0.15f, column.velocityX() * phase * 0.2f));
+                float driftZ = Math.max(-0.15f, Math.min(0.15f, column.velocityZ() * phase * 0.2f));
+                float x = cell.blockX() + 0.5f + driftX;
+                float z = cell.blockZ() + 0.5f + driftZ;
+                float y = ClientWaterImmersion.visibleSurfaceHeight(level, column, x, z, partialTick) + 0.045f;
+                BlockPos foamPosition = BlockPos.containing(x, y, z);
+                if (!level.getBlockState(foamPosition).getCollisionShape(level, foamPosition).isEmpty()) continue;
+                float pattern = (float) (0.5 + 0.5 * Math.sin(cell.blockX() * 1.73 + cell.blockZ() * 2.31));
+                float radius = 0.14f + (0.10f + pattern * 0.10f) * phase;
+                int color = foamColor(strength * (0.50f + pattern * 0.40f));
+                int light = waterLight(level, x, y, z);
+                // Skewed patches and different sizes break up a tiled white sheet.
+                addVertex(buffer, pose, waterSprite, light, color, 0, 1, 0, x - radius, y, z - radius * 0.55f);
+                addVertex(buffer, pose, waterSprite, light, color, 0, 1, 0, x - radius * 0.65f, y, z + radius);
+                addVertex(buffer, pose, waterSprite, light, color, 0, 1, 0, x + radius, y, z + radius * 0.60f);
+                addVertex(buffer, pose, waterSprite, light, color, 0, 1, 0, x + radius * 0.70f, y, z - radius);
+                quads++;
+                patches++;
+            }
         }
 
         boolean drawRunUp = detailedRunUp && WaterRenderingConfig.coastalRunUpEnabled(level);
@@ -220,6 +259,8 @@ public final class CoastalRunupRenderer {
                         ? wave.foam()
                         * WaterRenderingConfig.coastalFoamStrength()
                         * season.foamMultiplier()
+                        * CoastalFoamModel.wash(cell.distanceFromWaterBlocks(), wave.runUpDistanceBlocks(),
+                                cell.blockX(), cell.blockZ(), wave.normalizedPhase())
                         : 0.0f;
                 drawTopQuad(
                         buffer,
@@ -356,11 +397,11 @@ public final class CoastalRunupRenderer {
             CoastalSeasonModel.Sample season
     ) {
         int seasonalTint = seasonalTint(tint, season);
-        float whiten = Math.max(0.0f, Math.min(0.72f, foam * 0.52f));
+        float whiten = Math.max(0.0f, Math.min(0.92f, foam * 1.10f));
         int red = blend((seasonalTint >> 16) & 0xFF, 238, whiten);
         int green = blend((seasonalTint >> 8) & 0xFF, 247, whiten);
         int blue = blend(seasonalTint & 0xFF, 250, whiten);
-        int alpha = channel(0.20f + Math.min(1.0f, foam) * 0.20f);
+        int alpha = channel(0.20f + Math.min(1.0f, foam) * 0.48f);
         return alpha << 24 | red << 16 | green << 8 | blue;
     }
 
@@ -385,7 +426,9 @@ public final class CoastalRunupRenderer {
     }
 
     private static int foamColor(float strength) {
-        int alpha = channel(0.20f + Math.min(1.0f, strength) * 0.72f);
+        // Zero residual strength must become transparent rather than retaining
+        // a fixed alpha floor and disappearing abruptly at the draw threshold.
+        int alpha = channel(Math.max(0.0f, Math.min(1.0f, strength)) * 0.94f);
         return alpha << 24 | 0xEAF7FA;
     }
 

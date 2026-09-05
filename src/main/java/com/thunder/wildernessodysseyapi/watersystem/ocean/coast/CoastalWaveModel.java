@@ -184,7 +184,8 @@ public final class CoastalWaveModel {
             case RUN_UP -> 1.0f - stagePhase * 0.38f;
             case RETREAT -> 0.62f * (1.0f - stagePhase);
         };
-        foam = clamp01(foam * profile.foamAmount() * (0.38f + coastalEnergy * 0.72f));
+        // Breaking swell produces readable whitewater even in calm local wind.
+        foam = clamp01(foam * profile.foamAmount() * (0.68f + coastalEnergy * 0.42f));
 
         float runUpDistance = switch (stage) {
             case INCOMING, SHOALING, BREAKING -> 0.0f;

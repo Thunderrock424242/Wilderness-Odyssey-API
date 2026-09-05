@@ -16,7 +16,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.tags.BiomeTags;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
@@ -307,9 +306,8 @@ public final class ClientCoastalSegmentStore {
             BlockPos topPosition = new BlockPos(blockX, topY, blockZ);
             Holder<Biome> biome = level.getBiome(topPosition);
             BlockState surface = level.getBlockState(topPosition);
-            if (!isCoastalBiome(biome)) {
-                break;
-            }
+            // Ocean contact establishes a coastline. Biomes select appearance,
+            // but plains, forest and modded shores must not lose their surf.
             if (distance > 1 && detours < 2
                     && (!isWettableSurface(surface) || Math.abs(topY - previousTopY) > 1)) {
                 // At most two lateral turns per cached ribbon. Test both the
@@ -406,7 +404,7 @@ public final class ClientCoastalSegmentStore {
         LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
         int top = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15);
         BlockPos pos = new BlockPos(x, top, z);
-        if (Math.abs(top - previousY) > 1 || !isCoastalBiome(level.getBiome(pos))
+        if (Math.abs(top - previousY) > 1
                 || !isWettableSurface(level.getBlockState(pos))
                 || !level.getBlockState(pos.above()).isAir()) return null;
         return new CoastalSegment.RunUpCell(x, top, z, distance);
@@ -464,10 +462,6 @@ public final class ClientCoastalSegmentStore {
                 && !column.surfaceCovered()
                 && (column.bodyType() == GeneratedWaterChunk.BodyType.OCEAN
                 || column.oceanWeight() >= 128);
-    }
-
-    private static boolean isCoastalBiome(Holder<Biome> biome) {
-        return biome.is(BiomeTags.IS_BEACH) || GlacialBiomeManager.isGlacial(biome);
     }
 
     private static boolean isWettableSurface(BlockState state) {

@@ -36,7 +36,7 @@ class OllamaLocalRuntimeTest {
     }
 
     @Test
-    void prefersInstalledWindowsApplicationAndRejectsArbitraryExecutables() throws Exception {
+    void prefersInstalledWindowsServerAndRejectsArbitraryExecutables() throws Exception {
         Path installation = temporaryDirectory.resolve("Programs").resolve("Ollama");
         Files.createDirectories(installation);
         Path server = Files.createFile(installation.resolve("ollama.exe"));
@@ -44,8 +44,12 @@ class OllamaLocalRuntimeTest {
         Path arbitrary = Files.createFile(temporaryDirectory.resolve("something-else.exe"));
 
         assertEquals(
-                application,
+                server,
                 OllamaLocalRuntime.resolveExecutable("", temporaryDirectory.toString(), "").orElseThrow()
+        );
+        assertEquals(
+                List.of(server, application),
+                OllamaLocalRuntime.resolveExecutables("", temporaryDirectory.toString(), "")
         );
         assertTrue(OllamaLocalRuntime.resolveExecutable(
                 arbitrary.toString(), "", "").isEmpty());
@@ -56,6 +60,65 @@ class OllamaLocalRuntimeTest {
         assertEquals(
                 List.of(application.toAbsolutePath().normalize().toString()),
                 OllamaLocalRuntime.buildLaunchCommand(application)
+        );
+    }
+
+    @Test
+    void fallsBackToApplicationWhenServerDoesNotBecomeReady() throws Exception {
+        Path installation = temporaryDirectory.resolve("Programs").resolve("Ollama");
+        Files.createDirectories(installation);
+        Path server = Files.createFile(installation.resolve("ollama.exe"));
+        Path application = Files.createFile(installation.resolve("ollama app.exe"));
+        List<List<String>> commands = new ArrayList<>();
+        OllamaLocalRuntime runtime = new OllamaLocalRuntime(
+                (uri, timeout) -> commands.size() == 2,
+                command -> commands.add(List.copyOf(command)),
+                milliseconds -> {
+                },
+                "Windows 11",
+                temporaryDirectory.toString(),
+                ""
+        );
+
+        assertEquals(OllamaLocalRuntime.StartupResult.STARTED, runtime.ensureAvailable(new AISettings()));
+        assertEquals(
+                List.of(
+                        List.of(server.toString(), "serve"),
+                        List.of(application.toString())
+                ),
+                commands
+        );
+    }
+
+    @Test
+    void fallsBackToApplicationWhenServerCannotBeStarted() throws Exception {
+        Path installation = temporaryDirectory.resolve("Programs").resolve("Ollama");
+        Files.createDirectories(installation);
+        Path server = Files.createFile(installation.resolve("ollama.exe"));
+        Path application = Files.createFile(installation.resolve("ollama app.exe"));
+        List<List<String>> commands = new ArrayList<>();
+        OllamaLocalRuntime runtime = new OllamaLocalRuntime(
+                (uri, timeout) -> commands.size() == 2,
+                command -> {
+                    commands.add(List.copyOf(command));
+                    if (command.getFirst().equals(server.toString())) {
+                        throw new java.io.IOException("simulated launch failure");
+                    }
+                },
+                milliseconds -> {
+                },
+                "Windows 11",
+                temporaryDirectory.toString(),
+                ""
+        );
+
+        assertEquals(OllamaLocalRuntime.StartupResult.STARTED, runtime.ensureAvailable(new AISettings()));
+        assertEquals(
+                List.of(
+                        List.of(server.toString(), "serve"),
+                        List.of(application.toString())
+                ),
+                commands
         );
     }
 
