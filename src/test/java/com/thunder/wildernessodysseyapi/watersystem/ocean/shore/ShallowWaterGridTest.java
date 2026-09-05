@@ -60,4 +60,22 @@ class ShallowWaterGridTest {
         }
         return grid;
     }
+
+    @Test
+    void longStormAndMalformedInputsRemainFiniteWithBoundedMotion() {
+        ShallowWaterGrid grid = filledGrid(7, 4.0f);
+        grid.addImpulse(3, 3, Float.NaN, Float.POSITIVE_INFINITY);
+        grid.step(Float.POSITIVE_INFINITY, 2);
+        for (int tick = 0; tick < 12_000; tick++) {
+            if (tick % 40 == 0) grid.addImpulse(3, 3, 100, -100);
+            grid.step(tick % 100 == 0 ? 1000 : 0.05f, (float) Math.sin(tick * 0.03) * 2);
+        }
+        for (int z = 0; z < 7; z++) {
+            for (int x = 0; x < 7; x++) {
+                assertTrue(Float.isFinite(grid.surface(x, z)));
+                assertTrue(Math.abs(grid.velocityX(x, z)) <= 8.0f);
+                assertTrue(Math.abs(grid.velocityZ(x, z)) <= 8.0f);
+            }
+        }
+    }
 }

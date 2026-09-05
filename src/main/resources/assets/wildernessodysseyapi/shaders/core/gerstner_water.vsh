@@ -330,6 +330,17 @@ void main() {
     accumulateWave(localXZ, PondWaveParam3, PondWaveShape3, 1.0, bodyBlend.z, vec2(0.0),
         frameWind, enclosedWaterSpectrum,
         gpuHeight, horizontalDisplacement, tangentXDelta, tangentZDelta);
+    // Mirror DepthWaveResponse using the same decoded, cached depth as CPU
+    // immersion. Shoaling changes the envelope without relocating carriers.
+    float waterDepth = depthFactor * 24.0;
+    float shallowDepthResponse = clamp(waterDepth / 3.0, 0.0, 1.0);
+    float offshoreDepthResponse = clamp((waterDepth - 3.0) / 13.0, 0.0, 1.0);
+    float depthWaveScale = mix(0.45 + shallowDepthResponse * 0.75, 1.0, offshoreDepthResponse);
+    gpuHeight *= depthWaveScale;
+    horizontalDisplacement *= depthWaveScale;
+    tangentXDelta *= depthWaveScale;
+    tangentZDelta *= depthWaveScale;
+
     // Bound the combined horizontal derivative after body-profile blending.
     // Authored profiles normally remain well below this limit; the clamp is a
     // safety net for storm energy and future designer tuning.

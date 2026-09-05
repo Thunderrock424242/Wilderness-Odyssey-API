@@ -30,8 +30,8 @@ public final class WatershedChunkState {
     private long environmentBits;
     private long flowBits;
     private long climateBits;
-    private final long drainageDirectionBits;
-    private final long drainageAccumulationBits;
+    private long drainageDirectionBits;
+    private long drainageAccumulationBits;
     private long representativePosition;
     private long revision;
     private long lastUpdatedTick;
@@ -69,6 +69,16 @@ public final class WatershedChunkState {
         this.floodCursor = Math.floorMod(floodCursor, 256);
         this.activeFloodCells = Math.max(0, activeFloodCells);
         this.activeSurfaceWaterCells = Math.max(0, activeSurfaceWaterCells);
+    }
+
+    /** Refreshes terrain topology while preserving basin identity and accumulated hydrology. */
+    void refreshTerrain(WatershedChunkState terrain) {
+        long runtimeMask = FLOODING_BIT | (FEATURE_MASK << DYNAMIC_FEATURE_SHIFT);
+        terrainBits = (terrain.terrainBits & ~runtimeMask) | (terrainBits & runtimeMask);
+        drainageDirectionBits = terrain.drainageDirectionBits;
+        drainageAccumulationBits = terrain.drainageAccumulationBits;
+        representativePosition = terrain.representativePosition;
+        revision++;
     }
 
     /** Creates a new terrain-initialized watershed cell with dry conditions. */
@@ -259,6 +269,12 @@ public final class WatershedChunkState {
             float floodThreshold,
             long gameTime
     ) {
+        return apply(result, floodThreshold, gameTime, 0.0f);
+    }
+
+    /** Blends conserved suspended material into existing presentation metadata, never creating material. */
+    public boolean apply(WatershedSimulationModel.Result result, float floodThreshold,
+                         long gameTime, float sedimentFloor) {
         WatershedSimulationModel.Result safe = result == null
                 ? new WatershedSimulationModel.Result(
                 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
@@ -270,10 +286,12 @@ public final class WatershedChunkState {
                 safe.storedRunoff(),
                 safe.riverDischarge()
         );
+        float suspendedMaterial = Math.min(1.0f, Math.max(0.0f, finiteOrZero(sedimentFloor)));
+        float sediment = Math.max(safe.sediment(), suspendedMaterial);
         long nextEnvironment = packFourUnits(
                 safe.floodRisk(),
-                safe.sediment(),
-                safe.clarity(),
+                sediment,
+                Math.min(safe.clarity(), 1.0f - suspendedMaterial * 0.88f),
                 safe.debris()
         );
         long nextFlow = packFlow(

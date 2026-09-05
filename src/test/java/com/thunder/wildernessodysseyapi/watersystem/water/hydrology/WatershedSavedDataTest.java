@@ -14,6 +14,37 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WatershedSavedDataTest {
 
     @Test
+    void terrainRefreshPreservesRuntimeWaterAndBasinIdentity() {
+        WatershedChunkState state = WatershedChunkState.create(41L, 60, DrainageDirection.NORTH,
+                WaterFeature.RIVER, 0.4f, 0L, 0.8f, 0L);
+        state.apply(new WatershedSimulationModel.Result(0.7f, 0.2f, 0.3f, 0.4f, 0.1f, 0.9f,
+                true, 0.2f, 0.8f, 0.1f, 0.2f, 0.0f, 0.0f, 0.0f), 0.8f, 20L);
+        state.setDynamicWaterFeature(WaterFeature.POND);
+        var before = state.conditions();
+        state.refreshTerrain(WatershedChunkState.create(99L, 59, DrainageDirection.SOUTH,
+                WaterFeature.RIVER, 0.5f, 1L, 0.8f, 21L));
+        var after = state.conditions();
+        assertEquals(41L, after.basinId());
+        assertEquals(59, after.averageTerrainElevation());
+        assertEquals(DrainageDirection.SOUTH, after.downstreamDirection());
+        assertEquals(before.riverDischarge(), after.riverDischarge());
+        assertEquals(WaterFeature.POND, after.waterFeature());
+        assertTrue(after.flooding());
+    }
+
+    @Test
+    void conservedSedimentReducesClarityThroughExistingConditions() {
+        WatershedChunkState state = WatershedChunkState.create(1L, 60, DrainageDirection.NORTH,
+                WaterFeature.RIVER, 0.4f, 0L, 0.8f, 0L);
+        state.apply(null, 0.8f, 20L, 0.5f);
+        assertEquals(0.5f, state.conditions().sediment(), 0.0001f);
+        assertEquals(0.56f, state.conditions().clarity(), 0.0001f);
+        state.apply(null, 0.8f, 40L, Float.NaN);
+        assertEquals(0.0f, state.conditions().sediment(), 0.0001f);
+        assertEquals(1.0f, state.conditions().clarity(), 0.0001f);
+    }
+
+    @Test
     void packedStateAndSavedDataRoundTripConditions() {
         long key = ChunkPos.asLong(-7, 12);
         WatershedChunkState state = WatershedChunkState.create(

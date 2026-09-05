@@ -37,6 +37,17 @@ public final class WaterDebugCommand {
     /** Registers the {@code /wowater} diagnostics command tree. */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("wowater")
+                .then(Commands.literal("erosion").executes(context -> {
+                    ServerLevel level = context.getSource().getLevel();
+                    BlockPos position = sourceBlockPos(context.getSource());
+                    long chunk = net.minecraft.world.level.ChunkPos.asLong(position.getX() >> 4, position.getZ() >> 4);
+                    var ledger = com.thunder.wildernessodysseyapi.watersystem.water.erosion.ErosionSavedData.get(level);
+                    context.getSource().sendSuccess(() -> Component.literal(
+                            com.thunder.wildernessodysseyapi.watersystem.water.erosion.ErosionManager.diagnostics(level)
+                                    + ", localNaturalEligible=" + ledger.eligible(chunk)
+                                    + ", localSedimentUnits=" + ledger.units(chunk)), false);
+                    return 1;
+                }))
                 .then(Commands.literal("inspect")
                         .executes(context -> inspect(context, sourceBlockPos(context.getSource())))
                         .then(Commands.argument("pos", BlockPosArgument.blockPos())

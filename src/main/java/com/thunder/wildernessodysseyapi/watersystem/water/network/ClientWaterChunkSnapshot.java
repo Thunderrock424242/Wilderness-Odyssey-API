@@ -176,6 +176,7 @@ public final class ClientWaterChunkSnapshot {
         int generatedFloor = generatedTop == null
                 ? Integer.MAX_VALUE : generated.floorY(localX, localZ);
         int searchFloor = generatedFloor;
+        boolean editedColumn = false;
 
         // Sparse chunks remain small. This pass runs only on snapshot replacement
         // and finds runtime water above the immutable generated surface.
@@ -184,6 +185,7 @@ public final class ClientWaterChunkSnapshot {
             if ((packed & 0xFF) != column) {
                 continue;
             }
+            editedColumn = true;
             int y = unpackY(packed);
             if (isVisibleSparseWater(offset)) {
                 candidateTop = Math.max(candidateTop, y);
@@ -201,7 +203,7 @@ public final class ClientWaterChunkSnapshot {
                     int sparseVolume = Math.max(0, sparseCells[sparseOffset + 1]);
                     GeneratedWaterChunk.WaterSpan atY = generated == null
                             ? null : generated.spanAt(localX, y, localZ);
-                    setResolvedColumn(column, y, searchFloor,
+                    setResolvedColumn(column, y, resolveFloor(localX, localZ, y, searchFloor, editedColumn),
                             amountToLevel(sparseVolume), atY,
                             atY != null && generated.surfaceCovered(localX, localZ)
                                     && generatedTop != null && y == generatedTop.topY(),
@@ -215,11 +217,28 @@ public final class ClientWaterChunkSnapshot {
                     ? null
                     : generated.spanAt(localX, y, localZ);
             if (span != null) {
-                setResolvedColumn(column, y, generatedFloor, span.cell().amount(), span,
+                setResolvedColumn(column, y, resolveFloor(localX, localZ, y, searchFloor, editedColumn), span.cell().amount(), span,
                         generated.surfaceCovered(localX, localZ), 0.0f, 0.0f);
                 return;
             }
         }
+    }
+
+    // Sparse dry/solid overrides can raise a bed, while newly filled sparse
+    // cells can extend it below the original generated floor. Resolve only
+    // edited columns, once on immutable snapshot publication, not per frame.
+    private int resolveFloor(int x, int z, int top, int fallback, boolean edited) {
+        if (!edited) return fallback;
+        int limit = Math.max(fallback, top - 64);
+        for (int y = top - 1; y > limit; y--) {
+            int offset = sparseOffset(pack(x, y, z));
+            if (offset >= 0) {
+                if (!isVisibleSparseWater(offset)) return y;
+            } else if (generated == null || generated.spanAt(x, y, z) == null) {
+                return y;
+            }
+        }
+        return limit;
     }
 
     private void setResolvedColumn(

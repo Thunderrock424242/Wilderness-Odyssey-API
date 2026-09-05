@@ -137,4 +137,25 @@ public final class CanonicalWaterFlowGameTests {
                 false
         );
     }
+
+    /** Environmental sediment placement must conserve the same units as player solid displacement. */
+    @GameTest(template = "empty")
+    public static void sedimentPlacementConservesShallowWater(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos deposit = helper.absolutePos(new BlockPos(4, 3, 4));
+        level.setBlock(deposit.below(), Blocks.STONE.defaultBlockState(), 3);
+        setCanonical(level, deposit, WaterVolumeChunk.UNITS_PER_BLOCK);
+        var previous = level.getBlockState(deposit);
+        var placed = Blocks.CLAY.defaultBlockState();
+        helper.assertTrue(level.setBlock(deposit, placed, 3), "Sediment was not placed");
+        CanonicalWater.displaceForSolidPlacement(level, deposit, previous, placed);
+        WildernessFluidRegistry.notifyTerrainChanged(level, deposit);
+        int total = 0;
+        for (BlockPos pos : BlockPos.betweenClosed(deposit.offset(-3, -1, -3), deposit.offset(3, 3, 3))) {
+            total += CanonicalWater.get(level, pos).volumeUnits();
+        }
+        helper.assertTrue(total == WaterVolumeChunk.UNITS_PER_BLOCK, "Sediment placement lost or created water");
+        helper.assertTrue(level.getBlockState(deposit).is(Blocks.CLAY), "Displacement replaced the sediment");
+        helper.succeed();
+    }
 }

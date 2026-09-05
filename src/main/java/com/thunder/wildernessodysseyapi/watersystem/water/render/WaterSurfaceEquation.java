@@ -159,6 +159,21 @@ public final class WaterSurfaceEquation {
             float tideOffset,
             float transientHeight
     ) {
+        return snapshotSurfaceHeight(baseSurfaceY, worldX, worldZ, timeSeconds,
+                oceanSpectrum, enclosedWaterSpectrum, oceanWaveLimit, riverWaveLimit,
+                pondWaveLimit, oceanWeight, riverWeight, lakeWeight, currentX, currentZ,
+                surfaceContinuity, tideOffset, transientHeight, 24.0f);
+    }
+
+    /** Mirrors the active shader's cached-depth shoaling envelope. */
+    public static float snapshotSurfaceHeight(
+            float baseSurfaceY, double worldX, double worldZ, double timeSeconds,
+            WaveSpectrumState oceanSpectrum, WaveSpectrumState enclosedWaterSpectrum,
+            int oceanWaveLimit, int riverWaveLimit, int pondWaveLimit,
+            float oceanWeight, float riverWeight, float lakeWeight,
+            float currentX, float currentZ, float surfaceContinuity,
+            float tideOffset, float transientHeight, float waterDepth
+    ) {
         WaveSpectrumState safeOceanSpectrum = oceanSpectrum == null
                 ? WaveSpectrumState.NEUTRAL
                 : oceanSpectrum;
@@ -194,6 +209,7 @@ public final class WaterSurfaceEquation {
                 safeEnclosedSpectrum
         ).height() * boundedLakeWeight;
         float continuity = surfaceContinuityFactor(surfaceContinuity);
+        waveHeight *= com.thunder.wildernessodysseyapi.watersystem.water.wave.DepthWaveResponse.amplitudeScale(waterDepth);
         return finiteOrZero(baseSurfaceY)
                 + (waveHeight + clamp(finiteOrZero(transientHeight), -0.25f, 0.25f)) * continuity
                 + finiteOrZero(tideOffset) * boundedOceanWeight * continuity;

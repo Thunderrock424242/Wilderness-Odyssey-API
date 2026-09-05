@@ -276,7 +276,8 @@ public final class ClientWaterImmersion {
                 column.velocityZ() + localFlow.currentZ(),
                 surfaceContinuity,
                 customSurface ? TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE : 0.0f,
-                transientHeight
+                transientHeight,
+                depthFactor * WaterSurfaceVertexData.DEPTH_NORMALIZATION_BLOCKS
         );
     }
 

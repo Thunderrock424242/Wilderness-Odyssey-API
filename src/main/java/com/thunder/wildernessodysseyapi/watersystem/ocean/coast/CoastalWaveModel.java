@@ -232,6 +232,18 @@ public final class CoastalWaveModel {
         );
     }
 
+    /** Applies the existing tide authority to run-up reach without changing the wave clock. */
+    public static Sample withTide(Sample wave, float tideOffset, float tideRate, float beachSlope) {
+        float slope = finiteClamp(beachSlope, 0.0f, 2.0f, 0.25f);
+        float reachScale = finiteClamp(1.0f + finiteClamp(tideOffset, -3.0f, 3.0f, 0.0f)
+                * 0.16f / (1.0f + slope * 2.0f)
+                + finiteClamp(tideRate * 20.0f, -0.12f, 0.12f, 0.0f), 0.55f, 1.60f, 1.0f);
+        return new Sample(wave.stage(), wave.cycleIndex(), wave.normalizedPhase(), wave.stagePhase(),
+                wave.energy(), wave.waveHeight(), wave.breakerLift(), wave.breakerDistanceBlocks(),
+                wave.crestDistanceFromShoreBlocks(), wave.foam(), wave.runUpDistanceBlocks() * reachScale,
+                wave.maximumRunUpDistanceBlocks() * reachScale, wave.wetness(), wave.spray());
+    }
+
     private static float cycleSeconds(
             CoastalWaveProfile profile,
             OceanSeaState.Sample seaState

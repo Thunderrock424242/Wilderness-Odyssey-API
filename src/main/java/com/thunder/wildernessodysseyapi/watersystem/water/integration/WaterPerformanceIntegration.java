@@ -268,6 +268,12 @@ public final class WaterPerformanceIntegration {
                 WatershedSynchronizer.syncLevel(level);
             }
         },
+        EROSION(6, UpdatePriority.LOW, 20) {
+            @Override
+            void run(ServerLevel level) {
+                com.thunder.wildernessodysseyapi.watersystem.water.erosion.ErosionManager.tick(level);
+            }
+        },
         PERSISTENCE(5, UpdatePriority.LOW, SPHConstants.PERSISTENCE_CAPTURE_INTERVAL_TICKS) {
             @Override
             void run(ServerLevel level) {

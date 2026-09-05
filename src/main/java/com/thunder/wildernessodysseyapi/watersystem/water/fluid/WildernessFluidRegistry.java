@@ -456,6 +456,17 @@ public final class WildernessFluidRegistry {
         }
     }
 
+    /** Notifies existing water owners after a server environmental terrain edit. */
+    public static void notifyTerrainChanged(ServerLevel level, BlockPos pos) {
+        com.thunder.wildernessodysseyapi.watersystem.water.surface.WaterDepthSampler.invalidate(level, pos);
+        CanonicalWater.materializeGeneratedNeighborhood(level, pos);
+        WaterBodyClassifier.invalidate(level, pos);
+        com.thunder.wildernessodysseyapi.watersystem.ocean.shore.ShorelineWaterManager.get().invalidate(level, pos);
+        com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedSavedData.get(level)
+                .refreshTerrain(level, pos);
+        wakeTrackedWaterAround(level, pos);
+    }
+
     private static void wakeTrackedWaterAround(ServerLevel level, BlockPos pos) {
         scheduleIfTracked(level, pos);
         scheduleIfTracked(level, pos.below());

@@ -125,6 +125,19 @@ public final class WaterSurfaceDisplacement {
             kind = DisturbanceKind.BOW_WAVE;
         }
         add(level, x, z, amplitude, radius, WAKE_LIFETIME_TICKS, kind);
+        if (entity instanceof Boat && horizontalSpeed > 0.03f) {
+            // Two aft lobes accumulate a spreading wake behind a moving hull.
+            // Reuse the existing capped disturbance pool and GPU selection.
+            double forwardX = velocity.x / horizontalSpeed;
+            double forwardZ = velocity.z / horizontalSpeed;
+            double aftX = entity.getX() - forwardX * bodyScale;
+            double aftZ = entity.getZ() - forwardZ * bodyScale;
+            double spread = bodyScale * 0.65;
+            add(level, aftX - forwardZ * spread, aftZ + forwardX * spread,
+                    amplitude * 0.45f, radius * 0.70f, WAKE_LIFETIME_TICKS, DisturbanceKind.WAKE);
+            add(level, aftX + forwardZ * spread, aftZ - forwardX * spread,
+                    amplitude * 0.45f, radius * 0.70f, WAKE_LIFETIME_TICKS, DisturbanceKind.WAKE);
+        }
     }
 
     /**

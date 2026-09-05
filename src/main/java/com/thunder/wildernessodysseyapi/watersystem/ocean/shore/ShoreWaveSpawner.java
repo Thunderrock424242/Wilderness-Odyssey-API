@@ -46,6 +46,7 @@ public final class ShoreWaveSpawner {
     public static void onLevelTick(LevelTickEvent.Post event) {
         if (!ENABLED) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
+        if (!com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules.isEnabled(level)) return;
         if (level.players().isEmpty()) return;
 
         ResourceKey<Level> key = level.dimension();
@@ -58,11 +59,12 @@ public final class ShoreWaveSpawner {
         float tideMotion = Math.min(1.0f, Math.abs(tideRate) * 45.0f);
         Map<Long, Long> levelCooldowns = cooldowns.computeIfAbsent(key, ignored -> new HashMap<>());
         long now = level.getGameTime();
-        if (levelCooldowns.size() > 2048) {
-            levelCooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
-        }
+        levelCooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
 
-        level.players().forEach(player -> {
+        int playerBudget = Math.min(level.players().size(), Math.min(8,
+                com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig.localWaterNetworkEventsPerTick()));
+        for (int playerIndex = 0; playerIndex < playerBudget; playerIndex++) {
+            var player = level.players().get((int) Math.floorMod(now / TICK_INTERVAL + playerIndex, level.players().size()));
             OceanSeaState.Sample seaState = OceanSeaState.sampleAt(
                     level, player.getX(), player.getZ(), 0.0f);
             if (Math.max(tideMotion, seaState.breakingStrength()) >= 0.20f) {
@@ -76,7 +78,7 @@ public final class ShoreWaveSpawner {
                         now
                 );
             }
-        });
+        }
     }
 
     @SubscribeEvent
@@ -110,7 +112,7 @@ public final class ShoreWaveSpawner {
                 if (candidate == null) continue;
 
                 long cooldownKey = cooldownKey(candidate.surface());
-                if (levelCooldowns.getOrDefault(cooldownKey, 0L) > now) continue;
+                if (levelCooldowns.getOrDefault(cooldownKey, 0L) > now || levelCooldowns.size() >= 2048) continue;
 
                 spawnShorePulse(level, candidate, tideRate, tideMotion, seaState);
                 levelCooldowns.put(cooldownKey, now + SHORE_COOLDOWN_TICKS);
@@ -215,6 +217,8 @@ public final class ShoreWaveSpawner {
                         SPHConstants.SHORE_WAVE_LIFETIME_TICKS
                 )
         );
+        com.thunder.wildernessodysseyapi.watersystem.water.erosion.ErosionManager.offerImpact(
+                level, candidate.surface(), Math.max(tideMotion, seaState.breakingStrength()));
     }
 
     private static long cooldownKey(BlockPos pos) {

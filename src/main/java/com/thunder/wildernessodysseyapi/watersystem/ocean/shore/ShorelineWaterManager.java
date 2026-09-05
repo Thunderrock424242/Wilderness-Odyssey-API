@@ -135,6 +135,18 @@ public final class ShorelineWaterManager {
         return region == null ? FlowSample.dry() : region.sample(blockX, blockZ);
     }
 
+    /** Invalidates only cached regions touching an edited terrain column. */
+    public void invalidate(ServerLevel level, BlockPos position) {
+        Map<Long, Region> regions = regionsByLevel.get(level);
+        if (regions == null) return;
+        for (Region region : regions.values()) {
+            if (position.getX() >= region.originX - 1 && position.getX() <= region.originX + REGION_SPAN + 1
+                    && position.getZ() >= region.originZ - 1 && position.getZ() <= region.originZ + REGION_SPAN + 1) {
+                region.lastBathymetryRefresh = Long.MIN_VALUE;
+            }
+        }
+    }
+
     /** Clears runtime regions for an unloading dimension. */
     public void clearLevel(ServerLevel level) {
         regionsByLevel.remove(level);
@@ -242,14 +254,10 @@ public final class ShorelineWaterManager {
                         continue;
                     }
 
-                    float depth = 0.0f;
-                    for (int offsetY = 0; offsetY <= MAX_BATHYMETRY_DEPTH; offsetY++) {
-                        pos.set(worldX, seaSurfaceBlockY - offsetY, worldZ);
-                        if (!level.getBlockState(pos).getCollisionShape(level, pos).isEmpty()) {
-                            depth = offsetY;
-                            break;
-                        }
-                    }
+                    // The authority already knows generated-column floors and
+                    // scans only bounded local volume when no baseline exists.
+                    // A column deeper than the cap stays wet, not incorrectly dry.
+                    float depth = WildernessWaterAuthority.getWaterDepth(level, pos, MAX_BATHYMETRY_DEPTH);
                     grid.setRestDepth(localX, localZ, depth);
                 }
             }

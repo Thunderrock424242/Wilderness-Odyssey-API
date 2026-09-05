@@ -122,6 +122,8 @@ public final class ClientCoastalSegmentStore {
                 onshoreWind
         );
         CoastalSeasonModel.Sample season = ClientCoastalClimate.sample(level, segment);
+        wave = CoastalWaveModel.withTide(wave, TideSystem.getTideOffset(level),
+                TideSystem.getTideRate(level), segment.averageBeachSlope());
         return List.of(
                 String.format(
                         Locale.ROOT,
@@ -278,10 +280,12 @@ public final class ClientCoastalSegmentStore {
         int firstTopY = 0;
         int previousTopY = (int) Math.floor(waterSurfaceY) - 1;
         float positiveRise = 0.0f;
+        int laneOffset = 0;
+        int detours = 0;
 
         for (int distance = 1; distance <= maximumRunUp; distance++) {
-            int blockX = waterX + landwardX * distance;
-            int blockZ = waterZ + landwardZ * distance;
+            int blockX = waterX + landwardX * distance - landwardZ * laneOffset;
+            int blockZ = waterZ + landwardZ * distance + landwardX * laneOffset;
             BlockPos horizontal = new BlockPos(
                     blockX, (int) Math.floor(waterSurfaceY), blockZ);
             if (!level.hasChunkAt(horizontal)) {
@@ -305,6 +309,32 @@ public final class ClientCoastalSegmentStore {
             BlockState surface = level.getBlockState(topPosition);
             if (!isCoastalBiome(biome)) {
                 break;
+            }
+            if (distance > 1 && detours < 2
+                    && (!isWettableSurface(surface) || Math.abs(topY - previousTopY) > 1)) {
+                // At most two lateral turns per cached ribbon. Test both the
+                // sideways cell and the forward cell so wash never cuts the
+                // corner through a rock, wall, log or unloaded chunk.
+                for (int side : new int[]{1, -1}) {
+                    int sideX = -landwardZ * side;
+                    int sideZ = landwardX * side;
+                    CoastalSegment.RunUpCell lateral = detourCell(level,
+                            blockX - landwardX + sideX, blockZ - landwardZ + sideZ,
+                            previousTopY, distance + detours);
+                    CoastalSegment.RunUpCell forward = detourCell(level,
+                            blockX + sideX, blockZ + sideZ, previousTopY, distance + detours + 1);
+                    if (lateral == null || forward == null) continue;
+                    if (forward.distanceFromWaterBlocks() > maximumRunUp) break;
+                    cells.add(lateral);
+                    laneOffset += side;
+                    detours++;
+                    blockX = forward.blockX();
+                    blockZ = forward.blockZ();
+                    topY = forward.topBlockY();
+                    topPosition = new BlockPos(blockX, topY, blockZ);
+                    surface = level.getBlockState(topPosition);
+                    break;
+                }
             }
             if (!isWettableSurface(surface)) {
                 // Built shore walls and other solid structures still define an
@@ -334,7 +364,8 @@ public final class ClientCoastalSegmentStore {
             }
             positiveRise += Math.max(0, topY - previousTopY);
             previousTopY = topY;
-            cells.add(new CoastalSegment.RunUpCell(blockX, topY, blockZ, distance));
+            if (distance + detours > maximumRunUp) break;
+            cells.add(new CoastalSegment.RunUpCell(blockX, topY, blockZ, distance + detours));
         }
 
         if (firstBiome == null) {
@@ -365,6 +396,20 @@ public final class ClientCoastalSegmentStore {
                 nearshore.underwaterSlope(),
                 distanceSquared
         );
+    }
+
+    private static CoastalSegment.RunUpCell detourCell(ClientLevel level, int x, int z, int previousY, int distance) {
+        BlockPos probe = new BlockPos(x, previousY, z);
+        if (!level.hasChunkAt(probe)) return null;
+        var snapshot = ClientWaterSnapshotStore.getAtBlock(level, x, z);
+        if (snapshot != null && snapshot.column(x & 15, z & 15).wet()) return null;
+        LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
+        int top = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15);
+        BlockPos pos = new BlockPos(x, top, z);
+        if (Math.abs(top - previousY) > 1 || !isCoastalBiome(level.getBiome(pos))
+                || !isWettableSurface(level.getBlockState(pos))
+                || !level.getBlockState(pos.above()).isAir()) return null;
+        return new CoastalSegment.RunUpCell(x, top, z, distance);
     }
 
     private static NearshoreProfile traceNearshore(

@@ -191,6 +191,17 @@ public final class WatershedSavedData extends SavedData {
         return created;
     }
 
+    /** Re-samples only the edited loaded chunk, retaining its environmental history. */
+    public void refreshTerrain(ServerLevel level, net.minecraft.core.BlockPos position) {
+        LevelChunk chunk = level.getChunkSource().getChunkNow(position.getX() >> 4, position.getZ() >> 4);
+        if (chunk == null) return;
+        WatershedChunkState existing = states.get(chunk.getPos().toLong());
+        if (existing != null) {
+            existing.refreshTerrain(WatershedTerrainInitializer.initialize(level, chunk));
+            setDirty();
+        }
+    }
+
     /** Returns an initialized state without creating or loading a chunk. */
     public WatershedChunkState state(long chunkKey) {
         return states.get(chunkKey);
