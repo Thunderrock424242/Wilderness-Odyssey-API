@@ -39,6 +39,7 @@ in float depthFactor;
 in float disturbanceStrength;
 in float waveSlope;
 in float crestCompression;
+in float coastalCrest;
 in float regionalSeaState;
 in vec2 regionalWindDirection;
 in float regionalWindSpeed;
@@ -512,6 +513,9 @@ void main() {
     float foamPattern = smoothstep(-0.55, 0.60,
         sin(stableWorldPhase(vec2(2.73, 1.91)) - SurfaceAnimationPhases1.z)
         * cos(stableWorldPhase(vec2(-1.37, 3.17)) + SurfaceAnimationPhases1.w));
+    // Whitewater follows the elevated native crest, including where horizontal
+    // shore taper deliberately reduces the Gerstner compression cue.
+    crestFoam = max(crestFoam, coastalCrest * 0.85);
     crestFoam *= 0.48 + foamPattern * 0.52;
     float currentSpeed = length(localCurrent);
     float shallowWater = 1.0 - clamp(depthFactor, 0.0, 1.0);

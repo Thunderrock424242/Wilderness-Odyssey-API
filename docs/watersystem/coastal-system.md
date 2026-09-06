@@ -59,15 +59,18 @@ expose to ordinary multiplayer clients. This keeps nearby clients aligned from
 data they already share and avoids adding a seed-disclosure packet solely for a
 cosmetic animation.
 
-`CoastalRunupRenderer` is a detail subpass of `WaterRenderCoordinator`. It
-appends nearshore crests, a thin terrain-aware wash sheet, foam tint, and a dark
-wet-surface overlay to the coordinator's shared translucent batch. Each crest
-uses three faces: a water-colored seaward slope, a foamy lip, and a landward
-slope that stays visible when viewed from the beach. Height is not attenuated
-again in the renderer. Its position and base height interpolate between cached
-water cells; the feet stay within that sampled strip. All three faces count
-against the existing quad budget, which is not increased. This avoids
-a competing render event or a second water pipeline. `CoastalBreakEffects`
+`CoastalRunupRenderer` is a terrain-detail subpass of `WaterRenderCoordinator`.
+It appends only thin terrain-aware wash and wetness. The former three-face
+crests and floating foam cards were removed after they appeared as detached
+translucent ramps. Ocean crests now belong entirely to the native Gerstner
+water mesh, so they share its optical material, depth and reflection path.
+`DepthWaveResponse.shapeCrest` smoothly sharpens shallow ocean crests, with
+matching shader height, analytic derivative, CPU immersion and server-profile
+vertical velocity. Deep water and inland profiles retain their previous shape.
+Dry-boundary continuity and horizontal fold limits still apply. This is a
+single-valued surface approximation, not overturning fluid geometry. The
+existing coastal clock still drives terrain wash and ambience; it does not
+introduce a second ocean displacement timeline. `CoastalBreakEffects`
 emits only the strongest nearby breaker under a hard cadence and particle
 budget. Its `CoastalWaveBreakEvent` is a local immutable result for diagnostics
 and future ambience consumers, not a network or gameplay event.
@@ -150,14 +153,12 @@ Cliffs and built obstacles stop run-up, while lakes and rivers remain outside
 the ocean-column eligibility check. Disabling custom beaches does not disable surf.
 
 Crest foam in the built-in water shader responds to steep compressed swell
-even without storm wind. Coastal breakers retain stronger whitewater through
-run-up and retreat. Nearby trails add at most three drifting, expanding patches
-per shoreline point within the existing global quad budget. They use the
-existing wave clock and synchronized current, follow the CPU water surface,
-and create no persistent foam state or new packets. Run-up whitening emphasizes
+even without storm wind, and to the raised native shallow-ocean crest where
+shoreline horizontal taper reduces compression. It is shaded on the water
+surface rather than floating translucent cards. Run-up whitening emphasizes
 its front and varies across terrain. External shader packs still control their
-own water material; the stock translucent coastal geometry remains separate
-from the built-in shader's crest treatment.
+own water material and displacement; the removed ramp geometry is not used
+as a fallback. No persistent foam state or new packets are added.
 
 - coastal waves, run-up, foam, wetness, spray, audio, regional weather, and
   seasonal presentation influence have independent switches;

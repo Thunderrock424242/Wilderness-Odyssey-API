@@ -22,7 +22,7 @@ registrations and callers in this checkout, not a visual runtime test.
 | ShorelineWaterManager / ShallowWaterGrid | Active server local flow, scheduled by WaterPerformanceIntegration and consumed by entity physics and shore SPH. Bounded regions, primitive arrays. |
 | ShoreWaveSpawner | Active, sparse client SPH shore-wash payloads. Not the breaking-wave surface or an ocean SPH body. |
 | ClientCoastalSegmentStore / CoastalSegment | Active cached, loaded-only shore topology and run-up terrain. |
-| CoastalWaveModel / CoastalBreakerGeometry / CoastalRunupRenderer | Active deterministic incoming, shoaling, breaking, run-up and retreat presentation, using the coordinator's translucent batch. |
+| CoastalWaveModel / CoastalRunupRenderer | Active deterministic terrain wash and ambience. Detached CoastalBreakerGeometry crest rendering was subsequently retired; native Gerstner geometry owns ocean crests. |
 | CoastalBreakEffects / RiverSoundscape / WaterAmbientEffects | Active positional coast/river/rapids/waterfall sound and particle presentation. |
 | WaterEntryEventHandler / RippleRenderer / WaterSurfaceDisplacement | Active entry impact, ripples and bounded movement disturbances, including persistent GPU wake foam. |
 | WaveEntityPhysics / ClientWaveEntityEffects / BoatTiltStore / BoatRenderMixin | Active authoritative forces and client visual hull response. |
