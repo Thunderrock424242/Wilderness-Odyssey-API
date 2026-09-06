@@ -210,6 +210,8 @@ public final class WaterSurfaceEquation {
         ).height() * boundedLakeWeight;
         float continuity = surfaceContinuityFactor(surfaceContinuity);
         waveHeight *= com.thunder.wildernessodysseyapi.watersystem.water.wave.DepthWaveResponse.amplitudeScale(waterDepth);
+        waveHeight = com.thunder.wildernessodysseyapi.watersystem.water.wave.DepthWaveResponse.shapeCrest(
+                waveHeight, waterDepth, boundedOceanWeight);
         return finiteOrZero(baseSurfaceY)
                 + (waveHeight + clamp(finiteOrZero(transientHeight), -0.25f, 0.25f)) * continuity
                 + finiteOrZero(tideOffset) * boundedOceanWeight * continuity;

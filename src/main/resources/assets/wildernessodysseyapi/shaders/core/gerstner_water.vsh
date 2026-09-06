@@ -83,6 +83,7 @@ out float depthFactor;
 out float disturbanceStrength;
 out float waveSlope;
 out float crestCompression;
+out float coastalCrest;
 out vec3 celestialDirection;
 out float celestialDaylight;
 out float regionalSeaState;
@@ -340,6 +341,16 @@ void main() {
     horizontalDisplacement *= depthWaveScale;
     tangentXDelta *= depthWaveScale;
     tangentZDelta *= depthWaveScale;
+    // Shape the actual continuous surface. Mirror DepthWaveResponse and its
+    // derivative; separate translucent crest ramps are deliberately absent.
+    float coastalBand = bodyBlend.x * smoothstep(0.3, 2.0, waterDepth)
+        * (1.0 - smoothstep(6.0, 16.0, waterDepth));
+    float crestRoot = sqrt(gpuHeight * gpuHeight + 0.04);
+    float crestDerivative = 1.0 + 0.35 * coastalBand * gpuHeight / crestRoot;
+    gpuHeight += 0.35 * coastalBand * (crestRoot - 0.2);
+    tangentXDelta.y *= crestDerivative;
+    tangentZDelta.y *= crestDerivative;
+    coastalCrest = coastalBand * smoothstep(0.06, 0.55, gpuHeight);
 
     // Bound the combined horizontal derivative after body-profile blending.
     // Authored profiles normally remain well below this limit; the clamp is a
@@ -399,6 +410,7 @@ void main() {
     float shoreHorizontalTaper = 1.0 - smoothstep(0.18, 0.88, shoreFactor);
     float frozen = clamp(Weather.w, 0.0, 1.0);
     float waveFreedom = 1.0 - frozen * 0.94;
+    coastalCrest *= continuityWave * waveFreedom * clamp(GpuWaveStrength, 0.0, 1.0);
     float horizontalTaper = continuityWave * shoreHorizontalTaper * waveFreedom;
     disturbanceStrength *= waveFreedom;
     displacedPosition.xz += horizontalDisplacement * GpuWaveStrength * horizontalTaper;

@@ -294,6 +294,13 @@ public final class GerstnerWaveProfile {
             tangentZZ -= horizontalDerivative * directionZ * directionZ;
         }
 
+        if (this == OCEAN || this == COAST) {
+            float crestDerivative = DepthWaveResponse.crestDerivative(height, waterDepth, 1.0f);
+            height = DepthWaveResponse.shapeCrest(height, waterDepth, 1.0f);
+            tangentXY *= crestDerivative;
+            tangentZY *= crestDerivative;
+            velocityY *= crestDerivative;
+        }
         float horizontalJacobian = tangentXX * tangentZZ - tangentXZ * tangentZX;
 
         // tangentZ x tangentX points upward for an undisturbed XZ plane.

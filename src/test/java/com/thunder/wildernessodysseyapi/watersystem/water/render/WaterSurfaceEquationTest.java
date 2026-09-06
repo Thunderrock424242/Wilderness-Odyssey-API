@@ -10,6 +10,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class WaterSurfaceEquationTest {
 
     @Test
+    void immersionMatchesNativeShallowOceanCrest() {
+        var spectrum = WaveSpectrumState.NEUTRAL;
+        float expected = 63.0f + GerstnerWaveProfile.OCEAN.sampleAt(
+                11, 17, 4.0, 4, spectrum, 0, 0, 3).height();
+        float actual = WaterSurfaceEquation.snapshotSurfaceHeight(63, 11, 17, 4,
+                spectrum, spectrum, 4, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 3);
+        assertEquals(expected, actual, 0.00001f);
+    }
+
+    @Test
     void snapshotHeightMatchesWeightedCpuProfilesAndTransientDisplacement() {
         float x = 31.25f;
         float z = -12.75f;
