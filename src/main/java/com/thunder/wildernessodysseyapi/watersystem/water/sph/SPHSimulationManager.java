@@ -46,6 +46,8 @@ public class SPHSimulationManager {
     /** Per-level round-robin cursor that prevents particle-budget starvation. */
     private final Map<BlockGetter, Integer> tickCursors =
             Collections.synchronizedMap(new IdentityHashMap<>());
+    private final Map<BlockGetter, StepMeasurements> stepMeasurements =
+            Collections.synchronizedMap(new IdentityHashMap<>());
 
     private SPHSimulationManager() {}
 
@@ -180,9 +182,11 @@ public class SPHSimulationManager {
             if (availableParticles <= 0) {
                 return false;
             }
+            if (!existing.tryAddCanonicalVolumeUnits(conservedVolume)) {
+                return false;
+            }
             existing.spawnPulse(x, y, z, Math.min(particleCount, availableParticles),
                     impulseX, impulseY, impulseZ);
-            existing.addCanonicalVolumeUnits(conservedVolume);
             return true;
         }
 
@@ -197,9 +201,11 @@ public class SPHSimulationManager {
                 if (availableParticles <= 0) {
                     return false;
                 }
+                if (!overloaded.tryAddCanonicalVolumeUnits(conservedVolume)) {
+                    return false;
+                }
                 overloaded.spawnPulse(x, y, z, Math.min(Math.max(8, particleCount / 2), availableParticles),
                         impulseX, impulseY, impulseZ);
-                overloaded.addCanonicalVolumeUnits(conservedVolume);
                 return true;
             }
             if (countSimulations(level) >= maxActiveBodies) {
@@ -208,7 +214,9 @@ public class SPHSimulationManager {
         }
 
         SPHSimulator sim = new SPHSimulator(level);
-        sim.addCanonicalVolumeUnits(conservedVolume);
+        if (!sim.tryAddCanonicalVolumeUnits(conservedVolume)) {
+            return false;
+        }
         configureSettlement(sim, level, pos -> { });
         sim.spawnPulse(x, y, z, particleCount, impulseX, impulseY, impulseZ);
         active.add(sim);
@@ -337,6 +345,8 @@ public class SPHSimulationManager {
     }
 
     public void tickLevel(BlockGetter level, float deltaTime) {
+        long started = System.nanoTime();
+        long steppedParticles = 0;
         runPendingSettleCallbacks(level);
         if (!(level instanceof ServerLevel) && !WaterRenderingConfig.localSphEffectsEnabled()) {
             active.removeIf(sim -> sim.getLevel() == level
@@ -353,6 +363,7 @@ public class SPHSimulationManager {
         }
         if (levelSimulations.isEmpty()) {
             tickCursors.remove(level);
+            stepMeasurements.put(level, new StepMeasurements(0, System.nanoTime() - started));
             return;
         }
 
@@ -387,6 +398,7 @@ public class SPHSimulationManager {
                 remainingParticleBudget = Math.max(0, remainingParticleBudget - particleCost);
                 advancedBudgetedSimulation = true;
             }
+            if (!sim.isRemoteMirror()) steppedParticles += sim.particleCount();
             sim.tick(deltaTime);
             if ((sim.particleCount() == 0 && sim.getCanonicalVolumeUnits() <= 0)
                     || sim.isRemoteExpired()) {
@@ -394,7 +406,17 @@ public class SPHSimulationManager {
                 settlementRetries.remove(sim);
             }
         }
+        stepMeasurements.put(level, new StepMeasurements(steppedParticles, System.nanoTime() - started));
     }
+
+    /** Latest particle workload for the requested logical level, without scanning bodies. */
+    public String diagnostics(BlockGetter level) {
+        StepMeasurements measurements = stepMeasurements.get(level);
+        return measurements == null ? "SPH has not run" : "SPH particles stepped=" + measurements.particles
+                + ", solver microseconds=" + measurements.elapsedNanos / 1000;
+    }
+
+    private record StepMeasurements(long particles, long elapsedNanos) { }
 
     private static boolean simulationAreaLoaded(ServerLevel level, SPHSimulator simulator) {
         List<SPHParticle> particles = simulator.getRenderParticles();
@@ -479,7 +501,10 @@ public class SPHSimulationManager {
             List<SPHParticle> particles,
             int canonicalVolumeUnits
     ) {
-        if (particles.isEmpty() || countSimulations(level) >= SPHConstants.MAX_ACTIVE_SIMULATIONS) {
+        if (particles.isEmpty() && canonicalVolumeUnits > 0) {
+            throw new IllegalArgumentException("Cannot restore owned SPH water without its saved position");
+        }
+        if (particles.isEmpty()) {
             return;
         }
         for (SPHSimulator sim : active) {
@@ -574,7 +599,7 @@ public class SPHSimulationManager {
         }
     }
 
-    private static boolean materializeCanonicalVolume(
+    static boolean materializeCanonicalVolume(
             ServerLevel level,
             SPHSimulator simulator,
             List<SPHParticle> particles,
@@ -657,6 +682,8 @@ public class SPHSimulationManager {
                         }
                         BlockPos destination = target.offset(offsetX, offsetY, offsetZ);
                         WaterVolumeChunk.WaterCell previous = CanonicalWater.getOrImport(level, destination);
+                        net.minecraft.world.level.block.state.BlockState original = level.hasChunkAt(destination)
+                                ? level.getBlockState(destination) : null;
                         int accepted = CanonicalWater.addVolume(
                                 level,
                                 destination,
@@ -666,7 +693,7 @@ public class SPHSimulationManager {
                                 velocityZ
                         );
                         if (accepted > 0) {
-                            writes.add(new SettlementWrite(destination.immutable(), previous));
+                            writes.add(new SettlementWrite(destination.immutable(), previous, original));
                         }
                         remaining -= accepted;
                     }
@@ -700,6 +727,10 @@ public class SPHSimulationManager {
         for (int index = writes.size() - 1; index >= 0; index--) {
             SettlementWrite write = writes.get(index);
             CanonicalWater.set(level, write.pos, write.previous, true);
+            if (write.previous.volumeUnits() == 0) {
+                com.thunder.wildernessodysseyapi.watersystem.water.hydrology.TemporaryFloodManager
+                        .restoreOriginalState(level, write.pos, write.original);
+            }
         }
         if (warnOnFailure) {
             warnIfVolumeCouldNotSettle(simulator, remainingVolume);
@@ -729,6 +760,7 @@ public class SPHSimulationManager {
         active.removeIf(sim -> sim.getLevel() == level);
         restoredPersistentLevels.remove(level);
         tickCursors.remove(level);
+        stepMeasurements.remove(level);
     }
 
     /**
@@ -808,7 +840,8 @@ public class SPHSimulationManager {
         private static final MobileWaterSample DRY = new MobileWaterSample(false, 0.0f, 0.0f, 0.0f);
     }
 
-    private record SettlementWrite(BlockPos pos, WaterVolumeChunk.WaterCell previous) {
+    private record SettlementWrite(BlockPos pos, WaterVolumeChunk.WaterCell previous,
+                                   net.minecraft.world.level.block.state.BlockState original) {
     }
 
     private static final class SettlementAccumulator {

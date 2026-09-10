@@ -20,6 +20,11 @@ public final class WatershedTags {
     public static final TagKey<Block> FLOOD_REPLACEABLE = blockTag("watershed_flood_replaceable");
     /** Blocks that temporary overflow must never replace. */
     public static final TagKey<Block> FLOOD_PROTECTED = blockTag("watershed_flood_protected");
+    public static final TagKey<Block> SOIL_IMPERMEABLE = blockTag("hydrology_impermeable");
+    public static final TagKey<Block> SOIL_GRAVEL = blockTag("hydrology_gravel");
+    public static final TagKey<Block> SOIL_SAND = blockTag("hydrology_sand");
+    public static final TagKey<Block> SOIL_CLAY = blockTag("hydrology_clay");
+    public static final TagKey<Block> SOIL_ROCK = blockTag("hydrology_rock");
 
     private WatershedTags() {
     }

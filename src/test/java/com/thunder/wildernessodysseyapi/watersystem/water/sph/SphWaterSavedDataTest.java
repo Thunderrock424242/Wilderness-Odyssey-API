@@ -23,6 +23,7 @@ class SphWaterSavedDataTest {
         CompoundTag simulation = rewritten.getList("simulations", Tag.TAG_COMPOUND)
                 .getCompound(0);
         assertEquals(1, simulation.getInt("particle_count"));
+        assertEquals(4_096, simulation.getInt("volume_units"));
         assertEquals(8, simulation.getIntArray("particle_data").length);
     }
 

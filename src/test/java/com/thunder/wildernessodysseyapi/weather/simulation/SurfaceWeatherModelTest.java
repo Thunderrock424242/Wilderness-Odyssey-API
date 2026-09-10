@@ -4,11 +4,27 @@ import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.SurfaceWeatherState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindVector;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.AtmosphericWaterExchange;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SurfaceWeatherModelTest {
+
+    @Test
+    void physicalSnowProjectionCannotIndependentlyAccumulateOrMelt() {
+        AtmosphericWaterExchange.Receipt receipt = new AtmosphericWaterExchange.Receipt(
+                0L, 0L, 1.0, 0.37, 256.0, List.of());
+        SurfaceWeatherState snow = SurfaceWeatherModel.simulate(SurfaceWeatherState.DRY,
+                weather(-12.0, PrecipitationType.SNOW, 1.0), AtmosphereEnvironment.TEMPERATE, 1.0, receipt);
+        assertEquals(0.37, snow.snowpack(), 1.0E-12);
+        SurfaceWeatherState warm = SurfaceWeatherModel.simulate(snow,
+                weather(35.0, PrecipitationType.NONE, 0.0), AtmosphereEnvironment.TEMPERATE, 1.0, receipt);
+        assertEquals(0.37, warm.snowpack(), 1.0E-12);
+    }
 
     @Test
     void rainBuildsWetnessAndPuddlesWithoutSnow() {

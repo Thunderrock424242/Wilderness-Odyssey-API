@@ -37,6 +37,11 @@ public final class WaterDebugCommand {
     /** Registers the {@code /wowater} diagnostics command tree. */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("wowater")
+                .then(Commands.literal("budget")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(context -> budget(context, sourceBlockPos(context.getSource())))
+                        .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                                .executes(context -> budget(context, BlockPosArgument.getLoadedBlockPos(context, "pos")))))
                 .then(Commands.literal("erosion").executes(context -> {
                     ServerLevel level = context.getSource().getLevel();
                     BlockPos position = sourceBlockPos(context.getSource());
@@ -113,6 +118,14 @@ public final class WaterDebugCommand {
                                         context,
                                         IntegerArgumentType.getInteger(context, "radius")
                                 )))));
+    }
+
+    private static int budget(CommandContext<CommandSourceStack> context, BlockPos pos) {
+        for (String line : com.thunder.wildernessodysseyapi.watersystem.water.hydrology.RegionalBudgetDiagnostics
+                .describe(context.getSource().getLevel(), pos)) {
+            context.getSource().sendSuccess(() -> Component.literal(line), false);
+        }
+        return 1;
     }
 
     private static int inspect(CommandContext<CommandSourceStack> context, BlockPos pos) {

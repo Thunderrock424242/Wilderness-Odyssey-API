@@ -192,38 +192,34 @@ This is a two-way connection rather than a second weather or water authority:
 ```text
 Wilderness water bodies -> moisture/thermal context -> atmosphere simulation
 atmosphere query -> regional sea state -> waves, shore behavior, immersion
-atmosphere query -> persistent finite-body ledger -> WaterAccess transfers
-atmosphere query -> packed watershed cells -> runoff, aquifers, baseflow, ponds/flood budgets
+atmosphere query -> persistent finite regional stores -> runoff, aquifers, rivers/lakes
+regional actual ET/SWE -> accepted weather receipts -> vapor/snow projection
+regional excess -> exact funded canonical parcel -> reversible ponds/floods
 ```
 
-Rain and hail can add conserved volume to finite Wilderness lakes and rivers.
-Settled snow contributes only after thawing, while hot, dry, windy conditions
-can remove volume through evaporation. Large oceans remain neutral reservoirs,
-and every realized change passes through `WaterAccess`; the persistent ledger
-only carries sub-cell or temporarily unrealizable balance. Sampling and
-transfers are player-bounded, rate-limited, deduplicated by chunk, and never
-force an unloaded chunk to load.
+Regional records now persist exact SWE, soil, groundwater, runoff, river, lake,
+floodplain and aggregate ice inventory. Precipitation and actual ET have explicit
+boundary receipts. Oceans remain an explicitly named infinite boundary, while
+generated water stays a separate lazy baseline. New regional stores start dry;
+old normalized metadata is not converted into fictitious physical quantities.
 
-The default watershed phase supersedes the older probe ledger with compact
-chunk conditions for rainfall memory, saturation, runoff, aquifer recharge and
-storage, downstream/baseflow discharge,
-bounded river/lake offsets, sediment, clarity, current, debris, and localized
-flood risk. Real closed depressions can form reversible rain ponds, shallow
-wetlands, or aquifer-fed springs under independent placement limits. It retains
-runoff when a cached downstream chunk is unavailable and
-never loads that neighbor. Exact temporary overflow uses separately flagged
-canonical sparse cells plus an exact-position recession ledger; permanent or
-player-placed water cannot pass that two-key removal gate. See
-[`watersheds-and-flooding.md`](watersheds-and-flooding.md) for the model,
-budgets, safety tags, configuration, and loaded-only validation boundaries.
+Cached cross-chunk priority-flood drainage and Manning reaches derive discharge,
+stage and currents. Lake spill and river bankfull excess fund every new temporary
+canonical cell; recession transfers those units back to the original region.
+Exact claims survive movement and protect ordinary/player water. Regional state
+advances without nearby players using bounded coarse catch-up and cached weather;
+block mutations and terrain sampling remain loaded-only. No missing terrain is
+force-loaded. See [conservation architecture](conservation-architecture.md) and
+[watersheds and flooding](watersheds-and-flooding.md) for invariants, budgets,
+configuration, migration and intentional approximations.
 
 Freezing also respects water ownership. Vanilla or externally tagged water may
 still be replaced by frosted ice, but Wilderness-owned water is not directly
 replaced because doing so would split the projected block from canonical
-volume. Instead, the synchronized frozen fraction progressively damps custom
-surface motion and applies the visual ice response. This keeps the liquid
-ledger authoritative; custom frozen water is therefore visual rather than a
-walkable solid until a dedicated frozen-volume projection is implemented.
+volume. Regional liquid/ice stores exchange exact quantities without placing new
+solid blocks. Separately, the synchronized frozen fraction damps custom surface
+motion and applies a cosmetic icy response to existing canonical water. That
+shader appearance is not a second ice inventory or a walkable solid.
 
 If localized weather ownership is disabled for a dimension, the regional field
 is cleared and consumers fall back to Minecraft's dimension-wide rain and

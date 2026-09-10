@@ -92,6 +92,7 @@ public final class WaterSimulationConfig {
                 .push("water_simulation");
 
         com.thunder.wildernessodysseyapi.watersystem.water.erosion.ErosionConfig.define(builder);
+        com.thunder.wildernessodysseyapi.watersystem.water.hydrology.RegionalHydrologyConfig.define(builder);
 
         ENABLE_WILDERNESS_ODYSSEY_WATER = builder
                 .comment("Initial server choice for Wilderness Odyssey water authority, local flow, SPH gameplay water, and replacement rendering. The first world start persists this together with enableWildernessOdysseyWater; live changes cannot suspend established authority.")

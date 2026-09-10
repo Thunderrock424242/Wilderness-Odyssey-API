@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.weather.simulation;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.SurfaceWeatherState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.AtmosphericWaterExchange;
 
 /**
  * Evolves ground wetness, puddles, snowpack, and freeze/thaw memory.
@@ -21,6 +22,17 @@ public final class SurfaceWeatherModel {
             WeatherSample atmosphere,
             AtmosphereEnvironment environment,
             double step
+    ) {
+        return simulate(current, atmosphere, environment, step, AtmosphericWaterExchange.Receipt.EMPTY);
+    }
+
+    /** Uses the regional SWE projection wherever physical hydrology owns the snow reservoir. */
+    public static SurfaceWeatherState simulate(
+            SurfaceWeatherState current,
+            WeatherSample atmosphere,
+            AtmosphereEnvironment environment,
+            double step,
+            AtmosphericWaterExchange.Receipt waterReceipt
     ) {
         SurfaceWeatherState surface = current == null ? SurfaceWeatherState.DRY : current;
         WeatherSample weather = atmosphere == null ? WeatherSample.CLEAR : atmosphere;
@@ -48,6 +60,10 @@ public final class SurfaceWeatherModel {
         double melt = Math.max(0.0, weather.temperature() - 0.5)
                 * (0.003 + inputs.daylight() * 0.003) * rate;
         double snowpack = unit(surface.snowpack() + snowGain - melt);
+        if (waterReceipt != null) {
+            snowpack = snowpack * (1.0 - waterReceipt.coveredFraction())
+                    + waterReceipt.snowCoverage() * waterReceipt.coveredFraction();
+        }
 
         double freezeTarget = weather.temperature() <= -2.0
                 ? unit((wetness * 0.45 + puddles * 0.55 + snowpack * 0.18)

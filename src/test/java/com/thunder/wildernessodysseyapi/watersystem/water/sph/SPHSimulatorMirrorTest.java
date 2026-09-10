@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SPHSimulatorMirrorTest {
@@ -41,11 +42,22 @@ class SPHSimulatorMirrorTest {
         SPHParticle particle = new SPHParticle(2.0f, 3.0f, 4.0f);
         particle.velocity.set(0.25f, -0.5f, 0.75f);
 
-        SPHSimulator restored = SPHSimulator.restoreAuthoritative(id, null, List.of(particle));
+        SPHSimulator restored = SPHSimulator.restoreAuthoritative(id, null, List.of(particle), 4_096);
 
         assertEquals(id, restored.getSimulationId());
         assertEquals(0.75f, restored.getRenderParticles().getFirst().velocity.z, 1.0e-6f);
+        assertEquals(4_096, restored.getCanonicalVolumeUnits());
         assertTrue(!restored.isRemoteMirror());
+    }
+
+    @Test
+    void canonicalVolumeCreditRejectsOverflowWithoutSaturating() {
+        SPHSimulator simulator = SPHSimulator.restoreAuthoritative(
+                UUID.randomUUID(), null, List.of(), Integer.MAX_VALUE - 4
+        );
+
+        assertFalse(simulator.tryAddCanonicalVolumeUnits(5));
+        assertEquals(Integer.MAX_VALUE - 4, simulator.getCanonicalVolumeUnits());
     }
 
     @Test

@@ -6,11 +6,13 @@ import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.simulation.WeatherAuthority;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.AtmosphericWaterExchange;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -56,9 +58,16 @@ public final class SurfaceWeatheringScheduler {
         BlockState belowState = level.getBlockState(top.below());
         boolean snowing = sample.precipitationType() == PrecipitationType.SNOW
                 && sample.precipitationIntensity() >= 0.18;
+        AtmosphericWaterExchange.SurfaceSnapshot hydrology = AtmosphericWaterExchange.query(
+                level, new ChunkPos(top));
 
-        // Accumulation uses normal snow-layer blocks and never forces chunk loads.
-        if ((snowing || surface.snowpack() >= 0.42) && sample.temperature() <= 1.0) {
+        // Physical hydrology owns SWE, while its synchronized surface snow cover
+        // is a render-only projection. Do not turn that same snow into harvestable
+        // vanilla blocks: without a snow-block ownership ledger, repeated placement
+        // would let harvesting duplicate the regional store. Legacy unmodeled
+        // columns retain their established vanilla-layer weather behavior.
+        if (!hydrology.supported()
+                && (snowing || surface.snowpack() >= 0.42) && sample.temperature() <= 1.0) {
             if (topState.is(Blocks.SNOW)) {
                 int layers = topState.getValue(SnowLayerBlock.LAYERS);
                 if (layers < settings.maximumSnowLayers() && (randomBits & 3L) == 0L) {
@@ -70,7 +79,8 @@ public final class SurfaceWeatheringScheduler {
                     level.setBlockAndUpdate(top, snow);
                 }
             }
-        } else if (topState.is(Blocks.SNOW) && sample.temperature() >= 2.0 && (randomBits & 1L) == 0L) {
+        } else if (!hydrology.supported() && topState.is(Blocks.SNOW)
+                && sample.temperature() >= 2.0 && (randomBits & 1L) == 0L) {
             int layers = topState.getValue(SnowLayerBlock.LAYERS);
             level.setBlockAndUpdate(top, layers <= 1
                     ? Blocks.AIR.defaultBlockState()

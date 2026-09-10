@@ -53,6 +53,8 @@ public final class RainwaterBodyManager {
 
         TemporaryFloodSavedData ledger = TemporaryFloodSavedData.get(level);
         WatershedConditions conditions = state.conditions();
+        RegionalHydrologyState region = RegionalHydrologySavedData.get(level).state(chunkKey);
+        if (region == null) return 0;
         int placed = 0;
         int attempts = 0;
         int maximumAttempts = maximumPlacements * MAX_ATTEMPTS_PER_PLACEMENT;
@@ -77,15 +79,14 @@ public final class RainwaterBodyManager {
             boolean localSink = state.drainageGrid().direction(cell)
                     == WatershedConditions.DrainageDirection.SINK;
             int depressionDepth = sampledDepressionDepth(level, target);
-            SurfaceWaterKind kind = TransientSurfaceWaterModel.formationKind(
-                    conditions,
-                    depressionDepth,
-                    localSink,
-                    adjacentKind,
-                    WaterSimulationConfig.watershedPondFormationThreshold(),
-                    WaterSimulationConfig.watershedWetlandFormationThreshold(),
-                    WaterSimulationConfig.watershedSpringThreshold()
-            );
+            SurfaceWaterKind kind = SurfaceWaterKind.NONE;
+            if (depressionDepth > 0 && (localSink || adjacentKind.standingWater())) {
+                if (region.stored(HydrologicReservoir.LAKE) >= 4096000L) kind = SurfaceWaterKind.RAIN_POND;
+                else if (region.stored(HydrologicReservoir.LAKE) >= 2048000L) kind = SurfaceWaterKind.WETLAND;
+            }
+            if (kind == SurfaceWaterKind.NONE && region.lastBaseflow > 0
+                    && conditions.aquiferStorage() >= WaterSimulationConfig.watershedSpringThreshold()
+                    && (localSink || adjacentKind == SurfaceWaterKind.SPRING)) kind = SurfaceWaterKind.SPRING;
             if (kind == SurfaceWaterKind.NONE) {
                 continue;
             }

@@ -16,6 +16,8 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
 
 /**
  * Performs loaded-only, budgeted temporary flood expansion and recession.
@@ -45,7 +47,9 @@ public final class TemporaryFloodManager {
             return 0;
         }
         WatershedConditions conditions = state.conditions();
-        if (!conditions.flooding()
+        RegionalHydrologyState region = RegionalHydrologySavedData.get(level).state(chunkKey);
+        if (region == null || region.stored(HydrologicReservoir.FLOODPLAIN) < 4096000L
+                || !conditions.flooding()
                 || !conditions.hasSurfaceWater()
                 || state.representativePosition() == WatershedChunkState.NO_REPRESENTATIVE) {
             return 0;
@@ -64,7 +68,8 @@ public final class TemporaryFloodManager {
         int placed = 0;
         int attempts = 0;
         int maximumAttempts = maximumPlacements * MAX_ATTEMPTS_PER_PLACEMENT;
-        while (placed < maximumPlacements && attempts++ < maximumAttempts) {
+        List<BlockPos> lowConnectedTargets = new ArrayList<>();
+        while (attempts++ < Math.min(64, maximumAttempts)) {
             int cursor = state.nextFloodCursor();
             int localX = cursor & 15;
             int localZ = cursor >>> 4;
@@ -77,6 +82,12 @@ public final class TemporaryFloodManager {
                     || !adjacentWater(level, water, target)) {
                 continue;
             }
+            lowConnectedTargets.add(target);
+        }
+        lowConnectedTargets.sort(Comparator.comparingInt((BlockPos position) -> position.getY())
+                .thenComparingLong(position -> position.asLong()));
+        for (BlockPos target : lowConnectedTargets) {
+            if (placed >= maximumPlacements) break;
             var localFlow = WatershedServices.localFlow(level, target);
             if (!placeTrackedSurfaceWater(
                     level,
@@ -100,7 +111,7 @@ public final class TemporaryFloodManager {
         return placed;
     }
 
-    /** Recedes exact tracked floodwater whose watershed has returned below risk. */
+    /** Returns exact tracked water to its funding region after excess storage recedes. */
     public static int recede(
             ServerLevel level,
             WatershedSavedData watersheds,
@@ -135,7 +146,21 @@ public final class TemporaryFloodManager {
                     : state.conditions();
             SurfaceWaterKind kind = ledger.kind(packedPosition);
             long ageTicks = Math.max(0L, level.getGameTime() - ledger.placedTick(packedPosition));
-            if (TransientSurfaceWaterModel.retains(
+            long funding = ledger.fundingRegion(packedPosition);
+            RegionalHydrologySavedData regionalData = RegionalHydrologySavedData.get(level);
+            RegionalHydrologyState funded = regionalData.state(funding);
+            if (funded != null && WaterSimulationConfig.watershedSimulationEnabled()
+                    && (funded.stored(HydrologicReservoir.FLOODPLAIN) > 0
+                    || kind != SurfaceWaterKind.FLOOD && funded.stored(HydrologicReservoir.LAKE) >= 4096000L)) {
+                continue;
+            }
+            if (funding != TemporaryFloodSavedData.LEGACY_FUNDING
+                    && ageTicks < (kind == SurfaceWaterKind.FLOOD ? 40 : WaterSimulationConfig.surfaceWaterMinimumLifetimeTicks())) {
+                continue;
+            }
+            if (funded == null && funding != TemporaryFloodSavedData.LEGACY_FUNDING) continue;
+            /* Legacy visual conditions may retain old claims during their migration. */
+            if (funding == TemporaryFloodSavedData.LEGACY_FUNDING && TransientSurfaceWaterModel.retains(
                     kind,
                     conditions,
                     ageTicks,
@@ -150,12 +175,34 @@ public final class TemporaryFloodManager {
             }
 
             WaterVolumeChunk.WaterCell tracked = CanonicalWater.getTracked(level, position);
+            // A player-placed solid may temporarily retain displaced water out
+            // of view. Keep its claim until the displacement reservoir drains.
+            if (tracked != null && tracked.temporaryFlood() && tracked.displacementReservoir()) continue;
             int flags = tracked == null ? 0 : tracked.flags();
             boolean projection = WildernessWaterAuthority.isPlainWaterProjection(
                     level.getBlockState(position));
             if (TemporaryFloodSavedData.mayRemoveTrackedCell(true, flags, projection)) {
-                if (CanonicalWater.removeTemporaryFlood(level, position)) {
-                    restoreOriginalState(level, position, ledger.originalState(packedPosition));
+                int ownedUnits = ledger.ownedUnits(packedPosition);
+                // Exact two-key match is required. A foreign overwrite relinquishes the
+                // claim instead of crediting water that canonical no longer contains.
+                if (tracked == null || tracked.volumeUnits() != ownedUnits) {
+                    ledger.forget(packedPosition);
+                    continue;
+                }
+                if (funded == null) {
+                    WatershedChunkState local = watersheds.getOrCreate(level, chunk);
+                    RegionalHydrologyManager.onChunkLoad(level, chunk, local);
+                    funded = regionalData.state(chunkKey);
+                }
+                if (funded == null || funded.storage.availableCapacity(HydrologicReservoir.SURFACE_RUNOFF) < ownedUnits * 1000L) continue;
+                Math.addExact(funded.receipt(funding == TemporaryFloodSavedData.LEGACY_FUNDING
+                        ? RegionalHydrologyState.Boundary.LEGACY_RETURN : RegionalHydrologyState.Boundary.PROJECTION_IN), ownedUnits * 1000L);
+                if (CanonicalWater.removeTemporaryFlood(level, position, ownedUnits)) {
+                    RegionalWaterProjection.returnParcel(funded, ownedUnits, funding == TemporaryFloodSavedData.LEGACY_FUNDING);
+                    regionalData.setDirty();
+                    if (tracked != null && tracked.volumeUnits() <= ownedUnits) {
+                        restoreOriginalState(level, position, ledger.originalState(packedPosition));
+                    }
                     ledger.forget(packedPosition);
                     removed++;
                 }
@@ -186,46 +233,51 @@ public final class TemporaryFloodManager {
         if (state == null || kind == null || kind == SurfaceWaterKind.NONE) {
             return false;
         }
-        BlockState originalState = level.getBlockState(target);
-        if (!CanonicalWater.placeTemporarySurfaceWater(
-                level,
-                target,
-                volumeUnits,
-                velocityX,
-                velocityZ
-        )) {
-            return false;
+        RegionalHydrologySavedData regionalData = RegionalHydrologySavedData.get(level);
+        RegionalHydrologyState region = regionalData.state(chunkKey);
+        HydrologicReservoir source = kind == SurfaceWaterKind.FLOOD ? HydrologicReservoir.FLOODPLAIN
+                : kind == SurfaceWaterKind.SPRING ? HydrologicReservoir.GROUNDWATER : HydrologicReservoir.LAKE;
+        try (RegionalWaterProjection.Reservation reservation = RegionalWaterProjection.reserve(region, source, volumeUnits)) {
+            if (reservation == null) return false;
+            BlockState originalState = level.getBlockState(target);
+            if (!CanonicalWater.placeTemporarySurfaceWater(level, target, volumeUnits, velocityX, velocityZ)) {
+                return false;
+            }
+            TemporaryFloodSavedData ledger = TemporaryFloodSavedData.get(level);
+            if (!ledger.record(target, state.conditions().basinId(), level.getGameTime(),
+                    WaterSimulationConfig.watershedMaxTransientWaterCells(), originalState,
+                    kind, volumeUnits, chunkKey)) {
+                CanonicalWater.removeTemporaryFlood(level, target);
+                restoreOriginalState(level, target, originalState);
+                return false;
+            }
+            reservation.commit();
+            WaterVolumeChunk.WaterCell cell = CanonicalWater.getTracked(level, target);
+            if (cell != null) CanonicalWater.set(level, target,
+                    cell.withTemperature((int) Math.round((region.temperatureCelsius + 273.15) * 1000)), true);
+            regionalData.setDirty();
+            if (synchronizeStateCounts(state, ledger, chunkKey)) watersheds.markChanged();
+            return true;
         }
-        TemporaryFloodSavedData ledger = TemporaryFloodSavedData.get(level);
-        if (!ledger.record(
-                target,
-                state.conditions().basinId(),
-                level.getGameTime(),
-                WaterSimulationConfig.watershedMaxTransientWaterCells(),
-                originalState,
-                kind
-        )) {
-            CanonicalWater.removeTemporaryFlood(level, target);
-            restoreOriginalState(level, target, originalState);
-            return false;
-        }
-        if (synchronizeStateCounts(state, ledger, chunkKey)) {
-            watersheds.markChanged();
-        }
-        return true;
     }
 
     /** Returns whether terrain is safe for any reversible watershed surface water. */
-    static boolean safeTemporaryWaterTarget(
+    public static boolean safeTemporaryWaterTarget(
             ServerLevel level,
             LevelChunk chunk,
             BlockPos target
     ) {
-        if (level.isOutsideBuildHeight(target)
+        if (chunk == null || level.isOutsideBuildHeight(target)
                 || level.getBlockEntity(target) != null
+                || !chunk.getAllReferences().isEmpty()
                 || insideStructure(chunk, target)) {
             return false;
         }
+        // Story structures do not necessarily have vanilla StructureStart data.
+        var bunker = com.thunder.wildernessodysseyapi.worldgen.spawn.CryoSpawnData.get(level)
+                .getStarterBunkerBounds().orElse(null);
+        if (bunker != null && target.getX() >= bunker.minX - 1 && target.getX() <= bunker.maxX + 1
+                && target.getZ() >= bunker.minZ - 1 && target.getZ() <= bunker.maxZ + 1) return false;
         BlockState state = level.getBlockState(target);
         if (state.is(WatershedTags.FLOOD_PROTECTED)
                 || !state.getFluidState().isEmpty()) {
@@ -251,7 +303,7 @@ public final class TemporaryFloodManager {
         return false;
     }
 
-    static void restoreOriginalState(
+    public static void restoreOriginalState(
             ServerLevel level,
             BlockPos position,
             BlockState originalState

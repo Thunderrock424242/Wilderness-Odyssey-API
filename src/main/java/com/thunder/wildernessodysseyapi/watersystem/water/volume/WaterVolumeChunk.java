@@ -416,6 +416,48 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
             return volumeUnits / (float) UNITS_PER_BLOCK;
         }
 
+        /** Returns a copy with a different conserved volume and all ownership metadata intact. */
+        public WaterCell withVolume(int newVolumeUnits) {
+            if (volumeUnits == newVolumeUnits) {
+                return this;
+            }
+            return new WaterCell(newVolumeUnits, velocityX, velocityY, velocityZ,
+                    flags, temperatureMilliKelvin).sanitized();
+        }
+
+        /** Returns a copy with different momentum and all ownership metadata intact. */
+        public WaterCell withVelocity(float newVelocityX, float newVelocityY, float newVelocityZ) {
+            if (Float.compare(velocityX, newVelocityX) == 0
+                    && Float.compare(velocityY, newVelocityY) == 0
+                    && Float.compare(velocityZ, newVelocityZ) == 0) {
+                return this;
+            }
+            return new WaterCell(volumeUnits, newVelocityX, newVelocityY, newVelocityZ,
+                    flags, temperatureMilliKelvin).sanitized();
+        }
+
+        /** Returns a copy with a different physical temperature and all ownership metadata intact. */
+        public WaterCell withTemperature(int newTemperatureMilliKelvin) {
+            if (temperatureMilliKelvin == newTemperatureMilliKelvin) {
+                return this;
+            }
+            return new WaterCell(volumeUnits, velocityX, velocityY, velocityZ,
+                    flags, newTemperatureMilliKelvin).sanitized();
+        }
+
+        /**
+         * Updates volume and momentum as one flow transaction without rebuilding provenance flags.
+         */
+        public WaterCell withFlowState(
+                int newVolumeUnits,
+                float newVelocityX,
+                float newVelocityY,
+                float newVelocityZ
+        ) {
+            return new WaterCell(newVolumeUnits, newVelocityX, newVelocityY, newVelocityZ,
+                    flags, temperatureMilliKelvin).sanitized();
+        }
+
         /** Returns whether this cell was lazily imported from vanilla state. */
         public boolean imported() {
             return (flags & FLAG_IMPORTED) != 0;

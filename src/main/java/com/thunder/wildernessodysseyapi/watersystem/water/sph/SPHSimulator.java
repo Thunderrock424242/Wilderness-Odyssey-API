@@ -134,12 +134,28 @@ public class SPHSimulator {
     public boolean isRemoteMirror()                  { return remoteMirror; }
     public int getCanonicalVolumeUnits()              { return canonicalVolumeUnits; }
 
-    /** Adds conserved canonical volume represented by a newly merged mobile slice. */
+    /**
+     * Atomically accepts a complete canonical-volume credit or leaves ownership unchanged.
+     */
+    public boolean tryAddCanonicalVolumeUnits(int volumeUnits) {
+        if (volumeUnits <= 0) {
+            return false;
+        }
+        long combined = (long) canonicalVolumeUnits + volumeUnits;
+        if (combined > Integer.MAX_VALUE) {
+            return false;
+        }
+        canonicalVolumeUnits = (int) combined;
+        return true;
+    }
+
+    /** Compatibility entry point; overflow fails explicitly instead of truncating owned water. */
+    @Deprecated
     public void addCanonicalVolumeUnits(int volumeUnits) {
-        canonicalVolumeUnits = (int) Math.min(
-                Integer.MAX_VALUE,
-                (long) canonicalVolumeUnits + Math.max(0, volumeUnits)
-        );
+        if (volumeUnits <= 0) return;
+        if (!tryAddCanonicalVolumeUnits(volumeUnits)) {
+            throw new IllegalArgumentException("SPH canonical volume capacity exceeded");
+        }
     }
 
     // A fully enclosed settled body can remain SPH-owned until canonical

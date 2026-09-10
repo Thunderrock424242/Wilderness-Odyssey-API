@@ -16,6 +16,23 @@ class FiniteWaterFlowPlannerTest {
     private static final int FULL = WaterVolumeChunk.UNITS_PER_BLOCK;
 
     @Test
+    void repeatEvaluationsDoNotInventElapsedTime() {
+        assertEquals(0.0, FiniteWaterFlowPlanner.elapsedSeconds(80L, 80L));
+        assertEquals(0.1, FiniteWaterFlowPlanner.elapsedSeconds(80L, 82L));
+        assertEquals(0, FiniteWaterFlowPlanner.verticalTransfer(FULL, 0, 0));
+    }
+
+    @Test
+    void hydraulicMultiOutletEquilibriumDoesNotEmptySourceBelowItsNeighbors() {
+        var plan = FiniteWaterFlowPlanner.planHydraulic(0, FULL,
+                new double[]{0, 0, 0, 0}, new int[]{0, 0, 0, 0}, new double[]{1, 1, 1, 1}, 1);
+        int moved = Arrays.stream(plan.transfers()).sum();
+        assertEquals(FULL, moved + plan.sourceRemainder());
+        for (int amount : plan.transfers()) assertTrue(plan.sourceRemainder() >= amount);
+        assertTrue(moved > 0);
+    }
+
+    @Test
     void gravityFillsAllAvailableCapacityWithoutOverdrawingSource() {
         assertEquals(FULL, FiniteWaterFlowPlanner.verticalTransfer(FULL, 0));
         assertEquals(3, FiniteWaterFlowPlanner.verticalTransfer(8, FULL - 3));
@@ -85,5 +102,51 @@ class FiniteWaterFlowPlannerTest {
     @Test
     void wildernessFluidCannotUseVanillaInfiniteSourceConversion() {
         assertFalse(WildernessFluidRegistry.ALLOW_SOURCE_CONVERSION);
+    }
+
+    @Test
+    void hydraulicHeadUsesBedPlusDepthInsteadOfRawFillAlone() {
+        FiniteWaterFlowPlanner.LateralPlan plan = FiniteWaterFlowPlanner.planHydraulic(
+                10.0,
+                FULL / 2,
+                new double[]{9.0},
+                new int[]{FULL * 3 / 4},
+                new double[]{1.0},
+                0.05
+        );
+
+        assertTrue(plan.transfers()[0] > 0,
+                "Higher source free surface must flow despite its lower raw fill fraction");
+        assertEquals(FULL / 2, plan.sourceRemainder() + plan.transfers()[0]);
+    }
+
+    @Test
+    void hydraulicOpeningAndElapsedTimeControlDischargeWithoutChangingMass() {
+        FiniteWaterFlowPlanner.LateralPlan shortOpen = FiniteWaterFlowPlanner.planHydraulic(
+                0.0, FULL, new double[]{0.0}, new int[]{0}, new double[]{1.0}, 0.05
+        );
+        FiniteWaterFlowPlanner.LateralPlan longRestricted = FiniteWaterFlowPlanner.planHydraulic(
+                0.0, FULL, new double[]{0.0}, new int[]{0}, new double[]{0.25}, 0.20
+        );
+        FiniteWaterFlowPlanner.LateralPlan blocked = FiniteWaterFlowPlanner.planHydraulic(
+                0.0, FULL, new double[]{0.0}, new int[]{0}, new double[]{0.0}, 0.20
+        );
+
+        assertEquals(shortOpen.transfers()[0], longRestricted.transfers()[0], 1);
+        assertEquals(0, blocked.transfers()[0]);
+        assertEquals(FULL, shortOpen.sourceRemainder() + shortOpen.transfers()[0]);
+    }
+
+    @Test
+    void steepHeadBuildsMoreMomentumThanCentimeterEqualization() {
+        float pondVelocity = FiniteWaterFlowPlanner.velocityAfterHeadGradient(
+                0.0f, 0.01, 0.05, 2.5, 4.8
+        );
+        float breachVelocity = FiniteWaterFlowPlanner.velocityAfterHeadGradient(
+                0.0f, 1.0, 0.05, 2.5, 4.8
+        );
+
+        assertTrue(breachVelocity > pondVelocity * 50.0f);
+        assertTrue(breachVelocity <= 4.8f);
     }
 }

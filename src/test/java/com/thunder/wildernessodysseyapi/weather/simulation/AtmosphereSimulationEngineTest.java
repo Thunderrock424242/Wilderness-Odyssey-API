@@ -3,7 +3,10 @@ package com.thunder.wildernessodysseyapi.weather.simulation;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindVector;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.AtmosphericWaterExchange;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,6 +15,39 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AtmosphereSimulationEngineTest {
 
     private final AtmosphereSimulationEngine engine = new AtmosphereSimulationEngine();
+
+    @Test
+    void coveredDryLandDoesNotInventEvaporationFromWaterCoverage() {
+        WeatherSample center = sample(15.0, 0.1, 1.0, 0.0, 0.0, 0.0);
+        AtmosphereEnvironment environment = new AtmosphereEnvironment(
+                15.0, 0.9, 64.0, 1.0, 0.5, 0.0, 0.0, 0.0);
+        SimulationSettings settings = new SimulationSettings(
+                1.0, 0.0, 0.0, 0.0, 1.0, 0.99, 0.99, 1.0, 1.0, 0.0);
+        AtmosphericWaterExchange.Receipt dry = new AtmosphericWaterExchange.Receipt(
+                0L, 0L, 1.0, 0.0, 256.0, List.of());
+        WeatherSample modeled = engine.simulate(center, environment,
+                AtmosphereSimulationEngine.Neighborhood.uniform(center), settings, dry);
+        WeatherSample legacy = engine.simulate(center, environment,
+                AtmosphereSimulationEngine.Neighborhood.uniform(center), settings);
+        assertEquals(center.humidity(), modeled.humidity(), 1.0E-9);
+        assertTrue(legacy.humidity() > modeled.humidity());
+    }
+
+    @Test
+    void acceptedEvaporationReceiptFeedsVaporWithoutSimulationRateMultiplication() {
+        WeatherSample center = sample(15.0, 0.1, 1.0, 0.0, 0.0, 0.0);
+        AtmosphereEnvironment environment = new AtmosphereEnvironment(
+                15.0, 0.1, 64.0, 0.0, 0.5, 0.0, 0.0, 0.0);
+        SimulationSettings settings = new SimulationSettings(
+                1.0, 0.0, 0.0, 0.0, 0.0, 0.99, 0.99, 1.0, 1.0, 0.0);
+        AtmosphericWaterExchange.Receipt receipt = new AtmosphericWaterExchange.Receipt(
+                0L, 100_000L, 1.0, 0.0, 256.0, List.of());
+        WeatherSample result = engine.simulate(center, environment,
+                AtmosphereSimulationEngine.Neighborhood.uniform(center), settings, receipt);
+        double capacity = AtmosphericThermodynamics.saturationCapacity(15.0);
+        assertEquals(center.humidity() + receipt.evaporatedVaporInventory() / capacity,
+                result.humidity(), 1.0E-9);
+    }
 
     @Test
     void pressureGradientDrivesWindAndAdvectsUpwindHumidity() {

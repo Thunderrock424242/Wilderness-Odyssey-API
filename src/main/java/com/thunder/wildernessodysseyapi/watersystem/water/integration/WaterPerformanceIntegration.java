@@ -15,7 +15,6 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaStateField;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.shore.ShorelineWaterManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
-import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WeatherHydrologyManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.OceanSeaStateSynchronizer;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.SphSnapshotSynchronizer;
@@ -232,9 +231,6 @@ public final class WaterPerformanceIntegration {
             void run(ServerLevel level) {
                 OceanSeaStateField.tickLevel(level);
                 WatershedSimulationManager.tickLevel(level);
-                if (!WaterSimulationConfig.watershedSimulationEnabled()) {
-                    WeatherHydrologyManager.tickLevel(level);
-                }
             }
         },
         SHORELINE(1, UpdatePriority.NORMAL, 1) {

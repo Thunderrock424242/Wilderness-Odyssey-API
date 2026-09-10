@@ -17,12 +17,28 @@ public final class WeatherPhenomenaModel {
             AtmosphericFrontModel.FrontState front,
             double step
     ) {
+        return apply(sample, environment, front, step, 1.0);
+    }
+
+    /**
+     * Retains lake/ocean weather dynamics but only permits unmodeled surface
+     * fractions to supply heuristic moisture. Modeled areas supply accepted ET
+     * through the shared water receipt before condensation.
+     */
+    public static WeatherSample apply(
+            WeatherSample sample,
+            AtmosphereEnvironment environment,
+            AtmosphericFrontModel.FrontState front,
+            double step,
+            double unmodeledMoistureFraction
+    ) {
         WeatherSample weather = sample == null ? WeatherSample.CLEAR : sample;
         AtmosphereEnvironment inputs = environment == null ? AtmosphereEnvironment.TEMPERATE : environment;
         AtmosphericFrontModel.FrontState boundary = front == null
                 ? AtmosphericFrontModel.FrontState.NONE
                 : front;
         double rate = unit(step);
+        double moistureBoundary = unit(unmodeledMoistureFraction);
         double lakeEffect = inputs.lakeEffectPotential(weather.temperature(), weather.wind().magnitude());
         double oceanStorm = inputs.oceanStormPotential(weather.temperature(), weather.humidity());
         double drought = unit((0.38 - weather.humidity()) / 0.38)
@@ -35,12 +51,12 @@ public final class WeatherPhenomenaModel {
 
         double temperature = weather.temperature() + heat * 0.22 * rate;
         double humidity = unit(weather.humidity()
-                + lakeEffect * 0.035 * rate
-                + oceanStorm * 0.024 * rate
+                + lakeEffect * 0.035 * rate * moistureBoundary
+                + oceanStorm * 0.024 * rate * moistureBoundary
                 - drought * 0.025 * rate);
         double cloudWater = unit(weather.cloudWater()
-                + lakeEffect * 0.040 * rate
-                + oceanStorm * 0.032 * rate
+                + lakeEffect * 0.040 * rate * moistureBoundary
+                + oceanStorm * 0.032 * rate * moistureBoundary
                 - drought * 0.020 * rate);
         double instability = unit(weather.instability()
                 + oceanStorm * 0.026 * rate

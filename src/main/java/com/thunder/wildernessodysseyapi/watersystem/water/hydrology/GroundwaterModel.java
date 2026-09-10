@@ -49,6 +49,41 @@ public final class GroundwaterModel {
         return new Result(recharge, nextStorage, unit(discharge));
     }
 
+    /**
+     * Advances a physical high-precision aquifer without replacing the legacy normalized view.
+     */
+    public static PhysicalResult advancePhysical(PhysicalInput input) {
+        if (input == null) {
+            return PhysicalResult.EMPTY;
+        }
+        long capacity = Math.max(0L, input.capacityMilliUnits);
+        long initial = Math.max(0L, input.storageMilliUnits);
+        long requestedRecharge = Math.max(0L, input.rechargeMilliUnits);
+        long acceptedRecharge = Math.min(requestedRecharge, Math.max(0, capacity - initial));
+        long storage = initial + acceptedRecharge;
+        double dt = Math.max(0.0, Double.isFinite(input.dtSeconds) ? input.dtSeconds : 0.0);
+        double conductivity = Math.max(0.0, Double.isFinite(input.conductivityPerSecond)
+                ? input.conductivityPerSecond : 0.0);
+        double head = Math.max(0.0, Double.isFinite(input.headExcess) ? input.headExcess : 0.0);
+        long potentialDischarge = (long) Math.floor(storage * -Math.expm1(-conductivity * head * dt));
+        long discharge = input.surfaceOutlet
+                ? Math.min(storage, Math.max(0L, potentialDischarge))
+                : 0L;
+        storage -= discharge;
+        double deepRate = Double.isFinite(input.deepSeepageFractionPerSecond)
+                ? Math.max(0.0, input.deepSeepageFractionPerSecond) : 0;
+        long deepSeepage = Math.min(storage, (long) Math.floor(storage * -Math.expm1(-deepRate * dt)));
+        storage -= deepSeepage;
+        return new PhysicalResult(
+                storage,
+                acceptedRecharge,
+                requestedRecharge - acceptedRecharge,
+                discharge,
+                deepSeepage,
+                initial + acceptedRecharge - storage - discharge - deepSeepage
+        );
+    }
+
     private static float approach(float current, float target, float response) {
         return current + (target - current) * unit(response);
     }
@@ -82,5 +117,30 @@ public final class GroundwaterModel {
             storage = unit(storage);
             discharge = unit(discharge);
         }
+    }
+
+    /** Unit-bearing aquifer inputs used by the regional conservation layer. */
+    public record PhysicalInput(
+            long storageMilliUnits,
+            long capacityMilliUnits,
+            long rechargeMilliUnits,
+            double conductivityPerSecond,
+            double headExcess,
+            double deepSeepageFractionPerSecond,
+            double dtSeconds,
+            boolean surfaceOutlet
+    ) {
+    }
+
+    /** Exact physical aquifer outputs; rejected recharge remains with its caller. */
+    public record PhysicalResult(
+            long storageMilliUnits,
+            long acceptedRechargeMilliUnits,
+            long rejectedRechargeMilliUnits,
+            long dischargeMilliUnits,
+            long deepBoundaryMilliUnits,
+            long residualMilliUnits
+    ) {
+        public static final PhysicalResult EMPTY = new PhysicalResult(0L, 0L, 0L, 0L, 0L, 0L);
     }
 }

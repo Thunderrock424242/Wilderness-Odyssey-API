@@ -53,4 +53,17 @@ class ShorelineWaterManagerTest {
         assertTrue(ShorelineWaterManager.isBathymetryRefreshDue(100L, 0L));
         assertTrue(ShorelineWaterManager.isBathymetryRefreshDue(20L, 200L));
     }
+
+    @Test
+    void delayedRegionPassesAllElapsedTimeToTheBoundedSolverQueue() {
+        assertEquals(0.05f, ShorelineWaterManager.elapsedStepSeconds(100L, Long.MIN_VALUE));
+        assertEquals(0.15f, ShorelineWaterManager.elapsedStepSeconds(103L, 100L));
+        assertEquals(20.0f, ShorelineWaterManager.elapsedStepSeconds(500L, 100L));
+    }
+
+    @Test
+    void repeatedOrRewoundTickDoesNotAdvanceWaterAgain() {
+        assertEquals(0.0f, ShorelineWaterManager.elapsedStepSeconds(100L, 100L));
+        assertEquals(0.0f, ShorelineWaterManager.elapsedStepSeconds(99L, 100L));
+    }
 }

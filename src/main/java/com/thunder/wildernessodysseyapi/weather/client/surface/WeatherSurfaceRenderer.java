@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Draws bounded connected wetness and puddle contours from synchronized surface memory.
+ * Draws bounded wetness, puddle and cosmetic snow contours from synchronized surface memory.
  *
  * <p>Continuous world-space noise is triangulated across block boundaries, so
  * neighboring samples join into irregular shapes. Puddles require a perfectly
@@ -27,6 +27,7 @@ public final class WeatherSurfaceRenderer {
 
     private static final long WET_SALT = 0x9E3779B97F4A7C15L;
     private static final long PUDDLE_SALT = 0xC2B2AE3D27D4EB4FL;
+    private static final long SNOW_SALT = 0xD6E8FEB86659FD93L;
     private static final List<SurfaceTriangle> TRIANGLES = new ArrayList<>();
 
     private static ClientLevel cachedLevel;
@@ -64,13 +65,15 @@ public final class WeatherSurfaceRenderer {
         poses.translate(-camera.x, -camera.y, -camera.z);
         var matrix = poses.last().pose();
         for (SurfaceTriangle triangle : TRIANGLES) {
-            int red = triangle.puddle ? 58 : 24;
-            int green = triangle.puddle ? 78 : 34;
-            int blue = triangle.puddle ? 96 : 39;
-            int alpha = (int) (255.0F * (triangle.puddle
-                    ? 0.07F + triangle.strength * 0.16F
+            boolean snow = triangle.kind == SurfaceKind.SNOW;
+            boolean puddle = triangle.kind == SurfaceKind.PUDDLE;
+            int red = snow ? 229 : puddle ? 58 : 24;
+            int green = snow ? 239 : puddle ? 78 : 34;
+            int blue = snow ? 245 : puddle ? 96 : 39;
+            int alpha = (int) (255.0F * (snow ? 0.20F + triangle.strength * 0.65F
+                    : puddle ? 0.07F + triangle.strength * 0.16F
                     : 0.035F + triangle.strength * 0.085F));
-            float y = triangle.y + (triangle.puddle ? 0.0025F : 0.0012F);
+            float y = triangle.y + (snow ? 0.004F : puddle ? 0.0025F : 0.0012F);
             vertices.addVertex(matrix, triangle.x0, y, triangle.z0).setColor(red, green, blue, alpha);
             vertices.addVertex(matrix, triangle.x1, y, triangle.z1).setColor(red, green, blue, alpha);
             vertices.addVertex(matrix, triangle.x2, y, triangle.z2).setColor(red, green, blue, alpha);
@@ -121,6 +124,7 @@ public final class WeatherSurfaceRenderer {
         int[] heights = sampleHeights(level, minimumX, minimumZ, diameter);
         int wetCells = 0;
         int puddleCells = 0;
+        int snowCells = 0;
         int surfaceCells = 0;
         BlockPos.MutableBlockPos ground = new BlockPos.MutableBlockPos();
         BlockPos.MutableBlockPos sky = new BlockPos.MutableBlockPos();
@@ -162,10 +166,12 @@ public final class WeatherSurfaceRenderer {
                             && SurfacePatchModel.flatEnough(y, north, east, south, west, 1);
                     boolean puddleSuitable = surface.puddleCoverage() >= 0.04D
                             && SurfacePatchModel.flatEnough(y, north, east, south, west, 0);
+                    boolean snowSuitable = surface.snowpack() >= 0.025D
+                            && SurfacePatchModel.flatEnough(y, north, east, south, west, 1);
                     boolean added = false;
                     if (wetSuitable) {
                         int before = TRIANGLES.size();
-                        appendContour(x, y, z, surface.wetness(), false, WET_SALT);
+                        appendContour(x, y, z, surface.wetness(), SurfaceKind.WET, WET_SALT);
                         if (TRIANGLES.size() > before) {
                             wetCells++;
                             added = true;
@@ -173,9 +179,17 @@ public final class WeatherSurfaceRenderer {
                     }
                     if (puddleSuitable) {
                         int before = TRIANGLES.size();
-                        appendContour(x, y, z, surface.puddleCoverage(), true, PUDDLE_SALT);
+                        appendContour(x, y, z, surface.puddleCoverage(), SurfaceKind.PUDDLE, PUDDLE_SALT);
                         if (TRIANGLES.size() > before) {
                             puddleCells++;
+                            added = true;
+                        }
+                    }
+                    if (snowSuitable) {
+                        int before = TRIANGLES.size();
+                        appendContour(x, y, z, surface.snowpack(), SurfaceKind.SNOW, SNOW_SALT);
+                        if (TRIANGLES.size() > before) {
+                            snowCells++;
                             added = true;
                         }
                     }
@@ -185,7 +199,7 @@ public final class WeatherSurfaceRenderer {
                 }
             }
         }
-        diagnostics = new Diagnostics(true, wetCells, puddleCells, TRIANGLES.size());
+        diagnostics = new Diagnostics(true, wetCells, puddleCells, TRIANGLES.size(), snowCells);
     }
 
     private static int[] sampleHeights(ClientLevel level, int minimumX, int minimumZ, int diameter) {
@@ -216,7 +230,7 @@ public final class WeatherSurfaceRenderer {
             int y,
             int blockZ,
             double coverage,
-            boolean puddle,
+            SurfaceKind kind,
             long salt
     ) {
         float northWest = SurfacePatchModel.field(blockX, blockZ, coverage, salt);
@@ -236,7 +250,7 @@ public final class WeatherSurfaceRenderer {
                     blockX + triangle.x2(), blockZ + triangle.z2(),
                     y,
                     strength,
-                    puddle
+                    kind
             ));
         }
     }
@@ -250,12 +264,23 @@ public final class WeatherSurfaceRenderer {
             float z2,
             float y,
             float strength,
-            boolean puddle
+            SurfaceKind kind
     ) {
     }
 
     /** Renderer facts kept separate from synchronized surface state. */
-    public record Diagnostics(boolean active, int wetCells, int puddleCells, int triangles) {
-        public static final Diagnostics INACTIVE = new Diagnostics(false, 0, 0, 0);
+    public record Diagnostics(boolean active, int wetCells, int puddleCells, int triangles, int snowCells) {
+        public static final Diagnostics INACTIVE = new Diagnostics(false, 0, 0, 0, 0);
+
+        /** Preserves the previous diagnostics construction shape for integrations. */
+        public Diagnostics(boolean active, int wetCells, int puddleCells, int triangles) {
+            this(active, wetCells, puddleCells, triangles, 0);
+        }
+    }
+
+    private enum SurfaceKind {
+        WET,
+        PUDDLE,
+        SNOW
     }
 }
