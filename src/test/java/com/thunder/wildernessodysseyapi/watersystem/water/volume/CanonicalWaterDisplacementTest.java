@@ -11,6 +11,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CanonicalWaterDisplacementTest {
 
     @Test
+    void inflowTemperatureIsVolumeWeightedAndFloodResidualRetainsOwnership() {
+        var cold = WaterVolumeChunk.WaterCell.still(1024, WaterVolumeChunk.FLAG_TEMPORARY_FLOOD).withTemperature(273150);
+        var warm = WaterVolumeChunk.WaterCell.still(3072, 0).withTemperature(293150);
+        assertEquals(288150, CanonicalWater.mixedTemperature(warm, cold, 1024));
+        var remaining = CanonicalWater.retainedDisplacementResidual(cold, 700);
+        assertTrue(remaining.temporaryFlood());
+        assertEquals(324, remaining.volumeUnits());
+        assertEquals(273150, remaining.temperatureMilliKelvin());
+    }
+
+    @Test
     void retainsEveryUnitThatDestinationsCannotAccept() {
         WaterVolumeChunk.WaterCell source = new WaterVolumeChunk.WaterCell(
                 WaterVolumeChunk.UNITS_PER_BLOCK,

@@ -81,6 +81,9 @@ public final class SphWaterSavedData extends SavedData {
                 throw new IllegalArgumentException("Duplicate SPH water simulation " + simulationId);
             }
             List<SPHParticle> particles = loadParticles(simulationTag, format);
+            if (particles.isEmpty() && simulationTag.getInt(VOLUME_UNITS_KEY) > 0) {
+                throw new IllegalArgumentException("Owned SPH water has no persisted position: " + simulationId);
+            }
             if (!particles.isEmpty()) {
                 int volumeUnits = simulationTag.contains(VOLUME_UNITS_KEY, Tag.TAG_INT)
                         ? simulationTag.getInt(VOLUME_UNITS_KEY)
@@ -124,6 +127,7 @@ public final class SphWaterSavedData extends SavedData {
             if (simulator.isRemoteMirror() || simulator.isTransientSimulation()) {
                 continue;
             }
+            simulator.ensureResidualMarker();
 
             List<SPHParticle> particles = new ArrayList<>(simulator.particleCount());
             for (SPHParticle particle : simulator.getRenderParticles()) {

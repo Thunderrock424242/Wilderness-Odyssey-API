@@ -158,10 +158,10 @@ public final class WatershedChunkState {
         return new WatershedChunkState(
                 basinId,
                 terrain,
-                climate,
+                0L,
                 environment,
                 flow,
-                0L,
+                climate,
                 grid.directionBits(),
                 grid.accumulationBits(),
                 representativePosition,
@@ -324,7 +324,22 @@ public final class WatershedChunkState {
         return changed;
     }
 
-    /** Adds routed upstream runoff without changing any world blocks. */
+    /** Projects cached regional drainage into the unchanged client metadata shape. */
+    void applyRegionalDrainage(long downstream, long ownKey, double contributingArea) {
+        DrainageDirection direction = DrainageDirection.SINK;
+        if (downstream != RegionalHydrologyState.NO_OUTLET) {
+            int dx = net.minecraft.world.level.ChunkPos.getX(downstream) - net.minecraft.world.level.ChunkPos.getX(ownKey);
+            int dz = net.minecraft.world.level.ChunkPos.getZ(downstream) - net.minecraft.world.level.ChunkPos.getZ(ownKey);
+            for (DrainageDirection candidate : DrainageDirection.values()) {
+                if (candidate.stepX() == dx && candidate.stepZ() == dz) direction = candidate;
+            }
+        }
+        long next = (terrainBits & ~(DIRECTION_MASK << 16)) | ((long) direction.ordinal() << 16);
+        next = (next & ~(0xFFFFL << 32)) | ((long) quantizeUnit((float) (contributingArea / 16384.0)) << 32);
+        if (next != terrainBits) { terrainBits = next; revision++; }
+    }
+
+    /** Legacy presentation helper; physical routing now uses RegionalHydrologyState.routeTo. */
     public boolean addIncomingRunoff(float incomingRunoff) {
         int oldRunoff = word(hydrologyBits, 2);
         float combined = dequantizeUnit(oldRunoff) + Math.max(0.0f, finiteOrZero(incomingRunoff));

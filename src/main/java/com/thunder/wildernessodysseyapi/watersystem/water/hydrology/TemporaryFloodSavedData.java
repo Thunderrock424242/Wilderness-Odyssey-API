@@ -32,7 +32,9 @@ import java.util.Map;
 public final class TemporaryFloodSavedData extends SavedData {
 
     private static final String DATA_NAME = ModConstants.MOD_ID + "_temporary_floodwater";
-    private static final int DATA_VERSION = 3;
+    private static final int DATA_VERSION = 5;
+    /** Legacy claims have no regional debit; their return is an explicit legacy boundary input. */
+    public static final long LEGACY_FUNDING = Long.MIN_VALUE;
     private static final int HARD_MAX_ENTRIES = 65_536;
     private static final String VERSION_KEY = "version";
     private static final String POSITIONS = "positions";
@@ -40,6 +42,7 @@ public final class TemporaryFloodSavedData extends SavedData {
     private static final String PLACED_TICKS = "placed_ticks";
     private static final String ORIGINAL_STATES = "original_states";
     private static final String KINDS = "kinds";
+    private static final String OWNED_UNITS = "owned_units";
 
     private final LinkedHashMap<Long, FloodEntry> entries = new LinkedHashMap<>();
     private final Map<Long, Integer> chunkCounts = new HashMap<>();
@@ -57,14 +60,21 @@ public final class TemporaryFloodSavedData extends SavedData {
         TemporaryFloodSavedData data = new TemporaryFloodSavedData();
         int version = tag == null ? 0 : tag.getInt(VERSION_KEY);
         if (version < 1 || version > DATA_VERSION) {
-            return data;
+            throw new IllegalArgumentException("Unsupported temporary water ledger version " + version);
         }
         long[] positions = tag.getLongArray(POSITIONS);
         long[] basins = tag.getLongArray(BASINS);
         long[] placedTicks = tag.getLongArray(PLACED_TICKS);
         ListTag originals = tag.getList(ORIGINAL_STATES, Tag.TAG_COMPOUND);
         byte[] kinds = tag.getByteArray(KINDS);
+        int[] ownedUnits = tag.getIntArray(OWNED_UNITS);
+        long[] funding = tag.getLongArray("funding_regions");
         int count = Math.min(positions.length, Math.min(basins.length, placedTicks.length));
+        if (count != positions.length || count != basins.length || count != placedTicks.length
+                || count > HARD_MAX_ENTRIES || version >= 4 && ownedUnits.length != count
+                || version >= 5 && funding.length != count) {
+            throw new IllegalArgumentException("Truncated or oversized temporary water ledger");
+        }
         for (int index = 0; index < count && data.entries.size() < HARD_MAX_ENTRIES; index++) {
             CompoundTag originalTag = version >= 2 && index < originals.size()
                     ? originals.getCompound(index)
@@ -75,13 +85,25 @@ public final class TemporaryFloodSavedData extends SavedData {
                     originalTag
             )
                     : null;
+            SurfaceWaterKind migratedKind = version >= 3 && index < kinds.length
+                    ? SurfaceWaterKind.fromId(Byte.toUnsignedInt(kinds[index]))
+                    : SurfaceWaterKind.FLOOD;
+            int migratedOwnedUnits = version >= 4 && index < ownedUnits.length
+                    ? ownedUnits[index]
+                    : migratedKind == SurfaceWaterKind.WETLAND
+                    ? WaterVolumeChunk.UNITS_PER_BLOCK / 2
+                    : WaterVolumeChunk.UNITS_PER_BLOCK;
+            if (migratedOwnedUnits < 0 || migratedOwnedUnits > WaterVolumeChunk.UNITS_PER_BLOCK
+                    || data.entries.containsKey(positions[index])) {
+                throw new IllegalArgumentException("Invalid or duplicate temporary water claim");
+            }
             data.put(positions[index], new FloodEntry(
                     basins[index],
                     Math.max(0L, placedTicks[index]),
                     original,
-                    version >= 3 && index < kinds.length
-                            ? SurfaceWaterKind.fromId(Byte.toUnsignedInt(kinds[index]))
-                            : SurfaceWaterKind.FLOOD
+                    migratedKind,
+                    clampOwnedUnits(migratedOwnedUnits),
+                    version >= 5 && index < funding.length ? funding[index] : LEGACY_FUNDING
             ));
         }
         return data;
@@ -94,6 +116,8 @@ public final class TemporaryFloodSavedData extends SavedData {
         long[] placedTicks = new long[entries.size()];
         ListTag originals = new ListTag();
         byte[] kinds = new byte[entries.size()];
+        int[] ownedUnits = new int[entries.size()];
+        long[] funding = new long[entries.size()];
         int index = 0;
         for (Map.Entry<Long, FloodEntry> entry : entries.entrySet()) {
             positions[index] = entry.getKey();
@@ -103,6 +127,8 @@ public final class TemporaryFloodSavedData extends SavedData {
                     ? new CompoundTag()
                     : NbtUtils.writeBlockState(entry.getValue().originalState));
             kinds[index] = (byte) entry.getValue().kind.ordinal();
+            ownedUnits[index] = entry.getValue().ownedUnits;
+            funding[index] = entry.getValue().fundingRegion;
             index++;
         }
         tag.putInt(VERSION_KEY, DATA_VERSION);
@@ -111,6 +137,8 @@ public final class TemporaryFloodSavedData extends SavedData {
         tag.putLongArray(PLACED_TICKS, placedTicks);
         tag.put(ORIGINAL_STATES, originals);
         tag.putByteArray(KINDS, kinds);
+        tag.putIntArray(OWNED_UNITS, ownedUnits);
+        tag.putLongArray("funding_regions", funding);
         return tag;
     }
 
@@ -122,7 +150,8 @@ public final class TemporaryFloodSavedData extends SavedData {
                 gameTime,
                 maximumEntries,
                 null,
-                SurfaceWaterKind.FLOOD
+                SurfaceWaterKind.FLOOD,
+                WaterVolumeChunk.UNITS_PER_BLOCK
         );
     }
 
@@ -140,7 +169,8 @@ public final class TemporaryFloodSavedData extends SavedData {
                 gameTime,
                 maximumEntries,
                 originalState,
-                SurfaceWaterKind.FLOOD
+                SurfaceWaterKind.FLOOD,
+                WaterVolumeChunk.UNITS_PER_BLOCK
         );
     }
 
@@ -153,9 +183,32 @@ public final class TemporaryFloodSavedData extends SavedData {
             BlockState originalState,
             SurfaceWaterKind kind
     ) {
+        return record(position, basinId, gameTime, maximumEntries, originalState, kind,
+                kind == SurfaceWaterKind.WETLAND ? WaterVolumeChunk.UNITS_PER_BLOCK / 2 : WaterVolumeChunk.UNITS_PER_BLOCK);
+    }
+
+    /** Records one exact reversible surface-water claim and its owned unit count. */
+    public boolean record(
+            BlockPos position,
+            long basinId,
+            long gameTime,
+            int maximumEntries,
+            BlockState originalState,
+            SurfaceWaterKind kind,
+            int ownedUnits
+    ) {
+        return record(position, basinId, gameTime, maximumEntries, originalState, kind,
+                ownedUnits, LEGACY_FUNDING);
+    }
+
+    /** Records the reservoir source separately from the displayed basin identity. */
+    public boolean record(BlockPos position, long basinId, long gameTime, int maximumEntries,
+                          BlockState originalState, SurfaceWaterKind kind, int ownedUnits,
+                          long fundingRegion) {
         if (position == null
                 || entries.containsKey(position.asLong())
-                || entries.size() >= Math.max(1, maximumEntries)) {
+                || ownedUnits <= 0 || ownedUnits > WaterVolumeChunk.UNITS_PER_BLOCK
+                || entries.size() >= Math.max(1, Math.min(HARD_MAX_ENTRIES, maximumEntries))) {
             return false;
         }
         put(position.asLong(), new FloodEntry(
@@ -164,10 +217,86 @@ public final class TemporaryFloodSavedData extends SavedData {
                 originalState,
                 kind == null || kind == SurfaceWaterKind.NONE
                         ? SurfaceWaterKind.FLOOD
-                        : kind
+                        : kind,
+                clampOwnedUnits(ownedUnits), fundingRegion
         ));
         setDirty();
         return true;
+    }
+
+    /**
+     * Moves exact ownership only after the destination has accepted canonical volume.
+     *
+     * <p>The caller rolls back destination writes if this transaction is rejected.</p>
+     */
+    public boolean transferOwnedUnits(
+            BlockPos source,
+            BlockPos target,
+            int transferredUnits,
+            long gameTime,
+            int maximumEntries,
+            BlockState targetOriginalState
+    ) {
+        if (source == null || target == null || source.equals(target) || transferredUnits <= 0) {
+            return false;
+        }
+        FloodEntry sourceEntry = entries.get(source.asLong());
+        if (sourceEntry == null || sourceEntry.ownedUnits < transferredUnits) {
+            return false;
+        }
+        FloodEntry targetEntry = entries.get(target.asLong());
+        if (targetEntry == null) {
+            if (entries.size() >= Math.max(1, Math.min(HARD_MAX_ENTRIES, maximumEntries))) {
+                return false;
+            }
+            targetEntry = new FloodEntry(
+                    sourceEntry.basinId,
+                    Math.max(0L, gameTime),
+                    targetOriginalState,
+                    sourceEntry.kind,
+                    0, sourceEntry.fundingRegion
+            );
+            put(target.asLong(), targetEntry);
+        } else if (targetEntry.basinId != sourceEntry.basinId
+                || targetEntry.fundingRegion != sourceEntry.fundingRegion
+                || targetEntry.kind != sourceEntry.kind
+                || targetEntry.ownedUnits > WaterVolumeChunk.UNITS_PER_BLOCK - transferredUnits) {
+            return false;
+        }
+        sourceEntry.ownedUnits -= transferredUnits;
+        targetEntry.ownedUnits += transferredUnits;
+        setDirty();
+        return true;
+    }
+
+    /** Returns the exact canonical units claimed at one position. */
+    public int ownedUnits(long packedPosition) {
+        FloodEntry entry = entries.get(packedPosition);
+        return entry == null ? 0 : entry.ownedUnits;
+    }
+
+    /** Releases an externally withdrawn claim without crediting water back to a reservoir. */
+    public int releaseOwnedUnits(BlockPos position, int requested) {
+        FloodEntry entry = entries.get(position.asLong());
+        if (entry == null) return 0;
+        int released = Math.min(entry.ownedUnits, Math.max(0, requested));
+        entry.ownedUnits -= released;
+        if (released > 0) setDirty();
+        return released;
+    }
+
+    public long fundingRegion(long position) {
+        FloodEntry entry = entries.get(position);
+        return entry == null ? LEGACY_FUNDING : entry.fundingRegion;
+    }
+
+    /** Exact detailed inventory is a memorandum, never also stored in regional reservoirs. */
+    public long ownedMilliUnits(long fundingRegion) {
+        long total = 0;
+        for (FloodEntry entry : entries.values()) {
+            if (entry.fundingRegion == fundingRegion) total += entry.ownedUnits * 1000L;
+        }
+        return total;
     }
 
     /** Forgets an entry without touching world or canonical water state. */
@@ -288,6 +417,8 @@ public final class TemporaryFloodSavedData extends SavedData {
     }
 
     private void put(long position, FloodEntry entry) {
+        FloodEntry previous = entries.get(position);
+        if (previous != null) decrementChunkCount(chunkKey(position), previous.kind);
         entries.put(position, entry);
         long chunkKey = chunkKey(position);
         chunkCounts.merge(chunkKey, 1, Integer::sum);
@@ -317,11 +448,26 @@ public final class TemporaryFloodSavedData extends SavedData {
         return ChunkPos.asLong(position.getX() >> 4, position.getZ() >> 4);
     }
 
-    private record FloodEntry(
-            long basinId,
-            long placedTick,
-            BlockState originalState,
-            SurfaceWaterKind kind
-    ) {
+    private static int clampOwnedUnits(int units) {
+        return Math.max(0, Math.min(WaterVolumeChunk.UNITS_PER_BLOCK, units));
+    }
+
+    private static final class FloodEntry {
+        private final long basinId;
+        private final long placedTick;
+        private final BlockState originalState;
+        private final SurfaceWaterKind kind;
+        private int ownedUnits;
+        private final long fundingRegion;
+
+        private FloodEntry(long basinId, long placedTick, BlockState originalState,
+                           SurfaceWaterKind kind, int ownedUnits, long fundingRegion) {
+            this.basinId = basinId;
+            this.placedTick = placedTick;
+            this.originalState = originalState;
+            this.kind = kind;
+            this.ownedUnits = clampOwnedUnits(ownedUnits);
+            this.fundingRegion = fundingRegion;
+        }
     }
 }

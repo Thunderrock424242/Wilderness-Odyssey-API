@@ -69,20 +69,20 @@ public final class WatershedServices {
         }
         WatershedDrainageGrid grid = state.drainageGrid();
         int cell = WatershedDrainageGrid.cell(position.getX(), position.getZ());
-        var direction = grid.direction(cell);
         int contributingCells = grid.accumulation(cell);
         WatershedConditions conditions = state.conditions(basinId);
-        float strength = conditions.currentStrength()
-                * (0.68f + contributingCells / 15.0f * 0.42f)
-                * (grid.confluence(cell) ? 1.12f : 1.0f);
+        // Packed conditions now carry Manning-derived velocity. Local terrain
+        // metadata remains useful for inspection, but must not amplify or turn
+        // that physical current into a second heuristic gameplay force.
+        var direction = conditions.downstreamDirection();
         return new WatershedLocalFlow(
                 basinId,
                 cell,
                 direction,
                 contributingCells,
                 grid.confluence(cell),
-                direction.unitX() * strength,
-                direction.unitZ() * strength
+                conditions.currentX(),
+                conditions.currentZ()
         );
     }
 }

@@ -198,6 +198,7 @@ public final class WatershedSavedData extends SavedData {
         WatershedChunkState existing = states.get(chunk.getPos().toLong());
         if (existing != null) {
             existing.refreshTerrain(WatershedTerrainInitializer.initialize(level, chunk));
+            RegionalHydrologyManager.terrainChanged(level, chunk, existing);
             setDirty();
         }
     }

@@ -165,4 +165,25 @@ class WaterVolumeChunkTest {
 
         assertFalse(volume.deltaSince(0L, 32).available());
     }
+
+    @Test
+    void flowModifiersPreserveOwnershipFlagsAndTemperature() {
+        int flags = WaterVolumeChunk.FLAG_TEMPORARY_FLOOD
+                | WaterVolumeChunk.FLAG_GENERATED_OVERRIDE
+                | WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED;
+        WaterVolumeChunk.WaterCell original = new WaterVolumeChunk.WaterCell(
+                3_072, 0.1f, -0.2f, 0.3f, flags, 276_150
+        );
+
+        WaterVolumeChunk.WaterCell changed = original
+                .withVolume(2_048)
+                .withVelocity(1.0f, -2.0f, 3.0f)
+                .withTemperature(275_150)
+                .withFlowState(1_024, 0.5f, -1.0f, 1.5f);
+
+        assertEquals(1_024, changed.volumeUnits());
+        assertEquals(flags, changed.flags());
+        assertEquals(275_150, changed.temperatureMilliKelvin());
+        assertTrue(changed.temporaryFlood());
+    }
 }

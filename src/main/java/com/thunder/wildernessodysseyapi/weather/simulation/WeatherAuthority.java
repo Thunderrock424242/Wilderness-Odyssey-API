@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.simulation;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.AtmosphericWaterExchange;
+
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereView;
@@ -671,6 +673,7 @@ public final class WeatherAuthority implements WeatherQuery {
 
     /** Releases only the unloading dimension's ephemeral caches. */
     public synchronized void unload(ServerLevel level) {
+        AtmosphericWaterExchange.clearLevel(level);
         LevelRuntime runtime = runtimes.remove(level);
         if (runtime != null) {
             runtime.inputSampler.clear();
@@ -691,6 +694,7 @@ public final class WeatherAuthority implements WeatherQuery {
             runtime.approachingWeatherCache.clear();
         }
         runtimes.clear();
+        AtmosphericWaterExchange.clear();
         WeatherSnapshotManager.clear();
         DistantThunderSnapshotManager.clear();
     }
@@ -779,6 +783,9 @@ public final class WeatherAuthority implements WeatherQuery {
                     view.revision(),
                     view.sample(),
                     environment,
+                    settings.simulationSpeed() > 0.0
+                            ? AtmosphericWaterExchange.capture(level, view.key(), scheduling.cellSize())
+                            : AtmosphericWaterExchange.Receipt.EMPTY,
                     neighbors,
                     catchUpSteps,
                     tracker.influenceAt(centerX, centerZ),
@@ -816,7 +823,10 @@ public final class WeatherAuthority implements WeatherQuery {
         for (CellCalculationInput input : batch.inputs) {
             WeatherSample next = input.sample;
             for (int step = 0; step < input.catchUpSteps; step++) {
-                next = engine.simulate(next, input.environment, input.neighborhood, batch.settings);
+                // One accepted hydrology receipt may span multiple catch-up
+                // steps, but its water feedback must be applied exactly once.
+                next = engine.simulate(next, input.environment, input.neighborhood, batch.settings,
+                        step == 0 ? input.waterReceipt : input.waterReceipt.withoutFlux());
             }
             next = WeatherSystemInfluenceModel.apply(
                     next,
@@ -899,6 +909,11 @@ public final class WeatherAuthority implements WeatherQuery {
                     calculated.sample,
                     batch.gameTime
             );
+        }
+        for (CellCalculationInput input : batch.inputs) {
+            if (input.catchUpSteps > 0) {
+                AtmosphericWaterExchange.acknowledge(level, input.waterReceipt);
+            }
         }
         Set<Long> protectedKeys = new HashSet<>(batch.activeKeys);
         WeatherConfig.SchedulingSettings currentScheduling = WeatherConfig.scheduling();
@@ -1528,6 +1543,7 @@ public final class WeatherAuthority implements WeatherQuery {
             long baseRevision,
             WeatherSample sample,
             AtmosphereEnvironment environment,
+            AtmosphericWaterExchange.Receipt waterReceipt,
             AtmosphereSimulationEngine.Neighborhood neighborhood,
             int catchUpSteps,
             WeatherSystemTracker.SystemInfluence systemInfluence,

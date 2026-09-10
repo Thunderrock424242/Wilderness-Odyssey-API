@@ -5,9 +5,12 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
+import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -26,11 +29,14 @@ import java.util.Map;
  */
 public final class ShorelineWaterManager {
 
+    private static final float SHARED_TIDE_SURFACE_SCALE = 0.18f;
+
     private static final ShorelineWaterManager INSTANCE = new ShorelineWaterManager();
 
     private static final int REGION_SPAN = 32;
     private static final int GRID_SIZE = REGION_SPAN + 1;
     private static final int MAX_BATHYMETRY_DEPTH = 10;
+    private static final int MAX_DRY_SHORE_HEIGHT = 4;
     private static final int BATHYMETRY_REFRESH_TICKS = 100;
     private static final int REGION_EXPIRY_TICKS = 240;
     private static final int MAX_REGIONS_PER_LEVEL = 18;
@@ -135,6 +141,19 @@ public final class ShorelineWaterManager {
         return region == null ? FlowSample.dry() : region.sample(blockX, blockZ);
     }
 
+    /**
+     * Returns a local derived-grid balance for diagnostics, or {@code null}
+     * outside cached regions. This volume must not be added to the canonical
+     * or watershed water budget because the grid owns only current estimates.
+     */
+    public ShallowWaterGrid.Balance balanceAt(ServerLevel level, BlockPos position) {
+        Map<Long, Region> regions = regionsByLevel.get(level);
+        if (regions == null) return null;
+        Region region = regions.get(regionKey(Math.floorDiv(position.getX(), REGION_SPAN),
+                Math.floorDiv(position.getZ(), REGION_SPAN)));
+        return region == null ? null : region.grid.balance();
+    }
+
     /** Invalidates only cached regions touching an edited terrain column. */
     public void invalidate(ServerLevel level, BlockPos position) {
         Map<Long, Region> regions = regionsByLevel.get(level);
@@ -197,6 +216,7 @@ public final class ShorelineWaterManager {
         private final ShallowWaterGrid grid = new ShallowWaterGrid(GRID_SIZE, GRID_SIZE, 1.0f);
         private long lastSeenTick;
         private long lastBathymetryRefresh = Long.MIN_VALUE;
+        private long lastSimulatedTick = Long.MIN_VALUE;
 
         private Region(int regionX, int regionZ) {
             this.originX = regionX * REGION_SPAN;
@@ -224,6 +244,8 @@ public final class ShorelineWaterManager {
                 return refreshed;
             }
 
+            if (lastSimulatedTick == gameTime) return refreshed;
+
             float centerX = originX + REGION_SPAN * 0.5f;
             float centerZ = originZ + REGION_SPAN * 0.5f;
             float timeSeconds = gameTime / 20.0f;
@@ -234,32 +256,61 @@ public final class ShorelineWaterManager {
                     GerstnerWaveProfile.OCEAN.waveCount,
                     OceanSeaState.sampleAt(level, centerX, centerZ, 0.0f).spectrum()
             );
-            float boundarySurface = TideSystem.getTideOffset(level) + oceanBoundary.height();
-            grid.step(0.05f, boundarySurface);
+            float boundarySurface = TideSystem.getTideOffset(level) * SHARED_TIDE_SURFACE_SCALE
+                    + oceanBoundary.height();
+            float dtSeconds = elapsedStepSeconds(gameTime, lastSimulatedTick);
+            lastSimulatedTick = gameTime;
+            grid.step(dtSeconds, boundarySurface);
             return refreshed;
         }
 
         private void refreshBathymetry(ServerLevel level) {
             int seaSurfaceBlockY = level.getSeaLevel() - 1;
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-            BlockPos.MutableBlockPos neighbour = new BlockPos.MutableBlockPos();
 
             for (int localZ = 0; localZ < GRID_SIZE; localZ++) {
                 for (int localX = 0; localX < GRID_SIZE; localX++) {
                     int worldX = originX + localX;
                     int worldZ = originZ + localZ;
                     pos.set(worldX, seaSurfaceBlockY, worldZ);
-                    if (!level.hasChunkAt(pos) || !touchesOceanSurface(level, pos, neighbour)) {
-                        grid.setRestDepth(localX, localZ, 0.0f);
+                    LevelChunk chunk = level.getChunkSource().getChunkNow(worldX >> 4, worldZ >> 4);
+                    if (chunk == null) {
+                        grid.setBlocked(localX, localZ);
                         continue;
                     }
 
-                    // The authority already knows generated-column floors and
-                    // scans only bounded local volume when no baseline exists.
-                    // A column deeper than the cap stays wet, not incorrectly dry.
-                    float depth = WildernessWaterAuthority.getWaterDepth(level, pos, MAX_BATHYMETRY_DEPTH);
-                    grid.setRestDepth(localX, localZ, depth);
+                    if (WildernessWaterAuthority.isWOWaterAt(level, pos)) {
+                        // Generated-column floors are reused without a global
+                        // ocean scan. The capped offshore column stays wet.
+                        float depth = WildernessWaterAuthority.getWaterDepth(level, pos, MAX_BATHYMETRY_DEPTH);
+                        grid.setRestDepth(localX, localZ, depth);
+                    } else {
+                        int floorSurfaceY = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR,
+                                worldX & 15, worldZ & 15) + 1;
+                        int relativeBed = floorSurfaceY - level.getSeaLevel();
+                        if (relativeBed < -MAX_BATHYMETRY_DEPTH || relativeBed > MAX_DRY_SHORE_HEIGHT) {
+                            grid.setBlocked(localX, localZ);
+                        } else {
+                            // Known dry terrain can wet from a neighbouring
+                            // cell, but never acquires an ocean ghost by itself.
+                            grid.setTerrain(localX, localZ, relativeBed, 0.0f);
+                        }
+                    }
                 }
+            }
+
+            // Only loaded, ocean-classified neighbours are open boundaries.
+            // A lake at sea level, beach, wall or unloaded chunk is not an
+            // infinite tide reservoir. Corners have two distinct faces.
+            for (int coordinate = 0; coordinate < GRID_SIZE; coordinate++) {
+                grid.setBoundaryOpen(ShallowWaterGrid.Side.WEST, coordinate, isOceanBoundary(level,
+                        pos.set(originX - 1, seaSurfaceBlockY, originZ + coordinate)));
+                grid.setBoundaryOpen(ShallowWaterGrid.Side.EAST, coordinate, isOceanBoundary(level,
+                        pos.set(originX + GRID_SIZE, seaSurfaceBlockY, originZ + coordinate)));
+                grid.setBoundaryOpen(ShallowWaterGrid.Side.NORTH, coordinate, isOceanBoundary(level,
+                        pos.set(originX + coordinate, seaSurfaceBlockY, originZ - 1)));
+                grid.setBoundaryOpen(ShallowWaterGrid.Side.SOUTH, coordinate, isOceanBoundary(level,
+                        pos.set(originX + coordinate, seaSurfaceBlockY, originZ + GRID_SIZE)));
             }
         }
 
@@ -270,29 +321,26 @@ public final class ShorelineWaterManager {
                     grid.surface(localX, localZ),
                     grid.velocityX(localX, localZ),
                     grid.velocityZ(localX, localZ),
-                    grid.restDepth(localX, localZ)
+                    grid.waterDepth(localX, localZ)
             );
         }
 
-        private static boolean touchesOceanSurface(
-                ServerLevel level,
-                BlockPos.MutableBlockPos pos,
-                BlockPos.MutableBlockPos neighbour
-        ) {
-            if (WildernessWaterAuthority.isWaterAt(level, pos)) {
-                return true;
-            }
-            int x = pos.getX();
-            int y = pos.getY();
-            int z = pos.getZ();
-            return WildernessWaterAuthority.isWaterAt(level, neighbour.set(x + 1, y, z))
-                    || WildernessWaterAuthority.isWaterAt(level, neighbour.set(x - 1, y, z))
-                    || WildernessWaterAuthority.isWaterAt(level, neighbour.set(x, y, z + 1))
-                    || WildernessWaterAuthority.isWaterAt(level, neighbour.set(x, y, z - 1));
+        private static boolean isOceanBoundary(ServerLevel level, BlockPos pos) {
+            return level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4) != null
+                    && WildernessWaterAuthority.isWOWaterAt(level, pos)
+                    && WaterBodyClassifier.isOceanic(WaterBodyClassifier.classify(level, pos));
         }
     }
 
     private static long regionKey(int regionX, int regionZ) {
         return ((long) regionX & 0xFFFFFFFFL) | (((long) regionZ & 0xFFFFFFFFL) << 32);
+    }
+
+    static float elapsedStepSeconds(long gameTime, long previousSimulationTick) {
+        if (previousSimulationTick == Long.MIN_VALUE) return 0.05f;
+        if (gameTime <= previousSimulationTick) return 0.0f;
+        // The grid retains unprocessed elapsed time behind its CFL/work cap.
+        // A delayed region must not run slower simply because its turn was late.
+        return (float) (((double) gameTime - previousSimulationTick) / 20.0);
     }
 }

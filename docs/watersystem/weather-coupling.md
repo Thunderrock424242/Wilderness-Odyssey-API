@@ -1,178 +1,109 @@
-# Weather-Water Coupling
+# Weather-water coupling
 
-The weather and water systems share public boundaries while retaining one
-owner for each kind of state. `WeatherQuery` owns atmospheric sampling,
-`OceanSeaStateField` owns the derived regional physical response, and
-`WaterAccess` remains the only authority allowed to realize water-volume
-changes. No coupling component writes directly into the atmosphere simulation
-or creates an independent water store.
+Weather owns atmosphere, seasons, precipitation type, wind and synchronized
+weather snapshots. Regional hydrology owns finite catchment quantities.
+`OceanSeaStateField` owns a derived wave response; canonical water remains the
+only detailed local volume authority. No client owns gameplay water.
 
-Wildlife, vegetation, meteor, Riftfall, and client ambience consume the same
-public boundaries through
-[Shared world-system integration](../environment/world-system-integration.md).
-That composition layer cannot place or remove water.
-
-## Data flow and ownership
-
-The existing atmosphere input path samples generated Wilderness water and
-turns nearby ocean and lake coverage into moisture and thermal context. The
-return path starts only after the server weather simulation has updated:
+## Shared paths
 
 ```text
-GeneratedWaterChunk / WaterAccess
-  -> WildernessWeatherWaterInfluence
-  -> AtmosphereInputSampler
-  -> AtmosphereSimulationEngine
-  -> WeatherQuery
-       -> OceanSeaStateField
-       -> WatershedSimulationManager (default)
-       -> WeatherHydrologyManager (fallback when watersheds are disabled)
-       -> SurfaceWeatheringScheduler
+generated water coverage -> atmospheric terrain/thermal context
+atmosphere query -> regional sea state -> existing waves and shore consumers
+atmosphere query -> regional hydrology -> SWE/soil/aquifer/river/lake/floodplain
+regional accepted ET -> receipt -> accepted atmospheric worker batch
+regional SWE -> existing weather snapshot -> cosmetic snow coverage
+regional funded parcel <-> canonical water + exact temporary claim
 ```
 
-`WaterWeatherServerEvents` runs at the lowest server-tick priority. This makes
-the tick order explicit: the atmosphere first publishes the current localized
-state, then water derives sea state and hydrologic flux from that state. The
-coupling does not tick when the water system is disabled.
+The normal watershed and legacy weather-hydrology facades share
+`RegionalHydrologyManager`; the old per-player probe ledger no longer runs a
+second water cycle. Tick ordering stays with existing server scheduling, while
+a same-tick guard prevents duplicate regional advancement.
 
-## Regional sea state
+## Sea state
 
-`OceanSeaStateField` divides the player-relevant world into configurable cells,
-128 blocks wide by default. At each cell center it samples localized weather
-and derives a bounded target containing:
+The existing bounded sea-state field samples player-relevant weather cells,
+derives wind/swell/chop/breaking targets and approaches them with asymmetric
+storm-build and calm-decay times. Calm wind retains the previous direction.
+Clients receive nearby windows and interpolate in space and time. The shared
+native surface, immersion, shoreline and entity consumers keep using that
+response. There is no new render layer or replacement tide authority.
 
-- wind speed and direction;
-- swell and chop amplitudes;
-- directional blending; and
-- breaking-wave intensity.
+When localized weather ownership is disabled, the existing sea-state disabled
+payload clears stale client state and falls back to dimension rain/thunder.
+Finite regional forcing checks weather-coupling and dimension configuration too.
 
-Wind vector, storm energy, precipitation, thunder, and pressure deficit all
-contribute to the target. When wind is nearly calm, the previous direction is
-retained to prevent arbitrary wave-axis snapping. Exponential response uses a
-shorter build time and a longer decay time so storms arrive decisively but
-water settles naturally.
+## Finite rain, SWE and evaporation
 
-The field creates only the square of cells around active players, expires stale
-cells, and enforces a hard entry budget. Server-side waves, shore interactions,
-buoyancy inputs, and water queries sample this field at their world position.
-Sampling is bilinear across adjacent cell centers.
+Accepted precipitation credits runoff or snow SWE. Rain-on-snow increases the
+rate of a transfer from existing SWE; it is not another source of liquid.
+Regional soil, runoff, lake, river and floodplain stores supply one
+availability-limited ET debit. Oceans use an explicit effectively infinite
+boundary debit/credit instead of a hidden refill.
 
-Every second, `OceanSeaStateSynchronizer` sends each player only their bounded
-nearby window. `ClientOceanSeaState` validates the window, retains current and
-target samples, interpolates temporally, then performs the same spatial blend
-for rendering, immersion, shoreline visuals, and ambient effects. A new
-protocol version prevents older clients from decoding the regional payload as
-the former single dimension-wide sample.
+`AtmosphericWaterExchange` records the actual rain/ET quantities and remaining
+SWE per modeled footprint. Weather captures cumulative receipts for its worker
+input and acknowledges them only when that revision is successfully applied.
+New receipts during computation remain pending; forecast queries cannot consume
+them. Supported terrain suppresses legacy heuristic evaporation/moisture gains.
+See [atmospheric exchange](atmospheric-exchange.md) for the receipt and 25-mm
+normalized vapor-column conversion.
 
-When localized weather is not authoritative in the dimension, the server sends
-an explicit disabled payload. The client clears regional state and uses the
-dimension-wide vanilla rain/thunder fallback instead of retaining stale local
-conditions.
+The atmosphere is still a normalized open-boundary model, not a globally finite
+m3 inventory. Precipitation is not debited a second time from its existing cloud
+process. Atmospheric transport/clamps and uncovered terrain remain
+approximations; exact balance applies to regional water. Unacknowledged feedback
+is ephemeral, but losing that feedback on a crash cannot change water inventory.
 
-## Finite-body hydrology
+Admitted regional records evolve without nearby players. They hold cached
+forcing over old elapsed intervals, refresh weather for future intervals after
+catch-up, and do not load terrain. Detailed blocks remain loaded-only. The model
+does not reconstruct missed storms or run while the server is stopped.
 
-When `water_simulation.watersheds.enabled` is true, the time-sliced
-`WatershedSimulationManager` consumes localized weather into compact rainfall,
-saturation, runoff, aquifer recharge/storage, delayed baseflow, downstream
-discharge, level, flood, sediment, clarity, current, and debris conditions.
-Closed local sinks can form reversible rain ponds, shallow wetlands, and
-groundwater-fed springs. It operates only on already-loaded chunks near
-players and retains runoff when the cached downstream chunk is unavailable.
-The full ownership and flood-recession model is documented in
-[`watersheds-and-flooding.md`](watersheds-and-flooding.md).
+## Snow, temperature and freezing
 
-When watersheds are disabled, `WeatherHydrologyManager` remains as the legacy
-fallback and performs a small deterministic set of surface probes
-around each player at a configurable interval. It uses only already-loaded
-chunks, deduplicates probes by chunk, and ignores dry locations and large
-oceans. Each valid lake or river sample passes through `WaterCycleFluxModel`:
+Modeled snow coverage derives from SWE and uses the existing bounded cosmetic
+surface renderer. The weather scheduler does not create/remove collectible
+vanilla snow on modeled chunks; otherwise harvested snow could duplicate SWE.
+Old vanilla snow remains external and untouched. Unmodeled terrain retains its
+legacy behavior.
 
-- rain and hail add volume;
-- snow waits in surface snowpack and contributes only during thaw;
-- hot, dry, windy conditions evaporate volume; and
-- rivers use smaller gains and losses than lakes.
+Regional temperature follows air/sun with a thermal inertia approximation;
+seasons influence atmospheric inputs, not direct water creation. New funded
+canonical parcels inherit aggregate temperature and accepted local movement
+mixes temperature by volume. Regional liquid converts to/from exact aggregate
+ice storage. No new solid ice projection is created.
 
-The pure flux model returns signed authority units. `HydrologySavedData` stores
-the fractional remainder per chunk in milli-units, with strict codec bounds,
-finite values, an entry budget, and last-touched metadata. Once a balance
-crosses the configured transfer threshold, the manager performs a bounded add
-or remove through `WaterAccess` at the representative surface. It consumes only
-the amount the authority actually accepted, so failed or partial transfers do
-not destroy accumulated volume.
+The existing custom-water frozen shader response remains cosmetic: it damps
+motion and changes normals/roughness/transmission without making a walkable
+solid or deleting canonical liquid. The weather scheduler still avoids
+replacing Wilderness-owned projections with frosted ice. Shader-pack owners
+remain responsible for their own visual response.
 
-This ledger is accounting, not a second physical simulation. It cannot be
-queried as swimmable water, does not render, and does not bypass canonical
-projection rules. Large oceans stay neutral to avoid manufacturing or draining
-effectively infinite bodies.
+## Configuration and compatibility
 
-## Freeze ownership
+Sea-state controls remain under `water_simulation.weather_coupling`, including
+cell size, sync radius, update cadence, response times and cache cap. Existing
+`enableHydrology` participates in enabling the shared scheduler when the normal
+watershed path is disabled. Old probe count/rate/remainder settings and saved
+files are retained for compatibility but no longer own physical rain/ET.
 
-`SurfaceWeatheringScheduler` may still place frosted ice over vanilla or
-externally tagged water. It first checks `WaterAccess`, however, and never
-replaces Wilderness-owned water. Direct replacement would leave canonical
-volume behind a solid block and create conflicting authorities.
+Unit-bearing hydrology rates, aquifer timescale, thermal toggle, admission,
+topology/catch-up budgets and audit tolerance are documented in
+[watersheds and flooding](watersheds-and-flooding.md#configuration).
+Normalized client packet shapes remain unchanged.
 
-For custom water, the localized frozen fraction is sent through the existing
-weather shader uniform. The vertex stage progressively damps waves and impulses
-without abruptly changing the tide level. The fragment stage flattens normals,
-raises roughness and opacity, lowers transmission and foam, and blends toward a
-pale ice surface. The result preserves canonical liquid behavior and is not a
-walkable solid. A future solid-ice feature must add an explicit, reversible
-canonical frozen-volume representation rather than replacing projection blocks
-opportunistically.
+## Validation
 
-Shader-pack ownership remains respected. If an external pack owns the water
-pass, it must implement the frozen visual itself; the server still preserves
-volume correctly.
+Pure tests cover receipt capture/acknowledgement/retry, SWE projection,
+availability-limited vapor feedback, sea-state response, tide behavior,
+regional budgets and thermal phase conservation. The
+[engineering report](realism-upgrade-report.md) records executed commands and
+separates JUnit from runtime evidence.
 
-## Configuration
-
-All settings live under `water_simulation.weather_coupling`:
-
-| Setting | Default | Purpose |
-| --- | ---: | --- |
-| `enabled` | `true` | Enables the localized weather-water connection. |
-| `seaStateCellSize` | `128` | Width of each regional sea-state cell. |
-| `seaStateSyncRadiusCells` | `2` | Cell radius synchronized around each player. |
-| `seaStateUpdateIntervalTicks` | `10` | Server field update cadence. |
-| `seaStateBuildTimeSeconds` | `35` | Approximate approach time while roughening. |
-| `seaStateDecayTimeSeconds` | `180` | Approximate approach time while calming. |
-| `seaStateMaxCells` | `2048` | Hard in-memory regional-cell budget per level. |
-| `enableHydrology` | `true` | Enables finite lake and river balance changes. |
-| `hydrologyIntervalTicks` | `40` | Hydrology sampling cadence. |
-| `hydrologyProbesPerPlayer` | `4` | Bounded surface probes per player and pass. |
-| `hydrologyMaxTransfersPerTick` | `4` | Authority mutations allowed per level and pass. |
-| `hydrologyRainUnitsPerProbe` | `48` | Maximum wet-weather credit per probe. |
-| `hydrologyEvaporationUnitsPerProbe` | `18` | Maximum dry-weather debit per probe. |
-| `hydrologyMinTransferUnits` | `64` | Balance required before a physical transfer. |
-| `hydrologyMaxLedgerEntries` | `4096` | Runtime persistent-ledger budget per level. |
-
-The default watershed settings are under `water_simulation.watersheds`; see
-[`watersheds-and-flooding.md`](watersheds-and-flooding.md#configuration) for
-the complete conservative configuration table.
-
-## Verification
-
-Automated verification covers the pure weather-to-wave response, calm-direction
-retention, asymmetric build and decay, payload round trips and decode limits,
-rain/evaporation/snowmelt flux, ocean neutrality, persistent signed fractional
-balances, and CPU-to-shader freeze inputs.
-
-Use JDK 21:
-
-```powershell
-.\gradlew.bat test
-.\gradlew.bat build
-```
-
-For an in-game pass, first apply clear, rain, and thunder with vanilla
-`/weather`. Its broad localized override should make nearby waves build, change
-direction, break at shores, and decay without snapping. Next use two players far
-enough apart to occupy different weather cells. Run `/wilderness weather force
-rain` in one area and `/wilderness weather clear` in the other; each player
-should retain their local sea condition. Cross the boundary by boat and confirm
-the transition is smooth. Observe a finite lake through sustained rain and then
-hot, dry, windy weather; the response should be gradual and limited to loaded,
-player-relevant chunks. Finally, inspect a freezing custom shore: the water
-should become visually still and icy without losing its canonical volume or
-turning into a conflicting solid projection.
+Live checks should cover localized clear/rain/thunder on separated clients,
+smooth boat crossings between sea-state cells, snow coverage through thaw,
+depleted-reservoir ET, restored SWE after reload, dimension/config switches,
+worker retries and a freezing custom shore. A still icy shader surface must
+not be mistaken for a new solid or a second frozen-water inventory.

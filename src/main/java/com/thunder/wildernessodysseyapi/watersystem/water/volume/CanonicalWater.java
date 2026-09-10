@@ -234,6 +234,8 @@ public final class CanonicalWater {
         WaterVolumeChunk.WaterCell residual = retainedDisplacementResidual(source, moved);
         if (residual.volumeUnits() > 0) {
             set(level, pos, residual, false, false);
+        } else if (source.temporaryFlood()) {
+            com.thunder.wildernessodysseyapi.watersystem.water.hydrology.TemporaryFloodSavedData.get(level).forget(pos.asLong());
         }
         return moved;
     }
@@ -272,6 +274,25 @@ public final class CanonicalWater {
             float velocityY,
             float velocityZ
     ) {
+        return addVolume(level, pos, requestedUnits, velocityX, velocityY, velocityZ, 0);
+    }
+
+    /**
+     * Adds bounded volume while carrying parcel-owned provenance into the destination.
+     *
+     * <p>Position-owned flags such as generated overrides and compatibility projection are
+     * retained from the destination. Temporary-flood ownership follows the transferred water,
+     * preventing an awakened flood cell from silently becoming ownerless canonical water.</p>
+     */
+    public static int addVolume(
+            ServerLevel level,
+            BlockPos pos,
+            int requestedUnits,
+            float velocityX,
+            float velocityY,
+            float velocityZ,
+            int transferredFlags
+    ) {
         if (requestedUnits <= 0) {
             return 0;
         }
@@ -283,6 +304,8 @@ public final class CanonicalWater {
             return 0;
         }
         WaterVolumeChunk.WaterCell previous = getOrImport(level, pos);
+        boolean incomingFlood = (transferredFlags & WaterVolumeChunk.FLAG_TEMPORARY_FLOOD) != 0;
+        if (previous.volumeUnits() > 0 && previous.temporaryFlood() != incomingFlood) return 0;
         int accepted = Math.min(requestedUnits,
                 WaterVolumeChunk.UNITS_PER_BLOCK - previous.volumeUnits());
         if (accepted <= 0) {
@@ -292,15 +315,57 @@ public final class CanonicalWater {
         int total = previous.volumeUnits() + accepted;
         float previousWeight = previous.volumeUnits() / (float) total;
         float addedWeight = accepted / (float) total;
-        set(level, pos, new WaterVolumeChunk.WaterCell(
+        int parcelFlags = transferredFlags & WaterVolumeChunk.FLAG_TEMPORARY_FLOOD;
+        WaterVolumeChunk.WaterCell merged = previous.withFlowState(
                 total,
                 previous.velocityX() * previousWeight + velocityX * addedWeight,
                 previous.velocityY() * previousWeight + velocityY * addedWeight,
-                previous.velocityZ() * previousWeight + velocityZ * addedWeight,
-                WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED,
-                previous.temperatureMilliKelvin()
-        ), true);
+                previous.velocityZ() * previousWeight + velocityZ * addedWeight
+        ).withAddedFlags(WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED | parcelFlags)
+                .withoutFlags(WaterVolumeChunk.FLAG_SLEEPING | WaterVolumeChunk.FLAG_DRY_OVERRIDE
+                        | WaterVolumeChunk.FLAG_IMPORTED | WaterVolumeChunk.FLAG_DISPLACEMENT_RESERVOIR);
+        set(level, pos, merged, true);
         return accepted;
+    }
+
+    /**
+     * Credits a local parcel and atomically moves its detailed provenance claim.
+     * The caller debits the source by the returned amount. Rejected claims
+     * restore both canonical target state and replaceable target terrain.
+     */
+    public static int addTransferredVolume(ServerLevel level, BlockPos sourcePos, BlockPos targetPos,
+            WaterVolumeChunk.WaterCell source, int units, float vx, float vy, float vz) {
+        if (sourcePos.equals(targetPos) || !canAcceptVolume(level, targetPos)) return 0;
+        WaterVolumeChunk.WaterCell before = getOrImport(level, targetPos);
+        if (before.volumeUnits() > 0 && before.temporaryFlood() != source.temporaryFlood()) return 0;
+        BlockState original = level.getBlockState(targetPos);
+        var ledger = source.temporaryFlood()
+                ? com.thunder.wildernessodysseyapi.watersystem.water.hydrology.TemporaryFloodSavedData.get(level) : null;
+        if (ledger != null) {
+            if (ledger.ownedUnits(sourcePos.asLong()) <= 0) return 0;
+            if (before.volumeUnits() == 0 && !com.thunder.wildernessodysseyapi.watersystem.water.hydrology.TemporaryFloodManager
+                    .safeTemporaryWaterTarget(level, level.getChunkSource().getChunkNow(targetPos.getX() >> 4, targetPos.getZ() >> 4), targetPos)) return 0;
+        }
+        int accepted = addVolume(level, targetPos, Math.min(units, source.volumeUnits()), vx, vy, vz, source.flags());
+        if (accepted == 0) return 0;
+        if (ledger != null && !ledger.transferOwnedUnits(sourcePos, targetPos, accepted, level.getGameTime(),
+                com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig.watershedMaxTransientWaterCells(), original)) {
+            set(level, targetPos, before, true);
+            if (before.volumeUnits() == 0) com.thunder.wildernessodysseyapi.watersystem.water.hydrology.TemporaryFloodManager
+                    .restoreOriginalState(level, targetPos, original);
+            return 0;
+        }
+        WaterVolumeChunk.WaterCell merged = getTracked(level, targetPos);
+        if (merged != null) set(level, targetPos,
+                merged.withTemperature(mixedTemperature(before, source, accepted)), false, false);
+        return accepted;
+    }
+
+    static int mixedTemperature(WaterVolumeChunk.WaterCell target, WaterVolumeChunk.WaterCell source, int amount) {
+        long total = (long) target.volumeUnits() + amount;
+        return total <= 0 ? source.temperatureMilliKelvin()
+                : (int) (((long) target.volumeUnits() * target.temperatureMilliKelvin()
+                + (long) amount * source.temperatureMilliKelvin()) / total);
     }
 
     /** Drains bounded volume and returns the amount removed. */
@@ -314,16 +379,21 @@ public final class CanonicalWater {
             return 0;
         }
         int remaining = previous.volumeUnits() - drained;
+        if (previous.temporaryFlood()) {
+            com.thunder.wildernessodysseyapi.watersystem.water.hydrology.TemporaryFloodSavedData.get(level)
+                    .releaseOwnedUnits(pos, drained);
+        }
         set(level, pos, remaining == 0
                 ? WaterVolumeChunk.WaterCell.EMPTY
-                : new WaterVolumeChunk.WaterCell(
-                        remaining,
-                        previous.velocityX(),
-                        previous.velocityY(),
-                        previous.velocityZ(),
-                        WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED,
-                        previous.temperatureMilliKelvin()
-                ), true);
+                : previous.withVolume(remaining)
+                        .withAddedFlags(WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED)
+                        .withoutFlags(WaterVolumeChunk.FLAG_SLEEPING | WaterVolumeChunk.FLAG_IMPORTED), true);
+        if (remaining == 0 && previous.temporaryFlood()) {
+            var ledger = com.thunder.wildernessodysseyapi.watersystem.water.hydrology.TemporaryFloodSavedData.get(level);
+            com.thunder.wildernessodysseyapi.watersystem.water.hydrology.TemporaryFloodManager.restoreOriginalState(
+                    level, pos, ledger.originalState(pos.asLong()));
+            ledger.forget(pos.asLong());
+        }
         return drained;
     }
 
@@ -398,6 +468,15 @@ public final class CanonicalWater {
      * pass the exact flag/projection gate, so recession cannot delete them.</p>
      */
     public static boolean removeTemporaryFlood(ServerLevel level, BlockPos pos) {
+        return removeTemporaryFlood(level, pos, WaterVolumeChunk.UNITS_PER_BLOCK);
+    }
+
+    /** Removes only the quantity claimed by the temporary-water ownership ledger. */
+    public static boolean removeTemporaryFlood(
+            ServerLevel level,
+            BlockPos pos,
+            int ownedUnits
+    ) {
         if (level == null || pos == null || !level.hasChunkAt(pos)) {
             return false;
         }
@@ -407,7 +486,17 @@ public final class CanonicalWater {
                 || !WildernessWaterAuthority.isPlainWaterProjection(level.getBlockState(pos))) {
             return false;
         }
-        set(level, pos, WaterVolumeChunk.WaterCell.EMPTY, true, false);
+        int removed = Math.min(tracked.volumeUnits(), Math.max(0, ownedUnits));
+        if (removed <= 0) {
+            return false;
+        }
+        int remainingUnits = tracked.volumeUnits() - removed;
+        WaterVolumeChunk.WaterCell next = remainingUnits <= 0
+                ? WaterVolumeChunk.WaterCell.EMPTY
+                : tracked.withVolume(remainingUnits)
+                .withoutFlags(WaterVolumeChunk.FLAG_TEMPORARY_FLOOD
+                        | WaterVolumeChunk.FLAG_SLEEPING);
+        set(level, pos, next, true, false);
         WaterVolumeChunk.WaterCell remaining = getTracked(level, pos);
         return remaining == null || !remaining.temporaryFlood();
     }
@@ -537,6 +626,7 @@ public final class CanonicalWater {
     /** Releases runtime queues when a server dimension unloads. */
     public static void clearLevel(ServerLevel level) {
         ACTIVE_QUEUES.remove(level);
+        com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry.clearLevel(level);
     }
 
     private static WaterVolumeChunk volume(Level level, BlockPos pos) {
@@ -610,9 +700,11 @@ public final class CanonicalWater {
             BlockPos target = candidates.get(index);
             int candidatesLeft = candidates.size() - index;
             int requestedForTarget = Math.max(1, (remaining + candidatesLeft - 1) / candidatesLeft);
-            int accepted = addVolume(
+            int accepted = addTransferredVolume(
                     level,
+                    sourcePos,
                     target,
+                    source,
                     requestedForTarget,
                     displacementVelocityX(sourcePos, target, source),
                     displacementVelocityY(sourcePos, target, source),

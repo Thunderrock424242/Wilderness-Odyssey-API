@@ -3,9 +3,12 @@ package com.thunder.wildernessodysseyapi.watersystem.water.fluid;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.TemporaryFloodManager;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.TemporaryFloodSavedData;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -22,6 +25,7 @@ import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.PointedDripstoneBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.MapColor;
@@ -42,6 +46,9 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * Advances disturbed cells in the canonical finite-volume water state.
@@ -131,9 +138,13 @@ public final class WildernessFluidRegistry {
     };
     private static final int MOBILE_POUR_MIN_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK / 4;
     private static final int MOBILE_POUR_MAX_UNITS = WaterVolumeChunk.UNITS_PER_BLOCK / 2;
-    private static final float FALL_SPEED = -4.8f;
-    private static final float SIDE_FLOW_SPEED = 0.85f;
-    private static final float SOURCE_VELOCITY_DAMPING = 0.62f;
+    private static final float MAX_FALL_SPEED = -8.0f;
+    private static final float MAX_SIDE_SPEED = 4.8f;
+    private static final double MOMENTUM_DRAG_PER_SECOND = 2.5;
+    private static final int MAX_FLOW_CLOCK_ENTRIES = 131_072;
+    private static final Map<ServerLevel, LinkedHashMap<Long, Long>> FLOW_EVALUATION_TICKS =
+            new WeakHashMap<>();
+    private static final Map<ServerLevel, long[]> FLOW_MEASUREMENTS = new WeakHashMap<>();
 
     private WildernessFluidRegistry() {
     }
@@ -176,14 +187,38 @@ public final class WildernessFluidRegistry {
             return;
         }
 
+        long started = System.nanoTime();
+        long[] measurements = FLOW_MEASUREMENTS.computeIfAbsent(level, ignored -> new long[3]);
+        Arrays.fill(measurements, 0);
         int maxCells = WaterSimulationConfig.localFlowCellsPerTick();
+        java.util.Set<Long> evaluated = new java.util.HashSet<>();
+        java.util.List<BlockPos> deferred = new java.util.ArrayList<>();
         for (int processed = 0; processed < maxCells; processed++) {
             BlockPos pos = CanonicalWater.pollActive(level);
             if (pos == null) {
                 break;
             }
-            tickCell(level, pos);
+            if (evaluated.add(pos.asLong())) {
+                measurements[0]++;
+                tickCell(level, pos);
+            }
+            else deferred.add(pos);
         }
+        for (BlockPos pos : deferred) CanonicalWater.schedule(level, pos);
+        measurements[2] = System.nanoTime() - started;
+    }
+
+    /** Latest bounded local-flow pass; volume includes accepted canonical-to-SPH handoffs. */
+    public static String diagnostics(ServerLevel level) {
+        long[] measurement = FLOW_MEASUREMENTS.get(level);
+        return measurement == null ? "canonical flow has not run" : "canonical cells processed=" + measurement[0]
+                + ", canonical units moved=" + measurement[1] + ", solver microseconds=" + measurement[2] / 1000;
+    }
+
+    /** Releases only scheduling clocks and measurements, never persisted water. */
+    public static void clearLevel(ServerLevel level) {
+        FLOW_EVALUATION_TICKS.remove(level);
+        FLOW_MEASUREMENTS.remove(level);
     }
 
     /**
@@ -224,8 +259,13 @@ public final class WildernessFluidRegistry {
     static void tickCell(ServerLevel level, BlockPos pos) {
         WaterVolumeChunk.WaterCell current = CanonicalWater.getOrImport(level, pos);
         if (current.volumeUnits() <= 0 || current.imported() || current.sleeping()) {
+            forgetFlowTime(level, pos);
             return;
         }
+
+        double dtSeconds = elapsedFlowSeconds(level, pos);
+        if (dtSeconds <= 0) { CanonicalWater.schedule(level, pos); return; }
+        float damping = (float) Math.exp(-MOMENTUM_DRAG_PER_SECOND * dtSeconds);
 
         int remaining = current.volumeUnits();
         int transferredUnits = 0;
@@ -237,7 +277,12 @@ public final class WildernessFluidRegistry {
         BlockPos below = pos.below();
         if (canOccupy(level, below)) {
             WaterVolumeChunk.WaterCell target = CanonicalWater.getOrImport(level, below);
-            int transfer = FiniteWaterFlowPlanner.verticalTransfer(remaining, target.volumeUnits());
+            boolean ownershipBlocked = sourceCannotMixFloodOwnership(current, target);
+            int transfer = FiniteWaterFlowPlanner.verticalTransfer(
+                    remaining,
+                    ownershipBlocked ? WaterVolumeChunk.UNITS_PER_BLOCK : target.volumeUnits(),
+                    dtSeconds
+            );
             if (transfer > 0) {
                 int mobileTransfer = maybeCreateMobilePour(level, pos, current, target, transfer);
                 if (mobileTransfer > 0) {
@@ -247,11 +292,15 @@ public final class WildernessFluidRegistry {
                 } else {
                     int accepted = addTargetVolume(
                             level,
+                            pos,
                             below,
                             transfer,
                             current.velocityX() * 0.45f,
-                            Math.min(FALL_SPEED, current.velocityY() - 1.2f),
-                            current.velocityZ() * 0.45f
+                            Math.max(MAX_FALL_SPEED, current.velocityY()
+                                    - (float) (FiniteWaterFlowPlanner.GRAVITY_METERS_PER_SECOND_SQUARED
+                                    * dtSeconds)),
+                            current.velocityZ() * 0.45f,
+                            current
                     );
                     assert accepted >= 0 && accepted <= transfer
                             : "Canonical destination accepted an invalid gravity transfer amount";
@@ -263,7 +312,7 @@ public final class WildernessFluidRegistry {
         }
 
         if (!downwardTransferPending && remaining > FiniteWaterFlowPlanner.MIN_FLOW_UNITS) {
-            int lateralMoved = flowSideways(level, pos, current, remaining);
+            int lateralMoved = flowSideways(level, pos, current, remaining, dtSeconds);
             remaining -= lateralMoved;
             transferredUnits += lateralMoved;
         }
@@ -271,27 +320,27 @@ public final class WildernessFluidRegistry {
         assert current.volumeUnits() == remaining + transferredUnits
                 : "Finite-water transfer violated source conservation at " + pos;
         if (transferredUnits > 0) {
-            commitSource(level, pos, current, remaining);
+            commitSource(level, pos, current, remaining, damping);
+            long[] measurements = FLOW_MEASUREMENTS.get(level);
+            if (measurements != null) measurements[1] += transferredUnits;
         } else if (!shouldSleep(current)) {
             // A disturbed cell that cannot currently move should calm down
             // instead of carrying stale velocity forever.
-            CanonicalWater.set(level, pos, new WaterVolumeChunk.WaterCell(
+            CanonicalWater.set(level, pos, current.withFlowState(
                     current.volumeUnits(),
-                    current.velocityX() * SOURCE_VELOCITY_DAMPING,
-                    current.velocityY() * SOURCE_VELOCITY_DAMPING,
-                    current.velocityZ() * SOURCE_VELOCITY_DAMPING,
-                    WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED,
-                    current.temperatureMilliKelvin()
-            ), true);
+                    current.velocityX() * damping,
+                    current.velocityY() * damping,
+                    current.velocityZ() * damping
+            ).withAddedFlags(WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED), true);
         } else {
-            CanonicalWater.set(level, pos, new WaterVolumeChunk.WaterCell(
+            CanonicalWater.set(level, pos, current.withFlowState(
                     current.volumeUnits(),
                     0.0f,
                     0.0f,
-                    0.0f,
-                    WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED | WaterVolumeChunk.FLAG_SLEEPING,
-                    current.temperatureMilliKelvin()
-            ), true, false);
+                    0.0f
+            ).withAddedFlags(WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED
+                    | WaterVolumeChunk.FLAG_SLEEPING), true, false);
+            forgetFlowTime(level, pos);
         }
     }
 
@@ -299,10 +348,14 @@ public final class WildernessFluidRegistry {
             ServerLevel level,
             BlockPos sourcePos,
             WaterVolumeChunk.WaterCell source,
-            int sourceVolume
+            int sourceVolume,
+            double dtSeconds
     ) {
         BlockPos[] positions = new BlockPos[HORIZONTAL_DIRECTIONS.length];
         int[] targetVolumes = new int[HORIZONTAL_DIRECTIONS.length];
+        double[] targetBeds = new double[HORIZONTAL_DIRECTIONS.length];
+        double[] openingFractions = new double[HORIZONTAL_DIRECTIONS.length];
+        double sourceBed = bedElevation(level, sourcePos);
         Arrays.fill(targetVolumes, FiniteWaterFlowPlanner.BLOCKED_TARGET);
         for (int index = 0; index < HORIZONTAL_DIRECTIONS.length; index++) {
             Direction direction = HORIZONTAL_DIRECTIONS[index];
@@ -311,12 +364,24 @@ public final class WildernessFluidRegistry {
                 continue;
             }
             WaterVolumeChunk.WaterCell neighbour = CanonicalWater.getOrImport(level, neighbourPos);
+            if (sourceCannotMixFloodOwnership(source, neighbour)) {
+                continue;
+            }
             positions[index] = neighbourPos;
             targetVolumes[index] = neighbour.volumeUnits();
+            targetBeds[index] = bedElevation(level, neighbourPos);
+            openingFractions[index] = connectionOpening(level, sourcePos, neighbourPos);
         }
 
         FiniteWaterFlowPlanner.LateralPlan plan =
-                FiniteWaterFlowPlanner.planLateral(sourceVolume, targetVolumes);
+                FiniteWaterFlowPlanner.planHydraulic(
+                        sourceBed,
+                        sourceVolume,
+                        targetBeds,
+                        targetVolumes,
+                        openingFractions,
+                        dtSeconds
+                );
         int moved = 0;
         int[] transfers = plan.transfers();
         for (int index = 0; index < transfers.length; index++) {
@@ -326,21 +391,34 @@ public final class WildernessFluidRegistry {
                 continue;
             }
             Direction direction = HORIZONTAL_DIRECTIONS[index];
-            int difference = sourceVolume - targetVolumes[index];
-            float gradient = Math.min(1.0f,
-                    difference / (float) WaterVolumeChunk.UNITS_PER_BLOCK);
-
-            float velocityX = source.velocityX() * 0.35f
-                    + direction.getStepX() * SIDE_FLOW_SPEED * gradient;
-            float velocityZ = source.velocityZ() * 0.35f
-                    + direction.getStepZ() * SIDE_FLOW_SPEED * gradient;
+            double sourceHead = sourceBed
+                    + sourceVolume / (double) WaterVolumeChunk.UNITS_PER_BLOCK;
+            double targetHead = targetBeds[index]
+                    + targetVolumes[index] / (double) WaterVolumeChunk.UNITS_PER_BLOCK;
+            double gradient = Math.max(0.0, sourceHead - targetHead);
+            float velocityX = FiniteWaterFlowPlanner.velocityAfterHeadGradient(
+                    source.velocityX(),
+                    direction.getStepX() * gradient,
+                    dtSeconds,
+                    MOMENTUM_DRAG_PER_SECOND,
+                    MAX_SIDE_SPEED
+            );
+            float velocityZ = FiniteWaterFlowPlanner.velocityAfterHeadGradient(
+                    source.velocityZ(),
+                    direction.getStepZ() * gradient,
+                    dtSeconds,
+                    MOMENTUM_DRAG_PER_SECOND,
+                    MAX_SIDE_SPEED
+            );
             int accepted = addTargetVolume(
                     level,
+                    sourcePos,
                     targetPos,
                     requested,
                     velocityX,
                     source.velocityY() * 0.20f,
-                    velocityZ
+                    velocityZ,
+                    source
             );
             assert accepted >= 0 && accepted <= requested
                     : "Canonical destination accepted an invalid transfer amount";
@@ -356,7 +434,12 @@ public final class WildernessFluidRegistry {
             WaterVolumeChunk.WaterCell target,
             int transfer
     ) {
-        if (target.volumeUnits() > 0 || transfer < MOBILE_POUR_MIN_UNITS) {
+        // SPH currently owns exact canonical units but not flood-ledger provenance.
+        // Keep flood-owned water canonical until that ownership token is represented by SPH.
+        if (source.temporaryFlood()
+                || target.volumeUnits() > 0
+                || transfer <= 0 || source.volumeUnits() < MOBILE_POUR_MIN_UNITS
+                || source.velocityY() > -1.0f) {
             return 0;
         }
         int mobileVolume = Math.min(transfer, MOBILE_POUR_MAX_UNITS);
@@ -367,7 +450,7 @@ public final class WildernessFluidRegistry {
                 level,
                 mobileVolume,
                 source.velocityX() * 0.35f,
-                Math.min(FALL_SPEED, source.velocityY() - 1.0f),
+                Math.max(MAX_FALL_SPEED, source.velocityY() - 1.0f),
                 source.velocityZ() * 0.35f
         );
         return created ? mobileVolume : 0;
@@ -375,40 +458,45 @@ public final class WildernessFluidRegistry {
 
     private static int addTargetVolume(
             ServerLevel level,
+            BlockPos sourcePos,
             BlockPos targetPos,
             int transfer,
             float velocityX,
             float velocityY,
-            float velocityZ
+            float velocityZ,
+            WaterVolumeChunk.WaterCell source
     ) {
         // Commit the destination first. Its accepted amount is authoritative,
         // so a changed or non-replaceable target can never make volume vanish.
-        return CanonicalWater.addVolume(
-                level,
-                targetPos,
-                transfer,
-                velocityX,
-                velocityY,
-                velocityZ
-        );
+        return CanonicalWater.addTransferredVolume(level, sourcePos, targetPos, source,
+                transfer, velocityX, velocityY, velocityZ);
     }
 
     private static void commitSource(
             ServerLevel level,
             BlockPos sourcePos,
             WaterVolumeChunk.WaterCell source,
-            int remaining
+            int remaining,
+            float damping
     ) {
+        BlockState originalFloodState = null;
+        TemporaryFloodSavedData floodLedger = null;
+        if (remaining <= 0 && source.temporaryFlood()) {
+            floodLedger = TemporaryFloodSavedData.get(level);
+            originalFloodState = floodLedger.originalState(sourcePos.asLong());
+        }
         CanonicalWater.set(level, sourcePos, remaining <= 0
                 ? WaterVolumeChunk.WaterCell.EMPTY
-                : new WaterVolumeChunk.WaterCell(
+                : source.withFlowState(
                         remaining,
-                        source.velocityX() * SOURCE_VELOCITY_DAMPING,
-                        source.velocityY() * SOURCE_VELOCITY_DAMPING,
-                        source.velocityZ() * SOURCE_VELOCITY_DAMPING,
-                        WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED,
-                        source.temperatureMilliKelvin()
-                ), true);
+                        source.velocityX() * damping,
+                        source.velocityY() * damping,
+                        source.velocityZ() * damping
+                ).withAddedFlags(WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED)
+                        .withoutFlags(WaterVolumeChunk.FLAG_SLEEPING), true);
+        if (remaining <= 0 && floodLedger != null && floodLedger.forget(sourcePos.asLong())) {
+            TemporaryFloodManager.restoreOriginalState(level, sourcePos, originalFloodState);
+        }
     }
 
     private static float speedSquared(WaterVolumeChunk.WaterCell cell) {
@@ -424,6 +512,66 @@ public final class WildernessFluidRegistry {
 
     private static boolean canOccupy(ServerLevel level, BlockPos pos) {
         return CanonicalWater.canAcceptVolume(level, pos);
+    }
+
+    private static boolean sourceCannotMixFloodOwnership(
+            WaterVolumeChunk.WaterCell source,
+            WaterVolumeChunk.WaterCell target
+    ) {
+        return target.volumeUnits() > 0 && source.temporaryFlood() != target.temporaryFlood();
+    }
+
+    private static double elapsedFlowSeconds(ServerLevel level, BlockPos pos) {
+        long gameTime = level.getGameTime();
+        LinkedHashMap<Long, Long> levelTicks = FLOW_EVALUATION_TICKS.computeIfAbsent(
+                level,
+                ignored -> new LinkedHashMap<>(256, 0.75f, true)
+        );
+        Long previousTick = levelTicks.put(pos.asLong(), gameTime);
+        while (levelTicks.size() > MAX_FLOW_CLOCK_ENTRIES) {
+            var iterator = levelTicks.keySet().iterator();
+            iterator.next();
+            iterator.remove();
+        }
+        return FiniteWaterFlowPlanner.elapsedSeconds(previousTick, gameTime);
+    }
+
+    private static void forgetFlowTime(ServerLevel level, BlockPos pos) {
+        LinkedHashMap<Long, Long> levelTicks = FLOW_EVALUATION_TICKS.get(level);
+        if (levelTicks != null) {
+            levelTicks.remove(pos.asLong());
+            if (levelTicks.isEmpty()) {
+                FLOW_EVALUATION_TICKS.remove(level);
+            }
+        }
+    }
+
+    private static double bedElevation(ServerLevel level, BlockPos pos) {
+        // Canonical depth occupies this voxel, not the collision top in the
+        // block below. A bounded connected column adds hydrostatic pressure.
+        double columnHead = pos.getY();
+        if (WildernessWaterAuthority.getWaterAmount(level, pos) < WaterVolumeChunk.UNITS_PER_BLOCK) return columnHead;
+        for (int offset = 1; offset <= 8; offset++) {
+            BlockPos above = pos.above(offset);
+            if (level.isOutsideBuildHeight(above) || !level.hasChunkAt(above)) break;
+            int units = WildernessWaterAuthority.getWaterAmount(level, above);
+            if (units <= 0) break;
+            columnHead += units / (double) WaterVolumeChunk.UNITS_PER_BLOCK;
+            if (units < WaterVolumeChunk.UNITS_PER_BLOCK) break;
+        }
+        return columnHead;
+    }
+
+    private static double connectionOpening(ServerLevel level, BlockPos source, BlockPos target) {
+        var sourceShape = level.getBlockState(source).getCollisionShape(level, source);
+        var targetShape = level.getBlockState(target).getCollisionShape(level, target);
+        if (sourceShape.isEmpty() && targetShape.isEmpty()) {
+            return 1.0;
+        }
+        // Waterlogged or narrow collision hosts get a deliberately conservative opening.
+        boolean waterPresent = !level.getFluidState(source).isEmpty()
+                || !level.getFluidState(target).isEmpty();
+        return waterPresent ? 0.25 : 0.0;
     }
 
     private static void displaceWaterForPlacedBlocks(ServerLevel level, BlockEvent.EntityPlaceEvent event) {

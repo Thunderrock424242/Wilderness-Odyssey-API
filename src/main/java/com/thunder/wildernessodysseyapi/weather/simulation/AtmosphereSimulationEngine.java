@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.simulation;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.AtmosphericWaterExchange;
+
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.StormStage;
 import com.thunder.wildernessodysseyapi.weather.api.SurfaceWeatherState;
@@ -47,7 +49,24 @@ public final class AtmosphereSimulationEngine {
             Neighborhood neighborhood,
             SimulationSettings settings
     ) {
+        return simulate(current, environment, neighborhood, settings, AtmosphericWaterExchange.Receipt.EMPTY);
+    }
+
+    /**
+     * Advances the existing atmospheric owner using accepted regional ET only
+     * on the physically modeled fraction. Unknown terrain and open ocean retain
+     * explicit normalized boundary forcing. The receipt is immutable worker input.
+     */
+    public WeatherSample simulate(
+            WeatherSample current,
+            AtmosphereEnvironment environment,
+            Neighborhood neighborhood,
+            SimulationSettings settings,
+            AtmosphericWaterExchange.Receipt waterReceipt
+    ) {
         WeatherSample center = Objects.requireNonNullElse(current, WeatherSample.CLEAR);
+        AtmosphericWaterExchange.Receipt receipt = Objects.requireNonNullElse(
+                waterReceipt, AtmosphericWaterExchange.Receipt.EMPTY);
         AtmosphereEnvironment inputs = Objects.requireNonNullElse(environment, AtmosphereEnvironment.TEMPERATE);
         SimulationSettings controls = Objects.requireNonNullElse(settings, SimulationSettings.DEFAULT);
         Neighborhood neighbors = neighborhood == null ? Neighborhood.uniform(center) : neighborhood.withFallback(center);
@@ -116,17 +135,20 @@ public final class AtmosphereSimulationEngine {
                 step
         );
 
-        // Humid biomes and cached surface water restore vapor without scanning blocks.
+        // Regional ET has already been debited by hydrology. Its accepted receipt
+        // replaces both modeled local evaporation and biome moisture restoration
+        // for the covered fraction, so dry modeled land cannot invent vapor.
         double vaporCapacity = AtmosphericThermodynamics.saturationCapacity(temperature);
         double environmentalVapor = inputs.biomeHumidity() * vaporCapacity;
-        vapor = approach(vapor, environmentalVapor, boundedRate(0.02, step));
+        double unmodeledFraction = 1.0 - receipt.coveredFraction();
+        vapor = approach(vapor, environmentalVapor, boundedRate(0.02 * unmodeledFraction, step));
         double humidity = AtmosphericThermodynamics.relativeHumidity(temperature, vapor);
         double evaporation = controls.evaporationStrength()
                 * inputs.evaporationPotential(temperature, wind.magnitude())
                 * (1.0 - unit(humidity))
                 * 0.08
-                * step;
-        vapor += evaporation * vaporCapacity;
+                * step * unmodeledFraction;
+        vapor += evaporation * vaporCapacity + receipt.evaporatedVaporInventory();
         humidity = AtmosphericThermodynamics.relativeHumidity(temperature, vapor);
 
         // Temperature-dependent vapor capacity makes cooling air condense even
@@ -264,12 +286,13 @@ public final class AtmosphereSimulationEngine {
                 cloudWind,
                 center.surface()
         );
-        atmosphere = WeatherPhenomenaModel.apply(atmosphere, inputs, front, step);
+        atmosphere = WeatherPhenomenaModel.apply(atmosphere, inputs, front, step, unmodeledFraction);
         SurfaceWeatherState surface = SurfaceWeatherModel.simulate(
                 center.surface(),
                 atmosphere,
                 inputs,
-                step
+                step,
+                receipt
         );
         return new WeatherSample(
                 atmosphere.temperature(),
