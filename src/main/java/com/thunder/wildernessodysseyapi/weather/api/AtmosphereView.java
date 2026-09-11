@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.weather.api;
 
 import java.util.Objects;
+import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphericPhysicalState;
+import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphereEnvironment;
 
 /**
  * Immutable view of one authoritative atmospheric cell.
@@ -19,13 +21,24 @@ public record AtmosphereView(
         WeatherSample sample,
         long revision,
         long lastSimulatedTick,
-        long lastActiveTick
+        long lastActiveTick,
+        AtmosphericPhysicalState physicalState,
+        AtmosphereEnvironment environment
 ) {
+    /** Retains the original public and network construction shape. */
+    public AtmosphereView(AtmosphereCellKey key, WeatherSample sample, long revision,
+            long lastSimulatedTick, long lastActiveTick) {
+        this(key, sample, revision, lastSimulatedTick, lastActiveTick,
+                AtmosphericPhysicalState.fromLegacy(sample), AtmosphereEnvironment.TEMPERATE);
+    }
+
     public AtmosphereView {
         key = Objects.requireNonNull(key, "key");
         sample = Objects.requireNonNullElse(sample, WeatherSample.CLEAR);
         revision = Math.max(0L, revision);
         lastSimulatedTick = Math.max(0L, lastSimulatedTick);
         lastActiveTick = Math.max(0L, lastActiveTick);
+        physicalState = physicalState == null ? AtmosphericPhysicalState.fromLegacy(sample) : physicalState;
+        environment = Objects.requireNonNullElse(environment, AtmosphereEnvironment.TEMPERATE);
     }
 }

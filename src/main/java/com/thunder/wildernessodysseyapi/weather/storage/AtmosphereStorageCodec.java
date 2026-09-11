@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.weather.api.WindVector;
 import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphereGrid;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.ListTag;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,7 +26,8 @@ import java.util.Set;
  * readable and derive missing vertical or surface fields safely.</p>
  */
 public final class AtmosphereStorageCodec {
-    public static final int DATA_VERSION = 3;
+    public static final int DATA_VERSION = 4;
+    private static final int SURFACE_DATA_VERSION = 3;
     private static final int VERTICAL_DATA_VERSION = 2;
     private static final int LEGACY_DATA_VERSION = 1;
 
@@ -46,7 +48,7 @@ public final class AtmosphereStorageCodec {
     private static final long UNIT_10_MASK = UNIT_10_MAX;
     private static final long UNIT_12_MASK = UNIT_12_MAX;
     private static final long UNIT_16_MASK = UNIT_16_MAX;
-    private static final long WEATHER_B_RESERVED_MASK = ~((1L << 50) - 1L);
+    private static final long WEATHER_B_RESERVED_MASK = ~((1L << 51) - 1L);
     private static final long WEATHER_C_RESERVED_MASK = ~((1L << 48) - 1L);
     private static final long WEATHER_D_RESERVED_MASK = ~((1L << 48) - 1L);
     private static final long MAX_WORLD_COORDINATE = 30_000_000L;
@@ -70,6 +72,7 @@ public final class AtmosphereStorageCodec {
         long[] revisions = new long[count];
         long[] lastSimulated = new long[count];
         long[] lastActive = new long[count];
+        ListTag physical = new ListTag();
 
         for (int index = 0; index < count; index++) {
             AtmosphereView view = views.get(index);
@@ -81,6 +84,7 @@ public final class AtmosphereStorageCodec {
             revisions[index] = view.revision();
             lastSimulated[index] = view.lastSimulatedTick();
             lastActive[index] = view.lastActiveTick();
+            physical.add(PhysicalAtmosphereStorageCodec.encode(view));
         }
 
         CompoundTag tag = emptyTag(grid.cellSize());
@@ -92,6 +96,7 @@ public final class AtmosphereStorageCodec {
         tag.putLongArray(REVISIONS_KEY, revisions);
         tag.putLongArray(LAST_SIMULATED_KEY, lastSimulated);
         tag.putLongArray(LAST_ACTIVE_KEY, lastActive);
+        tag.put("physical", physical);
         return tag;
     }
 
@@ -112,6 +117,7 @@ public final class AtmosphereStorageCodec {
             int cellSize = storedSize >= 16 && storedSize <= 4_096 ? storedSize : safeFallbackSize;
             AtmosphereGrid grid = new AtmosphereGrid(cellSize);
             if (version != DATA_VERSION
+                    && version != SURFACE_DATA_VERSION
                     && version != VERTICAL_DATA_VERSION
                     && version != LEGACY_DATA_VERSION) {
                 return new DecodeResult(grid, version, 0, 0, true);
@@ -123,7 +129,7 @@ public final class AtmosphereStorageCodec {
             long[] weatherC = version >= VERTICAL_DATA_VERSION
                     ? readLongArray(tag, WEATHER_C_KEY)
                     : new long[keys.length];
-            long[] weatherD = version >= DATA_VERSION
+            long[] weatherD = version >= SURFACE_DATA_VERSION
                     ? readLongArray(tag, WEATHER_D_KEY)
                     : new long[keys.length];
             long[] revisions = readLongArray(tag, REVISIONS_KEY);
@@ -179,13 +185,24 @@ public final class AtmosphereStorageCodec {
                     continue;
                 }
                 AtmosphereCellKey key = AtmosphereCellKey.fromPacked(packedKey);
-                grid.restore(new AtmosphereView(
+                AtmosphereView restored = new AtmosphereView(
                         key,
                         sample,
                         revisions[index],
                         lastSimulated[index],
                         lastActive[index]
-                ));
+                );
+                if (version >= DATA_VERSION) {
+                    try {
+                        CompoundTag physical = tag.getList("physical", Tag.TAG_COMPOUND).getCompound(index);
+                        restored = new AtmosphereView(key, sample, revisions[index], lastSimulated[index], lastActive[index],
+                                PhysicalAtmosphereStorageCodec.state(physical), PhysicalAtmosphereStorageCodec.environment(physical));
+                    } catch (RuntimeException malformedPhysical) {
+                        skipped++;
+                        continue;
+                    }
+                }
+                grid.restore(restored);
                 restoredKeys.add(packedKey);
             }
 
@@ -284,7 +301,7 @@ public final class AtmosphereStorageCodec {
             long weatherD,
             int version
     ) {
-        int typeId = (int) ((weatherB >>> 48) & 0x3L);
+        int typeId = (int) ((weatherB >>> 48) & (version >= DATA_VERSION ? 0x7L : 0x3L));
         if (typeId < 0 || typeId >= PrecipitationType.values().length) {
             return null;
         }
@@ -339,7 +356,7 @@ public final class AtmosphereStorageCodec {
                 cloudDepth,
                 new WindVector(cloudWindX, cloudWindZ)
         );
-        if (version < DATA_VERSION) {
+        if (version < SURFACE_DATA_VERSION) {
             return verticalSample;
         }
         SurfaceWeatherState surface = new SurfaceWeatherState(
@@ -380,13 +397,13 @@ public final class AtmosphereStorageCodec {
         if (revision < 0L || lastSimulated < 0L || lastActive < 0L || restoredKeys.contains(packedKey)) {
             return false;
         }
-        if ((weatherB & WEATHER_B_RESERVED_MASK) != 0L) {
+        if ((weatherB & (version >= DATA_VERSION ? WEATHER_B_RESERVED_MASK : ~((1L << 50) - 1L))) != 0L) {
             return false;
         }
         if (version >= VERTICAL_DATA_VERSION && (weatherC & WEATHER_C_RESERVED_MASK) != 0L) {
             return false;
         }
-        if (version >= DATA_VERSION && (weatherD & WEATHER_D_RESERVED_MASK) != 0L) {
+        if (version >= SURFACE_DATA_VERSION && (weatherD & WEATHER_D_RESERVED_MASK) != 0L) {
             return false;
         }
         AtmosphereCellKey key = AtmosphereCellKey.fromPacked(packedKey);

@@ -1,11 +1,12 @@
 package com.thunder.wildernessodysseyapi.weather.api;
 
 /**
- * Immutable horizontal wind expressed as normalized atmospheric-cell motion.
+ * Immutable horizontal vector; the containing API specifies normalized units or physical m/s.
  *
  * <p>Positive X points east and positive Z points south. Components consumed by
  * {@link WeatherSample} are bounded to {@code [-1, 1]}, where one represents
- * the strongest transport speed supported by the first-pass simulation.</p>
+ * 40 m/s at the physical compatibility boundary. Physical column and steering
+ * vectors retain m/s without normalization.</p>
  *
  * @param x east-west component
  * @param z north-south component

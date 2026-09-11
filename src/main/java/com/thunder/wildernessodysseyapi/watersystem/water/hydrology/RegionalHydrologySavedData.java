@@ -24,6 +24,7 @@ public final class RegionalHydrologySavedData extends SavedData {
     private final List<Long> keys = new ArrayList<>();
     private long terrainRevision;
     private int cursor;
+    private AtmosphericWaterExchange.ReceiptBook atmosphereExchange = new AtmosphericWaterExchange.ReceiptBook();
 
     public static RegionalHydrologySavedData get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
@@ -44,6 +45,9 @@ public final class RegionalHydrologySavedData extends SavedData {
             data.keys.add(state.key);
         }
         data.terrainRevision = tag.getLong("terrain_revision");
+        if (tag.contains("atmosphere_exchange", Tag.TAG_COMPOUND)) {
+            data.atmosphereExchange = AtmosphericWaterExchange.ReceiptBook.load(tag.getCompound("atmosphere_exchange"));
+        }
         return data;
     }
 
@@ -54,11 +58,14 @@ public final class RegionalHydrologySavedData extends SavedData {
         ListTag entries = new ListTag();
         for (RegionalHydrologyState state : regions.values()) entries.add(state.save());
         tag.put("regions", entries);
+        tag.put("atmosphere_exchange", atmosphereExchange.save());
         return tag;
     }
 
     public RegionalHydrologyState state(long key) { return regions.get(key); }
     public int size() { return regions.size(); }
+    /** Transfer receipts persist in the same save as their debited regional reservoirs. */
+    AtmosphericWaterExchange.ReceiptBook atmosphereExchange() { return atmosphereExchange; }
     long terrainRevision() { return terrainRevision; }
     Map<Long, RegionalHydrologyState> regions() { return regions; }
 

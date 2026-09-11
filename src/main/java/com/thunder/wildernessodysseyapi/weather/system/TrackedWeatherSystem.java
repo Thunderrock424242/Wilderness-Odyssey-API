@@ -8,7 +8,8 @@ import java.util.Objects;
  * Immutable persistent identity for a moving storm or atmospheric front.
  *
  * <p>Coordinates and radius are block units. Motion is normalized atmospheric
- * direction; the tracker applies configured block-per-second movement.</p>
+ * steering divided by 40 m/s; the tracker applies the legacy movement setting
+ * as a relative tuning factor. Version-one saves migrate their old 3 m/s scale.</p>
  */
 public record TrackedWeatherSystem(
         long id,

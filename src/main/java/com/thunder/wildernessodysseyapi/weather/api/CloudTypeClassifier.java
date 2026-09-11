@@ -15,6 +15,27 @@ public final class CloudTypeClassifier {
     private CloudTypeClassifier() {
     }
 
+    /** Classifies server physical cloud geometry and ice fraction without random genus selection. */
+    public static CloudType classify(com.thunder.wildernessodysseyapi.weather.simulation.AtmosphericPhysicalState state) {
+        var cloud = com.thunder.wildernessodysseyapi.weather.simulation.CloudProperties.derive(state);
+        if (state.cloudWaterKgPerSquareMetre() < 0.01) {
+            return CloudType.CLEAR;
+        }
+        if (cloud.convectiveFraction() >= 0.45 && cloud.depthMetres() >= 2500) {
+            return CloudType.CUMULONIMBUS;
+        }
+        if (state.precipitationMmPerHour() > 0.05) {
+            return CloudType.NIMBOSTRATUS;
+        }
+        if (cloud.iceFraction() >= 0.75 && cloud.baseMetres() >= 3000 && cloud.depthMetres() < 2000) {
+            return CloudType.CIRRUS;
+        }
+        if (cloud.convectiveFraction() >= 0.15 || state.verticalVelocityMetresPerSecond() > 1.0) {
+            return CloudType.CUMULUS;
+        }
+        return cloud.baseMetres() >= 2000 ? CloudType.ALTOSTRATUS : CloudType.STRATUS;
+    }
+
     /** Returns the dominant cloud genus represented by one weather sample. */
     public static CloudType classify(WeatherSample sample) {
         WeatherSample weather = Objects.requireNonNullElse(sample, WeatherSample.CLEAR);

@@ -50,7 +50,7 @@ public final class ClientWeatherCoordinator {
      */
     public static boolean accept(WeatherRegionSyncPayload payload) {
         if (payload == null
-                || payload.dataVersion() != WeatherRegionSyncPayload.CURRENT_DATA_VERSION
+                || !WeatherRegionSyncPayload.supportsDataVersion(payload.dataVersion())
                 || payload.sequence() < 0L) {
             return false;
         }
@@ -297,22 +297,18 @@ public final class ClientWeatherCoordinator {
         if (previousType == currentType) {
             return currentType;
         }
-        if (previousType == PrecipitationType.NONE) {
-            return currentType;
-        }
-        if (currentType == PrecipitationType.NONE) {
-            return previousType;
-        }
-        if (previousType == PrecipitationType.HAIL || currentType == PrecipitationType.HAIL) {
-            return amount < 0.5D ? previousType : currentType;
+        // Only the legacy rain/snow transition needs two extra scalar queries
+        // for each rendered column; column-derived mixed phases keep their IDs.
+        boolean thermalTransition = (previousType == PrecipitationType.RAIN && currentType == PrecipitationType.SNOW)
+                || (previousType == PrecipitationType.SNOW && currentType == PrecipitationType.RAIN);
+        if (!thermalTransition) {
+            return WeatherSample.interpolatePrecipitationType(previousType, currentType, 0.0, intensity, amount);
         }
         double previousTemperature = state.previous().temperature(blockX, blockZ);
         double currentTemperature = state.current().temperature(blockX, blockZ);
-        return precipitationTypeForTemperature(ClientWeatherTimeline.scalar(
-                previousTemperature,
-                currentTemperature,
-                amount
-        ));
+        return WeatherSample.interpolatePrecipitationType(previousType, currentType,
+                ClientWeatherTimeline.scalar(previousTemperature, currentTemperature, amount),
+                intensity, amount);
     }
 
     /** Returns the interpolated weather sample at the local player or camera. */
@@ -557,12 +553,6 @@ public final class ClientWeatherCoordinator {
             );
         }
         return state.displayedSnapshot(now);
-    }
-
-    private static PrecipitationType precipitationTypeForTemperature(double temperature) {
-        return temperature <= WeatherSample.SNOW_MAX_TEMPERATURE
-                ? PrecipitationType.SNOW
-                : PrecipitationType.RAIN;
     }
 
     private record State(

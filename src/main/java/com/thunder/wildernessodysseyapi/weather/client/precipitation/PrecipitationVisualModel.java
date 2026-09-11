@@ -48,7 +48,7 @@ public final class PrecipitationVisualModel {
 
     /** Returns whether the camera-local phase may use Minecraft's rain ambience. */
     public static boolean usesRainSound(PrecipitationType type, double intensity) {
-        return (type == PrecipitationType.RAIN || type == PrecipitationType.HAIL)
+        return type != null && (type.usesRainInteractions() || type == PrecipitationType.SLEET)
                 && intensity > PRECIPITATION_EPSILON;
     }
 

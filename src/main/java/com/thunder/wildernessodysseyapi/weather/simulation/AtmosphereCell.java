@@ -20,6 +20,8 @@ final class AtmosphereCell {
     private long revision;
     private long lastSimulatedTick;
     private long lastActiveTick;
+    private AtmosphericPhysicalState physicalState;
+    private AtmosphereEnvironment environment;
 
     AtmosphereCell(
             AtmosphereCellKey key,
@@ -33,10 +35,18 @@ final class AtmosphereCell {
         this.revision = Math.max(0L, revision);
         this.lastSimulatedTick = Math.max(0L, lastSimulatedTick);
         this.lastActiveTick = Math.max(0L, lastActiveTick);
+        this.physicalState = AtmosphericPhysicalState.fromLegacy(this.sample);
+        this.environment = AtmosphereEnvironment.TEMPERATE;
+    }
+
+    AtmosphereCell(AtmosphereView view) {
+        this(view.key(), view.sample(), view.revision(), view.lastSimulatedTick(), view.lastActiveTick());
+        physicalState = view.physicalState();
+        environment = view.environment();
     }
 
     AtmosphereView view() {
-        return new AtmosphereView(key, sample, revision, lastSimulatedTick, lastActiveTick);
+        return new AtmosphereView(key, sample, revision, lastSimulatedTick, lastActiveTick, physicalState, environment);
     }
 
     /** Returns the immutable sample without allocating a public cell view. */
@@ -69,8 +79,28 @@ final class AtmosphereCell {
         apply(next, gameTick);
     }
 
+    /** Atomically commits physical inventory and its presentation under the existing revision guard. */
+    boolean applyPhysicalIfRevision(long expectedRevision, AtmosphericPhysicalState nextState,
+            WeatherSample nextSample, AtmosphereEnvironment nextEnvironment, long gameTick) {
+        if (revision != expectedRevision) {
+            return false;
+        }
+        boolean changed = !physicalState.equals(nextState) || !sample.equals(nextSample)
+                || !environment.equals(nextEnvironment) || gameTick > lastSimulatedTick;
+        physicalState = Objects.requireNonNull(nextState);
+        sample = Objects.requireNonNull(nextSample);
+        environment = Objects.requireNonNull(nextEnvironment);
+        lastSimulatedTick = Math.max(lastSimulatedTick, gameTick);
+        if (changed) {
+            revision = revision == Long.MAX_VALUE ? Long.MAX_VALUE : revision + 1L;
+        }
+        return changed;
+    }
+
     private void apply(WeatherSample next, long gameTick) {
         sample = Objects.requireNonNullElse(next, WeatherSample.CLEAR);
+        // Explicit legacy/operator edits start a new physical state exactly once.
+        physicalState = AtmosphericPhysicalState.fromLegacy(sample);
         revision = revision == Long.MAX_VALUE ? Long.MAX_VALUE : revision + 1L;
         lastSimulatedTick = Math.max(lastSimulatedTick, Math.max(0L, gameTick));
     }

@@ -7,16 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Verifies natural snow needs both freezing air and a valid biome or winter climate. */
+/** Regresses the removed season permission gate: thermal structure owns precipitation phase. */
 class PrecipitationPhaseModelTest {
 
     @Test
-    void coldSnapInOrdinaryNonWinterBiomeRemainsRain() {
+    void coldSnapInOrdinaryNonWinterBiomeProducesSnow() {
         AtmosphereEnvironment ordinaryAutumn = climate(12.0, 0.0, true);
 
         assertFalse(PrecipitationPhaseModel.supportsNaturalSnow(ordinaryAutumn));
         assertEquals(
-                PrecipitationType.RAIN,
+                PrecipitationType.SNOW,
                 PrecipitationPhaseModel.classify(0.8, -4.0, 0.95, ordinaryAutumn)
         );
     }
@@ -27,7 +27,8 @@ class PrecipitationPhaseModelTest {
         AtmosphereEnvironment temperateWinter = climate(12.0, 1.0, true);
 
         assertTrue(PrecipitationPhaseModel.supportsNaturalSnow(coldBiome));
-        assertTrue(PrecipitationPhaseModel.supportsNaturalSnow(temperateWinter));
+        assertFalse(PrecipitationPhaseModel.supportsNaturalSnow(temperateWinter),
+                "calendar winter alone does not supply a freezing environmental temperature");
         assertEquals(
                 PrecipitationType.SNOW,
                 PrecipitationPhaseModel.classify(0.8, -4.0, 0.95, coldBiome)

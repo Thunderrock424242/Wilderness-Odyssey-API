@@ -29,11 +29,10 @@ public interface WeatherQuery {
         return WeatherThreatForecast.NONE;
     }
 
-    /** Returns whether localized rain is active at the position. */
+    /** Returns whether rain interactions are active, including freezing rain and legacy hail. */
     default boolean isRainingAt(ServerLevel level, BlockPos position) {
         WeatherSample sample = sample(level, position);
-        return (sample.precipitationType() == PrecipitationType.RAIN
-                || sample.precipitationType() == PrecipitationType.HAIL)
+        return sample.precipitationType().usesRainInteractions()
                 && PrecipitationIntensity.isFunctional(sample.precipitationIntensity());
     }
 
@@ -54,10 +53,10 @@ public interface WeatherQuery {
         return sample(level, position).thunderIntensity();
     }
 
-    /** Returns whether localized snow is active at the position. */
+    /** Returns whether frozen accumulation is active, including sleet. */
     default boolean isSnowingAt(ServerLevel level, BlockPos position) {
         WeatherSample sample = sample(level, position);
-        return sample.precipitationType() == PrecipitationType.SNOW
+        return sample.precipitationType().usesSnowInteractions()
                 && PrecipitationIntensity.isFunctional(sample.precipitationIntensity());
     }
 

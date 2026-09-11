@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.rendering;
 
-import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindSample;
 import com.thunder.wildernessodysseyapi.weather.client.WeatherVisualState;
@@ -63,8 +62,8 @@ public record EnvironmentState(
         WeatherSample safeWeather = weather == null ? WeatherSample.CLEAR : weather;
         WindSample safeWind = wind == null ? WindSample.calm(null) : wind;
         float precipitation = (float) safeWeather.precipitationIntensity();
-        float rain = safeWeather.precipitationType() == PrecipitationType.SNOW ? 0.0F : precipitation;
-        float snow = safeWeather.precipitationType() == PrecipitationType.SNOW ? precipitation : 0.0F;
+        float rain = safeWeather.precipitationType().usesSnowInteractions() ? 0.0F : precipitation;
+        float snow = safeWeather.precipitationType().usesSnowInteractions() ? precipitation : 0.0F;
         float thunder = (float) safeWeather.thunderIntensity();
         Vec3 direction = safeWind.direction();
         return new EnvironmentState(

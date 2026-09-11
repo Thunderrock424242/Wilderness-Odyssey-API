@@ -57,7 +57,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class ModPayloads {
 
     // This channel version covers every payload registered below; bump it for wire-shape changes.
-    private static final String NETWORK_VERSION = "29";
+    private static final String NETWORK_VERSION = "30";
 
     private ModPayloads() {
     }

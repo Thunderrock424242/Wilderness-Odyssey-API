@@ -39,9 +39,8 @@ public final class SurfaceWeatherModel {
         AtmosphereEnvironment inputs = environment == null ? AtmosphereEnvironment.TEMPERATE : environment;
         double rate = unit(step);
         double precipitation = weather.precipitationIntensity();
-        boolean snow = weather.precipitationType() == PrecipitationType.SNOW;
-        boolean wetPrecipitation = weather.precipitationType() == PrecipitationType.RAIN
-                || weather.precipitationType() == PrecipitationType.HAIL;
+        boolean snow = weather.precipitationType().usesSnowInteractions();
+        boolean wetPrecipitation = weather.precipitationType().usesRainInteractions();
 
         double wetGain = (wetPrecipitation ? precipitation * 0.18 : snow ? precipitation * 0.035 : 0.0) * rate;
         double drying = (0.004
@@ -65,7 +64,9 @@ public final class SurfaceWeatherModel {
                     + waterReceipt.snowCoverage() * waterReceipt.coveredFraction();
         }
 
-        double freezeTarget = weather.temperature() <= -2.0
+        double freezeTarget = weather.precipitationType() == PrecipitationType.FREEZING_RAIN
+                ? unit(surface.frozenFraction() + precipitation * 0.20)
+                : weather.temperature() <= -2.0
                 ? unit((wetness * 0.45 + puddles * 0.55 + snowpack * 0.18)
                 * (-weather.temperature() / 12.0))
                 : 0.0;

@@ -158,21 +158,30 @@ public record WeatherSample(
         return precipitationType != PrecipitationType.NONE && precipitationIntensity > 0.0;
     }
 
-    /** Returns whether localized rain is active at this sample. */
+    /** Returns whether rain-like interactions are active, including freezing rain and legacy hail. */
     public boolean isRaining() {
-        return (precipitationType == PrecipitationType.RAIN
-                || precipitationType == PrecipitationType.HAIL)
+        return precipitationType.usesRainInteractions()
                 && precipitationIntensity > 0.0;
     }
 
-    /** Returns whether localized snow is active at this sample. */
+    /** Returns whether frozen accumulation is active, including sleet. */
     public boolean isSnowing() {
-        return precipitationType == PrecipitationType.SNOW && precipitationIntensity > 0.0;
+        return precipitationType.usesSnowInteractions() && precipitationIntensity > 0.0;
     }
 
     /** Returns whether hail is active at this sample. */
     public boolean isHailing() {
         return precipitationType == PrecipitationType.HAIL && precipitationIntensity > 0.0;
+    }
+
+    /** Returns whether refrozen sleet pellets are active at this sample. */
+    public boolean isSleeting() {
+        return precipitationType == PrecipitationType.SLEET && precipitationIntensity > 0.0;
+    }
+
+    /** Returns whether supercooled liquid precipitation is active at this sample. */
+    public boolean isFreezingRain() {
+        return precipitationType == PrecipitationType.FREEZING_RAIN && precipitationIntensity > 0.0;
     }
 
     /**
@@ -280,31 +289,46 @@ public record WeatherSample(
             double intensity,
             double alpha
     ) {
-        if (intensity == 0.0) {
+        return interpolatePrecipitationType(from.precipitationType, to.precipitationType,
+                temperature, intensity, alpha);
+    }
+
+    /**
+     * Blends categorical phase without reclassifying vertical-profile phases from surface temperature.
+     * Rain/snow retains the legacy thermal transition; hail, sleet and freezing rain follow
+     * the nearer authoritative endpoint. Scalar render paths share this rule with samples.
+     */
+    public static PrecipitationType interpolatePrecipitationType(
+            PrecipitationType from,
+            PrecipitationType to,
+            double temperature,
+            double intensity,
+            double alpha
+    ) {
+        from = Objects.requireNonNullElse(from, PrecipitationType.NONE);
+        to = Objects.requireNonNullElse(to, PrecipitationType.NONE);
+        if (!(intensity > 0.0)) {
             return PrecipitationType.NONE;
         }
-        if (from.precipitationType == to.precipitationType) {
-            return from.precipitationType;
+        if (from == to) {
+            return from;
         }
-        if (from.precipitationType == PrecipitationType.HAIL
-                || to.precipitationType == PrecipitationType.HAIL) {
-            return alpha < 0.5 ? from.precipitationType : to.precipitationType;
+        if (from == PrecipitationType.HAIL || to == PrecipitationType.HAIL) {
+            return unit(alpha) < 0.5 ? from : to;
         }
-        if (from.precipitationType == PrecipitationType.NONE) {
-            return to.precipitationType;
+        if (from == PrecipitationType.NONE) {
+            return to;
         }
-        if (to.precipitationType == PrecipitationType.NONE) {
-            return from.precipitationType;
+        if (to == PrecipitationType.NONE) {
+            return from;
         }
-        if (from.precipitationType == PrecipitationType.SNOW
-                && to.precipitationType == PrecipitationType.RAIN) {
+        if (from == PrecipitationType.SNOW && to == PrecipitationType.RAIN) {
             return temperature <= SNOW_MAX_TEMPERATURE ? PrecipitationType.SNOW : PrecipitationType.RAIN;
         }
-        if (from.precipitationType == PrecipitationType.RAIN
-                && to.precipitationType == PrecipitationType.SNOW) {
+        if (from == PrecipitationType.RAIN && to == PrecipitationType.SNOW) {
             return temperature <= SNOW_MAX_TEMPERATURE ? PrecipitationType.SNOW : PrecipitationType.RAIN;
         }
-        return alpha < 0.5 ? from.precipitationType : to.precipitationType;
+        return unit(alpha) < 0.5 ? from : to;
     }
 
     private static final double CLEAR_TEMPERATURE = 15.0;

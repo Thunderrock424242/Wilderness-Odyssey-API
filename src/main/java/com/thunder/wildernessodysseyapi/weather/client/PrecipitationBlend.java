@@ -49,6 +49,14 @@ public record PrecipitationBlend(float rain, float snow, float hail) {
         if (phase == PrecipitationType.NONE) {
             return NONE;
         }
+        // These phases depend on the full atmospheric column. A cold surface
+        // must not turn authoritative supercooled drops into visual snow.
+        if (phase == PrecipitationType.FREEZING_RAIN) {
+            return new PrecipitationBlend(1.0F, 0.0F, 0.0F);
+        }
+        if (phase == PrecipitationType.SLEET) {
+            return new PrecipitationBlend(0.0F, 0.0F, 1.0F);
+        }
         float snow = (float) (1.0D - smoothstep(-1.5D, 3.5D, temperature));
         if (phase == PrecipitationType.SNOW) {
             snow = Math.max(0.28F, snow);

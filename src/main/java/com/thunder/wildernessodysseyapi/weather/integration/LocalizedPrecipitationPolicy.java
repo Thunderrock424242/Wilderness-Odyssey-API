@@ -23,15 +23,14 @@ public final class LocalizedPrecipitationPolicy {
                 && PrecipitationIntensity.isFunctional(sample.precipitationIntensity());
     }
 
-    /** Returns whether the sample supplies functional rain. */
+    /** Returns whether the sample supplies rain interactions, including freezing rain and legacy hail. */
     public static boolean isRain(WeatherSample sample) {
         return hasPrecipitation(sample)
-                && (sample.precipitationType() == PrecipitationType.RAIN
-                || sample.precipitationType() == PrecipitationType.HAIL);
+                && sample.precipitationType().usesRainInteractions();
     }
 
-    /** Returns whether the sample supplies functional snow. */
+    /** Returns whether the sample supplies frozen accumulation, including sleet. */
     public static boolean isSnow(WeatherSample sample) {
-        return hasPrecipitation(sample) && sample.precipitationType() == PrecipitationType.SNOW;
+        return hasPrecipitation(sample) && sample.precipitationType().usesSnowInteractions();
     }
 }

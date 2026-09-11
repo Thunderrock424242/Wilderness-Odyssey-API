@@ -42,7 +42,7 @@ class RaymarchedCloudShaderContractTest {
         assertTrue(fragment.contains("sampleIndex >= RaymarchSteps"));
         assertTrue(fragment.contains("for (int index = 0; index < 6; index++)"));
         assertTrue(fragment.contains("index >= LightingSteps"));
-        assertTrue(fragment.contains("worldXZ + WindOffset"));
+        assertTrue(fragment.contains("worldXZ - WindOffset"));
         assertTrue(fragment.contains("vec2 bandBounds(int band)"));
         assertTrue(fragment.contains("stableRayJitter(gl_FragCoord.xy, band, distant)"));
         assertTrue(fragment.contains("float sampleAlpha = 1.0 - exp(-density * stepLength * extinction)"));

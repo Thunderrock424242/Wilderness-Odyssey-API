@@ -4,8 +4,8 @@ package com.thunder.wildernessodysseyapi.weather.simulation;
  * Immutable, clamp-safe controls used by the pure atmospheric engine.
  *
  * <p>Scheduling, persistence, and networking controls remain outside this
- * calculation contract. Every rate is a fraction of one nominal simulation
- * update and is multiplied by {@link #simulationSpeed()}.</p>
+ * calculation contract. Legacy transport controls scale physical transport;
+ * response fractions refer to the fixed two-second reference, never the configured cadence.</p>
  */
 public record SimulationSettings(
         double simulationSpeed,
@@ -18,7 +18,8 @@ public record SimulationSettings(
         double stormFormationThreshold,
         double maximumPrecipitationIntensity,
         double randomVariation,
-        double weatherFrontStrength
+        double weatherFrontStrength,
+        double coriolisPerSecond
 ) {
     public static final SimulationSettings DEFAULT = new SimulationSettings(
             1.0,
@@ -33,6 +34,16 @@ public record SimulationSettings(
             0.04,
             0.75
     );
+
+    /** Keeps the pre-physical configuration and integration constructor. */
+    public SimulationSettings(double simulationSpeed, double humidityTransportRate,
+            double temperatureTransportRate, double pressureEqualizationRate, double evaporationStrength,
+            double cloudFormationThreshold, double precipitationThreshold, double stormFormationThreshold,
+            double maximumPrecipitationIntensity, double randomVariation, double weatherFrontStrength) {
+        this(simulationSpeed, humidityTransportRate, temperatureTransportRate, pressureEqualizationRate,
+                evaporationStrength, cloudFormationThreshold, precipitationThreshold, stormFormationThreshold,
+                maximumPrecipitationIntensity, randomVariation, weatherFrontStrength, 0.0001);
+    }
 
     /** Preserves the pre-front settings shape for integrations and focused tests. */
     public SimulationSettings(
@@ -74,6 +85,7 @@ public record SimulationSettings(
         maximumPrecipitationIntensity = unit(maximumPrecipitationIntensity);
         randomVariation = clamp(finiteOr(randomVariation, 0.04), 0.0, 0.25);
         weatherFrontStrength = unit(weatherFrontStrength);
+        coriolisPerSecond = clamp(finiteOr(coriolisPerSecond, 0.0001), -0.001, 0.001);
     }
 
     private static double unit(double value) {

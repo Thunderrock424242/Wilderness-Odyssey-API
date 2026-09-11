@@ -156,6 +156,13 @@ public final class AtmosphereGrid {
         return cell != null && cell.applyIfRevision(expectedRevision, next, gameTick);
     }
 
+    /** Commits a physical step without reconstructing its mass from normalized fields. */
+    public boolean applyPhysicalIfRevision(AtmosphereCellKey key, long expectedRevision,
+            AtmosphericPhysicalState state, WeatherSample sample, AtmosphereEnvironment environment, long gameTick) {
+        AtmosphereCell cell = cells.get(Objects.requireNonNull(key, "key").packed());
+        return cell != null && cell.applyPhysicalIfRevision(expectedRevision, state, sample, environment, gameTick);
+    }
+
     /** Replaces a cell for operator/debug control and increments its revision. */
     public boolean force(AtmosphereCellKey key, WeatherSample next, long gameTick) {
         AtmosphereCell cell = cells.get(Objects.requireNonNull(key, "key").packed());
@@ -170,13 +177,7 @@ public final class AtmosphereGrid {
     /** Restores one validated immutable view from persistent storage. */
     public void restore(AtmosphereView view) {
         Objects.requireNonNull(view, "view");
-        cells.put(view.key().packed(), new AtmosphereCell(
-                view.key(),
-                view.sample(),
-                view.revision(),
-                view.lastSimulatedTick(),
-                view.lastActiveTick()
-        ));
+        cells.put(view.key().packed(), new AtmosphereCell(view));
     }
 
     /** Removes all cells, used only for config migration and corrupt-data recovery. */

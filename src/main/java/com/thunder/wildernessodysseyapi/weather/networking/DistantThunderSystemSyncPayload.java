@@ -33,7 +33,7 @@ public record DistantThunderSystemSyncPayload(
         List<StormSnapshot> storms
 ) implements CustomPacketPayload {
 
-    public static final int DATA_VERSION = 1;
+    public static final int DATA_VERSION = 2;
     public static final int MAX_STORMS = 64;
 
     /** Payload identifier used by NeoForge's client-bound play protocol. */
@@ -57,6 +57,9 @@ public record DistantThunderSystemSyncPayload(
 
         Set<Long> uniqueIds = new HashSet<>(storms.size());
         for (StormSnapshot storm : storms) {
+            if (dataVersion == 1 && storm.precipitationType().ordinal() > 3) {
+                throw new IllegalArgumentException("Distant-thunder v1 cannot represent " + storm.precipitationType());
+            }
             if (!uniqueIds.add(storm.id())) {
                 throw new IllegalArgumentException("Distant-thunder payload contains duplicate storm ids");
             }
@@ -135,8 +138,13 @@ public record DistantThunderSystemSyncPayload(
         return new DistantThunderSystemSyncPayload(dimension, dataVersion, sequence, enabled, storms);
     }
 
+    /** Returns whether this client can decode the storm-summary schema. */
+    public static boolean supportsDataVersion(int dataVersion) {
+        return dataVersion == 1 || dataVersion == DATA_VERSION;
+    }
+
     private static void validateHeader(int dataVersion, long sequence) {
-        if (dataVersion != DATA_VERSION) {
+        if (!supportsDataVersion(dataVersion)) {
             throw new IllegalArgumentException("Unsupported distant-thunder data version: " + dataVersion);
         }
         if (sequence < 0L) {

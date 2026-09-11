@@ -47,7 +47,7 @@ public final class DistantThunderAudioManager {
 
     /** Validates and accepts one newest server-authored storm summary. */
     public static boolean accept(DistantThunderSystemSyncPayload payload) {
-        if (payload == null || payload.dataVersion() != DistantThunderSystemSyncPayload.DATA_VERSION) {
+        if (payload == null || !DistantThunderSystemSyncPayload.supportsDataVersion(payload.dataVersion())) {
             return false;
         }
         Minecraft minecraft = Minecraft.getInstance();

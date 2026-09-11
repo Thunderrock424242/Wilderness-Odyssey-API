@@ -37,7 +37,7 @@ public final class WeatherThreatForecastService {
         long horizon = Math.max(0L, Math.min(MAXIMUM_LOOK_AHEAD_TICKS, lookAheadTicks));
         WeatherThreatForecast best = WeatherThreatForecast.NONE;
         for (TrackedWeatherSystem system : systems == null ? List.<TrackedWeatherSystem>of() : systems) {
-            Intersection intersection = intersection(blockX, blockZ, system, controls.movementBlocksPerSecond());
+            Intersection intersection = intersection(blockX, blockZ, system, controls.steeringScale());
             if (intersection == null || intersection.etaTicks() > horizon) {
                 continue;
             }

@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.weather.integration.survival;
 
-import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.simulation.WeatherHazardModel;
 
@@ -45,8 +44,8 @@ public final class WeatherSurvivalExposureModel {
                 ? -2.5 * unit((10.0 - weather.temperature()) / 25.0) * normalizedWind
                 : 0.0;
         double wetCooling = switch (weather.precipitationType()) {
-            case RAIN -> -1.5 * weather.precipitationIntensity();
-            case SNOW -> -2.5 * weather.precipitationIntensity();
+            case RAIN, FREEZING_RAIN -> -1.5 * weather.precipitationIntensity();
+            case SNOW, SLEET -> -2.5 * weather.precipitationIntensity();
             case HAIL -> -2.0 * weather.precipitationIntensity();
             case NONE -> 0.0;
         };

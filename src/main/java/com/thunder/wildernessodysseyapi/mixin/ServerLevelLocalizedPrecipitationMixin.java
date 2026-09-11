@@ -3,7 +3,6 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.integration.LocalizedPrecipitationController;
 import net.minecraft.core.BlockPos;
@@ -69,7 +68,7 @@ public abstract class ServerLevelLocalizedPrecipitationMixin {
             return original.call(biome, levelReader, position);
         }
         return LocalizedPrecipitationController.get().precipitationTypeAt(level, position)
-                == PrecipitationType.SNOW
+                .usesSnowInteractions()
                 && wildernessodysseyapi$canPlaceSnow(levelReader, position);
     }
 
@@ -91,8 +90,8 @@ public abstract class ServerLevelLocalizedPrecipitationMixin {
             return original.call(biome, position);
         }
         return switch (LocalizedPrecipitationController.get().precipitationTypeAt(level, position)) {
-            case RAIN -> Biome.Precipitation.RAIN;
-            case SNOW -> Biome.Precipitation.SNOW;
+            case RAIN, FREEZING_RAIN -> Biome.Precipitation.RAIN;
+            case SNOW, SLEET -> Biome.Precipitation.SNOW;
             case HAIL -> Biome.Precipitation.RAIN;
             case NONE -> Biome.Precipitation.NONE;
         };

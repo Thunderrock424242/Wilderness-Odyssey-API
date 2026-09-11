@@ -10,7 +10,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
 
 /**
  * Receipts from the regional water owner to the existing weather owner.
@@ -18,12 +17,12 @@ import java.util.WeakHashMap;
  * <p>These counters are not water storage. Hydrology publishes only accepted
  * transfers; weather acknowledges a detached receipt only after its revision-
  * checked calculation commits. Rejected worker results cannot consume feedback.
- * Precipitation is an explicitly open atmospheric boundary: weather's normalized
- * cloud inventory is not a second finite cubic-metre reservoir.</p>
+ * Physical precipitation is queued only after the atmosphere removes that mass.
+ * The receipt book persists with regional water, including pending fractions.</p>
  */
 public final class AtmosphericWaterExchange {
     public static final long MILLI_UNITS_PER_CUBIC_METRE = 4_096_000L;
-    private static final Map<ServerLevel, ReceiptBook> LEVELS = new WeakHashMap<>();
+
 
     private AtmosphericWaterExchange() {
     }
@@ -32,39 +31,57 @@ public final class AtmosphericWaterExchange {
     public static synchronized boolean publish(ServerLevel level, ChunkPos chunk,
             long precipitationMilliUnits, long evaporationMilliUnits,
             long snowWaterEquivalentMilliUnits, double areaSquareMetres, long throughTick) {
-        return LEVELS.computeIfAbsent(level, ignored -> new ReceiptBook()).publish(chunk.toLong(),
-                precipitationMilliUnits, evaporationMilliUnits, snowWaterEquivalentMilliUnits,
-                areaSquareMetres, throughTick);
+        RegionalHydrologySavedData data = RegionalHydrologySavedData.get(level);
+        boolean changed = data.atmosphereExchange().publish(chunk.toLong(), precipitationMilliUnits, evaporationMilliUnits,
+                snowWaterEquivalentMilliUnits, areaSquareMetres, throughTick);
+        if (changed) data.setDirty();
+        return changed;
     }
 
     /** Reads already-published surface state without querying or loading a chunk. */
     public static synchronized SurfaceSnapshot query(ServerLevel level, ChunkPos chunk) {
-        ReceiptBook book = LEVELS.get(level);
+        ReceiptBook book = RegionalHydrologySavedData.get(level).atmosphereExchange();
         return book == null ? SurfaceSnapshot.UNSUPPORTED : book.query(chunk.toLong());
     }
 
     /** Captures immutable outstanding feedback for a weather worker without consuming it. */
     public static synchronized Receipt capture(ServerLevel level, AtmosphereCellKey cell, int cellSize) {
-        ReceiptBook book = LEVELS.get(level);
+        ReceiptBook book = RegionalHydrologySavedData.get(level).atmosphereExchange();
         return book == null ? Receipt.EMPTY : book.capture(cell, cellSize);
     }
 
     /** Acknowledges only the captured totals; publications made during calculation remain pending. */
     public static synchronized void acknowledge(ServerLevel level, Receipt receipt) {
-        ReceiptBook book = LEVELS.get(level);
+        ReceiptBook book = RegionalHydrologySavedData.get(level).atmosphereExchange();
         if (book != null) {
             book.acknowledge(receipt);
+            RegionalHydrologySavedData.get(level).setDirty();
         }
     }
 
-    /** Releases optional weather feedback on dimension unload; no water volume is destroyed. */
+    /** Unload leaves durable receipts in the dimension's SavedData owner. */
     public static synchronized void clearLevel(ServerLevel level) {
-        LEVELS.remove(level);
+        // The dimension SavedData owns durable receipts; unloading cannot discard them.
     }
 
-    /** Clears ephemeral feedback when the server stops. Regional storage persists independently. */
+    /** No process-global feedback needs clearing; regional SavedData owns persistence. */
     public static synchronized void clear() {
-        LEVELS.clear();
+        // No static receipt owner remains.
+    }
+
+    /** Publishes only precipitation whose physical atmospheric debit has committed. */
+    public static synchronized void publishPrecipitation(ServerLevel level, AtmosphereCellKey cell, int cellSize,
+            com.thunder.wildernessodysseyapi.weather.simulation.AtmosphericWaterFlux flux, long throughTick) {
+        RegionalHydrologySavedData data = RegionalHydrologySavedData.get(level);
+        if (data.atmosphereExchange().publishPrecipitation(cell, cellSize, flux, throughTick)) data.setDirty();
+    }
+
+    /** Applies accepted queued precipitation to the existing surface/SWE/ice owners exactly once. */
+    public static synchronized long applyPrecipitation(ServerLevel level, RegionalHydrologyState state) {
+        RegionalHydrologySavedData data = RegionalHydrologySavedData.get(level);
+        long accepted = data.atmosphereExchange().applyPrecipitation(state);
+        if (accepted > 0) data.setDirty();
+        return accepted;
     }
 
     /** Read-only snow-water equivalent supplied by regional storage, not an independent snowpack. */
@@ -99,7 +116,8 @@ public final class AtmosphericWaterExchange {
         /**
          * Maps accepted evaporation into the normalized atmospheric column.
          * One inventory unit represents 25 mm of precipitable water. This is
-         * a documented climate approximation, not a claim of atmospheric mass closure.
+         * the compatibility conversion; the physical solver multiplies by 25
+         * and retains the exact accepted water amount in kg/m2.
          */
         public double evaporatedVaporInventory() {
             return evaporationMilliUnits
@@ -124,6 +142,8 @@ public final class AtmosphericWaterExchange {
         private final Map<Long, Entry> entries = new HashMap<>();
         private final Map<Long, Set<Long>> cells = new HashMap<>();
         private int indexedCellSize;
+        private final Map<Long, Long> precipitationClocks = new HashMap<>();
+        private final Map<Long, double[]> pendingPrecipitation = new HashMap<>();
 
         /** Records an already-accepted interval atomically, rejecting negative amounts. */
         public boolean publish(long chunk, long precipitation, long evaporation,
@@ -161,6 +181,9 @@ public final class AtmosphericWaterExchange {
         public Receipt capture(AtmosphereCellKey cell, int cellSize) {
             if (cellSize < 16) {
                 throw new IllegalArgumentException("Atmospheric cells must be at least one chunk wide");
+            }
+            if (cellSize % 16 != 0) {
+                throw new IllegalArgumentException("Hydrology exchange requires chunk-aligned atmosphere cells");
             }
             if (indexedCellSize != cellSize) {
                 cells.clear();
@@ -200,6 +223,98 @@ public final class AtmosphericWaterExchange {
                             Math.min(entry.evaporation, mark.evaporation()));
                 }
             }
+        }
+
+        /** Queues exact cell-depth times admitted chunk area, retaining fractional milli-units. */
+        public boolean publishPrecipitation(AtmosphereCellKey cell, int size,
+                com.thunder.wildernessodysseyapi.weather.simulation.AtmosphericWaterFlux flux, long throughTick) {
+            if (throughTick <= precipitationClocks.getOrDefault(cell.packed(), Long.MIN_VALUE)) return false;
+            capture(cell, size); // builds the bounded spatial index
+            Set<Long> members = cells.getOrDefault(cell.packed(), Set.of());
+            for (long key : members) {
+                Entry entry = entries.get(key);
+                double factor = entry.surface.areaSquareMetres() * MILLI_UNITS_PER_CUBIC_METRE / 1000.0;
+                double[] amounts = pendingPrecipitation.computeIfAbsent(key, ignored -> new double[5]);
+                amounts[0] += flux.rainfallMm() * factor;
+                amounts[1] += flux.snowfallMm() * factor;
+                amounts[2] += flux.sleetMm() * factor;
+                amounts[3] += flux.freezingRainMm() * factor;
+                amounts[4] += flux.hailMm() * factor;
+            }
+            // No admitted nodes means explicit precipitation export to unmodeled terrain.
+            if (!members.isEmpty()) precipitationClocks.put(cell.packed(), throughTick);
+            return !members.isEmpty();
+        }
+
+        /** The same saved book and regional store are dirtied together, including capacity-rejected remainder. */
+        public long applyPrecipitation(RegionalHydrologyState state) {
+            double[] amounts = pendingPrecipitation.get(state.key);
+            if (amounts == null) return 0;
+            long accepted = 0;
+            HydrologicReservoir[] reservoirs = { HydrologicReservoir.SURFACE_RUNOFF, HydrologicReservoir.SNOW,
+                    HydrologicReservoir.SNOW, HydrologicReservoir.ICE, HydrologicReservoir.SNOW };
+            for (int i = 0; i < amounts.length; i++) {
+                long requested = (long) Math.floor(Math.min(Long.MAX_VALUE, amounts[i]));
+                long moved = state.credit(reservoirs[i], requested, RegionalHydrologyState.Boundary.PRECIPITATION);
+                amounts[i] -= moved;
+                accepted = Math.addExact(accepted, moved);
+            }
+            state.physicalPrecipitation = true;
+            return accepted;
+        }
+
+        /** Exact receipts and pending fractional precipitation survive orderly save/load. */
+        public net.minecraft.nbt.CompoundTag save() {
+            net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
+            tag.putInt("version", 1);
+            net.minecraft.nbt.ListTag saved = new net.minecraft.nbt.ListTag();
+            for (long key : new java.util.TreeSet<>(entries.keySet())) {
+                Entry e = entries.get(key);
+                net.minecraft.nbt.CompoundTag item = new net.minecraft.nbt.CompoundTag();
+                item.putLong("key", key); item.putLong("rain", e.precipitation); item.putLong("et", e.evaporation);
+                item.putLong("ack_rain", e.acknowledgedPrecipitation); item.putLong("ack_et", e.acknowledgedEvaporation);
+                item.putLong("snow", e.surface.snowWaterEquivalentMilliUnits()); item.putDouble("area", e.surface.areaSquareMetres());
+                item.putLong("time", e.surface.throughTick());
+                double[] pending = pendingPrecipitation.getOrDefault(key, new double[5]);
+                long[] bits = new long[5];
+                for (int i = 0; i < bits.length; i++) bits[i] = Double.doubleToLongBits(pending[i]);
+                item.putLongArray("pending", bits); saved.add(item);
+            }
+            tag.put("entries", saved);
+            net.minecraft.nbt.ListTag clocks = new net.minecraft.nbt.ListTag();
+            precipitationClocks.forEach((key, time) -> {
+                net.minecraft.nbt.CompoundTag clock = new net.minecraft.nbt.CompoundTag();
+                clock.putLong("key", key); clock.putLong("time", time); clocks.add(clock);
+            });
+            tag.put("clocks", clocks);
+            return tag;
+        }
+
+        public static ReceiptBook load(net.minecraft.nbt.CompoundTag tag) {
+            if (tag.getInt("version") != 1) throw new IllegalArgumentException("Unsupported atmospheric exchange save");
+            ReceiptBook book = new ReceiptBook();
+            net.minecraft.nbt.ListTag saved = tag.getList("entries", net.minecraft.nbt.Tag.TAG_COMPOUND);
+            for (int i = 0; i < saved.size(); i++) {
+                net.minecraft.nbt.CompoundTag item = saved.getCompound(i);
+                long key = item.getLong("key");
+                book.publish(key, item.getLong("rain"), item.getLong("et"), item.getLong("snow"),
+                        item.getDouble("area"), item.getLong("time"));
+                Entry entry = book.entries.get(key);
+                entry.acknowledgedPrecipitation = Math.max(0, Math.min(entry.precipitation, item.getLong("ack_rain")));
+                entry.acknowledgedEvaporation = Math.max(0, Math.min(entry.evaporation, item.getLong("ack_et")));
+                long[] bits = item.getLongArray("pending");
+                if (bits.length != 5) throw new IllegalArgumentException("Malformed precipitation receipt");
+                double[] pending = new double[5];
+                for (int n = 0; n < 5; n++) {
+                    pending[n] = Double.longBitsToDouble(bits[n]);
+                    if (!Double.isFinite(pending[n]) || pending[n] < 0) throw new IllegalArgumentException("Invalid pending precipitation");
+                }
+                book.pendingPrecipitation.put(key, pending);
+            }
+            net.minecraft.nbt.ListTag clocks = tag.getList("clocks", net.minecraft.nbt.Tag.TAG_COMPOUND);
+            for (int i = 0; i < clocks.size(); i++) book.precipitationClocks.put(clocks.getCompound(i).getLong("key"),
+                    clocks.getCompound(i).getLong("time"));
+            return book;
         }
 
         private void index(long chunkKey) {

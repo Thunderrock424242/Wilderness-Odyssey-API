@@ -21,6 +21,23 @@ public final class AtmosphericFrontModel {
     private AtmosphericFrontModel() {
     }
 
+    /** Physical-gradient adapter: strength refers to a fixed distance, never one arbitrary grid cell. */
+    public static FrontState analyze(AtmosphericPhysicalState center,
+            AtmosphereSimulationEngine.PhysicalNeighborhood neighbors, double cellSizeMeters) {
+        FrontState diagnosed = analyze(center.toWeatherSample(center.surface(),
+                        com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.NONE),
+                new AtmosphereSimulationEngine.Neighborhood(
+                        neighbors.north().toWeatherSample(neighbors.north().surface(), com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.NONE),
+                        neighbors.east().toWeatherSample(neighbors.east().surface(), com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.NONE),
+                        neighbors.south().toWeatherSample(neighbors.south().surface(), com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.NONE),
+                        neighbors.west().toWeatherSample(neighbors.west().surface(), com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.NONE)));
+        double distanceScale = AtmosphericUnits.REFERENCE_CELL_METRES / Math.max(16.0, cellSizeMeters);
+        double shear = AtmosphericUnits.unit(center.column().shearMetresPerSecond() / 40.0);
+        return new FrontState(diagnosed.type(), diagnosed.strength() * distanceScale,
+                diagnosed.lift() * distanceScale, diagnosed.stormBoost() * distanceScale * (0.8 + shear * 0.4),
+                diagnosed.gust());
+    }
+
     /** Returns the front crossing the center of an immutable neighborhood. */
     public static FrontState analyze(
             WeatherSample centerSample,

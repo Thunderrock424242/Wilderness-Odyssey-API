@@ -12,7 +12,7 @@ import java.util.Set;
 
 /** Versioned, defensive NBT codec for persistent storm and front identities. */
 public final class WeatherSystemStorageCodec {
-    public static final int DATA_VERSION = 1;
+    public static final int DATA_VERSION = 2;
     private static final int ABSOLUTE_MAXIMUM_SYSTEMS = 256;
 
     private WeatherSystemStorageCodec() {
@@ -56,7 +56,7 @@ public final class WeatherSystemStorageCodec {
             return new DecodeResult(1L, List.of(), 0, true);
         }
         int version = root.getInt("dataVersion");
-        if (version != DATA_VERSION || !root.contains("systems", Tag.TAG_LIST)) {
+        if ((version != DATA_VERSION && version != 1) || !root.contains("systems", Tag.TAG_LIST)) {
             return new DecodeResult(1L, List.of(), version, true);
         }
 
@@ -85,7 +85,8 @@ public final class WeatherSystemStorageCodec {
                         entry.getDouble("z"),
                         entry.getDouble("radius"),
                         entry.getDouble("intensity"),
-                        new WindVector(entry.getDouble("motionX"), entry.getDouble("motionZ")),
+                        new WindVector(entry.getDouble("motionX") * (version == 1 ? 3.0 / 40.0 : 1.0),
+                                entry.getDouble("motionZ") * (version == 1 ? 3.0 / 40.0 : 1.0)),
                         entry.getDouble("organization"),
                         entry.getLong("age"),
                         entry.getLong("updated"),
@@ -96,7 +97,7 @@ public final class WeatherSystemStorageCodec {
             }
         }
         long nextId = root.contains("nextId", Tag.TAG_LONG) ? Math.max(1L, root.getLong("nextId")) : 1L;
-        return new DecodeResult(nextId, List.copyOf(systems), version, skipped > 0);
+        return new DecodeResult(nextId, List.copyOf(systems), version, skipped > 0 || version != DATA_VERSION);
     }
 
     /** Validated decoded tracker state and recovery metadata. */

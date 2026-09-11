@@ -22,6 +22,7 @@ public final class RegionalHydrologyState {
     long forcingTick;
     double precipitationFraction;
     boolean snowing;
+    boolean physicalPrecipitation;
     HydrologicFlux lastFlux = HydrologicFlux.ZERO;
     double airTemperature = 15.0;
     double humidity = 0.5;
@@ -125,6 +126,7 @@ public final class RegionalHydrologyState {
         tag.putLong("forcing_time", forcingTick);
         tag.putDouble("rain", precipitationFraction);
         tag.putBoolean("snowing", snowing);
+        tag.putBoolean("physical_precipitation", physicalPrecipitation);
         tag.putDouble("air", airTemperature);
         tag.putDouble("humidity", humidity);
         tag.putDouble("wind", wind);
@@ -161,6 +163,7 @@ public final class RegionalHydrologyState {
         state.forcingTick = tag.getLong("forcing_time");
         state.precipitationFraction = finite(tag, "rain");
         state.snowing = tag.getBoolean("snowing");
+        state.physicalPrecipitation = tag.getBoolean("physical_precipitation");
         state.airTemperature = finite(tag, "air");
         state.humidity = finite(tag, "humidity");
         state.wind = finite(tag, "wind");

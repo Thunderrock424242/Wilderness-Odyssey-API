@@ -445,7 +445,7 @@ public final class WeatherAuthority implements WeatherQuery {
                 position.getX() + 0.5,
                 position.getZ() + 0.5,
                 systems(level),
-                features.movementBlocksPerSecond()
+                features.trackingSettings(scheduling.simulationIntervalTicks()).steeringScale()
         );
     }
 
@@ -739,7 +739,7 @@ public final class WeatherAuthority implements WeatherQuery {
         }
 
         Map<Long, AtmosphereView> previous = grid.snapshotByPackedKey();
-        Set<Long> scheduledKeys = new HashSet<>(activeKeys);
+        Set<Long> scheduledKeys = new java.util.TreeSet<>(previous.keySet());
         for (AtmosphereView view : previous.values()) {
             if (AtmosphereActivityPolicy.shouldSimulate(
                     view,
@@ -767,7 +767,8 @@ public final class WeatherAuthority implements WeatherQuery {
                     level,
                     view.key(),
                     scheduling.cellSize(),
-                    scheduling.environmentResampleIntervalTicks()
+                    scheduling.environmentResampleIntervalTicks(),
+                    view.environment()
             );
             AtmosphereSimulationEngine.Neighborhood neighbors = neighborhood(previous, view);
             int catchUpSteps = AtmosphereActivityPolicy.catchUpSteps(
@@ -782,6 +783,7 @@ public final class WeatherAuthority implements WeatherQuery {
                     view.key(),
                     view.revision(),
                     view.sample(),
+                    view,
                     environment,
                     settings.simulationSpeed() > 0.0
                             ? AtmosphericWaterExchange.capture(level, view.key(), scheduling.cellSize())
@@ -818,38 +820,34 @@ public final class WeatherAuthority implements WeatherQuery {
      */
     public SimulationResult calculateSimulationBatch(SimulationBatch batch) {
         Objects.requireNonNull(batch, "Simulation batch is required");
+        List<AtmosphericGridStepper.Input> inputs = new ArrayList<>(batch.inputs.size());
+        for (CellCalculationInput input : batch.inputs) {
+            inputs.add(new AtmosphericGridStepper.Input(input.view, input.environment, input.waterReceipt, input.systemInfluence));
+        }
+        AtmosphericGridStepper.Result physics = AtmosphericGridStepper.advance(inputs, batch.settings, batch.cellSize,
+                batch.gameTime, batch.maximumCellSteps);
         List<CalculatedCell> calculated = new ArrayList<>(batch.inputs.size());
         List<WeatherSystemTracker.Observation> observations = new ArrayList<>();
         for (CellCalculationInput input : batch.inputs) {
-            WeatherSample next = input.sample;
-            for (int step = 0; step < input.catchUpSteps; step++) {
-                // One accepted hydrology receipt may span multiple catch-up
-                // steps, but its water feedback must be applied exactly once.
-                next = engine.simulate(next, input.environment, input.neighborhood, batch.settings,
-                        step == 0 ? input.waterReceipt : input.waterReceipt.withoutFlux());
-            }
-            next = WeatherSystemInfluenceModel.apply(
-                    next,
-                    input.systemInfluence,
-                    batch.settings.maximumPrecipitationIntensity()
-            );
+            AtmosphericGridStepper.Output output = physics.cells().get(input.key.packed());
+            WeatherSample next = output.sample();
             AtmosphericFrontModel.FrontState front = AtmosphericFrontModel.analyze(next, input.neighborhood);
-            WeatherHazardModel.HazardProfile hazards = WeatherHazardModel.evaluate(
-                    next, input.environment, front.type(), front.strength()
-            );
-            collectObservations(
-                    observations,
-                    next,
-                    front,
-                    hazards,
-                    batch.features,
-                    input.centerX,
-                    input.centerZ,
-                    batch.cellSize
-            );
-            calculated.add(new CalculatedCell(input.key, input.baseRevision, next));
+            WeatherHazardModel.HazardProfile hazards = WeatherHazardModel.evaluate(next, input.environment, front.type(), front.strength());
+            int before = observations.size();
+            collectObservations(observations, next, front, hazards, batch.features, input.centerX, input.centerZ, batch.cellSize);
+            // Keep the existing tracker API's normalized motion; its fixed 40 m/s adapter recovers steering speed.
+            WindVector steering = output.state().column().steeringWind();
+            for (int index = before; index < observations.size(); index++) {
+                WeatherSystemTracker.Observation observation = observations.get(index);
+                observations.set(index, new WeatherSystemTracker.Observation(observation.type(), observation.centerX(),
+                        observation.centerZ(), observation.radiusBlocks(), observation.intensity(),
+                        new WindVector(steering.x() / AtmosphericUnits.WIND_SCALE_METRES_PER_SECOND,
+                                steering.z() / AtmosphericUnits.WIND_SCALE_METRES_PER_SECOND), observation.organization()));
+            }
+            calculated.add(new CalculatedCell(input.key, input.baseRevision, next, output.state(),
+                    input.environment, output.flux(), output.throughTick()));
         }
-        return new SimulationResult(batch, List.copyOf(calculated), List.copyOf(observations));
+        return new SimulationResult(batch, List.copyOf(calculated), List.copyOf(observations), physics);
     }
 
     /** SERVER THREAD ONLY. Marks an accepted batch as owning this cadence slot. */
@@ -903,18 +901,22 @@ public final class WeatherAuthority implements WeatherQuery {
         AtmosphereGrid grid = data.grid();
         boolean changed = false;
         for (CalculatedCell calculated : result.calculated) {
-            changed |= grid.applyIfRevision(
-                    calculated.key,
-                    calculated.baseRevision,
-                    calculated.sample,
-                    batch.gameTime
-            );
-        }
-        for (CellCalculationInput input : batch.inputs) {
-            if (input.catchUpSteps > 0) {
-                AtmosphericWaterExchange.acknowledge(level, input.waterReceipt);
+            changed |= grid.applyPhysicalIfRevision(calculated.key, calculated.baseRevision,
+                    calculated.state, calculated.sample, calculated.environment, calculated.throughTick);
+            if (calculated.flux.dtSeconds() > 0) {
+                AtmosphericWaterExchange.publishPrecipitation(level, calculated.key, batch.cellSize,
+                        calculated.flux, calculated.throughTick);
             }
         }
+        for (int index = 0; index < batch.inputs.size(); index++) {
+            if (result.calculated.get(index).flux.dtSeconds() > 0) {
+                AtmosphericWaterExchange.acknowledge(level, batch.inputs.get(index).waterReceipt);
+            }
+        }
+        runtime.physicsDiagnostics = new PhysicsDiagnostics(result.physics.cellSteps(), result.physics.calculationNanos(),
+                result.physics.deferredTicks(), result.calculated.stream().mapToDouble(value -> value.flux.evaporationMm()).sum(),
+                result.calculated.stream().mapToDouble(value -> value.flux.precipitationMm()).sum(),
+                result.calculated.stream().mapToDouble(value -> value.flux.boundaryVaporMm()).sum());
         Set<Long> protectedKeys = new HashSet<>(batch.activeKeys);
         WeatherConfig.SchedulingSettings currentScheduling = WeatherConfig.scheduling();
         if (currentScheduling.cellSize() == batch.cellSize) {
@@ -923,10 +925,14 @@ public final class WeatherAuthority implements WeatherQuery {
         int removed = grid.trimToLimit(batch.maximumPersistedCells, protectedKeys);
         WeatherSystemsSavedData systemsData = WeatherSystemsSavedData.get(level, batch.features);
         WeatherSystemTracker tracker = systemsData.tracker();
+        long physicsTick = result.calculated.stream().mapToLong(CalculatedCell::throughTick).min().orElse(batch.gameTime);
+        int elapsedSystemTicks = (int) Math.min(Integer.MAX_VALUE, Math.max(0,
+                physicsTick - tracker.systems().stream().mapToLong(com.thunder.wildernessodysseyapi.weather.system.TrackedWeatherSystem::lastUpdatedTick)
+                        .min().orElse(physicsTick)));
         boolean systemsChanged = tracker.update(
                 result.observations,
-                batch.gameTime,
-                batch.simulationIntervalTicks,
+                physicsTick,
+                elapsedSystemTicks,
                 batch.trackingSettings
         );
         if (systemsChanged) {
@@ -1127,13 +1133,8 @@ public final class WeatherAuthority implements WeatherQuery {
                 continue;
             }
 
-            boolean snowClimateEligible = state != VanillaWeatherCommandAdapter.State.CLEAR
-                    && PrecipitationPhaseModel.supportsNaturalSnow(runtime.inputSampler.sample(
-                            level,
-                            key,
-                            scheduling.cellSize(),
-                            scheduling.environmentResampleIntervalTicks()
-                    ));
+            boolean snowClimateEligible = PrecipitationPhaseModel.classify(1.0, view.physicalState().column(),
+                    0, 0, 2000) == PrecipitationType.SNOW;
             WeatherSample next = VanillaWeatherCommandAdapter.apply(
                     view.sample(),
                     state,
@@ -1251,6 +1252,9 @@ public final class WeatherAuthority implements WeatherQuery {
         );
         WeatherSample initial = initialSample(environment, WeatherConfig.settings());
         AtmosphereView created = data.grid().getOrCreate(key, initial, level.getGameTime());
+        data.grid().restore(new AtmosphereView(created.key(), created.sample(), created.revision(),
+                created.lastSimulatedTick(), created.lastActiveTick(), created.physicalState(), environment));
+        created = data.grid().view(key);
         data.markChanged();
         return created;
     }
@@ -1412,6 +1416,7 @@ public final class WeatherAuthority implements WeatherQuery {
         private final int simulationIntervalTicks;
         private final int maximumPersistedCells;
         private final boolean debugLogging;
+        private final int maximumCellSteps;
         private final SimulationSettings settings;
         private final WeatherConfig.FeatureSettings features;
         private final WeatherSystemTracker.TrackingSettings trackingSettings;
@@ -1439,6 +1444,7 @@ public final class WeatherAuthority implements WeatherQuery {
             this.simulationIntervalTicks = simulationIntervalTicks;
             this.maximumPersistedCells = maximumPersistedCells;
             this.debugLogging = debugLogging;
+            this.maximumCellSteps = WeatherConfig.maximumPhysicalCellSteps();
             this.settings = settings;
             this.features = features;
             this.trackingSettings = trackingSettings;
@@ -1458,16 +1464,30 @@ public final class WeatherAuthority implements WeatherQuery {
         private final SimulationBatch batch;
         private final List<CalculatedCell> calculated;
         private final List<WeatherSystemTracker.Observation> observations;
+        private final AtmosphericGridStepper.Result physics;
 
         private SimulationResult(
                 SimulationBatch batch,
                 List<CalculatedCell> calculated,
-                List<WeatherSystemTracker.Observation> observations
+                List<WeatherSystemTracker.Observation> observations,
+                AtmosphericGridStepper.Result physics
         ) {
+            this.physics = physics;
             this.batch = batch;
             this.calculated = calculated;
             this.observations = observations;
         }
+    }
+
+    /** Read-only counters from the last committed batch; Data Engine owns queue/backpressure metrics. */
+    public PhysicsDiagnostics physicsDiagnostics(ServerLevel level) {
+        LevelRuntime runtime = runtimes.get(level);
+        return runtime == null ? PhysicsDiagnostics.EMPTY : runtime.physicsDiagnostics;
+    }
+
+    public record PhysicsDiagnostics(int cellSteps, long calculationNanos, long deferredTicks,
+            double evaporationMm, double precipitationMm, double boundaryVaporMm) {
+        public static final PhysicsDiagnostics EMPTY = new PhysicsDiagnostics(0, 0, 0, 0, 0, 0);
     }
 
     /** Debug-editable atmospheric scalar. */
@@ -1487,6 +1507,7 @@ public final class WeatherAuthority implements WeatherQuery {
     }
 
     private static final class LevelRuntime {
+        private PhysicsDiagnostics physicsDiagnostics = PhysicsDiagnostics.EMPTY;
         private final AtmosphereInputSampler inputSampler;
         private final LocalizedLightningScheduler lightningScheduler;
         private final WildfireScheduler wildfireScheduler;
@@ -1542,6 +1563,7 @@ public final class WeatherAuthority implements WeatherQuery {
             AtmosphereCellKey key,
             long baseRevision,
             WeatherSample sample,
+            AtmosphereView view,
             AtmosphereEnvironment environment,
             AtmosphericWaterExchange.Receipt waterReceipt,
             AtmosphereSimulationEngine.Neighborhood neighborhood,
@@ -1555,7 +1577,11 @@ public final class WeatherAuthority implements WeatherQuery {
     private record CalculatedCell(
             AtmosphereCellKey key,
             long baseRevision,
-            WeatherSample sample
+            WeatherSample sample,
+            AtmosphericPhysicalState state,
+            AtmosphereEnvironment environment,
+            AtmosphericWaterFlux flux,
+            long throughTick
     ) {
     }
 
