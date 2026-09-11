@@ -98,6 +98,7 @@ public final class RegionalHydrologyManager {
                 RegionalHydrologyState target = runtime.graph == null ? data.state(state.downstream) : null;
                 long stepTicks = catchupStepTicks(now - state.lastSimulationTick,
                         RegionalHydrologyConfig.catchupSteps() - steps++);
+                AtmosphericWaterExchange.applyPrecipitation(level, state);
                 RegionalHydrologyModel.Exchange exchange = RegionalHydrologyModel.advance(state, target, parameters, stepTicks / 20.0);
                 state.lastSimulationTick += stepTicks;
                 AtmosphericWaterExchange.publish(level, new ChunkPos(state.key), exchange.precipitationMilliUnits(),
@@ -144,8 +145,8 @@ public final class RegionalHydrologyManager {
         // unloaded terrain; it never initializes terrain or requests a chunk.
         WeatherSample weather = enabled ? WeatherServices.query().sample(level, position) : WeatherSample.CLEAR;
         state.precipitationFraction = enabled ? weather.precipitationIntensity() : 0;
-        state.snowing = weather.precipitationType() == com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.SNOW
-                || weather.precipitationType() == com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.HAIL;
+        state.snowing = weather.precipitationType().isFrozen();
+        state.physicalPrecipitation = enabled;
         state.airTemperature = weather.temperature();
         state.humidity = enabled ? weather.humidity() : 1.0;
         state.wind = Math.min(1, Math.hypot(weather.wind().x(), weather.wind().z()));

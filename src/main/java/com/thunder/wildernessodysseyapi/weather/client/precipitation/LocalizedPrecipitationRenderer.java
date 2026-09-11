@@ -84,7 +84,7 @@ public final class LocalizedPrecipitationRenderer {
     private static final float[] DISTANT_TEMPERATURE = new float[MAX_DISTANT_SHAFTS];
     private static final float[] DISTANT_STORM = new float[MAX_DISTANT_SHAFTS];
     private static final float[] DISTANT_INSTABILITY = new float[MAX_DISTANT_SHAFTS];
-    private static final byte[] DISTANT_TYPE = new byte[MAX_DISTANT_SHAFTS];
+    private static final PrecipitationType[] DISTANT_TYPE = new PrecipitationType[MAX_DISTANT_SHAFTS];
 
     private static ClientLevel renderedLevel;
     private static int renderColumnCount;
@@ -244,8 +244,7 @@ public final class LocalizedPrecipitationRenderer {
                     || surfacePos.getY() > cameraPos.getY() + 10
                     || surfacePos.getY() < cameraPos.getY() - 10
                     || !level.canSeeSky(surfacePos)
-                    || (surfaceType != PrecipitationType.RAIN
-                    && surfaceType != PrecipitationType.HAIL)) {
+                    || (!surfaceType.usesRainInteractions() && !surfaceType.isIcePellet())) {
                 continue;
             }
 
@@ -284,7 +283,7 @@ public final class LocalizedPrecipitationRenderer {
                     particleFactor
             );
             if (random.nextDouble() <= impactChance) {
-                ImpactSurface impactSurface = surfaceType == PrecipitationType.HAIL
+                ImpactSurface impactSurface = surfaceType.isIcePellet()
                         ? ImpactSurface.HAIL
                         : fluidState.is(FluidTags.WATER)
                         ? ImpactSurface.WATER
@@ -540,9 +539,7 @@ public final class LocalizedPrecipitationRenderer {
                 DISTANT_TEMPERATURE[index] = (float) cloudField.temperature();
                 DISTANT_STORM[index] = (float) cloudField.stormEnergy();
                 DISTANT_INSTABILITY[index] = (float) cloudField.instability();
-                DISTANT_TYPE[index] = type == PrecipitationType.HAIL
-                        ? HAIL
-                        : type == PrecipitationType.SNOW ? SNOW : RAIN;
+                DISTANT_TYPE[index] = type;
             }
         }
 
@@ -581,9 +578,7 @@ public final class LocalizedPrecipitationRenderer {
             if (alpha <= 0.001F) {
                 continue;
             }
-            PrecipitationType type = DISTANT_TYPE[index] == HAIL
-                    ? PrecipitationType.HAIL
-                    : DISTANT_TYPE[index] == SNOW ? PrecipitationType.SNOW : PrecipitationType.RAIN;
+            PrecipitationType type = DISTANT_TYPE[index];
             PrecipitationBlend blend = PrecipitationBlend.fromPhase(
                     type,
                     DISTANT_TEMPERATURE[index],

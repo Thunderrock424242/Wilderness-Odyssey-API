@@ -66,43 +66,46 @@ public final class WeatherSystemTracker {
         List<Observation> observations = deduplicate(sourceObservations, controls.observationSeparationBlocks());
         boolean[] used = new boolean[observations.size()];
         List<TrackedWeatherSystem> next = new ArrayList<>(systems.size() + observations.size());
-        int deltaTicks = Math.max(1, elapsedTicks);
+        int deltaTicks = Math.max(0, elapsedTicks);
+        if (deltaTicks == 0 && !systems.isEmpty()) return false;
 
         for (TrackedWeatherSystem system : systems) {
             double seconds = deltaTicks / 20.0;
             double predictedX = system.centerX()
-                    + system.motion().x() * controls.movementBlocksPerSecond() * seconds;
+                    + system.motion().x() * controls.steeringScale() * seconds;
             double predictedZ = system.centerZ()
-                    + system.motion().z() * controls.movementBlocksPerSecond() * seconds;
+                    + system.motion().z() * controls.steeringScale() * seconds;
             int match = nearestCompatible(system, predictedX, predictedZ, observations, used, controls);
             if (match >= 0) {
                 Observation observation = observations.get(match);
                 used[match] = true;
                 double previousIntensity = system.intensity();
-                double intensity = approach(previousIntensity, observation.intensity(), 0.44);
+                double intensity = approach(previousIntensity, observation.intensity(), response(0.44, seconds));
                 WeatherSystemStage stage = lifecycle(previousIntensity, intensity);
                 if (!system.type().severe() && observation.type().severe()) {
                     // A newly promoted severe identity must be observed again
                     // before entity wind begins, avoiding one-sample touchdown.
                     stage = WeatherSystemStage.FORMING;
                 }
+                WindVector correction = new WindVector(observation.centerX() - predictedX,
+                        observation.centerZ() - predictedZ).limited(4.0 * seconds);
                 next.add(new TrackedWeatherSystem(
                         system.id(),
                         observation.type(),
                         stage,
-                        approach(predictedX, observation.centerX(), 0.48),
-                        approach(predictedZ, observation.centerZ(), 0.48),
-                        approach(system.radiusBlocks(), observation.radiusBlocks(), 0.32),
+                        predictedX + correction.x(),
+                        predictedZ + correction.z(),
+                        approach(system.radiusBlocks(), observation.radiusBlocks(), response(0.32, seconds)),
                         intensity,
-                        WindVector.lerp(system.motion(), observation.motion(), 0.35),
-                        approach(system.organization(), observation.organization(), 0.40),
+                        WindVector.lerp(system.motion(), observation.motion(), response(0.35, seconds)),
+                        approach(system.organization(), observation.organization(), response(0.40, seconds)),
                         saturatingAdd(system.ageTicks(), deltaTicks),
                         gameTick,
                         system.lastSplitTick()
                 ));
             } else {
                 double decay = controls.dissipationPerUpdate()
-                        * Math.max(1.0, deltaTicks / (double) controls.nominalIntervalTicks());
+                        * (deltaTicks / 60.0);
                 double intensity = Math.max(0.0, system.intensity() - decay);
                 if (intensity >= controls.minimumRetainedIntensity()) {
                     next.add(new TrackedWeatherSystem(
@@ -326,7 +329,7 @@ public final class WeatherSystemTracker {
                     || parent.intensity() < settings.splitIntensity()
                     || parent.organization() < settings.splitOrganization()
                     || gameTick - parent.lastSplitTick() < settings.splitCooldownTicks()
-                    || !deterministicSplit(parent.id(), gameTick, settings.nominalIntervalTicks())) {
+                    || parent.motion().magnitude() < 0.05) {
                 continue;
             }
             double length = Math.max(0.001, parent.motion().magnitude());
@@ -342,8 +345,8 @@ public final class WeatherSystemTracker {
                     parent.id(),
                     parent.type(),
                     WeatherSystemStage.WEAKENING,
-                    parent.centerX() - perpendicularX * offset * 0.22,
-                    parent.centerZ() - perpendicularZ * offset * 0.22,
+                    parent.centerX(),
+                    parent.centerZ(),
                     parent.radiusBlocks() * 0.82,
                     parent.intensity() * 0.72,
                     parent.motion(),
@@ -389,6 +392,10 @@ public final class WeatherSystemTracker {
         long mixed = id * 0x9E3779B97F4A7C15L ^ window * 0xC2B2AE3D27D4EB4FL;
         mixed ^= mixed >>> 29;
         return (mixed & 3L) == 0L;
+    }
+
+    private static double response(double referenceFraction, double seconds) {
+        return -Math.expm1(Math.log1p(-referenceFraction) * seconds / 3.0);
     }
 
     private static double squaredDistance(double x0, double z0, double x1, double z1) {
@@ -480,6 +487,12 @@ public final class WeatherSystemTracker {
                 true, 48, 60, 3.0, 220.0, 520.0, 0.28, 0.08,
                 0.035, 0.58, true, 0.86, 0.62, 6_000
         );
+
+        /** Physical steering scale; the legacy movement key remains a relative tuning control around its old default. */
+        public double steeringScale() {
+            return com.thunder.wildernessodysseyapi.weather.simulation.AtmosphericUnits.WIND_SCALE_METRES_PER_SECOND
+                    * movementBlocksPerSecond / 3.0;
+        }
 
         public TrackingSettings {
             maximumSystems = Math.max(1, Math.min(256, maximumSystems));

@@ -52,6 +52,12 @@ public final class AtmosphereInputSampler {
             int cellSize,
             int refreshIntervalTicks
     ) {
+        return sample(level, cell, cellSize, refreshIntervalTicks, null);
+    }
+
+    /** Preserves stored terrain/water context after restart when detailed probes remain unloaded. */
+    public synchronized AtmosphereEnvironment sample(ServerLevel level, AtmosphereCellKey cell,
+            int cellSize, int refreshIntervalTicks, AtmosphereEnvironment persistedEnvironment) {
         Objects.requireNonNull(level, "level");
         Objects.requireNonNull(cell, "cell");
         int refresh = Math.max(20, refreshIntervalTicks);
@@ -60,7 +66,11 @@ public final class AtmosphereInputSampler {
         if (cached == null || gameTime - cached.sampledAtTick >= refresh) {
             Climate climate = sampleLoadedClimate(level, cell, cellSize);
             if (climate.loadedProbes > 0 || cached == null) {
-                cached = new CachedClimate(gameTime, climate.withFallback(dimensionFallback(level)));
+                Climate fallback = persistedEnvironment == null ? dimensionFallback(level)
+                        : new Climate(persistedEnvironment.biomeTemperatureCelsius(), persistedEnvironment.biomeHumidity(),
+                        persistedEnvironment.elevationBlocks(), 1, persistedEnvironment.terrainGradientX(),
+                        persistedEnvironment.terrainGradientZ(), persistedEnvironment.terrainRoughness());
+                cached = new CachedClimate(gameTime, climate.withFallback(fallback));
             } else {
                 // Keep the last known terrain climate while a formerly active
                 // region is dormant; repeated misses do not cause hot polling.
@@ -84,7 +94,8 @@ public final class AtmosphereInputSampler {
                 climate.temperatureCelsius,
                 humidity,
                 climate.elevation,
-                water.moisturePotential(),
+                water.loadedProbeFraction() == 0 && persistedEnvironment != null
+                        ? persistedEnvironment.waterCoverage() : water.moisturePotential(),
                 daylight(level),
                 dimensionTemperatureOffset(level.dimensionType()),
                 season.temperatureCelsius(),
@@ -94,8 +105,10 @@ public final class AtmosphereInputSampler {
                 climate.terrainGradientX,
                 climate.terrainGradientZ,
                 climate.terrainRoughness,
-                water.oceanCoverage() * water.loadedProbeFraction(),
-                water.inlandWaterCoverage() * water.loadedProbeFraction(),
+                water.loadedProbeFraction() == 0 && persistedEnvironment != null
+                        ? persistedEnvironment.oceanCoverage() : water.oceanCoverage() * water.loadedProbeFraction(),
+                water.loadedProbeFraction() == 0 && persistedEnvironment != null
+                        ? persistedEnvironment.inlandWaterCoverage() : water.inlandWaterCoverage() * water.loadedProbeFraction(),
                 season.fireSeasonFactor(),
                 season.snowSeasonFactor(),
                 season.calendarAvailable(),

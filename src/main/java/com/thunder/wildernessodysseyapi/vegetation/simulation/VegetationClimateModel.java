@@ -2,7 +2,6 @@ package com.thunder.wildernessodysseyapi.vegetation.simulation;
 
 import com.thunder.wildernessodysseyapi.vegetation.api.VegetationClimateState;
 import com.thunder.wildernessodysseyapi.vegetation.api.VegetationSeasonState;
-import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.SeasonalClimateState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 
@@ -34,8 +33,7 @@ public final class VegetationClimateModel {
         double droughtScale = clamp(droughtSensitivity, 0.0, 4.0, 1.0);
         double recovery = unit(rainRecoveryRate);
 
-        boolean liquidRain = sample.precipitationType() == PrecipitationType.RAIN
-                || sample.precipitationType() == PrecipitationType.HAIL;
+        boolean liquidRain = sample.precipitationType().usesRainInteractions();
         double rain = liquidRain ? sample.precipitationIntensity() : 0.0;
         double rainfallTarget = unit(rain * 0.82 + sample.surface().wetness() * 0.18);
         double rainfallRate = rain > 0.0 ? 0.16 + rain * 0.16 : 0.018;

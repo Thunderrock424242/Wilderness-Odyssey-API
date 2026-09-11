@@ -1,5 +1,8 @@
 # Wilderness Water System
 
+For repeatable in-game checks, automated commands and a results checklist, see
+[Water system testing](testing.md).
+
 Wilderness water is generated as a first-class world fluid. Newly generated
 terrain stores the namespaced Wilderness source or flowing fluid immediately;
 the runtime does not scan completed chunks, import vanilla oceans, or queue

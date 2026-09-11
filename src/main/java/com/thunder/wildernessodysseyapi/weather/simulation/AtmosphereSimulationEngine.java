@@ -1,436 +1,238 @@
 package com.thunder.wildernessodysseyapi.weather.simulation;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.AtmosphericWaterExchange;
-
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
-import com.thunder.wildernessodysseyapi.weather.api.StormStage;
 import com.thunder.wildernessodysseyapi.weather.api.SurfaceWeatherState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
-import com.thunder.wildernessodysseyapi.weather.api.WindVector;
-
 import java.util.Objects;
-import java.util.function.ToDoubleFunction;
 
 /**
- * Pure first-pass atmospheric calculation for one cell.
- *
- * <p>The engine reads only immutable samples and captured environment data. It
- * never touches levels, chunks, registries, or mutable authority state, so a
- * scheduler may calculate cells away from the server thread and reject stale
- * results by cell revision before applying them.</p>
- *
- * <p>One step applies environmental temperature relaxation, temperature-driven
- * pressure, pressure-driven wind, conservative face transport, vapor-capacity
- * condensation, terrain/convergence lift, precipitation loss, vertical cloud
- * development, and storm lifecycle hysteresis.</p>
+ * Pure physical evolution of the existing atmosphere owner.
+ * The authority supplies synchronous immutable neighbor generations and elapsed seconds.
+ * World sampling, revision checks, water receipt acknowledgement and persistence stay on the server.
  */
 public final class AtmosphereSimulationEngine {
-    private static final double TEMPERATURE_RELAXATION = 0.035;
-    private static final double THERMAL_PRESSURE_COUPLING = 0.0025;
-    private static final double PRESSURE_TO_WIND = 4.0;
-    private static final double CLOUD_CONDENSATION_RATE = 0.28;
-    private static final double PRECIPITATION_RESPONSE = 0.35;
-    private static final double PRECIPITATION_LOSS = 0.04;
-    private static final double STORM_GROWTH = 0.12;
-    private static final double STORM_DECAY = 0.025;
-
     /**
-     * Advances one cell from an immutable previous-state capture.
-     *
-     * @param current previous cell-center weather
-     * @param environment cached world-derived environmental input
-     * @param neighborhood previous-state cardinal neighbors
-     * @param settings clamp-safe simulation controls
-     * @return a new immutable weather sample
+     * Compatibility adapter for callers holding only normalized samples.
+     * Persistent owners must retain StepResult.state() rather than reconstructing water from humidity.
      */
-    public WeatherSample simulate(
-            WeatherSample current,
-            AtmosphereEnvironment environment,
-            Neighborhood neighborhood,
-            SimulationSettings settings
-    ) {
+    public WeatherSample simulate(WeatherSample current, AtmosphereEnvironment environment,
+            Neighborhood neighborhood, SimulationSettings settings) {
         return simulate(current, environment, neighborhood, settings, AtmosphericWaterExchange.Receipt.EMPTY);
     }
 
-    /**
-     * Advances the existing atmospheric owner using accepted regional ET only
-     * on the physically modeled fraction. Unknown terrain and open ocean retain
-     * explicit normalized boundary forcing. The receipt is immutable worker input.
-     */
-    public WeatherSample simulate(
-            WeatherSample current,
-            AtmosphereEnvironment environment,
-            Neighborhood neighborhood,
-            SimulationSettings settings,
-            AtmosphericWaterExchange.Receipt waterReceipt
-    ) {
-        WeatherSample center = Objects.requireNonNullElse(current, WeatherSample.CLEAR);
-        AtmosphericWaterExchange.Receipt receipt = Objects.requireNonNullElse(
-                waterReceipt, AtmosphericWaterExchange.Receipt.EMPTY);
-        AtmosphereEnvironment inputs = Objects.requireNonNullElse(environment, AtmosphereEnvironment.TEMPERATE);
+    /** Retains the original receipt-taking entry point at the fixed two-second reference interval. */
+    public WeatherSample simulate(WeatherSample current, AtmosphereEnvironment environment,
+            Neighborhood neighborhood, SimulationSettings settings, AtmosphericWaterExchange.Receipt receipt) {
+        WeatherSample sample = Objects.requireNonNullElse(current, WeatherSample.CLEAR);
         SimulationSettings controls = Objects.requireNonNullElse(settings, SimulationSettings.DEFAULT);
-        Neighborhood neighbors = neighborhood == null ? Neighborhood.uniform(center) : neighborhood.withFallback(center);
-        AtmosphericFrontModel.FrontState front = AtmosphericFrontModel.analyze(center, neighbors);
-        double step = controls.simulationSpeed();
-        if (step == 0.0) {
-            return center;
+        if (controls.simulationSpeed() == 0) {
+            return sample;
         }
-
-        // Environmental heating/cooling changes pressure relative to adjacent air.
-        double targetTemperature = inputs.targetTemperatureCelsius(controls.randomVariation());
-        double temperature = approach(center.temperature(), targetTemperature,
-                boundedRate(TEMPERATURE_RELAXATION, step));
-        double neighborTemperature = neighbors.average(WeatherSample::temperature);
-        double neighborPressure = neighbors.average(WeatherSample::pressure);
-        double pressureEqualization = boundedRate(controls.pressureEqualizationRate() * 0.25, step);
-        double equalizedPressure = approach(center.pressure(), neighborPressure, pressureEqualization);
-        double thermalPressureDelta = (neighborTemperature - temperature)
-                * THERMAL_PRESSURE_COUPLING
-                * controls.pressureEqualizationRate()
-                * step;
-        double pressure = equalizedPressure + thermalPressureDelta;
-
-        // Pressure gradients accelerate air from higher pressure toward lower pressure.
-        double frontStrength = controls.weatherFrontStrength();
-        double targetWindX = (neighbors.west().pressure() - neighbors.east().pressure()) * PRESSURE_TO_WIND
-                + front.gust().x() * frontStrength;
-        double targetWindZ = (neighbors.north().pressure() - neighbors.south().pressure()) * PRESSURE_TO_WIND
-                + front.gust().z() * frontStrength;
-        double windResponse = boundedRate(0.12 + controls.pressureEqualizationRate() * 0.45, step);
-        WindVector wind = new WindVector(
-                approach(center.wind().x(), targetWindX, windResponse),
-                approach(center.wind().z(), targetWindZ, windResponse)
-        );
-
-        // Shared-face fluxes move air properties without the one-sided blur
-        // produced by selecting only one upwind neighbor.
-        temperature = conservativeTransport(
-                temperature,
-                center,
-                neighbors,
-                WeatherSample::temperature,
-                controls.temperatureTransportRate(),
-                step
-        );
-        double vapor = conservativeTransport(
-                AtmosphericThermodynamics.vaporContent(
-                        center.temperature(),
-                        center.humidity()
-                ),
-                center,
-                neighbors,
-                sample -> AtmosphericThermodynamics.vaporContent(
-                        sample.temperature(),
-                        sample.humidity()
-                ),
-                controls.humidityTransportRate(),
-                step
-        );
-        double cloudWater = conservativeTransport(
-                center.cloudWater(),
-                center,
-                neighbors,
-                WeatherSample::cloudWater,
-                controls.humidityTransportRate() * 0.8,
-                step
-        );
-
-        // Regional ET has already been debited by hydrology. Its accepted receipt
-        // replaces both modeled local evaporation and biome moisture restoration
-        // for the covered fraction, so dry modeled land cannot invent vapor.
-        double vaporCapacity = AtmosphericThermodynamics.saturationCapacity(temperature);
-        double environmentalVapor = inputs.biomeHumidity() * vaporCapacity;
-        double unmodeledFraction = 1.0 - receipt.coveredFraction();
-        vapor = approach(vapor, environmentalVapor, boundedRate(0.02 * unmodeledFraction, step));
-        double humidity = AtmosphericThermodynamics.relativeHumidity(temperature, vapor);
-        double evaporation = controls.evaporationStrength()
-                * inputs.evaporationPotential(temperature, wind.magnitude())
-                * (1.0 - unit(humidity))
-                * 0.08
-                * step * unmodeledFraction;
-        vapor += evaporation * vaporCapacity + receipt.evaporatedVaporInventory();
-        humidity = AtmosphericThermodynamics.relativeHumidity(temperature, vapor);
-
-        // Temperature-dependent vapor capacity makes cooling air condense even
-        // when its absolute moisture inventory has not changed.
-        double saturationInventory = vaporCapacity * controls.cloudFormationThreshold();
-        double saturationExcess = Math.max(0.0, vapor - saturationInventory);
-        double condensation = Math.min(humidity, saturationExcess / vaporCapacity)
-                * CLOUD_CONDENSATION_RATE
-                * (0.75 + center.instability() * 0.25)
-                * step;
-        vapor = Math.max(0.0, vapor - condensation * vaporCapacity);
-        humidity = AtmosphericThermodynamics.relativeHumidity(temperature, vapor);
-        cloudWater = unit(cloudWater + condensation);
-        double cloudDissipation = boundedRate(0.006 + (1.0 - humidity) * 0.008, step);
-        cloudWater = approach(cloudWater, 0.0, cloudDissipation);
-
-        // Convergence, buoyancy, and windward terrain build vertical motion.
-        double temperatureContrast = unit(Math.abs(temperature - neighborTemperature) / 30.0);
-        double convergence = clamp(
-                (neighbors.west().wind().x() - neighbors.east().wind().x()
-                        + neighbors.north().wind().z() - neighbors.south().wind().z()) * 0.5,
-                -1.0,
-                1.0
-        );
-        double buoyancy = clamp((temperature - neighborTemperature) / 18.0, -1.0, 1.0);
-        double lowPressureSupport = unit((1.04 - pressure) / 0.20);
-        double liftTarget = clamp(
-                convergence * 0.38
-                        + buoyancy * 0.30
-                        + inputs.orographicLift(wind) * 0.42
-                        + lowPressureSupport * 0.16
-                        + front.lift() * frontStrength * 0.42
-                        + inputs.seasonalStorminessOffset() * 0.28
-                        - center.precipitationIntensity() * 0.12,
-                -1.0,
-                1.0
-        );
-        double verticalMotion = approach(
-                center.verticalMotion(),
-                liftTarget,
-                boundedRate(0.14, step)
-        );
-
-        // Moisture, horizontal contrast, and ascent build convective instability.
-        double instabilityTarget = unit(
-                humidity * 0.34
-                        + temperatureContrast * 0.38
-                        + Math.max(0.0, verticalMotion) * 0.28
-                        + front.stormBoost() * frontStrength * 0.25
-                        + inputs.seasonalStorminessOffset() * 0.20
-        );
-        double instability = approach(center.instability(), instabilityTarget, boundedRate(0.08, step));
-
-        // Mature storms decay more slowly than forming cells, preventing rapid
-        // threshold flicker while precipitation unloads the cloud column.
-        double stormPotential = unit(
-                humidity
-                        * instability
-                        * (0.44 + lowPressureSupport * 0.34
-                        + Math.max(0.0, verticalMotion) * 0.30)
-                        + front.stormBoost() * frontStrength * 0.18
-                        + inputs.seasonalStorminessOffset()
-        );
-        double stormEnergy = center.stormEnergy();
-        if (stormPotential > controls.stormFormationThreshold()) {
-            stormEnergy += (stormPotential - controls.stormFormationThreshold()) * STORM_GROWTH * step;
-        } else {
-            double lifecycleDecay = center.stormStage()
-                    == StormStage.MATURE
-                    ? STORM_DECAY * 0.45
-                    : STORM_DECAY;
-            stormEnergy -= lifecycleDecay * step;
+        AtmosphericPhysicalState state = AtmosphericPhysicalState.fromLegacy(sample);
+        Neighborhood values = neighborhood == null ? Neighborhood.uniform(sample) : neighborhood.withFallback(sample);
+        PhysicalNeighborhood neighbors = new PhysicalNeighborhood(
+                AtmosphericPhysicalState.fromLegacy(values.north()), AtmosphericPhysicalState.fromLegacy(values.east()),
+                AtmosphericPhysicalState.fromLegacy(values.south()), AtmosphericPhysicalState.fromLegacy(values.west()));
+        double remaining = AtmosphericUnits.REFERENCE_STEP_SECONDS;
+        boolean first = true;
+        while (remaining > 1.0E-9) {
+            double seconds = Math.min(remaining, maximumStepSeconds(AtmosphericUnits.REFERENCE_CELL_METRES, controls));
+            // A uniform synthetic neighborhood follows the evolving center. Real grids use the physical API.
+            PhysicalNeighborhood inputs = values.north().equals(sample) && values.east().equals(sample)
+                    && values.south().equals(sample) && values.west().equals(sample)
+                    ? PhysicalNeighborhood.uniform(state) : neighbors;
+            StepResult result = simulatePhysical(state, environment, inputs, controls, seconds,
+                    AtmosphericUnits.REFERENCE_CELL_METRES, first ? receipt : receipt.withoutFlux());
+            state = result.state();
+            current = result.sample();
+            first = false;
+            remaining -= seconds;
         }
-        stormEnergy = unit(stormEnergy);
-
-        // Cloud water above threshold produces smoothly varying rain or snow.
-        double precipitationTarget = 0.0;
-        if (cloudWater > controls.precipitationThreshold()) {
-            double availableCloud = (cloudWater - controls.precipitationThreshold())
-                    / Math.max(0.01, 1.0 - controls.precipitationThreshold());
-            precipitationTarget = unit(availableCloud)
-                    * controls.maximumPrecipitationIntensity()
-                    * (0.68 + stormEnergy * 0.22 + Math.max(0.0, verticalMotion) * 0.10);
-        }
-        double precipitationIntensity = approach(
-                center.precipitationIntensity(),
-                precipitationTarget,
-                boundedRate(PRECIPITATION_RESPONSE, step)
-        );
-
-        // Falling precipitation depletes condensed water and a smaller vapor share.
-        double precipitationLoss = precipitationIntensity
-                * PRECIPITATION_LOSS
-                * (1.0 + stormEnergy * 0.25)
-                * step;
-        cloudWater = unit(cloudWater - precipitationLoss);
-        vapor = Math.max(0.0, vapor - precipitationLoss * vaporCapacity * 0.15);
-        humidity = AtmosphericThermodynamics.relativeHumidity(temperature, vapor);
-        PrecipitationType precipitationType = PrecipitationPhaseModel.classify(
-                precipitationIntensity,
-                temperature,
-                humidity,
-                inputs
-        );
-
-        double cloudDepthTarget = unit(
-                cloudWater * 0.38
-                        + instability * 0.24
-                        + stormEnergy * 0.24
-                        + Math.max(0.0, verticalMotion) * 0.30
-        );
-        double cloudDepth = approach(center.cloudDepth(), cloudDepthTarget, boundedRate(0.12, step));
-        WindVector cloudWindTarget = new WindVector(
-                wind.x() - verticalMotion * wind.z() * 0.22,
-                wind.z() + verticalMotion * wind.x() * 0.22
-        );
-        WindVector cloudWind = WindVector.lerp(
-                center.cloudWind(),
-                cloudWindTarget,
-                boundedRate(0.10, step)
-        );
-
-        WeatherSample atmosphere = new WeatherSample(
-                temperature,
-                humidity,
-                pressure,
-                wind,
-                cloudWater,
-                instability,
-                stormEnergy,
-                precipitationIntensity,
-                precipitationType,
-                verticalMotion,
-                cloudDepth,
-                cloudWind,
-                center.surface()
-        );
-        atmosphere = WeatherPhenomenaModel.apply(atmosphere, inputs, front, step, unmodeledFraction);
-        SurfaceWeatherState surface = SurfaceWeatherModel.simulate(
-                center.surface(),
-                atmosphere,
-                inputs,
-                step,
-                receipt
-        );
-        return new WeatherSample(
-                atmosphere.temperature(),
-                atmosphere.humidity(),
-                atmosphere.pressure(),
-                atmosphere.wind(),
-                atmosphere.cloudWater(),
-                atmosphere.instability(),
-                atmosphere.stormEnergy(),
-                atmosphere.precipitationIntensity(),
-                atmosphere.precipitationType(),
-                atmosphere.verticalMotion(),
-                atmosphere.cloudDepth(),
-                atmosphere.cloudWind(),
-                surface
-        );
+        return current;
     }
 
-    /** Alias for schedulers that describe simulation advancement as a step. */
-    public WeatherSample step(
-            WeatherSample current,
-            AtmosphereEnvironment environment,
-            Neighborhood neighborhood,
-            SimulationSettings settings
-    ) {
+    /** Alias preserved for integrations. */
+    public WeatherSample step(WeatherSample current, AtmosphereEnvironment environment,
+            Neighborhood neighborhood, SimulationSettings settings) {
         return simulate(current, environment, neighborhood, settings);
     }
 
-    private static double conservativeTransport(
-            double current,
-            WeatherSample center,
-            Neighborhood neighbors,
-            ToDoubleFunction<WeatherSample> value,
-            double configuredRate,
-            double step
-    ) {
-        if (configuredRate <= 0.0) {
-            return current;
-        }
-
-        double eastFlux = faceFlux(
-                current,
-                value.applyAsDouble(neighbors.east()),
-                center,
-                neighbors.east(),
-                true
-        );
-        double westFlux = faceFlux(
-                value.applyAsDouble(neighbors.west()),
-                current,
-                neighbors.west(),
-                center,
-                true
-        );
-        double southFlux = faceFlux(
-                current,
-                value.applyAsDouble(neighbors.south()),
-                center,
-                neighbors.south(),
-                false
-        );
-        double northFlux = faceFlux(
-                value.applyAsDouble(neighbors.north()),
-                current,
-                neighbors.north(),
-                center,
-                false
-        );
-        double rate = boundedRate(configuredRate * 0.50, step);
-        return current + (westFlux - eastFlux + northFlux - southFlux) * rate;
-    }
-
-    private static double faceFlux(
-            double negativeSideValue,
-            double positiveSideValue,
-            WeatherSample negativeSide,
-            WeatherSample positiveSide,
-            boolean xAxis
-    ) {
-        double negativeWind = xAxis ? negativeSide.wind().x() : negativeSide.wind().z();
-        double positiveWind = xAxis ? positiveSide.wind().x() : positiveSide.wind().z();
-        double pressureVelocity = (negativeSide.pressure() - positiveSide.pressure())
-                * PRESSURE_TO_WIND;
-        double velocity = clamp(
-                pressureVelocity + (negativeWind + positiveWind) * 0.5,
-                -1.0,
-                1.0
-        );
-        return velocity * (velocity >= 0.0 ? negativeSideValue : positiveSideValue);
-    }
-
-    private static double boundedRate(double rate, double step) {
-        return unit(Math.max(0.0, rate) * Math.max(0.0, step));
-    }
-
-    private static double approach(double current, double target, double fraction) {
-        return current + (target - current) * unit(fraction);
-    }
-
-    private static double unit(double value) {
-        return clamp(Double.isFinite(value) ? value : 0.0, 0.0, 1.0);
-    }
-
-    private static double clamp(double value, double minimum, double maximum) {
-        return Math.max(minimum, Math.min(maximum, value));
+    /** Four-face Courant bound including simulation speed; scheduling may subdivide but never discard time. */
+    public static double maximumStepSeconds(double cellSizeMeters, SimulationSettings settings) {
+        return Math.min(2.0, Math.max(16.0, cellSizeMeters)
+                / (4.0 * AtmosphericUnits.MAX_WIND_METRES_PER_SECOND))
+                / Math.max(1.0, settings.simulationSpeed());
     }
 
     /**
-     * Immutable cardinal-neighbor capture from the same grid revision window.
-     * Missing edges fall back to the center sample instead of creating weather
-     * discontinuities or requiring distant cells to be loaded.
+     * Advances one stable explicit step. Receipt evaporation has already been debited at the surface.
+     * Boundary exchange on unmodeled land/ocean is separately reported, never disguised as conserved ET.
      */
-    public record Neighborhood(
-            WeatherSample north,
-            WeatherSample east,
-            WeatherSample south,
-            WeatherSample west
-    ) {
-        /** Creates a no-gradient neighborhood around one sample. */
+    public StepResult simulatePhysical(AtmosphericPhysicalState current, AtmosphereEnvironment environment,
+            PhysicalNeighborhood neighborhood, SimulationSettings settings, double dtSeconds,
+            double cellSizeMeters, AtmosphericWaterExchange.Receipt waterReceipt) {
+        Objects.requireNonNull(current, "physical state");
+        AtmosphereEnvironment inputs = Objects.requireNonNullElse(environment, AtmosphereEnvironment.TEMPERATE);
+        SimulationSettings controls = Objects.requireNonNullElse(settings, SimulationSettings.DEFAULT);
+        AtmosphericWaterExchange.Receipt receipt = Objects.requireNonNullElse(waterReceipt, AtmosphericWaterExchange.Receipt.EMPTY);
+        PhysicalNeighborhood neighbors = neighborhood == null ? PhysicalNeighborhood.uniform(current) : neighborhood.withFallback(current);
+        if (!Double.isFinite(dtSeconds) || dtSeconds < 0 || !Double.isFinite(cellSizeMeters) || cellSizeMeters < 16) {
+            throw new IllegalArgumentException("Atmosphere requires nonnegative seconds and cell width >= 16 metres");
+        }
+        if (dtSeconds > maximumStepSeconds(cellSizeMeters, controls) + 1.0E-8) {
+            throw new IllegalArgumentException("Subdivide the entire grid generation to satisfy atmospheric CFL");
+        }
+        double seconds = dtSeconds * controls.simulationSpeed();
+        if (seconds == 0) {
+            PrecipitationType phase = phase(current);
+            return new StepResult(current, current.toWeatherSample(current.surface(), phase), AtmosphericWaterFlux.NONE);
+        }
+
+        double surfaceTemperature = SurfaceEnergyModel.surfaceTemperature(current, inputs, seconds, controls.randomVariation());
+        double temperature = SurfaceEnergyModel.airTemperature(current.temperatureCelsius(), surfaceTemperature,
+                inputs.waterCoverage(), seconds);
+        temperature += AtmosphericTransport.intensiveDelta(current, neighbors, AtmosphericPhysicalState::temperatureCelsius,
+                0, seconds, cellSizeMeters, controls.temperatureTransportRate() / 0.10);
+        double meanTemperature = (neighbors.north().temperatureCelsius() + neighbors.east().temperatureCelsius()
+                + neighbors.south().temperatureCelsius() + neighbors.west().temperatureCelsius()) * 0.25;
+        double meanPressure = (neighbors.north().pressureHpa() + neighbors.east().pressureHpa()
+                + neighbors.south().pressureHpa() + neighbors.west().pressureHpa()) * 0.25;
+        double pressure = current.pressureHpa() + (meanPressure - current.pressureHpa())
+                * AtmosphericUnits.response(seconds, Math.max(20.0, cellSizeMeters * cellSizeMeters / 150.0))
+                * controls.pressureEqualizationRate();
+        pressure += (meanTemperature - temperature) * 0.004 * seconds * controls.pressureEqualizationRate();
+
+        double vaporDelta = AtmosphericTransport.delta(current, neighbors, AtmosphericPhysicalState::vaporKgPerSquareMetre,
+                0, seconds, cellSizeMeters, controls.humidityTransportRate() / 0.18);
+        double liquidDelta = AtmosphericTransport.delta(current, neighbors, AtmosphericPhysicalState::cloudLiquidKgPerSquareMetre,
+                2, seconds, cellSizeMeters, controls.humidityTransportRate() / 0.18);
+        double iceDelta = AtmosphericTransport.delta(current, neighbors, AtmosphericPhysicalState::cloudIceKgPerSquareMetre,
+                3, seconds, cellSizeMeters, controls.humidityTransportRate() / 0.18);
+        double vapor = nonnegativeRoundoff(current.vaporKgPerSquareMetre() + vaporDelta);
+        double liquid = nonnegativeRoundoff(current.cloudLiquidKgPerSquareMetre() + liquidDelta);
+        double ice = nonnegativeRoundoff(current.cloudIceKgPerSquareMetre() + iceDelta);
+
+        double humidity = AtmosphericUnits.unit(vapor / AtmosphericThermodynamics.saturationColumnWater(temperature));
+        double evaporation = receipt.evaporatedVaporInventory() * AtmosphericUnits.VAPOR_SCALE_KG_PER_SQUARE_METRE;
+        double boundary = (inputs.biomeHumidity() * AtmosphericThermodynamics.saturationColumnWater(temperature) - vapor)
+                * AtmosphericUnits.response(seconds, 7200.0) * (1.0 - receipt.coveredFraction());
+        // Bulk aerodynamic lake/ocean/soil boundary: stronger over warm water in dry, ventilated air.
+        double saturationDeficit = Math.max(0.0, AtmosphericThermodynamics.saturationColumnWater(surfaceTemperature) - vapor);
+        boundary += controls.evaporationStrength() * inputs.evaporationPotential(surfaceTemperature,
+                current.column().surface().windSpeedMetresPerSecond() / 20.0)
+                * saturationDeficit * (0.5 + current.column().surface().windSpeedMetresPerSecond() / 10.0)
+                * seconds / 1800.0 * (1.0 - receipt.coveredFraction());
+        vapor += evaporation + boundary;
+
+        AtmosphericColumn column = AtmosphericColumnModel.advance(current, neighbors, inputs, temperature,
+                pressure, humidity, seconds, cellSizeMeters, controls);
+        AtmosphericFrontModel.FrontState front = AtmosphericFrontModel.analyze(current, neighbors, cellSizeMeters);
+        double convergence = (neighbors.west().column().surface().windXMetresPerSecond()
+                - neighbors.east().column().surface().windXMetresPerSecond()
+                + neighbors.north().column().surface().windZMetresPerSecond()
+                - neighbors.south().column().surface().windZMetresPerSecond()) / (2.0 * cellSizeMeters);
+        double terrainLift = WindPhysicsModel.orographicVelocity(inputs, column.surface());
+        double cape = column.instabilityJoulesPerKg();
+        double buoyantLift = Math.sqrt(2.0 * cape) * 0.06 * humidity;
+        double liftTarget = AtmosphericUnits.clamp(convergence * 300.0 + terrainLift
+                + buoyantLift + front.lift() * controls.weatherFrontStrength() * 8.0
+                - current.precipitationMmPerHour() * 0.025, -20.0, 40.0);
+        double lift = current.verticalVelocityMetresPerSecond() + (liftTarget - current.verticalVelocityMetresPerSecond())
+                * AtmosphericUnits.response(seconds, 30.0);
+        // Adiabatic cooling on windward slopes, warming and RH loss in descending air.
+        temperature -= lift * 0.0065 * seconds;
+        double instability = current.instabilityJoulesPerKg() + (cape - current.instabilityJoulesPerKg())
+                * AtmosphericUnits.response(seconds, 90.0);
+        double potential = AtmosphericUnits.unit(humidity * (instability / 2200.0)
+                * (0.35 + Math.max(0.0, lift) / 10.0) * (0.7 + column.shearMetresPerSecond() / 50.0)
+                + front.stormBoost() * controls.weatherFrontStrength() * 0.2
+                + inputs.oceanStormPotential(temperature, humidity) * Math.max(0.0, lift) / 40.0);
+        double storm = current.stormEnergy();
+        if (potential > controls.stormFormationThreshold()) {
+            storm += (potential - storm) * AtmosphericUnits.response(seconds, 180.0);
+        } else {
+            storm *= Math.exp(-seconds / (storm >= 0.42 ? 600.0 : 240.0));
+        }
+
+        AtmosphericMoistureBudget.Result moisture = AtmosphericMoistureBudget.advance(vapor, liquid, ice, temperature,
+                column.middle().temperatureCelsius(), lift, instability, seconds, controls);
+        temperature += moisture.latentTemperatureChange();
+        humidity = AtmosphericUnits.unit(moisture.vapor() / AtmosphericThermodynamics.saturationColumnWater(temperature));
+        AtmosphericLayer air = column.surface();
+        column = new AtmosphericColumn(new AtmosphericLayer(0, pressure, temperature, humidity,
+                air.windXMetresPerSecond(), air.windZMetresPerSecond()), column.low(), column.middle(), column.upper());
+        AtmosphericPhysicalState next = new AtmosphericPhysicalState(temperature, pressure, moisture.vapor(),
+                moisture.liquid(), moisture.ice(), column, lift, instability, storm, surfaceTemperature,
+                moisture.precipitation() * 3600.0 / dtSeconds, current.surface());
+        PrecipitationType type = phase(next);
+        WeatherSample atmosphere = next.toWeatherSample(current.surface(), type);
+        SurfaceWeatherState surface = SurfaceWeatherModel.simulate(current.surface(), atmosphere, inputs,
+                seconds / AtmosphericUnits.REFERENCE_STEP_SECONDS, receipt);
+        next = new AtmosphericPhysicalState(next.temperatureCelsius(), next.pressureHpa(), next.vaporKgPerSquareMetre(),
+                next.cloudLiquidKgPerSquareMetre(), next.cloudIceKgPerSquareMetre(), next.column(),
+                next.verticalVelocityMetresPerSecond(), next.instabilityJoulesPerKg(), next.stormEnergy(),
+                next.surfaceTemperatureCelsius(), next.precipitationMmPerHour(), surface);
+        double precipitation = moisture.precipitation();
+        AtmosphericWaterFlux flux = new AtmosphericWaterFlux(dtSeconds, evaporation, moisture.condensation(),
+                moisture.cloudEvaporation(), type == PrecipitationType.RAIN ? precipitation : 0,
+                type == PrecipitationType.SNOW ? precipitation : 0, type == PrecipitationType.SLEET ? precipitation : 0,
+                type == PrecipitationType.FREEZING_RAIN ? precipitation : 0, type == PrecipitationType.HAIL ? precipitation : 0,
+                boundary, vaporDelta + liquidDelta + iceDelta);
+        return new StepResult(next, next.toWeatherSample(surface, type), flux);
+    }
+
+    private static PrecipitationType phase(AtmosphericPhysicalState state) {
+        return PrecipitationPhaseModel.classify(state.precipitationMmPerHour(), state.column(),
+                state.instabilityJoulesPerKg(), state.verticalVelocityMetresPerSecond(),
+                CloudProperties.derive(state).depthMetres());
+    }
+
+    private static double nonnegativeRoundoff(double water) {
+        if (water < -1.0E-9) {
+            throw new IllegalStateException("Negative atmospheric inventory: grid timestep violates conservation bound");
+        }
+        return Math.max(0.0, water);
+    }
+
+    /** All physical state and integrated water transfers from one accepted numerical step. */
+    public record StepResult(AtmosphericPhysicalState state, WeatherSample sample, AtmosphericWaterFlux flux) { }
+
+    /** Physical neighbors captured from one immutable generation, never partially updated live cells. */
+    public record PhysicalNeighborhood(AtmosphericPhysicalState north, AtmosphericPhysicalState east,
+            AtmosphericPhysicalState south, AtmosphericPhysicalState west, int closedFaces) {
+        public PhysicalNeighborhood(AtmosphericPhysicalState north, AtmosphericPhysicalState east,
+                AtmosphericPhysicalState south, AtmosphericPhysicalState west) {
+            this(north, east, south, west, 0);
+        }
+
+        /** Unresolved or differently timed faces are closed, rather than exporting untracked mass. */
+        public static PhysicalNeighborhood bounded(AtmosphericPhysicalState center, AtmosphericPhysicalState north,
+                AtmosphericPhysicalState east, AtmosphericPhysicalState south, AtmosphericPhysicalState west) {
+            int mask = (north == null ? 1 : 0) | (east == null ? 2 : 0) | (south == null ? 4 : 0) | (west == null ? 8 : 0);
+            return new PhysicalNeighborhood(Objects.requireNonNullElse(north, center), Objects.requireNonNullElse(east, center),
+                    Objects.requireNonNullElse(south, center), Objects.requireNonNullElse(west, center), mask);
+        }
+        public static PhysicalNeighborhood uniform(AtmosphericPhysicalState state) {
+            return new PhysicalNeighborhood(state, state, state, state);
+        }
+
+        PhysicalNeighborhood withFallback(AtmosphericPhysicalState state) {
+            return new PhysicalNeighborhood(Objects.requireNonNullElse(north, state), Objects.requireNonNullElse(east, state),
+                    Objects.requireNonNullElse(south, state), Objects.requireNonNullElse(west, state), closedFaces);
+        }
+    }
+
+    /** Original normalized neighbor API retained for front, forecast and third-party callers. */
+    public record Neighborhood(WeatherSample north, WeatherSample east, WeatherSample south, WeatherSample west) {
         public static Neighborhood uniform(WeatherSample sample) {
             WeatherSample value = Objects.requireNonNullElse(sample, WeatherSample.CLEAR);
             return new Neighborhood(value, value, value, value);
         }
 
         Neighborhood withFallback(WeatherSample fallback) {
-            return new Neighborhood(
-                    Objects.requireNonNullElse(north, fallback),
-                    Objects.requireNonNullElse(east, fallback),
-                    Objects.requireNonNullElse(south, fallback),
-                    Objects.requireNonNullElse(west, fallback)
-            );
-        }
-
-        private double average(ToDoubleFunction<WeatherSample> value) {
-            return (value.applyAsDouble(north)
-                    + value.applyAsDouble(east)
-                    + value.applyAsDouble(south)
-                    + value.applyAsDouble(west)) * 0.25;
+            return new Neighborhood(Objects.requireNonNullElse(north, fallback), Objects.requireNonNullElse(east, fallback),
+                    Objects.requireNonNullElse(south, fallback), Objects.requireNonNullElse(west, fallback));
         }
     }
 }

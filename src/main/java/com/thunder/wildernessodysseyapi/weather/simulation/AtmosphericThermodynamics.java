@@ -17,6 +17,19 @@ public final class AtmosphericThermodynamics {
     private AtmosphericThermodynamics() {
     }
 
+    /** Physically proportional effective column water capacity, kg/m2 (mm liquid equivalent). */
+    public static double saturationColumnWater(double temperatureCelsius) {
+        return saturationCapacity(temperatureCelsius) * AtmosphericUnits.VAPOR_SCALE_KG_PER_SQUARE_METRE;
+    }
+
+    /** Magnus dew point for the diagnostic cloud-base approximation. */
+    public static double dewPointTemperature(double temperatureCelsius, double relativeHumidity) {
+        double temperature = clamp(temperatureCelsius, -80, 60);
+        double gamma = Math.log(Math.max(0.001, unit(relativeHumidity)))
+                + MAGNUS_A * temperature / (MAGNUS_B + temperature);
+        return clamp(MAGNUS_B * gamma / (MAGNUS_A - gamma), -80, 60);
+    }
+
     /** Returns normalized saturation capacity for air at the supplied temperature. */
     public static double saturationCapacity(double temperatureCelsius) {
         double boundedTemperature = clamp(temperatureCelsius, -80.0, 60.0);
@@ -52,7 +65,10 @@ public final class AtmosphericThermodynamics {
                 + 0.00391838 * Math.pow(humidityPercent, 1.5)
                 * Math.atan(0.023101 * humidityPercent)
                 - 4.686035;
-        return clamp(wetBulb, -80.0, 60.0);
+        // Saturation must give the dry bulb exactly; the fitted approximation
+        // otherwise yields an unphysical positive wet-bulb bias in cold air.
+        return humidityPercent >= 99.99 ? temperature
+                : Math.min(temperature, clamp(wetBulb, -80.0, 60.0));
     }
 
     private static double saturationPressureRaw(double temperatureCelsius) {

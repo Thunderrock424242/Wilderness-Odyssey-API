@@ -1,56 +1,81 @@
 package com.thunder.wildernessodysseyapi.weather.simulation;
 
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
-import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
+import com.thunder.wildernessodysseyapi.weather.api.WindVector;
 
-/**
- * Selects natural rain or snow from temperature, biome climate, and season.
- *
- * <p>Wet-bulb temperature still controls whether flakes can survive, but an
- * ordinary biome also needs an active temperate winter. Permanently cold
- * biomes remain snow-capable in every season. Explicit operator snow commands
- * bypass this natural-weather policy.</p>
- */
+/** Classifies precipitation from wet-bulb thermal structure; calendars never grant snow permission. */
 public final class PrecipitationPhaseModel {
+    private PrecipitationPhaseModel() { }
 
-    private static final double COLD_BIOME_MAXIMUM_CELSIUS = 0.0;
-    private static final double WINTER_SNOW_FACTOR_MINIMUM = 0.35;
-
-    private PrecipitationPhaseModel() {
+    /** Legacy single-level call derives a lapse-rate column from the actual air temperature. */
+    public static PrecipitationType classify(double intensity, double airTemperatureCelsius,
+            double humidity, AtmosphereEnvironment environment) {
+        return classify(intensity, AtmosphericColumn.initial(airTemperatureCelsius, 1013.25, humidity,
+                WindVector.ZERO, WindVector.ZERO), 0, 0, 2000);
     }
 
-    /** Returns the natural precipitation phase for one completed atmosphere step. */
-    public static PrecipitationType classify(
-            double intensity,
-            double airTemperatureCelsius,
-            double humidity,
-            AtmosphereEnvironment environment
-    ) {
-        if (!Double.isFinite(intensity) || intensity <= 0.001) {
+    /**
+     * Integrates warm-layer melting and underlying cold-layer refreezing in degree-metres.
+     * Thresholds approximate hydrometeor residence time, rather than a full drop-size spectrum.
+     */
+    public static PrecipitationType classify(double intensity, AtmosphericColumn column,
+            double instabilityJoulesPerKg, double updraftMetresPerSecond, double cloudDepthMetres) {
+        if (!Double.isFinite(intensity) || intensity <= 0.0) {
             return PrecipitationType.NONE;
         }
-        AtmosphereEnvironment climate = environment == null
-                ? AtmosphereEnvironment.TEMPERATE
-                : environment;
-        double wetBulbTemperature = AtmosphericThermodynamics.wetBulbTemperature(
-                airTemperatureCelsius,
-                humidity
-        );
-        return supportsNaturalSnow(climate)
-                && wetBulbTemperature <= WeatherSample.SNOW_MAX_TEMPERATURE
-                ? PrecipitationType.SNOW
-                : PrecipitationType.RAIN;
+        if (instabilityJoulesPerKg >= 1500 && updraftMetresPerSecond >= 10
+                && column.upper().temperatureCelsius() <= -10 && cloudDepthMetres >= 2500) {
+            return PrecipitationType.HAIL;
+        }
+        double warmArea = 0;
+        double surfaceColdArea = 0;
+        double surfaceColdDepth = 0;
+        boolean reachedWarmLayer = false;
+        for (int i = 1; i < 4; i++) {
+            AtmosphericLayer bottom = column.layer(i - 1);
+            AtmosphericLayer top = column.layer(i);
+            double t0 = bottom.wetBulbCelsius();
+            double t1 = top.wetBulbCelsius();
+            double depth = top.heightMetres() - bottom.heightMetres();
+            warmArea += positiveArea(t0, t1, depth);
+            if (!reachedWarmLayer) {
+                if (t0 <= 0 && t1 <= 0) {
+                    surfaceColdArea += -(t0 + t1) * depth * 0.5;
+                    surfaceColdDepth += depth;
+                } else if (t0 < 0) {
+                    double coldDepth = depth * -t0 / (t1 - t0);
+                    surfaceColdArea += -t0 * coldDepth * 0.5;
+                    surfaceColdDepth += coldDepth;
+                }
+            }
+            reachedWarmLayer |= t0 > 0 || t1 > 0;
+        }
+        double surfaceWetBulb = column.surface().wetBulbCelsius();
+        if (warmArea < 150 && surfaceWetBulb <= 1.0) {
+            return PrecipitationType.SNOW;
+        }
+        if (surfaceWetBulb <= 0) {
+            return surfaceColdArea >= 750 && surfaceColdDepth >= 300
+                    ? PrecipitationType.SLEET : PrecipitationType.FREEZING_RAIN;
+        }
+        return PrecipitationType.RAIN;
     }
 
-    /** Returns whether biome or calendar climate currently permits natural snow. */
+    private static double positiveArea(double bottom, double top, double depth) {
+        if (bottom >= 0 && top >= 0) {
+            return (bottom + top) * depth * 0.5;
+        }
+        if (bottom <= 0 && top <= 0) {
+            return 0;
+        }
+        double warm = Math.max(bottom, top);
+        return warm * depth * warm / Math.abs(top - bottom) * 0.5;
+    }
+
+    /** Compatibility query based only on environmental temperature, not a season permission bit. */
+    @Deprecated
     public static boolean supportsNaturalSnow(AtmosphereEnvironment environment) {
-        AtmosphereEnvironment climate = environment == null
-                ? AtmosphereEnvironment.TEMPERATE
-                : environment;
-        boolean permanentlyColdBiome = climate.biomeTemperatureCelsius()
-                <= COLD_BIOME_MAXIMUM_CELSIUS;
-        boolean temperateWinter = climate.seasonCalendarAvailable()
-                && climate.snowSeasonFactor() >= WINTER_SNOW_FACTOR_MINIMUM;
-        return permanentlyColdBiome || temperateWinter;
+        AtmosphereEnvironment climate = environment == null ? AtmosphereEnvironment.TEMPERATE : environment;
+        return climate.targetTemperatureCelsius(0) <= 1.5;
     }
 }

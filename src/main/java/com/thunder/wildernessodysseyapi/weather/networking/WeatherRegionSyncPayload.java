@@ -55,7 +55,7 @@ public record WeatherRegionSyncPayload(
 ) implements CustomPacketPayload {
 
     /** Current atmospheric snapshot schema understood by server and client. */
-    public static final int DATA_VERSION = 5;
+    public static final int DATA_VERSION = 6;
     /** Descriptive alias used by payload construction and validation code. */
     public static final int CURRENT_DATA_VERSION = DATA_VERSION;
     /** Hard cap for a 17 by 17 region around one player. */
@@ -99,6 +99,9 @@ public record WeatherRegionSyncPayload(
 
         Set<Long> uniqueCells = new HashSet<>(cells.size());
         for (CellSnapshot cell : cells) {
+            if (dataVersion == 5 && precipitationTypeId(cell.precipitationType()) > 3) {
+                throw new IllegalArgumentException("Weather v5 cannot represent " + cell.precipitationType());
+            }
             long relativeX = (long) cell.cellX() - centerCellX;
             long relativeZ = (long) cell.cellZ() - centerCellZ;
             if (Math.abs(relativeX) > MAX_CELL_OFFSET || Math.abs(relativeZ) > MAX_CELL_OFFSET) {
@@ -248,11 +251,15 @@ public record WeatherRegionSyncPayload(
             buffer.writeByte(quantizeUnit(cell.instability, UNSIGNED_BYTE_MAX));
             buffer.writeByte(quantizeUnit(cell.stormEnergy, UNSIGNED_BYTE_MAX));
 
-            // Precipitation type needs only two bits, leaving the remaining six
-            // for intensity without another byte per cell.
+            // Version six adds a phase bit without reducing the six-bit
+            // intensity precision used by the shared gameplay threshold.
             int precipitation = precipitationTypeId(cell.precipitationType) << 6;
             precipitation |= PrecipitationIntensity.quantize(cell.precipitationIntensity);
-            buffer.writeByte(precipitation);
+            if (payload.dataVersion >= 6) {
+                buffer.writeShort(precipitation);
+            } else {
+                buffer.writeByte(precipitation);
+            }
             buffer.writeShort(quantizeSignedUnit(cell.verticalMotion));
             buffer.writeByte(quantizeUnit(cell.cloudDepth, UNSIGNED_BYTE_MAX));
             buffer.writeShort(quantizeSignedUnit(cell.cloudWindX));
@@ -330,7 +337,10 @@ public record WeatherRegionSyncPayload(
             float cloudWater = dequantizeUnit(buffer.readUnsignedByte(), UNSIGNED_BYTE_MAX);
             float instability = dequantizeUnit(buffer.readUnsignedByte(), UNSIGNED_BYTE_MAX);
             float stormEnergy = dequantizeUnit(buffer.readUnsignedByte(), UNSIGNED_BYTE_MAX);
-            int precipitation = buffer.readUnsignedByte();
+            int precipitation = dataVersion >= 6 ? buffer.readUnsignedShort() : buffer.readUnsignedByte();
+            if ((precipitation & ~0x1FF) != 0) {
+                throw new IllegalArgumentException("Weather payload contains reserved precipitation bits");
+            }
             PrecipitationType precipitationType = precipitationTypeFromId(precipitation >>> 6);
             float precipitationIntensity = PrecipitationIntensity.dequantize(
                     precipitation & PrecipitationIntensity.QUANTIZED_MAX
@@ -392,8 +402,13 @@ public record WeatherRegionSyncPayload(
         );
     }
 
+    /** Returns whether this client can decode the bounded regional snapshot schema. */
+    public static boolean supportsDataVersion(int dataVersion) {
+        return dataVersion == 5 || dataVersion == CURRENT_DATA_VERSION;
+    }
+
     private static void validateHeader(int dataVersion, long sequence, long serverTick, int cellSize) {
-        if (dataVersion != CURRENT_DATA_VERSION) {
+        if (!supportsDataVersion(dataVersion)) {
             throw new IllegalArgumentException("Unsupported weather snapshot data version: " + dataVersion);
         }
         if (sequence < 0L) {
@@ -445,6 +460,8 @@ public record WeatherRegionSyncPayload(
             case RAIN -> 1;
             case SNOW -> 2;
             case HAIL -> 3;
+            case SLEET -> 4;
+            case FREEZING_RAIN -> 5;
         };
     }
 
@@ -454,6 +471,8 @@ public record WeatherRegionSyncPayload(
             case 1 -> PrecipitationType.RAIN;
             case 2 -> PrecipitationType.SNOW;
             case 3 -> PrecipitationType.HAIL;
+            case 4 -> PrecipitationType.SLEET;
+            case 5 -> PrecipitationType.FREEZING_RAIN;
             default -> throw new IllegalArgumentException("Invalid precipitation type id: " + typeId);
         };
     }

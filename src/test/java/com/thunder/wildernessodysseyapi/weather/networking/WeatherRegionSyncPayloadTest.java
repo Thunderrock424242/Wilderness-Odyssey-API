@@ -309,6 +309,110 @@ class WeatherRegionSyncPayloadTest {
         ));
     }
 
+    @Test
+    void codecPreservesAllSixPhasesWithoutReducingIntensityPrecision() {
+        for (PrecipitationType type : PrecipitationType.values()) {
+            var payload = phasePayload(WeatherRegionSyncPayload.DATA_VERSION, type);
+            FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+            try {
+                WeatherRegionSyncPayload.STREAM_CODEC.encode(buffer, payload);
+                var decoded = WeatherRegionSyncPayload.STREAM_CODEC.decode(buffer);
+                assertEquals(type, decoded.cells().getFirst().precipitationType());
+                assertEquals(PrecipitationIntensity.dequantize(PrecipitationIntensity.quantize(0.75F)),
+                        decoded.cells().getFirst().precipitationIntensity());
+                assertEquals(0, buffer.readableBytes());
+            } finally {
+                buffer.release();
+            }
+        }
+    }
+
+    @Test
+    void decodesLegacyV5PackedPhaseAndFollowingFieldsWithoutShiftingTheStream() {
+        FriendlyByteBuf buffer = phaseFixture(5, (3 << 6) | 32);
+        try {
+            var decoded = WeatherRegionSyncPayload.STREAM_CODEC.decode(buffer);
+            assertEquals(5, decoded.dataVersion());
+            assertEquals(PrecipitationType.HAIL, decoded.cells().getFirst().precipitationType());
+            assertEquals(32.0F / 63.0F, decoded.cells().getFirst().precipitationIntensity());
+            assertEquals(0.25F, decoded.windSettings().gustFrequency());
+            assertEquals(0, buffer.readableBytes());
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
+    void legacyWriterRejectsNewPhasesInsteadOfTruncatingTheirIds() {
+        assertThrows(IllegalArgumentException.class, () -> phasePayload(5, PrecipitationType.SLEET));
+        assertThrows(IllegalArgumentException.class, () -> phasePayload(5, PrecipitationType.FREEZING_RAIN));
+    }
+
+    @Test
+    void rejectsUnknownPhaseIdsAndReservedBits() {
+        for (int packed : new int[]{(6 << 6) | 32, (7 << 6) | 32, (1 << 9) | 32}) {
+            FriendlyByteBuf buffer = phaseFixture(6, packed);
+            try {
+                assertThrows(IllegalArgumentException.class,
+                        () -> WeatherRegionSyncPayload.STREAM_CODEC.decode(buffer));
+            } finally {
+                buffer.release();
+            }
+        }
+    }
+
+    private static WeatherRegionSyncPayload phasePayload(int version, PrecipitationType type) {
+        return new WeatherRegionSyncPayload(OVERWORLD, version, 2L, true, false, 256, 0, 0,
+                List.of(new WeatherRegionSyncPayload.CellSnapshot(
+                        0, 0, 0L, -4.0F, 0.9F, 0.96F, 0.2F, 0.1F,
+                        0.9F, 0.8F, 0.9F, 0.75F, type)));
+    }
+
+    /** Independent old wire fixture fixes the byte layout at the v5/v6 boundary. */
+    private static FriendlyByteBuf phaseFixture(int version, int precipitation) {
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeResourceLocation(OVERWORLD);
+        buffer.writeVarInt(version);
+        buffer.writeVarLong(1L);
+        buffer.writeVarLong(600L);
+        buffer.writeByte(3);
+        buffer.writeVarInt(256);
+        buffer.writeVarInt(0);
+        buffer.writeVarInt(0);
+        buffer.writeVarInt(1);
+        buffer.writeByte(0);
+        buffer.writeByte(0);
+        buffer.writeVarLong(1L);
+        buffer.writeShort(30_000); // temperature
+        buffer.writeByte(220); // humidity
+        buffer.writeShort(32_767); // pressure
+        buffer.writeShort(0); // wind X
+        buffer.writeShort(0); // wind Z
+        buffer.writeByte(200); // cloud water
+        buffer.writeByte(120); // instability
+        buffer.writeByte(180); // storm energy
+        if (version == 5) {
+            buffer.writeByte(precipitation);
+        } else {
+            buffer.writeShort(precipitation);
+        }
+        buffer.writeShort(0); // vertical motion
+        buffer.writeByte(200); // cloud depth
+        buffer.writeShort(0); // cloud wind X
+        buffer.writeShort(0); // cloud wind Z
+        buffer.writeByte(120); // surface wetness
+        buffer.writeByte(40); // puddles
+        buffer.writeByte(10); // snowpack
+        buffer.writeByte(50); // frozen fraction
+        buffer.writeBoolean(true);
+        buffer.writeFloat(1.0F);
+        buffer.writeFloat(0.25F);
+        buffer.writeFloat(2.0F);
+        buffer.writeFloat(1.5F);
+        buffer.writeFloat(20.0F);
+        return buffer;
+    }
+
     private static WeatherRegionSyncPayload.CellSnapshot clearCell(int cellX, int cellZ) {
         return new WeatherRegionSyncPayload.CellSnapshot(
                 cellX,

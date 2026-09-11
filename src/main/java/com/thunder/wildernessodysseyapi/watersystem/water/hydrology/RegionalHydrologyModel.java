@@ -17,11 +17,11 @@ public final class RegionalHydrologyModel {
             throw new IllegalArgumentException("Regional hydrology requires a positive step at most one simulation hour");
         }
         // Weather rates are normalized; this explicit conversion defines their hydrologic boundary.
-        double rainExact = state.precipitationFraction * parameters.rainfallMmPerGameHour
+        double rainExact = (state.physicalPrecipitation ? 0.0 : state.precipitationFraction) * parameters.rainfallMmPerGameHour
                 * 0.001 / 50.0 * RegionalHydrologyState.AREA * dt * UNITS + state.precipitationRemainder;
         long rainRequested = units(rainExact);
         state.precipitationRemainder = rainExact - rainRequested;
-        boolean snowfall = state.snowing || state.airTemperature <= 0;
+        boolean snowfall = state.snowing;
         long initialFlood = state.stored(FLOODPLAIN);
         long initialLake = state.stored(LAKE);
         long rain = state.credit(snowfall ? SNOW : SURFACE_RUNOFF,

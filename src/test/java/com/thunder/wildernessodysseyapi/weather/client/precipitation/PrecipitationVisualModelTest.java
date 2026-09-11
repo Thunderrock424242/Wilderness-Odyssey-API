@@ -102,6 +102,8 @@ class PrecipitationVisualModelTest {
     void rainAmbienceNeverPlaysForCameraLocalSnow() {
         assertTrue(PrecipitationVisualModel.usesRainSound(PrecipitationType.RAIN, 0.8));
         assertTrue(PrecipitationVisualModel.usesRainSound(PrecipitationType.HAIL, 0.8));
+        assertTrue(PrecipitationVisualModel.usesRainSound(PrecipitationType.FREEZING_RAIN, 0.8));
+        assertTrue(PrecipitationVisualModel.usesRainSound(PrecipitationType.SLEET, 0.8));
         assertFalse(PrecipitationVisualModel.usesRainSound(PrecipitationType.SNOW, 0.8));
         assertFalse(PrecipitationVisualModel.usesRainSound(PrecipitationType.RAIN, 0.0));
     }

@@ -4,7 +4,7 @@ import com.thunder.wildernessodysseyapi.weather.api.AtmosphericFrontType;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 
-/** Applies physically bounded lake, ocean, drought, heat, and hail feedback. */
+/** Legacy diagnostic dynamics adapter; all moisture creation and loss belongs to the physical engine. */
 public final class WeatherPhenomenaModel {
 
     private WeatherPhenomenaModel() {
@@ -50,14 +50,8 @@ public final class WeatherPhenomenaModel {
                 * (1.0 - weather.humidity() * 0.55);
 
         double temperature = weather.temperature() + heat * 0.22 * rate;
-        double humidity = unit(weather.humidity()
-                + lakeEffect * 0.035 * rate * moistureBoundary
-                + oceanStorm * 0.024 * rate * moistureBoundary
-                - drought * 0.025 * rate);
-        double cloudWater = unit(weather.cloudWater()
-                + lakeEffect * 0.040 * rate * moistureBoundary
-                + oceanStorm * 0.032 * rate * moistureBoundary
-                - drought * 0.020 * rate);
+        double humidity = weather.humidity();
+        double cloudWater = weather.cloudWater();
         double instability = unit(weather.instability()
                 + oceanStorm * 0.026 * rate
                 + Math.max(0.0, inputs.seasonalStorminessOffset()) * 0.018 * rate);
@@ -69,16 +63,6 @@ public final class WeatherPhenomenaModel {
                 + oceanStorm * 0.020 * rate, -1.0, 1.0);
         double precipitation = weather.precipitationIntensity();
         PrecipitationType type = weather.precipitationType();
-        double lakePrecipitation = unit(Math.max(precipitation, lakeEffect * 0.62));
-        if (lakeEffect >= 0.28 && PrecipitationPhaseModel.classify(
-                lakePrecipitation,
-                temperature,
-                humidity,
-                inputs
-        ) == PrecipitationType.SNOW) {
-            precipitation = lakePrecipitation;
-            type = PrecipitationType.SNOW;
-        }
 
         boolean hailColumn = precipitation >= 0.24
                 && stormEnergy >= 0.70
@@ -88,7 +72,6 @@ public final class WeatherPhenomenaModel {
                 && temperature > -12.0;
         if (hailColumn) {
             type = PrecipitationType.HAIL;
-            precipitation = Math.max(precipitation, 0.38 + stormEnergy * 0.42);
         }
         if (precipitation <= 0.001) {
             type = PrecipitationType.NONE;

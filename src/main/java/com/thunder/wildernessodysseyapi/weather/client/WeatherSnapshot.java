@@ -230,19 +230,22 @@ public final class WeatherSnapshot {
                 type(northWest),
                 type(northEast),
                 northTemperature,
-                northIntensity
+                northIntensity,
+                xAmount
         );
         PrecipitationType southType = interpolateAvailableType(
                 type(southWest),
                 type(southEast),
                 southTemperature,
-                southIntensity
+                southIntensity,
+                xAmount
         );
         return interpolateAvailableType(
                 northType,
                 southType,
                 interpolateAvailableScalar(northTemperature, southTemperature, zAmount),
-                interpolateAvailableScalar(northIntensity, southIntensity, zAmount)
+                interpolateAvailableScalar(northIntensity, southIntensity, zAmount),
+                zAmount
         );
     }
 
@@ -413,7 +416,8 @@ public final class WeatherSnapshot {
             PrecipitationType from,
             PrecipitationType to,
             double temperature,
-            double intensity
+            double intensity,
+            double amount
     ) {
         if (intensity <= 1.0E-4D || (from == null && to == null)) {
             return PrecipitationType.NONE;
@@ -424,19 +428,7 @@ public final class WeatherSnapshot {
         if (to == null || from == to) {
             return from;
         }
-        if (from == PrecipitationType.HAIL || to == PrecipitationType.HAIL) {
-            return intensity >= 0.18D ? PrecipitationType.HAIL
-                    : from == PrecipitationType.HAIL ? to : from;
-        }
-        if (from == PrecipitationType.NONE) {
-            return to;
-        }
-        if (to == PrecipitationType.NONE) {
-            return from;
-        }
-        return temperature <= WeatherSample.SNOW_MAX_TEMPERATURE
-                ? PrecipitationType.SNOW
-                : PrecipitationType.RAIN;
+        return WeatherSample.interpolatePrecipitationType(from, to, temperature, intensity, amount);
     }
 
     private static WeatherSample interpolateAvailable(

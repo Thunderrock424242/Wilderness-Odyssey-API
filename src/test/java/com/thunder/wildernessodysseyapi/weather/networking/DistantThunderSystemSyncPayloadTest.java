@@ -75,6 +75,34 @@ class DistantThunderSystemSyncPayloadTest {
     }
 
     @Test
+    void currentCodecPreservesSleetAndFreezingRainAndReadsLegacySummaries() {
+        for (PrecipitationType type : PrecipitationType.values()) {
+            int version = type.ordinal() <= 3 ? 1 : DistantThunderSystemSyncPayload.DATA_VERSION;
+            FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+            try {
+                var original = phasePayload(version, type);
+                DistantThunderSystemSyncPayload.STREAM_CODEC.encode(buffer, original);
+                var decoded = DistantThunderSystemSyncPayload.STREAM_CODEC.decode(buffer);
+                assertEquals(type, decoded.storms().getFirst().precipitationType());
+                assertEquals(version, decoded.dataVersion());
+                assertEquals(0, buffer.readableBytes());
+            } finally {
+                buffer.release();
+            }
+        }
+        assertThrows(IllegalArgumentException.class, () -> phasePayload(1, PrecipitationType.SLEET));
+        assertThrows(IllegalArgumentException.class, () -> phasePayload(1, PrecipitationType.FREEZING_RAIN));
+    }
+
+    private static DistantThunderSystemSyncPayload phasePayload(int version, PrecipitationType type) {
+        return new DistantThunderSystemSyncPayload(OVERWORLD, version, 1L, true,
+                List.of(new DistantThunderSystemSyncPayload.StormSnapshot(
+                        2L, WeatherSystemType.STORM, WeatherSystemStage.MATURE,
+                        0.0, 0.0, 300.0, 0.9, -1.0, 0.0, 0.9,
+                        type, 0.9, 0.9, 0.9, 0.9)));
+    }
+
+    @Test
     void atmosphericFrontCannotEnterThunderPayload() {
         assertThrows(IllegalArgumentException.class, () -> new DistantThunderSystemSyncPayload.StormSnapshot(
                 1L,

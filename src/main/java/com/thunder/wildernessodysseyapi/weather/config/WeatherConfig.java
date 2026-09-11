@@ -39,6 +39,8 @@ public final class WeatherConfig {
     public static ModConfigSpec.DoubleValue TEMPERATURE_TRANSPORT_RATE;
     public static ModConfigSpec.DoubleValue PRESSURE_EQUALIZATION_RATE;
     public static ModConfigSpec.DoubleValue WEATHER_FRONT_STRENGTH;
+    public static ModConfigSpec.DoubleValue CORIOLIS_PER_SECOND;
+    public static ModConfigSpec.IntValue MAXIMUM_PHYSICAL_CELL_STEPS;
     public static ModConfigSpec.DoubleValue EVAPORATION_STRENGTH;
     public static ModConfigSpec.DoubleValue CLOUD_FORMATION_THRESHOLD;
     public static ModConfigSpec.DoubleValue PRECIPITATION_THRESHOLD;
@@ -156,13 +158,13 @@ public final class WeatherConfig {
         builder.comment("Pure atmospheric calculation controls.")
                 .push("simulation");
         SIMULATION_SPEED = builder
-                .comment("Multiplier applied to one atmospheric update. Zero freezes evolution without deleting state.")
+                .comment("Multiplier of elapsed physical seconds. Zero freezes evolution without deleting state.")
                 .defineInRange("speed", 1.0, 0.0, 8.0);
         HUMIDITY_TRANSPORT_RATE = builder
-                .comment("Fraction of vapor and cloud moisture transported downwind per nominal update.")
+                .comment("Legacy transport control: 0.18 means full physical wind advection; lower values reduce transport.")
                 .defineInRange("humidityTransportRate", 0.18, 0.0, 1.0);
         TEMPERATURE_TRANSPORT_RATE = builder
-                .comment("Fraction of neighboring air temperature transported downwind per nominal update.")
+                .comment("Legacy temperature transport control: 0.10 means full physical advection.")
                 .defineInRange("temperatureTransportRate", 0.10, 0.0, 1.0);
         PRESSURE_EQUALIZATION_RATE = builder
                 .comment("Rate at which pressure equalizes and pressure gradients accelerate wind.")
@@ -170,6 +172,12 @@ public final class WeatherConfig {
         WEATHER_FRONT_STRENGTH = builder
                 .comment("Strength of lift, gusts, and storm development where contrasting air masses form weather fronts.")
                 .defineInRange("weatherFrontStrength", 0.75, 0.0, 1.0);
+        CORIOLIS_PER_SECOND = builder
+                .comment("Regional Coriolis deflection in 1/seconds. Positive/negative choose hemisphere; zero disables it.")
+                .defineInRange("coriolisPerSecond", 0.0001, -0.001, 0.001);
+        MAXIMUM_PHYSICAL_CELL_STEPS = builder
+                .comment("Numerical cell updates per pass. At least one complete retained-grid generation is permitted; excess elapsed time remains deferred.")
+                .defineInRange("maximumPhysicalCellSteps", 16384, 1024, 1048576);
         EVAPORATION_STRENGTH = builder
                 .comment("Humidity gain from cached surface water and humid biomes.")
                 .defineInRange("evaporationStrength", 0.12, 0.0, 1.0);
@@ -401,10 +409,20 @@ public final class WeatherConfig {
                     STORM_FORMATION_THRESHOLD.get(),
                     MAXIMUM_PRECIPITATION_INTENSITY.get(),
                     RANDOM_VARIATION.get(),
-                    WEATHER_FRONT_STRENGTH.get()
+                    WEATHER_FRONT_STRENGTH.get(),
+                    CORIOLIS_PER_SECOND.get()
             );
         } catch (IllegalStateException exception) {
             return SimulationSettings.DEFAULT;
+        }
+    }
+
+    /** Returns clamp-safe wind controls for server queries and client snapshots. */
+    public static int maximumPhysicalCellSteps() {
+        try {
+            return MAXIMUM_PHYSICAL_CELL_STEPS.get();
+        } catch (IllegalStateException exception) {
+            return 16384;
         }
     }
 
@@ -698,6 +716,7 @@ public final class WeatherConfig {
 
         public SchedulingSettings {
             cellSize = clamp(cellSize, 16, 4_096);
+            cellSize = Math.max(16, cellSize / 16 * 16);
             simulationIntervalTicks = clamp(simulationIntervalTicks, 10, 1_200);
             activeSimulationRadius = clamp(activeSimulationRadius, 0, 16);
             inactiveCellGracePeriodTicks = clamp(inactiveCellGracePeriodTicks, 0, 1_728_000);

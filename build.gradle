@@ -677,6 +677,21 @@ tasks.register('aiTest', Test) {
     }
 }
 
+// Uses the same existing offline JUnit runtime as other pure subsystem tests.
+// GameTests and live mod registration remain separate runtime validation.
+tasks.register('weatherPhysicsTest', Test) {
+    group = 'verification'
+    description = 'Runs weather and atmospheric water exchange regressions without starting Minecraft.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '2g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.weather.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.hydrology.*'
+    }
+}
+
 tasks.register('structureGenBunkerTest', Test) {
     group = 'verification'
     description = 'Runs the memory-intensive read-only bunker fixture regression.'

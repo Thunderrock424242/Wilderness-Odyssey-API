@@ -144,6 +144,33 @@ class WeatherSnapshotTest {
         assertEquals(0.0, snapshot.supportedPrecipitationIntensity(384.0, 128.0), 1.0E-12);
     }
 
+    @Test
+    void scalarAndSamplePathsAgreeAcrossEveryAuthoritativePhaseBoundary() {
+        for (PrecipitationType from : PrecipitationType.values()) {
+            for (PrecipitationType to : PrecipitationType.values()) {
+                WeatherSnapshot snapshot = snapshot(Map.of(
+                        WeatherSnapshot.packCell(0, 0), cell(0, 0, sample(-4.0, 0.8, from)),
+                        WeatherSnapshot.packCell(1, 0), cell(1, 0, sample(4.0, 0.8, to))
+                ));
+                for (double amount : new double[]{0.0, 0.25, 0.5, 0.75, 1.0}) {
+                    double x = 128.0 + amount * 256.0;
+                    assertEquals(snapshot.sample(x, 128.0).precipitationType(),
+                            snapshot.precipitationType(x, 128.0), from + " to " + to + " at " + amount);
+                }
+            }
+        }
+    }
+
+    @Test
+    void freezingRainAndSleetAreNotReclassifiedFromSurfaceTemperature() {
+        WeatherSnapshot snapshot = snapshot(Map.of(
+                WeatherSnapshot.packCell(0, 0), cell(0, 0, sample(-4.0, 0.8, PrecipitationType.FREEZING_RAIN)),
+                WeatherSnapshot.packCell(1, 0), cell(1, 0, sample(-8.0, 0.8, PrecipitationType.SLEET))
+        ));
+        assertEquals(PrecipitationType.FREEZING_RAIN, snapshot.precipitationType(192.0, 128.0));
+        assertEquals(PrecipitationType.SLEET, snapshot.precipitationType(320.0, 128.0));
+    }
+
     private static WeatherSnapshot snapshot(Map<Long, WeatherSnapshot.SnapshotCell> cells) {
         return new WeatherSnapshot(OVERWORLD, 1, 1L, 256, new HashMap<>(cells));
     }

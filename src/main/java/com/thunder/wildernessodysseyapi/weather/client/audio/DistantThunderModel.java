@@ -1,6 +1,5 @@
 package com.thunder.wildernessodysseyapi.weather.client.audio;
 
-import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import com.thunder.wildernessodysseyapi.weather.networking.DistantThunderSystemSyncPayload;
@@ -36,7 +35,7 @@ public final class DistantThunderModel {
      *
      * <p>This is the trust boundary that keeps light and gentle rain peaceful.
      * Even a tracked {@link WeatherSystemType#STORM} is rejected unless its
-     * current authoritative cell has sufficiently convective rain or hail.</p>
+     * current authoritative cell has sufficiently convective liquid or pellet precipitation.</p>
      */
     public static boolean canProduceThunderstormAudio(
             DistantThunderSystemSyncPayload.StormSnapshot storm,
@@ -45,8 +44,8 @@ public final class DistantThunderModel {
         if (storm == null || settings == null || !storm.type().storm()) {
             return false;
         }
-        boolean convectivePrecipitation = storm.precipitationType() == PrecipitationType.RAIN
-                || storm.precipitationType() == PrecipitationType.HAIL;
+        boolean convectivePrecipitation = storm.precipitationType().isLiquid()
+                || storm.precipitationType().isIcePellet();
         return convectivePrecipitation
                 && meetsSynchronizedThreshold(storm.intensity(), settings.minimumStormIntensity())
                 && meetsSynchronizedThreshold(

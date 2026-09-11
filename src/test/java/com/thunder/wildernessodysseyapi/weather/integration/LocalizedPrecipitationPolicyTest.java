@@ -39,6 +39,22 @@ class LocalizedPrecipitationPolicyTest {
         assertTrue(LocalizedPrecipitationPolicy.isRain(sample(PrecipitationType.RAIN, 0.025D)));
     }
 
+    @Test
+    void freezingRainWetsAndSleetAccumulatesFrozenAtTheSharedIntensityBoundary() {
+        WeatherSample freezingRain = sample(PrecipitationType.FREEZING_RAIN, 0.025D);
+        WeatherSample sleet = sample(PrecipitationType.SLEET, 0.025D);
+
+        assertTrue(LocalizedPrecipitationPolicy.isRain(freezingRain));
+        assertFalse(LocalizedPrecipitationPolicy.isSnow(freezingRain));
+        assertTrue(LocalizedPrecipitationPolicy.isSnow(sleet));
+        assertFalse(LocalizedPrecipitationPolicy.isRain(sleet));
+        assertTrue(freezingRain.isFreezingRain());
+        assertTrue(sleet.isSleeting());
+        assertFalse(sleet.isHailing());
+        assertFalse(LocalizedPrecipitationPolicy.isRain(sample(PrecipitationType.FREEZING_RAIN, 0.020D)));
+        assertFalse(LocalizedPrecipitationPolicy.isSnow(sample(PrecipitationType.SLEET, 0.020D)));
+    }
+
     private static WeatherSample sample(PrecipitationType type, double intensity) {
         return new WeatherSample(
                 type == PrecipitationType.SNOW ? -4.0D : 12.0D,
