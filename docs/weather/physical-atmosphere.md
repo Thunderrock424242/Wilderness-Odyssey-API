@@ -123,6 +123,38 @@ melting; visual snow cover does not create a second meltwater source.
 
 ## Operational checks
 
+`/wilderness weather physics` reports the retained cell's physical values, four
+layer winds, integrated last-batch evaporation/precipitation/boundary volumes,
+cell steps, calculation milliseconds, deferred ticks and the shared worker
+queue. `/wilderness weather systems` identifies storms/fronts; `sample` reports
+the local front classification. These operator-only commands do no extra
+simulation and add no production rendering or per-tick log output.
+
+`weather.simulation.coriolisPerSecond` defaults to `0.0001`; its sign selects a
+hemisphere-like deflection and zero disables it. `maximumPhysicalCellSteps`
+defaults to 16384 per batch. At least one complete tick generation is allowed,
+including stable substeps at small cell widths/high speed. Deferred time remains
+in the cell clock. A zero simulation speed consumes paused time without moving
+the physical state or consuming water receipts, so resuming does not replay the
+pause. All retained cells evolve with player-independent coarse physics; player
+interest still controls admission, loaded effects and snapshots.
+
+Atmosphere storage is version 4 (exact physical state plus compatibility words),
+persistent-system storage is version 2, regional snapshots are protocol 6, and
+distant-thunder snapshots are protocol 2. Save versions 1–3 and legacy snapshot
+decoders remain supported. The network registration handshake is version 30;
+clients and servers must update together to use the expanded phase protocol.
+This is source/API compatibility where old constructors are retained, not a
+promise that every separately compiled record consumer is binary compatible.
+
+Retention remains bounded. Exploration beyond the configured cell cap evicts
+cells, and changing atmospheric width resets the grid under the existing
+configuration contract. Width rounds down to a 16-block multiple for exchange
+accounting. Domain admission/eviction/reset is outside closed-domain conservation.
+Cached forcing supports orderly restart and unloaded cells; separate atmosphere
+and water save files are not crash-atomic. Historic forcing is not replayed for
+backlogged time. These are explicit limits of the coarse persistence model.
+
 Use Java 21 and the checked-in Gradle wrapper. Quote the project property in
 Windows PowerShell so the output directory remains one argument:
 
@@ -140,3 +172,68 @@ and at supported alternate cell widths and update intervals. Confirm loaded
 chunk counts do not grow because of weather sampling. Client appearance,
 multiplayer convergence, and modpack performance require these live checks;
 compilation and pure tests alone do not establish them.
+
+## Component and regression map
+
+Paths below are relative to `src/main/java/com/thunder/wildernessodysseyapi`.
+
+| Files/components | Responsibility |
+|---|---|
+| `weather/simulation/AtmosphereCell`, `AtmosphereGrid`, `WeatherAuthority`, `AtmosphericGridStepper` | Retain physical state; capture, budget, advance, validate and commit synchronous generations. |
+| `AtmosphericPhysicalState`, `AtmosphericUnits`, `AtmosphericLayer`, `AtmosphericColumn`, `AtmosphericColumnModel` in `weather/simulation` | Explicit units and four-layer continuity alongside the normalized API. |
+| `AtmosphericTransport`, `AtmosphericMoistureBudget`, `AtmosphericWaterFlux` in `weather/simulation` | Conservative transport, phase transfers and typed integrated precipitation. |
+| `WindPhysicsModel`, `SurfaceEnergyModel`, `AtmosphericFrontModel`, `CloudProperties`, `PrecipitationPhaseModel` in `weather/simulation` | Physical forcing, cloud geometry and precipitation classification. |
+| `weather/system/WeatherSystemTracker`, `WeatherSystemStorageCodec`; `weather/forecast/WeatherThreatForecastService` | Persistent motion, bounded association, lifecycle and matching forecast time units. |
+| `weather/storage/AtmosphereStorageCodec`, `PhysicalAtmosphereStorageCodec`; `weather/simulation/AtmosphereInputSampler` | Exact inventory/profile persistence and unloaded environment continuity. |
+| `watersystem/water/hydrology/AtmosphericWaterExchange`, `RegionalHydrologyManager`, `RegionalHydrologyModel`, `RegionalHydrologySavedData`, `RegionalHydrologyState` | Accepted finite ET, pending precipitation, SWE/ice ownership and durable watermarks. |
+| `weather/api`, `weather/networking`, existing precipitation render/audio consumers and localized mixins | Six-phase compatibility, versioned codecs and client/server phase parity. |
+| `weather/config/WeatherConfig`, `weather/debug/PhysicalWeatherDiagnostics`, `WeatherDebugCommand` | Bounded controls and operator diagnostics. |
+
+| Regression group | Contract exercised |
+|---|---|
+| `AtmosphericPhysicsTest` | Closed water cycle, accepted ET, supersaturation, timestep convergence, gradients, front resolution, friction, all phases, orography and surface energy. |
+| `AtmosphericGridStepperTest` | Synchronous multi-cell conservation, activity independence, deferred work, maximum-speed minimum-cell progress, differing clocks, cadence and pause/resume. |
+| `AtmosphericTransportTest` | A 10 m/s vapor pulse moves 600 metres in 60 seconds at 128, 256 and 512 metre widths while conserving mass. |
+| `PhysicalAtmosphericExchangeTest` | Equal regional debit/atmospheric credit, restart, phase destinations, fractional carry, rejected capacity and area weighting. |
+| `PhysicalAtmosphereStorageCodecTest` | Repeated exact saves, warm noses, supersaturated inventory, every phase, independent v3 fixture, corrupt-row isolation and seasonal humidity continuity. |
+| Tracker/forecast, grid/snapshot, network and precipitation tests | Continuous identity motion/merges, old velocity migration, cadence-independent decay, six-phase interpolation, codec compatibility and visual mappings. |
+| `WeatherDataEngineGameTests` | Loaded-server capture/worker/apply path with physical inventory, layer and step-counter assertions; requires an actual GameTest run. |
+
+
+## Recorded validation
+
+The September 11, 2026 implementation run completed production compilation,
+`weatherPhysicsTest` and mod packaging with JDK 21 and isolated `.codex-build`
+output. The final focused suite recorded **325 tests in 75 suites, zero failures,
+zero errors and zero skipped tests**. `git diff --check` also completed cleanly.
+The September 14 continuation confirmed the checkout and packaged artifact.
+
+Commands used, from the repository root:
+
+```powershell
+.\gradlew.bat compileJava '-PcodexBuildDir=.codex-build' --no-daemon --no-parallel --console=plain
+.\gradlew.bat weatherPhysicsTest build '-PcodexBuildDir=.codex-build' --no-daemon --no-parallel --console=plain
+.\gradlew.bat weatherPhysicsTest '-PcodexBuildDir=.codex-build' --no-daemon --no-parallel --console=plain
+```
+
+The final test-only pass included the added advection-distance and primitive
+phase-query regressions; production source and the packaged JAR were unchanged.
+The repository's `build` task performs assembly without the full JUnit suite,
+so the separately completed focused task is the test evidence. This does not
+claim that every unrelated repository test ran.
+
+The regular mod artifact is `.codex-build/libs/wildernessodysseyapi-4.2.0.jar`.
+Its physical simulation, persistence, diagnostics classes and NeoForge metadata
+were checked in the archive. Its SHA-256 at verification was
+`6690680787D7F2ACD59D9FE17435F254EF99F421F09245E3024EF062C7DE291B`.
+
+Gradle reported an existing StructureGen catalog fingerprint mismatch and
+skipped optional modded catalog content; the three configured structures still
+validated/generated, and packaging succeeded. Initial sandbox access failures
+were resolved for validation with approved execution outside the sandbox.
+No permissions, caches or generated dependency JARs were modified as recovery.
+
+The updated GameTest source compiled, but `runGameTestServer`, live client/server,
+two-client synchronization, visual weather acceptance and representative modpack
+performance have **not** been run for this upgrade. Use the operational checks
+above and the main localized-atmosphere checklist for that runtime acceptance.

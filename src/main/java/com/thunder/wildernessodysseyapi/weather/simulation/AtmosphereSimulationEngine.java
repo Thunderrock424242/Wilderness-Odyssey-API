@@ -26,6 +26,7 @@ public final class AtmosphereSimulationEngine {
             Neighborhood neighborhood, SimulationSettings settings, AtmosphericWaterExchange.Receipt receipt) {
         WeatherSample sample = Objects.requireNonNullElse(current, WeatherSample.CLEAR);
         SimulationSettings controls = Objects.requireNonNullElse(settings, SimulationSettings.DEFAULT);
+        receipt = Objects.requireNonNullElse(receipt, AtmosphericWaterExchange.Receipt.EMPTY);
         if (controls.simulationSpeed() == 0) {
             return sample;
         }

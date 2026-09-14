@@ -58,6 +58,13 @@ public final class WeatherDataEngineGameTests {
                             applied.lastSimulatedTick() > capturedSimulationTick,
                             "The worker result has not advanced the authoritative simulation tick"
                     );
+                    helper.assertTrue(Double.isFinite(applied.physicalState().totalWaterKgPerSquareMetre()),
+                            "The committed physical moisture inventory is not finite");
+                    helper.assertTrue(applied.physicalState().column().upper().heightMetres()
+                                    > applied.physicalState().column().low().heightMetres(),
+                            "The worker did not retain the four-layer atmospheric profile");
+                    helper.assertTrue(authority.physicsDiagnostics(level).cellSteps() > 0,
+                            "No physical cell steps were recorded for the committed generation");
 
                     DataEngineMetricsSnapshot current = dataEngine.metricsSnapshot();
                     helper.assertTrue(

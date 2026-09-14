@@ -134,16 +134,16 @@ public final class WeatherConfig {
                 .comment("Master switch for Wilderness Odyssey localized weather.")
                 .define("enabled", true);
         ATMOSPHERIC_CELL_SIZE = builder
-                .comment("Horizontal atmospheric cell width in blocks. Changing this resets stored cells because coordinates no longer describe the same regions.")
+                .comment("Horizontal atmospheric cell width in metres/blocks, rounded down to a multiple of 16. Changing the effective width resets stored cells.")
                 .defineInRange("atmosphericCellSize", DEFAULT_CELL_SIZE, 16, 4_096);
         SIMULATION_INTERVAL_TICKS = builder
                 .comment("Server ticks between throttled atmospheric simulation passes.")
                 .defineInRange("simulationIntervalTicks", DEFAULT_SIMULATION_INTERVAL, 10, 1_200);
         ACTIVE_SIMULATION_RADIUS = builder
-                .comment("Atmospheric cell radius simulated around each active player, excluding no additional chunk loads.")
+                .comment("Radius of atmosphere cells admitted around players. All retained cells evolve; sampling never loads additional chunks.")
                 .defineInRange("activeSimulationRadius", DEFAULT_ACTIVE_RADIUS, 0, 16);
         INACTIVE_CELL_GRACE_PERIOD_TICKS = builder
-                .comment("Ticks recently active cells remain eligible for simulation after players leave.")
+                .comment("Ticks cells keep GRACE interest status after players leave. All retained cells continue coarse evolution.")
                 .defineInRange("inactiveCellGracePeriodTicks", DEFAULT_INACTIVE_GRACE, 0, 1_728_000);
         ENVIRONMENT_RESAMPLE_INTERVAL_TICKS = builder
                 .comment("Ticks between cached biome, terrain, daylight, and water-influence refreshes.")
@@ -179,7 +179,7 @@ public final class WeatherConfig {
                 .comment("Numerical cell updates per pass. At least one complete retained-grid generation is permitted; excess elapsed time remains deferred.")
                 .defineInRange("maximumPhysicalCellSteps", 16384, 1024, 1048576);
         EVAPORATION_STRENGTH = builder
-                .comment("Humidity gain from cached surface water and humid biomes.")
+                .comment("Open-boundary evaporation strength for terrain without finite regional water receipts.")
                 .defineInRange("evaporationStrength", 0.12, 0.0, 1.0);
         CLOUD_FORMATION_THRESHOLD = builder
                 .comment("Relative-humidity baseline above which vapor condenses into cloud water.")

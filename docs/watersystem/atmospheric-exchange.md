@@ -26,33 +26,56 @@ ordinary queries cannot acknowledge or drain receipts.
 The book is indexed by atmospheric cell rather than scanning all terrain on each
 query. A cell-size change rebuilds only the in-memory index. Its entry count is
 bounded by the regional owner's admitted nodes. Neither capture nor publication
-loads chunks. `clearLevel` releases the optional feedback on dimension unload;
-the regional owner must also call it when disabling physical hydrology. The
-weather authority clears its copy on level unload and server shutdown.
+loads chunks. The receipt book lives in regional hydrology SavedData, so
+`clearLevel` and server shutdown do not discard pending transfers.
 
-## Explicit atmospheric approximation
+## Physical atmospheric transfers
 
-Atmospheric vapor and cloud water remain normalized quantities. They are not
-finite cubic-metre stores, and the current weather model is **not** a closed
-global water-budget solver. Precipitation enters the regional budget through an
-explicit atmospheric boundary. Its receipt is retained for diagnostics and
-acknowledged, but is not subtracted a second time from weather's existing
-precipitation/cloud process.
+Weather retains vapor, cloud liquid and cloud ice in column kg/m². One kg/m²
+equals one millimetre of liquid water. The normalized humidity/cloud API is
+derived from that state and cannot truncate its inventory.
 
-Accepted regional evaporation is converted to a normalized column feedback using
-25 mm of precipitable water per inventory unit. That feedback is not multiplied
-again by weather's simulation-speed setting. For the regional footprint covered
-by receipts, weather disables the old coverage-derived evaporation, biome vapor
-restoration and heuristic lake/ocean moisture gains. Thus a depleted physical
-reservoir cannot keep supplying vapor simply because terrain is categorized as
-wet. The uncovered fraction retains legacy open-boundary forcing, including
-unmodeled terrain and ocean background. Atmospheric transport, humidity clamps,
-cloud heuristics and seasonal forcing still make global atmospheric mass closure
-an approximation; exact conservation claims apply to the regional water owner.
+Accepted regional evaporation is converted by dividing milli-units by
+4,096,000, then by atmospheric cell area, then multiplying by 1,000 to obtain
+mm. The legacy 25 mm-per-inventory-unit helper remains available, but the
+physical solver stores the complete accepted amount. Simulation speed and
+numerical substeps never multiply the same receipt again.
 
-Receipts are ephemeral integration state, not separately persisted water. A crash
-can lose the most recent not-yet-applied weather feedback but cannot delete or
-duplicate regional water. Regional restart snapshots republish the latest SWE.
+For covered terrain, the atmosphere disables independent bulk evaporation and
+biome vapor restoration. Unmodeled terrain retains explicitly reported open
+boundary forcing. A depleted finite store cannot keep supplying vapor simply
+because the terrain has water coverage.
+
+Atmospheric cloud sedimentation removes water before a committed weather batch
+calls `publishPrecipitation`. Typed integrated depths multiply each admitted
+node's area; rain enters runoff, snow/sleet/hail enter SWE, and freezing rain
+enters ice. Every pending sub-unit fraction survives save/load and repeated
+application. Capacity-rejected amounts remain pending. Replayed publication
+clocks are ignored. The regional normalized rain calculation is disabled for
+physically coupled nodes, preventing a second precipitation source. Modelled
+SWE/ice melt transfers existing stored mass into liquid.
+
+Only admitted terrain receives finite precipitation credits. The rest of a
+weather cell's precipitation is explicit export to unmodeled terrain.
+Hydrologic scheduling applies pending precipitation at the next bounded regional
+step; it does not reconstruct a sub-step rainfall history during catch-up.
+Conservation holds over atmosphere plus regional stores plus pending transfers
+and named open-boundary exchanges, not an infinite global ocean/atmosphere.
+
+## Persistence and recovery boundary
+
+Regional SavedData contains the versioned receipt book alongside water stores.
+It saves cumulative evaporation, acknowledgement watermarks, current SWE
+observations, typed pending precipitation fractions and replay clocks.
+An orderly save/restart retains pending transfers and does not recredit an
+acknowledged receipt. Older regional saves without a book initialize it empty;
+version 1–3 atmospheric saves migrate once to physical state.
+
+Atmosphere and regional water remain separate Minecraft SavedData files.
+An abrupt process crash between their writes is not an atomic cross-file
+transaction and can replay or lose the latest exchange. This implementation
+does not claim a crash-proof distributed journal. Existing water inventory
+validation remains fail-closed for invalid regional data.
 
 ## Snow appearance and compatibility
 
@@ -81,7 +104,10 @@ Focused tests cover outstanding receipt capture, duplicate acknowledgement,
 publications during calculation, duplicate interval rejection, negative amounts,
 negative chunk coordinates, atmospheric resolution changes, SWE projection during
 warm and snowy weather, dry-reservoir evaporation suppression and the accepted
-ET-to-vapor conversion. They are part of the normal Gradle test source set.
+ET-to-vapor conversion. Physical tests also cover saved pending transfers, exact
+regional debit/atmospheric credit, all five precipitation destinations, capacity
+rejection, fractional carry, area weighting and closed-grid conservation. They
+run with `weatherPhysicsTest` through the checked-in Gradle wrapper.
 
 In-game checks must separately verify synchronized snow patches, reconnect and
 dimension-unload behavior, physically modeled versus unmodeled snow columns,

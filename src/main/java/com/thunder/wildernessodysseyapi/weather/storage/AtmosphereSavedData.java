@@ -14,8 +14,8 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Dimension-scoped persistent owner of the authoritative atmosphere grid.
  *
- * <p>Only compact simulation continuity is saved. Client rendering state and
- * live environment caches are intentionally excluded. Loading never propagates
+ * <p>Physical continuity and detached environment forcing are saved. Client rendering
+ * state and live world objects are excluded. Loading never propagates
  * malformed atmosphere data into the level load path.</p>
  */
 public final class AtmosphereSavedData extends SavedData {

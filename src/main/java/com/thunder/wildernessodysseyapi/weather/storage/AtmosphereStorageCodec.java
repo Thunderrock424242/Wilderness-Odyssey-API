@@ -20,10 +20,9 @@ import java.util.Set;
 /**
  * Versioned compact NBT codec for persistent atmospheric cells.
  *
- * <p>Schema version three uses eight parallel primitive long arrays. Four packed
- * weather words quantize normalized state, while keys, revisions, and activity
- * ticks retain their full range. Version-one and version-two saves remain
- * readable and derive missing vertical or surface fields safely.</p>
+ * <p>Schema version four retains eight compatibility arrays and adds exact physical
+ * inventory, four layers and cached environment per cell. Versions one through three
+ * migrate once from normalized weather with safe defaults for missing fields.</p>
  */
 public final class AtmosphereStorageCodec {
     public static final int DATA_VERSION = 4;
@@ -101,7 +100,7 @@ public final class AtmosphereStorageCodec {
     }
 
     /**
-     * Decodes valid version-one, version-two, or version-three entries and recovers to an empty grid for an
+     * Decodes valid versions one through four and recovers to an empty grid for an
      * absent, unsupported, or structurally malformed payload.
      */
     public static DecodeResult decode(CompoundTag tag, int fallbackCellSize, int maximumCells) {

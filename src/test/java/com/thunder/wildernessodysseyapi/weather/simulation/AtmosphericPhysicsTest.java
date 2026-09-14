@@ -8,6 +8,22 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Behavioral physical contracts; no Minecraft level, chunk, player or worker is required. */
 class AtmosphericPhysicsTest {
+    @Test
+    void theSamePhysicalFrontGradientHasTheSameClassificationAtDifferentCellWidths() {
+        var center = state(10, .8, 0, 0);
+        AtmosphericFrontModel.FrontState reference = null;
+        for (int width : new int[]{128, 256, 512}) {
+            var warm = state(10 + width * .04, .8, 0, 0);
+            var cold = state(10 - width * .04, .8, 0, 0);
+            var front = AtmosphericFrontModel.analyze(center,
+                    new AtmosphereSimulationEngine.PhysicalNeighborhood(center, warm, center, cold), width);
+            if (reference == null) reference = front;
+            assertEquals(reference.type(), front.type());
+            assertEquals(reference.strength(), front.strength(), 1.0E-10);
+            assertEquals(reference.lift(), front.lift(), 1.0E-10);
+        }
+        assertTrue(reference.strength() > 0);
+    }
     private static final AtmosphereSimulationEngine ENGINE = new AtmosphereSimulationEngine();
     private static final AtmosphericWaterExchange.Receipt CLOSED = new AtmosphericWaterExchange.Receipt(
             0, 0, 1, 0, 256 * 256, List.of());
