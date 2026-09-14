@@ -13,6 +13,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies that the authoritative grid exposes smooth, position-local weather. */
 class AtmosphereGridTest {
+    @Test
+    void allPhasesAgreeBetweenPrimitiveAndObjectSamplingAcrossCellBoundaries() {
+        for (PrecipitationType from : PrecipitationType.values()) {
+            for (PrecipitationType to : PrecipitationType.values()) {
+                var grid = new AtmosphereGrid(256);
+                grid.getOrCreate(new AtmosphereCellKey(0, 0), sample(-3, from == PrecipitationType.NONE ? 0 : .8, from), 0);
+                grid.getOrCreate(new AtmosphereCellKey(1, 0), sample(2, to == PrecipitationType.NONE ? 0 : .8, to), 0);
+                for (int x = 128; x <= 384; x += 16) {
+                    assertEquals(grid.sample(x, 128).precipitationType(), grid.functionalPrecipitationType(x, 128),
+                            from + " to " + to + " at " + x);
+                }
+            }
+        }
+    }
 
     @Test
     void samplesLocalizedPrecipitationAtCellCentersAndInterpolatesBetweenThem() {

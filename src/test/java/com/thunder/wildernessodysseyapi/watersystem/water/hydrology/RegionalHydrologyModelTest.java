@@ -21,6 +21,7 @@ class RegionalHydrologyModelTest {
     @Test void closedRegionConservesStormSnowThawEvaporationAndIce() {
         RegionalHydrologyState state = new RegionalHydrologyState(1, 0, 64);
         state.airTemperature = -8;
+        state.snowing = true; // The atmosphere owns phase; cold air alone no longer reclassifies rain.
         state.precipitationFraction = 1;
         long vaporReceipts = 0;
         for (int i = 0; i < 100; i++) {
@@ -30,6 +31,7 @@ class RegionalHydrologyModelTest {
         }
         assertTrue(state.stored(SNOW) > 0);
         state.airTemperature = 15;
+        state.snowing = false;
         state.sunlight = .8;
         for (int i = 0; i < 500; i++) {
             var exchange = RegionalHydrologyModel.advance(state, null, WEATHER, 2);

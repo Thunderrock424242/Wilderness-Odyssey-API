@@ -25,9 +25,10 @@ import com.thunder.wildernessodysseyapi.weather.api.WindVector;
  * @param oceanCoverage exposed ocean-water coverage
  * @param inlandWaterCoverage exposed lake and inland-water coverage
  * @param fireSeasonFactor normalized temperate-summer or tropical-dry-season strength
- * @param snowSeasonFactor normalized temperate-winter snowfall eligibility
+ * @param snowSeasonFactor legacy temperate-winter metadata, never a snowfall permission
  * @param seasonCalendarAvailable whether an external calendar supplied a season phase
  * @param seasonalCyclePhase normalized temperate calendar position, or NaN when unavailable
+ * @param seasonalHumidityOffset applied humidity adjustment retained to avoid adding it again after restart
  */
 public record AtmosphereEnvironment(
         double biomeTemperatureCelsius,
@@ -48,7 +49,8 @@ public record AtmosphereEnvironment(
         double fireSeasonFactor,
         double snowSeasonFactor,
         boolean seasonCalendarAvailable,
-        double seasonalCyclePhase
+        double seasonalCyclePhase,
+        double seasonalHumidityOffset
 ) {
     public static final AtmosphereEnvironment TEMPERATE = new AtmosphereEnvironment(
             15.0,
@@ -71,6 +73,25 @@ public record AtmosphereEnvironment(
             false,
             Double.NaN
     );
+
+    /** Retains the existing constructor; legacy inputs have no separately retained humidity adjustment. */
+    public AtmosphereEnvironment(double biomeTemperatureCelsius, double biomeHumidity, double elevationBlocks,
+            double waterCoverage, double daylight, double dimensionTemperatureOffset, double seasonalTemperatureOffset,
+            double atmosphericVariation, double seasonalStorminessOffset, double seasonalEvaporationMultiplier,
+            double terrainGradientX, double terrainGradientZ, double terrainRoughness, double oceanCoverage,
+            double inlandWaterCoverage, double fireSeasonFactor, double snowSeasonFactor,
+            boolean seasonCalendarAvailable, double seasonalCyclePhase) {
+        this(biomeTemperatureCelsius, biomeHumidity, elevationBlocks, waterCoverage, daylight,
+                dimensionTemperatureOffset, seasonalTemperatureOffset, atmosphericVariation, seasonalStorminessOffset,
+                seasonalEvaporationMultiplier, terrainGradientX, terrainGradientZ, terrainRoughness,
+                oceanCoverage, inlandWaterCoverage, fireSeasonFactor, snowSeasonFactor, seasonCalendarAvailable,
+                seasonalCyclePhase, 0.0);
+    }
+
+    /** Raw cached terrain humidity before seasonal forcing, including when the combined value saturated. */
+    public double terrainHumidity() {
+        return unit(biomeHumidity - seasonalHumidityOffset);
+    }
 
     /** Retains the pre-cycle-phase construction shape for integrations and tests. */
     public AtmosphereEnvironment(
@@ -276,6 +297,7 @@ public record AtmosphereEnvironment(
     public AtmosphereEnvironment {
         biomeTemperatureCelsius = clamp(finiteOr(biomeTemperatureCelsius, 15.0), -80.0, 60.0);
         biomeHumidity = unit(biomeHumidity);
+        seasonalHumidityOffset = clamp(finiteOr(seasonalHumidityOffset, 0), -1, 1);
         elevationBlocks = clamp(finiteOr(elevationBlocks, 64.0), -128.0, 2048.0);
         waterCoverage = unit(waterCoverage);
         daylight = unit(daylight);

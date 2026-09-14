@@ -67,7 +67,7 @@ public final class AtmosphereInputSampler {
             Climate climate = sampleLoadedClimate(level, cell, cellSize);
             if (climate.loadedProbes > 0 || cached == null) {
                 Climate fallback = persistedEnvironment == null ? dimensionFallback(level)
-                        : new Climate(persistedEnvironment.biomeTemperatureCelsius(), persistedEnvironment.biomeHumidity(),
+                        : new Climate(persistedEnvironment.biomeTemperatureCelsius(), persistedEnvironment.terrainHumidity(),
                         persistedEnvironment.elevationBlocks(), 1, persistedEnvironment.terrainGradientX(),
                         persistedEnvironment.terrainGradientZ(), persistedEnvironment.terrainRoughness());
                 cached = new CachedClimate(gameTime, climate.withFallback(fallback));
@@ -112,7 +112,8 @@ public final class AtmosphereInputSampler {
                 season.fireSeasonFactor(),
                 season.snowSeasonFactor(),
                 season.calendarAvailable(),
-                season.cyclePhase()
+                season.cyclePhase(),
+                humidity - climate.humidity
         );
     }
 

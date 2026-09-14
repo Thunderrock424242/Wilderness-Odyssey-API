@@ -17,6 +17,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Covers threat tiers, movement rejection, dissipation, and competing systems. */
 class WeatherThreatForecastServiceTest {
+    @Test
+    void weakeningForecastUsesPhysicalDecayRegardlessOfConfiguredCadence() {
+        var storm = system(20, WeatherSystemType.STORM, WeatherSystemStage.WEAKENING,
+                .8, -1000, new WindVector(1, 0));
+        var frequent = new WeatherSystemTracker.TrackingSettings(true, 48, 20, 3, 220, 520, .28, .08,
+                .035, .58, true, .86, .62, 6000);
+        var normal = forecast(storm);
+        assertTrue(normal.incoming(), "A fast storm arrives before it dissipates");
+        assertEquals(normal, WeatherThreatForecastService.forecast(0, 0, 7200, List.of(storm), frequent));
+    }
 
     private static final WeatherSystemTracker.TrackingSettings SETTINGS =
             WeatherSystemTracker.TrackingSettings.DEFAULT;
@@ -71,7 +81,7 @@ class WeatherThreatForecastServiceTest {
     void weakeningSystemThatDissipatesBeforeArrivalIsIgnored() {
         TrackedWeatherSystem weakening = system(
                 8L, WeatherSystemType.STORM, WeatherSystemStage.WEAKENING,
-                0.80, -1_000.0, new WindVector(1.0, 0.0));
+                0.80, -1_000.0, new WindVector(3.0 / 40.0, 0.0));
 
         assertEquals(WeatherThreat.NONE, forecast(weakening).type());
     }

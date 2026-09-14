@@ -9,6 +9,50 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WeatherSystemTrackerTest {
+    @Test
+    void pausingConsumesTheClockWithoutAgingOrMovingAStorm() {
+        var tracker = new WeatherSystemTracker();
+        var storm = new TrackedWeatherSystem(1, WeatherSystemType.STORM, WeatherSystemStage.MATURE,
+                0, 0, 320, .8, new WindVector(.25, 0), .5, 0, 0, 0);
+        tracker.restore(2, List.of(storm));
+        assertTrue(tracker.pauseThrough(600));
+        assertEquals(storm.centerX(), tracker.systems().getFirst().centerX());
+        assertEquals(storm.intensity(), tracker.systems().getFirst().intensity());
+        assertEquals(storm.ageTicks(), tracker.systems().getFirst().ageTicks());
+        tracker.update(List.of(), 620, 20, WeatherSystemTracker.TrackingSettings.DEFAULT);
+        assertEquals(10, tracker.systems().getFirst().centerX());
+    }
+
+    @Test
+    void physicalSteeringDistanceIsIndependentOfUpdateCadence() {
+        for (int interval : new int[]{20, 60, 120}) {
+            var tracker = new WeatherSystemTracker();
+            tracker.restore(2, List.of(new TrackedWeatherSystem(1, WeatherSystemType.STORM,
+                    WeatherSystemStage.MATURE, 0, 0, 320, .9, new WindVector(.25, -.125),
+                    .3, 0, 0, 0)));
+            for (int tick = interval; tick <= 600; tick += interval) {
+                tracker.update(List.of(), tick, interval, WeatherSystemTracker.TrackingSettings.DEFAULT);
+            }
+            assertEquals(1, tracker.systems().size());
+            assertEquals(300, tracker.systems().getFirst().centerX(), 1.0E-10);
+            assertEquals(-150, tracker.systems().getFirst().centerZ(), 1.0E-10);
+            assertEquals(1, tracker.systems().getFirst().id());
+        }
+    }
+
+    @Test
+    void mergingStormsPreservesTheSurvivingIdentityPosition() {
+        var tracker = new WeatherSystemTracker();
+        tracker.restore(3, List.of(
+                new TrackedWeatherSystem(1, WeatherSystemType.STORM, WeatherSystemStage.MATURE,
+                        0, 0, 600, .8, WindVector.ZERO, .5, 0, 0, 0),
+                new TrackedWeatherSystem(2, WeatherSystemType.STORM, WeatherSystemStage.MATURE,
+                        200, 0, 600, .7, WindVector.ZERO, .5, 0, 0, 0)));
+        tracker.update(List.of(), 20, 20, WeatherSystemTracker.TrackingSettings.DEFAULT);
+        assertEquals(1, tracker.systems().size());
+        assertEquals(1, tracker.systems().getFirst().id());
+        assertEquals(0, tracker.systems().getFirst().centerX());
+    }
 
     @Test
     void identityMovesStrengthensAndDissipatesAcrossUpdates() {

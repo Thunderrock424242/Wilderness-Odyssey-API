@@ -53,6 +53,8 @@ public final class WeatherDebugCommand {
                                 .executes(context -> wind(context.getSource())))
                         .then(Commands.literal("cell")
                                 .executes(context -> cell(context.getSource())))
+                        .then(Commands.literal("physics")
+                                .executes(context -> physics(context.getSource())))
                         .then(Commands.literal("forecast")
                                 .executes(context -> forecast(context.getSource())))
                         .then(Commands.literal("systems")
@@ -250,6 +252,29 @@ public final class WeatherDebugCommand {
                 )
                 : "none within 6.0 minutes";
         source.sendSuccess(() -> Component.literal("  Wildlife threat forecast: " + threatSummary), false);
+        return 1;
+    }
+
+    /** Reads only authoritative snapshots and existing Data Engine counters on the command thread. */
+    private static int physics(CommandSourceStack source) {
+        WeatherAuthority authority = WeatherAuthority.get();
+        AtmosphereView view = authority.cellAt(source.getLevel(), BlockPos.containing(source.getPosition()));
+        if (view == null) {
+            source.sendFailure(Component.literal("No atmosphere cell is retained here yet."));
+            return 0;
+        }
+        for (String line : PhysicalWeatherDiagnostics.describe(view)) {
+            source.sendSuccess(() -> Component.literal(line), false);
+        }
+        WeatherAuthority.PhysicsDiagnostics physics = authority.physicsDiagnostics(source.getLevel());
+        var engine = com.thunder.wildernessodysseyapi.dataengine.DataEngine.get().metricsSnapshot();
+        double volumePerMm = Math.pow(WeatherConfig.scheduling().cellSize(), 2) / 1000.0;
+        source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
+                "Last batch: %d cell steps, %.3f ms, %d ticks deferred; ET %.6f m3, precipitation %.6f m3, open-boundary vapor %+.6f m3. %d systems; shared worker queue %d, rejected %d.",
+                physics.cellSteps(), physics.calculationNanos() / 1_000_000.0, physics.deferredTicks(),
+                physics.evaporationMm() * volumePerMm, physics.precipitationMm() * volumePerMm,
+                physics.boundaryVaporMm() * volumePerMm, authority.systems(source.getLevel()).size(),
+                engine.asyncQueueLength(), engine.asyncTasksRejected())), false);
         return 1;
     }
 

@@ -64,7 +64,6 @@ import java.util.function.LongFunction;
  */
 public final class WeatherAuthority implements WeatherQuery {
 
-    private static final int MAX_CATCH_UP_STEPS = 12;
     private static final double PERSISTENT_STORM_ENERGY = 0.55;
     private static final BooleanSupplier ALWAYS_HAS_TIME = () -> true;
     private static final WeatherAuthority INSTANCE = new WeatherAuthority();
@@ -341,13 +340,13 @@ public final class WeatherAuthority implements WeatherQuery {
     @Override
     public boolean isRainingAt(ServerLevel level, BlockPos position) {
         PrecipitationType type = precipitationTypeAt(level, position);
-        return type == PrecipitationType.RAIN || type == PrecipitationType.HAIL;
+        return type.usesRainInteractions();
     }
 
     /** Uses the cached primitive grid path for localized snow checks. */
     @Override
     public boolean isSnowingAt(ServerLevel level, BlockPos position) {
-        return precipitationTypeAt(level, position) == PrecipitationType.SNOW;
+        return precipitationTypeAt(level, position).usesSnowInteractions();
     }
 
     /** Returns allocation-free primitive precipitation from the attached level grid. */
@@ -740,22 +739,6 @@ public final class WeatherAuthority implements WeatherQuery {
 
         Map<Long, AtmosphereView> previous = grid.snapshotByPackedKey();
         Set<Long> scheduledKeys = new java.util.TreeSet<>(previous.keySet());
-        for (AtmosphereView view : previous.values()) {
-            if (AtmosphereActivityPolicy.shouldSimulate(
-                    view,
-                    gameTime,
-                    scheduling.inactiveCellGracePeriodTicks(),
-                    PERSISTENT_STORM_ENERGY
-            )) {
-                scheduledKeys.add(view.key().packed());
-            }
-            if (view.sample().stormEnergy() >= PERSISTENT_STORM_ENERGY) {
-                // Retain the existing cardinal ring around a detached storm so
-                // pressure and moisture can continue crossing its boundary.
-                addExistingCardinalNeighbors(scheduledKeys, previous, view.key());
-            }
-        }
-
         List<CellCalculationInput> inputs = new ArrayList<>(scheduledKeys.size());
         Map<Long, Long> expectedRevisions = new HashMap<>(Math.max(16, scheduledKeys.size() * 2));
         for (long packedKey : scheduledKeys) {
@@ -770,13 +753,6 @@ public final class WeatherAuthority implements WeatherQuery {
                     scheduling.environmentResampleIntervalTicks(),
                     view.environment()
             );
-            AtmosphereSimulationEngine.Neighborhood neighbors = neighborhood(previous, view);
-            int catchUpSteps = AtmosphereActivityPolicy.catchUpSteps(
-                    view,
-                    gameTime,
-                    scheduling.simulationIntervalTicks(),
-                    MAX_CATCH_UP_STEPS
-            );
             double centerX = (view.key().x() + 0.5) * scheduling.cellSize();
             double centerZ = (view.key().z() + 0.5) * scheduling.cellSize();
             inputs.add(new CellCalculationInput(
@@ -788,8 +764,6 @@ public final class WeatherAuthority implements WeatherQuery {
                     settings.simulationSpeed() > 0.0
                             ? AtmosphericWaterExchange.capture(level, view.key(), scheduling.cellSize())
                             : AtmosphericWaterExchange.Receipt.EMPTY,
-                    neighbors,
-                    catchUpSteps,
                     tracker.influenceAt(centerX, centerZ),
                     centerX,
                     centerZ
@@ -831,7 +805,12 @@ public final class WeatherAuthority implements WeatherQuery {
         for (CellCalculationInput input : batch.inputs) {
             AtmosphericGridStepper.Output output = physics.cells().get(input.key.packed());
             WeatherSample next = output.sample();
-            AtmosphericFrontModel.FrontState front = AtmosphericFrontModel.analyze(next, input.neighborhood);
+            var physicalNeighbors = AtmosphereSimulationEngine.PhysicalNeighborhood.bounded(output.state(),
+                    physicalNeighbor(physics, input.key.x(), input.key.z() - 1, output.throughTick()),
+                    physicalNeighbor(physics, input.key.x() + 1, input.key.z(), output.throughTick()),
+                    physicalNeighbor(physics, input.key.x(), input.key.z() + 1, output.throughTick()),
+                    physicalNeighbor(physics, input.key.x() - 1, input.key.z(), output.throughTick()));
+            AtmosphericFrontModel.FrontState front = AtmosphericFrontModel.analyze(output.state(), physicalNeighbors, batch.cellSize);
             WeatherHazardModel.HazardProfile hazards = WeatherHazardModel.evaluate(next, input.environment, front.type(), front.strength());
             int before = observations.size();
             collectObservations(observations, next, front, hazards, batch.features, input.centerX, input.centerZ, batch.cellSize);
@@ -848,6 +827,12 @@ public final class WeatherAuthority implements WeatherQuery {
                     input.environment, output.flux(), output.throughTick()));
         }
         return new SimulationResult(batch, List.copyOf(calculated), List.copyOf(observations), physics);
+    }
+
+    private static AtmosphericPhysicalState physicalNeighbor(AtmosphericGridStepper.Result result,
+            int x, int z, long throughTick) {
+        AtmosphericGridStepper.Output output = result.cells().get(new AtmosphereCellKey(x, z).packed());
+        return output != null && output.throughTick() == throughTick ? output.state() : null;
     }
 
     /** SERVER THREAD ONLY. Marks an accepted batch as owning this cadence slot. */
@@ -929,7 +914,7 @@ public final class WeatherAuthority implements WeatherQuery {
         int elapsedSystemTicks = (int) Math.min(Integer.MAX_VALUE, Math.max(0,
                 physicsTick - tracker.systems().stream().mapToLong(com.thunder.wildernessodysseyapi.weather.system.TrackedWeatherSystem::lastUpdatedTick)
                         .min().orElse(physicsTick)));
-        boolean systemsChanged = tracker.update(
+        boolean systemsChanged = batch.settings.simulationSpeed() == 0 ? tracker.pauseThrough(physicsTick) : tracker.update(
                 result.observations,
                 physicsTick,
                 elapsedSystemTicks,
@@ -1148,29 +1133,6 @@ public final class WeatherAuthority implements WeatherQuery {
         return changed;
     }
 
-    private static void addExistingCardinalNeighbors(
-            Set<Long> scheduledKeys,
-            Map<Long, AtmosphereView> views,
-            AtmosphereCellKey center
-    ) {
-        addIfPresent(scheduledKeys, views, center.x(), center.z() - 1);
-        addIfPresent(scheduledKeys, views, center.x() + 1, center.z());
-        addIfPresent(scheduledKeys, views, center.x(), center.z() + 1);
-        addIfPresent(scheduledKeys, views, center.x() - 1, center.z());
-    }
-
-    private static void addIfPresent(
-            Set<Long> scheduledKeys,
-            Map<Long, AtmosphereView> views,
-            int cellX,
-            int cellZ
-    ) {
-        long packed = new AtmosphereCellKey(cellX, cellZ).packed();
-        if (views.containsKey(packed)) {
-            scheduledKeys.add(packed);
-        }
-    }
-
     private Set<Long> collectActiveKeys(
             ServerLevel level,
             WeatherConfig.SchedulingSettings scheduling
@@ -1193,30 +1155,6 @@ public final class WeatherAuthority implements WeatherQuery {
             }
         }
         return keys;
-    }
-
-    private AtmosphereSimulationEngine.Neighborhood neighborhood(
-            Map<Long, AtmosphereView> views,
-            AtmosphereView center
-    ) {
-        AtmosphereCellKey key = center.key();
-        WeatherSample fallback = center.sample();
-        return new AtmosphereSimulationEngine.Neighborhood(
-                neighbor(views, key.x(), key.z() - 1, fallback),
-                neighbor(views, key.x() + 1, key.z(), fallback),
-                neighbor(views, key.x(), key.z() + 1, fallback),
-                neighbor(views, key.x() - 1, key.z(), fallback)
-        );
-    }
-
-    private static WeatherSample neighbor(
-            Map<Long, AtmosphereView> views,
-            int cellX,
-            int cellZ,
-            WeatherSample fallback
-    ) {
-        AtmosphereView view = views.get(new AtmosphereCellKey(cellX, cellZ).packed());
-        return view == null ? fallback : view.sample();
     }
 
     private CellContext ensureCell(ServerLevel level, BlockPos position) {
@@ -1566,8 +1504,6 @@ public final class WeatherAuthority implements WeatherQuery {
             AtmosphereView view,
             AtmosphereEnvironment environment,
             AtmosphericWaterExchange.Receipt waterReceipt,
-            AtmosphereSimulationEngine.Neighborhood neighborhood,
-            int catchUpSteps,
             WeatherSystemTracker.SystemInfluence systemInfluence,
             double centerX,
             double centerZ

@@ -24,18 +24,30 @@ public final class AtmosphericFrontModel {
     /** Physical-gradient adapter: strength refers to a fixed distance, never one arbitrary grid cell. */
     public static FrontState analyze(AtmosphericPhysicalState center,
             AtmosphereSimulationEngine.PhysicalNeighborhood neighbors, double cellSizeMeters) {
-        FrontState diagnosed = analyze(center.toWeatherSample(center.surface(),
-                        com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.NONE),
-                new AtmosphereSimulationEngine.Neighborhood(
-                        neighbors.north().toWeatherSample(neighbors.north().surface(), com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.NONE),
-                        neighbors.east().toWeatherSample(neighbors.east().surface(), com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.NONE),
-                        neighbors.south().toWeatherSample(neighbors.south().surface(), com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.NONE),
-                        neighbors.west().toWeatherSample(neighbors.west().surface(), com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.NONE)));
         double distanceScale = AtmosphericUnits.REFERENCE_CELL_METRES / Math.max(16.0, cellSizeMeters);
+        // Normalize contrasts before thresholds and classification, otherwise a finer
+        // grid can hide the same physical front by falling below a per-cell threshold.
+        FrontState diagnosed = analyze(frontSample(center, center, 1),
+                new AtmosphereSimulationEngine.Neighborhood(
+                        frontSample(center, neighbors.north(), distanceScale), frontSample(center, neighbors.east(), distanceScale),
+                        frontSample(center, neighbors.south(), distanceScale), frontSample(center, neighbors.west(), distanceScale)));
         double shear = AtmosphericUnits.unit(center.column().shearMetresPerSecond() / 40.0);
-        return new FrontState(diagnosed.type(), diagnosed.strength() * distanceScale,
-                diagnosed.lift() * distanceScale, diagnosed.stormBoost() * distanceScale * (0.8 + shear * 0.4),
+        return new FrontState(diagnosed.type(), diagnosed.strength(),
+                diagnosed.lift(), diagnosed.stormBoost() * (0.8 + shear * 0.4),
                 diagnosed.gust());
+    }
+
+    private static WeatherSample frontSample(AtmosphericPhysicalState center, AtmosphericPhysicalState neighbor,
+            double scale) {
+        AtmosphericLayer air = center.column().surface();
+        AtmosphericLayer other = neighbor.column().surface();
+        return new WeatherSample(center.temperatureCelsius() + (neighbor.temperatureCelsius() - center.temperatureCelsius()) * scale,
+                center.relativeHumidity() + (neighbor.relativeHumidity() - center.relativeHumidity()) * scale,
+                1 + (center.pressureHpa() - AtmosphericUnits.REFERENCE_PRESSURE_HPA
+                        + (neighbor.pressureHpa() - center.pressureHpa()) * scale) / AtmosphericUnits.PRESSURE_SCALE_HPA,
+                new WindVector((air.windXMetresPerSecond() + (other.windXMetresPerSecond() - air.windXMetresPerSecond()) * scale) / 40,
+                        (air.windZMetresPerSecond() + (other.windZMetresPerSecond() - air.windZMetresPerSecond()) * scale) / 40),
+                0, 0, 0, 0, com.thunder.wildernessodysseyapi.weather.api.PrecipitationType.NONE);
     }
 
     /** Returns the front crossing the center of an immutable neighborhood. */

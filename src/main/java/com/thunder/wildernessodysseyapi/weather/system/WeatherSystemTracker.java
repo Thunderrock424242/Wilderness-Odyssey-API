@@ -32,6 +32,20 @@ public final class WeatherSystemTracker {
         return nextId;
     }
 
+    /** Consumes deliberately paused time without moving, aging or dissipating systems. */
+    public boolean pauseThrough(long gameTick) {
+        boolean changed = false;
+        for (int i = 0; i < systems.size(); i++) {
+            TrackedWeatherSystem s = systems.get(i);
+            if (gameTick <= s.lastUpdatedTick()) continue;
+            systems.set(i, new TrackedWeatherSystem(s.id(), s.type(), s.stage(), s.centerX(), s.centerZ(),
+                    s.radiusBlocks(), s.intensity(), s.motion(), s.organization(), s.ageTicks(), gameTick,
+                    s.lastSplitTick()));
+            changed = true;
+        }
+        return changed;
+    }
+
     /** Replaces tracker state after validated storage decode. */
     public void restore(long restoredNextId, List<TrackedWeatherSystem> restoredSystems) {
         systems.clear();
@@ -282,12 +296,15 @@ public final class WeatherSystemTracker {
                 double rightWeight = right.intensity() / total;
                 WeatherSystemType mergedType = left.intensity() >= right.intensity()
                         ? left.type() : right.type();
+                // Retain the surviving identity's already-advected center. Weighted centroid
+                // reassignment would teleport that identity when a large neighbor merges.
+                TrackedWeatherSystem survivor = left.id() <= right.id() ? left : right;
                 left = new TrackedWeatherSystem(
                         Math.min(left.id(), right.id()),
                         mergedType,
                         WeatherSystemStage.MATURE,
-                        approach(left.centerX(), right.centerX(), rightWeight),
-                        approach(left.centerZ(), right.centerZ(), rightWeight),
+                        survivor.centerX(),
+                        survivor.centerZ(),
                         Math.min(8_192.0, Math.max(left.radiusBlocks(), right.radiusBlocks())
                                 + Math.min(left.radiusBlocks(), right.radiusBlocks()) * 0.25),
                         unit(Math.max(left.intensity(), right.intensity())
@@ -385,13 +402,6 @@ public final class WeatherSystemTracker {
             return WeatherSystemStage.MATURE;
         }
         return current > previous + 0.02 ? WeatherSystemStage.FORMING : WeatherSystemStage.WEAKENING;
-    }
-
-    private static boolean deterministicSplit(long id, long gameTick, int interval) {
-        long window = gameTick / Math.max(1, interval);
-        long mixed = id * 0x9E3779B97F4A7C15L ^ window * 0xC2B2AE3D27D4EB4FL;
-        mixed ^= mixed >>> 29;
-        return (mixed & 3L) == 0L;
     }
 
     private static double response(double referenceFraction, double seconds) {

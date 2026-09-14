@@ -112,7 +112,8 @@ public final class WeatherThreatForecastService {
         if (system.stage() != WeatherSystemStage.WEAKENING) {
             return system.intensity();
         }
-        double updatesUntilArrival = etaTicks / (double) Math.max(1, controls.nominalIntervalTicks());
+        // Match tracker decay at its fixed three-second reference, independent of scheduling cadence.
+        double updatesUntilArrival = etaTicks / 60.0;
         return Math.max(0.0, system.intensity() - controls.dissipationPerUpdate() * updatesUntilArrival);
     }
 

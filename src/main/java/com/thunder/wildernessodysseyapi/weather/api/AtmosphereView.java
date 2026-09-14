@@ -14,7 +14,9 @@ import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphereEnvironment
  * @param sample immutable cell-center weather values
  * @param revision monotonic cell revision
  * @param lastSimulatedTick last server tick on which the cell was advanced
- * @param lastActiveTick last server tick on which activity kept the cell awake
+ * @param lastActiveTick last server tick with player interest; not a physical forcing
+ * @param physicalState conserved physical column retained by the server
+ * @param environment detached cached forcing, safe to retain while terrain is unloaded
  */
 public record AtmosphereView(
         AtmosphereCellKey key,

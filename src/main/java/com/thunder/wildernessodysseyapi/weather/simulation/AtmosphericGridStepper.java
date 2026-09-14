@@ -12,7 +12,14 @@ public final class AtmosphericGridStepper {
 
     /** Inputs include no player objects; activity changes admission/detail sampling only. */
     public record Input(AtmosphereView view, AtmosphereEnvironment environment,
-                        AtmosphericWaterExchange.Receipt receipt, WeatherSystemTracker.SystemInfluence influence) { }
+                        AtmosphericWaterExchange.Receipt receipt, WeatherSystemTracker.SystemInfluence influence) {
+        public Input {
+            Objects.requireNonNull(view, "view");
+            environment = Objects.requireNonNullElse(environment, view.environment());
+            receipt = Objects.requireNonNullElse(receipt, AtmosphericWaterExchange.Receipt.EMPTY);
+            influence = Objects.requireNonNullElse(influence, WeatherSystemTracker.SystemInfluence.NONE);
+        }
+    }
     public record Output(AtmosphericPhysicalState state, WeatherSample sample, AtmosphericWaterFlux flux, long throughTick) { }
     public record Result(Map<Long, Output> cells, int cellSteps, long deferredTicks, long calculationNanos) { }
 
@@ -26,10 +33,15 @@ public final class AtmosphericGridStepper {
             long key = input.view().key().packed();
             inputs.put(key, input);
             states.put(key, new Output(input.view().physicalState(), input.view().sample(),
-                    AtmosphericWaterFlux.NONE, input.view().lastSimulatedTick()));
+                    AtmosphericWaterFlux.NONE, settings.simulationSpeed() == 0
+                            ? Math.max(targetTick, input.view().lastSimulatedTick()) : input.view().lastSimulatedTick()));
         }
         int work = 0;
-        int budget = Math.max(inputs.size(), maximumCellSteps);
+        double maxStep = AtmosphereSimulationEngine.maximumStepSeconds(cellSize, settings);
+        // One tick may need several stable substeps. Always permit a complete generation
+        // so small cells at high simulation speed cannot remain permanently backlogged.
+        int minimumSubsteps = Math.max(1, (int) Math.ceil(.05 / maxStep));
+        int budget = Math.max(Math.multiplyExact(inputs.size(), minimumSubsteps), maximumCellSteps);
         AtmosphereSimulationEngine engine = new AtmosphereSimulationEngine();
         while (!states.isEmpty() && work < budget && settings.simulationSpeed() > 0) {
             long minimumTick = states.values().stream().mapToLong(Output::throughTick).min().orElse(targetTick);
@@ -41,7 +53,6 @@ public final class AtmosphericGridStepper {
                 if (clock == minimumTick) group.add(entry.getKey());
                 else nextClock = Math.min(nextClock, clock);
             }
-            double maxStep = AtmosphereSimulationEngine.maximumStepSeconds(cellSize, settings);
             long ticks = Math.min(nextClock - minimumTick, Math.max(1, (long) Math.floor(maxStep * 20)));
             int substeps = Math.max(1, (int) Math.ceil(ticks * .05 / maxStep));
             if (work + group.size() * substeps > budget) break;

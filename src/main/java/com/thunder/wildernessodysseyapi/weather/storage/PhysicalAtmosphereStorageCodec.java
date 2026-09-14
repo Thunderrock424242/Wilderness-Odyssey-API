@@ -24,6 +24,7 @@ public final class PhysicalAtmosphereStorageCodec {
         }
         tag.putLongArray("layers", layers);
         AtmosphereEnvironment e = view.environment();
+        tag.putDouble("seasonalHumidityOffset", e.seasonalHumidityOffset());
         tag.putLongArray("environment", bits(e.biomeTemperatureCelsius(), e.biomeHumidity(), e.elevationBlocks(),
                 e.waterCoverage(), e.daylight(), e.dimensionTemperatureOffset(), e.seasonalTemperatureOffset(),
                 e.atmosphericVariation(), e.seasonalStorminessOffset(), e.seasonalEvaporationMultiplier(),
@@ -43,8 +44,10 @@ public final class PhysicalAtmosphereStorageCodec {
 
     public static AtmosphereEnvironment environment(CompoundTag tag) {
         double[] e = values(tag, "environment", 19, true);
+        double humidityOffset = tag.getDouble("seasonalHumidityOffset");
+        if (!Double.isFinite(humidityOffset)) throw new IllegalArgumentException("Nonfinite seasonal humidity offset");
         return new AtmosphereEnvironment(e[0], e[1], e[2], e[3], e[4], e[5], e[6], e[7], e[8], e[9],
-                e[10], e[11], e[12], e[13], e[14], e[15], e[16], e[17] > .5, e[18]);
+                e[10], e[11], e[12], e[13], e[14], e[15], e[16], e[17] > .5, e[18], humidityOffset);
     }
 
     private static AtmosphericLayer layer(double[] values, int i) {

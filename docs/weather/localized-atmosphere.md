@@ -9,7 +9,7 @@ scheduler by default. The implemented phases provide evolving atmospheric cells,
 persistence, regional client synchronization, per-column rain and snow,
 Minecraft-style functional cloud masses and distant rain curtains, overhead
 cloud optics, localized natural lightning, position-aware gameplay rain,
-diagnostics, read-only Wilderness water coupling, optional Ecliptic/Serene
+diagnostics, conserved regional water exchange, optional Ecliptic/Serene
 season input, thermodynamic vapor transport, terrain lift, and layered 3D
 cloud volumes with standard cloud genera, multi-altitude decks, persistent
 moving storm/front identities, forecasting, surface accumulation, typed
@@ -26,6 +26,10 @@ when that program is unavailable. Those boundaries are intentional and are liste
 Cross-system consumers use the read-only regional composition described in
 [Shared world-system integration](../environment/world-system-integration.md);
 that layer never becomes a second atmosphere authority.
+
+The current physical implementation, units, conservation boundary, migrations and
+approximations are documented in [Physical atmosphere](physical-atmosphere.md).
+That document supersedes the former normalized simulation formulas.
 
 ## Weather V3 additions
 
@@ -91,7 +95,7 @@ The principal ownership boundaries are:
 - `WeatherSnapshotManager` sends server-to-client regional state. There is no
   client-to-server atmospheric-state payload.
 - `ClientWeatherCoordinator` atomically publishes immutable client snapshots;
-  rendering never reads live server state or mutable network DTOs. Payload v5
+  rendering never reads live server state or mutable network DTOs. Payload v6
   carries the authoritative level tick, which drives a bounded client visual
   timeline rather than assuming a fixed packet interval. One immutable
   `WeatherVisualState` then supplies the camera-local interpretation shared by
@@ -114,9 +118,9 @@ Engine is disabled.
 ## Atmospheric grid and units
 
 Each dimension uses one horizontal grid. The default cell width is `256`
-blocks, so one cell represents `256 x 256` columns. There is no per-block or
-multi-layer vertical grid; each column carries bounded derived lift/depth
-scalars for thermodynamics and rendering. Block coordinates map with `floorDiv`, including
+blocks, so one cell represents `256 x 256` columns. Each cell retains a four-layer physical profile at 0, 1500, 3000 and 5500
+metres above terrain, plus column vapor/liquid/ice inventories. There is no
+per-block vertical simulation. The normalized sample is a compatibility projection. Block coordinates map with `floorDiv`, including
 negative coordinates. Cell coordinates are packed into one `long` with signed
 X in the high 32 bits and signed Z in the low 32 bits.
 
@@ -132,7 +136,7 @@ The public `WeatherSample` fields use these units and enforced ranges:
 | `instability` | normalized `[0, 1]` | Convective instability. |
 | `stormEnergy` | normalized `[0, 1]` | Persistent severe-weather potential. |
 | `precipitationIntensity` | normalized `[0, 1]` | Current local rain or snow strength. |
-| `precipitationType` | `NONE`, `RAIN`, `SNOW`, or `HAIL` | Current precipitation form. |
+| `precipitationType` | `NONE`, `RAIN`, `SNOW`, `HAIL`, `SLEET`, `FREEZING_RAIN` | Phase from the wet-bulb column. |
 | `verticalMotion` | normalized `[-1, 1]` | Rising or sinking air derived from convergence, buoyancy, pressure, terrain, and season. |
 | `cloudDepth` | normalized `[0, 1]` | Vertical cloud development used by the 3D column renderer. |
 | `cloudWind.x`, `cloudWind.z` | normalized components `[-1, 1]` | Smoothed motion at cloud altitude; separate from surface precipitation wind. |
@@ -283,260 +287,114 @@ Survival integration balance is server-configurable:
 
 ## Water coupling
 
-Weather observes water through the `WeatherWaterInfluence` read-only boundary.
-`WildernessWeatherWaterInfluence` uses `WaterServices.access().isWaterAt` for
-the existing Wilderness authority and `FluidTags.WATER` as a vanilla/modded
-fallback. It never imports, creates, removes, replaces, or otherwise mutates
-water state.
+`WeatherWaterInfluence` remains the loaded-only environment sampling adapter.
+It observes ocean, river, lake and wetland coverage, surface elevation and
+terrain gradients without mutating water or creating chunk tickets.
 
-For each atmospheric cell it samples a deterministic `8 x 8` surface lattice:
+`AtmosphericWaterExchange` carries accepted transfers between existing owners.
+Regional hydrology debits evaporation before publishing cumulative receipts.
+Weather captures immutable watermarks and credits that exact quantity once;
+only a revision-checked server-thread commit acknowledges it. New publications
+during calculation remain pending. Covered terrain disables independent weather
+evaporation and biome vapor restoration.
 
-- only already-loaded chunks are considered through `getChunkNow`;
-- each probe reads one `MOTION_BLOCKING` surface column;
-- wet probes are classified as ocean, river, or inland from biome tags;
-- Wilderness-owned and tagged-only water both contribute to total surface
-  coverage; and
-- results are immutable, cached for the environment refresh interval, and held
-  in a separate 2,048-entry least-recently-used cache.
+Weather removes precipitation from cloud inventory, then publishes integrated
+rain/snow/sleet/freezing-rain/hail amounts after commit. Regional hydrology
+credits runoff, SWE or ice and retains fractional or capacity-rejected amounts.
+Rain follows its classified phase even when the surface is below freezing.
+The normalized rainfall-rate fallback is disabled for physically coupled nodes.
 
-If no probe chunk is loaded, the result is `UNKNOWN` with a loaded fraction of
-zero. A previously observed cell retains its last known water sample when all
-probe chunks later unload. Moisture potential is calculated from normalized
-loaded-probe coverage and weighted by the observed fraction, so one loaded wet
-column cannot make an otherwise unknown cell appear fully wet:
-
-```text
-moisturePotential = clamp01((surfaceWaterCoverage * 0.55
-                           + oceanCoverage * 0.35
-                           + riverCoverage * 0.18
-                           + inlandWaterCoverage * 0.10)
-                          * loadedProbeFraction)
-```
-
-This aggregate becomes the environment's `waterCoverage`. Evaporation then
-uses it without enumerating stored water positions:
-
-```text
-warmth = clamp((temperature + 10) / 45, 0.05, 1.0)
-ventilation = clamp(0.6 + windMagnitude * 0.4, 0.6, 1.2)
-evaporationPotential = clamp01((waterCoverage * 0.85 + biomeHumidity * 0.15)
-                             * warmth * ventilation)
-```
-
-The built-in water shader separately consumes the camera's immutable local
-weather sample for its rain, thunder, and sky-brightness uniforms. This is a
-client rendering input and does not reverse the ownership direction.
+The receipt book, acknowledgement watermarks and pending precipitation persist
+with regional hydrology. Unload does not discard pending transfers. Regional SWE
+owns modeled snow mass; weather derives coverage at 50 mm liquid equivalent for
+full cover. Unmodeled terrain keeps an explicit open moisture boundary.
+See [the exchange contract](../watersystem/atmospheric-exchange.md) for units,
+save behavior and the separate-file crash-consistency limitation.
 
 ## Simulation update flow and formulas
 
-Let `s` be configured simulation speed. One nominal update uses:
+1. On the server thread, capture retained physical cells, cached environment,
+   committed surface-water receipts, and persistent-system influence.
+2. `AtmosphericGridStepper` groups cells by simulation clock and advances
+   synchronous generations. Every shared face reads the same old state.
+   Missing or differently timed neighbors have closed moisture faces.
+3. Convert ticks to seconds and subdivide using physical wind, cell width,
+   simulation speed and a four-face Courant bound. Elapsed time is never
+   replaced by a fixed number of nominal updates.
+4. Integrate surface heating/cooling, temperature transport, pressure gradients,
+   friction and Coriolis. Retain and evolve four layer temperatures and winds.
+5. Diagnose fronts, convergence, terrain lift, instability and storm support.
+   Apply adiabatic cooling/warming and transfer conserved water through
+   condensation, cloud evaporation, freezing/melting and sedimentation.
+6. Classify precipitation from the wet-bulb column. Season affects forcing;
+   it never grants or denies snow. Derive cloud geometry and normalized output.
+7. Apply existing persistent-system dynamic feedback without rebuilding vapor
+   from clipped humidity. Commit only if the generation and every revision
+   still match, then publish/acknowledge hydrologic transfers.
+8. Track storm/front identities with layer-weighted steering in metres per
+   second. Observation correction is bounded to 4 m/s; mergers preserve the
+   surviving center. Lifecycle relaxation and dissipation scale with seconds.
 
-```text
-approach(current, target, fraction) = current + (target - current) * fraction
-rate(r) = clamp01(r * s)
-```
-
-All result fields are canonicalized through the `WeatherSample` bounds. The
-engine reads a frozen center sample, four frozen cardinal neighbors, and one
-captured environment. Missing neighbors fall back to the center.
-
-1. **Environmental heating and cooling**
-
-   ```text
-   temperature = approach(temperature, targetTemperature, rate(0.035))
-   neighborTemperature = average(north, east, south, west)
-   ```
-
-2. **Pressure equalization and thermal pressure coupling**
-
-   ```text
-   neighborPressure = average(north, east, south, west)
-   equalizedPressure = approach(pressure, neighborPressure,
-                                rate(pressureEqualizationRate * 0.25))
-   thermalDelta = (neighborTemperature - temperature)
-                * 0.0025 * pressureEqualizationRate * s
-   pressure = equalizedPressure + thermalDelta
-   ```
-
-3. **Pressure-driven wind**
-
-   ```text
-   targetWindX = (westPressure - eastPressure) * 4
-   targetWindZ = (northPressure - southPressure) * 4
-   windResponse = rate(0.12 + pressureEqualizationRate * 0.45)
-   wind = approach(wind, targetWind, windResponse)
-   ```
-
-4. **Conservative face transport**
-
-   Every shared north/east/south/west face derives one signed velocity from the
-   pressure difference plus the two adjacent winds. The upwind scalar crosses
-   that face, and the center adds incoming flux while subtracting outgoing
-   flux. Temperature uses `temperatureTransportRate`; vapor inventory uses
-   `humidityTransportRate`; condensed cloud water uses 80 percent of that rate.
-   Moving temperature-dependent vapor inventory instead of relative humidity
-   means transported air naturally approaches saturation as it cools.
-
-5. **Biome vapor relaxation and evaporation**
-
-   ```text
-   vaporCapacity = saturationCapacity(temperature)
-   vapor = approach(vapor, biomeHumidity * vaporCapacity, rate(0.02))
-   evaporation = evaporationStrength * evaporationPotential
-               * seasonalEvaporationMultiplier
-               * (1 - relativeHumidity) * 0.08 * s
-   ```
-
-6. **Temperature-dependent condensation**
-
-   Saturation capacity uses a bounded Magnus approximation. Vapor above
-   `vaporCapacity * cloudFormationThreshold` condenses into cloud water.
-   Cooling can therefore create clouds without inventing moisture; warming air
-   can hold more vapor. Dry-air dissipation remains gradual.
-
-7. **Vertical motion and instability**
-
-   ```text
-   lift = convergence * 0.38
-        + buoyancy * 0.30
-        + windwardTerrainLift * 0.42
-        + lowPressureSupport * 0.16
-        + seasonalStorminess * 0.28
-        - precipitation * 0.12
-   verticalMotion = approach(previousVerticalMotion, clamp(lift, -1, 1),
-                             rate(0.14))
-   ```
-
-   The terrain sampler derives east-west and north-south rise plus local relief
-   from its existing loaded-only `3 x 3` lattice. Only wind flowing uphill adds
-   orographic lift. Humidity, temperature contrast, and positive vertical
-   motion then build instability.
-
-8. **Storm lifecycle**
-
-   Storm energy remains continuous, while `StormStage` is derived as `CALM`,
-   `DEVELOPING`, `MATURE`, or `DISSIPATING`. Developing cells need rising,
-   unstable air. Mature cells need both storm energy and precipitation, and
-   decay at 45 percent of the normal rate to prevent rapid threshold flicker.
-   The stage is diagnostic/visual metadata and is not separately persisted.
-
-9. **Precipitation, wet-bulb phase, and cloud depth**
-
-   When cloud water exceeds `precipitationThreshold`:
-
-   ```text
-   availableCloud = (cloudWater - precipitationThreshold)
-                  / (1 - precipitationThreshold)
-   precipitationTarget = clamp01(availableCloud)
-                       * maximumPrecipitationIntensity
-                       * (0.68 + stormEnergy * 0.22
-                         + positiveVerticalMotion * 0.10)
-   precipitationIntensity = approach(previousIntensity,
-                                     precipitationTarget,
-                                     rate(0.35))
-
-   loss = precipitationIntensity * 0.04
-        * (1 + stormEnergy * 0.25) * s
-   cloudWater -= loss
-   vapor -= loss * vaporCapacity * 0.15
-   ```
-
-   Intensity at or below `0.001` becomes `NONE`. Otherwise the Stull-style
-   wet-bulb temperature, rather than dry-bulb temperature alone, selects snow
-   at or below `1.5 C`. Cloud water, instability, storm energy, and ascent form
-   `cloudDepth`; a smoothed, convectively turned `cloudWind` controls cloud
-   detail separately from surface precipitation wind.
-
-New cells initialize from their environmental temperature target, biome/water
-humidity, temperature/elevation-adjusted pressure, and small bounded
-instability. They begin without precipitation or storm energy; debug force
-commands are the deterministic way to create immediate local test weather.
+The physical equations and approximations live in
+[Physical atmosphere](physical-atmosphere.md). `WeatherSample` remains a
+normalized presentation/query contract; it is not the authoritative water store.
+Legacy `simulate(WeatherSample,...)` calls retain their constructor/API shape
+and use a fixed two-second compatibility interval. Persistent owners must use
+the physical result and retain its inventory.
 
 ## Scheduling, activity, and catch-up
 
-The authority runs after normal server tick work, but only simulates a
-dimension when `gameTime` is divisible by `simulationIntervalTicks` (60 ticks
-by default).
+All retained cells evolve, including cells without nearby players. Player
+interest admits new cells, refreshes available terrain detail and controls
+networking/effects. `ACTIVE`, `GRACE`, `PERSISTENT_STORM` and `DORMANT` remain
+interest diagnostics; dormant cells are no longer frozen by that label.
 
-- Player activity is collected into one deduplicated set, so overlapping player
-  regions do not simulate the same cell twice.
-- The active radius includes one continuity/interpolation ring:
-  `min(16, activeSimulationRadius + 1)`. With the default configured radius of
-  two, this is a `7 x 7` cell region per isolated player.
-- Active cells are created lazily, have their activity watermark advanced, and
-  remain scheduled during the configured grace period (2,400 ticks by default).
-- Existing cells with storm energy at least `0.55` remain scheduled as
-  persistent storms even without a nearby player. Their already-retained
-  north/east/south/west neighbors are also scheduled as a cardinal continuity
-  halo. This halo does not create missing cells or load chunks.
-- Dormant cells do no regular work. When scheduled again, catch-up is bounded to
-  `min(12, max(1, elapsedTicks / simulationIntervalTicks))` engine steps. All
-  catch-up steps use already captured immutable environment/neighborhood data.
-- Every pass calculates from one frozen grid view. Results apply only if the
-  cell revision still equals the captured revision, preventing a debug edit or
-  future asynchronous result from being overwritten.
-- Retention is bounded per dimension. Active cells are protected during trim;
-  quiet, low-storm, least-recently-active cells are evicted first.
+The pure grid stepper has a configurable `maximumPhysicalCellSteps` budget.
+At least one complete tick generation is permitted, including its required
+numerical substeps. If the budget runs out, `lastSimulatedTick` records only
+completed time. Subsequent passes resume the backlog instead of discarding it.
+A newly admitted cell waits at its creation clock while older neighbors catch up.
+Surface receipts apply once even when a batch needs many substeps.
 
-Changing the configured cell size clears retained atmospheric cells because
-the old coordinates no longer represent the same world regions.
+Cached detached environment values survive restart and unloaded terrain.
+Current daylight/season forcing can refresh without loading terrain; old elapsed
+time uses the available forcing snapshot rather than replaying historic calendars.
+Stopped-server wall-clock time is not simulated.
+
+This is a bounded retained domain, not an infinite-world atmosphere.
+`maxPersistedCells` still limits retention; existing storm/interest priorities
+choose eviction when exploration reaches that cap. Evicted cells and deliberate
+cell-width changes lose local continuity. Changing cell width retains the
+existing explicit grid-reset behavior. The configured width rounds down to a
+multiple of 16 blocks for chunk-aligned hydrologic accounting. Conservation
+tests apply to an unchanged retained closed domain, not admission/reset/eviction.
 
 ## Persistence format
 
-Each dimension stores `wildernessodysseyapi_atmosphere` as NeoForge
-`SavedData`. Schema version 3 contains:
+`wildernessodysseyapi_atmosphere` remains dimension-scoped SavedData.
+Schema **4** keeps the existing parallel arrays for keys, four compact
+compatibility weather words, revisions and clocks. The precipitation word now
+reserves three type bits. A corresponding `physical` row stores exact double
+bits for physical inventory, temperature, pressure, surface memory, all four
+layers and detached environment forcing. Repeated saves never requantize
+physical moisture through relative humidity.
 
-| NBT key | Type | Content |
-| --- | --- | --- |
-| `dataVersion` | int | Schema version, currently `3`. |
-| `cellSize` | int | Cell width used by the saved coordinates. |
-| `cellKeys` | long array | Packed signed X/Z coordinates. |
-| `weatherA` | long array | Temperature, humidity, pressure, wind X/Z. |
-| `weatherB` | long array | Cloud water, instability, storm energy, precipitation, type. |
-| `weatherC` | long array | Vertical motion, cloud depth, and cloud-altitude wind X/Z. |
-| `weatherD` | long array | Surface wetness, puddle coverage, snowpack, and frozen fraction. |
-| `revisions` | long array | Monotonic cell revisions. |
-| `lastSimulatedTicks` | long array | Simulation watermarks. |
-| `lastActiveTicks` | long array | Activity watermarks. |
+Versions **1–3** remain readable. Missing vertical/surface fields use the
+existing defaults; the normalized sample initializes a physical column once.
+The next save writes version 4. Unsupported schemas recover safely, and one
+malformed cell row is skipped without discarding valid neighbors. Recovery is
+reported by the existing saved-data diagnostics.
 
-`weatherA` uses 16 bits for temperature, 12 for humidity, 16 for pressure,
-and 10 each for wind X/Z. `weatherB` uses 12 bits each for cloud water,
-instability, storm energy, and precipitation intensity, followed by two bits
-for precipitation type. Remaining `weatherB` bits are reserved and must be
-zero. `weatherC` uses 12 bits each for vertical motion, cloud depth, and the
-two cloud-wind components; its upper 16 bits are reserved. `weatherD` uses 12
-bits per surface field and reserves its upper 16 bits.
+`wildernessodysseyapi_weather_systems` now uses schema **2**. Persistent IDs,
+lifecycle and centers remain intact. Version-1 motion converts from its former
+3 m/s normalized scale to the physical 40 m/s adapter, preserving initial speed.
 
-Version-one saves load in place. Their missing vertical motion starts neutral,
-cloud depth is derived from existing cloud/storm state, and cloud wind begins
-at the surface wind. Version-one and version-two saves receive a dry surface
-default. The next normal save writes version three.
-
-Persistent storm/front identities use separate
-`wildernessodysseyapi_weather_systems` saved data with schema version one.
-Separating the two schemas prevents a tracker change from risking the compact
-atmospheric-cell migration path.
-
-The codec writes at most `maxPersistedCells`. If selection is necessary, high
-storm energy and recently active cells win; final output is sorted by packed
-key for stable saves. Client transition state and environmental caches are not
-saved.
-
-Load recovery is fail-safe:
-
-- absent or unsupported versions recover to an empty grid;
-- invalid cell size falls back to the configured size;
-- unequal parallel arrays use only their common valid prefix and count the
-  remaining entries as skipped;
-- negative revisions/ticks, duplicate keys, reserved bits, out-of-world keys,
-  and invalid precipitation types are skipped;
-- any unexpected runtime decode failure recovers to an empty grid; and
-- applying a different configured cell size clears restored cells safely.
-
-The data has no global dimension index. If a dimension is removed, its
-dimension-scoped `SavedData` is simply never requested by the authority.
-
-Malformed weather data therefore cannot prevent its dimension from loading.
+The regional hydrology save has an additive versioned `atmosphere_exchange`
+book for cumulative accepted ET, acknowledgements, SWE observations, pending
+typed precipitation fractions and replay clocks. Older regional saves start
+with an empty book. This provides orderly save/restart continuity. Minecraft
+does not atomically save separate atmosphere and water files, so arbitrary
+process crashes between file writes remain a documented consistency window.
 
 ## Regional synchronization
 
@@ -571,7 +429,7 @@ values:
 | Pressure `[0.5, 1.5]` | unsigned 16-bit fixed point |
 | Wind X/Z `[-1, 1]` | signed 16-bit fixed point each |
 | Cloud water, instability, storm energy | unsigned 8-bit fixed point each |
-| Precipitation | one byte: two-bit type plus six-bit intensity |
+| Precipitation | v6 unsigned short: three-bit type plus six-bit intensity; reserved bits validated |
 | Vertical motion `[-1, 1]` | signed 16-bit fixed point |
 | Cloud depth `[0, 1]` | unsigned 8-bit fixed point |
 | Cloud wind X/Z `[-1, 1]` | signed 16-bit fixed point each |
@@ -877,6 +735,8 @@ immutable scheduling/simulation records.
 | `simulation.temperatureTransportRate` | `0.10` | `0..1`. |
 | `simulation.pressureEqualizationRate` | `0.20` | `0..1`. |
 | `simulation.weatherFrontStrength` | `0.75` | `0..1`; scales bounded front lift, gusts, and storm development. |
+| `simulation.coriolisPerSecond` | `0.0001` | `-0.001..0.001` per second; zero disables deflection. |
+| `simulation.maximumPhysicalCellSteps` | `16384` | `1024..1048576`; at least one complete tick generation, with excess time deferred. |
 | `simulation.evaporationStrength` | `0.12` | `0..1`. |
 | `simulation.cloudFormationThreshold` | `0.72` | `0.05..0.99`. |
 | `simulation.precipitationThreshold` | `0.58` | `0.05..0.99`. |
@@ -985,6 +845,7 @@ All weather commands require permission level 2:
 /weather thunder [duration]
 /wilderness weather sample
 /wilderness weather cell
+/wilderness weather physics
 /wilderness weather set humidity <0..1>
 /wilderness weather set pressure <0.5..1.5>
 /wilderness weather set temperature <-80..60>
@@ -1004,8 +865,7 @@ All weather commands require permission level 2:
 `stratocumulus`, `cumulus`, `nimbostratus`, and `cumulonimbus`. The command
 sets classifier-safe continuous atmosphere fields across the local `3 x 3`
 cell area; it does not send a client-only cloud label. Nimbostratus and
-cumulonimbus include rain so cloud-shape testing cannot accidentally introduce
-out-of-season snow. Use `force snow` when testing snow. The
+cumulonimbus include liquid precipitation for repeatable cloud-shape testing. Use `force snow` when testing snow. The
 `/wilderness weather clear` command resets the local test area.
 
 Vanilla remains responsible for parsing, permissions, duration defaults,
@@ -1015,15 +875,17 @@ retained and currently player-relevant Overworld cell. Cells that become
 player-relevant during the command receive the same state before their next
 snapshot. Autonomous atmospheric evolution pauses for the vanilla duration;
 rain and thunder clear when that duration expires, then normal simulation
-resumes. Vanilla rain becomes snow only when wet-bulb temperature is below the
-normal snow threshold and the cell is in either a permanently cold biome or an
-Ecliptic/Serene temperate winter. A cold snap alone cannot turn an ordinary
-non-winter biome's rain into snow.
+resumes. Vanilla rain uses the retained thermal profile to select its snow compatibility
+preset. A physically cold column can snow in any season; a warm winter column
+can rain. Autonomous evolution distinguishes sleet and freezing rain as well.
 
 The `/wilderness weather` commands remain localized diagnostics and testing
 controls. `sample` reports the interpolated sample at the command source.
 `cell` reports the containing cell's revision/ticks and `ACTIVE`, `GRACE`,
-`PERSISTENT_STORM`, or `DORMANT` scheduling state. Scalar setters edit one
+`PERSISTENT_STORM`, or `DORMANT` interest state. `physics` reports exact physical
+water, layers, pressure, dew/wet-bulb temperature, cloud geometry, precipitation
+rate, batch time, deferred work, transferred cubic metres and the shared worker
+queue. Use `systems` for storm IDs and `sample` for front classification. Scalar setters edit one
 cell. `force` and `clear` affect the local `3 x 3` cell area and immediately
 dirty persistence and client synchronization. `dump` summarizes retained and
 scheduled state. Normal play produces no weather log spam unless
@@ -1046,14 +908,14 @@ a block-scale weather system:
 - one calculation is tracked per level; generation/revision validation rejects
   stale batches atomically, worker backpressure retains the due pass, and a
   bounded timeout recovers calculations whose failure produced no completion;
-- due regional publication uses retained dirty state with the v5 payload and
+- due regional publication uses retained dirty state with the v6 payload and
   per-player cell revision filtering;
 - nearby players share a deduplicated active-cell set;
-- only active, grace-period, and persistent-storm cells evolve;
+- every retained cell evolves under the physical step budget;
 - environment and water reads use fixed lattices, bounded caches, and loaded
   chunks only;
 - retained cells are bounded and least-valuable dormant cells are evicted;
-- persistence uses primitive arrays and fixed-point weather words;
+- persistence retains compact API words plus exact physical inventory and cached forcing;
 - each client receives only a bounded nearby region and changed revisions;
 - client state copies occur on payload receipt rather than every frame;
 - the client timeline uses authoritative tick deltas, permits at most `0.35` of
@@ -1077,9 +939,9 @@ Remaining risks are bounded but worth profiling. Each simulation
 capture still copies retained immutable views into temporary maps/lists on the
 server thread, so a
 very high `maxPersistedCells` combined with many active dimensions can create
-allocation pressure. Catch-up repeats at most 12 pure steps using one captured
-neighbor/environment window, which is safe and cheap but only an approximation
-of the missed timeline. The two 2,048-entry environment caches can churn on a
+allocation pressure. Catch-up uses synchronous old generations and a bounded
+number of cell steps, retaining unfinished time. It uses one captured environment
+window, so historical forcing remains an approximation. The two 2,048-entry environment caches can churn on a
 server that rotates rapidly through many distant cells. Pure cell math now runs
 on the shared worker, but capture, validation, apply, and the disabled-engine
 fallback remain server-thread work; aggressive radius, interval, or speed
@@ -1191,7 +1053,7 @@ The automated Phase 2 completion gate runs under `runGameTestServer` as
 loaded level, waits for the ordinary `weather_runtime` schedule and shared
 worker, and requires an accepted revision-checked apply with no new rejection
 or Data Engine failure. Its log reports the submission/completion deltas and
-worker time. This validates the dedicated-server lifecycle and execution path;
+worker time. When successfully run, this validates the dedicated-server lifecycle and execution path;
 it does not validate client rendering, audio, multiplayer interpolation, or
 representative performance.
 
@@ -1219,10 +1081,8 @@ explicitly changes them; changing size resets atmospheric state.
    near streaks, mid-field precipitation, far curtains, restrained impacts,
    precipitation sounds, sky darkening, air fog, and
    cloud cover around every Overworld player. Move into a newly relevant cell
-   during the duration and confirm it receives the same rain. In a cold biome
-   or an Ecliptic/Serene temperate winter, confirm freezing wet-bulb air
-   produces snow instead. Confirm an ordinary non-winter biome remains rain
-   through a short cold snap. Run
+   during the duration and confirm it receives the same override. Confirm a cold
+   column produces snow even outside winter, and warm winter air can rain. Run
    `/weather thunder 20s` and confirm the local sample becomes
    lightning-eligible. When a natural synchronized bolt appears, confirm only
    cloud volume near the strike receives the brief blue-white illumination and
@@ -1349,11 +1209,13 @@ explicitly changes them; changing size resets atmospheric state.
     and confirm the first full snapshot restores the correct local visuals and
     F3 sample. Confirm stale state from the previous connection or dimension is
     not briefly used.
-15. **Verify water is read-only.** At an ocean/river/lake, record
+15. **Verify loaded-only water sampling and conserved exchange.** At an ocean/river/lake, record
     `/wowater inspect` and `/wowater authority 16`, then record nearby weather
     humidity. Wait through an environment refresh and repeat. Confirm wet
-    regions contribute moisture over time while the water ownership/coverage
-    diagnostics and blocks are unchanged by weather.
+    regions supply only accepted surface evaporation. Compare water debits with
+    `/wilderness weather physics` ET volume, then compare cloud-water loss with
+    precipitation credits and pending regional transfers. Verify SWE/ice melt
+    preserves mass, restart does not recredit receipts, and sampling adds no chunks.
 16. **Verify every debug edit.** Exercise all scalar setters, `force rain`,
     `force snow`, `clear`, and `dump` as an operator. Confirm a non-operator is
     denied. Confirm edits increment the cell revision and appear on connected
