@@ -1,0 +1,21 @@
+[Unit]
+Description=Aether AI gateway
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=aether
+Group=aether
+WorkingDirectory=/opt/aether
+EnvironmentFile=/etc/aether/aether.env
+ExecStart=/usr/bin/java -jar /opt/aether/Aether-AI-Server.jar --config /etc/aether/aether-server.yml
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

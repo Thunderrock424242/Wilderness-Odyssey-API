@@ -1,7 +1,6 @@
 package com.thunder.wildernessodysseyapi.telemetry;
 
 import com.google.gson.JsonObject;
-import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -12,24 +11,26 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import java.time.Duration;
 import java.time.Instant;
 
-import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
 import static com.thunder.wildernessodysseyapi.core.ModConstants.currentVersion;
 
 /**
  * Sends event-based telemetry payloads (server lifecycle and player login/logout).
  */
 public final class EventTelemetryReporter {
+    private static boolean stopping;
     private EventTelemetryReporter() {
     }
 
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
+        stopping = false;
         sendEvent("server_starting", null, event.getServer());
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onServerStopping(ServerStoppingEvent event) {
         sendEvent("server_stopping", null, event.getServer());
+        stopping = true;
     }
 
     @SubscribeEvent
@@ -47,6 +48,9 @@ public final class EventTelemetryReporter {
     }
 
     private static void sendEvent(String eventType, ServerPlayer player, net.minecraft.server.MinecraftServer server) {
+        if (stopping) {
+            return; // Late vanilla logout events must not recreate a closed per-server spool.
+        }
         EventTelemetryConfig.EventTelemetryValues config = EventTelemetryConfig.values();
         if (!TelemetryConfig.values().enabled() || !config.enabled()) {
             return;
@@ -78,41 +82,10 @@ public final class EventTelemetryReporter {
         }
 
         TelemetryQueue queue = TelemetryQueue.get(server);
-        boolean accepted = AsyncTaskManager.trySubmitIoWork("event-telemetry", () -> {
-            try {
-                boolean sent = sendPayload(payload, config);
-                if (!sent) {
-                    enqueueFailedPayload(queue, payload, config);
-                }
-            } catch (Exception ex) {
-                LOGGER.warn("[Telemetry] Event telemetry failed: {}", ex.getMessage());
-            }
-        });
-        if (!accepted) {
-            enqueueFailedPayload(queue, payload, config);
-        }
+        enqueuePayload(queue, payload, config);
+        TelemetryQueueProcessor.requestFlush(queue, TelemetryConfig.values().queueFlushBatchSize());
     }
-
-    private static boolean sendPayload(JsonObject payload, EventTelemetryConfig.EventTelemetryValues config) {
-        try {
-            var response = TelemetryHttp.sendWithRetry(
-                    TelemetryPayloads.buildRequest(config.webhookUrl(), config.requestTimeoutSeconds(), payload),
-                    config.retryMaxAttempts(),
-                    Duration.ofMillis(config.retryBaseDelayMs()),
-                    Duration.ofMillis(config.retryMaxDelayMs())
-            );
-            if (response.statusCode() / 100 != 2) {
-                LOGGER.warn("[Telemetry] Event telemetry failed (status {}).", response.statusCode());
-                return false;
-            }
-            return true;
-        } catch (Exception ex) {
-            LOGGER.warn("[Telemetry] Event telemetry failed: {}", ex.getMessage());
-            return false;
-        }
-    }
-
-    private static void enqueueFailedPayload(TelemetryQueue queue, JsonObject payload,
+    private static void enqueuePayload(TelemetryQueue queue, JsonObject payload,
                                              EventTelemetryConfig.EventTelemetryValues config) {
         TelemetryConfig.TelemetryValues telemetryConfig = TelemetryConfig.values();
         TelemetryQueue.PendingTelemetryPayload pending = new TelemetryQueue.PendingTelemetryPayload(

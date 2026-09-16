@@ -29,6 +29,18 @@ public final class TemporalRiftConfig {
     public static ModConfigSpec.ConfigValue<List<? extends String>> ECHO_ALLOWED_MOBS;
     public static ModConfigSpec.BooleanValue ENABLE_ECHO_CHUNK_DISTORTION;
     public static ModConfigSpec.BooleanValue ENABLE_ECHO_BUILD_ECHOES;
+    public static ModConfigSpec.BooleanValue ENABLE_ECHO_STABILITY_SYSTEM;
+    public static ModConfigSpec.BooleanValue ENABLE_ECHO_REALITY_ECHOES;
+    public static ModConfigSpec.BooleanValue ENABLE_ECHO_TIME_ANOMALIES;
+    public static ModConfigSpec.BooleanValue ENABLE_ECHO_ATMOSPHERIC_DISTORTION;
+    public static ModConfigSpec.BooleanValue ENABLE_ECHO_FRACTURE_INFLUENCE;
+    public static ModConfigSpec.IntValue ECHO_STABLE_REGION_WEIGHT;
+    public static ModConfigSpec.IntValue ECHO_DESYNCED_REGION_WEIGHT;
+    public static ModConfigSpec.IntValue ECHO_FRACTURED_REGION_WEIGHT;
+    public static ModConfigSpec.IntValue ECHO_FRACTURE_INFLUENCE_RADIUS;
+    public static ModConfigSpec.DoubleValue ECHO_REALITY_ECHO_CHANCE;
+    public static ModConfigSpec.IntValue ECHO_MAX_PENDING_REALITY_ECHOES;
+    public static ModConfigSpec.IntValue ECHO_REALITY_ECHO_RETENTION_DAYS;
     public static ModConfigSpec.BooleanValue RETURN_ONLY_ACTIVE_RIFT;
     public static ModConfigSpec.BooleanValue CHAT_BROADCASTS;
     public static ModConfigSpec.BooleanValue DEBUG_LOGGING;
@@ -111,7 +123,7 @@ public final class TemporalRiftConfig {
                 .defineListAllowEmpty("beforeAllowedStructures", List.of(), value -> value instanceof String string && string.contains(":"));
 
         ECHO_ALLOWED_MOBS = BUILDER
-                .comment("Entity ids allowed to spawn or remain in The Echo. Villagers are always removed; iron golems and quiet wildlife are allowed by default.")
+                .comment("Entity ids allowed by natural spawn checks in Echo Earth. Existing village inhabitants are removed; wildlife and iron golems are allowed by default.")
                 .defineListAllowEmpty("echoAllowedMobs", List.of(
                         "minecraft:iron_golem",
                         "minecraft:allay",
@@ -153,12 +165,35 @@ public final class TemporalRiftConfig {
                 ), value -> value instanceof String string && string.contains(":"));
 
         ENABLE_ECHO_CHUNK_DISTORTION = BUILDER
-                .comment("If true, chunks in The Echo are lightly mutated on load: doors are opened and some leaf clusters vanish.")
+                .comment("Decorate new desynced/fractured Echo Earth chunks once with sampled open doors and dead leaf patches. Existing chunks and stable regions are preserved.")
                 .define("enableEchoChunkDistortion", true);
 
         ENABLE_ECHO_BUILD_ECHOES = BUILDER
-                .comment("If true, some player-built Overworld blocks later appear in The Echo as partial ruined copies.")
+                .comment("Legacy master switch for sampled Overworld construction appearing as damaged material synchronization in Echo Earth.")
                 .define("enableEchoBuildEchoes", true);
+
+        ENABLE_ECHO_STABILITY_SYSTEM = BUILDER.comment("Enable deterministic regional instability in Echo Earth.")
+                .define("enableEchoStabilitySystem", true);
+        ENABLE_ECHO_REALITY_ECHOES = BUILDER.comment("Enable delayed reality echoes; enableEchoBuildEchoes must also be true.")
+                .define("enableEchoRealityEchoes", true);
+        ENABLE_ECHO_TIME_ANOMALIES = BUILDER.comment("Enable rare brief celestial pauses in fractured regions. Cosmetic only; server time and scheduled ticks remain unchanged.")
+                .define("enableEchoTimeAnomalies", false);
+        ENABLE_ECHO_ATMOSPHERIC_DISTORTION = BUILDER.comment("Scale Echo fog, sky, sound attenuation and anomaly particles by server-reported stability.")
+                .define("enableEchoAtmosphericDistortion", true);
+        ENABLE_ECHO_FRACTURE_INFLUENCE = BUILDER.comment("Increase Echo instability near active Temporal Rifts and remembered major fracture sites at corresponding Earth coordinates.")
+                .define("enableEchoFractureInfluence", true);
+        ECHO_STABLE_REGION_WEIGHT = BUILDER.comment("Relative stable-region weight. All weights zero means stable everywhere.")
+                .defineInRange("echoStableRegionWeight", 75, 0, 1000);
+        ECHO_DESYNCED_REGION_WEIGHT = BUILDER.defineInRange("echoDesyncedRegionWeight", 22, 0, 1000);
+        ECHO_FRACTURED_REGION_WEIGHT = BUILDER.defineInRange("echoFracturedRegionWeight", 3, 0, 1000);
+        ECHO_FRACTURE_INFLUENCE_RADIUS = BUILDER.comment("Horizontal influence radius in blocks; sampled at chunk centers.")
+                .defineInRange("echoFractureInfluenceRadius", 384, 16, 4096);
+        ECHO_REALITY_ECHO_CHANCE = BUILDER.comment("Probability from 0 to 1 of sampling a placed solid block; breaks use half this probability.")
+                .defineInRange("echoRealityEchoChance", 0.35, 0.0, 1.0);
+        ECHO_MAX_PENDING_REALITY_ECHOES = BUILDER.comment("Maximum pending sampled edits. Overflow declines new samples without evicting accepted work; a fixed 65536-record load safety cap applies to legacy data.")
+                .defineInRange("echoMaxPendingRealityEchoes", 8192, 128, 65536);
+        ECHO_REALITY_ECHO_RETENTION_DAYS = BUILDER.comment("Minecraft game-time days to retain due echoes while their destination is unloaded. Does not delete placed blocks.")
+                .defineInRange("echoRealityEchoRetentionDays", 30, 1, 365);
 
         RETURN_ONLY_ACTIVE_RIFT = BUILDER
                 .comment("If true, players can only return from the past dimension during an active rift.")

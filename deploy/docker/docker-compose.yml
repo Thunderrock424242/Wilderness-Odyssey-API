@@ -1,0 +1,23 @@
+services:
+  aether:
+    build:
+      context: ../../aether-server
+      dockerfile: ../deploy/docker/Dockerfile
+      args:
+        AETHER_JAR: .codex-build/libs/Aether-AI-Server.jar
+    environment:
+      AETHER_API_KEYS: ${AETHER_API_KEYS:?Set gateway credentials}
+    volumes:
+      - ./aether-server.docker.yml:/etc/aether/aether-server.yml:ro
+    ports:
+      - "127.0.0.1:8085:8085"
+    depends_on:
+      - ollama
+    restart: unless-stopped
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+volumes:
+  ollama_models:

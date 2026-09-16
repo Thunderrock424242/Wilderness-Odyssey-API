@@ -12,12 +12,13 @@ public final class MinecraftVerificationRelayConfig {
     private static ModConfigSpec.BooleanValue ENABLE_SERVER_VERIFICATION_RELAY;
     private static ModConfigSpec.ConfigValue<String> DISCORD_VERIFICATION_WEBHOOK_URL;
     private static ModConfigSpec.IntValue REQUEST_TIMEOUT_SECONDS;
+    private static ModConfigSpec.IntValue COOLDOWN_SECONDS;
 
     static {
         WildernessConfigSpecs.initialize();
     }
 
-    /** Defines the verification-relay category in the unified server config. */
+    /** Defines the verification-relay category in the unsynchronized common config. */
     public static void define(ModConfigSpec.Builder builder) {
 
         builder.comment("Server-side Minecraft account verification relay settings.").push("verificationRelay");
@@ -36,6 +37,8 @@ public final class MinecraftVerificationRelayConfig {
                 .comment("HTTP request timeout in seconds for verification relay webhook posts.")
                 .defineInRange("requestTimeoutSeconds", 10, 1, 60);
 
+        COOLDOWN_SECONDS = builder.comment("Minimum seconds between link submissions per player; reconnecting does not reset it.").defineInRange("cooldownSeconds", 30, 1, 3600);
+
         builder.pop();
     }
 
@@ -46,14 +49,20 @@ public final class MinecraftVerificationRelayConfig {
         return new Values(
                 ENABLE_SERVER_VERIFICATION_RELAY.get(),
                 DISCORD_VERIFICATION_WEBHOOK_URL.get(),
-                REQUEST_TIMEOUT_SECONDS.get()
+                REQUEST_TIMEOUT_SECONDS.get(),
+                COOLDOWN_SECONDS.get()
         );
     }
 
     public record Values(
             boolean enableServerVerificationRelay,
             String discordVerificationWebhookUrl,
-            int requestTimeoutSeconds
+            int requestTimeoutSeconds,
+            int cooldownSeconds
     ) {
+        /** Retains the former constructor with the production cooldown default. */
+        public Values(boolean enabled, String endpoint, int timeoutSeconds) {
+            this(enabled, endpoint, timeoutSeconds, 30);
+        }
     }
 }

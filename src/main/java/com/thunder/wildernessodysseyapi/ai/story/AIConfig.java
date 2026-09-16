@@ -17,6 +17,16 @@ public class AIConfig {
     private String corruptedPrefix;
     private final Personality personality = new Personality();
     private final Settings settings = new Settings();
+    private AIBackendConfig backend = AIBackendConfig.defaults();
+
+    /** Server-only backend settings, never synchronized to Minecraft clients. */
+    public AIBackendConfig getBackend() {
+        return backend;
+    }
+
+    public void setBackend(AIBackendConfig backend) {
+        this.backend = backend == null ? AIBackendConfig.defaults() : backend;
+    }
     private final PlayerMemory playerMemory = new PlayerMemory();
     private final Onboarding onboarding = new Onboarding();
     private final Fallback fallback = new Fallback();

@@ -1,48 +1,61 @@
 package com.thunder.wildernessodysseyapi.ai.story;
 
 import com.thunder.wildernessodysseyapi.ai.perf.MemoryStore;
-import com.thunder.wildernessodysseyapi.ai.story.provider.OllamaChatClient;
-import com.thunder.wildernessodysseyapi.ai.story.provider.OllamaLocalRuntime;
+import com.thunder.wildernessodysseyapi.ai.story.provider.AetherBackendClient;
+import com.thunder.wildernessodysseyapi.ai.story.provider.AetherRequest;
+import com.thunder.wildernessodysseyapi.ai.story.provider.BackendStatus;
 import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
+import net.minecraft.server.MinecraftServer;
+import net.neoforged.fml.loading.FMLPaths;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-
-import net.minecraft.server.MinecraftServer;
+import java.util.function.BooleanSupplier;
 
 /**
- * Coordinates the central Aether intelligence, its local-model specialists,
- * conversation memory, and the scripted provider-failure responder.
+ * Owns game-side conversation memory, onboarding, routing and deterministic fallback.
+ * Permanent model prompts and verification belong to the standalone Aether service.
  */
-public class AIClient {
-
-    private final List<String> story = new ArrayList<>();
-    private final List<String> corruptedLore = new ArrayList<>();
-    private final List<String> backgroundHistory = new ArrayList<>();
-    private final List<String> authoritativeKnowledge = new ArrayList<>();
-    private final List<String> knowledgeBoundaries = new ArrayList<>();
+public class AIClient implements AutoCloseable {
     private final AISettings settings = new AISettings();
     private final VoiceIntegration voiceIntegration = new VoiceIntegration();
     private final MemoryStore memoryStore = new MemoryStore();
-    private final AIPlayerProfileStore playerProfileStore = new AIPlayerProfileStore();
-    private final AIOnboardingStore onboardingStore = new AIOnboardingStore();
+    private final AIPlayerProfileStore playerProfileStore;
+    private final AIOnboardingStore onboardingStore;
     private final AIFallbackResponder fallbackResponder = new AIFallbackResponder();
-    private final OllamaChatClient ollamaChatClient = new OllamaChatClient();
-    private final OllamaLocalRuntime ollamaLocalRuntime = new OllamaLocalRuntime();
-    private AISubsystemRegistry subsystemRegistry = new AISubsystemRegistry("Aether", List.of());
+    private final AetherBackendClient backend;
+    private final AISubsystemRegistry subsystemRegistry;
+    private volatile Thread serverThread;
+    private volatile boolean active;
     private boolean onboardingEnabled;
     private String onboardingCompletionMessage = "You're all set. You can ask me anything now.";
     private String onboardingInvalidChoiceMessage = "Pick one of the numbered options so I can guide you.";
     private final List<AIConfig.OnboardingStep> onboardingSteps = new ArrayList<>();
     private boolean playerMemoryEnabled = true;
-    private boolean naturalPlayerLearningEnabled = true;
+    private boolean naturalPlayerLearningEnabled;
     private int maxPlayerMemories = AIPlayerProfileStore.DEFAULT_MAX_MEMORIES;
 
+    /** Loads only server-owned configuration; no model process or network starts here. */
     public AIClient() {
-        loadStory();
+        this(AIConfigLoader.load(), FMLPaths.CONFIGDIR.get(), null);
+    }
+
+    /** Injectable state and network guard for offline integration tests. */
+    AIClient(AIConfig config, Path stateDirectory, BooleanSupplier networkGuard) {
+        playerProfileStore = new AIPlayerProfileStore(stateDirectory.resolve("aether_player_profiles.yaml"));
+        onboardingStore = new AIOnboardingStore(stateDirectory.resolve("ai_onboarding.yaml"));
+        applySettings(config);
+        configurePlayerMemory(config.getPlayerMemory());
+        subsystemRegistry = new AISubsystemRegistry(settings.getPersonaName(), config.getSubsystems());
+        configureOnboarding(config.getOnboarding());
+        fallbackResponder.configure(config.getFallback(), settings.getPersonaName(), settings.getWakeWord());
+        backend = new AetherBackendClient(settings.getBackend(), networkGuard == null
+                ? () -> active && Thread.currentThread() != serverThread : networkGuard);
     }
 
     public String getWakeWord() {
@@ -57,96 +70,57 @@ public class AIClient {
         return settings.isAtlasEnabled();
     }
 
+    /** Ordinary multiplayer conversation is never forwarded unless Aether is addressed. */
     public boolean isAiInvocation(String message) {
         if (message == null || message.isBlank()) {
             return false;
         }
         String lower = message.toLowerCase(Locale.ROOT);
-        return lower.contains(settings.getWakeWord()) || subsystemRegistry.findExplicitSpeaker(message).isPresent();
+        return java.util.regex.Pattern.compile("(?<![\\p{L}\\p{N}_])"
+                        + java.util.regex.Pattern.quote(settings.getWakeWord()) + "(?![\\p{L}\\p{N}_])")
+                .matcher(lower).find() || subsystemRegistry.findExplicitSpeaker(message).isPresent();
     }
 
     public String resolveSpeaker(String message) {
         return subsystemRegistry.findExplicitSpeaker(message).orElse(subsystemRegistry.centralName());
     }
 
-    private void loadStory() {
-        AIConfig config = AIConfigLoader.load();
-        story.addAll(config.getStory());
-        corruptedLore.addAll(config.getCorruptedData());
-        backgroundHistory.addAll(config.getBackgroundHistory());
-        authoritativeKnowledge.addAll(config.getAuthoritativeKnowledge());
-        knowledgeBoundaries.addAll(config.getKnowledgeBoundaries());
-        applySettings(config);
-        configurePlayerMemory(config.getPlayerMemory());
-        subsystemRegistry = new AISubsystemRegistry(settings.getPersonaName(), config.getSubsystems());
-        configureOnboarding(config.getOnboarding());
-        fallbackResponder.configure(config.getFallback(), settings.getPersonaName(), settings.getWakeWord());
-    }
-
-    public synchronized void scanGameData(MinecraftServer server) {
-        if (!AIChatAccessPolicy.isAvailable(server) || !settings.isOllamaEnabled()) {
+    /** Records the owning tick thread, then checks the gateway on the bounded shared I/O pool. */
+    public void scanGameData(MinecraftServer server) {
+        if (!AIChatAccessPolicy.isAvailable(server)) {
             return;
         }
-        AsyncTaskManager.trySubmitIoWork("Aether_Ollama_Warmup", () -> {
-            OllamaLocalRuntime.StartupResult startup = ollamaLocalRuntime.ensureAvailable(settings);
-            if (startup.isAvailable()) {
-                ollamaChatClient.warmUp(settings);
-            }
-        });
+        serverThread = Thread.currentThread();
+        active = true;
+        if (settings.isAtlasEnabled() && settings.getBackend().enabled()) {
+            AsyncTaskManager.trySubmitIoWork("Aether_Backend_Health", backend::checkHealth);
+        }
+    }
+
+    /** Returns a cached observation without touching the network. */
+    public BackendStatus getBackendStatus() {
+        return backend.status();
     }
 
     private void applySettings(AIConfig config) {
-        if (config == null) {
-            return;
+        AIConfig.Settings configured = config.getSettings();
+        if (configured.getAtlasEnabled() != null) {
+            settings.setAtlasEnabled(configured.getAtlasEnabled());
         }
-        AIConfig.Settings configSettings = config.getSettings();
-        if (configSettings.getAtlasEnabled() != null) {
-            settings.setAtlasEnabled(configSettings.getAtlasEnabled());
+        if (configured.getWakeWord() != null) {
+            settings.setWakeWord(configured.getWakeWord());
         }
-        if (configSettings.getWakeWord() != null) {
-            settings.setWakeWord(configSettings.getWakeWord());
+        if (configured.getMaxHistoryMessages() != null) {
+            settings.setMaxHistoryMessages(configured.getMaxHistoryMessages());
         }
-        if (configSettings.getProvider() != null) {
-            settings.setProvider(configSettings.getProvider());
+        if (configured.getMaxResponseCharacters() != null) {
+            settings.setMaxResponseCharacters(configured.getMaxResponseCharacters());
         }
-        if (configSettings.getEndpoint() != null) {
-            settings.setEndpoint(configSettings.getEndpoint());
-        }
-        if (configSettings.getModel() != null) {
-            settings.setModelName(configSettings.getModel());
-        }
-        if (configSettings.getRequestTimeoutSeconds() != null) {
-            settings.setRequestTimeoutSeconds(configSettings.getRequestTimeoutSeconds());
-        }
-        if (configSettings.getMaxHistoryMessages() != null) {
-            settings.setMaxHistoryMessages(configSettings.getMaxHistoryMessages());
-        }
-        if (configSettings.getMaxResponseCharacters() != null) {
-            settings.setMaxResponseCharacters(configSettings.getMaxResponseCharacters());
-        }
-        if (configSettings.getMaxOutputTokens() != null) {
-            settings.setMaxOutputTokens(configSettings.getMaxOutputTokens());
-        }
-        if (configSettings.getOllamaAutostart() != null) {
-            settings.setOllamaAutostartEnabled(configSettings.getOllamaAutostart());
-        }
-        if (configSettings.getOllamaStartupTimeoutSeconds() != null) {
-            settings.setOllamaStartupTimeoutSeconds(configSettings.getOllamaStartupTimeoutSeconds());
-        }
-        if (configSettings.getOllamaExecutable() != null) {
-            settings.setOllamaExecutable(configSettings.getOllamaExecutable());
-        }
-
+        settings.setBackend(config.getBackend());
         AIConfig.Personality personality = config.getPersonality();
-        if (personality.getName() != null) {
-            settings.setPersonaName(personality.getName());
-        }
-        if (personality.getTone() != null) {
-            settings.setPersonalityTone(personality.getTone());
-        }
-        if (personality.getEmpathy() != null) {
-            settings.setEmpathyLevel(personality.getEmpathy());
-        }
+        settings.setPersonaName(personality.getName());
+        settings.setPersonalityTone(personality.getTone());
+        settings.setEmpathyLevel(personality.getEmpathy());
     }
 
     private void configureOnboarding(AIConfig.Onboarding onboarding) {
@@ -160,7 +134,6 @@ public class AIClient {
         if (onboarding.getInvalidChoiceMessage() != null) {
             onboardingInvalidChoiceMessage = onboarding.getInvalidChoiceMessage();
         }
-        onboardingSteps.clear();
         onboardingSteps.addAll(onboarding.getSteps());
         if (onboardingEnabled && onboardingSteps.isEmpty()) {
             onboardingSteps.addAll(buildDefaultOnboardingSteps());
@@ -168,9 +141,6 @@ public class AIClient {
     }
 
     private void configurePlayerMemory(AIConfig.PlayerMemory playerMemory) {
-        if (playerMemory == null) {
-            return;
-        }
         if (playerMemory.getEnabled() != null) {
             playerMemoryEnabled = playerMemory.getEnabled();
         }
@@ -178,32 +148,17 @@ public class AIClient {
             naturalPlayerLearningEnabled = playerMemory.getNaturalLearningEnabled();
         }
         if (playerMemory.getMaxMemoriesPerPlayer() != null) {
-            maxPlayerMemories = Math.max(
-                    1,
-                    Math.min(AIPlayerProfileStore.HARD_MAX_MEMORIES, playerMemory.getMaxMemoriesPerPlayer())
-            );
+            maxPlayerMemories = Math.max(1, Math.min(AIPlayerProfileStore.HARD_MAX_MEMORIES,
+                    playerMemory.getMaxMemoriesPerPlayer()));
         }
     }
 
-    /**
-     * Adds the message to memory and returns a scripted reply.
-     *
-     * @param player  player name
-     * @param message player message
-     * @return AI reply
-     */
+    /** Compatibility entry point for callers already running on an I/O worker. */
     public String sendMessage(String player, String message) {
         return sendMessage(null, player, message);
     }
 
-    /**
-     * Adds the message to per-world memory and returns a scripted reply.
-     *
-     * @param world   world or save identifier
-     * @param player  player name
-     * @param message player message
-     * @return AI reply
-     */
+    /** Compatibility entry point for callers already running on an I/O worker. */
     public String sendMessage(String world, String player, String message) {
         return sendMessageWithVoice(world, player, message).text();
     }
@@ -213,158 +168,112 @@ public class AIClient {
     }
 
     public VoiceIntegration.VoiceResult sendMessageWithVoice(String world, String player, String message,
-                                                            AIFallbackResponder.ResponseContext responseContext) {
-        return sendMessageWithVoice(world, player, player, message, responseContext);
+                                                            AIFallbackResponder.ResponseContext context) {
+        return sendMessageWithVoice(world, player, player, message, context);
     }
 
-    public VoiceIntegration.VoiceResult sendMessageWithVoice(
-            String world,
-            String playerProfileKey,
-            String player,
-            String message,
-            AIFallbackResponder.ResponseContext responseContext
-    ) {
+    public VoiceIntegration.VoiceResult sendMessageWithVoice(String world, String profileKey, String player,
+                                                            String message, AIFallbackResponder.ResponseContext context) {
+        UUID compatibilityId = UUID.nameUUIDFromBytes(("aether:" + player).getBytes(StandardCharsets.UTF_8));
+        return sendMessageWithVoice(world, profileKey, compatibilityId, player, message, context);
+    }
+
+    /**
+     * Processes captured values on a worker; no Minecraft objects are accessed here.
+     * Profile notes stay local unless the operator explicitly enables sharing them.
+     */
+    public VoiceIntegration.VoiceResult sendMessageWithVoice(String world, String profileKey, UUID playerId,
+            String player, String message, AIFallbackResponder.ResponseContext responseContext) {
         if (!settings.isAtlasEnabled()) {
             return voiceIntegration.wrap(settings.getPersonaName(), "");
         }
-        AIFallbackResponder.ResponseContext safeResponseContext =
-                responseContext == null ? AIFallbackResponder.ResponseContext.empty() : responseContext;
-        Optional<String> requiredSpeaker = subsystemRegistry.findExplicitSpeaker(message);
-        String speaker = requiredSpeaker.orElse(subsystemRegistry.centralName());
-
-        // Profile deletion stays available even when learning is disabled so
-        // the privacy control can always remove previously stored details.
+        AIFallbackResponder.ResponseContext context = responseContext == null
+                ? AIFallbackResponder.ResponseContext.empty() : responseContext;
+        String speaker = resolveSpeaker(message);
+        // The save/player key is local-only. Neither its filesystem identity nor hash is transmitted.
+        String conversationKey = profileKey == null ? playerId.toString() : profileKey;
         if (AIPlayerProfileStore.isForgetRequest(message)) {
-            memoryStore.addPlayerMessage(world, player, message);
-            boolean removed = playerProfileStore.clear(playerProfileKey);
-            String reply = removed
+            memoryStore.clearPlayer(conversationKey);
+            boolean removed = playerProfileStore.clear(profileKey);
+            return voiceIntegration.wrap(speaker, removed
                     ? "I've cleared the personal details you shared with me. We can start fresh."
-                    : "I don't have a saved profile for you, so there was nothing to forget.";
-            memoryStore.addAiMessage(world, player, speaker, reply);
-            return voiceIntegration.wrap(speaker, reply);
+                    : "I've cleared our recent conversation. I don't have a saved profile for you.");
         }
 
         AIPlayerProfileStore.LearningResult learning = playerMemoryEnabled
-                ? playerProfileStore.learn(
-                        playerProfileKey,
-                        message,
-                        naturalPlayerLearningEnabled,
-                        maxPlayerMemories
-                )
+                ? playerProfileStore.learn(profileKey, message, naturalPlayerLearningEnabled, maxPlayerMemories)
                 : AIPlayerProfileStore.LearningResult.none();
         if (learning.explicitRequest()) {
-            memoryStore.addPlayerMessage(world, player, message);
-            String reply;
-            if (!learning.accepted()) {
-                reply = learning.rejectionMessage();
-            } else if (learning.changed()) {
-                reply = "I'll remember that about you: " + learning.memory() + ".";
-            } else {
-                reply = "I already remember that about you: " + learning.memory() + ".";
-            }
-            memoryStore.addAiMessage(world, player, speaker, reply);
+            String reply = !learning.accepted() ? learning.rejectionMessage()
+                    : learning.changed() ? "I'll remember that about you: " + learning.memory() + "."
+                    : "I already remember that about you: " + learning.memory() + ".";
+            // Durable profile exchanges are intentionally excluded from outgoing conversation history.
             return voiceIntegration.wrap(speaker, reply);
         }
-
-        memoryStore.addPlayerMessage(world, player, message);
-        String playerProfileContext = playerMemoryEnabled
-                ? playerProfileStore.getContextSnippet(playerProfileKey, maxPlayerMemories)
-                : "";
         if (AIPlayerProfileStore.isRecallRequest(message)) {
-            String reply = playerMemoryEnabled
-                    ? playerProfileStore.describeForPlayer(playerProfileKey, maxPlayerMemories)
-                    : "Player profile memory is disabled in the local Aether configuration.";
-            memoryStore.addAiMessage(world, player, speaker, reply);
-            return voiceIntegration.wrap(speaker, reply);
+            return voiceIntegration.wrap(speaker, playerMemoryEnabled
+                    ? playerProfileStore.describeForPlayer(profileKey, maxPlayerMemories)
+                    : "Player profile memory is disabled in the Aether configuration.");
         }
 
-        if (settings.isOllamaEnabled()) {
-            String systemPrompt = AetherSystemPrompt.build(
-                    settings,
-                    story,
-                    backgroundHistory,
-                    corruptedLore,
-                    authoritativeKnowledge,
-                    knowledgeBoundaries,
-                    subsystemRegistry,
-                    requiredSpeaker.orElse(""),
-                    safeResponseContext,
-                    playerProfileContext
-            );
-            List<MemoryStore.ConversationMessage> history = memoryStore.getRecentMessages(
-                    world,
-                    player,
-                    settings.getMaxHistoryMessages()
-            );
-            OllamaChatClient.ModelResponse modelResponse = ollamaChatClient.generate(
-                    settings,
-                    systemPrompt,
-                    requiredSpeaker.orElse(""),
-                    subsystemRegistry.allowedSpeakers(),
-                    subsystemRegistry.centralName(),
-                    history
-            );
-            if (modelResponse.successful()) {
-                speaker = subsystemRegistry.canonicalOrCentral(modelResponse.speaker());
-                String verifierPrompt = AetherSystemPrompt.buildVerifier(
-                        story,
-                        backgroundHistory,
-                        corruptedLore,
-                        authoritativeKnowledge,
-                        knowledgeBoundaries,
-                        speaker,
-                        subsystemRegistry.profileFor(speaker).orElse(null),
-                        safeResponseContext,
-                        playerProfileContext,
-                        message,
-                        modelResponse.displayText(),
-                        modelResponse.speechText()
-                );
-                OllamaChatClient.VerificationResponse verification =
-                        ollamaChatClient.verify(settings, verifierPrompt);
-                String verifiedReply = verification.successful() && verification.approved()
-                        ? modelResponse.text()
-                        : safeUngroundedReply(message);
-                memoryStore.addAiMessage(world, player, speaker, verifiedReply);
-                if (verification.successful() && verification.approved()) {
-                    return voiceIntegration.wrap(
-                            speaker,
-                            modelResponse.displayText(),
-                            modelResponse.speechText(),
-                            modelResponse.emotion(),
-                            modelResponse.radioEffect()
-                    );
-                }
-                return voiceIntegration.wrap(speaker, verifiedReply);
-            }
+        List<MemoryStore.ConversationMessage> history =
+                memoryStore.getRecentMessages(world, conversationKey, settings.getMaxHistoryMessages());
+        memoryStore.addPlayerMessage(world, conversationKey, message);
+        String profile = settings.getBackend().sendPlayerMemory() && playerMemoryEnabled
+                ? playerProfileStore.getContextSnippet(profileKey, maxPlayerMemories) : "";
+        List<String> tags = context.tags().stream().limit(128).toList();
+        AetherRequest.Context dynamicContext = new AetherRequest.Context(
+                world == null ? "minecraft:overworld" : world,
+                contextValue(tags, "biome:", ""), tags.contains("surface"),
+                contextValue(tags, "interface:", "server_chat"), tags, profile);
+        AetherRequest request = new AetherRequest(UUID.randomUUID().toString(), settings.getBackend().serverId(),
+                dynamicContext.dimension(), playerId.toString(), player,
+                subsystemRegistry.findExplicitSpeaker(message).orElse(""), message, dynamicContext,
+                history.stream().map(line -> new AetherRequest.HistoryMessage(
+                        line.role() == MemoryStore.Role.PLAYER ? "user" : "assistant",
+                        line.speaker(), line.text())).toList());
+        AetherBackendClient.ModelResponse model = backend.generate(
+                request, subsystemRegistry.allowedSpeakers(), settings.getMaxResponseCharacters());
+        if (model.successful()) {
+            memoryStore.addAiMessage(world, conversationKey, model.speaker(), model.displayText());
+            return voiceIntegration.wrap(model.speaker(), model.displayText(), model.speechText(),
+                    model.emotion(), model.radioEffect());
         }
-
-        // Scripted intent matching is an availability fallback, not the normal
-        // conversation authority. It runs only when Ollama is disabled or the
-        // local request did not produce a usable reply.
-        Optional<AIFallbackResponder.FallbackReply> authoredReply =
-                fallbackResponder.buildReply(message, safeResponseContext);
-        speaker = authoredReply.map(AIFallbackResponder.FallbackReply::speaker)
-                .map(subsystemRegistry::canonicalOrCentral)
-                .orElse(speaker);
-        String reply = authoredReply.map(AIFallbackResponder.FallbackReply::text)
-                .orElse("Archive gap detected. I do not have a recovered answer for that yet.");
-        if (settings.isOllamaEnabled()) {
-            reply = fallbackResponder.appendUnavailableHint(reply);
-        }
-        memoryStore.addAiMessage(world, player, speaker, reply);
-        return voiceIntegration.wrap(speaker, reply);
+        VoiceIntegration.VoiceResult fallback = fallback(message, context);
+        memoryStore.addAiMessage(world, conversationKey, fallback.speaker(), fallback.text());
+        return fallback;
     }
 
-    private static String safeUngroundedReply(String message) {
-        String lower = message == null ? "" : message.trim().toLowerCase(Locale.ROOT);
-        if (lower.equals("hi") || lower.equals("hello") || lower.equals("hey")
-                || lower.equals("idk") || lower.equals("ok") || lower.equals("okay")
-                || lower.contains("how are you") || lower.contains("how is your day")
-                || lower.contains("thank you") || lower.contains("thanks")) {
-            return "I'm here and operational, if a little fragmented. What would you like to talk about?";
+    /** Pure, deterministic response for rejected jobs, outages and model verification failures. */
+    public VoiceIntegration.VoiceResult fallback(String message, AIFallbackResponder.ResponseContext context) {
+        Optional<AIFallbackResponder.FallbackReply> authored = fallbackResponder.buildReply(message, context);
+        String speaker = authored.map(AIFallbackResponder.FallbackReply::speaker)
+                .map(subsystemRegistry::canonicalOrCentral).orElseGet(() -> resolveSpeaker(message));
+        String text = authored.map(AIFallbackResponder.FallbackReply::text)
+                .orElse("Archive gap detected. I do not have a recovered answer for that yet.");
+        if (settings.getBackend().enabled()) {
+            text = fallbackResponder.appendUnavailableHint(text);
         }
-        return "I don't have a recovered record for that. If you find field evidence, I can help interpret it.";
+        return voiceIntegration.wrap(speaker, text);
+    }
+
+    private static String contextValue(List<String> tags, String prefix, String defaultValue) {
+        return tags.stream().filter(tag -> tag.startsWith(prefix)).map(tag -> tag.substring(prefix.length()))
+                .findFirst().orElse(defaultValue);
+    }
+
+    /** Invalidates pending network work and transient conversations when the server session stops. */
+    @Override
+    public void close() {
+        active = false;
+        backend.close();
+        memoryStore.close();
+    }
+
+
+    /** Reads cached progress only; persistence happens in the worker-side handler. */
+    public boolean hasPendingOnboarding(UUID playerId) {
+        return onboardingEnabled && playerId != null && onboardingStore.getStep(playerId) < onboardingSteps.size();
     }
 
     public String handleOnboarding(UUID playerId, String message) {

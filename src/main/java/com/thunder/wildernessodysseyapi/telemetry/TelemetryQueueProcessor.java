@@ -46,10 +46,15 @@ public final class TelemetryQueueProcessor {
 
         // Each server-owned queue prevents its own overlapping network flush.
         TelemetryQueue queue = TelemetryQueue.get(event.getServer());
+        requestFlush(queue, config.queueFlushBatchSize());
+    }
+
+    /** Starts at most one bounded worker flush; saturation retains queued reports. */
+    static void requestFlush(TelemetryQueue queue, int batchSize) {
         if (!queue.tryBeginFlush()) {
             return;
         }
-        int batchSize = config.queueFlushBatchSize();
+
         if (!AsyncTaskManager.trySubmitIoWork("Telemetry_Flush", () -> {
             try {
                 queue.flush(batchSize);

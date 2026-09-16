@@ -1,26 +1,16 @@
 package com.thunder.wildernessodysseyapi.ai.story;
 
 import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-/** Verifies that A.E.T.H.E.R cannot cross the single-player chat boundary. */
+/** All supported hosting modes share the same server-side network boundary. */
 class AIChatAccessPolicyTest {
-
     @Test
-    void allowsPrivateIntegratedWorld() {
+    void supportsIntegratedLanAndDedicatedHosting() {
         assertTrue(AIChatAccessPolicy.isAvailable(true, false));
-    }
-
-    @Test
-    void rejectsWorldAsSoonAsItIsPublishedToLan() {
-        assertFalse(AIChatAccessPolicy.isAvailable(true, true));
-    }
-
-    @Test
-    void rejectsDedicatedAndNonSingleplayerServers() {
-        assertFalse(AIChatAccessPolicy.isAvailable(false, true));
-        assertFalse(AIChatAccessPolicy.isAvailable(false, false));
+        assertTrue(AIChatAccessPolicy.isAvailable(true, true));
+        assertTrue(AIChatAccessPolicy.isAvailable(false, false));
+        assertTrue(AIChatAccessPolicy.isAvailable(false, true));
+        assertFalse(AIChatAccessPolicy.isAvailable(null));
     }
 }

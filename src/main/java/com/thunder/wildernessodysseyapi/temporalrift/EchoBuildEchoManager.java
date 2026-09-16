@@ -16,17 +16,17 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.thunder.wildernessodysseyapi.temporalrift.echo.EchoRealityModel;
 
+/** Owns sampled Earth-to-Echo synchronization using the existing persistent ledger. */
 public final class EchoBuildEchoManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("TemporalRift");
-    private static final int ECHO_SAMPLE_PERCENT = 35;
-    private static long lastCheckedDay = -1L;
 
     private EchoBuildEchoManager() {
     }
 
     public static void tick(MinecraftServer server) {
-        if (!TemporalRiftConfig.ENABLE_ECHO_BUILD_ECHOES.get()) {
+        if (!enabled()) {
             return;
         }
 
@@ -36,23 +36,18 @@ public final class EchoBuildEchoManager {
             return;
         }
 
+        if (overworld.getGameTime() % 20 != 0) return;
         long currentDay = overworld.getGameTime() / 24000L;
-        if (currentDay == lastCheckedDay) {
-            return;
-        }
-        lastCheckedDay = currentDay;
 
         EchoBuildEchoSavedData data = EchoBuildEchoSavedData.get(server);
-        List<EchoBuildEcho> due = new ArrayList<>();
-        for (EchoBuildEcho echoBuildEcho : data.pendingEchoes()) {
-            if (currentDay >= echoBuildEcho.revealDay()) {
-                due.add(echoBuildEcho);
-            }
-        }
-
-        for (EchoBuildEcho echoBuildEcho : due) {
-            if (applyEcho(echo, echoBuildEcho)) {
+        // At most 64 examined records and 32 world writes per second across the server.
+        int applied = 0;
+        for (EchoBuildEcho echoBuildEcho : data.nextBatch(64)) {
+            if (currentDay - echoBuildEcho.revealDay() > TemporalRiftConfig.ECHO_REALITY_ECHO_RETENTION_DAYS.get()) {
                 data.removeEcho(echoBuildEcho);
+            } else if (currentDay >= echoBuildEcho.revealDay() && applied < 32 && applyEcho(echo, echoBuildEcho)) {
+                data.removeEcho(echoBuildEcho);
+                applied++;
             }
         }
     }
@@ -63,7 +58,7 @@ public final class EchoBuildEchoManager {
         }
 
         long hash = mix(overworld.getSeed() ^ pos.asLong() ^ 0xE0C0E0L);
-        if (Math.floorMod(hash, 100) >= ECHO_SAMPLE_PERCENT) {
+        if (!EchoRealityModel.sample(hash, TemporalRiftConfig.ECHO_REALITY_ECHO_CHANCE.get(), false)) {
             return;
         }
 
@@ -87,7 +82,7 @@ public final class EchoBuildEchoManager {
         }
 
         long hash = mix(overworld.getSeed() ^ pos.asLong() ^ 0xB12EA7L);
-        if (Math.floorMod(hash, 100) >= ECHO_SAMPLE_PERCENT / 2) {
+        if (!EchoRealityModel.sample(hash, TemporalRiftConfig.ECHO_REALITY_ECHO_CHANCE.get(), true)) {
             return;
         }
 
@@ -106,28 +101,34 @@ public final class EchoBuildEchoManager {
     }
 
     private static boolean shouldRecord(ServerLevel overworld, BlockPos pos, BlockState state) {
-        return TemporalRiftConfig.ENABLE_ECHO_BUILD_ECHOES.get()
+        return enabled()
                 && overworld.dimension().equals(Level.OVERWORLD)
                 && !state.isAir()
                 && state.isSolid()
+                && !state.hasBlockEntity()
                 && !state.is(Blocks.BEDROCK)
                 && !state.is(TemporalRiftBlocks.RIFT_CORE.get())
                 && !state.is(TemporalRiftBlocks.TIME_CAPSULE.get());
     }
 
     private static BlockPos distortedTarget(ServerLevel overworld, BlockPos pos, long hash) {
-        int dx = Math.floorMod(hash, 9) - 4;
-        int dy = Math.floorMod(hash >>> 8, 3) - 1;
-        int dz = Math.floorMod(hash >>> 16, 9) - 4;
+        long fragment = EchoRealityModel.fragmentHash(overworld.getSeed(), pos.getX(), pos.getY(), pos.getZ());
+        int dx = EchoRealityModel.lateralOffset(fragment);
+        int dy = EchoRealityModel.verticalOffset(fragment);
+        int dz = EchoRealityModel.lateralOffset(fragment >>> 16);
         int y = Math.max(overworld.getMinBuildHeight() + 2, Math.min(overworld.getMaxBuildHeight() - 2, pos.getY() + dy));
         return new BlockPos(pos.getX() + dx, y, pos.getZ() + dz);
     }
 
     private static boolean applyEcho(ServerLevel echoLevel, EchoBuildEcho echoBuildEcho) {
         BlockPos target = echoBuildEcho.targetPos();
+        if (echoLevel.isOutsideBuildHeight(target) || !echoLevel.getWorldBorder().isWithinBounds(target)) return true;
         if (!echoLevel.hasChunkAt(target)) {
             return false;
         }
+        var chunk = echoLevel.getChunkAt(target);
+        if (chunk.hasData(com.thunder.wildernessodysseyapi.core.ModAttachments.ECHO_CHUNK)
+                && chunk.getData(com.thunder.wildernessodysseyapi.core.ModAttachments.ECHO_CHUNK).playerModified()) return true;
 
         BlockState current = echoLevel.getBlockState(target);
         if (!canReplaceWithEcho(echoLevel, target, current)) {
@@ -137,8 +138,19 @@ public final class EchoBuildEchoManager {
         BlockState replacement = echoBuildEcho.type() == TemporalEcho.Type.BREAK
                 ? scarredStateFor(echoBuildEcho.materialKey())
                 : ruinedStateFor(echoBuildEcho.materialKey());
-        echoLevel.setBlock(target, replacement, 3);
-        LOGGER.info("[TemporalRift] Echo copy from {} distorted {} into The Echo at {}.", echoBuildEcho.playerName(), echoBuildEcho.sourcePos(), target);
+        if (replacement.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS)) {
+            long fragment = EchoRealityModel.fragmentHash(echoLevel.getSeed(), target.getX(), target.getY(), target.getZ());
+            replacement = replacement.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS,
+                    net.minecraft.core.Direction.Axis.values()[Math.floorMod(fragment, 3)]);
+        }
+        if (echoLevel.setBlock(target, replacement, 3)) {
+            chunk.getData(com.thunder.wildernessodysseyapi.core.ModAttachments.ECHO_CHUNK)
+                    .record(target, net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(replacement.getBlock()));
+            com.thunder.wildernessodysseyapi.temporalrift.echo.EchoSyncManager.onRealityEcho(echoLevel, target);
+        }
+        if (TemporalRiftConfig.DEBUG_LOGGING.get()) {
+            LOGGER.debug("[TemporalRift] Material synchronization from {} reached Echo Earth at {}.", echoBuildEcho.sourcePos(), target);
+        }
         return true;
     }
 
@@ -206,5 +218,9 @@ public final class EchoBuildEchoManager {
         value *= 0xc4ceb9fe1a85ec53L;
         value ^= value >>> 33;
         return value;
+    }
+
+    private static boolean enabled() {
+        return TemporalRiftConfig.ENABLE_ECHO_BUILD_ECHOES.get() && TemporalRiftConfig.ENABLE_ECHO_REALITY_ECHOES.get();
     }
 }

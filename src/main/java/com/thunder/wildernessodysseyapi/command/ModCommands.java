@@ -17,6 +17,7 @@ import com.thunder.wildernessodysseyapi.modlisttracker.commands.ModListDiffComma
 import com.thunder.wildernessodysseyapi.modlisttracker.commands.ModListVersionCommand;
 import com.thunder.wildernessodysseyapi.modpack.structure.command.ModpackStructureCommand;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationCommands;
+import com.thunder.wildernessodysseyapi.playtest.PlaytestStatusCommand;
 import com.thunder.wildernessodysseyapi.simulation.debug.SimulationDebugCommand;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueStatsCommand;
 import com.thunder.wildernessodysseyapi.vegetation.debug.ReactiveVegetationDebugCommand;
@@ -64,6 +65,7 @@ public final class ModCommands {
         MeteorCommand.register(dispatcher);
         UnstuckCommand.register(dispatcher);
         MinecraftVerificationCommands.register(dispatcher);
+        PlaytestStatusCommand.register(dispatcher);
         WaterDebugCommand.register(dispatcher);
         WeatherDebugCommand.register(dispatcher);
         EcosystemDebugCommand.register(dispatcher);

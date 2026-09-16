@@ -26,11 +26,11 @@ class AIConfigLoaderTest {
             assertTrue(config.getSubsystems().get(1).getRole().startsWith("Rifts, anomalies"));
             assertEquals(2, config.getSubsystems().get(5).getBoundaries().size());
             assertEquals(true, config.getPlayerMemory().getEnabled());
-            assertEquals(true, config.getPlayerMemory().getNaturalLearningEnabled());
+            assertEquals(false, config.getPlayerMemory().getNaturalLearningEnabled());
             assertEquals(12, config.getPlayerMemory().getMaxMemoriesPerPlayer());
-            assertEquals(true, config.getSettings().getOllamaAutostart());
-            assertEquals(20, config.getSettings().getOllamaStartupTimeoutSeconds());
-            assertEquals("", config.getSettings().getOllamaExecutable());
+            assertEquals(null, config.getSettings().getOllamaAutostart());
+            assertEquals(null, config.getSettings().getOllamaStartupTimeoutSeconds());
+            assertEquals(null, config.getSettings().getOllamaExecutable());
         }
     }
 

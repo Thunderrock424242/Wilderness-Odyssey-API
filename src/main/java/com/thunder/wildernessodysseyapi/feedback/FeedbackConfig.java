@@ -13,6 +13,7 @@ public final class FeedbackConfig {
     public static ModConfigSpec.ConfigValue<String> WEBHOOK_URL;
     public static ModConfigSpec.IntValue REQUEST_TIMEOUT_SECONDS;
     public static ModConfigSpec.IntValue MAX_MESSAGE_LENGTH;
+    public static ModConfigSpec.IntValue COOLDOWN_SECONDS;
 
     private static ModConfigSpec.Builder BUILDER;
 
@@ -20,7 +21,7 @@ public final class FeedbackConfig {
         WildernessConfigSpecs.initialize();
     }
 
-    /** Defines feedback settings in the unified server config. */
+    /** Defines feedback settings in the unsynchronized common config. */
     public static void define(ModConfigSpec.Builder builder) {
         BUILDER = builder;
         BUILDER.push("feedback");
@@ -39,6 +40,8 @@ public final class FeedbackConfig {
         MAX_MESSAGE_LENGTH = BUILDER.comment("Maximum feedback message length (Discord has a 2000 char limit).")
                 .defineInRange("maxMessageLength", 500, 20, 2000);
 
+        COOLDOWN_SECONDS = BUILDER.comment("Minimum seconds between feedback submissions per player; reconnecting does not reset it.").defineInRange("cooldownSeconds", 30, 1, 3600);
+
         BUILDER.pop();
         BUILDER = null;
     }
@@ -51,7 +54,8 @@ public final class FeedbackConfig {
                 ENABLED.get(),
                 WEBHOOK_URL.get(),
                 REQUEST_TIMEOUT_SECONDS.get(),
-                MAX_MESSAGE_LENGTH.get()
+                MAX_MESSAGE_LENGTH.get(),
+                COOLDOWN_SECONDS.get()
         );
     }
 
@@ -59,7 +63,12 @@ public final class FeedbackConfig {
             boolean enabled,
             String webhookUrl,
             int requestTimeoutSeconds,
-            int maxMessageLength
+            int maxMessageLength,
+            int cooldownSeconds
     ) {
+        /** Retains the former constructor with the production cooldown default. */
+        public FeedbackConfigValues(boolean enabled, String endpoint, int timeoutSeconds, int maxLength) {
+            this(enabled, endpoint, timeoutSeconds, maxLength, 30);
+        }
     }
 }

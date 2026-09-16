@@ -57,7 +57,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class ModPayloads {
 
     // This channel version covers every payload registered below; bump it for wire-shape changes.
-    private static final String NETWORK_VERSION = "30";
+    private static final String NETWORK_VERSION = "31";
 
     private ModPayloads() {
     }
@@ -70,6 +70,11 @@ public final class ModPayloads {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(NETWORK_VERSION);
         DataEnginePayloads.register(registrar);
+        registrar.playToClient(
+                com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityPayload.TYPE,
+                com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityPayload.STREAM_CODEC,
+                (payload, context) -> com.thunder.wildernessodysseyapi.temporalrift.client.ClientEchoState.accept(
+                        context.player().level(), payload));
         registrar.playToClient(
                 GlacialSeasonSyncPayload.TYPE,
                 GlacialSeasonSyncPayload.STREAM_CODEC,

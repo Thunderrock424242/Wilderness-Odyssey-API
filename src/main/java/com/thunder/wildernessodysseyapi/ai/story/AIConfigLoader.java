@@ -30,6 +30,10 @@ public final class AIConfigLoader {
         }
         AIConfig config = parse(content);
         applyBundledKnowledgeDefaults(config, parse(bundledContent));
+        String environmentKey = System.getenv("AETHER_BACKEND_API_KEY");
+        if (environmentKey != null && !environmentKey.isBlank()) {
+            config.setBackend(config.getBackend().withApiKey(environmentKey));
+        }
         return config;
     }
 
@@ -84,12 +88,10 @@ public final class AIConfigLoader {
         }
         Map<?, ?> root = parseWithSnakeYaml(content);
         if (root == null) {
-            root = parseSimpleYaml(content);
-        }
-        if (root == null) {
             return config;
         }
 
+        config.setBackend(readBackend(root));
         config.getStory().addAll(readStringList(root.get("story")));
         config.getBackgroundHistory().addAll(readStringList(root.get("background_history")));
         config.getCorruptedData().addAll(readStringList(root.get("corrupted_data")));
@@ -163,20 +165,59 @@ public final class AIConfigLoader {
 
     private static Map<?, ?> parseWithSnakeYaml(String content) {
         try {
-            Class<?> yamlClass = Class.forName("org.yaml.snakeyaml.Yaml");
-            Object yaml = yamlClass.getDeclaredConstructor().newInstance();
-            Object parsed = yamlClass.getMethod("load", String.class).invoke(yaml, content);
-            if (parsed instanceof Map<?, ?> map) {
-                return map;
-            }
-            return null;
-        } catch (ClassNotFoundException e) {
-            ModConstants.LOGGER.warn("SnakeYAML not found on the classpath; falling back to a minimal parser.");
-            return null;
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            ModConstants.LOGGER.warn("Failed to parse AI config YAML with SnakeYAML.", e);
+            org.yaml.snakeyaml.LoaderOptions options = new org.yaml.snakeyaml.LoaderOptions();
+            options.setAllowDuplicateKeys(false);
+            options.setMaxAliasesForCollections(20);
+            options.setCodePointLimit(1_048_576);
+            Object parsed = new org.yaml.snakeyaml.Yaml(
+                    new org.yaml.snakeyaml.constructor.SafeConstructor(options)).load(content);
+            return parsed instanceof Map<?, ?> map ? map : null;
+        } catch (RuntimeException exception) {
+            // YAML diagnostics can quote source lines containing an API key.
+            ModConstants.LOGGER.warn("Invalid Aether YAML; using safe defaults without remote access.");
             return null;
         }
+    }
+
+    private static AIBackendConfig readBackend(Map<?, ?> root) {
+        if (!(root.get("ai_backend") instanceof Map<?, ?>)) {
+            Map<String, Object> oldSettings = readStringObjectMap(root.get("settings"));
+            if (root.containsKey("local_model") || oldSettings.containsKey("provider")
+                    || oldSettings.containsKey("ollama_autostart")) {
+                ModConstants.LOGGER.warn("[Aether] Legacy local_model/Ollama settings are deprecated. "
+                        + "Automatic model startup is removed. Configure ai_backend to use the standalone Aether server; "
+                        + "recovered-intent fallback remains available.");
+            }
+            return AIBackendConfig.defaults();
+        }
+        Map<String, Object> backend = readStringObjectMap(root.get("ai_backend"));
+        String modeName = readStringValue(backend.get("mode"));
+        AIBackendConfig.Mode mode = "remote".equalsIgnoreCase(modeName) ? AIBackendConfig.Mode.REMOTE
+                : "local_dev".equalsIgnoreCase(modeName) ? AIBackendConfig.Mode.LOCAL_DEV : AIBackendConfig.Mode.DISABLED;
+        Map<String, Object> remote = readStringObjectMap(backend.get("remote"));
+        Map<String, Object> local = readStringObjectMap(backend.get("local_dev"));
+        Map<String, Object> selected = mode == AIBackendConfig.Mode.LOCAL_DEV ? local : remote;
+        boolean enabled = Boolean.TRUE.equals(readBoolean(backend.get("enabled")))
+                && (mode != AIBackendConfig.Mode.LOCAL_DEV || Boolean.TRUE.equals(readBoolean(local.get("enabled"))));
+        return new AIBackendConfig(enabled, mode, defaultString(selected.get("base_url"), "http://127.0.0.1:8085"),
+                defaultString(selected.get("api_key"), defaultString(remote.get("api_key"), "")),
+                defaultString(backend.get("server_id"), "wilderness-server"),
+                defaultInteger(selected.get("timeout_seconds"), defaultInteger(remote.get("timeout_seconds"), 30)),
+                defaultInteger(selected.get("retry_attempts"), defaultInteger(remote.get("retry_attempts"), 3)),
+                defaultInteger(selected.get("retry_backoff_millis"), defaultInteger(remote.get("retry_backoff_millis"), 250)),
+                defaultInteger(backend.get("circuit_cooldown_seconds"), 30),
+                defaultInteger(backend.get("max_concurrent_requests"), 2),
+                Boolean.TRUE.equals(readBoolean(backend.get("send_player_memory"))));
+    }
+
+    private static String defaultString(Object value, String fallback) {
+        String parsed = readStringValue(value);
+        return parsed == null ? fallback : parsed;
+    }
+
+    private static int defaultInteger(Object value, int fallback) {
+        Integer parsed = readInteger(value);
+        return parsed == null ? fallback : parsed;
     }
 
     private static Map<String, Object> parseSimpleYaml(String content) {
@@ -372,9 +413,6 @@ public final class AIConfigLoader {
             return List.of();
         }
         Map<?, ?> root = parseWithSnakeYaml(content);
-        if (root == null) {
-            root = parseSimpleYaml(content);
-        }
         if (root == null) {
             return List.of();
         }

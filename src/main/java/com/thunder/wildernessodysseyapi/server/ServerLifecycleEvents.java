@@ -49,6 +49,7 @@ public final class ServerLifecycleEvents {
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
+        TelemetryQueue.get(event.getServer()); // Load the bounded spool before gameplay ticks or player login.
         BackgroundEfficiencyManager.start(BackgroundEfficiencyConfig.values());
         TickEngine.start(TickEngineConfig.values(), BackgroundEfficiencyManager.schedulerControl());
         DataEngine.get().start(event.getServer());

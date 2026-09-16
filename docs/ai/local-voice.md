@@ -1,6 +1,6 @@
 # A.E.T.H.E.R local voice
 
-A.E.T.H.E.R voice is an optional, client-local input and presentation layer for the existing private single-player Ollama companion. It does not replace Ollama, create a second chatbot, or send microphone audio to the server or internet.
+A.E.T.H.E.R voice is an optional, client-local input and presentation layer for the server-mediated Aether companion in private single-player worlds. It does not replace Ollama, create a second chatbot, or send microphone audio to the server or internet.
 
 ## Implemented flow
 
@@ -10,7 +10,7 @@ Hold V in a private single-player world
   -> POST /v1/transcribe to 127.0.0.1
   -> faster-whisper returns text
   -> Minecraft sends that text as ordinary player chat
-  -> the existing Aether Ollama history, player profile, specialist router, lore context,
+  -> the existing Aether conversation history, player profile, specialist router, lore context,
      factual verifier, and provider-outage fallback handle it
   -> the verified display response appears once in chat
   -> a client payload carries the matching spoken text and metadata
@@ -19,7 +19,7 @@ Hold V in a private single-player world
   -> JavaSound plays it and the client shows one temporary subtitle
 ```
 
-The local voice service intentionally owns only heavy speech work. The established Java-to-Ollama chat path remains the conversation authority, so typed and spoken requests cannot develop separate memories, profiles, or personalities. Stable details shared through either input method are stored by the same bounded per-save, per-player profile owner.
+The local voice service intentionally owns only heavy speech work. The server-to-Aether-gateway chat path remains the conversation authority, so typed and spoken requests cannot develop separate memories, profiles, or personalities. Stable details shared through either input method are stored by the same bounded per-save, per-player profile owner.
 
 ## Uses beyond conversation
 
@@ -51,7 +51,7 @@ The `[aether_voice]` category contains:
 
 The push-to-talk key defaults to **V** and can be changed in Minecraft's normal Controls screen. An unbound **Aether Voice Status** key is also available there; bind it to request local readiness and latency diagnostics even before enabling speech.
 
-Voice is hard-disabled on dedicated servers and as soon as an integrated world is opened to LAN. The same private-single-player authority used by Aether chat owns this boundary.
+Voice is hard-disabled on dedicated servers and as soon as an integrated world is opened to LAN. The existing private-single-player voice policy owns this boundary; text AI independently supports dedicated and LAN servers.
 
 ## Install and start the speech service on Windows
 
@@ -104,7 +104,7 @@ The service selects CUDA/float16 for faster-whisper when CTranslate2 reports a u
 - Microphone and generated WAV data live in bounded memory buffers. No recording or generated speech file is written permanently.
 - Push-to-talk is capped at 30 seconds, and clips shorter than 200 ms are ignored.
 - Requests, responses, display strings, speaker names, emotion values, effect strengths, and audio sizes are bounded.
-- The Python voice service is never launched automatically, and no speech model is downloaded without the explicit environment opt-in plus model-load request. The separate Ollama text runtime may start an already-installed Windows application as documented in `ollama-autostart.md`.
+- The Python voice service is never launched automatically, and no speech model is downloaded without the explicit environment opt-in plus model-load request. The Aether gateway and Ollama text service are also started independently; see `aether-backend.md`.
 - Voice transcripts can contribute the same bounded personal preferences as typed chat, but raw microphone audio is never used as profile data. Say `what do you remember about me?` to inspect the profile or `forget what you know about me` to remove it.
 - A loopback listener can still be called by another local process. Set `AETHER_VOICE_TOKEN` and the matching client `serviceToken` when local process isolation is not enough. Never commit that token.
 
@@ -123,7 +123,7 @@ Unavailable models, service timeouts, a denied microphone, malformed structured 
 - most recent STT/TTS request latency;
 - the most recent bounded service error.
 
-Ollama remains independently observable through the existing Aether chat path and logs. LLM first-token timing is not reported yet because the reliable initial implementation uses non-streaming Ollama responses.
+Gateway reachability and model readiness remain observable through the cached Aether backend status. LLM first-token timing is not reported yet because the reliable initial implementation uses non-streaming Ollama responses.
 
 ## Intentionally deferred
 

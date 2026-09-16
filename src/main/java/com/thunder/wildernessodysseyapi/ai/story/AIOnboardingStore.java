@@ -25,7 +25,12 @@ public class AIOnboardingStore {
     private final Map<UUID, Integer> playerSteps = new HashMap<>();
 
     public AIOnboardingStore() {
-        this.configPath = FMLPaths.CONFIGDIR.get().resolve(CONFIG_NAME);
+        this(FMLPaths.CONFIGDIR.get().resolve(CONFIG_NAME));
+    }
+
+    /** Opens onboarding progress at an explicit server-owned location. */
+    AIOnboardingStore(Path configPath) {
+        this.configPath = configPath;
         load();
     }
 

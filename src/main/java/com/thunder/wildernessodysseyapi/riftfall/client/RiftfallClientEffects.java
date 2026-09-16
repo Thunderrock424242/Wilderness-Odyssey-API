@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.riftfall.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.riftfall.RiftfallDimensionRules;
+import com.thunder.wildernessodysseyapi.temporalrift.client.ClientEchoState;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationIntensity;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
@@ -31,9 +32,10 @@ public final class RiftfallClientEffects {
             return;
         }
 
-        event.setRed(0.46F);
-        event.setGreen(0.18F);
-        event.setBlue(0.58F);
+        float amount = ClientEchoState.riftfallIntensity();
+        event.setRed(event.getRed() * (1 - amount) + 0.46F * amount);
+        event.setGreen(event.getGreen() * (1 - amount) + 0.18F * amount);
+        event.setBlue(event.getBlue() * (1 - amount) + 0.58F * amount);
     }
 
     @SubscribeEvent
@@ -47,7 +49,7 @@ public final class RiftfallClientEffects {
         RandomSource random = level.getRandom();
         BlockPos playerPos = minecraft.player.blockPosition();
 
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < Math.round(8 * ClientEchoState.riftfallIntensity()); i++) {
             double x = playerPos.getX() + random.nextDouble() * 20.0D - 10.0D;
             double y = playerPos.getY() + 8.0D + random.nextDouble() * 6.0D;
             double z = playerPos.getZ() + random.nextDouble() * 20.0D - 10.0D;
@@ -56,6 +58,7 @@ public final class RiftfallClientEffects {
     }
 
     private static boolean isRiftfallVisualActive(Level level) {
+        if (ClientEchoState.riftfallIntensity() < 0.3F) return false;
         if (level instanceof net.minecraft.client.multiplayer.ClientLevel clientLevel
                 && ClientWeatherCoordinator.controls(clientLevel)) {
             WeatherSample sample = ClientWeatherCoordinator.localSample(clientLevel);

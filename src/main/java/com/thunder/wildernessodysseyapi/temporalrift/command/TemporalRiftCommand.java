@@ -154,7 +154,7 @@ public final class TemporalRiftCommand {
             }
 
             player.teleportTo(echoLevel, safePos.getX() + 0.5D, safePos.getY(), safePos.getZ() + 0.5D, Set.<RelativeMovement>of(), player.getYRot(), player.getXRot());
-            player.sendSystemMessage(Component.literal("[Temporal Rift] You cross into The Echo. Everything remembers you incorrectly."));
+            player.sendSystemMessage(Component.translatable("message.wildernessodysseyapi.echo.arrival"));
             source.sendSuccess(() -> Component.literal("Teleported to The Echo."), true);
             return 1;
         } catch (Exception exception) {

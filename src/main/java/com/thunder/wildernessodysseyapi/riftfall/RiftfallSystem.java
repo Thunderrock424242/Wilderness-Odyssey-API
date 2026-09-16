@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.environment.event.WorldDisturbanceType;
 import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteSource;
 import com.thunder.wildernessodysseyapi.meteor.event.MeteorImpactEvent;
 import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
+import com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityManager;
 import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.entity.RiftbornEntity;
 import com.thunder.wildernessodysseyapi.entity.RiftboundWraithEntity;
@@ -155,6 +156,11 @@ public final class RiftfallSystem {
 
         double chance = RiftfallConfig.CONFIG.baseStartChance();
         if (localWeather.thundering()) chance *= RiftfallConfig.CONFIG.thunderMultiplier();
+        double localInstability = 0;
+        for (ServerPlayer player : level.players()) {
+            localInstability = Math.max(localInstability, EchoStabilityManager.riftfallIntensity(level, player.blockPosition()));
+        }
+        chance *= localInstability;
 
         if (level.random.nextDouble() < chance) {
             enterStage(level, RiftfallStage.WARNING, RiftfallConfig.CONFIG.warningTicks());
@@ -165,7 +171,9 @@ public final class RiftfallSystem {
     /** Resolves dimension-wide Riftfall eligibility from player-local authority. */
     private static LocalWeather weatherAtPlayers(ServerLevel level) {
         if (!WeatherConfig.dimensionEnabled(level.dimension())) {
-            boolean wet = level.isRaining() || level.isThundering();
+            boolean eligible = level.players().stream().anyMatch(player ->
+                    EchoStabilityManager.riftfallIntensity(level, player.blockPosition()) >= 0.3);
+            boolean wet = eligible && (level.isRaining() || level.isThundering());
             return new LocalWeather(wet, level.isThundering());
         }
 
@@ -174,6 +182,7 @@ public final class RiftfallSystem {
         boolean thundering = false;
         for (ServerPlayer player : level.players()) {
             BlockPos position = player.blockPosition();
+            if (EchoStabilityManager.riftfallIntensity(level, position) < 0.3) continue;
             precipitating |= weather.isPrecipitatingAt(level, position);
             thundering |= weather.isThunderingAt(level, position);
             if (precipitating && thundering) {
@@ -219,6 +228,7 @@ public final class RiftfallSystem {
 
         if (nextStage == RiftfallStage.ACTIVE || nextStage == RiftfallStage.METEOR_SURGE) {
             for (ServerPlayer player : level.players()) {
+                if (EchoStabilityManager.riftfallIntensity(level, player.blockPosition()) < 0.3) continue;
                 WorldDisturbanceService.publish(
                         level,
                         player.blockPosition(),
@@ -251,7 +261,8 @@ public final class RiftfallSystem {
             float value = getExposure(player);
             boolean exposed = playerCanSeeSky(level, player) && stage.isActiveDanger();
             if (exposed) {
-                value += (float) RiftfallConfig.CONFIG.exposureGainPerTick();
+                value += (float) (RiftfallConfig.CONFIG.exposureGainPerTick()
+                        * EchoStabilityManager.riftfallIntensity(level, player.blockPosition()));
             } else if (stage == RiftfallStage.CLEAR) {
                 value -= (float) RiftfallConfig.CONFIG.exposureDecayClearPerTick();
             } else {
@@ -268,7 +279,8 @@ public final class RiftfallSystem {
 
     private static boolean playerCanSeeSky(ServerLevel level, ServerPlayer player) {
         BlockPos pos = player.blockPosition();
-        return level.canSeeSky(pos) || level.canSeeSky(pos.above());
+        return EchoStabilityManager.riftfallIntensity(level, pos) >= 0.3
+                && (level.canSeeSky(pos) || level.canSeeSky(pos.above()));
     }
 
     private static void applyExposureEffects(ServerPlayer player, float exposure) {
@@ -289,6 +301,7 @@ public final class RiftfallSystem {
     private static void broadcast(ServerLevel level, String text, ChatFormatting style) {
         Component message = Component.literal(text).withStyle(style);
         for (ServerPlayer player : level.players()) {
+            if (EchoStabilityManager.riftfallIntensity(level, player.blockPosition()) < 0.3) continue;
             player.sendSystemMessage(message);
         }
     }
@@ -360,6 +373,9 @@ public final class RiftfallSystem {
                         level.random.nextInt(7) - 3,
                         level.random.nextInt(25) - 12
                 );
+                if (!level.hasChunkAt(sample)) continue;
+                double instability = EchoStabilityManager.riftfallIntensity(level, sample);
+                if (instability < 0.3 || level.random.nextDouble() > instability) continue;
                 if (!level.canSeeSky(sample)) continue;
                 BlockState state = level.getBlockState(sample);
                 boolean crop = state.getBlock() instanceof CropBlock;
