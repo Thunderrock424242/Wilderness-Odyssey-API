@@ -1,26 +1,19 @@
 package com.thunder.wildernessodysseyapi.ai.story;
 
-import com.thunder.wildernessodysseyapi.core.PrivateSingleplayerPolicy;
 import net.minecraft.server.MinecraftServer;
 
-/**
- * Defines the hard gameplay boundary for A.E.T.H.E.R chat availability.
- *
- * <p>A.E.T.H.E.R is a personal single-player companion. An integrated world
- * that has been published to LAN is treated as multiplayer immediately, even
- * before another player connects.</p>
- */
+/** Chat is served by the logical server for integrated, LAN and dedicated games. */
 public final class AIChatAccessPolicy {
-
     private AIChatAccessPolicy() {
     }
 
-    /** Returns whether A.E.T.H.E.R may listen to chat on the supplied server. */
+    /** A client-only connection has no local logical server and cannot use backend credentials. */
     public static boolean isAvailable(MinecraftServer server) {
-        return PrivateSingleplayerPolicy.permits(server);
+        return server != null;
     }
 
+    /** Pure policy seam used by offline tests of all three hosting modes. */
     static boolean isAvailable(boolean singleplayer, boolean publishedToLan) {
-        return singleplayer && !publishedToLan;
+        return true;
     }
 }

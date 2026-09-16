@@ -1,0 +1,57 @@
+plugins {
+    id 'application'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+// Support both the repository task and the same wrapper's -p tools/structure-viewer invocation.
+def standalone = rootProject == project
+def checkoutDir = standalone ? layout.projectDirectory.dir('../..') : rootProject.layout.projectDirectory
+def checkoutBuild = standalone
+        ? providers.gradleProperty('codexBuildDir').map { checkoutDir.dir(it) }.orElse(checkoutDir.dir('build'))
+        : rootProject.layout.buildDirectory
+layout.buildDirectory.set(checkoutBuild.map { it.dir('tools/structure-viewer') })
+
+repositories { mavenCentral() }
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.11.0'
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'com.thunder.wildernessodysseyapi.tools.structureviewer.StructureViewer'
+    applicationDefaultJvmArgs = ['-Xmx2g']
+}
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.withType(JavaExec).configureEach {
+    workingDir checkoutDir
+    systemProperty 'structureViewer.projectDir', checkoutDir.asFile.absolutePath
+    systemProperty 'structureViewer.buildDir', checkoutBuild.get().asFile.absolutePath
+}
+tasks.named('run') {
+    group = 'Wilderness Odyssey Tools'
+    description = 'Structure Viewer: standalone Java 21 development application.'
+    if (providers.gradleProperty('structureViewerFile').isPresent()) {
+        args '--open', providers.gradleProperty('structureViewerFile').get()
+    }
+}
+tasks.named('test') {
+    useJUnitPlatform()
+    maxHeapSize = '2g'
+    systemProperty 'structureViewer.projectDir', checkoutDir.asFile.absolutePath
+}
+tasks.register('uiSmokeTest', JavaExec) {
+    group = 'verification'
+    description = 'Opens a real viewer window and checks rendering, camera input, and block inspection.'
+    systemProperty 'structureViewer.smokeFile', providers.gradleProperty('structureViewerSmokeFile').getOrElse('')
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.thunder.wildernessodysseyapi.tools.structureviewer.UiSmokeTest'
+    maxHeapSize = '2g'
+    args layout.buildDirectory.dir('reports/ui-smoke').get().asFile.absolutePath
+}
+

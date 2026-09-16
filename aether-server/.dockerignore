@@ -1,0 +1,7 @@
+**
+!build/
+!build/libs/
+!build/libs/Aether-AI-Server.jar
+!.codex-build/
+!.codex-build/libs/
+!.codex-build/libs/Aether-AI-Server.jar

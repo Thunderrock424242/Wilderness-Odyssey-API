@@ -94,6 +94,11 @@ public final class WildernessConfigSpecs {
         CoastalWorldgenConfig.defineCommon(builder);
         AsyncThreadingConfig.define(builder);
         OwnershipConfig.define(builder);
+        FeedbackConfig.define(builder);
+        EventTelemetryConfig.define(builder);
+        PlayerTelemetryConfig.define(builder);
+        TelemetryConfig.define(builder);
+        MinecraftVerificationRelayConfig.define(builder);
         return builder.build();
     }
 
@@ -113,11 +118,6 @@ public final class WildernessConfigSpecs {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         StructureBlockConfig.define(builder);
         PerformanceServerConfig.define(builder);
-        MinecraftVerificationRelayConfig.define(builder);
-        TelemetryConfig.define(builder);
-        PlayerTelemetryConfig.define(builder);
-        EventTelemetryConfig.define(builder);
-        FeedbackConfig.define(builder);
         RiftfallConfig.define(builder);
         MeteorConfig.define(builder);
         TemporalRiftConfig.define(builder);
@@ -155,11 +155,11 @@ public final class WildernessConfigSpecs {
 
         StructureBlockConfig.CONFIG_SPEC = serverSpec;
         PerformanceServerConfig.attachSpec(serverSpec);
-        MinecraftVerificationRelayConfig.CONFIG_SPEC = serverSpec;
-        TelemetryConfig.CONFIG_SPEC = serverSpec;
-        PlayerTelemetryConfig.CONFIG_SPEC = serverSpec;
-        EventTelemetryConfig.CONFIG_SPEC = serverSpec;
-        FeedbackConfig.CONFIG_SPEC = serverSpec;
+        MinecraftVerificationRelayConfig.CONFIG_SPEC = commonSpec;
+        TelemetryConfig.CONFIG_SPEC = commonSpec;
+        PlayerTelemetryConfig.CONFIG_SPEC = commonSpec;
+        EventTelemetryConfig.CONFIG_SPEC = commonSpec;
+        FeedbackConfig.CONFIG_SPEC = commonSpec;
         RiftfallConfig.CONFIG_SPEC = serverSpec;
         MeteorConfig.SPEC = serverSpec;
         TemporalRiftConfig.CONFIG_SPEC = serverSpec;

@@ -1,95 +1,81 @@
 package com.thunder.wildernessodysseyapi.feedback;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
+import com.thunder.wildernessodysseyapi.playtest.PlaytestReplies;
+import com.thunder.wildernessodysseyapi.playtest.PlaytestRequestLimiter;
+import com.thunder.wildernessodysseyapi.playtest.PlaytestWebhookClient;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-
-import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
-
-/** Registers the bounded asynchronous player-feedback command. */
+/** Registers bounded asynchronous feedback with server-thread completion messages. */
 public final class FeedbackCommand {
-    private static final Gson GSON = new GsonBuilder().create();
-    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final FeedbackSubmissionService SERVICE = new FeedbackSubmissionService();
 
     private FeedbackCommand() {
     }
 
-    /** Registers the server command and validates player input before queueing network I/O. */
+    /** Validates input on the logical server and reports success only after HTTP acknowledgement. */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        PlaytestRequestLimiter limiter = new PlaytestRequestLimiter();
         dispatcher.register(Commands.literal("feedback")
                 .then(Commands.argument("message", StringArgumentType.greedyString())
                         .executes(context -> {
                             CommandSourceStack source = context.getSource();
                             if (!(source.getEntity() instanceof ServerPlayer player)) {
-                                source.sendFailure(Component.translatable("command.wildernessodysseyapi.feedback.players_only"));
+                                source.sendFailure(message("players_only"));
                                 return 0;
                             }
-                            FeedbackConfig.FeedbackConfigValues config = FeedbackConfig.values();
+                            var config = FeedbackConfig.values();
                             if (!config.enabled()) {
-                                player.sendSystemMessage(Component.translatable("command.wildernessodysseyapi.feedback.disabled"));
+                                player.sendSystemMessage(message("disabled"));
                                 return 0;
                             }
-                            if (config.webhookUrl() == null || config.webhookUrl().isBlank()) {
-                                player.sendSystemMessage(Component.translatable("command.wildernessodysseyapi.feedback.not_configured"));
+                            if (!PlaytestWebhookClient.isConfigured(config.webhookUrl())) {
+                                player.sendSystemMessage(message("not_configured"));
                                 return 0;
                             }
-                            String message = StringArgumentType.getString(context, "message").trim();
-                            if (message.isBlank()) {
-                                player.sendSystemMessage(Component.translatable("command.wildernessodysseyapi.feedback.empty"));
+                            String text = StringArgumentType.getString(context, "message").trim();
+                            if (text.isBlank()) {
+                                player.sendSystemMessage(message("empty"));
                                 return 0;
                             }
-                            int maxLength = config.maxMessageLength();
-                            if (message.length() > maxLength) {
-                                player.sendSystemMessage(Component.translatable("command.wildernessodysseyapi.feedback.too_long", maxLength));
+                            if (text.length() > config.maxMessageLength()) {
+                                player.sendSystemMessage(Component.translatable(
+                                        "command.wildernessodysseyapi.feedback.too_long", config.maxMessageLength()));
                                 return 0;
                             }
-                            if (submitFeedback(player, message, config)) {
-                                player.sendSystemMessage(Component.translatable("command.wildernessodysseyapi.feedback.sent"));
-                                return 1;
+                            var playerId = player.getUUID();
+                            if (!limiter.tryAcquire(playerId, config.cooldownSeconds())) {
+                                player.sendSystemMessage(Component.translatable(
+                                        "command.wildernessodysseyapi.feedback.cooldown", config.cooldownSeconds()));
+                                return 0;
                             }
-                            player.sendSystemMessage(Component.translatable("command.wildernessodysseyapi.feedback.busy"));
-                            return 0;
+                            var server = source.getServer();
+                            var connection = player.connection;
+                            player.sendSystemMessage(message("sending"));
+                            var submission = SERVICE.submit(player.getGameProfile().getName(),
+                                    playerId.toString(), text, config);
+                            submission.whenComplete((result, error) -> {
+                                if (result == PlaytestWebhookClient.Result.RATE_LIMITED) {
+                                    limiter.pause(60);
+                                }
+                                limiter.complete(playerId);
+                            });
+                            PlaytestReplies.deliver(submission, server::execute, result -> {
+                                var connectedPlayer = server.getPlayerList().getPlayer(playerId);
+                                if (!server.isStopped() && connectedPlayer != null && connectedPlayer.connection == connection) {
+                                    connectedPlayer.sendSystemMessage(message(
+                                            result == PlaytestWebhookClient.Result.DELIVERED ? "sent" : "failed"));
+                                }
+                            });
+                            return 1;
                         })));
     }
 
-    private static boolean submitFeedback(ServerPlayer player, String message,
-                                          FeedbackConfig.FeedbackConfigValues config) {
-        String playerName = player.getGameProfile().getName();
-        String playerUuid = player.getUUID().toString();
-        return AsyncTaskManager.trySubmitIoWork("feedback-webhook", () -> {
-            try {
-                JsonObject payload = new JsonObject();
-                String content = "Feedback from **" + playerName
-                        + "** (`" + playerUuid + "`):\n" + message;
-                payload.addProperty("content", content);
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(config.webhookUrl()))
-                        .timeout(Duration.ofSeconds(config.requestTimeoutSeconds()))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(payload)))
-                        .build();
-                HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() / 100 != 2) {
-                    LOGGER.warn("[Feedback] Webhook returned status {}", response.statusCode());
-                }
-            } catch (Exception ex) {
-                LOGGER.warn("[Feedback] Failed to send feedback: {}", ex.getMessage());
-            }
-        });
+    private static Component message(String key) {
+        return Component.translatable("command.wildernessodysseyapi.feedback." + key);
     }
 }

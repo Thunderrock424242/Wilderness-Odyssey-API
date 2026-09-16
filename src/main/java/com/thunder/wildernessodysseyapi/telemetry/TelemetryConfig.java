@@ -20,7 +20,7 @@ public final class TelemetryConfig {
         WildernessConfigSpecs.initialize();
     }
 
-    /** Defines the telemetry-master category in the unified server config. */
+    /** Defines the telemetry-master category in the unsynchronized common config. */
     public static void define(ModConfigSpec.Builder builder) {
         BUILDER = builder;
         BUILDER.push("telemetry");

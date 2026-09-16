@@ -35,7 +35,7 @@ public final class PlayerTelemetryConfig {
         WildernessConfigSpecs.initialize();
     }
 
-    /** Defines player telemetry in the unified server config. */
+    /** Defines player telemetry in the unsynchronized common config. */
     public static void define(ModConfigSpec.Builder builder) {
         BUILDER = builder;
         BUILDER.push("playerTelemetry");
@@ -46,12 +46,12 @@ public final class PlayerTelemetryConfig {
         GEO_IP_ENDPOINT = BUILDER.comment(
                         "Geo IP lookup endpoint used to resolve state/country. Use {ip} as a placeholder.",
                         "Example: https://ipapi.co/{ip}/json/")
-                .define("geoIpEndpoint", "https://ipapi.co/{ip}/json/");
+                .define("geoIpEndpoint", "");
 
         ACCOUNT_AGE_ENDPOINT = BUILDER.comment(
                         "Endpoint for player name history lookup to estimate account age. Use {uuid} placeholder.",
                         "Example: https://api.mojang.com/user/profiles/{uuid}/names")
-                .define("accountAgeEndpoint", "https://api.mojang.com/user/profiles/{uuid}/names");
+                .define("accountAgeEndpoint", "");
 
         SHEET_WEBHOOK_URL = BUILDER.comment(
                         "Google Sheets webhook URL (Apps Script or other endpoint) that accepts JSON payloads.",
@@ -90,7 +90,7 @@ public final class PlayerTelemetryConfig {
                 .defineInRange("sampleRatePercent", 100.0, 0.0, 100.0);
 
         SAMPLE_EVERY_NTH = BUILDER.comment(
-                        "Only export every Nth player telemetry event.",
+                        "Only export every Nth player session; login and logout share the sampling decision.",
                         "Set to 1 to disable Nth sampling.")
                 .defineInRange("sampleEveryNth", 1, 1, 1000000);
 

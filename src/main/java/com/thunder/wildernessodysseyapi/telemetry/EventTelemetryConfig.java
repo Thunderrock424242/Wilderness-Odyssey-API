@@ -27,7 +27,7 @@ public final class EventTelemetryConfig {
         WildernessConfigSpecs.initialize();
     }
 
-    /** Defines event telemetry in the unified server config. */
+    /** Defines event telemetry in the unsynchronized common config. */
     public static void define(ModConfigSpec.Builder builder) {
         BUILDER = builder;
         BUILDER.push("eventTelemetry");

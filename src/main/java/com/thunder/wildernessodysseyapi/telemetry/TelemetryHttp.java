@@ -1,47 +1,52 @@
 package com.thunder.wildernessodysseyapi.telemetry;
 
+import com.thunder.wildernessodysseyapi.playtest.PlaytestWebhookClient;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
-/**
- * Shared HTTP utilities for telemetry with retry/backoff.
- */
+/** Worker-only HTTP retry/backoff with bounded response memory and interruptible deadlines. */
 public final class TelemetryHttp {
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+            .connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NEVER).build();
 
     private TelemetryHttp() {
     }
 
+    /** Call only on an I/O worker; interruption aborts all retries during shutdown. */
     public static HttpResponse<String> sendWithRetry(HttpRequest request, int maxRetries, Duration baseDelay,
                                                      Duration maxDelay) throws Exception {
-        int attempt = 0;
         Exception lastException = null;
         HttpResponse<String> lastResponse = null;
-
-        while (attempt <= maxRetries) {
+        int retries = Math.clamp(maxRetries, 0, 10);
+        for (int attempt = 0; attempt <= retries; attempt++) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedException("Telemetry worker interrupted");
+            }
+            var response = HTTP_CLIENT.sendAsync(request, PlaytestWebhookClient.responseBodyHandler());
             try {
-                HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-                lastResponse = response;
-                if (response.statusCode() / 100 == 2) {
-                    return response;
+                long timeoutMillis = Math.clamp(request.timeout().orElse(Duration.ofSeconds(10)).toMillis(), 1, 60_000);
+                lastResponse = response.get(timeoutMillis, TimeUnit.MILLISECONDS);
+                lastException = null;
+                int status = lastResponse.statusCode();
+                if (status / 100 == 2 || (status >= 400 && status < 500 && status != 429)) {
+                    return lastResponse;
                 }
-            } catch (Exception ex) {
-                lastException = ex;
+            } catch (InterruptedException interrupted) {
+                response.cancel(true);
+                Thread.currentThread().interrupt();
+                throw interrupted;
+            } catch (Exception failure) {
+                response.cancel(true);
+                lastException = failure;
             }
-
-            if (attempt == maxRetries) {
-                break;
+            if (attempt < retries) {
+                Thread.sleep(calculateDelayMillis(baseDelay, maxDelay, attempt));
             }
-            long delayMillis = calculateDelayMillis(baseDelay, maxDelay, attempt);
-            Thread.sleep(delayMillis);
-            attempt++;
         }
-
         if (lastException != null) {
             throw lastException;
         }
@@ -49,11 +54,9 @@ public final class TelemetryHttp {
     }
 
     private static long calculateDelayMillis(Duration baseDelay, Duration maxDelay, int attempt) {
-        long baseMillis = Math.max(1L, baseDelay.toMillis());
-        long maxMillis = Math.max(baseMillis, maxDelay.toMillis());
-        long expDelay = Math.min(maxMillis, baseMillis * (1L << Math.min(attempt, 10)));
-        double jitter = ThreadLocalRandom.current().nextDouble(0.5, 1.5);
-        long delay = (long) (expDelay * jitter);
-        return Math.max(1L, Math.min(delay, maxMillis));
+        long baseMillis = Math.clamp(baseDelay.toMillis(), 1L, 10_000L);
+        long maxMillis = Math.clamp(maxDelay.toMillis(), baseMillis, 60_000L);
+        long exponential = Math.min(maxMillis, baseMillis * (1L << Math.min(attempt, 10)));
+        return Math.clamp((long) (exponential * ThreadLocalRandom.current().nextDouble(0.5, 1.5)), 1L, maxMillis);
     }
 }

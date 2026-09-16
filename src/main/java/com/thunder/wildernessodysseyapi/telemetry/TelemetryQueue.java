@@ -36,6 +36,13 @@ import static com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER;
  * stores pending events on disk safely without blocking the main thread.
  */
 public final class TelemetryQueue {
+    private static final int MAX_ROW_CHARS = 256 * 1024;
+    private static final int MAX_SPOOL_BYTES = 16 * 1024 * 1024;
+    private static final int MAX_ENTRIES = 10_000;
+    private long queuedBytes;
+    private final AtomicInteger droppedCount = new AtomicInteger();
+    private volatile int inFlight;
+
     private static final Gson GSON = new GsonBuilder()
             .registerTypeAdapter(Instant.class, new InstantJsonAdapter())
             .create();
@@ -50,7 +57,7 @@ public final class TelemetryQueue {
     private final AtomicBoolean flushInProgress = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicInteger failedCount = new AtomicInteger();
-    private Instant lastSuccess;
+    private volatile Instant lastSuccess;
 
     private TelemetryQueue(Path spoolPath) {
         this(spoolPath, task -> AsyncTaskManager.trySubmitIoWork("Telemetry_Persist", task));
@@ -101,12 +108,20 @@ public final class TelemetryQueue {
             if (closed.get()) {
                 return;
             }
-            int boundedQueueSize = Math.max(1, maxQueueSize);
-            while (queue.size() >= boundedQueueSize) {
-                queue.pollFirst();
-                failedCount.incrementAndGet();
+            if (!payload.normalizeAfterLoad() || payload.reservedBytes() > MAX_ROW_CHARS) {
+                droppedCount.incrementAndGet();
+                LOGGER.warn("[Telemetry] Rejected an invalid or oversized report.");
+                return;
+            }
+            int boundedQueueSize = Math.clamp(maxQueueSize, 1, MAX_ENTRIES);
+            while (!queue.isEmpty() && (queue.size() >= boundedQueueSize
+                    || queuedBytes + payload.reservedBytes() > MAX_SPOOL_BYTES)) {
+                queuedBytes -= queue.removeFirst().reservedBytes();
+                droppedCount.incrementAndGet();
+                LOGGER.warn("[Telemetry] Queue capacity reached; discarded its oldest report.");
             }
             queue.addLast(payload);
+            queuedBytes += payload.reservedBytes();
         }
         schedulePersistence();
     }
@@ -121,7 +136,8 @@ public final class TelemetryQueue {
         // Snapshot rather than removing in-flight entries. A concurrent server
         // shutdown can then persist an at-least-once copy instead of losing work.
         synchronized (this) {
-            batch = queue.stream().limit(Math.max(1, maxBatchSize)).toList();
+            batch = queue.stream().limit(Math.clamp(maxBatchSize, 1, 512)).toList();
+            inFlight = batch.size();
         }
 
         if (batch.isEmpty()) {
@@ -134,13 +150,15 @@ public final class TelemetryQueue {
 
         // 2. Perform slow network I/O safely (lock is released, main thread is free!)
         for (PendingTelemetryPayload payload : batch) {
+            if (closed.get() || Thread.currentThread().isInterrupted()) {
+                break;
+            }
             attempted++;
             boolean sent = payload.send();
             if (sent) {
                 this.lastSuccess = Instant.now();
                 sentPayloads.add(payload);
             } else {
-                payload.incrementAttempts();
                 failed.add(payload);
             }
         }
@@ -150,43 +168,178 @@ public final class TelemetryQueue {
         // later payloads.
         synchronized (this) {
             for (PendingTelemetryPayload payload : sentPayloads) {
-                queue.removeFirstOccurrence(payload);
+                if (queue.removeFirstOccurrence(payload)) {
+                    queuedBytes -= payload.reservedBytes();
+                }
             }
             for (PendingTelemetryPayload payload : failed) {
+                payload.incrementAttempts();
                 if (queue.removeFirstOccurrence(payload)) {
                     queue.addLast(payload);
                 }
                 failedCount.incrementAndGet();
             }
         }
+        inFlight = 0;
         schedulePersistence();
         return attempted;
     }
 
     public synchronized TelemetryQueueStats stats() {
-        return new TelemetryQueueStats(queue.size(), failedCount.get(), lastSuccess);
+        return new TelemetryQueueStats(queue.size(), failedCount.get(), lastSuccess,
+                (int) queue.stream().filter(payload -> payload.attempts > 0).count(), inFlight, droppedCount.get());
+    }
+
+    /** Replaces best-effort enrichment only while the original report remains queue-owned. */
+    public synchronized void enrich(PendingTelemetryPayload pending, JsonObject enriched) {
+        if (closed.get() || !queue.contains(pending) || enriched == null) {
+            return;
+        }
+        JsonObject original = pending.payload;
+        int previousBytes = pending.reservedBytes();
+        pending.payload = enriched.deepCopy();
+        if (original.has("report_id")) {
+            pending.payload.add("report_id", original.get("report_id"));
+        }
+        pending.reservedBytes = 0;
+        int nextBytes = pending.reservedBytes();
+        if (nextBytes > MAX_ROW_CHARS || queuedBytes - previousBytes + nextBytes > MAX_SPOOL_BYTES) {
+            pending.payload = original;
+            pending.reservedBytes = previousBytes;
+            return;
+        }
+        queuedBytes += nextBytes - previousBytes;
+        schedulePersistence();
     }
 
     private void loadFromDisk() {
         if (!Files.exists(spoolPath)) {
             return;
         }
-        try (BufferedReader reader = Files.newBufferedReader(spoolPath)) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.isBlank()) {
-                    continue;
-                }
-                PendingTelemetryPayload payload = GSON.fromJson(line, PendingTelemetryPayload.class);
-                if (payload != null && payload.payload != null && payload.webhookUrl != null) {
+        int limit = MAX_ENTRIES;
+        // Config is loaded for runtime queues; injectable disk tests can run before NeoForge config load.
+        try {
+            limit = Math.clamp(TelemetryConfig.values().queueMaxSize(), 1, MAX_ENTRIES);
+        } catch (IllegalStateException ignored) {
+            // The hard limit still bounds offline tests and early lifecycle construction.
+        }
+        try (BufferedReader reader = new BufferedReader(new java.io.InputStreamReader(
+                new SpoolInputStream(Files.newInputStream(spoolPath)), java.nio.charset.StandardCharsets.UTF_8))) {
+            readBoundedRows(reader, limit, line -> {
+                try {
+                    if (!hasBoundedNesting(line)) {
+                        droppedCount.incrementAndGet();
+                        return false;
+                    }
+                    PendingTelemetryPayload payload = GSON.fromJson(line, PendingTelemetryPayload.class);
+                    if (payload == null || !payload.normalizeAfterLoad()
+                            || payload.reservedBytes() > MAX_ROW_CHARS
+                            || queuedBytes + payload.reservedBytes() > MAX_SPOOL_BYTES) {
+                        droppedCount.incrementAndGet();
+                        return false;
+                    }
                     queue.addLast(payload);
+                    queuedBytes += payload.reservedBytes();
+                    return true;
+                } catch (RuntimeException invalidRow) {
+                    droppedCount.incrementAndGet();
+                    return false;
                 }
+            });
+            if (droppedCount.get() > 0) {
+                LOGGER.warn("[Telemetry] Skipped {} invalid persisted reports.", droppedCount.get());
             }
-        } catch (IOException | RuntimeException ex) {
-            LOGGER.warn("[Telemetry] Failed to load telemetry queue: {}", ex.getMessage());
+        } catch (IOException ex) {
+            LOGGER.warn("[Telemetry] Queue load stopped by an I/O error or its 16 MiB scan limit; valid reports were retained.");
         }
     }
 
+    static int readBoundedRows(java.io.Reader reader, int maximumEntries,
+                               java.util.function.Predicate<String> accept) throws IOException {
+        int limit = Math.clamp(maximumEntries, 0, MAX_ENTRIES);
+        if (limit == 0) {
+            return 0;
+        }
+        StringBuilder row = new StringBuilder(1024);
+        int accepted = 0;
+        boolean oversized = false;
+        for (int scanned = 0; scanned < MAX_SPOOL_BYTES; scanned++) {
+            int value = reader.read();
+            if (value == -1) {
+                if (!oversized && !row.isEmpty() && accept.test(row.toString())) {
+                    accepted++;
+                }
+                return accepted;
+            }
+            if (value == '\n') {
+                if (!oversized && !row.isEmpty() && accept.test(row.toString()) && ++accepted >= limit) {
+                    return accepted;
+                }
+                row.setLength(0);
+                oversized = false;
+            } else if (!oversized) {
+                if (row.length() < MAX_ROW_CHARS) {
+                    row.append((char) value);
+                } else {
+                    row.setLength(0);
+                    oversized = true;
+                }
+            }
+        }
+        return accepted;
+    }
+
+    static boolean hasBoundedNesting(String json) {
+        int depth = 0;
+        boolean quoted = false;
+        boolean escaped = false;
+        for (int i = 0; i < json.length(); i++) {
+            char value = json.charAt(i);
+            if (quoted) {
+                if (escaped) {
+                    escaped = false;
+                } else if (value == '\\') {
+                    escaped = true;
+                } else if (value == '"') {
+                    quoted = false;
+                }
+            } else if (value == '"') {
+                quoted = true;
+            } else if (value == '{' || value == '[') {
+                if (++depth > 64) {
+                    return false;
+                }
+            } else if (value == '}' || value == ']') {
+                if (--depth < 0) {
+                    return false;
+                }
+            }
+        }
+        return depth == 0 && !quoted;
+    }
+
+    private static final class SpoolInputStream extends java.io.FilterInputStream {
+        private long remaining = MAX_SPOOL_BYTES;
+
+        private SpoolInputStream(java.io.InputStream input) {
+            super(input);
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) throws IOException {
+            if (length == 0) {
+                return 0;
+            }
+            if (remaining == 0) {
+                throw new java.io.EOFException("Spool scan limit");
+            }
+            int count = in.read(buffer, offset, (int) Math.min(length, remaining));
+            if (count > 0) {
+                remaining -= count;
+            }
+            return count;
+        }
+    }
     private void schedulePersistence() {
         persistenceDirty.set(true);
         if (closed.get() || !persistenceScheduled.compareAndSet(false, true)) {
@@ -204,7 +357,7 @@ public final class TelemetryQueue {
         try {
             List<PendingTelemetryPayload> snapshot;
             synchronized (this) {
-                snapshot = List.copyOf(queue);
+                snapshot = queue.stream().map(PendingTelemetryPayload::copy).toList();
                 persistenceDirty.set(false);
             }
             persisted = persistSnapshot(snapshot);
@@ -223,6 +376,11 @@ public final class TelemetryQueue {
 
     private boolean persistSnapshot(List<PendingTelemetryPayload> snapshot) {
         synchronized (persistenceLock) {
+            if (closed.get()) {
+                synchronized (this) {
+                    snapshot = queue.stream().map(PendingTelemetryPayload::copy).toList();
+                }
+            }
             return writeSnapshot(snapshot);
         }
     }
@@ -231,7 +389,7 @@ public final class TelemetryQueue {
         try {
             Files.createDirectories(spoolPath.getParent());
         } catch (IOException ex) {
-            LOGGER.warn("[Telemetry] Failed to create telemetry queue directory: {}", ex.getMessage());
+            LOGGER.warn("[Telemetry] Failed to create telemetry queue directory (I/O failure).");
             return false;
         }
         Path temporaryPath = spoolPath.resolveSibling(spoolPath.getFileName() + ".tmp");
@@ -242,7 +400,7 @@ public final class TelemetryQueue {
             }
             writer.flush();
         } catch (IOException | RuntimeException ex) {
-            LOGGER.warn("[Telemetry] Failed to write telemetry queue snapshot: {}", ex.getMessage());
+            LOGGER.warn("[Telemetry] Failed to write telemetry queue snapshot (I/O failure).");
             return false;
         }
         try {
@@ -253,7 +411,7 @@ public final class TelemetryQueue {
             }
             return true;
         } catch (IOException ex) {
-            LOGGER.warn("[Telemetry] Failed to publish telemetry queue snapshot: {}", ex.getMessage());
+            LOGGER.warn("[Telemetry] Failed to publish telemetry queue snapshot (I/O failure).");
             return false;
         }
     }
@@ -264,7 +422,7 @@ public final class TelemetryQueue {
         }
         List<PendingTelemetryPayload> snapshot;
         synchronized (this) {
-            snapshot = List.copyOf(queue);
+            snapshot = queue.stream().map(PendingTelemetryPayload::copy).toList();
         }
         if (persistSnapshot(snapshot)) {
             persistenceDirty.set(false);
@@ -314,7 +472,8 @@ public final class TelemetryQueue {
     /** A retryable telemetry request stored in the server-owned spool. */
     public static final class PendingTelemetryPayload {
         private String type;
-        private JsonObject payload;
+        private volatile JsonObject payload;
+        private transient int reservedBytes;
         private String webhookUrl;
         private int timeoutSeconds;
         private int maxRetries;
@@ -331,7 +490,10 @@ public final class TelemetryQueue {
         public PendingTelemetryPayload(String type, JsonObject payload, String webhookUrl, int timeoutSeconds,
                                        int maxRetries, Duration baseDelay, Duration maxDelay) {
             this.type = type;
-            this.payload = payload;
+            this.payload = payload == null ? null : payload.deepCopy();
+            if (this.payload != null && !this.payload.has("report_id")) {
+                this.payload.addProperty("report_id", java.util.UUID.randomUUID().toString());
+            }
             this.webhookUrl = webhookUrl;
             this.timeoutSeconds = timeoutSeconds;
             this.maxRetries = maxRetries;
@@ -341,6 +503,42 @@ public final class TelemetryQueue {
             this.createdAt = Instant.now();
         }
 
+        private int reservedBytes() {
+            if (reservedBytes == 0) {
+                // Reserve space for attempt counters and timestamps added after the first write.
+                reservedBytes = GSON.toJson(this).getBytes(java.nio.charset.StandardCharsets.UTF_8).length + 512;
+            }
+            return reservedBytes;
+        }
+
+        private PendingTelemetryPayload copy() {
+            var copy = new PendingTelemetryPayload(type, payload, webhookUrl, timeoutSeconds, maxRetries,
+                    Duration.ofMillis(retryBaseDelayMs), Duration.ofMillis(retryMaxDelayMs));
+            copy.attempts = attempts;
+            copy.createdAt = createdAt;
+            copy.lastAttempt = lastAttempt;
+            return copy;
+        }
+
+        private boolean normalizeAfterLoad() {
+            if (type == null || type.isBlank() || type.length() > 128 || payload == null
+                    || webhookUrl == null || webhookUrl.length() > 8192
+                    || !com.thunder.wildernessodysseyapi.playtest.PlaytestWebhookClient.isConfigured(webhookUrl)) {
+                return false;
+            }
+            timeoutSeconds = Math.clamp(timeoutSeconds, 1, 60);
+            maxRetries = Math.clamp(maxRetries, 0, 10);
+            retryBaseDelayMs = Math.clamp(retryBaseDelayMs, 1L, 10_000L);
+            retryMaxDelayMs = Math.clamp(retryMaxDelayMs, retryBaseDelayMs, 60_000L);
+            attempts = Math.clamp(attempts, 0, 1_000_000);
+            if (!payload.has("report_id")) {
+                payload.addProperty("report_id", java.util.UUID.randomUUID().toString());
+            }
+            if (createdAt == null) {
+                createdAt = Instant.now();
+            }
+            return true;
+        }
         public boolean send() {
             if (payload == null || webhookUrl == null || webhookUrl.isBlank()) {
                 return false;
@@ -354,18 +552,23 @@ public final class TelemetryQueue {
                 );
                 return response != null && response.statusCode() / 100 == 2;
             } catch (Exception ex) {
-                LOGGER.warn("[Telemetry] Queued payload send failed ({}): {}", type, ex.getMessage());
+                LOGGER.warn("[Telemetry] Queued report submission failed.");
                 return false;
             }
         }
 
         public void incrementAttempts() {
-            attempts++;
+            attempts = Math.min(1_000_000, attempts + 1);
             lastAttempt = Instant.now();
         }
     }
 
-    public record TelemetryQueueStats(int pending, int failed, Instant lastSuccess) {
+    public record TelemetryQueueStats(int pending, int failed, Instant lastSuccess, int retrying, int inFlight, int dropped) {
+        /** Retains the original diagnostics constructor for existing integrations. */
+        public TelemetryQueueStats(int pending, int failed, Instant lastSuccess) {
+            this(pending, failed, lastSuccess, 0, 0, 0);
+        }
+
         public Optional<Instant> lastSuccessOptional() {
             return Optional.ofNullable(lastSuccess);
         }

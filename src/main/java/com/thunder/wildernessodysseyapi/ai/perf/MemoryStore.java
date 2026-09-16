@@ -13,6 +13,8 @@ import java.util.Map;
 public class MemoryStore {
 
     private static final int MAX_HISTORY = 20;
+    private static final int MAX_CONVERSATIONS = 256;
+    private boolean closed;
     private final Map<String, Map<String, Deque<ConversationMessage>>> worldMessages = new HashMap<>();
 
     private static String normalizeWorld(String world) {
@@ -112,9 +114,34 @@ public class MemoryStore {
     }
 
     private void addMessage(String world, String player, ConversationMessage message) {
+        if (closed) {
+            return;
+        }
         String worldKey = normalizeWorld(world);
         String playerKey = player == null || player.isBlank() ? "player" : player;
+        // Bound all retained conversations, including disconnected players and many dimensions.
+        Map<String, Deque<ConversationMessage>> existing = worldMessages.get(worldKey);
+        if ((existing == null || !existing.containsKey(playerKey))
+                && worldMessages.values().stream().mapToInt(Map::size).sum() >= MAX_CONVERSATIONS) {
+            var worlds = worldMessages.entrySet().iterator();
+            if (worlds.hasNext()) {
+                var oldest = worlds.next();
+                var players = oldest.getValue().keySet().iterator();
+                players.next();
+                players.remove();
+                if (oldest.getValue().isEmpty()) {
+                    worlds.remove();
+                }
+            }
+        }
+        // Bound disconnected-player history as well as per-player message counts.
+        if (!worldMessages.containsKey(worldKey) && worldMessages.size() >= 64) {
+            worldMessages.remove(worldMessages.keySet().iterator().next());
+        }
         Map<String, Deque<ConversationMessage>> worldBucket = worldMessages.computeIfAbsent(worldKey, ignored -> new HashMap<>());
+        if (!worldBucket.containsKey(playerKey) && worldBucket.size() >= 256) {
+            worldBucket.remove(worldBucket.keySet().iterator().next());
+        }
         Deque<ConversationMessage> deque = worldBucket.computeIfAbsent(playerKey, ignored -> new ArrayDeque<>());
         if (deque.size() >= MAX_HISTORY) {
             deque.removeFirst();
@@ -122,8 +149,36 @@ public class MemoryStore {
         deque.addLast(message);
     }
 
+    /** Clears recent dialogue for one save/player without writing it to disk. */
+    public synchronized void clearPlayer(String world, String player) {
+        Map<String, Deque<ConversationMessage>> bucket = worldMessages.get(normalizeWorld(world));
+        if (bucket != null) {
+            bucket.remove(player);
+            if (bucket.isEmpty()) {
+                worldMessages.remove(normalizeWorld(world));
+            }
+        }
+    }
+
+    /** Clears this player's dialogue across dimensions when they request deletion. */
+    public synchronized void clearPlayer(String player) {
+        worldMessages.values().forEach(bucket -> bucket.remove(player));
+        worldMessages.values().removeIf(Map::isEmpty);
+    }
+
+    /** Rejects late worker writes after the owning server has shut down. */
+    public synchronized void close() {
+        closed = true;
+        worldMessages.clear();
+    }
+
+    /** Clears all transient dialogue when the owning server session stops. */
+    public synchronized void clear() {
+        worldMessages.clear();
+    }
+
     private static String safeText(String message) {
-        return message == null ? "" : message.trim();
+        return message == null ? "" : message.trim().substring(0, Math.min(4000, message.trim().length()));
     }
 
     /** Identifies whether a stored line came from the player or A.E.T.H.E.R. */

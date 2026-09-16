@@ -60,11 +60,11 @@ class WildernessConfigSpecsTest {
         assertSame(WildernessConfigSpecs.serverSpec(), BackgroundEfficiencyConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), TickEngineConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), DataEngineConfig.CONFIG_SPEC);
-        assertSame(WildernessConfigSpecs.serverSpec(), MinecraftVerificationRelayConfig.CONFIG_SPEC);
-        assertSame(WildernessConfigSpecs.serverSpec(), TelemetryConfig.CONFIG_SPEC);
-        assertSame(WildernessConfigSpecs.serverSpec(), PlayerTelemetryConfig.CONFIG_SPEC);
-        assertSame(WildernessConfigSpecs.serverSpec(), EventTelemetryConfig.CONFIG_SPEC);
-        assertSame(WildernessConfigSpecs.serverSpec(), FeedbackConfig.CONFIG_SPEC);
+        assertSame(WildernessConfigSpecs.commonSpec(), MinecraftVerificationRelayConfig.CONFIG_SPEC);
+        assertSame(WildernessConfigSpecs.commonSpec(), TelemetryConfig.CONFIG_SPEC);
+        assertSame(WildernessConfigSpecs.commonSpec(), PlayerTelemetryConfig.CONFIG_SPEC);
+        assertSame(WildernessConfigSpecs.commonSpec(), EventTelemetryConfig.CONFIG_SPEC);
+        assertSame(WildernessConfigSpecs.commonSpec(), FeedbackConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), RiftfallConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), MeteorConfig.SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), TemporalRiftConfig.CONFIG_SPEC);

@@ -62,6 +62,8 @@
     "ClientLevelLocalizedWeatherMixin",
     "ClientLevelWeatherColorMixin",
     "DebugScreenOverlayAccessor",
+    "EchoCelestialTimeMixin",
+    "EchoSoundVolumeMixin",
     "GerstnerWaveRenderMixin",
     "GlStateManagerGpuProfilerMixin",
     "IrisWaterMaterialBridgeMixin",

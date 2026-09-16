@@ -53,17 +53,22 @@ On the official playtest server, players can link their Minecraft identity throu
 2. Copy the one-time code returned by the bot.
 3. On the playtest server, run `/wo link CODE`.
 
-The server config lives at `config/wildernessodysseyapi/wildernessodysseyapi-server.toml`
-under `[verificationRelay]`:
+The private service config lives at `config/wildernessodysseyapi/wildernessodysseyapi-common.toml`
+on the server, under `[verificationRelay]`:
 
 ```toml
 [verificationRelay]
 enableServerVerificationRelay = true
 discordVerificationWebhookUrl = ""
 requestTimeoutSeconds = 10
+cooldownSeconds = 30
 ```
 
-The server sends a Discord webhook message to the private verification relay channel. The payload contains only the one-time code, Minecraft UUID, and Minecraft profile name. No Discord bot token is stored in the mod, and the webhook URL belongs only in server config, never in client config.
+The server sends the one-time code, Minecraft UUID, and profile name to the private Discord relay channel. The Minecraft confirmation means the message was delivered; the bot remains responsible for validating the code and confirming the account link in Discord. Codes use 4-64 letters, digits, hyphens or underscores.
+
+No Discord bot token is stored in the mod. Keep the webhook URL in the server installation's private COMMON config; NeoForge sends SERVER configs to joining clients. Do not distribute production common configs. Operators can run `/wo playtest status` for diagnostics without displaying secrets.
+
+See [the playtesting guide](docs/playtesting.md) for feedback, telemetry, cooldowns, config migration, and multiplayer acceptance checks.
 
 Multithreaded Task System:
 --------------------------
@@ -72,11 +77,11 @@ An opt-in async task system now ships with the mod. Enable or tune it in
 Use `/asyncstats` (level 2 permission) to view worker usage, queue depth, and rejected tasks. See `docs/async-threading-plan.md`
 for architecture and tuning notes, including guidance on keeping main-thread mutations safe when scheduling heavy jobs.
 
-A.E.T.H.E.R local companion:
+A.E.T.H.E.R server companion:
 ----------------------------
 See `docs/ai/purpose-scope.md` for A.E.T.H.E.R's core boundaries and `docs/ai/local-voice.md` for optional faster-whisper/Kokoro setup.
 
-A.E.T.H.E.R uses a private loopback Ollama model for normal single-player chat, one grounded conversation history, six bounded specialist personalities, and a factual verification pass. On Windows it can start an already-installed Ollama application when a private world opens; see `docs/ai/ollama-autostart.md`. The scripted response banks below are retained for local-provider outages; they are not the normal conversation authority. No relay item, wake word, command, cloud service, or multiplayer connection is required or accepted.
+A.E.T.H.E.R sends addressed chat from the logical Minecraft server to a separate authenticated Java gateway, which connects privately to Ollama. Dedicated, LAN and integrated servers share this architecture. Canonical lore, six specialist personalities and factual verification live on the gateway; deterministic recovered-intent replies remain in the mod for outages. Minecraft never launches or downloads a model runtime. See [backend configuration and migration](docs/ai/aether-backend.md) and [deployment](deploy/README.md).
 
 Scripted response data lives in:
 - `src/main/resources/ai_config.yaml`

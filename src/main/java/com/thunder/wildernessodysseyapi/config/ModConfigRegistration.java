@@ -66,6 +66,9 @@ public final class ModConfigRegistration {
             );
         }
 
+        PlaytestConfigMigration.prepare(configDirectory.resolve(WildernessConfigSpecs.COMMON_FILE),
+                configDirectory.resolve(WildernessConfigSpecs.SERVER_FILE));
+
         WildernessConfigSpecs.initialize();
         ConfigRegistrationValidator.register(
                 container,

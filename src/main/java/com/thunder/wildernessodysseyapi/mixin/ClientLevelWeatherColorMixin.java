@@ -27,12 +27,12 @@ public class ClientLevelWeatherColorMixin {
         Vec3 result = cir.getReturnValue();
         boolean changed = false;
         if (isEcho(level)) {
-            result = blend(result, new Vec3(0.02D, 0.025D, 0.04D), 0.9D);
+            result = blend(result, new Vec3(0.02D, 0.025D, 0.04D), 0.9D * com.thunder.wildernessodysseyapi.temporalrift.client.ClientEchoState.atmosphere());
             changed = true;
         }
 
         if (shouldApplyRiftfallTint(level)) {
-            result = blend(result, new Vec3(0.50D, 0.22D, 0.70D), 0.65D);
+            result = blend(result, new Vec3(0.50D, 0.22D, 0.70D), 0.65D * com.thunder.wildernessodysseyapi.temporalrift.client.ClientEchoState.riftfallIntensity());
             changed = true;
         }
         if (changed) {
@@ -46,12 +46,12 @@ public class ClientLevelWeatherColorMixin {
         Vec3 result = cir.getReturnValue();
         boolean changed = false;
         if (isEcho(level)) {
-            result = blend(result, new Vec3(0.035D, 0.035D, 0.055D), 0.85D);
+            result = blend(result, new Vec3(0.035D, 0.035D, 0.055D), 0.85D * com.thunder.wildernessodysseyapi.temporalrift.client.ClientEchoState.atmosphere());
             changed = true;
         }
 
         if (shouldApplyRiftfallTint(level)) {
-            result = blend(result, new Vec3(0.58D, 0.26D, 0.79D), 0.75D);
+            result = blend(result, new Vec3(0.58D, 0.26D, 0.79D), 0.75D * com.thunder.wildernessodysseyapi.temporalrift.client.ClientEchoState.riftfallIntensity());
             changed = true;
         }
         if (changed) {

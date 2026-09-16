@@ -10,13 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AISettingsTest {
 
     @Test
-    void defaultsToInstalledLocalProviderShape() {
+    void retiredRuntimeCannotBeEnabledByLegacyDefaults() {
         AISettings settings = new AISettings();
 
-        assertTrue(settings.isOllamaEnabled());
+        assertFalse(settings.isOllamaEnabled());
         assertEquals("http://127.0.0.1:11434", settings.getEndpoint());
         assertEquals("llama3.2:latest", settings.getModelName());
-        assertTrue(settings.isOllamaAutostartEnabled());
+        assertFalse(settings.isOllamaAutostartEnabled());
         assertEquals(20, settings.getOllamaStartupTimeoutSeconds());
         assertEquals("", settings.getOllamaExecutable());
     }

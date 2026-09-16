@@ -33,7 +33,10 @@ jobs:
       - name: Run focused StructureGen tests
         run: ./gradlew structureGenTest -PcodexBuildDir=.ci-build --no-daemon --console=plain
 
-      - name: Run tests and build release artifact
+      - name: Run complete Java test suite
+        run: ./gradlew test -PcodexBuildDir=.ci-build --no-daemon --no-parallel --console=plain
+
+      - name: Build release artifact
         run: ./gradlew build -PcodexBuildDir=.ci-build --no-daemon --console=plain
 
       - name: Verify generators did not modify tracked sources

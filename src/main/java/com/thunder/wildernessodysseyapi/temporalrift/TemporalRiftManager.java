@@ -87,6 +87,7 @@ public final class TemporalRiftManager {
         RiftEffectHelper.playOpeningEffects(overworld, riftPos);
         data.setRiftOpen(true);
         data.setRiftPosition(riftPos);
+        com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityManager.recordMajorFracture(overworld, riftPos);
         data.setRiftCloseGameTime(gameTime + TemporalRiftConfig.RIFT_OPEN_DURATION_TICKS.get());
         placeBeforeRifts(server, data, riftPos);
         LOGGER.info("[TemporalRift] Rift force-opened at {}.", riftPos);
@@ -115,6 +116,7 @@ public final class TemporalRiftManager {
         RiftEffectHelper.playOpeningEffects(overworld, riftPos);
         data.setRiftOpen(true);
         data.setRiftPosition(riftPos);
+        com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityManager.recordMajorFracture(overworld, riftPos);
         data.setRiftCloseGameTime(currentGameTime + duration);
         placeBeforeRifts(server, data, riftPos);
 

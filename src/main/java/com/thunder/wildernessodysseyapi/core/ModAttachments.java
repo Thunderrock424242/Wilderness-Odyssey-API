@@ -86,4 +86,14 @@ public final class ModAttachments {
 
     private ModAttachments() {
     }
+
+    /** Server-only Echo edit protection and bounded remnant evidence, persisted with each chunk. */
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<com.thunder.wildernessodysseyapi.temporalrift.echo.EchoChunkData>> ECHO_CHUNK = ATTACHMENTS.register(
+            "echo_chunk",
+            () -> AttachmentType.serializable(holder -> {
+                var data = new com.thunder.wildernessodysseyapi.temporalrift.echo.EchoChunkData();
+                if (holder instanceof ChunkAccess chunk) data.setDirtyListener(() -> chunk.setUnsaved(true));
+                return data;
+            }).build()
+    );
 }

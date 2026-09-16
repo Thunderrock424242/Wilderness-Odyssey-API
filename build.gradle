@@ -81,7 +81,9 @@ neoForge {
             type = "gameTestServer"
             // Keep automated tests isolated from the developer's normal run/
             // mods and configs so unrelated local mods cannot block startup.
-            gameDirectory = project.file('run-gametest')
+            gameDirectory = codexBuildDir.isPresent()
+                    ? layout.buildDirectory.dir('run-gametest').get().asFile
+                    : project.file('run-gametest')
             // Limit GameTests to our namespace by default so third-party mod tests do not fail the run.
             // Either property can be overridden from the command line, e.g.
             //   -Dforge.enabledGameTestNamespaces=
@@ -271,6 +273,8 @@ dependencies {
 
     testImplementation platform("org.junit:junit-bom:5.10.2")
     testImplementation "org.junit.jupiter:junit-jupiter"
+    // Protocol integration tests use the actual standalone gateway; never a mod runtime dependency.
+    testImplementation project(':aether-server')
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 
     implementation "curse.maven:worldedit-225608:5830452"
@@ -666,6 +670,21 @@ tasks.register('structureGenTest', Test) {
     }
 }
 
+tasks.register('playtestTest', Test) {
+    group = 'verification'
+    description = 'Runs focused playtesting, feedback, telemetry and configuration regressions.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '1g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.playtest.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.feedback.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.telemetry.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.config.*'
+    }
+}
+
 tasks.register('aiTest', Test) {
     group = 'verification'
     description = 'Runs focused A.E.T.H.E.R logic tests without starting Minecraft or loading project mods.'
@@ -749,4 +768,11 @@ idea {
         downloadSources = true
         downloadJavadoc = true
     }
+}
+
+// The standalone tool owns its classpath and is never a mod dependency.
+tasks.register('structureViewer') {
+    group = 'Wilderness Odyssey Tools'
+    description = 'Structure Viewer: opens the standalone NBT preview application.'
+    dependsOn ':tools:structure-viewer:run'
 }

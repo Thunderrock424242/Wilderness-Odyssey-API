@@ -1,0 +1,25 @@
+server:
+  bind: "0.0.0.0"
+  port: 8085
+  request_timeout_seconds: 10
+ollama:
+  url: "http://ollama:11434"
+  model: "aether-custom:8b"
+  timeout_seconds: 30
+  max_output_tokens: 256
+security:
+  # Set AETHER_API_KEYS to a comma-separated list of independent server credentials.
+  # No keys means generation fails closed; health remains available.
+  api_keys: []
+limits:
+  max_concurrent_generations: 2
+  max_queue_size: 20
+  requests_per_minute_per_server: 60
+  max_request_bytes: 65536
+  http_workers: 8
+logging:
+  log_requests: false
+  log_player_messages: false
+  log_responses: false
+# Optional operator-owned override; otherwise the bundled canon is used.
+prompts_file: ""

@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.ai.story;
 
+import com.thunder.wildernessodysseyapi.temporalrift.echo.EchoDiscoveryStage;
+
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -32,7 +34,7 @@ public class AIFallbackResponder {
 
     public void configure(AIConfig.Fallback config, String defaultPersonaName, String defaultWakeWord) {
         personas.clear();
-        enabled = config != null && Boolean.TRUE.equals(config.getEnabled());
+        enabled = config == null || !Boolean.FALSE.equals(config.getEnabled());
         minimumKeywordMatches = 1;
         unknownResponses.clear();
         unknownResponses.addAll(DEFAULT_UNKNOWN_RESPONSES);
@@ -95,6 +97,10 @@ public class AIFallbackResponder {
         }
         ResponseContext safeContext = context == null ? ResponseContext.empty() : context;
         MatchInput input = MatchInput.from(message);
+        Optional<FallbackReply> echo = echoDiscoveryReply(input, safeContext);
+        if (echo.isPresent()) {
+            return echo;
+        }
         Optional<Persona> aether = findAetherPersona();
 
         if (aether.isPresent() && mentionsPersona(input.lower(), aether.get())) {
@@ -128,6 +134,26 @@ public class AIFallbackResponder {
             return unavailableHint;
         }
         return baseReply + " " + unavailableHint;
+    }
+
+    // Keep this code-owned evidence gate ahead of older installed fallback YAML,
+    // whose Echo entry may still describe the obsolete memory/copy lore.
+    private Optional<FallbackReply> echoDiscoveryReply(MatchInput input, ResponseContext context) {
+        boolean inEcho = context.has("dimension:the_echo")
+                || context.has("dimension:wildernessodysseyapi:the_echo");
+        boolean asksAboutEcho = input.tokens().contains("echo") || inEcho
+                && (input.containsPhrase("where am i") || input.tokens().contains("dimension")
+                || input.tokens().contains("copy") || input.tokens().contains("shadow"));
+        if (!asksAboutEcho) {
+            return Optional.empty();
+        }
+        Optional<String> addressed = findMentionedPersonaName(input.original());
+        if (addressed.isPresent() && !addressed.get().equalsIgnoreCase("aether")
+                && !addressed.get().equalsIgnoreCase("eclipse")) {
+            return Optional.empty();
+        }
+        EchoDiscoveryStage stage = EchoDiscoveryStage.fromContext(context.tags());
+        return Optional.of(new FallbackReply("Eclipse", stage.finding(), false, true));
     }
 
     private FallbackReply buildAetherReply(MatchInput input, Persona aether, ResponseContext context) {

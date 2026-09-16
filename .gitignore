@@ -41,3 +41,7 @@ repo
 /logs/debug.log
 /logs/latest.log
 /logs/
+
+/aether-server/.codex-build/
+/aether-server/aether-server.yml
+/deploy/aether-server.yml

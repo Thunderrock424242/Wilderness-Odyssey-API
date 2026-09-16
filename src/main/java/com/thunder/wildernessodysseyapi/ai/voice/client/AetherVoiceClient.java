@@ -181,7 +181,13 @@ public final class AetherVoiceClient {
             if (minecraft.player == null) {
                 return;
             }
-            minecraft.player.connection.sendChat(transcript);
+            // Push-to-talk is an explicit Aether invocation; ordinary unaddressed chat stays private.
+            String addressed = "Aether, " + transcript;
+            int end = Math.min(256, addressed.length());
+            if (end > 0 && Character.isHighSurrogate(addressed.charAt(end - 1))) {
+                end--;
+            }
+            minecraft.player.connection.sendChat(addressed.substring(0, end));
         }));
     }
 

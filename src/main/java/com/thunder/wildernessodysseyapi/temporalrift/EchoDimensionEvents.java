@@ -2,18 +2,11 @@ package com.thunder.wildernessodysseyapi.temporalrift;
 
 import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftDimensions;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.ServerLevelAccessor;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.DoorBlock;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
@@ -75,7 +68,7 @@ public final class EchoDimensionEvents {
             return;
         }
 
-        openDoorsAndStripLeaves(level, chunk);
+        com.thunder.wildernessodysseyapi.temporalrift.echo.EchoDistortionManager.decorateNewChunk(level, chunk);
     }
 
     private static boolean isEcho(ServerLevelAccessor level) {
@@ -86,54 +79,4 @@ public final class EchoDimensionEvents {
         return id != null && TemporalRiftConfig.ECHO_ALLOWED_MOBS.get().contains(id.toString());
     }
 
-    private static void openDoorsAndStripLeaves(net.minecraft.server.level.ServerLevel level, LevelChunk chunk) {
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        int minX = chunk.getPos().getMinBlockX();
-        int minZ = chunk.getPos().getMinBlockZ();
-        LevelChunkSection[] sections = chunk.getSections();
-
-        // The palette check skips empty and irrelevant sections without 4,096 block reads apiece.
-        for (int sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
-            LevelChunkSection section = sections[sectionIndex];
-            if (section.hasOnlyAir() || !section.maybeHas(EchoDimensionEvents::isDistortionCandidate)) {
-                continue;
-            }
-            int sectionMinY = chunk.getSectionYFromSectionIndex(sectionIndex) << 4;
-            for (int localY = 0; localY < 16; localY++) {
-                for (int localX = 0; localX < 16; localX++) {
-                    for (int localZ = 0; localZ < 16; localZ++) {
-                        BlockState state = section.getBlockState(localX, localY, localZ);
-                        if (!isDistortionCandidate(state)) {
-                            continue;
-                        }
-                        pos.set(minX + localX, sectionMinY + localY, minZ + localZ);
-                        if (state.getBlock() instanceof DoorBlock && state.hasProperty(BlockStateProperties.OPEN)
-                                && !state.getValue(BlockStateProperties.OPEN)) {
-                            level.setBlock(pos, state.setValue(BlockStateProperties.OPEN, true), 2);
-                        } else if (state.is(BlockTags.LEAVES) && shouldStripLeaf(level.getSeed(), pos)) {
-                            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private static boolean isDistortionCandidate(BlockState state) {
-        return state.getBlock() instanceof DoorBlock || state.is(BlockTags.LEAVES);
-    }
-
-    private static boolean shouldStripLeaf(long seed, BlockPos pos) {
-        long cellX = Math.floorDiv(pos.getX(), 6);
-        long cellY = Math.floorDiv(pos.getY(), 8);
-        long cellZ = Math.floorDiv(pos.getZ(), 6);
-        long hash = seed
-                ^ (cellX * 0x9E3779B97F4A7C15L)
-                ^ (cellY * 0xC2B2AE3D27D4EB4FL)
-                ^ (cellZ * 0x165667B19E3779F9L);
-        hash ^= hash >>> 33;
-        hash *= 0xff51afd7ed558ccdL;
-        hash ^= hash >>> 33;
-        return Math.floorMod(hash, 100) < 7;
-    }
 }

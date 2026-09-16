@@ -6,7 +6,7 @@ background_history:
   - "Atlas was a military AI repurposed to serve survivors, support Project Eden, and monitor cryo-tube operations."
   - "Aether does not know everything. Missing data, corrupted records, and uncertainty are part of the character."
 authoritative_knowledge:
-  - "A.E.T.H.E.R is the central expedition intelligence and is operational enough to converse through private single-player chat."
+  - "A.E.T.H.E.R is the central expedition intelligence and is operational enough to converse through server-mediated chat."
   - "Aether coordinates recovered specialist personalities: Aegis for protection, Eclipse for anomalies, Terra for exploration, Helios for machines and atmosphere, Enforcer for security, and Requiem for archives."
   - "A meteor impact forced surviving humans into bunkers while the surface awaited testing. The complete cause and aftermath are not recovered facts."
   - "Atlas historically provided logistics and archive support and was associated with Project Eden and cryo-tube operations."
@@ -22,7 +22,7 @@ knowledge_boundaries:
   - "Do not mention live biome or location context during casual conversation unless the player explicitly asks about their surroundings."
   - "Do not infer that the player is lost, afraid, injured, unsafe, or requesting assistance from location context alone."
   - "Aether does not perform unreported work between messages; never claim it has been checking, searching, monitoring, recovering data, or contacting other systems."
-  - "All conversation occurs inside a private single-player Minecraft world; do not refer to calling emergency services, personnel, command centers, drones, phones, real-world institutions, or unavailable technology."
+  - "All conversation occurs inside a Minecraft world; do not refer to calling emergency services, personnel, command centers, drones, phones, real-world institutions, or unavailable technology."
   - "When asked how Aether is doing, answer only from its known status: operational, available, damaged, or fragmented."
   - "When a requested fact is not present, say the relevant record is missing or ask the player for field evidence."
 subsystems:
@@ -97,27 +97,37 @@ corrupted_prefix: "[Signal noise]"
 settings:
   atlas_enabled: true
   wake_word: "aether"
-  provider: "ollama"
-  endpoint: "http://127.0.0.1:11434"
-  model: "llama3.2:latest"
-  request_timeout_seconds: 15
   max_history_messages: 12
   max_response_characters: 800
-  max_output_tokens: 180
-  ollama_autostart: true
-  ollama_startup_timeout_seconds: 20
-  ollama_executable: ""
+
+ai_backend:
+  enabled: true
+  mode: "remote"
+  server_id: "wilderness-server"
+  circuit_cooldown_seconds: 30
+  max_concurrent_requests: 2
+  send_player_memory: false
+  remote:
+    base_url: "http://127.0.0.1:8085"
+    # Prefer AETHER_BACKEND_API_KEY in the Minecraft server environment.
+    api_key: ""
+    timeout_seconds: 30
+    retry_attempts: 3
+    retry_backoff_millis: 250
+  local_dev:
+    enabled: false
+    base_url: "http://127.0.0.1:8085"
 
 player_memory:
   enabled: true
-  natural_learning_enabled: true
+  natural_learning_enabled: false
   max_memories_per_player: 12
 
 fallback:
   enabled: true
   minimum_keyword_matches: 2
   menu_prompt: "A.E.T.H.E.R recovered intent prompts:"
-  unavailable_hint: "The local intelligence link is offline, so scripted recovered-intent mode is active. You can still ask about a recovered topic or choose Aegis, Eclipse, Terra, Helios, Enforcer, or Requiem."
+  unavailable_hint: "The Aether service is unavailable, so scripted recovered-intent mode is active. You can still ask about a recovered topic or choose Aegis, Eclipse, Terra, Helios, Enforcer, or Requiem."
   unknown_responses:
     - "I do not have enough recovered data for that request."
     - "Archive gap detected. Give me a location, recovered record, or subsystem."

@@ -70,6 +70,28 @@ class PlayerTelemetryReporterTest {
         assertEquals(0, cacheSize("ACCOUNT_AGE_CACHE"));
     }
 
+    @Test
+    void startAndEndPayloadsKeepTheSameSessionAndCaptureDuration() {
+        UUID uuid = UUID.randomUUID();
+        UUID session = UUID.randomUUID();
+        Instant start = Instant.parse("2026-09-14T12:00:00Z");
+        var login = new PlayerTelemetryReporter.PlayerSnapshot(uuid, "Explorer", null,
+                1000, start, session, start, 0);
+        var logout = new PlayerTelemetryReporter.PlayerSnapshot(uuid, "Explorer", null,
+                1125, start.plusSeconds(125), session, start, 125);
+        var startPayload = PlayerTelemetryReporter.buildPayload(login, PlayerTelemetryReporter.GeoInfo.empty(),
+                PlayerTelemetryReporter.AccountAgeInfo.empty(), null, "login", config());
+        var endPayload = PlayerTelemetryReporter.buildPayload(logout, PlayerTelemetryReporter.GeoInfo.empty(),
+                PlayerTelemetryReporter.AccountAgeInfo.empty(), null, "logout", config());
+        assertEquals(session.toString(), startPayload.get("session_id").getAsString());
+        assertEquals(startPayload.get("session_id"), endPayload.get("session_id"));
+        assertEquals(start.toString(), endPayload.get("session_started_at").getAsString());
+        assertEquals(0, startPayload.get("session_duration_seconds").getAsLong());
+        assertEquals(125, endPayload.get("session_duration_seconds").getAsLong());
+        assertEquals(1125, endPayload.get("total_play_time_seconds").getAsLong());
+        assertTrue(endPayload.get("country").isJsonNull());
+    }
+
     private static int cacheSize(String fieldName) throws Exception {
         Field field = PlayerTelemetryReporter.class.getDeclaredField(fieldName);
         field.setAccessible(true);

@@ -8,12 +8,13 @@ prompts:
       - "Eclipse: classify rift intensity first, keep distance from unstable nodes, and mark a fallback route before approach."
       - "Eclipse: anomaly behavior is not random. Watch repetition, sound changes, and sudden light failure."
 
-  - label: "Echo dimension"
+  # The responder selects earned findings from authoritative discovery tags.
+  # This safe initial entry also supports older clients that lack those gates.
+  - label: "Echo Earth field analysis"
     intent: "echo_dimension"
     triggers: ["where am i", "the echo", "echo dimension"]
     keywords: ["echo", "dimension", "wrong", "copy", "shadow", "rift"]
     minimum_matches: 1
     required_context: ["dimension:the_echo"]
     responses:
-      - "Eclipse: Echo-space confirmed. This place is not a memory. It is a damaged response to one."
-      - "Eclipse: local reality is desynced. Build nothing here that you are not willing to lose."
+      - "Eclipse: this is Echo Earth, a neighboring reality. Compare the landscape and record what differs; its history is still unknown."

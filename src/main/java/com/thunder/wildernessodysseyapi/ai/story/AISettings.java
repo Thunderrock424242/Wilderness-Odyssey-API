@@ -9,19 +9,34 @@ public class AISettings {
 
     private static final String DEFAULT_OLLAMA_MODEL = "llama3.2:latest";
 
+    private AIBackendConfig backend = AIBackendConfig.defaults();
+
+    /** Returns the new network-only backend configuration. */
+    public AIBackendConfig getBackend() {
+        return backend;
+    }
+
+    public void setBackend(AIBackendConfig backend) {
+        this.backend = backend == null ? AIBackendConfig.defaults() : backend;
+    }
+
+    public boolean isBackendEnabled() {
+        return backend.enabled();
+    }
+
     private boolean atlasEnabled = true;
-    private String provider = "ollama";
+    private String provider = "scripted";
     private String endpoint = "http://127.0.0.1:11434";
     private String modelName = DEFAULT_OLLAMA_MODEL;
     private int requestTimeoutSeconds = 15;
     private int maxHistoryMessages = 12;
     private int maxResponseCharacters = 800;
     private int maxOutputTokens = 180;
-    private boolean ollamaAutostartEnabled = true;
+    private boolean ollamaAutostartEnabled = false;
     private int ollamaStartupTimeoutSeconds = 20;
     private String ollamaExecutable = "";
-    private String wakeWord = "atlas";
-    private String personaName = "Atlas";
+    private String wakeWord = "aether";
+    private String personaName = "Aether";
     private String personalityTone = "warm and conversational";
     private String empathyLevel = "balanced";
 
@@ -62,7 +77,7 @@ public class AISettings {
     }
 
     public boolean isOllamaEnabled() {
-        return "ollama".equals(provider);
+        return false; // Legacy compatibility: the mod no longer calls Ollama.
     }
 
     public String getEndpoint() {
@@ -108,7 +123,7 @@ public class AISettings {
     }
 
     public boolean isOllamaAutostartEnabled() {
-        return ollamaAutostartEnabled;
+        return false; // Automatic runtime management has been removed.
     }
 
     public void setOllamaAutostartEnabled(boolean ollamaAutostartEnabled) {

@@ -52,4 +52,16 @@ class MemoryStoreTest {
         assertEquals("echo", store.getRecentMessages("the_echo", "Alex", 20).getFirst().text());
         assertEquals("other player", store.getRecentMessages("overworld", "Steve", 20).getFirst().text());
     }
+    @Test
+    void forgetClearsAllDimensionsAndClosedSessionRejectsLateWrites() {
+        MemoryStore store = new MemoryStore();
+        store.addPlayerMessage("overworld", "save-player", "private");
+        store.addPlayerMessage("nether", "save-player", "also private");
+        store.clearPlayer("save-player");
+        assertEquals(List.of(), store.getRecentMessages("overworld", "save-player", 20));
+        assertEquals(List.of(), store.getRecentMessages("nether", "save-player", 20));
+        store.close();
+        store.addAiMessage("overworld", "save-player", "late result");
+        assertEquals(List.of(), store.getRecentMessages("overworld", "save-player", 20));
+    }
 }
