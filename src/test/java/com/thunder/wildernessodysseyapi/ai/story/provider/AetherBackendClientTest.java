@@ -53,7 +53,7 @@ class AetherBackendClientTest {
         assertEquals("Aether", reply.speaker());
         assertEquals("Recovered.", reply.displayText());
         assertEquals("calm", reply.emotion().name().toLowerCase(java.util.Locale.ROOT));
-        assertEquals("Bearer test-key-only", authorization.get());
+        assertNull(authorization.get());
         assertEquals("minecraft:overworld", captured.get().getAsJsonObject("context").get("dimension").getAsString());
         assertEquals("test-one", captured.get().get("serverId").getAsString());
         assertFalse(captured.get().has("apiKey"));
@@ -62,7 +62,28 @@ class AetherBackendClientTest {
     }
 
     @Test
-    void authenticationFailureIsNotRetriedAndOpensCircuit() throws Exception {
+    void healthAndReadinessAreCheckedWithoutAuthorizationHeaders() throws Exception {
+        AtomicInteger checks = new AtomicInteger();
+        AtomicReference<String> authorization = new AtomicReference<>();
+        start(exchange -> send(exchange, 500, "{}"));
+        for (String path : List.of("/health", "/ready")) {
+            server.createContext(path, exchange -> {
+                checks.incrementAndGet();
+                String header = exchange.getRequestHeaders().getFirst("Authorization");
+                if (header != null) { authorization.set(header); }
+                send(exchange, 200, "{\"status\":\"UP\",\"ready\":true,\"model\":\"aether-custom:8b\"}");
+            });
+        }
+        var status = client(3, 1).checkHealth();
+        assertTrue(status.reachable());
+        assertTrue(status.modelReady());
+        assertEquals("aether-custom:8b", status.model());
+        assertEquals(2, checks.get());
+        assertNull(authorization.get());
+    }
+
+    @Test
+    void hostingProxyAccessDenialIsNotRetriedAndOpensCircuit() throws Exception {
         AtomicInteger calls = new AtomicInteger();
         start(exchange -> {
             calls.incrementAndGet();
@@ -251,7 +272,7 @@ class AetherBackendClientTest {
 
     private AIBackendConfig config(int seconds, int attempts) {
         return new AIBackendConfig(true, AIBackendConfig.Mode.REMOTE,
-                "http://127.0.0.1:" + server.getAddress().getPort(), "test-key-only", "test-server",
+                "http://127.0.0.1:" + server.getAddress().getPort(), "test-server",
                 seconds, attempts, 1, 30, 2, false);
     }
 

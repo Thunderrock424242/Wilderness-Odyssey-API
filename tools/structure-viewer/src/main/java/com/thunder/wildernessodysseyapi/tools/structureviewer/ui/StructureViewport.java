@@ -29,6 +29,9 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
     private long version, lastTick = System.nanoTime();
     private int selected = -1, mouseX, mouseY;
     private String renderError;
+    private RenderQuality quality = RenderQuality.HIGH;
+    private boolean blockEdges = true, textures = true, showEntities, showBlockEntities, showCoordinates;
+    private java.util.List<DebugOverlay.Marker> markers = java.util.List.of();
 
     /** Creates a focusable viewport with freecam/orbit bindings and block picking. */
     public StructureViewport(IntConsumer onSelect, Runnable onReload) {
@@ -44,6 +47,7 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
                     case KeyEvent.VK_F1 -> camera.setOrbit(true);
                     case KeyEvent.VK_F2 -> camera.setOrbit(false);
                     case KeyEvent.VK_F -> focusStructure();
+                    case KeyEvent.VK_G -> focusSelected();
                     case KeyEvent.VK_R -> StructureViewport.this.onReload.run();
                     default -> { }
                 }
@@ -105,12 +109,17 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
         BlockMesh current = mesh;
         Camera.View view = camera.view();
         int select = selected;
-        boolean wire = wireframe, box = bounds;
-        double scale = Math.min(1, Math.min(1100.0 / getWidth(), 800.0 / getHeight()));
+        boolean wire = wireframe, box = bounds, edges = blockEdges, textured = textures;
+        boolean entities = showEntities, blockEntities = showBlockEntities, coordinates = showCoordinates;
+        var currentMarkers = markers;
+        double scale = quality.scale(getWidth(), getHeight());
         int width = Math.max(1, (int) (getWidth() * scale)), height = Math.max(1, (int) (getHeight() * scale));
         renderer.submit(() -> {
             try {
-                var result = new SoftwareRenderer().render(current, view, width, height, select, wire, box);
+                var result = new SoftwareRenderer().render(current, view, width, height, select, wire, box, edges, textured);
+                java.awt.Graphics2D overlay = result.image().createGraphics();
+                DebugOverlay.draw(overlay, width, height, view, currentMarkers, entities, blockEntities, coordinates);
+                overlay.dispose();
                 SwingUtilities.invokeLater(() -> {
                     rendering = false;
                     if (closed || mesh != current) return;
@@ -142,21 +151,54 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
     public void setOverlays(boolean wireframe, boolean bounds) {
         this.wireframe = wireframe; this.bounds = bounds; changed();
     }
+    /** Focuses the camera on one selected block at an inspectable distance. */
+    public void focusSelected() {
+        if (mesh != null && selected >= 0 && selected < mesh.data().blocks().size()) {
+            camera.focusBlock(mesh.data().blocks().get(selected).position());
+            changed();
+        }
+    }
+    /** Applies a manual quality choice without rebuilding or dropping model geometry. */
+    public void setQuality(RenderQuality quality, boolean edges, boolean textures) {
+        this.quality = quality; this.blockEdges = edges; this.textures = textures; changed();
+    }
+    /** Installs precomputed diagnostic marker positions. */
+    public void setMarkers(java.util.List<DebugOverlay.Marker> markers) { this.markers = markers; changed(); }
+    /** Controls bounded diagnostic overlays separately from block geometry. */
+    public void setDebugOverlays(boolean entities, boolean blockEntities, boolean coordinates) {
+        showEntities = entities; showBlockEntities = blockEntities; showCoordinates = coordinates; changed();
+    }
     /** Read-only camera state for diagnostics and input regression checks. */
     public Camera.View cameraView() { return camera.view(); }
     /** Latest rendered pixels and block IDs, useful for independent smoke validation. */
     public SoftwareRenderer.Frame renderedFrame() { return frame; }
 
+    /** Whether the current mesh and camera have finished producing a frame. */
+    public boolean renderingIdle() { return frame != null && !dirty && !rendering; }
+
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        if (frame != null) g.drawImage(frame.image(), 0, 0, getWidth(), getHeight(), null);
+        if (frame != null) {
+            java.awt.Graphics2D scaled = (java.awt.Graphics2D) g.create();
+            scaled.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                    frame.image().getWidth() > getWidth() ? java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR
+                            : java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            scaled.drawImage(frame.image(), 0, 0, getWidth(), getHeight(), null);
+            scaled.dispose();
+        }
         g.setColor(new Color(0xc2d7df));
         var view = camera.view();
         g.drawString(view.orbit() ? "ORBIT CAMERA  ·  F2 to fly inside" :
                 String.format(java.util.Locale.ROOT, "FREE CAMERA  ·  %.1f blocks/s  ·  Ctrl for precision", view.speed()), 16, 24);
         g.drawString(String.format(java.util.Locale.ROOT, "X %.2f   Y %.2f   Z %.2f",
                 view.position().x(), view.position().y(), view.position().z()), 16, 44);
-        if (mesh == null) g.drawString("Select an NBT structure from the browser or use Open NBT.", 16, 78);
+        if (mesh == null) g.drawString("Select an NBT or JSON structure from the browser.", 16, 78);
+        g.drawString("Quality: " + quality + (blockEdges ? " · Block edges" : "")
+                + (frame == null ? "" : " · " + frame.image().getWidth() + " × " + frame.image().getHeight()), 16, 64);
+        if (showCoordinates && mesh != null && selected >= 0) {
+            var p = mesh.data().blocks().get(selected).position();
+            g.drawString("Selected block: X " + p.x() + " / Y " + p.y() + " / Z " + p.z(), 16, 84);
+        }
         if (renderError != null) { g.setColor(Color.PINK); g.drawString("Preview error: " + renderError, 16, 100); }
     }
 

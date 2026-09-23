@@ -48,10 +48,10 @@ class AIClientGatewayIntegrationTest {
         ollama.start();
         try(AetherServer gateway=new AetherServer(new ServerConfig("127.0.0.1",0,3,
                 "http://127.0.0.1:"+ollama.getAddress().getPort(),"aether-custom:8b",3,256,
-                List.of("test-gateway-key"),2,4,60,65536,4,false,false,false,""))){
+                2,4,60,65536,4,false,false,false,""))){
             gateway.start();gateway.refreshHealth();
             AIBackendConfig backendConfig=new AIBackendConfig(true,AIBackendConfig.Mode.REMOTE,
-                    "http://127.0.0.1:"+gateway.port(),"test-gateway-key","minecraft-test-server",
+                    "http://127.0.0.1:"+gateway.port(),"minecraft-test-server",
                     4,1,0,30,2,false);
             try(AetherBackendClient transport=new AetherBackendClient(backendConfig)){
                 var health=transport.checkHealth();

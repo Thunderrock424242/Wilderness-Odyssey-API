@@ -23,7 +23,7 @@ import java.util.function.LongSupplier;
 
 /**
  * Server-owned Aether API transport. A single deadline covers retries and body reading.
- * Authentication failures, overload and timeouts fail promptly into the caller's fallback.
+ * Access denial by a hosting proxy, overload and timeouts fail promptly into the caller's fallback.
  * This class never launches processes and never sends requests to Ollama.
  */
 public final class AetherBackendClient implements AutoCloseable {
@@ -89,7 +89,7 @@ public final class AetherBackendClient implements AutoCloseable {
             for (int attempt = 0; attempt < config.retryAttempts(); attempt++) {
                 HttpResponse<byte[]> response;
                 try {
-                    response = exchange("/v1/aether/generate", body, deadline, true);
+                    response = exchange("/v1/aether/generate", body, deadline);
                 } catch (TimeoutException exception) {
                     return failed("TIMEOUT", false, started);
                 } catch (java.util.concurrent.ExecutionException exception) {
@@ -150,13 +150,13 @@ public final class AetherBackendClient implements AutoCloseable {
         boolean reachable = false;
         try {
             long deadline = started + TimeUnit.SECONDS.toNanos(Math.min(5, config.timeoutSeconds()));
-            HttpResponse<byte[]> health = exchange("/health", null, deadline, false);
+            HttpResponse<byte[]> health = exchange("/health", null, deadline);
             reachable = health.statusCode() == 200;
             if (!reachable) {
                 status = snapshot(false, false, "", elapsed(started), "BACKEND_UNAVAILABLE");
                 return status;
             }
-            HttpResponse<byte[]> ready = exchange("/ready", null, deadline, true);
+            HttpResponse<byte[]> ready = exchange("/ready", null, deadline);
             JsonObject result = jsonObject(ready.body());
             boolean modelReady = ready.statusCode() == 200
                     && ((result.has("ready") && result.get("ready").isJsonPrimitive()
@@ -176,11 +176,11 @@ public final class AetherBackendClient implements AutoCloseable {
     }
 
     private boolean canUseNetwork() {
-        return !closed && config.enabled() && !config.apiKey().isBlank()
+        return !closed && config.enabled()
                 && networkAllowed.getAsBoolean() && baseUri(config.baseUrl()).isPresent();
     }
 
-    private HttpResponse<byte[]> exchange(String path, byte[] body, long deadline, boolean authenticate)
+    private HttpResponse<byte[]> exchange(String path, byte[] body, long deadline)
             throws InterruptedException, java.util.concurrent.ExecutionException, TimeoutException {
         if (closed || !networkAllowed.getAsBoolean()) {
             throw new TimeoutException("CANCELLED");
@@ -192,9 +192,6 @@ public final class AetherBackendClient implements AutoCloseable {
         URI base = baseUri(config.baseUrl()).orElseThrow();
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(base.toString() + path))
                 .timeout(Duration.ofNanos(remaining)).header("Accept", "application/json");
-        if (authenticate) {
-            builder.header("Authorization", "Bearer " + config.apiKey());
-        }
         if (body == null) {
             builder.GET();
         } else {

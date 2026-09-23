@@ -76,7 +76,7 @@ class NbtStructureReaderTest {
     }
 
     @Test void discoversBothResourceConventionsAndIgnoresUnrelatedNbt() throws Exception {
-        for (String file : List.of("data/demo/structure/a.nbt","data/demo/structures/b.nbt","assets/irrelevant.nbt")) {
+        for (String file : List.of("data/demo/structure/a.nbt","data/demo/structures/b.nbt","assets/irrelevant.nbt","data/demo/tags/worldgen/structure/tag.json","data/demo/worldgen/structure/definition.json")) {
             Path path = temp.resolve(file);Files.createDirectories(path.getParent());Files.write(path,new byte[0]);
         }
         assertEquals(2,StructureDiscovery.discover(List.of(temp,temp)).size());

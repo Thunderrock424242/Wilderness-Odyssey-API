@@ -3,7 +3,7 @@ plugins {
     id 'application'
     id 'java-library'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.143'
+    id 'net.neoforged.moddev' version '2.0.147'
 }
 
 // Codex can opt into isolated generated output so Windows locks in the normal
@@ -33,8 +33,8 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = project.mod_version
-group = project.mod_group_id
+version = "5.0.0"
+group = "com.thunderrock424242.wildernessodyssey"
 
 base {
     archivesName = "wildernessodysseyapi"
@@ -51,7 +51,7 @@ def tickEngineCompilerWorkaround = providers.gradleProperty('tickEngineCompilerW
 
 neoForge {
     // Specify the version of NeoForge to use.
-    version = project.neo_version
+    version = "21.1.250"
 
     parchment {
         mappingsVersion = project.parchment_mappings_version
@@ -696,6 +696,20 @@ tasks.register('aiTest', Test) {
     }
 }
 
+// Reuses the repository's normal offline JUnit runtime; no alternate compiler or Minecraft launch.
+tasks.register('echoTest', Test) {
+    group = 'verification'
+    description = 'Runs Echo stability, synchronization, discovery, structure policy and persistence regressions.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '1g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.temporalrift.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.ai.story.EchoDiscoveryFallbackTest'
+    }
+}
+
 // Uses the same existing offline JUnit runtime as other pure subsystem tests.
 // GameTests and live mod registration remain separate runtime validation.
 tasks.register('weatherPhysicsTest', Test) {
@@ -773,6 +787,12 @@ idea {
 // The standalone tool owns its classpath and is never a mod dependency.
 tasks.register('structureViewer') {
     group = 'Wilderness Odyssey Tools'
-    description = 'Structure Viewer: opens the standalone NBT preview application.'
+    description = 'Structure Viewer: opens the standalone NBT/JSON preview application.'
     dependsOn ':tools:structure-viewer:run'
+}
+
+tasks.register('structureValidator') {
+    group = 'Wilderness Odyssey Tools'
+    description = 'Structure Validator: reports structure and asset diagnostics without Minecraft.'
+    dependsOn ':tools:structure-viewer:validate'
 }

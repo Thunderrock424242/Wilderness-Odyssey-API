@@ -55,3 +55,15 @@ tasks.register('uiSmokeTest', JavaExec) {
     args layout.buildDirectory.dir('reports/ui-smoke').get().asFile.absolutePath
 }
 
+
+tasks.register('validate', JavaExec) {
+    group = 'Wilderness Odyssey Tools'
+    description = 'Structure Validator: checks NBT/JSON and reports missing models, textures, and invalid data.'
+    dependsOn classes
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.thunder.wildernessodysseyapi.tools.structureviewer.validation.StructureValidator'
+    maxHeapSize = '2g'
+    if (providers.gradleProperty('structureViewerFile').isPresent()) {
+        args providers.gradleProperty('structureViewerFile').get()
+    }
+}

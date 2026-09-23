@@ -15,7 +15,6 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.bus.api.EventPriority;
 import com.thunder.wildernessodysseyapi.temporalrift.echo.EchoSyncManager;
-import com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityManager;
 import com.thunder.wildernessodysseyapi.temporalrift.echo.EchoDebugCommand;
 
 import static com.thunder.wildernessodysseyapi.core.ModConstants.MOD_ID;
@@ -45,6 +44,9 @@ public final class TemporalRiftEventHandler {
                 && echoLevel.dimension().equals(TemporalRiftDimensions.THE_ECHO_KEY)
                 && event.getEntity() instanceof ServerPlayer) {
             markPlayerEdited(echoLevel, event.getPos());
+            if (event instanceof BlockEvent.EntityMultiPlaceEvent multiple) {
+                for (var snapshot : multiple.getReplacedBlockSnapshots()) markPlayerEdited(echoLevel, snapshot.getPos());
+            }
         }
         if (event.getLevel() instanceof ServerLevel level
                 && level.dimension().equals(TemporalRiftDimensions.THE_BEFORE_KEY)

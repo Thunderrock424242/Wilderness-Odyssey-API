@@ -8,7 +8,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -29,8 +28,13 @@ public class EchoBuildEchoSavedData extends SavedData {
     }
 
     public void addEcho(EchoBuildEcho echo) {
+        addEcho(echo, TemporalRiftConfig.ECHO_MAX_PENDING_REALITY_ECHOES.get());
+    }
+
+    // Separate bounded admission from config lookup so persistence invariants can be tested offline.
+    void addEcho(EchoBuildEcho echo, int maximum) {
         if (!pendingEchoes.containsKey(echo.sourcePos())
-                && pendingEchoes.size() >= TemporalRiftConfig.ECHO_MAX_PENDING_REALITY_ECHOES.get()) return;
+                && pendingEchoes.size() >= Math.max(0, maximum)) return;
         pendingEchoes.put(echo.sourcePos(), echo);
         setDirty();
     }
@@ -40,7 +44,7 @@ public class EchoBuildEchoSavedData extends SavedData {
         setDirty();
     }
 
-    private static EchoBuildEchoSavedData load(CompoundTag tag, HolderLookup.Provider registries) {
+    static EchoBuildEchoSavedData load(CompoundTag tag, HolderLookup.Provider registries) {
         EchoBuildEchoSavedData data = new EchoBuildEchoSavedData();
         ListTag list = tag.getList("echoes", Tag.TAG_COMPOUND);
         for (int i = 0; i < Math.min(list.size(), LEGACY_LOAD_LIMIT); i++) {

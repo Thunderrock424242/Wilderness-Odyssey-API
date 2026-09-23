@@ -17,11 +17,11 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
-application { mainClass = 'com.thunder.aether.server.AetherServer' }
+application { mainClass = 'com.thunder.aether.server.bootstrap.AetherLauncher' }
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 tasks.withType(Test).configureEach { useJUnitPlatform() }
 tasks.named('jar') {
-    archiveFileName = 'Aether-AI-Server.jar'
+    archiveFileName = 'Aether-Gateway.jar'
     manifest { attributes 'Main-Class': application.mainClass.get() }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from { configurations.runtimeClasspath.collect { zipTree(it) } }
@@ -47,3 +47,4 @@ tasks.named('test') {
     dependsOn tasks.named('jar')
     doFirst { systemProperty 'aether.jar', tasks.named('jar').get().archiveFile.get().asFile.absolutePath }
 }
+apply from: 'bundle.gradle'

@@ -30,10 +30,6 @@ public final class AIConfigLoader {
         }
         AIConfig config = parse(content);
         applyBundledKnowledgeDefaults(config, parse(bundledContent));
-        String environmentKey = System.getenv("AETHER_BACKEND_API_KEY");
-        if (environmentKey != null && !environmentKey.isBlank()) {
-            config.setBackend(config.getBackend().withApiKey(environmentKey));
-        }
         return config;
     }
 
@@ -173,7 +169,7 @@ public final class AIConfigLoader {
                     new org.yaml.snakeyaml.constructor.SafeConstructor(options)).load(content);
             return parsed instanceof Map<?, ?> map ? map : null;
         } catch (RuntimeException exception) {
-            // YAML diagnostics can quote source lines containing an API key.
+            // YAML diagnostics can quote private source configuration.
             ModConstants.LOGGER.warn("Invalid Aether YAML; using safe defaults without remote access.");
             return null;
         }
@@ -200,7 +196,6 @@ public final class AIConfigLoader {
         boolean enabled = Boolean.TRUE.equals(readBoolean(backend.get("enabled")))
                 && (mode != AIBackendConfig.Mode.LOCAL_DEV || Boolean.TRUE.equals(readBoolean(local.get("enabled"))));
         return new AIBackendConfig(enabled, mode, defaultString(selected.get("base_url"), "http://127.0.0.1:8085"),
-                defaultString(selected.get("api_key"), defaultString(remote.get("api_key"), "")),
                 defaultString(backend.get("server_id"), "wilderness-server"),
                 defaultInteger(selected.get("timeout_seconds"), defaultInteger(remote.get("timeout_seconds"), 30)),
                 defaultInteger(selected.get("retry_attempts"), defaultInteger(remote.get("retry_attempts"), 3)),

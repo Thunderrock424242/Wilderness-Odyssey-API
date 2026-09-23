@@ -2,7 +2,7 @@
 
 A.E.T.H.E.R. is Wilderness Odyssey's damaged expedition intelligence: a conversational companion grounded in recovered canon, literal game context, and clearly stated uncertainty.
 
-The logical Minecraft server serves addressed chat in private worlds, LAN games and dedicated servers. It sends structured context to an authenticated standalone Aether gateway. The gateway owns permanent prompts, model settings, specialist selection and factual verification, and connects to privately hosted Ollama. See [backend architecture and migration](aether-backend.md) and [deployment](../../deploy/README.md).
+The logical Minecraft server serves addressed chat in private worlds, LAN games and dedicated servers. It sends structured context to a public standalone Aether gateway. The gateway owns permanent prompts, model settings, specialist selection and factual verification, and connects to privately hosted Ollama. See [backend architecture and migration](aether-backend.md) and [deployment](../../deploy/README.md).
 
 ## Personalities
 
@@ -33,4 +33,4 @@ Optional local speech keeps the existing manually started Python service, push-t
 
 ## Validation boundaries
 
-Mocked HTTP and unit tests establish transport, queue, authentication, routing, fallback and privacy behavior. Live model quality, Minecraft client/server behavior, multiple-player tick responsiveness, audio hardware and production HTTPS configuration require their own acceptance checks. Build success alone does not establish those results.
+Mocked HTTP and unit tests establish transport, queue, public access, routing, fallback and privacy behavior. Live model quality, Minecraft client/server behavior, multiple-player tick responsiveness, audio hardware and production HTTPS configuration require their own acceptance checks. Build success alone does not establish those results.
