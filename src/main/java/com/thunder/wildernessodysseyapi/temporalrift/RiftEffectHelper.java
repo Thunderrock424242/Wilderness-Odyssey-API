@@ -19,6 +19,7 @@ import java.util.List;
 public final class RiftEffectHelper {
     private static final double PULL_RADIUS = 8.0D;
     private static final double EARTHQUAKE_RADIUS = 192.0D;
+    private static final double EARTHQUAKE_RADIUS_SQUARED = EARTHQUAKE_RADIUS * EARTHQUAKE_RADIUS;
 
     private RiftEffectHelper() {
     }
@@ -78,11 +79,13 @@ public final class RiftEffectHelper {
                 continue;
             }
 
-            Vec3 offset = center.subtract(player.position());
-            double distance = Math.max(0.35D, offset.length());
+            double dx = center.x - player.getX();
+            double dy = center.y - player.getY();
+            double dz = center.z - player.getZ();
+            double distance = Math.max(0.35D, Math.sqrt(dx * dx + dy * dy + dz * dz));
             double strength = Math.max(0.0D, 1.0D - distance / PULL_RADIUS) * 0.045D;
-            Vec3 pull = offset.normalize().scale(strength);
-            player.push(pull.x, Math.max(-0.01D, pull.y * 0.35D), pull.z);
+            double scale = strength / distance;
+            player.push(dx * scale, Math.max(-0.01D, dy * scale * 0.35D), dz * scale);
         }
     }
 
@@ -98,11 +101,12 @@ public final class RiftEffectHelper {
                 continue;
             }
 
-            double distance = Math.sqrt(player.distanceToSqr(center));
-            if (distance > EARTHQUAKE_RADIUS) {
+            double distanceSquared = player.distanceToSqr(center);
+            if (distanceSquared > EARTHQUAKE_RADIUS_SQUARED) {
                 continue;
             }
 
+            double distance = Math.sqrt(distanceSquared);
             double strength = Math.max(0.05D, 1.0D - distance / EARTHQUAKE_RADIUS);
             double horizontalX = (random.nextDouble() - 0.5D) * 0.28D * strength;
             double horizontalZ = (random.nextDouble() - 0.5D) * 0.28D * strength;

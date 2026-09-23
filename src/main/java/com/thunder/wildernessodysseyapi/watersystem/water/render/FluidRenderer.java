@@ -36,6 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class FluidRenderer {
 
     private static final Map<SPHSimulator, FluidMesh> meshMap = new ConcurrentHashMap<>();
+    private static final List<SPHSimulator> ACTIVE_SIMULATIONS = new ArrayList<>(
+            SPHConstants.MAX_ACTIVE_SIMULATIONS + SPHConstants.MAX_TRANSIENT_SHORE_SIMULATIONS
+    );
     private static final FluidState WATER_STATE = Fluids.WATER.defaultFluidState();
 
     private static final float WATER_ALPHA = 0.56f;
@@ -55,16 +58,19 @@ public class FluidRenderer {
         ClientLevel level = mc.level;
         if (level == null) return;
 
-        List<SPHSimulator> active = new ArrayList<>(SPHSimulationManager.get().getActive(level));
-        if (active.isEmpty()) {
-            active = new ArrayList<>(SPHSimulationManager.get().getActive());
-            if (active.isEmpty()) {
-                meshMap.clear();
-                return;
-            }
+        SPHSimulationManager manager = SPHSimulationManager.get();
+        ACTIVE_SIMULATIONS.clear();
+        manager.collectActive(level, ACTIVE_SIMULATIONS);
+        if (ACTIVE_SIMULATIONS.isEmpty()) {
+            manager.collectActive(ACTIVE_SIMULATIONS);
         }
 
-        meshMap.keySet().retainAll(active);
+        if (ACTIVE_SIMULATIONS.isEmpty()) {
+            meshMap.clear();
+            return;
+        }
+
+        meshMap.keySet().retainAll(ACTIVE_SIMULATIONS);
 
         PoseStack poseStack = event.getPoseStack();
         var camera = event.getCamera().getPosition();
@@ -76,7 +82,7 @@ public class FluidRenderer {
         poseStack.translate(-camera.x, -camera.y, -camera.z);
 
         boolean drew = false;
-        for (SPHSimulator sim : active) {
+        for (SPHSimulator sim : ACTIVE_SIMULATIONS) {
             if (!isNearCamera(sim, camera.x, camera.y, camera.z)) {
                 continue;
             }

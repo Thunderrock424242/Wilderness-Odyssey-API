@@ -1,8 +1,8 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.bridge.StructureBlockHostileSpawnToggleBridge;
-import com.thunder.wildernessodysseyapi.util.StructureBlockHostileSpawnContext;
-import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
+import com.thunder.wildernessodysseyapi.structureblock.bridge.StructureBlockHostileSpawnToggleBridge;
+import com.thunder.wildernessodysseyapi.structureblock.StructureBlockHostileSpawnContext;
+import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.network.FriendlyByteBuf;

@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.worldgen.spawn;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.worldgen.configurable.StructureConfig;
+import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import com.thunder.wildernessodysseyapi.worldgen.processor.BunkerPlacementProcessor;
 import com.thunder.wildernessodysseyapi.worldgen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.worldgen.structure.StarterStructureSpawnGuard;

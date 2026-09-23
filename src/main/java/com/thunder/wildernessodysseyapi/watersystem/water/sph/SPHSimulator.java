@@ -30,6 +30,7 @@ public class SPHSimulator {
     // Scratch buffers (reused to avoid allocation per step)
     private final List<Integer> neighbours = new ArrayList<>(64);
     private final float[] gradBuf = new float[3];
+    private final BlockPos.MutableBlockPos collisionPos = new BlockPos.MutableBlockPos();
 
     /** The Minecraft level used for querying block boundaries and collisions. */
     private BlockGetter level;
@@ -241,7 +242,7 @@ public class SPHSimulator {
 
             // Tait equation of state for pressure
             float ratio = pi.density / SPHConstants.REST_DENSITY;
-            pi.pressure = SPHConstants.PRESSURE_STIFFNESS * ((float)Math.pow(ratio, SPHConstants.PRESSURE_GAMMA) - 1f);
+            pi.pressure = SPHConstants.PRESSURE_STIFFNESS * (pressureGamma7(ratio) - 1f);
             pi.pressure = Math.max(0f, pi.pressure); // Fluid resists compression but doesn't pull inward
         }
 
@@ -324,9 +325,16 @@ public class SPHSimulator {
 
         // 5. Droplet Classification & Cleanup
         classifyDroplets(pts);
-        pts.removeIf(p -> p.isDroplet && p.dropletLife <= 0);
-        for (SPHParticle p : pts) {
-            if (p.isDroplet && p.dropletLife > 0) p.dropletLife--;
+        for (int i = pts.size() - 1; i >= 0; i--) {
+            SPHParticle p = pts.get(i);
+            if (!p.isDroplet) {
+                continue;
+            }
+            if (p.dropletLife <= 0) {
+                pts.remove(i);
+            } else {
+                p.dropletLife--;
+            }
         }
 
         // 6. Check for settling (fluid has become completely still)
@@ -358,12 +366,13 @@ public class SPHSimulator {
         int bx = (int)Math.floor(p.position.x);
         int by = (int)Math.floor(p.position.y);
         int bz = (int)Math.floor(p.position.z);
+        BlockPos.MutableBlockPos pos = collisionPos;
 
         // Check the 3x3x3 area around the particle for solid geometry
         for (int dx = -1; dx <= 1; dx++) {
             for (int dy = -1; dy <= 1; dy++) {
                 for (int dz = -1; dz <= 1; dz++) {
-                    BlockPos pos = new BlockPos(bx+dx, by+dy, bz+dz);
+                    pos.set(bx + dx, by + dy, bz + dz);
                     BlockState state = level.getBlockState(pos);
                     if (state.isAir()) continue;
 
@@ -417,6 +426,12 @@ public class SPHSimulator {
                 }
             }
         }
+    }
+
+    private static float pressureGamma7(float ratio) {
+        float ratio2 = ratio * ratio;
+        float ratio4 = ratio2 * ratio2;
+        return ratio4 * ratio2 * ratio;
     }
 
     private void applyGroundSpread(SPHParticle p, float centerX, float centerZ, float dt) {

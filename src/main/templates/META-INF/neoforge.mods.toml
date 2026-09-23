@@ -83,3 +83,10 @@ mandatory=true
 versionRange="[9.2.0,)"
 ordering="NONE"
 side="BOTH"
+
+[[dependencies.wildernessodysseyapi]]
+modId="geckolib"
+mandatory=true
+versionRange="[4.8.2,)"
+ordering="AFTER"
+side="BOTH"

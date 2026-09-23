@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.temporalrift.registry;
 import com.mojang.serialization.MapCodec;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.temporalrift.worldgen.BeforeChunkGenerator;
+import com.thunder.wildernessodysseyapi.temporalrift.worldgen.EchoChunkGenerator;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.neoforged.bus.api.IEventBus;
@@ -15,6 +16,9 @@ public final class TemporalRiftWorldgen {
 
     public static final DeferredHolder<MapCodec<? extends ChunkGenerator>, MapCodec<BeforeChunkGenerator>> BEFORE_CHUNK_GENERATOR =
             CHUNK_GENERATORS.register("before_noise", () -> BeforeChunkGenerator.CODEC);
+
+    public static final DeferredHolder<MapCodec<? extends ChunkGenerator>, MapCodec<EchoChunkGenerator>> ECHO_CHUNK_GENERATOR =
+            CHUNK_GENERATORS.register("echo_noise", () -> EchoChunkGenerator.CODEC);
 
     private TemporalRiftWorldgen() {
     }

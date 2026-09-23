@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.entity;
 
-import com.thunder.wildernessodysseyapi.config.RiftfallConfig;
+import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
 import com.thunder.wildernessodysseyapi.core.ModEntities;
 import com.thunder.wildernessodysseyapi.riftfall.RiftfallSystem;
 import net.minecraft.core.BlockPos;

@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.thunder.wildernessodysseyapi.util.StructureBlockSettings;
+import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.blockentity.StructureBlockRenderer;

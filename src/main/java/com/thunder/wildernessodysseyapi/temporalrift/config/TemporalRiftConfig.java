@@ -25,6 +25,9 @@ public final class TemporalRiftConfig {
     public static final ModConfigSpec.IntValue TEMPORAL_ECHO_BURIAL_DEPTH;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> BEFORE_ALLOWED_MOBS;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> BEFORE_ALLOWED_STRUCTURES;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> ECHO_ALLOWED_MOBS;
+    public static final ModConfigSpec.BooleanValue ENABLE_ECHO_CHUNK_DISTORTION;
+    public static final ModConfigSpec.BooleanValue ENABLE_ECHO_BUILD_ECHOES;
     public static final ModConfigSpec.BooleanValue RETURN_ONLY_ACTIVE_RIFT;
     public static final ModConfigSpec.BooleanValue CHAT_BROADCASTS;
     public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
@@ -99,6 +102,56 @@ public final class TemporalRiftConfig {
         BEFORE_ALLOWED_STRUCTURES = BUILDER
                 .comment("Structure ids intended to be allowed in The Before. Empty by default. Runtime structure filtering requires a dedicated biome-source/structure layer; this list is stored now for that bridge.")
                 .defineListAllowEmpty("beforeAllowedStructures", List.of(), value -> value instanceof String string && string.contains(":"));
+
+        ECHO_ALLOWED_MOBS = BUILDER
+                .comment("Entity ids allowed to spawn or remain in The Echo. Villagers are always removed; iron golems and quiet wildlife are allowed by default.")
+                .defineListAllowEmpty("echoAllowedMobs", List.of(
+                        "minecraft:iron_golem",
+                        "minecraft:allay",
+                        "minecraft:armadillo",
+                        "minecraft:axolotl",
+                        "minecraft:bat",
+                        "minecraft:bee",
+                        "minecraft:camel",
+                        "minecraft:cat",
+                        "minecraft:chicken",
+                        "minecraft:cod",
+                        "minecraft:cow",
+                        "minecraft:donkey",
+                        "minecraft:fox",
+                        "minecraft:frog",
+                        "minecraft:glow_squid",
+                        "minecraft:goat",
+                        "minecraft:horse",
+                        "minecraft:llama",
+                        "minecraft:mooshroom",
+                        "minecraft:mule",
+                        "minecraft:ocelot",
+                        "minecraft:panda",
+                        "minecraft:parrot",
+                        "minecraft:pig",
+                        "minecraft:polar_bear",
+                        "minecraft:pufferfish",
+                        "minecraft:rabbit",
+                        "minecraft:salmon",
+                        "minecraft:sheep",
+                        "minecraft:skeleton_horse",
+                        "minecraft:sniffer",
+                        "minecraft:squid",
+                        "minecraft:strider",
+                        "minecraft:tadpole",
+                        "minecraft:tropical_fish",
+                        "minecraft:turtle",
+                        "minecraft:wolf"
+                ), value -> value instanceof String string && string.contains(":"));
+
+        ENABLE_ECHO_CHUNK_DISTORTION = BUILDER
+                .comment("If true, chunks in The Echo are lightly mutated on load: doors are opened and some leaf clusters vanish.")
+                .define("enableEchoChunkDistortion", true);
+
+        ENABLE_ECHO_BUILD_ECHOES = BUILDER
+                .comment("If true, some player-built Overworld blocks later appear in The Echo as partial ruined copies.")
+                .define("enableEchoBuildEchoes", true);
 
         RETURN_ONLY_ACTIVE_RIFT = BUILDER
                 .comment("If true, players can only return from the past dimension during an active rift.")

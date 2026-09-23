@@ -1,8 +1,8 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.thunder.wildernessodysseyapi.ModPackPatches.client.DebugOverlayAnimator;
-import com.thunder.wildernessodysseyapi.ModPackPatches.client.DebugOverlayLineFilter;
+import com.thunder.wildernessodysseyapi.debugoverlay.client.DebugOverlayAnimator;
+import com.thunder.wildernessodysseyapi.debugoverlay.client.DebugOverlayLineFilter;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.DebugScreenOverlay;
 import org.spongepowered.asm.mixin.Mixin;

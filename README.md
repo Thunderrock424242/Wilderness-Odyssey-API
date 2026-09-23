@@ -32,8 +32,8 @@ Use `-Dwilderness.loadingstall.minutes=5` (for example) to lower the timeout; th
 
 Global Chat:
 ------------
-See `docs/global-chat-beginner.md` for a quickstart on hosting the relay, binding servers, and getting players talking.
-Read `docs/global-chat.md` for the full operations guide (anchoring, cluster tokens, moderation, opt-in controls, and whitelisting external tools).
+See `docs/globalchat/beginner.md` for a quickstart on hosting the relay, binding servers, and getting players talking.
+Read `docs/globalchat/operations.md` for the full operations guide (anchoring, cluster tokens, moderation, opt-in controls, and whitelisting external tools).
 
 Multithreaded Task System:
 --------------------------
@@ -52,7 +52,7 @@ These are pulled from Maven Central and can be used by any local or sidecar AI h
 
 Self-hosted AI chatbot (custom local LLM required)
 -------------------------------------
-AI purpose checklist: see `docs/ai-purpose-scope.md` for A.E.T.H.E.R core + subsystem scope, boundaries, and MVP definition.
+AI purpose checklist: see `docs/ai/purpose-scope.md` for A.E.T.H.E.R core + subsystem scope, boundaries, and MVP definition.
 A.E.T.H.E.R. can use a local custom LLM backend for full runtime responses, and it now also supports deterministic fallback personas when players prefer a lighter-weight menu flow.
 
 Local LLM support is sidecar-based:
@@ -101,7 +101,7 @@ Multiple impact zones can now exist—add more structure set entries via datapac
 
 Modpack Structure Staging (drop-in NBT)
 -----------------------------------------
-For a step-by-step flow that starts from `config/wildernessodysseyapi/modpack_structures/*.nbt` and scaffolds a full datapack layout, see `docs/modpack-structure-registry.md`.
+For a step-by-step flow that starts from `config/wildernessodysseyapi/modpack_structures/*.nbt` and scaffolds a full datapack layout, see `docs/modpack/structure-registry.md`.
 
 Using Data Pack Structures
 --------------------------
