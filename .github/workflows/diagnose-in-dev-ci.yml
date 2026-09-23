@@ -42,7 +42,7 @@ jobs:
             "data/minecraft/tags/block/mineable/pickaxe.json",
             "data/minecraft/tags/block/needs_diamond_tool.json",
             "data/minecraft/tags/item/music_discs.json",
-            "data/wildernessodysseyapi/structure/village.nbt",
+            "data/wildernessodysseyapi/structure/bunker.nbt",
             "logo.png",
             "assets/wildernessodysseyapi/textures/entity/rift_maw.png",
             "assets/wildernessodysseyapi/textures/entity/rift_listener.png"
@@ -51,7 +51,7 @@ jobs:
               entries=set(z.namelist())
               for entry in required:
                   print("PACKAGED", "OK" if entry in entries else "MISSING", entry)
-              print("VILLAGE CANDIDATES", [x for x in entries if "village" in x.lower() and x.endswith(".nbt")][:30])
+              print("BUNKER CANDIDATES", [x for x in entries if "bunker" in x.lower() and x.endswith(".nbt")][:30])
               print("LOGO CANDIDATES", [x for x in entries if "logo" in x.lower()][:20])
           root=pathlib.Path("src/main/resources/assets/wildernessodysseyapi/voice/cryo")
           manifest=json.loads((root/"manifest.json").read_text())

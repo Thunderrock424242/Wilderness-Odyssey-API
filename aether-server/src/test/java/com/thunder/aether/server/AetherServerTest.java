@@ -176,6 +176,7 @@ class AetherServerTest {
         assertEquals(400,post(value.toString(),null).statusCode());
         assertEquals(400,post("{\"unexpected\":"+"[".repeat(40)+"0"+"]".repeat(40)+"}",null).statusCode());
         assertEquals(413,post("x".repeat(70000),null).statusCode());
+        assertEquals(200,get("/health",null).statusCode());
         assertEquals(0,chatCalls.get());
     }
 
