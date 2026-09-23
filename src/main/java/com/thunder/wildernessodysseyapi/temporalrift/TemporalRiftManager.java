@@ -130,6 +130,10 @@ public final class TemporalRiftManager {
 
     private static void closeRift(MinecraftServer server, ServerLevel overworld, TemporalRiftSavedData data) {
         BlockPos riftPos = data.getRiftPosition();
+        // Also retain a major fracture that was already open when an older save adopted Echo stability.
+        if (riftPos != null) {
+            com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityManager.recordMajorFracture(overworld, riftPos);
+        }
         if (riftPos != null && overworld.getBlockState(riftPos).is(TemporalRiftBlocks.RIFT_CORE.get())) {
             overworld.removeBlock(riftPos, false);
             RiftEffectHelper.playClosingEffects(overworld, riftPos);

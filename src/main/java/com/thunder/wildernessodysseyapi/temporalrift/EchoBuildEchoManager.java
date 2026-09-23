@@ -14,8 +14,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
 import com.thunder.wildernessodysseyapi.temporalrift.echo.EchoRealityModel;
 
 /** Owns sampled Earth-to-Echo synchronization using the existing persistent ledger. */
@@ -64,7 +62,7 @@ public final class EchoBuildEchoManager {
 
         long currentDay = overworld.getGameTime() / 24000L;
         long revealDay = currentDay + 1L + Math.floorMod(hash, 3);
-        BlockPos target = distortedTarget(overworld, pos, hash);
+        BlockPos target = distortedTarget(overworld, pos);
         String materialKey = materialKeyFor(placedState);
         EchoBuildEchoSavedData.get(overworld.getServer()).addEcho(new EchoBuildEcho(
                 pos,
@@ -88,7 +86,7 @@ public final class EchoBuildEchoManager {
 
         long currentDay = overworld.getGameTime() / 24000L;
         long revealDay = currentDay + 1L + Math.floorMod(hash, 4);
-        BlockPos target = distortedTarget(overworld, pos, hash);
+        BlockPos target = distortedTarget(overworld, pos);
         String materialKey = materialKeyFor(brokenState);
         EchoBuildEchoSavedData.get(overworld.getServer()).addEcho(new EchoBuildEcho(
                 pos,
@@ -111,7 +109,7 @@ public final class EchoBuildEchoManager {
                 && !state.is(TemporalRiftBlocks.TIME_CAPSULE.get());
     }
 
-    private static BlockPos distortedTarget(ServerLevel overworld, BlockPos pos, long hash) {
+    private static BlockPos distortedTarget(ServerLevel overworld, BlockPos pos) {
         long fragment = EchoRealityModel.fragmentHash(overworld.getSeed(), pos.getX(), pos.getY(), pos.getZ());
         int dx = EchoRealityModel.lateralOffset(fragment);
         int dy = EchoRealityModel.verticalOffset(fragment);

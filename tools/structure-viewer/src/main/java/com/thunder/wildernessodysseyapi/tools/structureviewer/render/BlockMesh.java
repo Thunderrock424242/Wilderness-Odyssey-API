@@ -42,7 +42,7 @@ public record BlockMesh(StructureData data,List<Face> faces,int duplicatePositio
                     if(neighbor!=null){
                         var adjacent=data.state(data.blocks().get(neighbor));
                         BlockModel other=stateModels.getOrDefault(adjacent,missing);
-                        if(other.occludes() || (adjacent.equals(state)&&!model.occludes()&&model.quads().size()==6))continue;
+                        if(other.occludes())continue;
                     }
                 }
                 faces.add(new Face(p,index,side,BlockAppearance.color(state),quad));

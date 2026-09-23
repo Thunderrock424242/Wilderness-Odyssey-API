@@ -76,9 +76,12 @@ public final class OllamaAdapter implements AutoCloseable {
         String display = string(draft,"display");
         if (display.isBlank()) { display = string(draft,"reply"); }
         display = clean(display,speaker);
-        String speech = clean(string(draft,"speech"),speaker);
-        if (speech.isBlank()) { speech = display; }
-        if (display.isBlank()) { throw new Failure("INVALID_MODEL_RESPONSE"); }
+        // One canonical answer prevents a second generated field from inventing spoken-only facts.
+        String speech = display;
+        if (display.isBlank() || Set.of("short reply", "same spoken facts")
+                .contains(display.toLowerCase(java.util.Locale.ROOT))) {
+            throw new Failure("INVALID_MODEL_RESPONSE");
+        }
         String emotion = string(draft,"emotion").toLowerCase(java.util.Locale.ROOT);
         if (!Set.of("normal","calm","concerned","urgent","damaged","weak","mysterious").contains(emotion)) { emotion="normal"; }
         float radio = 0;

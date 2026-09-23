@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Backend configuration cannot reactivate retired runtime management or leak credentials. */
 class AIBackendConfigTest {
     @Test
-    void parsesNestedRemoteAndLocalDevelopmentSettings() {
+    void parsesNestedRemoteSettingsAndIgnoresObsoleteKey() {
         AIConfig config = AIConfigLoader.parse("""
                 ai_backend:
                   enabled: true
@@ -23,7 +23,6 @@ class AIBackendConfigTest {
                 """);
         assertTrue(config.getBackend().enabled());
         assertEquals("https://aether.example.test", config.getBackend().baseUrl());
-        assertEquals("test-key-only", config.getBackend().apiKey());
         assertEquals("shared-server-a", config.getBackend().serverId());
         assertFalse(config.getBackend().sendPlayerMemory());
         assertFalse(config.getBackend().toString().contains("test-key-only"));
@@ -84,13 +83,12 @@ class AIBackendConfigTest {
     @Test
     void boundsLimitsAndRedactsRecordDiagnostics() {
         AIBackendConfig config = new AIBackendConfig(true, AIBackendConfig.Mode.REMOTE,
-                "https://user:secret@example.test", "secret", "server", 1000, 999, 9999, 9999, 999, false);
+                "https://user:secret@example.test", "server", 1000, 999, 9999, 9999, 999, false);
         assertEquals(60, config.timeoutSeconds());
         assertEquals(3, config.retryAttempts());
         assertEquals(2000, config.retryBackoffMillis());
         assertEquals(300, config.circuitCooldownSeconds());
         assertEquals(8, config.maxConcurrentRequests());
         assertFalse(config.toString().contains("secret"));
-        assertEquals("", config.withApiKey("CHANGE_ME").apiKey());
     }
 }

@@ -4,7 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.sun.net.httpserver.HttpServer;
 import com.thunder.aether.server.config.ServerConfig;
-import com.thunder.aether.server.security.ApiSecurity;
+import com.thunder.aether.server.api.RequestLimits;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -62,6 +62,12 @@ class AetherServerTest {
                 message.addProperty("content",verifier
                         ? "{\"approved\":"+!mode.get().equals("REJECT")+"}"
                         : "{\"speaker\":\"Aether\",\"display\":\"Recovered response.\",\"speech\":\"Recovered response.\",\"emotion\":\"calm\"}");
+                if (!verifier && Set.of("SPEECH_DIVERGES", "PLACEHOLDER").contains(mode.get())) {
+                    JsonObject candidate = JsonParser.parseString(message.get("content").getAsString()).getAsJsonObject();
+                    candidate.addProperty("speech", "Invented spoken-only claim.");
+                    if (mode.get().equals("PLACEHOLDER")) { candidate.addProperty("display", "short reply"); }
+                    message.addProperty("content", candidate.toString());
+                }
                 outer.add("message",message);
                 byte[] body=outer.toString().getBytes(StandardCharsets.UTF_8);
                 exchange.sendResponseHeaders(200,body.length);
@@ -83,7 +89,7 @@ class AetherServerTest {
     @Test void generationPreservesContextAndUsesServerOwnedPromptAndVerification() throws Exception {
         start(2,4,60,3);
         String id=UUID.randomUUID().toString();
-        var response=post(request(id,"server-a"),"server-key-a");
+        var response=post(request(id,"server-a"),null);
         assertEquals(200,response.statusCode());
         JsonObject body=json(response);
         assertTrue(body.get("success").getAsBoolean());
@@ -97,19 +103,37 @@ class AetherServerTest {
         assertTrue(modelRequests.getLast().toString().contains("strict factual response verifier"));
     }
 
-    @Test void healthIsPublicButReadyAndGenerationRequireValidSingleBearerCredential() throws Exception {
+    @Test void displayAndVoiceUseTheSameVerifiedAnswerDespiteDivergentModelSpeech() throws Exception {
+        mode.set("SPEECH_DIVERGES"); start(1,1,60,3);
+        var response = post(request(), null);
+        assertEquals(200, response.statusCode());
+        assertEquals("Recovered response.", json(response).get("response").getAsString());
+        assertEquals(json(response).get("response"), json(response).get("speech"));
+        assertFalse(modelRequests.getLast().toString().contains("Invented spoken-only claim."));
+    }
+
+    @Test void copiedExamplePlaceholderCannotBecomeAnApprovedReply() throws Exception {
+        mode.set("PLACEHOLDER"); start(1,1,60,3);
+        var response = post(request(), null);
+        assertEquals(503, response.statusCode());
+        assertEquals("INVALID_MODEL_RESPONSE", json(response).get("error").getAsString());
+        assertEquals(1, chatCalls.get());
+    }
+    @Test void healthReadinessAndGenerationWorkWithoutCredentials() throws Exception {
         start(1,1,60,3);
         assertEquals(200,get("/health",null).statusCode());
-        assertEquals(401,get("/ready",null).statusCode());
-        assertEquals(401,post(request(),"wrong-key").statusCode());
-        assertEquals(401,post(request(),null).statusCode());
-        assertEquals(0,chatCalls.get());
-        assertEquals(200,get("/ready","server-key-a").statusCode());
+        assertEquals(200,get("/ready",null).statusCode());
+        var response=post(request(),null);
+        assertEquals(200,response.statusCode());
+        assertEquals("Recovered response.",json(response).get("response").getAsString());
+        assertTrue(response.headers().firstValue("WWW-Authenticate").isEmpty());
+        assertEquals(200,post(request(),"obsolete-key").statusCode());
+        assertEquals(4,chatCalls.get());
     }
 
     @Test void missingConfiguredModelIsNotReadyWhileServiceRemainsHealthy() throws Exception {
         model.set("other-model:latest");start(1,1,60,3);server.refreshHealth();
-        var ready=get("/ready","server-key-a");
+        var ready=get("/ready",null);
         assertEquals(503,ready.statusCode());
         assertFalse(json(ready).get("ready").getAsBoolean());
         assertEquals("UP",json(get("/health",null)).get("status").getAsString());
@@ -118,7 +142,7 @@ class AetherServerTest {
     @Test void unavailableOllamaProducesCategoricalFailure() throws Exception {
         start(1,1,60,3);mock.stop(0);mock=null;server.refreshHealth();
         assertEquals("DOWN",json(get("/health",null)).get("ollama").getAsString());
-        var response=post(request(),"server-key-a");
+        var response=post(request(),null);
         assertEquals(503,response.statusCode());
         assertFalse(json(response).get("success").getAsBoolean());
         assertEquals("MODEL_UNAVAILABLE",json(response).get("error").getAsString());
@@ -126,7 +150,7 @@ class AetherServerTest {
 
     @Test void rejectedVerifierNeverExposesTheDraftAsSuccess() throws Exception {
         mode.set("REJECT");start(1,1,60,3);
-        var response=post(request(),"server-key-a");
+        var response=post(request(),null);
         assertEquals(503,response.statusCode());
         assertEquals("UNVERIFIED_RESPONSE",json(response).get("error").getAsString());
         assertFalse(response.body().contains("Recovered response."));
@@ -134,7 +158,7 @@ class AetherServerTest {
 
     @Test void draftAndVerificationShareOneDeadline() throws Exception {
         delayMillis.set(650);start(1,1,60,1);
-        var response=assertTimeoutPreemptively(Duration.ofSeconds(2),() -> post(request(),"server-key-a"));
+        var response=assertTimeoutPreemptively(Duration.ofSeconds(2),() -> post(request(),null));
         assertEquals(408,response.statusCode());
         assertEquals("TIMEOUT",json(response).get("error").getAsString());
         assertEquals(2,chatCalls.get());
@@ -145,34 +169,34 @@ class AetherServerTest {
         for(String field:List.of("requestId","playerId","speaker")){
             JsonObject value=JsonParser.parseString(request()).getAsJsonObject();
             value.addProperty(field,"not-valid");
-            assertEquals(400,post(value.toString(),"server-key-a").statusCode());
+            assertEquals(400,post(value.toString(),null).statusCode());
         }
         JsonObject value=JsonParser.parseString(request()).getAsJsonObject();
         value.addProperty("message",4);
-        assertEquals(400,post(value.toString(),"server-key-a").statusCode());
-        assertEquals(400,post("{\"unexpected\":"+"[".repeat(40)+"0"+"]".repeat(40)+"}","server-key-a").statusCode());
-        assertEquals(413,post("x".repeat(70000),"server-key-a").statusCode());
+        assertEquals(400,post(value.toString(),null).statusCode());
+        assertEquals(400,post("{\"unexpected\":"+"[".repeat(40)+"0"+"]".repeat(40)+"}",null).statusCode());
+        assertEquals(413,post("x".repeat(70000),null).statusCode());
         assertEquals(0,chatCalls.get());
     }
 
-    @Test void credentialsBoundRateLimitsAcrossSpoofedServerIdsAndIsolateOtherServers() throws Exception {
+    @Test void publicRateLimitIsSharedAcrossServerIdsAndObsoleteCredentials() throws Exception {
         start(1,1,1,3);
-        assertEquals(200,post(request(UUID.randomUUID().toString(),"server-a"),"server-key-a").statusCode());
-        assertEquals(429,post(request(UUID.randomUUID().toString(),"different-id"),"server-key-a").statusCode());
-        assertEquals(200,post(request(UUID.randomUUID().toString(),"server-b"),"server-key-b").statusCode());
-        assertEquals(4,chatCalls.get());
+        assertEquals(200,post(request(UUID.randomUUID().toString(),"server-a"),null).statusCode());
+        assertEquals(429,post(request(UUID.randomUUID().toString(),"different-id"),null).statusCode());
+        assertEquals(429,post(request(UUID.randomUUID().toString(),"server-b"),"obsolete-key").statusCode());
+        assertEquals(2,chatCalls.get());
     }
 
     @Test void fullQueueRejectsPromptlyAndHealthRemainsResponsiveDuringInference() throws Exception {
         mode.set("BLOCK");start(1,1,60,5);
-        var first=postAsync(request(),"server-key-a");
+        var first=postAsync(request(),null);
         assertTrue(entered.await(2,TimeUnit.SECONDS));
-        var second=postAsync(request(),"server-key-b");
+        var second=postAsync(request(),null);
         long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(2);
         while(System.nanoTime()<until && json(get("/health",null)).get("queuedGenerations").getAsInt()!=1){Thread.sleep(10);}
         assertEquals(1,json(get("/health",null)).get("queuedGenerations").getAsInt());
         assertTimeoutPreemptively(Duration.ofMillis(500),() -> assertEquals(200,get("/health",null).statusCode()));
-        var overload=post(request(),"server-key-a");
+        var overload=post(request(),null);
         assertEquals(503,overload.statusCode());
         assertEquals("OVERLOADED",json(overload).get("error").getAsString());
         release.countDown();
@@ -183,15 +207,43 @@ class AetherServerTest {
     @Test void simultaneousPlayersReceiveTheirOwnRequestIds() throws Exception {
         start(2,4,60,3);
         String firstId=UUID.randomUUID().toString(),secondId=UUID.randomUUID().toString();
-        var first=postAsync(request(firstId,"server-a"),"server-key-a");
-        var second=postAsync(request(secondId,"server-b"),"server-key-b");
+        var first=postAsync(request(firstId,"server-a"),null);
+        var second=postAsync(request(secondId,"server-b"),null);
         assertEquals(firstId,json(first.get(3,TimeUnit.SECONDS)).get("requestId").getAsString());
         assertEquals(secondId,json(second.get(3,TimeUnit.SECONDS)).get("requestId").getAsString());
     }
 
-    @Test void safeLogsRedactKnownCredentialsEvenWhenContentLoggingIsEnabled() {
-        ApiSecurity security=new ApiSecurity(List.of("server-key-a","server-key-b"),60);
-        assertEquals("hello <redacted> <redacted> bye",security.safeLog("hello server-key-a\nserver-key-b\rbye"));
+    @Test void optInLogContentIsBoundedAndHasNoControlCharacters() {
+        RequestLimits limits=new RequestLimits(60);
+        assertEquals("hello world bye",limits.safeLog("hello\nworld\rbye"));
+        assertEquals(2000,limits.safeLog("x".repeat(3000)).length());
+    }
+
+    @Test void publicRateBudgetRecoversAfterOneMinute() {
+        RequestLimits limits=new RequestLimits(1);
+        assertTrue(limits.allow(0));
+        assertFalse(limits.allow(59_999_999_999L));
+        assertTrue(limits.allow(60_000_000_000L));
+    }
+
+    @Test void legacyKeysDoNotRestrictPublicAccessAndLegacyRateLimitStillApplies() throws Exception {
+        Path configuration=temporary.resolve("legacy.yml");
+        Files.writeString(configuration,"""
+                server:
+                  bind: 127.0.0.1
+                  port: 0
+                ollama:
+                  url: http://127.0.0.1:%d
+                security:
+                  api_keys: [CHANGE_ME]
+                limits:
+                  requests_per_minute_per_server: 1
+                """.formatted(mock.getAddress().getPort()));
+        server=new AetherServer(ServerConfig.load(configuration,Map.of("AETHER_API_KEYS","obsolete value")));
+        server.start();server.refreshHealth();
+        assertEquals(200,get("/ready",null).statusCode());
+        assertEquals(200,post(request(),null).statusCode());
+        assertEquals(429,post(request(),"obsolete-key").statusCode());
     }
 
     @Test void executableJarStartsAndHandlesHealthGenerationAndOutage() throws Exception {
@@ -204,17 +256,15 @@ class AetherServerTest {
                 server:
                   bind: 127.0.0.1
                   port: %d
+                  request_timeout_seconds: 1
                 ollama:
                   url: http://127.0.0.1:%d
                   model: aether-custom:8b
                   timeout_seconds: 2
-                security:
-                  api_keys: []
                 """.formatted(port,mock.getAddress().getPort()));
         Path log=temporary.resolve("service.log");
         ProcessBuilder process=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),
                 "-jar",jar.toString(),"--config",configuration.toString());
-        process.environment().put("AETHER_API_KEYS","server-key-a");
         process.redirectErrorStream(true).redirectOutput(log.toFile());
         Process running=process.start();
         try {
@@ -228,8 +278,16 @@ class AetherServerTest {
                 Thread.sleep(50);
             }
             assertTrue(up,"Executable server did not become healthy");
+            // A client that never finishes its headers must not hold an HTTP worker forever.
+            try (var stalled = new java.net.Socket("127.0.0.1", port)) {
+                stalled.setSoTimeout(4000);
+                stalled.getOutputStream().write("GET /health HTTP/1.1\r\nHost: localhost\r\nX-Stalled: "
+                        .getBytes(StandardCharsets.US_ASCII));
+                stalled.getOutputStream().flush();
+                assertEquals(-1, stalled.getInputStream().read(), "Incomplete headers must time out");
+            }
             HttpRequest generate=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/v1/aether/generate"))
-                    .timeout(Duration.ofSeconds(4)).header("Authorization","Bearer server-key-a")
+                    .timeout(Duration.ofSeconds(4))
                     .header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(request())).build();
             assertEquals(200,http.send(generate,HttpResponse.BodyHandlers.ofString()).statusCode());
             mode.set("OFFLINE");
@@ -243,7 +301,7 @@ class AetherServerTest {
     private void start(int concurrency,int queue,int rpm,int seconds) throws Exception {
         server=new AetherServer(new ServerConfig("127.0.0.1",0,3,
                 "http://127.0.0.1:"+mock.getAddress().getPort(),"aether-custom:8b",seconds,256,
-                List.of("server-key-a","server-key-b"),concurrency,queue,rpm,65536,4,false,false,false,""));
+                concurrency,queue,rpm,65536,4,false,false,false,""));
         server.start();server.refreshHealth();
     }
     private HttpResponse<String> get(String path,String key) throws Exception {

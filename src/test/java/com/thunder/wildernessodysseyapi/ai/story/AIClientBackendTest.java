@@ -42,7 +42,7 @@ class AIClientBackendTest {
     void preservesAuthoredFallbackAfterBackendOutageAndKeepsItDeterministic() throws Exception {
         AIConfig config = bundled();
         config.setBackend(new AIBackendConfig(true, AIBackendConfig.Mode.REMOTE,
-                "http://127.0.0.1:1", "test-key-only", "test-server", 1, 1, 0, 30, 2, false));
+                "http://127.0.0.1:1", "test-server", 1, 1, 0, 30, 2, false));
         client = new AIClient(config, state, () -> true);
         UUID player = UUID.randomUUID();
         AIFallbackResponder.ResponseContext context = new AIFallbackResponder.ResponseContext(
@@ -118,7 +118,7 @@ class AIClientBackendTest {
     private AIConfig configured() throws Exception {
         AIConfig config = bundled();
         config.setBackend(new AIBackendConfig(true, AIBackendConfig.Mode.REMOTE,
-                "http://127.0.0.1:" + gateway.getAddress().getPort(), "test-key-only",
+                "http://127.0.0.1:" + gateway.getAddress().getPort(),
                 "test-server", 3, 1, 0, 30, 2, false));
         return config;
     }

@@ -7,12 +7,11 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 
 /** Validated operator-only configuration, usable without Minecraft or mod loaders. */
 public record ServerConfig(String bind, int port, int requestTimeoutSeconds, String ollamaUrl,
-        String model, int timeoutSeconds, int maxOutputTokens, List<String> apiKeys,
+        String model, int timeoutSeconds, int maxOutputTokens,
         int concurrency, int queueSize, int requestsPerMinute, int maxRequestBytes, int httpWorkers,
         boolean logRequests, boolean logPlayerMessages, boolean logResponses, String promptsFile) {
     public ServerConfig {
@@ -24,17 +23,10 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
         range(httpWorkers, 2, 32);
         require(model != null && model.matches("[A-Za-z0-9._/:@-]{1,128}"));
         com.thunder.aether.server.api.JsonHttp.baseUri(ollamaUrl);
-        apiKeys = List.copyOf(apiKeys);
-        require(apiKeys.size() <= 64);
-        for (String key : apiKeys) {
-            require(key != null && key.length() >= 8 && key.length() <= 1024
-                    && !key.equalsIgnoreCase("CHANGE_ME")
-                    && key.chars().noneMatch(c -> c <= 32 || c >= 127));
-        }
         promptsFile = promptsFile == null ? "" : promptsFile;
     }
 
-    /** Loads an explicit file or bundled defaults; environment credentials replace file credentials. */
+    /** Loads public-service settings; obsolete key fields and environment credentials are ignored. */
     public static ServerConfig load(Path file, Map<String, String> environment) throws Exception {
         Map<?, ?> root;
         try (InputStream input = file == null
@@ -42,18 +34,12 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
             root = yaml(input);
         }
         Map<?, ?> server = section(root, "server"), ollama = section(root, "ollama"),
-                security = section(root, "security"), limits = section(root, "limits"), logging = section(root, "logging");
-        Object rawKeys = security.get("api_keys");
-        List<String> keys = rawKeys instanceof List<?> list ? list.stream().map(Object::toString).toList() : List.of();
-        String override = environment.get("AETHER_API_KEYS");
-        if (override != null && !override.isBlank()) {
-            keys = java.util.Arrays.stream(override.split(",")).map(String::trim).filter(s -> !s.isEmpty()).distinct().toList();
-        }
+                limits = section(root, "limits"), logging = section(root, "logging");
         return new ServerConfig(text(server,"bind","127.0.0.1"), number(server,"port",8085),
                 number(server,"request_timeout_seconds",10), text(ollama,"url","http://127.0.0.1:11434"),
                 text(ollama,"model","aether-custom:8b"), number(ollama,"timeout_seconds",30),
-                number(ollama,"max_output_tokens",256), keys, number(limits,"max_concurrent_generations",2),
-                number(limits,"max_queue_size",20), number(limits,"requests_per_minute_per_server",60),
+                number(ollama,"max_output_tokens",256), number(limits,"max_concurrent_generations",2),
+                number(limits,"max_queue_size",20), requestLimit(limits),
                 number(limits,"max_request_bytes",65536), number(limits,"http_workers",8),
                 flag(logging,"log_requests"), flag(logging,"log_player_messages"), flag(logging,"log_responses"),
                 text(root,"prompts_file",""));
@@ -74,6 +60,11 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
     private static Map<?, ?> section(Map<?, ?> root, String key) {
         Object value = root.get(key);
         return value instanceof Map<?, ?> map ? map : Map.of();
+    }
+    // Older limits remain effective, now shared by the public service instead of credentials.
+    private static int requestLimit(Map<?, ?> limits) {
+        return limits.containsKey("requests_per_minute") ? number(limits,"requests_per_minute",60)
+                : number(limits,"requests_per_minute_per_server",60);
     }
     private static int number(Map<?, ?> values, String key, int fallback) {
         Object value = values.get(key);
@@ -98,5 +89,5 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
     private static void require(boolean valid) {
         if (!valid) { throw new IllegalArgumentException("INVALID_CONFIGURATION"); }
     }
-    @Override public String toString() { return "ServerConfig[credentials and endpoints redacted]"; }
+    @Override public String toString() { return "ServerConfig[endpoints redacted]"; }
 }

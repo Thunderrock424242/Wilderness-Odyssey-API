@@ -28,6 +28,10 @@ public final class EchoDebugCommand {
     }
 
     private static int override(CommandSourceStack source, EchoStabilityLevel value) {
+        if (!com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig.ENABLE_ECHO_STABILITY_SYSTEM.get()) {
+            source.sendFailure(Component.translatable("command.wildernessodysseyapi.echo.disabled"));
+            return 0;
+        }
         if (!source.getLevel().dimension().equals(TemporalRiftDimensions.THE_ECHO_KEY)) {
             source.sendFailure(Component.translatable("command.wildernessodysseyapi.echo.only_echo"));
             return 0;

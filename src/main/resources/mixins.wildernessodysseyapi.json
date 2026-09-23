@@ -19,6 +19,7 @@
     "CreatePathsMixin",
     "CreateWaterPredicateMixin",
     "DayNightCycleMixin",
+    "EarthStructurePolicyMixin",
     "EntityAccessor",
     "EntityWaterParityMixin",
     "FishingHookWaterMixin",

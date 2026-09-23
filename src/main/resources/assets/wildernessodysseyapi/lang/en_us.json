@@ -66,6 +66,7 @@
   "dimension.wildernessodysseyapi.the_echo": "Echo Earth",
   "message.wildernessodysseyapi.echo.arrival": "[Temporal Rift] You enter Echo Earth. The landscape feels strangely familiar.",
   "command.wildernessodysseyapi.echo.only_echo": "Enter Echo Earth before overriding a region's stability.",
+  "command.wildernessodysseyapi.echo.disabled": "Echo stability is disabled. Enable enableEchoStabilitySystem in the server configuration before applying an override.",
   "command.wildernessodysseyapi.echo.override": "Echo region stability: %s. This temporary override clears when the server closes.",
   "command.wildernessodysseyapi.echo.stability": "Echo stability: %s | synchronization: %s%% | region: %s | override: %s",
   "command.wildernessodysseyapi.echo.syncinfo": "Dimension: %s | nearest known fracture: %s | horizontal distance at chunk center: %s blocks | fracture influence: %s%% | pending reality echoes: %s",

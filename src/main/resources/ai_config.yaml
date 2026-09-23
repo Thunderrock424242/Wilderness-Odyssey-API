@@ -109,8 +109,7 @@ ai_backend:
   send_player_memory: false
   remote:
     base_url: "http://127.0.0.1:8085"
-    # Prefer AETHER_BACKEND_API_KEY in the Minecraft server environment.
-    api_key: ""
+    # The public Aether gateway does not require an access key.
     timeout_seconds: 30
     retry_attempts: 3
     retry_backoff_millis: 250

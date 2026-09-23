@@ -23,8 +23,9 @@ public final class EchoDistortionManager {
         if (stability == EchoStabilityLevel.STABLE) return;
         long hash = EchoRegionModel.mix(level.getSeed() ^ chunk.getPos().toLong());
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        // One point in each 4x4 cell: at most 16 * 24 block reads and 64 mutations.
+        // One point in each 4x4 cell: 384 samples, up to 32 door-partner reads and 64 mutations.
         int changes = 0;
+        int doorChecks = 0;
         for (int sample = 0; sample < 16 && changes < 64; sample++) {
             int x = (sample & 3) * 4 + (int) (hash & 3);
             int z = (sample >> 2) * 4 + (int) ((hash >>> 2) & 3);
@@ -37,9 +38,20 @@ public final class EchoDistortionManager {
                     level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
                     changes++;
                 } else if (state.getBlock() instanceof DoorBlock && state.hasProperty(BlockStateProperties.OPEN)
-                        && !state.getValue(BlockStateProperties.OPEN)) {
+                        && !state.getValue(BlockStateProperties.OPEN)
+                        && state.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF)
+                        == net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER
+                        && changes <= 62 && doorChecks < 32) {
+                    // Flags 2 preserve generation isolation, so explicitly keep both door halves consistent.
+                    BlockPos upperPos = pos.above();
+                    doorChecks++;
+                    BlockState upper = chunk.getBlockState(upperPos);
+                    if (!upper.is(state.getBlock()) || !upper.hasProperty(BlockStateProperties.OPEN)
+                            || upper.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF)
+                            != net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER) continue;
                     level.setBlock(pos, state.setValue(BlockStateProperties.OPEN, true), 2);
-                    changes++;
+                    level.setBlock(upperPos, upper.setValue(BlockStateProperties.OPEN, true), 2);
+                    changes += 2;
                 }
             }
             hash = EchoRegionModel.mix(hash + sample);

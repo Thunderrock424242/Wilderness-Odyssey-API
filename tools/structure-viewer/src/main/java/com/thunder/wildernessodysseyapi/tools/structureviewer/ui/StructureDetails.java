@@ -17,8 +17,8 @@ final class StructureDetails {
                 + "\n\nStored blocks: " + data.blocks().size() + "\nNon-air blocks: " + nonAir
                 + "\nPrimary palette: " + data.palettes().getFirst().size() + "\nPalette variants: " + data.palettes().size()
                 + "\nBlock-entity records: " + blockEntities + "\nEntities: " + data.entities().size()
-                + "\n\nPhase 1 · approximate cube preview\nAll blocks use shaded cubes. Models, textures, transparency, "
-                + "block shapes and entity rendering are planned for Phase 2. State properties are retained for inspection.";
+                + "\n\nTextured model preview\nHigh/Ultra improve pixel detail; Block edges separates neighboring blocks. "
+                + "Select a block and press G to inspect it closely. Custom Java renderers use placeholders.";
     }
 
     static String inspection(StructureData data, int index) {
@@ -38,17 +38,16 @@ final class StructureDetails {
     }
 
     static String diagnostics(BlockMesh mesh) {
-        StringBuilder text = new StringBuilder("Preview uses placeholder cubes for every block.\n")
-                .append("No live Minecraft registry is available; block existence and allowed state values are not verified.\n\n")
-                .append("Exposed faces: ").append(mesh.faces().size())
+        StringBuilder text = new StringBuilder("Model states resolved: ").append(mesh.resolvedStates())
+                .append("\nPlaceholder states: ").append(mesh.fallbackStates())
+                .append("\nExposed faces: ").append(mesh.faces().size())
                 .append("\nDuplicate visible coordinates: ").append(mesh.duplicatePositions())
-                .append(" (last record shown)\n\nImport diagnostics\n");
-        if (mesh.data().diagnostics().isEmpty()) text.append("No basic import problems found.\n");
-        else mesh.data().diagnostics().forEach(message -> text.append("• ").append(message).append('\n'));
-        text.append("\nPalette / appearance report\n");
-        mesh.data().palettes().getFirst().stream().map(state -> state.id()).distinct().sorted().forEach(id ->
-                text.append(id).append(id.startsWith("minecraft:") ? " — approximate cube\n" : " — magenta placeholder\n"));
+                .append("\n\nAsset sources (highest priority first)\n");
+        mesh.assetSources().forEach(source -> text.append(source).append('\n'));
+        text.append("\nAsset/state diagnostics\n");
+        mesh.diagnostics().forEach(issue -> text.append("• ").append(issue).append('\n'));
+        text.append("\nRendering limits\nCustom Java/entity renderers are placeholders; animation uses a first frame; "
+                + "biome tints are approximate; weighted variants use their first entry. No Minecraft lighting simulation runs.");
         return text.toString();
     }
 }
-

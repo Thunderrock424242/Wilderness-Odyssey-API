@@ -4,9 +4,7 @@ services:
       context: ../../aether-server
       dockerfile: ../deploy/docker/Dockerfile
       args:
-        AETHER_JAR: .codex-build/libs/Aether-AI-Server.jar
-    environment:
-      AETHER_API_KEYS: ${AETHER_API_KEYS:?Set gateway credentials}
+        AETHER_JAR: .codex-build/libs/Aether-Gateway.jar
     volumes:
       - ./aether-server.docker.yml:/etc/aether/aether-server.yml:ro
     ports:

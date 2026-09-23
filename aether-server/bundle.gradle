@@ -1,0 +1,140 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import java.security.MessageDigest
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import org.gradle.api.file.RelativePath
+import org.gradle.api.tasks.bundling.ZipEntryCompression
+
+// Explicit build inputs: no runtime/model download or global installation occurs during normal build.
+def bundlePlatform = providers.gradleProperty('aetherBundlePlatform')
+def runtimeDirectory = providers.gradleProperty('aetherRuntimeDirectory')
+def modelDirectory = providers.gradleProperty('aetherModelDirectory')
+def modelName = providers.gradleProperty('aetherSourceModel').orElse('llama3.1:8b')
+def bundleManifest = layout.buildDirectory.file('generated/aether-bundle/manifest.json')
+def bundleNotice = layout.buildDirectory.file('generated/aether-bundle/NOTICE.txt')
+def runtimeRoot = { file(runtimeDirectory.get()).toPath().toAbsolutePath().normalize() }
+def modelsRoot = { file(modelDirectory.get()).toPath().toAbsolutePath().normalize() }
+def manifestRelative = {
+    String name = modelName.get()
+    if (!(name ==~ /[a-z0-9._-]+:[a-zA-Z0-9._-]+/)) { throw new GradleException('Use a local library model name with a tag.') }
+    def parts = name.split(':', 2)
+    "manifests/registry.ollama.ai/library/${parts[0]}/${parts[1]}"
+}
+def modelInventory = {
+    def root = modelsRoot()
+    def source = root.resolve(manifestRelative()).toFile()
+    if (!source.isFile()) { throw new GradleException('Selected model manifest is missing. Install the approved base model before packaging.') }
+    def descriptor = new JsonSlurper().parse(source)
+    if (descriptor.schemaVersion != 2 || !(descriptor.layers instanceof List) || descriptor.layers.size() > 64) {
+        throw new GradleException('Unsupported Ollama model manifest.')
+    }
+    def blobs = [descriptor.config] + descriptor.layers
+    blobs.each { item ->
+        if (!(item.digest ==~ /sha256:[0-9a-f]{64}/) || !(item.size instanceof Number) || item.size < 0) {
+            throw new GradleException('Invalid model blob descriptor.')
+        }
+    }
+    [root: root, manifest: source, blobs: blobs.unique { it.digest }, descriptor: descriptor]
+}
+
+tasks.register('prepareAetherBundle') {
+    group = 'distribution'
+    description = 'Validates and inventories explicit native Ollama/model inputs for a self-contained JAR.'
+    outputs.files(bundleManifest, bundleNotice)
+    // Always verify external inputs before packaging; do not trust a previous machine's descriptor.
+    outputs.upToDateWhen { false }
+    doLast {
+        if (!bundlePlatform.isPresent() || !runtimeDirectory.isPresent() || !modelDirectory.isPresent()) {
+            throw new GradleException('bundleJar requires -PaetherBundlePlatform, -PaetherRuntimeDirectory and -PaetherModelDirectory.')
+        }
+        String platform = bundlePlatform.get()
+        if (!(platform in ['windows-amd64', 'linux-amd64', 'linux-arm64'])) { throw new GradleException('Unsupported bundle platform.') }
+        def nativeRoot = runtimeRoot()
+        String executable = platform.startsWith('windows') ? 'ollama.exe' : 'bin/ollama'
+        if (!Files.isRegularFile(nativeRoot.resolve(executable))) { throw new GradleException('Native runtime does not contain the expected Ollama executable.') }
+        def nativeFiles = fileTree(nativeRoot.toFile()) {
+            include executable
+            include 'lib/ollama/**'
+        }.files.sort { a, b -> a.path <=> b.path }
+        if (nativeFiles.size() < 2) { throw new GradleException('Ollama runtime must include its native libraries.') }
+        def inventory = modelInventory()
+        def inputs = []
+        nativeFiles.each { source ->
+            if (!source.toPath().toRealPath().startsWith(nativeRoot.toRealPath())) {
+                throw new GradleException('Runtime symlink points outside the supplied distribution.')
+            }
+            inputs.add([path: 'runtime/' + nativeRoot.relativize(source.toPath()).toString().replace('\\', '/'), file: source, expected: null])
+        }
+        inputs.add([path: 'models/' + manifestRelative(), file: inventory.manifest, expected: null])
+        inventory.blobs.each { item ->
+            File source = inventory.root.resolve('blobs/' + item.digest.replace(':', '-')).toFile()
+            if (!source.isFile() || source.length() != item.size.longValue()) { throw new GradleException('A required model blob is missing or has the wrong size.') }
+            inputs.add([path: 'models/blobs/' + item.digest.replace(':', '-'), file: source, expected: item.digest.substring(7)])
+        }
+        File notice = bundleNotice.get().asFile
+        notice.parentFile.mkdirs()
+        notice.text = 'Built with Llama. This distribution includes Llama 3.1 weights and their original license.\nOllama is included under its MIT license. Native dependency license notices are retained with the runtime.\n'
+        inputs.add([path: 'licenses/NOTICE.txt', file: notice, expected: null])
+        File ollamaLicense = file('src/bundle/Ollama-LICENSE.txt')
+        if (!ollamaLicense.isFile()) { throw new GradleException('Ollama license is missing.') }
+        inputs.add([path: 'licenses/Ollama-LICENSE.txt', file: ollamaLicense, expected: null])
+        def licenses = inventory.descriptor.layers.findAll { it.mediaType == 'application/vnd.ollama.image.license' }
+        if (licenses.size() != 1) { throw new GradleException('Selected model must contain its original license layer.') }
+        File modelLicense = inventory.root.resolve('blobs/' + licenses.first().digest.replace(':', '-')).toFile()
+        inputs.add([path: 'licenses/Llama-LICENSE.txt', file: modelLicense, expected: licenses.first().digest.substring(7)])
+        logger.lifecycle("Verifying ${inputs.size()} bundled files; model and runtime are streamed.")
+        def assets = inputs.collect { item ->
+            MessageDigest hash = MessageDigest.getInstance('SHA-256')
+            item.file.withInputStream { stream ->
+                byte[] buffer = new byte[1024 * 1024]
+                int count
+                while ((count = stream.read(buffer)) != -1) { hash.update(buffer, 0, count) }
+            }
+            String digest = HexFormat.of().formatHex(hash.digest())
+            if (item.expected != null && item.expected != digest) { throw new GradleException('Model blob failed SHA-256 verification.') }
+            [path: item.path, size: item.file.length(), sha256: digest]
+        }
+        File output = bundleManifest.get().asFile
+        output.parentFile.mkdirs()
+        output.text = JsonOutput.prettyPrint(JsonOutput.toJson([
+                format: 1, platform: platform, ollamaVersion: '0.17.7',
+                executable: 'runtime/' + executable, sourceModel: modelName.get(),
+                targetModel: 'aether-custom:8b', assets: assets]))
+        logger.lifecycle("Verified payload size: ${assets.sum { it.size }} bytes.")
+    }
+}
+
+tasks.register('bundleJar', Jar) {
+    group = 'distribution'
+    description = 'Builds one ZIP64 JAR containing the gateway, native Ollama and the selected local model.'
+    dependsOn tasks.named('jar'), tasks.named('prepareAetherBundle')
+    archiveFileName = bundlePlatform.map { "Aether-AI-Server-${it}.jar" }
+    zip64 = true
+    entryCompression = ZipEntryCompression.STORED
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    manifest { attributes 'Main-Class': application.mainClass.get() }
+    from({ zipTree(tasks.named('jar').get().archiveFile.get().asFile) }) { exclude 'META-INF/MANIFEST.MF' }
+    from(bundleManifest) { into 'bundle' }
+    from({ runtimeRoot().toFile() }) {
+        include 'ollama.exe', 'bin/ollama', 'lib/ollama/**'
+        into 'bundle/files/runtime'
+    }
+    from({
+        def inventory = modelInventory()
+        [inventory.manifest] + inventory.blobs.collect { inventory.root.resolve('blobs/' + it.digest.replace(':', '-')).toFile() }
+    }) {
+        eachFile { detail ->
+            String relative = modelsRoot().relativize(detail.file.toPath().toAbsolutePath().normalize()).toString().replace('\\', '/')
+            detail.relativePath = new RelativePath(true, ('bundle/files/models/' + relative).split('/'))
+        }
+    }
+    from(bundleNotice) { into 'bundle/files/licenses' }
+    from('src/bundle/Ollama-LICENSE.txt') { into 'bundle/files/licenses' }
+    from({
+        def inventory = modelInventory()
+        def license = inventory.descriptor.layers.find { it.mediaType == 'application/vnd.ollama.image.license' }
+        inventory.root.resolve('blobs/' + license.digest.replace(':', '-')).toFile()
+    }) { into 'bundle/files/licenses'; rename { 'Llama-LICENSE.txt' } }
+    includeEmptyDirs = false
+}

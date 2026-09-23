@@ -16,7 +16,10 @@ public final class EchoRegionModel {
 
     /** Selects a region; an all-zero weight configuration safely means stable. */
     public static EchoStabilityLevel level(long seed, long region, int stable, int desynced, int fractured) {
-        long total = Math.max(0, stable) + (long) Math.max(0, desynced) + Math.max(0, fractured);
+        stable = Math.max(0, stable);
+        desynced = Math.max(0, desynced);
+        fractured = Math.max(0, fractured);
+        long total = stable + (long) desynced + fractured;
         if (total == 0) {
             return EchoStabilityLevel.STABLE;
         }
@@ -27,7 +30,8 @@ public final class EchoRegionModel {
 
     /** Smooth radial falloff, zero at and beyond the configured influence radius. */
     public static double fractureInfluence(double distance, double radius, double strength) {
-        if (radius <= 0 || distance >= radius || !Double.isFinite(distance)) {
+        if (radius <= 0 || distance >= radius || !Double.isFinite(distance)
+                || !Double.isFinite(radius) || !Double.isFinite(strength)) {
             return 0;
         }
         double t = Math.max(0, Math.min(1, 1 - distance / radius));

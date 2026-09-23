@@ -139,6 +139,9 @@ public class AIFallbackResponder {
     // Keep this code-owned evidence gate ahead of older installed fallback YAML,
     // whose Echo entry may still describe the obsolete memory/copy lore.
     private Optional<FallbackReply> echoDiscoveryReply(MatchInput input, ResponseContext context) {
+        if (input.containsPhrase("echo breathing mask") || input.containsPhrase("echo mask")) {
+            return Optional.empty();
+        }
         boolean inEcho = context.has("dimension:the_echo")
                 || context.has("dimension:wildernessodysseyapi:the_echo");
         boolean asksAboutEcho = input.tokens().contains("echo") || inEcho

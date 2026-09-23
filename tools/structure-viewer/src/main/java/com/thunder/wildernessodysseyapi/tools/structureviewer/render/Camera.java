@@ -20,6 +20,14 @@ public final class Camera {
         speed = Math.max(2, Math.min(64, distance / 8));
     }
 
+    /** Focuses on an individual block without changing the chosen camera mode. */
+    public void focusBlock(Position block) {
+        target = new Vec3(block.x() + .5, block.y() + .5, block.z() + .5);
+        distance = 4;
+        position = target.subtract(forward().multiply(distance));
+        speed = 2;
+    }
+
     /** Switches camera mode without jumping the current eye position. */
     public void setOrbit(boolean value) {
         if (value && !orbit) target = position.add(forward().multiply(distance));

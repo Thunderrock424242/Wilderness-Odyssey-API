@@ -7,7 +7,7 @@ public final class AIChatAccessPolicy {
     private AIChatAccessPolicy() {
     }
 
-    /** A client-only connection has no local logical server and cannot use backend credentials. */
+    /** A client-only connection has no local logical server and does not issue backend requests. */
     public static boolean isAvailable(MinecraftServer server) {
         return server != null;
     }

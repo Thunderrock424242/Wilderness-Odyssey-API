@@ -13,6 +13,7 @@ import java.util.*;
  */
 public final class BlockModelResolver {
     private final AssetRepository assets;
+    private final BlockStateCatalog catalog;
     private final Map<BlockState,BlockModel> states=new HashMap<>();
     private final Map<String,JsonObject> models=new HashMap<>();
     private final Map<String,Texture> textures=new HashMap<>();
@@ -21,7 +22,11 @@ public final class BlockModelResolver {
     private int resolved,missing;
 
     /** Uses an already opened read-only asset stack. */
-    public BlockModelResolver(AssetRepository assets){this.assets=assets;}
+    public BlockModelResolver(AssetRepository assets){this(assets,BlockStateCatalog.empty());}
+    /** Uses existing StructureGen snapshot defaults when available. */
+    public BlockModelResolver(AssetRepository assets,BlockStateCatalog catalog){
+        this.assets=assets;this.catalog=catalog;warn(catalog.description());
+    }
     /** Resolves each unique palette state once; every failure has a renderable placeholder. */
     public BlockModel resolve(BlockState state){return states.computeIfAbsent(state,this::load);}
     /** Bounded and deduplicated diagnostics, including unavailable source packs. */
@@ -38,7 +43,8 @@ public final class BlockModelResolver {
         return JsonInput.read(bytes);
     }
 
-    private BlockModel load(BlockState state) {
+    private BlockModel load(BlockState source) {
+        BlockState state=catalog.complete(source,this::warn);
         if(state.isAir())return ModelGeometry.cube(Texture.solid(0x6a9fb3));
         try {
             JsonObject blockstate=json(state.id(),"blockstates");
@@ -50,6 +56,21 @@ public final class BlockModelResolver {
             if(blockstate.has("multipart"))for(JsonElement item:blockstate.getAsJsonArray("multipart")){
                 JsonObject part=item.getAsJsonObject();
                 if(!part.has("when")||matches(part.get("when"),state.properties()))applications.add(choice(part.get("apply"),state.id()));
+            }
+            if(applications.isEmpty() && blockstate.has("variants")) {
+                for(var entry:blockstate.getAsJsonObject("variants").entrySet()) {
+                    boolean compatible=true;
+                    for(String pair:entry.getKey().split(",")) {
+                        String[] kv=pair.split("=",2);
+                        if(kv.length==2 && state.properties().containsKey(kv[0])
+                                && !oneOf(kv[1],state.properties().get(kv[0]))) compatible=false;
+                    }
+                    if(compatible) {
+                        applications.add(choice(entry.getValue(),state.id()));
+                        warn(state.id()+": omitted properties lack registry defaults; preview uses compatible variant "+entry.getKey());
+                        break;
+                    }
+                }
             }
             validateProperties(blockstate,state);
             if(applications.isEmpty())throw new IOException("No matching model for block state "+state.id()+state.properties());

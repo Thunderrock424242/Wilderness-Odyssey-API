@@ -7,7 +7,7 @@ import com.thunder.aether.server.api.JsonHttp;
 import com.thunder.aether.server.config.ServerConfig;
 import com.thunder.aether.server.model.PromptCatalog;
 import com.thunder.aether.server.ollama.OllamaAdapter;
-import com.thunder.aether.server.security.ApiSecurity;
+import com.thunder.aether.server.api.RequestLimits;
 
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
@@ -18,7 +18,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Standalone authenticated gateway. HTTP handlers release their worker after queueing;
+ * Standalone public gateway. HTTP handlers release their worker after queueing;
  * generation workers own accepted exchanges, keeping health responsive during inference.
  */
 public final class AetherServer implements AutoCloseable {
@@ -27,7 +27,7 @@ public final class AetherServer implements AutoCloseable {
     private final HttpServer http;
     private final OllamaAdapter ollama;
     private final PromptCatalog prompts;
-    private final ApiSecurity security;
+    private final RequestLimits limits;
     private final ThreadPoolExecutor handlers;
     private final ThreadPoolExecutor generations;
     private final ScheduledThreadPoolExecutor timers=new ScheduledThreadPoolExecutor(2);
@@ -39,7 +39,7 @@ public final class AetherServer implements AutoCloseable {
         this.config=config;
         prompts=new PromptCatalog(config.promptsFile());
         ollama=new OllamaAdapter(config,prompts);
-        security=new ApiSecurity(config.apiKeys(),config.requestsPerMinute());
+        limits=new RequestLimits(config.requestsPerMinute());
         dependency=Map.of("ollama","UNKNOWN","ready",false,"model",config.model());
         handlers=new ThreadPoolExecutor(config.httpWorkers(),config.httpWorkers(),0,TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(64),new ThreadPoolExecutor.AbortPolicy());
@@ -79,11 +79,6 @@ public final class AetherServer implements AutoCloseable {
                 JsonHttp.send(exchange,200,state); return;
             }
             if (!path.equals("/ready") && !path.equals("/v1/aether/generate")) { error(exchange,404,"","NOT_FOUND"); return; }
-            int identity=security.authenticate(exchange.getRequestHeaders());
-            if (identity<0) {
-                exchange.getResponseHeaders().set("WWW-Authenticate","Bearer");
-                error(exchange,401,"","UNAUTHORIZED"); return;
-            }
             if (path.equals("/ready")) {
                 if (!exchange.getRequestMethod().equals("GET")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
                 Map<String,Object> state=new HashMap<>(dependency);
@@ -92,7 +87,7 @@ public final class AetherServer implements AutoCloseable {
                 JsonHttp.send(exchange,ready ? 200 : 503,state); return;
             }
             if (!exchange.getRequestMethod().equals("POST")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
-            if (!security.allow(identity,System.nanoTime())) {
+            if (!limits.allow(System.nanoTime())) {
                 exchange.getResponseHeaders().set("Retry-After","60"); error(exchange,429,"","RATE_LIMITED"); return;
             }
             String contentType=exchange.getRequestHeaders().getFirst("Content-Type");
@@ -147,11 +142,11 @@ public final class AetherServer implements AutoCloseable {
             timeout.cancel(false); exchanges.remove(exchange); exchange.close();
             if (config.logRequests()) {
                 LOG.log(System.Logger.Level.INFO,"request={0} agent={1} result={2} latencyMs={3}",
-                        request.requestId(),security.safeLog(request.speaker()),resultCode,
+                        request.requestId(),limits.safeLog(request.speaker()),resultCode,
                         TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));
             }
-            if (config.logPlayerMessages()) { LOG.log(System.Logger.Level.INFO,"message={0}",security.safeLog(request.message())); }
-            if (config.logResponses()) { LOG.log(System.Logger.Level.INFO,"response={0}",security.safeLog(responseText)); }
+            if (config.logPlayerMessages()) { LOG.log(System.Logger.Level.INFO,"message={0}",limits.safeLog(request.message())); }
+            if (config.logResponses()) { LOG.log(System.Logger.Level.INFO,"response={0}",limits.safeLog(responseText)); }
         }
     }
 
@@ -166,6 +161,19 @@ public final class AetherServer implements AutoCloseable {
         generations.shutdownNow(); handlers.shutdownNow(); timers.shutdownNow(); ollama.close();
     }
 
+    /** Installs process-wide HTTP limits before the standalone listener is first created. */
+    public static void configureHttpLimits(ServerConfig config) {
+            // JDK 21 reads these once, before the first HttpServer is created. Set them only
+            // in the standalone process, never in an embedding Minecraft/test JVM.
+            System.setProperty("jdk.httpserver.maxConnections", "128");
+            System.setProperty("sun.net.httpserver.maxIdleConnections", "32");
+            System.setProperty("sun.net.httpserver.maxReqHeaders", "32");
+            System.setProperty("sun.net.httpserver.maxReqHeaderSize", "16384");
+            // OpenJDK 21 converts these properties from seconds internally.
+            System.setProperty("sun.net.httpserver.maxReqTime", Integer.toString(config.requestTimeoutSeconds()));
+            System.setProperty("sun.net.httpserver.maxRspTime", Integer.toString(config.timeoutSeconds() + 2));
+    }
+
     /** Entry point for java -jar Aether-AI-Server.jar [--config file]. */
     public static void main(String[] args) {
         try {
@@ -173,11 +181,11 @@ public final class AetherServer implements AutoCloseable {
                 throw new IllegalArgumentException("INVALID_ARGUMENTS");
             }
             ServerConfig config=ServerConfig.load(args.length==0 ? null : Path.of(args[1]),System.getenv());
+            configureHttpLimits(config);
             AetherServer server=new AetherServer(config);
             Runtime.getRuntime().addShutdownHook(new Thread(server::close,"aether-shutdown"));
             server.start();
-            LOG.log(System.Logger.Level.INFO,"Aether gateway listening on port {0}; configured credentials: {1}",
-                    server.port(),config.apiKeys().size());
+            LOG.log(System.Logger.Level.INFO,"Public Aether gateway listening on port {0}", server.port());
         } catch (Exception failure) {
             // Configuration/library diagnostics may include secrets or paths; keep startup logs categorical.
             LOG.log(System.Logger.Level.ERROR,"Aether gateway could not start: invalid configuration or unavailable listener.");

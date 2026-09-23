@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.tools.structureviewer;
 
 import com.thunder.wildernessodysseyapi.tools.structureviewer.ui.*;
+import com.thunder.wildernessodysseyapi.tools.structureviewer.io.JsonInput;
+import com.thunder.wildernessodysseyapi.tools.structureviewer.render.RenderQuality;
 import javax.imageio.ImageIO;
 import javax.swing.SwingUtilities;
 import java.awt.Graphics2D;
@@ -22,20 +24,27 @@ public final class UiSmokeTest {
         Path project = Path.of(System.getProperty("structureViewer.projectDir"));
         Path build = Path.of(System.getProperty("structureViewer.buildDir"));
         Path output = Path.of(args[0]); Files.createDirectories(output);
+        Path settings = output.resolve("smoke-settings.properties");
+        new ViewerSettings(RenderQuality.HIGH,true,true,true,java.util.List.of()).save(settings);
+        System.setProperty("structureViewer.settings",settings.toString());
         Path fixture = build.resolve("generated/structuregen/resources/data/wildernessodysseyapi/structure/test_shelter.nbt");
         if (!Files.isRegularFile(fixture)) fixture = project.resolve("src/main/resources/data/wildernessodysseyapi/structures/bunker.nbt");
         String override = System.getProperty("structureViewer.smokeFile", "");
         if (!override.isBlank()) fixture = Path.of(override);
-        StructureViewer.main(new String[]{"--open", fixture.toString()});
+        Path requestedFixture = fixture.toAbsolutePath().normalize();
+        StructureViewer.main(new String[]{"--open", requestedFixture.toString()});
         ViewerWindow window = edt(() -> java.util.Arrays.stream(java.awt.Window.getWindows())
                 .filter(ViewerWindow.class::isInstance).map(ViewerWindow.class::cast).findFirst().orElseThrow());
         try {
             await(() -> {
                 if (window.loadError() != null) throw new IllegalStateException(window.loadError());
-                return window.loadedStructure() != null && window.viewport().renderedFrame() != null;
+                return window.loadedStructure() != null && window.viewport().renderingIdle();
             },120000);
             edt(() -> {
                 if (!window.isShowing()) throw new AssertionError("Viewer window did not launch.");
+                if (!window.loadedStructure().source().equals(requestedFixture))
+                    throw new AssertionError("A different structure was selected during the smoke check: "+window.loadedStructure().source());
+                System.out.println("Opened source: "+window.loadedStructure().source()+" | "+window.loadedStructure().blocks().size()+" blocks | "+window.loadedStructure().size());
                 var viewport = window.viewport();
                 var frame = viewport.renderedFrame();
                 int x = -1, y = -1, blockIndex = -1;
@@ -54,7 +63,22 @@ public final class UiSmokeTest {
                     throw new AssertionError("Click did not populate the block inspector. Expected " + expected + "; got " + window.inspectorText());
                 return null;
             });
+            await(() -> window.viewport().renderingIdle(),120000);
             snapshot(window,output.resolve("structure-and-inspector.png"));
+            edt(() -> {window.selectQuality(RenderQuality.FAST);return null;});
+            await(() -> window.viewport().renderingIdle(),120000);
+            int fastWidth = edt(() -> window.viewport().renderedFrame().image().getWidth());
+            edt(() -> {window.selectQuality(RenderQuality.ULTRA);return null;});
+            await(() -> window.viewport().renderingIdle(),120000);
+            int ultraWidth = edt(() -> window.viewport().renderedFrame().image().getWidth());
+            if(ultraWidth<=fastWidth)throw new AssertionError("Ultra did not increase rendering resolution.");
+            if(ViewerSettings.read(settings).quality()!=RenderQuality.ULTRA)throw new AssertionError("Quality selection was not saved.");
+            var allView = edt(() -> window.viewport().cameraView());
+            edt(() -> {key(window.viewport(),KeyEvent.VK_G,true);key(window.viewport(),KeyEvent.VK_G,false);return null;});
+            await(() -> window.viewport().renderingIdle(),120000);
+            if(allView.position().equals(edt(() -> window.viewport().cameraView().position())))throw new AssertionError("G did not focus the selected block.");
+            snapshot(window,output.resolve("ultra-block-detail.png"));
+            edt(() -> {window.selectQuality(RenderQuality.HIGH);window.viewport().focusStructure();return null;});
             var before = edt(() -> window.viewport().cameraView());
             edt(() -> {key(window.viewport(),KeyEvent.VK_F2,true);key(window.viewport(),KeyEvent.VK_F2,false);
                 key(window.viewport(),KeyEvent.VK_W,true);return null;});
@@ -71,9 +95,30 @@ public final class UiSmokeTest {
             if (after.forward().equals(edt(() -> window.viewport().cameraView().forward()))) throw new AssertionError("Mouse look failed.");
             edt(() -> {key(window.viewport(),KeyEvent.VK_F1,true);key(window.viewport(),KeyEvent.VK_F1,false);return null;});
             if (!edt(() -> window.viewport().cameraView().orbit())) throw new AssertionError("F1 orbit input failed.");
+            // Reload only a copied fixture, preserving authored templates and user preferences.
+            Path watched = output.resolve("reload-fixture.json");
+            Files.copy(project.resolve("src/main/structure_blueprints/test_shelter.json"),watched,StandardCopyOption.REPLACE_EXISTING);
+            edt(() -> {window.load(watched);return null;});
+            await(() -> window.loadedStructure().source().equals(watched.toAbsolutePath()) && window.viewport().renderingIdle(),120000);
+            snapshot(window,output.resolve("json-textured-preview.png"));
+            var reloadView = edt(() -> window.viewport().cameraView());
+            var json = JsonInput.read(watched);
+            json.addProperty("name","Automatic reload check");
+            Path replacement = output.resolve("replacement.json");
+            Files.writeString(replacement,json.toString());
+            Files.move(replacement,watched,StandardCopyOption.REPLACE_EXISTING);
+            await(() -> window.loadedStructure().name().equals("Automatic reload check") && window.viewport().renderingIdle(),120000);
+            if(!reloadView.equals(edt(() -> window.viewport().cameraView())))throw new AssertionError("Reload reset the camera.");
+            Files.writeString(watched,"{\"incomplete\":");
+            await(() -> window.loadError()!=null,15000);
+            if(!edt(() -> window.loadedStructure().name()).equals("Automatic reload check"))throw new AssertionError("Invalid reload lost the previous preview.");
+            json.addProperty("name","Recovered reload check");
+            Files.writeString(watched,json.toString());
+            await(() -> window.loadedStructure().name().equals("Recovered reload check") && window.loadError()==null && window.viewport().renderingIdle(),15000);
+            System.out.println("PHASE 2 GUI PASSED: JSON, atomic reload, camera preservation, failed reload recovery, Fast/Ultra resolution "+fastWidth+"/"+ultraWidth+", saved quality, G block focus.");
             System.out.println("GUI SMOKE PASSED: real window, existing " + fixture.getFileName()
                     + ", rendered blocks, click inspector, F2/W movement, mouse look, F1 orbit. Screenshot: " + output);
-        } finally { snapshot(window,output.resolve("last-window.png")); edt(() -> {window.dispose();return null;}); }
+        } finally { try {snapshot(window,output.resolve("last-window.png"));} finally {edt(() -> {window.dispose();return null;});} }
     }
 
     private static void key(StructureViewport viewport,int code,boolean down) {
