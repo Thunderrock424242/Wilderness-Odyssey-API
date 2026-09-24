@@ -23,6 +23,13 @@ public final class EchoBuildEchoManager {
     private EchoBuildEchoManager() {
     }
 
+    /** Explicit outcomes prevent failed world writes from dropping pending changes. */
+    enum ApplyResult { APPLIED, SKIPPED, RETRY }
+
+    static boolean shouldDequeue(ApplyResult result) {
+        return result != ApplyResult.RETRY;
+    }
+
     public static void tick(MinecraftServer server) {
         if (!enabled()) {
             return;
@@ -43,9 +50,10 @@ public final class EchoBuildEchoManager {
         for (EchoBuildEcho echoBuildEcho : data.nextBatch(64)) {
             if (currentDay - echoBuildEcho.revealDay() > TemporalRiftConfig.ECHO_REALITY_ECHO_RETENTION_DAYS.get()) {
                 data.removeEcho(echoBuildEcho);
-            } else if (currentDay >= echoBuildEcho.revealDay() && applied < 32 && applyEcho(echo, echoBuildEcho)) {
-                data.removeEcho(echoBuildEcho);
-                applied++;
+            } else if (currentDay >= echoBuildEcho.revealDay() && applied < 32) {
+                ApplyResult result = applyEcho(echo, echoBuildEcho);
+                if (shouldDequeue(result)) data.removeEcho(echoBuildEcho);
+                if (result == ApplyResult.APPLIED) applied++;
             }
         }
     }
@@ -118,19 +126,19 @@ public final class EchoBuildEchoManager {
         return new BlockPos(pos.getX() + dx, y, pos.getZ() + dz);
     }
 
-    private static boolean applyEcho(ServerLevel echoLevel, EchoBuildEcho echoBuildEcho) {
+    private static ApplyResult applyEcho(ServerLevel echoLevel, EchoBuildEcho echoBuildEcho) {
         BlockPos target = echoBuildEcho.targetPos();
-        if (echoLevel.isOutsideBuildHeight(target) || !echoLevel.getWorldBorder().isWithinBounds(target)) return true;
+        if (echoLevel.isOutsideBuildHeight(target) || !echoLevel.getWorldBorder().isWithinBounds(target)) return ApplyResult.SKIPPED;
         if (!echoLevel.hasChunkAt(target)) {
-            return false;
+            return ApplyResult.RETRY;
         }
         var chunk = echoLevel.getChunkAt(target);
         if (chunk.hasData(com.thunder.wildernessodysseyapi.core.ModAttachments.ECHO_CHUNK)
-                && chunk.getData(com.thunder.wildernessodysseyapi.core.ModAttachments.ECHO_CHUNK).playerModified()) return true;
+                && chunk.getData(com.thunder.wildernessodysseyapi.core.ModAttachments.ECHO_CHUNK).protects(target)) return ApplyResult.SKIPPED;
 
         BlockState current = echoLevel.getBlockState(target);
         if (!canReplaceWithEcho(echoLevel, target, current)) {
-            return true;
+            return ApplyResult.SKIPPED;
         }
 
         BlockState replacement = echoBuildEcho.type() == TemporalEcho.Type.BREAK
@@ -141,15 +149,17 @@ public final class EchoBuildEchoManager {
             replacement = replacement.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS,
                     net.minecraft.core.Direction.Axis.values()[Math.floorMod(fragment, 3)]);
         }
-        if (echoLevel.setBlock(target, replacement, 3)) {
-            chunk.getData(com.thunder.wildernessodysseyapi.core.ModAttachments.ECHO_CHUNK)
-                    .record(target, net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(replacement.getBlock()));
-            com.thunder.wildernessodysseyapi.temporalrift.echo.EchoSyncManager.onRealityEcho(echoLevel, target);
+        if (!echoLevel.setBlock(target, replacement, 3)) {
+            // The write did not land: retain the pending echo for a later tick.
+            return ApplyResult.RETRY;
         }
+        chunk.getData(com.thunder.wildernessodysseyapi.core.ModAttachments.ECHO_CHUNK)
+                .record(target, net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(replacement.getBlock()));
+        com.thunder.wildernessodysseyapi.temporalrift.echo.EchoSyncManager.onRealityEcho(echoLevel, target);
         if (TemporalRiftConfig.DEBUG_LOGGING.get()) {
             LOGGER.debug("[TemporalRift] Material synchronization from {} reached Echo Earth at {}.", echoBuildEcho.sourcePos(), target);
         }
-        return true;
+        return ApplyResult.APPLIED;
     }
 
     private static boolean canReplaceWithEcho(ServerLevel echoLevel, BlockPos target, BlockState current) {

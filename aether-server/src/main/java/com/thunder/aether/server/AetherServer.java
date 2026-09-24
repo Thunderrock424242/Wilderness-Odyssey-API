@@ -95,7 +95,27 @@ public final class AetherServer implements AutoCloseable {
                 error(exchange,415,"","UNSUPPORTED_MEDIA_TYPE"); return;
             }
             String length=exchange.getRequestHeaders().getFirst("Content-Length");
-            if (length!=null && Long.parseLong(length)>config.maxRequestBytes()) { error(exchange,413,"","REQUEST_TOO_LARGE"); return; }
+            if (length != null) {
+                long declared = Long.parseLong(length);
+                if (declared > config.maxRequestBytes()) {
+                    // A small known-size overshoot must finish transmitting before
+                    // the response is closed. Otherwise the client can receive a
+                    // TCP reset instead of the intended HTTP 413 response.
+                    // Never drain unbounded attacker-controlled request bodies.
+                    if (declared <= (long) config.maxRequestBytes() + 8192L) {
+                        byte[] scratch = new byte[4096];
+                        long remaining = declared;
+                        while (remaining > 0) {
+                            int n = exchange.getRequestBody().read(scratch, 0,
+                                    (int) Math.min(scratch.length, remaining));
+                            if (n < 0) break;
+                            remaining -= n;
+                        }
+                    }
+                    error(exchange, 413, "", "REQUEST_TOO_LARGE");
+                    return;
+                }
+            }
             byte[] body=exchange.getRequestBody().readNBytes(config.maxRequestBytes()+1);
             if (body.length>config.maxRequestBytes()) { error(exchange,413,"","REQUEST_TOO_LARGE"); return; }
             GenerateRequest request=GenerateRequest.parse(JsonHttp.object(body),prompts.speakers());
