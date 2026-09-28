@@ -8,6 +8,9 @@ import com.thunder.aether.server.config.ServerConfig;
 import com.thunder.aether.server.model.PromptCatalog;
 import com.thunder.aether.server.ollama.OllamaAdapter;
 import com.thunder.aether.server.api.RequestLimits;
+import com.thunder.aether.server.security.ServiceAuthenticator;
+import com.thunder.aether.server.security.ServiceAuthenticator.Scope;
+import java.time.Instant;
 
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
@@ -28,6 +31,7 @@ public final class AetherServer implements AutoCloseable {
     private final OllamaAdapter ollama;
     private final PromptCatalog prompts;
     private final RequestLimits limits;
+    private final ServiceAuthenticator authentication;
     private final ThreadPoolExecutor handlers;
     private final ThreadPoolExecutor generations;
     private final ScheduledThreadPoolExecutor timers=new ScheduledThreadPoolExecutor(2);
@@ -40,6 +44,7 @@ public final class AetherServer implements AutoCloseable {
         prompts=new PromptCatalog(config.promptsFile());
         ollama=new OllamaAdapter(config,prompts);
         limits=new RequestLimits(config.requestsPerMinute());
+        authentication=new ServiceAuthenticator(config.security());
         dependency=Map.of("ollama","UNKNOWN","ready",false,"model",config.model());
         handlers=new ThreadPoolExecutor(config.httpWorkers(),config.httpWorkers(),0,TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(64),new ThreadPoolExecutor.AbortPolicy());
@@ -73,6 +78,25 @@ public final class AetherServer implements AutoCloseable {
         try {
             String path=exchange.getRequestURI().getPath();
             if (exchange.getRequestURI().getRawQuery()!=null) { error(exchange,400,"","INVALID_REQUEST"); return; }
+            Scope required = switch (path) {
+                case "/health", "/ready", "/v1/admin/admission" -> path.equals("/v1/admin/admission")
+                        && exchange.getRequestMethod().equals("POST") ? Scope.ADMINISTRATION : Scope.MONITORING;
+                case "/v1/aether/generate", "/v1/aether/status" -> Scope.INFERENCE;
+                default -> null;
+            };
+            if (required == null) { error(exchange,404,"","NOT_FOUND"); return; }
+            Scope caller = authentication.authenticate(exchange.getRequestHeaders(), Instant.now());
+            if (caller == null) {
+                exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
+                error(exchange,401,"","UNAUTHORIZED"); return;
+            }
+            if (caller != required) { error(exchange,403,"","FORBIDDEN"); return; }
+            if (path.equals("/v1/admin/admission")) { error(exchange,403,"","ADMINISTRATION_DISABLED"); return; }
+            if (path.equals("/v1/aether/status")) {
+                if (!exchange.getRequestMethod().equals("GET")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
+                JsonHttp.send(exchange,200,Map.of("available",config.activation().permits(config.model())
+                        && Boolean.TRUE.equals(dependency.get("ready")),"status","UP")); return;
+            }
             if (path.equals("/health")) {
                 if (!exchange.getRequestMethod().equals("GET")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
                 Map<String,Object> state=new HashMap<>(dependency); state.put("status","UP"); state.put("activeGenerations",generations.getActiveCount()); state.put("queuedGenerations",generations.getQueue().size());
@@ -99,6 +123,12 @@ public final class AetherServer implements AutoCloseable {
             byte[] body=exchange.getRequestBody().readNBytes(config.maxRequestBytes()+1);
             if (body.length>config.maxRequestBytes()) { error(exchange,413,"","REQUEST_TOO_LARGE"); return; }
             GenerateRequest request=GenerateRequest.parse(JsonHttp.object(body),prompts.speakers());
+            if (!request.serverId().equals(config.security().minecraftServerId())) {
+                error(exchange,403,request.requestId(),"SERVER_ID_MISMATCH"); return;
+            }
+            if (!config.activation().permits(config.model())) {
+                error(exchange,503,request.requestId(),"ACTIVATION_REQUIRED"); return;
+            }
             long received=System.nanoTime();
             // Queue waiting and both Ollama calls consume one total service deadline.
             long deadline=received+TimeUnit.SECONDS.toNanos(config.timeoutSeconds());
@@ -158,7 +188,7 @@ public final class AetherServer implements AutoCloseable {
     @Override public void close() {
         if (!closed.compareAndSet(false,true)) { return; }
         http.stop(0); exchanges.forEach(HttpExchange::close); exchanges.clear();
-        generations.shutdownNow(); handlers.shutdownNow(); timers.shutdownNow(); ollama.close();
+        generations.shutdownNow(); handlers.shutdownNow(); timers.shutdownNow(); ollama.close(); authentication.close();
     }
 
     /** Installs process-wide HTTP limits before the standalone listener is first created. */

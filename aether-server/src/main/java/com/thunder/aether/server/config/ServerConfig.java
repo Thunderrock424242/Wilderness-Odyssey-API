@@ -8,12 +8,14 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import com.thunder.aether.server.security.GatewaySecurityConfig;
 
 /** Validated operator-only configuration, usable without Minecraft or mod loaders. */
 public record ServerConfig(String bind, int port, int requestTimeoutSeconds, String ollamaUrl,
         String model, int timeoutSeconds, int maxOutputTokens,
         int concurrency, int queueSize, int requestsPerMinute, int maxRequestBytes, int httpWorkers,
-        boolean logRequests, boolean logPlayerMessages, boolean logResponses, String promptsFile) {
+        boolean logRequests, boolean logPlayerMessages, boolean logResponses, String promptsFile,
+        GatewaySecurityConfig security, ActivationConfig activation) {
     public ServerConfig {
         require(bind != null && !bind.isBlank() && bind.length() <= 255);
         range(port, 0, 65535); range(requestTimeoutSeconds, 1, 60);
@@ -24,9 +26,22 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
         require(model != null && model.matches("[A-Za-z0-9._/:@-]{1,128}"));
         com.thunder.aether.server.api.JsonHttp.baseUri(ollamaUrl);
         promptsFile = promptsFile == null ? "" : promptsFile;
+        require(security != null && activation != null);
+        // HTTPS terminates at the trusted local connector; the cleartext origin cannot listen publicly.
+        require(bind.equals("127.0.0.1") || bind.equals("::1") || bind.equals("localhost"));
     }
 
-    /** Loads public-service settings; obsolete key fields and environment credentials are ignored. */
+    /** Source-compatible construction stays locked until credentials and commissioning are explicit. */
+    public ServerConfig(String bind, int port, int requestTimeoutSeconds, String ollamaUrl,
+            String model, int timeoutSeconds, int maxOutputTokens, int concurrency, int queueSize,
+            int requestsPerMinute, int maxRequestBytes, int httpWorkers, boolean logRequests,
+            boolean logPlayerMessages, boolean logResponses, String promptsFile) {
+        this(bind, port, requestTimeoutSeconds, ollamaUrl, model, timeoutSeconds, maxOutputTokens,
+                concurrency, queueSize, requestsPerMinute, maxRequestBytes, httpWorkers, logRequests,
+                logPlayerMessages, logResponses, promptsFile, GatewaySecurityConfig.locked(), ActivationConfig.disabled());
+    }
+
+    /** Loads protected service settings; legacy anonymous configurations stay locked. */
     public static ServerConfig load(Path file, Map<String, String> environment) throws Exception {
         Map<?, ?> root;
         try (InputStream input = file == null
@@ -42,7 +57,10 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
                 number(limits,"max_queue_size",20), requestLimit(limits),
                 number(limits,"max_request_bytes",65536), number(limits,"http_workers",8),
                 flag(logging,"log_requests"), flag(logging,"log_player_messages"), flag(logging,"log_responses"),
-                text(root,"prompts_file",""));
+                text(root,"prompts_file",""),
+                GatewaySecurityConfig.load(section(root,"security"), environment,
+                        (file == null ? Path.of(".") : file.toAbsolutePath().getParent()).resolve("aether-state")),
+                ActivationConfig.load(section(root,"activation")));
     }
 
     /** Safe YAML data loader shared by configuration and the server-owned prompt catalog. */

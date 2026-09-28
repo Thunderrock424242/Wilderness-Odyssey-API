@@ -13,6 +13,8 @@ if (isolated.isPresent()) {
 dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'org.yaml:snakeyaml:2.2'
+    // Access JWT signatures/claims use the maintained Nimbus implementation, isolated from the mod runtime.
+    implementation 'com.nimbusds:nimbus-jose-jwt:10.10'
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
