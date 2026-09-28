@@ -18,6 +18,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Exercises the real HTTP boundary; no real Ollama process or production service is used. */
 class GatewaySecurityTest {
+    @Test void monitoringCanReadAdmissionWithoutGrantingMutationRights() throws Exception {
+        start(false);
+        var response = http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + gateway.port() + "/v1/admin/admission"))
+                .header("Authorization", "Bearer " + MONITOR).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, response.statusCode());
+        assertTrue(response.body().contains("revision"));
+    }
     @TempDir Path temporary;
     private AetherServer gateway;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
