@@ -50,6 +50,17 @@ class EchoBuildEchoSavedDataTest {
     }
 
     @Test
+    void failedWorldWriteDoesNotRemovePendingEcho() {
+        var data = new EchoBuildEchoSavedData();
+        var pending = echo(10, 4);
+        data.addEcho(pending, 2);
+        assertFalse(EchoBuildEchoManager.shouldDequeue(EchoBuildEchoManager.ApplyResult.RETRY));
+        assertTrue(EchoBuildEchoManager.shouldDequeue(EchoBuildEchoManager.ApplyResult.APPLIED));
+        assertTrue(EchoBuildEchoManager.shouldDequeue(EchoBuildEchoManager.ApplyResult.SKIPPED));
+        assertEquals(java.util.List.of(pending), data.pendingEchoes());
+    }
+
+    @Test
     void originalSavedRecordsAndMissingLegacyTypeRemainReadable() {
         var original = echo(-12, 123);
         CompoundTag record = original.save();

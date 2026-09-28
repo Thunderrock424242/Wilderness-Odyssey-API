@@ -166,6 +166,16 @@ tasks.named('processResources') {
     // Minecraft datagen stores provider hashes beneath its output root. Those
     // local cache records are build bookkeeping, not mod resources.
     exclude '.cache/**'
+    // The authored bunker is stored in the legacy plural source folder for
+    // existing editor/StructureGen paths, but Minecraft 1.21.1 loads packaged
+    // structure templates from the singular folder.
+    exclude 'data/wildernessodysseyapi/structures/**'
+    from('src/main/resources/data/wildernessodysseyapi/structures') {
+        include 'bunker.nbt'
+        into 'data/wildernessodysseyapi/structure'
+    }
+    // The mod icon lives at the repository root; package it in the mod JAR.
+    from('logo.png')
 
     from('src/main/resources/data/minecraft/structures/empty.nbt') {
         // 1.21 resource-pack structures use the singular `structure` folder;

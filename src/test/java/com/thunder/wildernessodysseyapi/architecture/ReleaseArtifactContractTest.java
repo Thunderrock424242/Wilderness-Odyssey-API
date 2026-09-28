@@ -30,7 +30,7 @@ class ReleaseArtifactContractTest {
             "data/minecraft/tags/block/mineable/pickaxe.json",
             "data/minecraft/tags/block/needs_diamond_tool.json",
             "data/minecraft/tags/item/music_discs.json",
-            "data/wildernessodysseyapi/structure/village.nbt",
+            "data/wildernessodysseyapi/structure/bunker.nbt",
             "logo.png",
             "assets/wildernessodysseyapi/textures/entity/rift_maw.png",
             "assets/wildernessodysseyapi/textures/entity/rift_listener.png"
@@ -39,6 +39,7 @@ class ReleaseArtifactContractTest {
             "data/wildernessodysseyapi/recipes/anomaly_gateway.json",
             "data/wildernessodysseyapi/recipes/breathing_mask.json",
             "data/wildernessodysseyapi/recipes/inhaler.json",
+            "data/wildernessodysseyapi/structures/bunker.nbt",
             "data/minecraft/tags/blocks/mineable/pickaxe.json",
             "data/minecraft/tags/blocks/needs_diamond_tool.json",
             "data/minecraft/tags/items/music_discs.json"

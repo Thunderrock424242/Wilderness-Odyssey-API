@@ -1,0 +1,82 @@
+name: Diagnose in-dev CI resources
+
+on:
+  push:
+    branches:
+      - fix/in-dev-echo-ci-2026-09-23
+    paths:
+      - .github/workflows/diagnose-in-dev-ci.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resource-diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Reproduce the release resource packaging stage
+        run: ./gradlew runData structureGenTest jar -PcodexBuildDir=.ci-build --no-daemon --no-parallel --console=plain
+
+      - name: Inspect packaged resources and voice durations
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, wave, zipfile, math
+          jars=list(pathlib.Path(".ci-build/libs").glob("*.jar"))
+          print("JARS", [str(x) for x in jars])
+          if not jars:
+              raise SystemExit("No packaged JAR")
+          jar=next((j for j in jars if "sources" not in j.name and "javadoc" not in j.name), jars[0])
+          required=[
+            "data/wildernessodysseyapi/recipe/anomaly_gateway.json",
+            "data/wildernessodysseyapi/recipe/breathing_mask.json",
+            "data/wildernessodysseyapi/recipe/inhaler.json",
+            "data/minecraft/tags/block/mineable/pickaxe.json",
+            "data/minecraft/tags/block/needs_diamond_tool.json",
+            "data/minecraft/tags/item/music_discs.json",
+            "data/wildernessodysseyapi/structure/bunker.nbt",
+            "logo.png",
+            "assets/wildernessodysseyapi/textures/entity/rift_maw.png",
+            "assets/wildernessodysseyapi/textures/entity/rift_listener.png"
+          ]
+          with zipfile.ZipFile(jar) as z:
+              entries=set(z.namelist())
+              for entry in required:
+                  print("PACKAGED", "OK" if entry in entries else "MISSING", entry)
+              print("BUNKER CANDIDATES", [x for x in entries if "bunker" in x.lower() and x.endswith(".nbt")][:30])
+              print("LOGO CANDIDATES", [x for x in entries if "logo" in x.lower()][:20])
+          root=pathlib.Path("src/main/resources/assets/wildernessodysseyapi/voice/cryo")
+          manifest=json.loads((root/"manifest.json").read_text())
+          lang=json.loads(pathlib.Path("src/main/resources/assets/wildernessodysseyapi/lang/en_us.json").read_text())
+          for key, clip in manifest["clips"].items():
+              source=lang.get("cinematic.wildernessodysseyapi.cryo.narration."+key)
+              path=root/clip["file"]
+              if not path.exists():
+                  print("CLIP MISSING",key,str(path))
+                  continue
+              try:
+                  with wave.open(str(path)) as wav:
+                      seconds=wav.getnframes()/wav.getframerate()
+                      ticks=math.ceil(seconds*20)+6
+                      format=(wav.getframerate(),wav.getsampwidth(),wav.getnchannels(),wav.getcomptype())
+              except Exception as e:
+                  print("CLIP UNREADABLE",key,str(e))
+                  continue
+              if source!=clip["source_text"] or abs(seconds-clip["duration_seconds"])>0.001 or ticks!=clip["duration_ticks"] or format!=(24000,2,1,"NONE"):
+                  print("VOICE MISMATCH",key,
+                    "source_match=",source==clip["source_text"],
+                    "measured_seconds=",round(seconds,6),
+                    "manifest_seconds=",clip["duration_seconds"],
+                    "measured_ticks=",ticks,
+                    "manifest_ticks=",clip["duration_ticks"],
+                    "format=",format)
+          print("DIAGNOSTICS COMPLETE")
+          PY

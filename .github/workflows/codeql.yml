@@ -39,7 +39,7 @@ jobs:
           dependency-caching: true
 
       - name: Compile project for CodeQL
-        run: ./gradlew compileJava -PcodexBuildDir=.codeql-build --no-daemon --console=plain --max-workers=1
+        run: ./gradlew compileJava -PcodexBuildDir=.codeql-build --no-daemon --console=plain --max-workers=1 --rerun-tasks --no-build-cache
 
       - name: Analyze Java
         uses: github/codeql-action/analyze@v4

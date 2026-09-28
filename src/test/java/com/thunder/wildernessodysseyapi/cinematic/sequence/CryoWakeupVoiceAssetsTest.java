@@ -59,9 +59,16 @@ class CryoWakeupVoiceAssetsTest {
                         assertEquals(24_000.0F, format.getSampleRate());
                         assertEquals(16, format.getSampleSizeInBits());
                         assertEquals(1, format.getChannels());
-                        double measuredSeconds = wav.getFrameLength() / format.getFrameRate();
-                        int measuredDurationTicks = (int) Math.ceil(measuredSeconds * 20.0D)
-                                + SUBTITLE_FADE_TICKS;
+                        // Divide in double precision for display, but calculate the
+                        // subtitle ceiling in integer sample frames. Converting the
+                        // frame count to float can round an exact tick boundary up.
+                        long frames = wav.getFrameLength();
+                        long framesPerSecond = Math.round(format.getFrameRate());
+                        double measuredSeconds = frames / (double) framesPerSecond;
+                        int measuredDurationTicks = Math.toIntExact(
+                                (frames * 20L + framesPerSecond - 1L) / framesPerSecond
+                                        + SUBTITLE_FADE_TICKS
+                        );
                         assertEquals(
                                 clip.get("duration_seconds").getAsDouble(),
                                 measuredSeconds,
