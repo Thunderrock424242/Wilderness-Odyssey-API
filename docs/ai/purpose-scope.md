@@ -2,7 +2,7 @@
 
 A.E.T.H.E.R. is Wilderness Odyssey's damaged expedition intelligence: a conversational companion grounded in recovered canon, literal game context, and clearly stated uncertainty.
 
-The logical Minecraft server serves addressed chat in private worlds, LAN games and dedicated servers. It sends structured context to a public standalone Aether gateway. The gateway owns permanent prompts, model settings, specialist selection and factual verification, and connects to privately hosted Ollama. See [backend architecture and migration](aether-backend.md) and [deployment](../../deploy/README.md).
+The logical Minecraft server serves addressed chat in private worlds, LAN games and dedicated servers. It sends structured context to an authenticated standalone Aether gateway using a server-only inference credential. The gateway owns permanent prompts, model settings, specialist selection and factual verification, and connects to privately hosted Ollama. See [backend architecture and migration](aether-backend.md) and [deployment](../../deploy/README.md).
 
 ## Personalities
 

@@ -643,6 +643,8 @@ tasks.register('checkDeprecations', JavaCompile) {
 }
 
 tasks.withType(Test).configureEach {
+    // Local HTTP fixtures use a fake credential; tests never inherit an operator's inference secret.
+    environment 'AETHER_INFERENCE_TOKEN', 'test-inference-credential-0000000000000001'
     useJUnitPlatform()
     // ModDev launches from build/minecraft-junit, so repository-oriented tests
     // need the checkout root explicitly instead of relying on user.dir.

@@ -36,7 +36,8 @@ public record GatewaySecurityConfig(String minecraftServerId, ServiceCredential 
                 credential(values, environment, "administration", "AETHER_ADMINISTRATION_TOKEN"),
                 flag(values, "administration_enabled"), text(values, "access_issuer", ""),
                 text(values, "access_audience", ""), text(values, "monitoring_client_id", ""),
-                text(values, "administration_client_id", ""), directory);
+                text(values, "administration_client_id", ""),
+                Path.of(text(values, "state_directory", directory.toString())).toAbsolutePath().normalize());
     }
 
     public static GatewaySecurityConfig locked() { return load(Map.of(), Map.of(), Path.of("aether-state")); }

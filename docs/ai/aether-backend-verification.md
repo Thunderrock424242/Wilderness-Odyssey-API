@@ -1,6 +1,6 @@
 # Aether backend refactor: delivery and verification
 
-Historical record: the subsequent public-access update removes access keys and credential generation. Current behavior and upgrade steps are in [the bundled server guide](aether-bundled-server.md). References to authentication below describe the earlier implementation.
+Historical record: this describes an earlier release. The subsequent anonymous-access release has now been superseded by [Protected Gateway Phase 1](protected-gateway-phase-1.md). Use its scoped authentication and commissioning rules; historical test results below are not current production approval.
 
 This is the historical 2026-09-21 gateway-only report. The later [complete bundle delivery and live-model evidence](aether-bundle-verification.md) supersedes its installation requirements and standalone artifact names; its root Minecraft test results remain historical evidence.
 

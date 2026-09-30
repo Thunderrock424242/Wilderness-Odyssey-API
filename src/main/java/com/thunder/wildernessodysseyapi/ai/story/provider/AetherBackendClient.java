@@ -30,6 +30,9 @@ public final class AetherBackendClient implements AutoCloseable {
     private static final Gson JSON = new Gson();
     private static final int MAX_BODY_BYTES = 65_536;
     private final AIBackendConfig config;
+    private final String inferenceToken;
+    private static final java.util.Set<String> POLICY_ERRORS = java.util.Set.of("UNAUTHORIZED", "FORBIDDEN",
+            "SERVER_ID_MISMATCH", "ACTIVATION_REQUIRED", "INFERENCE_PAUSED", "ACCESS_RESTRICTED", "AUTHENTICATION_REQUIRED");
     private final HttpClient http;
     private final Semaphore permits;
     private final BooleanSupplier networkAllowed;
@@ -52,6 +55,9 @@ public final class AetherBackendClient implements AutoCloseable {
 
     AetherBackendClient(AIBackendConfig config, BooleanSupplier networkAllowed, LongSupplier clock) {
         this.config = config;
+        String configuredToken = System.getenv(config.inferenceTokenEnv());
+        inferenceToken = configuredToken != null && configuredToken.matches("[A-Za-z0-9._~-]{32,256}")
+                ? configuredToken : "";
         this.networkAllowed = networkAllowed;
         this.clock = clock;
         this.permits = new Semaphore(config.maxConcurrentRequests());
@@ -70,6 +76,7 @@ public final class AetherBackendClient implements AutoCloseable {
         if (!canUseNetwork()) {
             return ModelResponse.failure("DISABLED");
         }
+        if (inferenceToken.isEmpty()) { return ModelResponse.failure("AUTHENTICATION_REQUIRED"); }
         if (!permits.tryAcquire()) {
             return ModelResponse.failure("CLIENT_BUSY");
         }
@@ -77,7 +84,7 @@ public final class AetherBackendClient implements AutoCloseable {
         long started = clock.getAsLong();
         try {
             if (!admitCircuit()) {
-                return ModelResponse.failure("CIRCUIT_OPEN");
+                return ModelResponse.failure(POLICY_ERRORS.contains(status.error()) ? status.error() : "CIRCUIT_OPEN");
             }
             admitted = true;
             byte[] body = JSON.toJson(request).getBytes(StandardCharsets.UTF_8);
@@ -120,6 +127,8 @@ public final class AetherBackendClient implements AutoCloseable {
                         && pauseBeforeRetry(attempt, deadline)) {
                     continue;
                 }
+                String policy = policyError(response.body());
+                if (POLICY_ERRORS.contains(policy)) { return failed(policy, true, started); }
                 return failed(switch (code) {
                     case 401, 403 -> "UNAUTHORIZED";
                     case 429, 503 -> "BACKEND_BUSY_OR_UNAVAILABLE";
@@ -143,6 +152,10 @@ public final class AetherBackendClient implements AutoCloseable {
 
     /** Checks liveness and readiness on a worker without changing the generation circuit. */
     public BackendStatus checkHealth() {
+        if (inferenceToken.isEmpty()) {
+            status = snapshot(false, false, "", -1, "AUTHENTICATION_REQUIRED");
+            return status;
+        }
         if (!canUseNetwork() || !permits.tryAcquire()) {
             return status;
         }
@@ -150,20 +163,19 @@ public final class AetherBackendClient implements AutoCloseable {
         boolean reachable = false;
         try {
             long deadline = started + TimeUnit.SECONDS.toNanos(Math.min(5, config.timeoutSeconds()));
-            HttpResponse<byte[]> health = exchange("/health", null, deadline);
+            HttpResponse<byte[]> health = exchange("/v1/aether/status", null, deadline);
             reachable = health.statusCode() == 200;
             if (!reachable) {
-                status = snapshot(false, false, "", elapsed(started), "BACKEND_UNAVAILABLE");
+                status = snapshot(false, false, "", elapsed(started),
+                        health.statusCode() == 401 || health.statusCode() == 403 ? "UNAUTHORIZED" : "BACKEND_UNAVAILABLE");
                 return status;
             }
-            HttpResponse<byte[]> ready = exchange("/ready", null, deadline);
-            JsonObject result = jsonObject(ready.body());
-            boolean modelReady = ready.statusCode() == 200
-                    && ((result.has("ready") && result.get("ready").isJsonPrimitive()
-                    && result.get("ready").getAsJsonPrimitive().isBoolean() && result.get("ready").getAsBoolean())
-                    || ("UP".equals(string(result, "status")) && "UP".equals(string(result, "ollama"))));
-            status = snapshot(true, modelReady, string(result, "model"), elapsed(started),
-                    modelReady ? "" : (ready.statusCode() == 401 ? "UNAUTHORIZED" : "MODEL_NOT_READY"));
+            JsonObject result = jsonObject(health.body());
+            boolean modelReady = result.has("available") && result.get("available").isJsonPrimitive()
+                    && result.getAsJsonPrimitive("available").isBoolean() && result.get("available").getAsBoolean();
+            String policy = policyError(health.body());
+            status = snapshot(true, modelReady, "", elapsed(started),
+                    modelReady ? "" : POLICY_ERRORS.contains(policy) ? policy : "MODEL_NOT_READY");
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             status = snapshot(reachable, false, "", elapsed(started), "INTERRUPTED");
@@ -191,7 +203,8 @@ public final class AetherBackendClient implements AutoCloseable {
         }
         URI base = baseUri(config.baseUrl()).orElseThrow();
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(base.toString() + path))
-                .timeout(Duration.ofNanos(remaining)).header("Accept", "application/json");
+                .timeout(Duration.ofNanos(remaining)).header("Accept", "application/json")
+                .header("Authorization", "Bearer " + inferenceToken);
         if (body == null) {
             builder.GET();
         } else {
@@ -281,6 +294,10 @@ public final class AetherBackendClient implements AutoCloseable {
                 return Optional.empty();
             }
             String path = uri.getPath();
+            if ("http".equalsIgnoreCase(scheme) && !("127.0.0.1".equals(uri.getHost())
+                    || "localhost".equalsIgnoreCase(uri.getHost()) || "[::1]".equals(uri.getHost()))) {
+                return Optional.empty();
+            }
             if (path != null && (path.contains("..") || path.contains("/api"))) {
                 return Optional.empty();
             }
@@ -341,6 +358,16 @@ public final class AetherBackendClient implements AutoCloseable {
         return object.has(key) && object.get(key).isJsonPrimitive()
                 && object.get(key).getAsJsonPrimitive().isString() ? object.get(key).getAsString() : "";
     }
+
+    private static String policyError(byte[] bytes) {
+        try {
+            String code = string(jsonObject(bytes), "error");
+            return POLICY_ERRORS.contains(code) ? code : "";
+        } catch (RuntimeException invalid) { return ""; }
+    }
+
+    /** Explicit policy denial must not be converted into an ordinary offline lore reply. */
+    public static boolean isPolicyDenial(String code) { return POLICY_ERRORS.contains(code); }
 
     private static String clean(String value, int limit) {
         String cleaned = value.replaceAll("[\\p{Cntrl}&&[^\\n\\t]]", "").trim();

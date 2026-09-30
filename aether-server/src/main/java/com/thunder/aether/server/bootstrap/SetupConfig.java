@@ -25,10 +25,10 @@ public final class SetupConfig {
         catch (NumberFormatException invalid) { throw new IllegalArgumentException("Hosting port must be an integer."); }
         if (port < 1 || port > 65535 || port == 11435) { throw new IllegalArgumentException("Hosting port must be 1-65535 and distinct from Ollama's private port."); }
         String contents = """
-                # First-launch settings for the public Aether service. No access key is required.
-                # Public deployments must provide HTTPS through the hosting proxy.
+                # Protected origin. Commission the host and model before enabling inference.
+                # Credentials are read from named environment variables, never from this file.
                 server:
-                  bind: "0.0.0.0"
+                  bind: "127.0.0.1"
                   port: %d
                   request_timeout_seconds: 10
                 ollama:
@@ -47,6 +47,17 @@ public final class SetupConfig {
                   log_player_messages: false
                   log_responses: false
                 prompts_file: ""
+                security:
+                  minecraft_server_id: wilderness-server
+                  inference_token_env: AETHER_INFERENCE_TOKEN
+                  monitoring_token_env: AETHER_MONITORING_TOKEN
+                  administration_token_env: AETHER_ADMINISTRATION_TOKEN
+                  administration_enabled: false
+                activation:
+                  hosting_verified: false
+                  capacity_verified: false
+                  inference_enabled: false
+                  verified_model: ""
                 """.formatted(port, manifest.targetModel());
         Files.createDirectories(directory);
         Path pending = directory.resolve(".aether-config.pending");

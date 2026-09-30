@@ -239,6 +239,15 @@ public class AIClient implements AutoCloseable {
             return voiceIntegration.wrap(model.speaker(), model.displayText(), model.speechText(),
                     model.emotion(), model.radioEffect());
         }
+        if (AetherBackendClient.isPolicyDenial(model.error())) {
+            String notice = switch (model.error()) {
+                case "INFERENCE_PAUSED" -> "Aether conversations are temporarily paused by the server administrator.";
+                case "ACTIVATION_REQUIRED" -> "Aether is waiting for the server administrator to complete hosting and capacity checks.";
+                case "ACCESS_RESTRICTED" -> "Your Aether access is restricted. Contact the server administrators for help.";
+                default -> "Aether could not authorize this server. Ask the server administrator to check its connection settings.";
+            };
+            return voiceIntegration.wrap(resolveSpeaker(message), notice);
+        }
         VoiceIntegration.VoiceResult fallback = fallback(message, context);
         memoryStore.addAiMessage(world, conversationKey, fallback.speaker(), fallback.text());
         return fallback;

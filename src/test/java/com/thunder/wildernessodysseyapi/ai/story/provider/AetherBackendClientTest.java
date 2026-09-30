@@ -24,6 +24,30 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Real HTTP boundary regressions with an in-process gateway double, never real Ollama. */
 class AetherBackendClientTest {
+    @Test void missingCredentialNeverSendsAnAnonymousRequest() throws Exception {
+        AtomicInteger calls = new AtomicInteger();
+        start(exchange -> { calls.incrementAndGet(); send(exchange,200,"{}"); });
+        var settings = new AIBackendConfig(true,AIBackendConfig.Mode.REMOTE,
+                "http://127.0.0.1:"+server.getAddress().getPort(),"test-server",3,1,0,30,2,false,
+                "AETHER_TEST_INTENTIONALLY_ABSENT_SECRET");
+        try (var client = new AetherBackendClient(settings)) {
+            assertEquals("AUTHENTICATION_REQUIRED",client.generate(request("test-server",UUID.randomUUID()),List.of("Aether"),800).error());
+            assertEquals("AUTHENTICATION_REQUIRED",client.checkHealth().error());
+        }
+        assertEquals(0,calls.get());
+    }
+
+    @Test void pauseAndActivationDenialsRemainExplicitDuringCircuitCooldown() throws Exception {
+        AtomicInteger calls = new AtomicInteger();
+        start(exchange -> { calls.incrementAndGet(); send(exchange,503,"{\"error\":\"INFERENCE_PAUSED\"}"); });
+        var client = client(3,3);
+        for (int i=0;i<2;i++) {
+            assertEquals("INFERENCE_PAUSED",client.generate(request("test-server",UUID.randomUUID()),List.of("Aether"),800).error());
+        }
+        assertEquals(1,calls.get());
+        assertTrue(AetherBackendClient.isPolicyDenial("ACTIVATION_REQUIRED"));
+        assertFalse(AetherBackendClient.isPolicyDenial("MODEL_UNAVAILABLE"));
+    }
     private HttpServer server;
     private final ExecutorService workers = Executors.newFixedThreadPool(6);
     private final List<AetherBackendClient> clients = new ArrayList<>();
@@ -53,7 +77,7 @@ class AetherBackendClientTest {
         assertEquals("Aether", reply.speaker());
         assertEquals("Recovered.", reply.displayText());
         assertEquals("calm", reply.emotion().name().toLowerCase(java.util.Locale.ROOT));
-        assertNull(authorization.get());
+        assertEquals("Bearer " + System.getenv("AETHER_INFERENCE_TOKEN"), authorization.get());
         assertEquals("minecraft:overworld", captured.get().getAsJsonObject("context").get("dimension").getAsString());
         assertEquals("test-one", captured.get().get("serverId").getAsString());
         assertFalse(captured.get().has("apiKey"));
@@ -62,24 +86,24 @@ class AetherBackendClientTest {
     }
 
     @Test
-    void healthAndReadinessAreCheckedWithoutAuthorizationHeaders() throws Exception {
+    void sanitizedStatusUsesOnlyTheInferenceCredential() throws Exception {
         AtomicInteger checks = new AtomicInteger();
         AtomicReference<String> authorization = new AtomicReference<>();
         start(exchange -> send(exchange, 500, "{}"));
-        for (String path : List.of("/health", "/ready")) {
+        for (String path : List.of("/v1/aether/status")) {
             server.createContext(path, exchange -> {
                 checks.incrementAndGet();
                 String header = exchange.getRequestHeaders().getFirst("Authorization");
                 if (header != null) { authorization.set(header); }
-                send(exchange, 200, "{\"status\":\"UP\",\"ready\":true,\"model\":\"aether-custom:8b\"}");
+                send(exchange, 200, "{\"status\":\"UP\",\"available\":true}");
             });
         }
         var status = client(3, 1).checkHealth();
         assertTrue(status.reachable());
         assertTrue(status.modelReady());
-        assertEquals("aether-custom:8b", status.model());
-        assertEquals(2, checks.get());
-        assertNull(authorization.get());
+        assertEquals("", status.model());
+        assertEquals(1, checks.get());
+        assertEquals("Bearer " + System.getenv("AETHER_INFERENCE_TOKEN"), authorization.get());
     }
 
     @Test
@@ -91,7 +115,7 @@ class AetherBackendClientTest {
         });
         AetherBackendClient client = client(3, 3);
         assertEquals("UNAUTHORIZED", client.generate(request("one", UUID.randomUUID()), List.of("Aether"), 800).error());
-        assertEquals("CIRCUIT_OPEN", client.generate(request("two", UUID.randomUUID()), List.of("Aether"), 800).error());
+        assertEquals("UNAUTHORIZED", client.generate(request("two", UUID.randomUUID()), List.of("Aether"), 800).error());
         assertEquals(1, calls.get());
     }
 
@@ -194,13 +218,12 @@ class AetherBackendClientTest {
     @Test
     void healthAndReadinessDescribeGatewayAndModelSeparately() throws Exception {
         start(exchange -> send(exchange, 200, "{}"));
-        server.createContext("/health", exchange -> send(exchange, 200, "{\"status\":\"UP\"}"));
-        server.createContext("/ready", exchange -> send(exchange, 503,
-                "{\"status\":\"DOWN\",\"model\":\"aether-custom:8b\"}"));
+        server.createContext("/v1/aether/status", exchange -> send(exchange, 200,
+                "{\"status\":\"UP\",\"available\":false}"));
         BackendStatus status = client(2, 1).checkHealth();
         assertTrue(status.reachable());
         assertFalse(status.modelReady());
-        assertEquals("aether-custom:8b", status.model());
+        assertEquals("", status.model());
     }
 
     @Test
@@ -240,6 +263,7 @@ class AetherBackendClientTest {
 
     @Test
     void endpointRejectsEmbeddedSecretsAndRedirectIsNotFollowed() throws Exception {
+        assertTrue(AetherBackendClient.baseUri("http://example.com").isEmpty());
         assertTrue(AetherBackendClient.baseUri("http://user:secret@example.com").isEmpty());
         assertTrue(AetherBackendClient.baseUri("https://example.com?api_key=secret").isEmpty());
         assertTrue(AetherBackendClient.baseUri("http://127.0.0.1:11434/api").isEmpty());

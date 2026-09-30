@@ -1,13 +1,13 @@
 # A.E.T.H.E.R. remote backend
 
-For a complete JAR with native Ollama and the approved model, see [the bundled server guide](aether-bundled-server.md).
+For the optional JAR with native Ollama and bundled model weights, see [the bundled server guide](aether-bundled-server.md). Bundled weights are not a capacity approval for Kinetic. See [Phase 1 commissioning and administration](protected-gateway-phase-1.md).
 
 ## Architecture and audit
 
 Development: Minecraft server -> localhost Aether gateway (8085) -> localhost Ollama (11434).
 Production: Minecraft server -> HTTPS reverse proxy -> Aether gateway -> private Ollama.
 
-Only the logical Minecraft server sends AI requests. Ordinary Minecraft clients receive dialogue and existing voice metadata. The public gateway requires no access key.
+Only the logical Minecraft server sends AI requests. Ordinary Minecraft clients receive dialogue and existing voice metadata. The protected gateway requires an inference-only bearer credential and binds that credential to the configured Minecraft server ID. Website administration travels through the Kinetic backend; the browser receives no gateway credentials.
 
 The audited checkout used `OllamaChatClient` and `OllamaLocalRuntime`, rather than the older `LocalModelClient` named in the request. It did not contain an active GGUF downloader, bundled model extractor, or AI process-based `BackendStatus`.
 
@@ -37,6 +37,7 @@ ai_backend:
   enabled: true
   mode: "remote"
   server_id: "wilderness-production-01"
+  inference_token_env: "AETHER_INFERENCE_TOKEN"
   circuit_cooldown_seconds: 30
   max_concurrent_requests: 2
   send_player_memory: false
@@ -50,7 +51,7 @@ ai_backend:
     base_url: "http://127.0.0.1:8085"
 ```
 
-No access key, account, or credential environment variable is needed. On multiplayer servers, the operator configures the address. In single-player, the player or modpack configures the integrated server with the gateway address; local Ollama is not required. Old `api_key` values and `AETHER_BACKEND_API_KEY` are ignored and never sent. Update both the mod and gateway when upgrading from a keyed release.
+Set the named environment variable in the Minecraft server process to the gateway's inference credential. Never distribute it in a public modpack, website, client packet, or YAML file. Monitoring and administration credentials must be different and must never be supplied to Minecraft. Update both applications when migrating from the former anonymous protocol. Old `api_key` values and `AETHER_BACKEND_API_KEY` are ignored; they do not satisfy the new authentication contract. Only trusted, explicitly provisioned integrated servers may use this service; public single-player enrollment is not implemented.
 
 For development, either set `remote.base_url` to `http://127.0.0.1:8085`, or select `mode: local_dev` and set `local_dev.enabled: true`. Local development requires an independently started gateway. The local mode rejects non-loopback endpoints.
 
@@ -72,7 +73,7 @@ The total transport deadline includes retries and complete response-body reading
 
 Access-denied responses from an external proxy, overload and timeouts are not retried. Explicit 502/504 gateway failures and eligible transport failures can retry within the same total deadline. Requests retain the same ID across retries. The next request after cooldown probes the backend again.
 
-Offline service, access denied by a hosting proxy, missing model, rejected verification, full gateway queue and unusable responses all leave deterministic recovered-intent replies available. Missing factual answers remain archive gaps. Network failures do not crash Minecraft.
+Offline service, missing model, rejected verification, full gateway queue and unusable responses leave deterministic recovered-intent replies available. Authentication, activation, pause and access-restriction denials instead return an explicit service notice, including during circuit cooldown. Missing factual answers remain archive gaps. Network failures do not crash Minecraft.
 
 `BackendStatus` is a cached observation: enabled mode, sanitized endpoint, reachability, model readiness/name, latency and a safe failure code. Reading status never makes a network request.
 
@@ -90,7 +91,7 @@ Recent dialogue remains in memory and is bounded. It is not written as a raw con
 
 New configurations disable natural profile learning; existing explicit settings are preserved. Forget clears local stored profile data and recent conversation history. This does not delete records an independently administered backend or proxy may have kept.
 
-Gateway request/message/response logging defaults off. When enabled, content logging is an operator decision; secure the resulting logs and configure retention outside the application. The Minecraft transport does not log remote error bodies. Keep request bodies out of proxy access logs.
+The gateway records bounded request metadata and durable administration mutations, never conversation content. Legacy gateway message/response logging switches no longer write content. Existing bounded Minecraft conversation memory and explicit personal-note ownership remain unchanged. Reports will be explicit player submissions in a later phase. Keep request bodies and authorization headers out of proxy logs.
 
 Optional Python speech, microphone capture, subtitles and cinematic voice retain their existing configuration and private-world restrictions. Neither Minecraft nor the gateway starts Python or downloads speech models. See [local voice](local-voice.md).
 
@@ -120,11 +121,11 @@ For service installation, ports, systemd and Docker examples, see [deployment](.
 2. Start Ollama and the separate gateway manually. Configure matching keys and obtain a model reply through Minecraft.
 3. Confirm ordinary chat is not sent, named specialists route correctly, and lore/biome/meteor context remains accurate.
 4. Stop the gateway, remove the selected model, saturate its queue and simulate a slow reply. Each case must preserve fallback and server responsiveness.
-5. Send simultaneous addressed messages from different players and two Minecraft servers. Confirm private replies and separate histories.
+5. Send simultaneous addressed messages from different players on the provisioned Minecraft server. Confirm private replies and separate histories; spoofed server IDs must be rejected.
 6. Stop or replace a Minecraft session during inference; confirm the response does not appear in the next session.
 7. Verify profile sharing defaults off and remember/recall/forget controls still work.
 8. Check real voice playback separately in a supported private world.
-9. Repeat the key-free connection and failure checks through the production HTTPS proxy.
+9. After separate production approval, repeat authenticated connection, wrong-scope, pause and failure checks through the HTTPS proxy.
 
 Compilation, mocked protocol tests, real model behavior and live multiplayer/tick responsiveness are separate evidence. Record unrun checks as unverified.
 

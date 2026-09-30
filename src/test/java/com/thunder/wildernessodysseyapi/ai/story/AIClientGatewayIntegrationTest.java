@@ -48,7 +48,11 @@ class AIClientGatewayIntegrationTest {
         ollama.start();
         try(AetherServer gateway=new AetherServer(new ServerConfig("127.0.0.1",0,3,
                 "http://127.0.0.1:"+ollama.getAddress().getPort(),"aether-custom:8b",3,256,
-                2,4,60,65536,4,false,false,false,""))){
+                2,4,60,65536,4,false,false,false,"",
+                com.thunder.aether.server.security.GatewaySecurityConfig.load(
+                        java.util.Map.of("minecraft_server_id", "minecraft-test-server"),
+                        java.util.Map.of("AETHER_INFERENCE_TOKEN", System.getenv("AETHER_INFERENCE_TOKEN")), state.resolve("gateway")),
+                new com.thunder.aether.server.config.ActivationConfig(true,true,true,"aether-custom:8b")))){
             gateway.start();gateway.refreshHealth();
             AIBackendConfig backendConfig=new AIBackendConfig(true,AIBackendConfig.Mode.REMOTE,
                     "http://127.0.0.1:"+gateway.port(),"minecraft-test-server",

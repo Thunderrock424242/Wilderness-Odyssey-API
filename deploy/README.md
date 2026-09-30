@@ -1,79 +1,71 @@
-# Deploying Aether
+# Deploying the protected Aether gateway
 
-For the self-contained JAR that includes Ollama and the approved model, start with [the bundled server guide](../docs/ai/aether-bundled-server.md). The instructions below cover the smaller gateway-only distribution with externally managed Ollama.
+Phase 1 provides a protected origin and Minecraft transport. Production deployment, live restarts, active-model changes and enabling remote administration require separate owner approval. The confirmed Kinetic allocation is a 500% CPU limit and 8 GB RAM, with GPU availability unknown. This does not establish that the existing 8B model fits alongside Minecraft.
 
-The Minecraft server calls Aether on port 8085; Aether calls privately hosted Ollama, normally on port 11434. On multiplayer servers, joining clients receive replies through Minecraft networking. A single-player installation sends requests from its integrated server to the gateway; it never needs direct access to Ollama.
+## Trust boundaries
 
-## Build and configure
+- Minecraft -> authenticated Aether Gateway -> private Ollama.
+- Cloudflare Pages browser -> Kinetic Discord/admin backend -> protected Aether Gateway.
+- The browser never receives gateway, Minecraft or Ollama administration credentials.
+- The gateway binds only to loopback. A trusted local HTTPS connector must reach that listener; a public origin port is unsupported.
+- The Kinetic backend remains the administration intermediary. The gateway independently checks its bearer scope, Cloudflare Access JWT signature, issuer, application audience, service identity, timestamps and each operation's schema.
+- No arbitrary Ollama proxy, shell, model pull, model deletion or model activation route exists.
 
-Use JDK 21. From the repository root:
+## Build and configuration
+
+Use JDK 21 and the repository wrapper, with one Gradle process at a time:
+
 ```powershell
-.\gradlew.bat -p aether-server build '-PcodexBuildDir=.codex-build' --no-parallel
+.\gradlew.bat :aether-server:build '-PcodexBuildDir=.codex-build' --no-parallel
 ```
 
-The tested executable is `aether-server/.codex-build/libs/Aether-Gateway.jar`. Without isolation, it is `aether-server/build/libs/Aether-Gateway.jar`. This build runs tests and checks that the JAR contains no Minecraft or NeoForge classes/dependencies.
+The gateway-only output is `aether-server/.codex-build/libs/Aether-Gateway.jar`. It does not contain model weights or Minecraft dependencies. See the [bundle guide](../docs/ai/aether-bundled-server.md) for optional native distributions; they were not rebuilt for Phase 1.
 
-Copy `aether-server.example.yml` to an operator-controlled `aether-server.yml`. Configure its listener and Ollama endpoint. The gateway is public: readiness and generation require no access key. Old `security.api_keys` and `AETHER_API_KEYS` values are ignored. Minecraft likewise ignores its former key settings. Update both applications when upgrading from a keyed release; existing configuration files are preserved.
+Copy [the example](aether-server.example.yml) into operator-owned configuration. Provision three different, cryptographically random secrets of at least 32 characters through the named environment variables. The allowed token alphabet is letters, digits, period, underscore, tilde and hyphen. Never commit their values or include them in a public client pack. Optional `inference_expires_at`, `monitoring_expires_at` and `administration_expires_at` settings accept ISO-8601 UTC timestamps; expired credentials fail closed. Rotation is an operator-controlled configuration/restart action requiring the production approval gate.
 
-Start the service:
+Set `security.minecraft_server_id` to the same ID as Minecraft's `ai_backend.server_id`. Minecraft receives only `AETHER_INFERENCE_TOKEN` (or its configured environment reference). Missing credentials cannot fall back to anonymous HTTP. Remote Minecraft endpoints require HTTPS; HTTP is permitted only for loopback.
+
+Keep all activation flags false until hosting and measured capacity are approved. `activation.verified_model` must match `ollama.model` exactly; changing the model invalidates the gate. The administrative API cannot change these fields. Keep Ollama private and independently managed for the gateway-only distribution.
+
+Ollama endpoints accept localhost, loopback IPs, private IPv4 addresses and private IPv6 addresses; public addresses and other DNS names are rejected. Use a private literal address or a local tunnel. This also avoids allowing an approved hostname to resolve later to a public model endpoint.
+
+After the separate deployment approval, the gateway-only entry point is:
+
 ```sh
 java -jar Aether-Gateway.jar --external --config aether-server.yml
 ```
 
-In `--external` mode without `--config`, bundled gateway defaults are used. Health, readiness and generation are available without credentials. Stop with Ctrl+C or the service manager; accepted HTTP exchanges and pending jobs close. Ollama is managed independently.
+Legacy anonymous configurations remain locked. Old `0.0.0.0` listener configurations are rejected. Old API-key settings are not migrated into the new scopes. Existing files are preserved, so migration is explicit.
 
-Install or create the configured Ollama model yourself. `aether-custom:8b` is the default model identifier, not a bundled/downloaded model. It must exist in your Ollama installation. The gateway never installs models or launches Ollama.
+## HTTP contract
 
-The adapter uses [Ollama chat](https://docs.ollama.com/api/chat) for non-streaming structured replies and a second verification pass. [Ollama model listing](https://docs.ollama.com/api/tags) identifies whether the configured model is installed. Readiness means that Ollama is reachable and lists that model; it is not proof of GPU capacity, a warm model, or response quality.
+| Operation | Required authority | Result |
+| --- | --- | --- |
+| GET /health | Monitoring credential | Liveness, cached model availability and bounded queue counts |
+| GET /ready | Monitoring credential | 200 only if commissioned, admitted and cached model check is ready |
+| GET /v1/aether/status | Inference credential | Sanitized availability and policy code; no model inventory |
+| POST /v1/aether/generate | Inference credential and matching server ID | Existing bounded generation/verification protocol |
+| GET /v1/admin/admission | Monitoring credential | Pause state, local revision and journal health |
+| POST /v1/admin/admission | Administration credential, verified Access assertion and enabled administration | Durable pause/resume only |
 
-## Local development
+Credentials do not inherit other scopes. Browser Origin or Sec-Fetch-Site headers are rejected; no CORS permission is supplied. This supplements secret separation and origin isolation, and is not a substitute for them.
 
-1. Start Ollama manually.
-2. Start the Aether JAR with its model configured.
-3. In Minecraft's `config/ai_config.yaml`, set `ai_backend.remote.base_url: "http://127.0.0.1:8085"`, `enabled: true`, and `mode: remote`.
-4. Address Aether in chat. Stop the gateway and confirm recovered-intent fallback.
+Apply the Cloudflare Access service policy to administration routes (and optionally monitoring routes) separately from Minecraft's inference route. Minecraft authenticates with its own bearer credential and does not hold Kinetic's Cloudflare service token. The connector must preserve that bearer while the origin remains unreachable directly from the public network.
 
-See [the complete nested Minecraft configuration](../docs/ai/aether-backend.md). A server restart applies configuration changes.
+To configure administration later, pin `access_issuer` to the team's HTTPS `*.cloudflareaccess.com` issuer, set `access_audience` to the application's audience and `administration_client_id` to the Kinetic service token's `common_name` identity. The local connector must pass the signed `Cf-Access-Jwt-Assertion`; an arbitrary identity header is insufficient. Kinetic sends its origin administration bearer separately from its Cloudflare service credentials. Optionally pin a separate `monitoring_client_id` as well. Keep `administration_enabled: false` until the owner approves the production route.
 
-## Linux and HTTPS
+The [Phase 1 record](../docs/ai/protected-gateway-phase-1.md) describes mutation validation, durability, replay handling and failure behavior.
 
-The default bind address is 127.0.0.1. Put a reverse proxy in front of port 8085 and terminate HTTPS there. Expose only the HTTPS gateway to the Minecraft host. Keep Ollama on loopback or an isolated private network; do not publish port 11434.
+## Host resources, state and privacy
 
-The gateway does not use an Authorization header. Disable request-body logging in the proxy. Set a 64 KiB body limit and bounded header/body/connection timeouts. Set the proxy response timeout to cover the gateway deadline. Minecraft's own deadline may be shorter than the gateway's maximum; increase it only after measuring actual inference latency.
+The [systemd example](systemd/aether-ai.service) expects a dedicated aether account, the JAR under /opt/aether, configuration and an operator-protected credentials.env under /etc/aether, and writable state under /var/lib/aether. StateDirectory creates service-owned state; this repository does not install the unit or change host permissions.
 
-The example [systemd unit](systemd/aether-ai.service) expects:
-- JAR: /opt/aether/Aether-Gateway.jar
-- Config: /etc/aether/aether-server.yml
-- A dedicated existing service account named aether
+The [Docker example](docker/docker-compose.yml) is a Linux host-network template with all services behind an explicit commissioning profile. Both listeners stay on host loopback; a connector on that same host is required. It is not a Windows/Docker Desktop networking prescription and has not been runtime tested. Native GPU access, fixed production image versions, model provisioning and secret delivery require host-specific review. There is no public port mapping.
 
-Review paths and access before installing. Use the host's usual service manager controls to start, stop and restart the unit. This repository does not install or modify host services automatically.
+Preserve the state directory across restarts. Its admission journal is the authoritative local pause state and mutation audit. Do not delete it to recover from an error. Corrupt/torn journals prevent startup; bounded journal exhaustion rejects new mutations. Routine request audits retain only timestamps, operation, scope and outcome in two bounded files. No prompts, conversations, bearer tokens or JWTs are written. Legacy message/response logging settings no longer enable conversation logging. Disable request-body and authorization-header logging in the connector too.
 
-## Health, load and privacy
+Health is an observation of an installed model, not a GPU, latency or answer-quality guarantee. The existing request, body, connection, generation-queue and total-deadline bounds remain. The default concurrency of two is a configuration default, not a recommendation for the unverified 8 GB host.
 
-`GET /health` is public liveness, with cached Ollama/model status and active/queued generation counts. It stays HTTP 200 when the model is unavailable. `GET /ready` is public and returns 200 only when the configured model is listed; otherwise 503. Dependency observations refresh every ten seconds.
+## Evidence and remaining acceptance
 
-`POST /v1/aether/generate` accepts validated JSON without credentials. Body size, nesting, context/history limits, deadlines, rates and queue capacity are bounded. Generation queue exhaustion returns 503 OVERLOADED; the shared service rate limit returns 429 RATE_LIMITED. All callers use one `limits.requests_per_minute` budget, so changing player IDs, server IDs, or headers cannot create another allowance. The old `requests_per_minute_per_server` setting is accepted only as a fallback for this shared limit.
-
-The executable also caps open HTTP connections at 128, idle connections at 32, request headers at 32 fields and 16 KiB, and incomplete requests at `server.request_timeout_seconds`. Response connections are bounded by the inference timeout plus two seconds. These [OpenJDK 21 listener settings](https://github.com/openjdk/jdk21u/blob/master/src/jdk.httpserver/share/classes/sun/net/httpserver/ServerConfig.java) are installed before startup in the standalone process; embedding the service in tests does not change the host JVM's HTTP settings.
-The default is two concurrent generations, twenty queued jobs, sixty requests across the service per minute. Queue time, draft generation and factual verification share one 30-second deadline. Raising concurrency can worsen latency and GPU memory use; tune using measured model behavior.
-
-Logging flags default false. Metadata can be enabled separately from player messages and responses. Opt-in content logs are length-bounded and remove control characters. The service does not persist conversations or maintain shared cross-server chat history. Secure logs and configure retention externally.
-
-## Docker example
-
-Build the JAR first. From the repository root:
-```sh
-docker build -f deploy/docker/Dockerfile --build-arg AETHER_JAR=.codex-build/libs/Aether-Gateway.jar aether-server
-```
-
-The Dockerfile defaults to `build/libs/Aether-Gateway.jar` for a normal Gradle build. The service runs as a non-root user.
-
-The [Compose example](docker/docker-compose.yml) runs separate gateway and Ollama containers. No credential environment variables are required. Its configuration binds the gateway inside its container and connects to Ollama by its private service name. The gateway's host port is bound to loopback for a local HTTPS proxy; Ollama has no published host port.
-
-Create/install the model explicitly in the Ollama container. GPU passthrough, model files, production image pinning and reverse-proxy configuration remain deployment-specific. Docker/systemd examples have not been exercised by automated Java tests.
-
-No new monitoring, account registration, or access-code system is included.
-
-## Validation
-
-Mocked tests cover the executable JAR, health/readiness, generation and verification, model outage, key-free requests, ignored legacy key settings, malformed/oversized input, timeouts, queue overload, multiple players and shared request limits. Live model quality, Minecraft gameplay/multiplayer tick responsiveness and remote production hosting are separate manual checks.
+Java tests use mock Ollama and locally signed Access fixtures, including executable gateway startup. They do not contact Kinetic, Cloudflare or a real model. Production HTTPS/Access configuration, persistent-volume behavior, real capacity and live Minecraft gameplay/multiplayer responsiveness require separate acceptance after approval. No production service has been deployed or enabled by this phase.

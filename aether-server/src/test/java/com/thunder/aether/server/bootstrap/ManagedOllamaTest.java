@@ -99,7 +99,7 @@ class ManagedOllamaTest {
 
     @Test void remoteEndpointCannotBeUsedAsManagedRuntime() throws Exception {
         var original = config(11435);
-        var remote = new ServerConfig(original.bind(), original.port(), 2, "http://example.com:11435",
+        var remote = new ServerConfig(original.bind(), original.port(), 2, "http://10.1.2.3:11435",
                 original.model(), 2, 128, 1, 1, 60, 65536, 2, false, false, false, "");
         assertThrows(IOException.class, () -> ManagedOllama.launch(remote, bundle(), data,
                 builder -> { fail("must reject before process launch"); return null; }));

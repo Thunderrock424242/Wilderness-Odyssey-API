@@ -202,7 +202,8 @@ public final class AIConfigLoader {
                 defaultInteger(selected.get("retry_backoff_millis"), defaultInteger(remote.get("retry_backoff_millis"), 250)),
                 defaultInteger(backend.get("circuit_cooldown_seconds"), 30),
                 defaultInteger(backend.get("max_concurrent_requests"), 2),
-                Boolean.TRUE.equals(readBoolean(backend.get("send_player_memory"))));
+                Boolean.TRUE.equals(readBoolean(backend.get("send_player_memory"))),
+                defaultString(backend.get("inference_token_env"), "AETHER_INFERENCE_TOKEN"));
     }
 
     private static String defaultString(Object value, String fallback) {

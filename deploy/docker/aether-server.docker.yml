@@ -1,16 +1,16 @@
 server:
-  bind: "0.0.0.0"
+  bind: "127.0.0.1"
   port: 8085
   request_timeout_seconds: 10
 ollama:
-  url: "http://ollama:11434"
+  url: "http://127.0.0.1:11434"
   model: "aether-custom:8b"
   timeout_seconds: 30
   max_output_tokens: 256
 limits:
   max_concurrent_generations: 2
   max_queue_size: 20
-  # Shared by all callers of this public gateway.
+  # Shared by authenticated inference callers.
   requests_per_minute: 60
   max_request_bytes: 65536
   http_workers: 8
@@ -20,3 +20,19 @@ logging:
   log_responses: false
 # Optional operator-owned override; otherwise the bundled canon is used.
 prompts_file: ""
+security:
+  minecraft_server_id: wilderness-server
+  inference_token_env: AETHER_INFERENCE_TOKEN
+  monitoring_token_env: AETHER_MONITORING_TOKEN
+  administration_token_env: AETHER_ADMINISTRATION_TOKEN
+  administration_enabled: false
+  access_issuer: ""
+  access_audience: ""
+  monitoring_client_id: ""
+  administration_client_id: ""
+  state_directory: /var/lib/aether
+activation:
+  hosting_verified: false
+  capacity_verified: false
+  inference_enabled: false
+  verified_model: ""

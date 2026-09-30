@@ -1,6 +1,6 @@
 # Aether Bundled Launcher Implementation Plan
 
-Historical record: the subsequent public-access update removes access keys and credential generation. Current behavior and upgrade steps are in [the bundled server guide](aether-bundled-server.md). References to authentication below describe the earlier implementation.
+Historical record: the former public-access plan is superseded by [Protected Gateway Phase 1](protected-gateway-phase-1.md). Current authentication, loopback binding and activation gates are described in [the bundled server guide](aether-bundled-server.md).
 
 > Execution: main agent, sequential implementation and Gradle validation. Follow the existing repository's one-Gradle-process rule and preserve unrelated changes.
 

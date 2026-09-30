@@ -77,9 +77,12 @@ public final class AetherLauncher {
                 BundleInstaller.install(data.path(), manifest,
                         name -> AetherLauncher.class.getResourceAsStream("/bundle/files/" + name));
                 Path configFile = SetupConfig.ensure(data.path(), manifest, System.getenv());
-                LOG.log(System.Logger.Level.INFO, "Public Aether settings are in {0}; no access key is required", configFile);
+                LOG.log(System.Logger.Level.INFO, "Protected Aether settings are in {0}; scoped credentials are required", configFile);
                 if (setupOnly) { LOG.log(System.Logger.Level.INFO, "Extraction complete. Start without --setup-only to serve Aether."); return; }
                 ServerConfig config = ServerConfig.load(configFile, System.getenv());
+                if (!config.activation().permits(config.model())) {
+                    throw new IOException("Aether activation requires verified hosting, model capacity, and explicit operator enablement.");
+                }
                 LOG.log(System.Logger.Level.INFO, "Starting bundled Ollama and registering Aether.");
                 runtime.set(ManagedOllama.launch(config, manifest, data.path()));
                 if (Thread.currentThread().isInterrupted()) { throw new InterruptedException(); }

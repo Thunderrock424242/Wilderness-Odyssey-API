@@ -1,6 +1,6 @@
 # Aether self-contained server
 
-The platform-specific JAR contains the Java gateway, native Ollama 0.17.7, the approved `llama3.1:8b` model weights, and Aether's personality, lore, and specialist prompts. It creates the local `aether-custom:8b` model on startup. Built with Llama; original model and runtime licenses are included.
+The platform-specific JAR contains the Java gateway, native Ollama 0.17.7, bundled `llama3.1:8b` weights, and Aether's personality, lore, and specialist prompts. Model startup is now gated by explicit hosting and capacity verification. The existing 8B model is not approved for the shared Kinetic server with a 500% CPU limit, 8 GB RAM and unknown GPU. Built with Llama; original model and runtime licenses are included.
 
 This is a standalone Java 21 server application. Start it as the server application's JAR in a compatible hosting panel, or alongside Minecraft as a separate service. It is not a Bukkit plugin or NeoForge mod to place in `plugins/` or `mods/`. If Minecraft itself also runs on that machine, the gateway needs its own available port.
 
@@ -21,8 +21,8 @@ On first launch the application:
 
 1. Checks the operating system and locks its data directory against a second launcher.
 2. Verifies and extracts the native runtime and model, streaming large files without loading them into Java's heap.
-3. Creates `aether/aether-server.yml` for public access without a key. It uses `SERVER_PORT`, then `PORT`, then port 8085 for the gateway. Later launches preserve the configuration.
-4. Starts its own Ollama process on loopback port 11435 with its own model directory and user-home directory.
+3. Creates locked, loopback-only `aether/aether-server.yml` with separate credential references and disabled activation. It uses `SERVER_PORT`, then `PORT`, then port 8085 for the gateway. Later launches preserve the configuration.
+4. Stops before native startup unless the configured model has explicit hosting/capacity approval and inference enablement. Once separately approved, starts its own Ollama process on loopback port 11435 with its own model directory and user-home directory.
 5. Creates `aether-custom:8b` from the included base model, preloads it with a bounded three-minute allowance, and then starts the gateway. Aether's complete personality and lore are applied by the gateway for each request. Display and voice share one verified answer; copied format placeholders fail validation.
 
 No model download or system-wide Ollama installation is required at startup. First extraction and later integrity checks can take time. Keep the JAR: the launcher uses it to repair a damaged bundled file on a later start. Normal shutdown stops its own Ollama process and descendants. Type `stop` in the application console or use a service manager's graceful stop. A forced process kill or machine power loss cannot run Java cleanup; check for a leftover owned Ollama process if its private port remains occupied.
@@ -43,7 +43,7 @@ The provider must permit custom Java applications to launch native child process
 
 Allow space for both the large JAR and its extracted contents, plus logs and working room. The Windows payload alone is about 10.4 GB; reserve at least 30 GB for that distribution. Linux library aliases can increase its size; check the delivered artifact's size and allow at least twice that amount plus working room. The 8B model also needs substantial native RAM and/or GPU memory beyond Minecraft and the Java process. Measure response time on the actual hosting plan before admitting players.
 
-The gateway binds to `0.0.0.0` in newly generated managed-mode settings. Keep Ollama private on loopback. Publish the gateway through HTTPS using the provider's proxy or your own reverse proxy. A Minecraft game port does not itself provide HTTPS. If the gateway shares a machine with Minecraft, assign distinct ports. If the provider assigns a port after the first setup, update the saved gateway port explicitly.
+The gateway binds only to loopback. Old `0.0.0.0` settings are rejected and require an explicit configuration migration. Keep Ollama private. A trusted local HTTPS connector must reach the gateway without exposing its origin port. The Kinetic backend supplies administration credentials and a Cloudflare Access assertion; the origin independently verifies both. A Minecraft game port does not itself provide HTTPS. Hosting support for this arrangement must be verified before activation.
 
 The gateway defaults to a 30-second generation deadline, covering both drafting and factual verification. A cold model on a busy or small machine can exceed it. `ollama.timeout_seconds` supports up to 120 seconds for diagnosis, while Minecraft's transport supports at most 60 seconds. Increasing only the gateway timeout does not make Minecraft wait longer. Managed startup preloads the model before opening the gateway. The existing one-hour retention also applies to normal model calls; after a longer idle period, a request may load it again. Readiness then remains an availability check, not a latency guarantee. Preloading follows the [official Ollama API guidance](https://docs.ollama.com/faq#how-can-i-preload-a-model-into-ollama-to-get-faster-response-times).
 
@@ -51,13 +51,13 @@ The gateway defaults to a 30-second generation deadline, covering both drafting 
 
 The player's integrated Minecraft server uses the same remote gateway path as a multiplayer server. The player does not need Ollama locally and does not have to join the host's Minecraft world.
 
-1. Start the AI bundle on the hosting machine and give its gateway a reachable HTTPS address.
-2. In that player's Minecraft installation, edit `config/ai_config.yaml`: enable `ai_backend`, choose `mode: remote`, and set `remote.base_url` to the gateway's HTTPS address. A modpack can ship this address in its default configuration. No access key or account is required.
+1. Obtain separate host/capacity and production activation approval, then provision a trusted integrated server with its own gateway instance/server identity.
+2. Configure `ai_backend`, `mode: remote`, and the HTTPS `remote.base_url`. Supply its inference-only credential through the integrated server process environment. Never put the official dedicated server's credential in a public modpack or distribute it to players. Public enrollment is outside Phase 1.
 3. Restart Minecraft/the world server after changing settings, then address Aether in chat.
 
 Each single-player installation is an API client with its own settings. There is no automatic address discovery. For multiplayer, only the Minecraft server operator supplies these settings; joining players receive replies through the existing mod networking. Conversation histories remain separated by game session and player.
 
-Old `security.api_keys`, `remote.api_key`, `AETHER_API_KEYS`, and `AETHER_BACKEND_API_KEY` values are ignored; existing configuration files are preserved. Update both the gateway and the Minecraft mod when moving from a keyed release. The gateway keeps one shared `limits.requests_per_minute` budget (default 60), bounded queues, timeouts, and request-size checks. The old `requests_per_minute_per_server` setting is accepted as a fallback for that shared budget. A monitoring system is not included in this change.
+Old `security.api_keys`, `remote.api_key`, `AETHER_API_KEYS`, and `AETHER_BACKEND_API_KEY` values are ignored; existing configuration files are preserved. Migrate both applications to the protected protocol and provision separate inference, monitoring and administration secrets. The shared inference rate budget, bounded queues, deadlines and request sizes remain. Read-only monitoring and durable pause/resume are documented in [Phase 1](protected-gateway-phase-1.md).
 
 See [the complete Minecraft configuration](aether-backend.md) and [gateway administration](../../deploy/README.md).
 

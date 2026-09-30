@@ -1,21 +1,28 @@
+# Linux-only template. Requires separate hosting/capacity/deployment approval.
+# A local connector on this host reaches loopback 8085; no origin port is published.
 services:
   aether:
+    profiles: ["commissioned"]
     build:
       context: ../../aether-server
       dockerfile: ../deploy/docker/Dockerfile
       args:
         AETHER_JAR: .codex-build/libs/Aether-Gateway.jar
+    network_mode: host
+    env_file:
+      - ./credentials.env
     volumes:
       - ./aether-server.docker.yml:/etc/aether/aether-server.yml:ro
-    ports:
-      - "127.0.0.1:8085:8085"
-    depends_on:
-      - ollama
-    restart: unless-stopped
+      - ./state:/var/lib/aether
+    restart: "no"
   ollama:
+    profiles: ["commissioned"]
     image: ollama/ollama:latest
+    network_mode: host
+    environment:
+      OLLAMA_HOST: "127.0.0.1:11434"
     volumes:
       - ollama_models:/root/.ollama
-    restart: unless-stopped
+    restart: "no"
 volumes:
   ollama_models:

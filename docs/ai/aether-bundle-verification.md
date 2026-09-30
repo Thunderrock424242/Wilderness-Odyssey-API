@@ -1,5 +1,7 @@
 # Bundled Aether server delivery and verification
 
+Historical artifacts: the bundles and anonymous-access results below predate [Protected Gateway Phase 1](protected-gateway-phase-1.md). They do not contain its current protection changes and must not be deployed as the Phase 1 deliverable. Phase 1 rebuilds the gateway-only JAR and Minecraft mod; native bundles require a later explicit rebuild and acceptance.
+
 Recorded 2026-09-22, Java 21.0.10. The user approved `llama3.1:8b` with Aether's existing personality and lore. These are complete platform-specific ZIP64 JARs, containing native Ollama 0.17.7, the selected model's weights/manifest, gateway classes, prompts, and license notices. The prompts configure the base model; this is not a separately trained set of Aether weights.
 
 ## Delivered artifacts

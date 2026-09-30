@@ -101,6 +101,8 @@ settings:
   max_response_characters: 800
 
 ai_backend:
+  # Server process environment only; never put the token value in this file or a client pack.
+  inference_token_env: "AETHER_INFERENCE_TOKEN"
   enabled: true
   mode: "remote"
   server_id: "wilderness-server"
@@ -109,7 +111,7 @@ ai_backend:
   send_player_memory: false
   remote:
     base_url: "http://127.0.0.1:8085"
-    # The public Aether gateway does not require an access key.
+    # Protected gateway: HTTPS for remote hosts; HTTP is allowed only on loopback.
     timeout_seconds: 30
     retry_attempts: 3
     retry_backoff_millis: 250

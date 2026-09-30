@@ -10,6 +10,8 @@ import com.thunder.aether.server.ollama.OllamaAdapter;
 import com.thunder.aether.server.api.RequestLimits;
 import com.thunder.aether.server.security.ServiceAuthenticator;
 import com.thunder.aether.server.security.ServiceAuthenticator.Scope;
+import com.thunder.aether.server.security.AdmissionJournal;
+import com.thunder.aether.server.security.RequestAudit;
 import java.time.Instant;
 
 import java.net.InetSocketAddress;
@@ -21,7 +23,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Standalone public gateway. HTTP handlers release their worker after queueing;
+ * Standalone protected gateway. HTTP handlers release their worker after queueing;
  * generation workers own accepted exchanges, keeping health responsive during inference.
  */
 public final class AetherServer implements AutoCloseable {
@@ -32,6 +34,9 @@ public final class AetherServer implements AutoCloseable {
     private final PromptCatalog prompts;
     private final RequestLimits limits;
     private final ServiceAuthenticator authentication;
+    private final AdmissionJournal admission;
+    private final RequestAudit audit;
+    private final Map<HttpExchange, Scope> callers = new ConcurrentHashMap<>();
     private final ThreadPoolExecutor handlers;
     private final ThreadPoolExecutor generations;
     private final ScheduledThreadPoolExecutor timers=new ScheduledThreadPoolExecutor(2);
@@ -40,11 +45,19 @@ public final class AetherServer implements AutoCloseable {
     private volatile Map<String,Object> dependency;
 
     public AetherServer(ServerConfig config) throws Exception {
+        this(config, new ServiceAuthenticator(config.security()));
+    }
+
+    AetherServer(ServerConfig config, ServiceAuthenticator authenticator) throws Exception {
         this.config=config;
         prompts=new PromptCatalog(config.promptsFile());
         ollama=new OllamaAdapter(config,prompts);
         limits=new RequestLimits(config.requestsPerMinute());
-        authentication=new ServiceAuthenticator(config.security());
+        authentication=authenticator;
+        try { admission = new AdmissionJournal(config.security().stateDirectory()); }
+        catch (Exception failure) { authentication.close(); ollama.close(); throw failure; }
+        try { audit = new RequestAudit(config.security().stateDirectory()); }
+        catch (Exception failure) { admission.close(); authentication.close(); ollama.close(); throw failure; }
         dependency=Map.of("ollama","UNKNOWN","ready",false,"model",config.model());
         handlers=new ThreadPoolExecutor(config.httpWorkers(),config.httpWorkers(),0,TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(64),new ThreadPoolExecutor.AbortPolicy());
@@ -53,7 +66,11 @@ public final class AetherServer implements AutoCloseable {
         generations=new ThreadPoolExecutor(config.concurrency(),config.concurrency(),0,TimeUnit.SECONDS,
                 queue,new ThreadPoolExecutor.AbortPolicy());
         timers.setRemoveOnCancelPolicy(true);
-        http=HttpServer.create(new InetSocketAddress(config.bind(),config.port()),64);
+        try { http=HttpServer.create(new InetSocketAddress(config.bind(),config.port()),64); }
+        catch (Exception failure) {
+            audit.close(); admission.close(); authentication.close(); ollama.close();
+            handlers.shutdownNow(); generations.shutdownNow(); timers.shutdownNow(); throw failure;
+        }
         http.setExecutor(handlers);
         http.createContext("/",this::handle);
     }
@@ -90,25 +107,31 @@ public final class AetherServer implements AutoCloseable {
                 exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
                 error(exchange,401,"","UNAUTHORIZED"); return;
             }
+            callers.put(exchange, caller);
             if (caller != required) { error(exchange,403,"","FORBIDDEN"); return; }
-            if (path.equals("/v1/admin/admission")) { error(exchange,403,"","ADMINISTRATION_DISABLED"); return; }
+            if (path.equals("/v1/admin/admission")) { administer(exchange); return; }
             if (path.equals("/v1/aether/status")) {
                 if (!exchange.getRequestMethod().equals("GET")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
-                JsonHttp.send(exchange,200,Map.of("available",config.activation().permits(config.model())
-                        && Boolean.TRUE.equals(dependency.get("ready")),"status","UP")); return;
+                send(exchange,200,Map.of("available",config.activation().permits(config.model())
+                        && admission.allowsInference() && Boolean.TRUE.equals(dependency.get("ready")),
+                        "status","UP", "error", !config.activation().permits(config.model()) ? "ACTIVATION_REQUIRED"
+                                : !admission.allowsInference() ? "INFERENCE_PAUSED" : "")); return;
             }
             if (path.equals("/health")) {
                 if (!exchange.getRequestMethod().equals("GET")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
                 Map<String,Object> state=new HashMap<>(dependency); state.put("status","UP"); state.put("activeGenerations",generations.getActiveCount()); state.put("queuedGenerations",generations.getQueue().size());
-                JsonHttp.send(exchange,200,state); return;
+                state.putAll(admission.snapshot());
+                send(exchange,200,state); return;
             }
             if (!path.equals("/ready") && !path.equals("/v1/aether/generate")) { error(exchange,404,"","NOT_FOUND"); return; }
             if (path.equals("/ready")) {
                 if (!exchange.getRequestMethod().equals("GET")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
                 Map<String,Object> state=new HashMap<>(dependency);
-                boolean ready=Boolean.TRUE.equals(state.get("ready"));
+                boolean ready=config.activation().permits(config.model()) && admission.allowsInference()
+                        && Boolean.TRUE.equals(state.get("ready"));
+                state.put("ready", ready);
                 state.put("status",ready ? "UP" : "DOWN");
-                JsonHttp.send(exchange,ready ? 200 : 503,state); return;
+                send(exchange,ready ? 200 : 503,state); return;
             }
             if (!exchange.getRequestMethod().equals("POST")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
             if (!limits.allow(System.nanoTime())) {
@@ -149,6 +172,7 @@ public final class AetherServer implements AutoCloseable {
             if (!config.activation().permits(config.model())) {
                 error(exchange,503,request.requestId(),"ACTIVATION_REQUIRED"); return;
             }
+            if (!admission.allowsInference()) { error(exchange,503,request.requestId(),"INFERENCE_PAUSED"); return; }
             long received=System.nanoTime();
             // Queue waiting and both Ollama calls consume one total service deadline.
             long deadline=received+TimeUnit.SECONDS.toNanos(config.timeoutSeconds());
@@ -164,44 +188,69 @@ public final class AetherServer implements AutoCloseable {
             error(exchange,400,"","INVALID_REQUEST");
         } finally {
             watchdog.cancel(false);
-            if (!handedOff) { exchanges.remove(exchange); exchange.close(); }
+            if (!handedOff) { exchanges.remove(exchange); callers.remove(exchange); exchange.close(); }
         }
     }
 
     private void generate(HttpExchange exchange,GenerateRequest request,long started,long deadline,ScheduledFuture<?> timeout) {
         String resultCode="OK";
-        String responseText="";
         try {
             if (closed.get()) { error(exchange,503,request.requestId(),"SHUTTING_DOWN"); return; }
+            if (!admission.allowsInference()) { error(exchange,503,request.requestId(),"INFERENCE_PAUSED"); return; }
             if (System.nanoTime()>=deadline) { error(exchange,408,request.requestId(),"TIMEOUT"); return; }
             OllamaAdapter.Dialogue reply=ollama.generate(request,deadline);
-            responseText=reply.response();
             Map<String,Object> response=new HashMap<>();
             response.put("requestId",request.requestId()); response.put("success",true);
             response.put("speaker",reply.speaker()); response.put("response",reply.response());
             response.put("speech",reply.speech()); response.put("emotion",reply.emotion());
             response.put("radioEffect",reply.radioEffect()); response.put("model",config.model());
             response.put("processingTimeMs",TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));
-            JsonHttp.send(exchange,200,response);
+            send(exchange,200,response);
         } catch (OllamaAdapter.Failure failure) {
             resultCode=failure.code();
             error(exchange,resultCode.equals("TIMEOUT") ? 408 : 503,request.requestId(),resultCode);
         } catch (Exception failure) {
             resultCode="MODEL_ERROR"; error(exchange,503,request.requestId(),resultCode);
         } finally {
-            timeout.cancel(false); exchanges.remove(exchange); exchange.close();
+            timeout.cancel(false); exchanges.remove(exchange); callers.remove(exchange); exchange.close();
             if (config.logRequests()) {
                 LOG.log(System.Logger.Level.INFO,"request={0} agent={1} result={2} latencyMs={3}",
                         request.requestId(),limits.safeLog(request.speaker()),resultCode,
                         TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));
             }
-            if (config.logPlayerMessages()) { LOG.log(System.Logger.Level.INFO,"message={0}",limits.safeLog(request.message())); }
-            if (config.logResponses()) { LOG.log(System.Logger.Level.INFO,"response={0}",limits.safeLog(responseText)); }
         }
     }
 
-    private static void error(HttpExchange exchange,int status,String id,String code) {
-        JsonHttp.send(exchange,status,Map.of("requestId",id,"success",false,"error",code));
+    private void administer(HttpExchange exchange) {
+        if (exchange.getRequestMethod().equals("GET")) { send(exchange,200,admission.snapshot()); return; }
+        if (!exchange.getRequestMethod().equals("POST")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
+        if (!config.security().administrationEnabled()) { error(exchange,403,"","ADMINISTRATION_DISABLED"); return; }
+        String contentType = exchange.getRequestHeaders().getFirst("Content-Type");
+        if (contentType == null || !contentType.split(";",2)[0].trim().equalsIgnoreCase("application/json")) {
+            error(exchange,415,"","UNSUPPORTED_MEDIA_TYPE"); return;
+        }
+        try {
+            byte[] body = exchange.getRequestBody().readNBytes(4097);
+            if (body.length > 4096) { error(exchange,413,"","REQUEST_TOO_LARGE"); return; }
+            send(exchange,200,admission.apply(JsonHttp.object(body)));
+        } catch (AdmissionJournal.Conflict conflict) { error(exchange,409,"","REVISION_OR_REPLAY_CONFLICT"); }
+        catch (IllegalArgumentException invalid) { error(exchange,400,"","INVALID_COMMAND"); }
+        catch (Exception unavailable) { error(exchange,503,"","ADMINISTRATION_UNAVAILABLE"); }
+    }
+
+    private void send(HttpExchange exchange, int status, Object body) {
+        String path = exchange.getRequestURI().getPath();
+        String operation = Set.of("/health", "/ready", "/v1/aether/status", "/v1/aether/generate", "/v1/admin/admission")
+                .contains(path) ? path : "UNKNOWN";
+        Scope caller = callers.get(exchange);
+        if (!audit.record(operation, caller == null ? "UNAUTHENTICATED" : caller.name(), status)) {
+            JsonHttp.send(exchange,503,Map.of("success",false,"error","AUDIT_UNAVAILABLE")); return;
+        }
+        JsonHttp.send(exchange,status,body);
+    }
+
+    private void error(HttpExchange exchange,int status,String id,String code) {
+        send(exchange,status,Map.of("requestId",id,"success",false,"error",code));
     }
 
     /** Closes accepted exchanges, queues and HTTP work; never starts or stops Ollama. */
@@ -209,6 +258,9 @@ public final class AetherServer implements AutoCloseable {
         if (!closed.compareAndSet(false,true)) { return; }
         http.stop(0); exchanges.forEach(HttpExchange::close); exchanges.clear();
         generations.shutdownNow(); handlers.shutdownNow(); timers.shutdownNow(); ollama.close(); authentication.close();
+        callers.clear();
+        try { try { audit.close(); } finally { admission.close(); } }
+        catch (java.io.IOException failure) { LOG.log(System.Logger.Level.ERROR,"Gateway state could not close cleanly."); }
     }
 
     /** Installs process-wide HTTP limits before the standalone listener is first created. */
@@ -235,7 +287,7 @@ public final class AetherServer implements AutoCloseable {
             AetherServer server=new AetherServer(config);
             Runtime.getRuntime().addShutdownHook(new Thread(server::close,"aether-shutdown"));
             server.start();
-            LOG.log(System.Logger.Level.INFO,"Public Aether gateway listening on port {0}", server.port());
+            LOG.log(System.Logger.Level.INFO,"Protected Aether gateway listening on port {0}", server.port());
         } catch (Exception failure) {
             // Configuration/library diagnostics may include secrets or paths; keep startup logs categorical.
             LOG.log(System.Logger.Level.ERROR,"Aether gateway could not start: invalid configuration or unavailable listener.");

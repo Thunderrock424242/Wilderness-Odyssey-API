@@ -2,7 +2,12 @@ package com.thunder.aether.server.api;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonNull;
+import com.google.gson.JsonPrimitive;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.ByteArrayOutputStream;
@@ -37,7 +42,45 @@ public final class JsonHttp {
                 if (++depth > 32) { throw new IllegalArgumentException("JSON_TOO_DEEP"); }
             } else if (c == '}' || c == ']') { depth--; }
         }
-        return JsonParser.parseString(value).getAsJsonObject();
+        try (JsonReader reader = new JsonReader(new java.io.StringReader(value))) {
+            reader.setLenient(false);
+            JsonElement result = readStrict(reader, 0);
+            if (!result.isJsonObject() || reader.peek() != JsonToken.END_DOCUMENT) {
+                throw new IllegalArgumentException("INVALID_JSON");
+            }
+            return result.getAsJsonObject();
+        } catch (IOException | IllegalStateException invalid) {
+            throw new IllegalArgumentException("INVALID_JSON");
+        }
+    }
+
+    private static JsonElement readStrict(JsonReader reader, int depth) throws IOException {
+        if (depth > 32) { throw new IllegalArgumentException("JSON_TOO_DEEP"); }
+        return switch (reader.peek()) {
+            case BEGIN_OBJECT -> {
+                JsonObject object = new JsonObject();
+                reader.beginObject();
+                while (reader.hasNext()) {
+                    String name = reader.nextName();
+                    if (object.has(name)) { throw new IllegalArgumentException("DUPLICATE_JSON_MEMBER"); }
+                    object.add(name, readStrict(reader, depth + 1));
+                }
+                reader.endObject();
+                yield object;
+            }
+            case BEGIN_ARRAY -> {
+                JsonArray array = new JsonArray();
+                reader.beginArray();
+                while (reader.hasNext()) { array.add(readStrict(reader, depth + 1)); }
+                reader.endArray();
+                yield array;
+            }
+            case STRING -> new JsonPrimitive(reader.nextString());
+            case NUMBER -> new JsonPrimitive(new java.math.BigDecimal(reader.nextString()));
+            case BOOLEAN -> new JsonPrimitive(reader.nextBoolean());
+            case NULL -> { reader.nextNull(); yield JsonNull.INSTANCE; }
+            default -> throw new IllegalArgumentException("INVALID_JSON");
+        };
     }
 
     /** Writes one bounded application response and closes the exchange. */

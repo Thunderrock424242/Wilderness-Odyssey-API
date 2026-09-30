@@ -1,6 +1,6 @@
 # Self-contained Aether server JAR
 
-Historical record: the subsequent public-access update removes access keys and credential generation. Current behavior and upgrade steps are in [the bundled server guide](aether-bundled-server.md). References to authentication below describe the earlier implementation.
+Historical record: the former public-access design is superseded by [Protected Gateway Phase 1](protected-gateway-phase-1.md). Current authentication, loopback binding and activation gates are described in [the bundled server guide](aether-bundled-server.md).
 
 The requested deliverable is one platform-specific executable Java 21 JAR containing the gateway, Ollama CLI/native libraries, the approved llama3.1:8b model and Aether's existing prompts. Upload it to a compatible dedicated hosting instance and start it with java -jar. This supersedes the previous manual Ollama installation requirement for this bundled distribution. The Minecraft mod remains a remote client.
 

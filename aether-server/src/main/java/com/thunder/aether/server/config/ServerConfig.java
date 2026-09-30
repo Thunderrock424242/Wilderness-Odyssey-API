@@ -24,7 +24,7 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
         range(requestsPerMinute, 1, 6000); range(maxRequestBytes, 1024, 262144);
         range(httpWorkers, 2, 32);
         require(model != null && model.matches("[A-Za-z0-9._/:@-]{1,128}"));
-        com.thunder.aether.server.api.JsonHttp.baseUri(ollamaUrl);
+        require(privateOllamaHost(com.thunder.aether.server.api.JsonHttp.baseUri(ollamaUrl).getHost()));
         promptsFile = promptsFile == null ? "" : promptsFile;
         require(security != null && activation != null);
         // HTTPS terminates at the trusted local connector; the cleartext origin cannot listen publicly.
@@ -104,6 +104,17 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
         return Boolean.TRUE.equals(value);
     }
     private static void range(int value, int low, int high) { require(value >= low && value <= high); }
+    private static boolean privateOllamaHost(String host) {
+        if ("localhost".equalsIgnoreCase(host)) { return true; }
+        // Only literals are resolved here, never a hostname that could rebind to a public address.
+        if (!(host.matches("[0-9.]+") || host.startsWith("[") && host.endsWith("]"))) { return false; }
+        try {
+            java.net.InetAddress address = java.net.InetAddress.getByName(host);
+            byte[] bytes = address.getAddress();
+            return address.isLoopbackAddress() || address.isSiteLocalAddress()
+                    || bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
+        } catch (java.net.UnknownHostException invalid) { return false; }
+    }
     private static void require(boolean valid) {
         if (!valid) { throw new IllegalArgumentException("INVALID_CONFIGURATION"); }
     }

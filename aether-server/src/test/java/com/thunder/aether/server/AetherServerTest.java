@@ -22,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Real HTTP integration tests against mocked Ollama, including the executable service JAR. */
 class AetherServerTest {
+    private static final String INFERENCE = "test-inference-credential-0000000000000001";
+    private static final String MONITOR = "test-monitoring-credential-000000000000001";
     @TempDir Path temporary;
     private HttpServer mock;
     private AetherServer server;
@@ -119,7 +121,7 @@ class AetherServerTest {
         assertEquals("INVALID_MODEL_RESPONSE", json(response).get("error").getAsString());
         assertEquals(1, chatCalls.get());
     }
-    @Test void healthReadinessAndGenerationWorkWithoutCredentials() throws Exception {
+    @Test void healthReadinessAndGenerationRequireTheirRespectiveCredentials() throws Exception {
         start(1,1,60,3);
         assertEquals(200,get("/health",null).statusCode());
         assertEquals(200,get("/ready",null).statusCode());
@@ -127,8 +129,8 @@ class AetherServerTest {
         assertEquals(200,response.statusCode());
         assertEquals("Recovered response.",json(response).get("response").getAsString());
         assertTrue(response.headers().firstValue("WWW-Authenticate").isEmpty());
-        assertEquals(200,post(request(),"obsolete-key").statusCode());
-        assertEquals(4,chatCalls.get());
+        assertEquals(401,post(request(),"obsolete-key").statusCode());
+        assertEquals(2,chatCalls.get());
     }
 
     @Test void missingConfiguredModelIsNotReadyWhileServiceRemainsHealthy() throws Exception {
@@ -180,11 +182,11 @@ class AetherServerTest {
         assertEquals(0,chatCalls.get());
     }
 
-    @Test void publicRateLimitIsSharedAcrossServerIdsAndObsoleteCredentials() throws Exception {
+    @Test void authenticatedRateLimitIsSharedAndInvalidCredentialsStillFailAuthentication() throws Exception {
         start(1,1,1,3);
         assertEquals(200,post(request(UUID.randomUUID().toString(),"server-a"),null).statusCode());
         assertEquals(429,post(request(UUID.randomUUID().toString(),"different-id"),null).statusCode());
-        assertEquals(429,post(request(UUID.randomUUID().toString(),"server-b"),"obsolete-key").statusCode());
+        assertEquals(401,post(request(UUID.randomUUID().toString(),"server-b"),"obsolete-key").statusCode());
         assertEquals(2,chatCalls.get());
     }
 
@@ -209,7 +211,7 @@ class AetherServerTest {
         start(2,4,60,3);
         String firstId=UUID.randomUUID().toString(),secondId=UUID.randomUUID().toString();
         var first=postAsync(request(firstId,"server-a"),null);
-        var second=postAsync(request(secondId,"server-b"),null);
+        var second=postAsync(request(secondId,"server-a"),null);
         assertEquals(firstId,json(first.get(3,TimeUnit.SECONDS)).get("requestId").getAsString());
         assertEquals(secondId,json(second.get(3,TimeUnit.SECONDS)).get("requestId").getAsString());
     }
@@ -227,7 +229,7 @@ class AetherServerTest {
         assertTrue(limits.allow(60_000_000_000L));
     }
 
-    @Test void legacyKeysDoNotRestrictPublicAccessAndLegacyRateLimitStillApplies() throws Exception {
+    @Test void legacyKeysNeverRestoreAnonymousAccess() throws Exception {
         Path configuration=temporary.resolve("legacy.yml");
         Files.writeString(configuration,"""
                 server:
@@ -242,9 +244,9 @@ class AetherServerTest {
                 """.formatted(mock.getAddress().getPort()));
         server=new AetherServer(ServerConfig.load(configuration,Map.of("AETHER_API_KEYS","obsolete value")));
         server.start();server.refreshHealth();
-        assertEquals(200,get("/ready",null).statusCode());
-        assertEquals(200,post(request(),null).statusCode());
-        assertEquals(429,post(request(),"obsolete-key").statusCode());
+        assertEquals(401,get("/ready",null).statusCode());
+        assertEquals(401,post(request(),null).statusCode());
+        assertEquals(401,post(request(),"obsolete-key").statusCode());
     }
 
     @Test void executableJarStartsAndHandlesHealthGenerationAndOutage() throws Exception {
@@ -262,18 +264,26 @@ class AetherServerTest {
                   url: http://127.0.0.1:%d
                   model: aether-custom:8b
                   timeout_seconds: 2
+                security:
+                  minecraft_server_id: server-a
+                activation:
+                  hosting_verified: true
+                  capacity_verified: true
+                  inference_enabled: true
+                  verified_model: aether-custom:8b
                 """.formatted(port,mock.getAddress().getPort()));
-        Path log=temporary.resolve("service.log");
         ProcessBuilder process=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),
                 "-jar",jar.toString(),"--config",configuration.toString());
-        process.redirectErrorStream(true).redirectOutput(log.toFile());
+        process.redirectErrorStream(true);
+        process.environment().put("AETHER_INFERENCE_TOKEN", INFERENCE);
+        process.environment().put("AETHER_MONITORING_TOKEN", MONITOR);
         Process running=process.start();
         try {
             URI health=URI.create("http://127.0.0.1:"+port+"/health");
             long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(8);
             boolean up=false;
             while(System.nanoTime()<until && running.isAlive()){
-                try{up=http.send(HttpRequest.newBuilder(health).timeout(Duration.ofSeconds(1)).GET().build(),
+                try{up=http.send(HttpRequest.newBuilder(health).header("Authorization","Bearer " + MONITOR).timeout(Duration.ofSeconds(1)).GET().build(),
                         HttpResponse.BodyHandlers.ofString()).statusCode()==200;if(up){break;}}
                 catch(Exception ignored){}
                 Thread.sleep(50);
@@ -288,13 +298,17 @@ class AetherServerTest {
                 assertEquals(-1, stalled.getInputStream().read(), "Incomplete headers must time out");
             }
             HttpRequest generate=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/v1/aether/generate"))
+                    .header("Authorization","Bearer " + INFERENCE)
                     .timeout(Duration.ofSeconds(4))
                     .header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(request())).build();
             assertEquals(200,http.send(generate,HttpResponse.BodyHandlers.ofString()).statusCode());
             mode.set("OFFLINE");
             assertEquals(503,http.send(generate,HttpResponse.BodyHandlers.ofString()).statusCode());
         }finally{running.destroy();if(!running.waitFor(3,TimeUnit.SECONDS)){running.destroyForcibly();running.waitFor();}}
-        String output=Files.readString(log);
+        String output;
+        try (var logs = running.getInputStream()) {
+            output = new String(logs.readNBytes(65536), StandardCharsets.UTF_8);
+        }
         assertFalse(output.contains("server-key-a"));
         assertFalse(output.contains("Aether, what happened"));
     }
@@ -302,19 +316,22 @@ class AetherServerTest {
     private void start(int concurrency,int queue,int rpm,int seconds) throws Exception {
         server=new AetherServer(new ServerConfig("127.0.0.1",0,3,
                 "http://127.0.0.1:"+mock.getAddress().getPort(),"aether-custom:8b",seconds,256,
-                concurrency,queue,rpm,65536,4,false,false,false,""));
+                concurrency,queue,rpm,65536,4,false,false,false,"",
+                com.thunder.aether.server.security.GatewaySecurityConfig.load(Map.of("minecraft_server_id", "server-a"),
+                        Map.of("AETHER_INFERENCE_TOKEN", INFERENCE, "AETHER_MONITORING_TOKEN", MONITOR), temporary.resolve("state")),
+                new com.thunder.aether.server.config.ActivationConfig(true,true,true,"aether-custom:8b")));
         server.start();server.refreshHealth();
     }
     private HttpResponse<String> get(String path,String key) throws Exception {
         var request=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+server.port()+path)).timeout(Duration.ofSeconds(3)).GET();
-        if(key!=null){request.header("Authorization","Bearer "+key);}
+        request.header("Authorization","Bearer "+(key == null ? MONITOR : key));
         return http.send(request.build(),HttpResponse.BodyHandlers.ofString());
     }
     private CompletableFuture<HttpResponse<String>> postAsync(String body,String key){
         var request=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+server.port()+"/v1/aether/generate"))
                 .timeout(Duration.ofSeconds(6)).header("Content-Type","application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
-        if(key!=null){request.header("Authorization","Bearer "+key);}
+        request.header("Authorization","Bearer "+(key == null ? INFERENCE : key));
         return http.sendAsync(request.build(),HttpResponse.BodyHandlers.ofString());
     }
     private HttpResponse<String> post(String body,String key) throws Exception {return postAsync(body,key).get(7,TimeUnit.SECONDS);}

@@ -85,12 +85,15 @@ class BundleInstallerTest {
         }
     }
 
-    @Test void firstSetupNeedsNoCredentialAndPreservesOperatorChangesOnRestart() throws Exception {
+    @Test void firstSetupRemainsLockedAndPreservesOperatorChangesOnRestart() throws Exception {
         var bundle = manifest("runtime/ollama", new byte[]{1});
         Path config = SetupConfig.ensure(temporary, bundle, Map.of("SERVER_PORT", "25565"));
         var initial = com.thunder.aether.server.config.ServerConfig.load(config, Map.of());
         assertEquals(25565, initial.port());
         assertEquals("aether-custom:8b", initial.model());
+        assertEquals("127.0.0.1",initial.bind());
+        assertFalse(initial.activation().permits(initial.model()));
+        assertFalse(initial.security().administrationEnabled());
         assertFalse(Files.readString(config).contains("api_keys"));
         String edited = Files.readString(config).replace("25565", "24444");
         Files.writeString(config, edited);

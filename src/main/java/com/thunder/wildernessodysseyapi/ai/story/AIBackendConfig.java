@@ -1,16 +1,28 @@
 package com.thunder.wildernessodysseyapi.ai.story;
 
 /**
- * Immutable server-only public gateway configuration. Settings are never part of packets
+ * Immutable server-only protected gateway configuration. Settings are never part of packets
  * or diagnostic text. The default is disabled until an explicit backend section exists.
  */
 public record AIBackendConfig(boolean enabled, Mode mode, String baseUrl, String serverId,
                               int timeoutSeconds, int retryAttempts, int retryBackoffMillis,
-                              int circuitCooldownSeconds, int maxConcurrentRequests, boolean sendPlayerMemory) {
+                              int circuitCooldownSeconds, int maxConcurrentRequests, boolean sendPlayerMemory,
+                              String inferenceTokenEnv) {
+    public AIBackendConfig(boolean enabled, Mode mode, String baseUrl, String serverId,
+            int timeoutSeconds, int retryAttempts, int retryBackoffMillis, int circuitCooldownSeconds,
+            int maxConcurrentRequests, boolean sendPlayerMemory) {
+        this(enabled, mode, baseUrl, serverId, timeoutSeconds, retryAttempts, retryBackoffMillis,
+                circuitCooldownSeconds, maxConcurrentRequests, sendPlayerMemory, "AETHER_INFERENCE_TOKEN");
+    }
     /** Hosting selection; both enabled modes use the same Aether HTTP protocol. */
     public enum Mode { REMOTE, LOCAL_DEV, DISABLED }
 
     public AIBackendConfig {
+        inferenceTokenEnv = inferenceTokenEnv == null ? "AETHER_INFERENCE_TOKEN" : inferenceTokenEnv;
+        if (!inferenceTokenEnv.matches("[A-Z][A-Z0-9_]{0,127}")) {
+            enabled = false;
+            inferenceTokenEnv = "AETHER_INVALID_SECRET_REFERENCE";
+        }
         mode = mode == null ? Mode.DISABLED : mode;
         enabled = enabled && mode != Mode.DISABLED;
         baseUrl = baseUrl == null ? "" : baseUrl.trim();
