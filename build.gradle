@@ -808,3 +808,9 @@ tasks.register('structureValidator') {
     description = 'Structure Validator: reports structure and asset diagnostics without Minecraft.'
     dependsOn ':tools:structure-viewer:validate'
 }
+
+tasks.register('structureViewerInstaller') {
+    group = 'Wilderness Odyssey Tools'
+    description = 'Structure Viewer: builds the Windows installer with a bundled Java runtime.'
+    dependsOn ':tools:structure-viewer:windowsInstaller'
+}

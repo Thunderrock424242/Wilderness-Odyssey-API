@@ -9,8 +9,12 @@ import java.util.List;
 /** Perspective-correct textured rasterization with depth-tested block selection and block outlines. */
 public final class SoftwareRenderer {
     private static final double NEAR=.04;
-    private record Vertex(Vec3 position,double u,double v){
-        Vertex interpolate(Vertex b,double t){return new Vertex(position.add(b.position.subtract(position).multiply(t)),u+(b.u-u)*t,v+(b.v-v)*t);}
+    private static final class Vertex {
+        double x,y,z,u,v;
+        Vertex(double x,double y,double z,double u,double v){set(x,y,z,u,v);}
+        void set(double x,double y,double z,double u,double v){this.x=x;this.y=y;this.z=z;this.u=u;this.v=v;}
+        Vertex interpolate(Vertex b,double t){return new Vertex(x+(b.x-x)*t,y+(b.y-y)*t,z+(b.z-z)*t,u+(b.u-u)*t,v+(b.v-v)*t);}
+        Vertex copy(){return new Vertex(x,y,z,u,v);}
     }
     private record Visible(BlockMesh.Face face,Vertex[] polygon,double distance,double shade){}
 
@@ -24,77 +28,93 @@ public final class SoftwareRenderer {
                         boolean bounds,boolean blockEdges,boolean textures){
         BufferedImage image=new BufferedImage(width,height,BufferedImage.TYPE_INT_RGB);
         int[] pixels=((DataBufferInt)image.getRaster().getDataBuffer()).getData();
-        Arrays.fill(pixels,0x18232e);
+        for(int y=0;y<height;y++)Arrays.fill(pixels,y*width,(y+1)*width,blend(0x182536,0x101820,(double)y/height));
         float[] depth=new float[pixels.length];int[] ids=new int[pixels.length];Arrays.fill(ids,-1);
         double focal=height*.9;
         List<Visible> transparent=new ArrayList<>();
+        Vec3 eye=camera.position(),right=camera.right(),up=camera.up(),forward=camera.forward();
+        // Opaque faces are consumed immediately; only translucent faces need retained vertices.
+        Vertex[] scratch={new Vertex(0,0,0,0,0),new Vertex(0,0,0,0,0),new Vertex(0,0,0,0,0),new Vertex(0,0,0,0,0)};
         if(mesh!=null)for(var face:mesh.faces()){
-            var quad=face.quad();var p=face.position();Vec3 origin=new Vec3(p.x(),p.y(),p.z());
-            Vec3 a=quad.vertices().get(0),b=quad.vertices().get(1),c=quad.vertices().get(2);
-            Vec3 ab=b.subtract(a),ac=c.subtract(a);
-            Vec3 normal=new Vec3(ab.y()*ac.z()-ab.z()*ac.y(),ab.z()*ac.x()-ab.x()*ac.z(),ab.x()*ac.y()-ab.y()*ac.x());
-            if(normal.dot(camera.position().subtract(a.add(origin)))<=0)continue;
-            Vec3 center=camera.transform(origin.add(new Vec3(.5,.5,.5)));
-            if(center.z()<-3||center.z()>20000
-                    ||Math.abs(center.x())>(center.z()+4)*width/(2*focal)+4
-                    ||Math.abs(center.y())>(center.z()+4)*height/(2*focal)+4)continue;
-            Vertex[] polygon=new Vertex[4];
-            for(int i=0;i<4;i++)polygon[i]=new Vertex(camera.transform(quad.vertices().get(i).add(origin)),quad.uv()[i*2],quad.uv()[i*2+1]);
-            polygon=clip(polygon);if(polygon.length<3)continue;
-            double length=Math.sqrt(normal.dot(normal));
-            double shade=quad.shade()? .65+.25*Math.max(0,normal.y()/length)+.1*Math.abs(normal.z()/length):1;
-            Visible visible=new Visible(face,polygon,center.z(),shade);
-            if(textures&&quad.texture().translucent())transparent.add(visible);
-            else draw(visible,focal,width,height,selected,wireframe,textures,pixels,depth,ids);
+            if(Thread.currentThread().isInterrupted())throw new java.util.concurrent.CancellationException();
+            var quad=face.quad();var p=face.position();
+            Vec3 a=quad.vertices().getFirst(),normal=quad.normal();
+            double dx=p.x()-eye.x(),dy=p.y()-eye.y(),dz=p.z()-eye.z();
+            if(normal.x()*(-dx-a.x())+normal.y()*(-dy-a.y())+normal.z()*(-dz-a.z())<=0)continue;
+            double cx=dx+.5,cy=dy+.5,cz=dz+.5;
+            double z=cx*forward.x()+cy*forward.y()+cz*forward.z();
+            if(z<-3||z>20000
+                    ||Math.abs(cx*right.x()+cy*right.y()+cz*right.z())>(z+4)*width/(2*focal)+4
+                    ||Math.abs(cx*up.x()+cy*up.y()+cz*up.z())>(z+4)*height/(2*focal)+4)continue;
+            Vertex[] polygon=scratch;
+            boolean needsClip=false;
+            for(int i=0;i<4;i++){
+                Vec3 v=quad.vertices().get(i);double vx=dx+v.x(),vy=dy+v.y(),vz=dz+v.z();
+                double depthValue=vx*forward.x()+vy*forward.y()+vz*forward.z();
+                needsClip|=depthValue<NEAR;
+                polygon[i].set(vx*right.x()+vy*right.y()+vz*right.z(),
+                        vx*up.x()+vy*up.y()+vz*up.z(),depthValue,quad.uv()[i*2],quad.uv()[i*2+1]);
+            }
+            if(needsClip){polygon=clip(polygon);if(polygon.length<3)continue;}
+            Vec3 middle=quad.center();
+            double distance=(dx+middle.x())*forward.x()+(dy+middle.y())*forward.y()+(dz+middle.z())*forward.z();
+            if(textures&&quad.texture().translucent()){
+                Vertex[] retained=new Vertex[polygon.length];
+                for(int i=0;i<polygon.length;i++)retained[i]=polygon[i].copy();
+                transparent.add(new Visible(face,retained,distance,quad.lighting()));
+            }else draw(face,polygon,quad.lighting(),focal,width,height,selected,wireframe,textures,pixels,depth,ids);
         }
         // Translucent faces blend back-to-front but remain occluded by the opaque depth buffer.
         transparent.sort(Comparator.comparingDouble(Visible::distance).reversed());
-        for(var visible:transparent)draw(visible,focal,width,height,selected,wireframe,textures,pixels,depth,ids);
+        for(var visible:transparent)draw(visible.face,visible.polygon,visible.shade,focal,width,height,selected,wireframe,textures,pixels,depth,ids);
         if(blockEdges)outlines(pixels,ids,width,height,selected);
         if(bounds&&mesh!=null)drawBounds(image,mesh,camera,focal);
         return new Frame(image,ids);
     }
 
-    private static void draw(Visible visible,double focal,int width,int height,int selected,boolean wire,boolean textured,
+    private static void draw(BlockMesh.Face face,Vertex[] p,double shade,double focal,int width,int height,int selected,boolean wire,boolean textured,
                              int[] pixels,float[] depth,int[] ids){
-        var p=visible.polygon;
-        for(int i=1;i+1<p.length;i++)triangle(p[0],p[i],p[i+1],visible,focal,width,height,selected,wire,textured,pixels,depth,ids);
+        for(int i=1;i+1<p.length;i++)triangle(p[0],p[i],p[i+1],face,shade,focal,width,height,selected,wire,textured,pixels,depth,ids);
     }
 
     private static Vertex[] clip(Vertex[] polygon){
         Vertex[] output=new Vertex[8];int count=0;Vertex previous=polygon[polygon.length-1];
         for(Vertex current:polygon){
-            if((current.position.z()>=NEAR)!=(previous.position.z()>=NEAR)){
-                double t=(NEAR-previous.position.z())/(current.position.z()-previous.position.z());
+            if((current.z>=NEAR)!=(previous.z>=NEAR)){
+                double t=(NEAR-previous.z)/(current.z-previous.z);
                 output[count++]=previous.interpolate(current,t);
             }
-            if(current.position.z()>=NEAR)output[count++]=current;
+            if(current.z>=NEAR)output[count++]=current;
             previous=current;
         }
         return Arrays.copyOf(output,count);
     }
 
-    private static void triangle(Vertex a,Vertex b,Vertex c,Visible visible,double focal,int width,int height,int selected,
+    private static void triangle(Vertex a,Vertex b,Vertex c,BlockMesh.Face face,double shade,double focal,int width,int height,int selected,
                                  boolean wire,boolean textured,int[] pixels,float[] depth,int[] ids){
-        double za=1/a.position.z(),zb=1/b.position.z(),zc=1/c.position.z();
-        double ax=width*.5+a.position.x()*focal*za,ay=height*.5-a.position.y()*focal*za;
-        double bx=width*.5+b.position.x()*focal*zb,by=height*.5-b.position.y()*focal*zb;
-        double cx=width*.5+c.position.x()*focal*zc,cy=height*.5-c.position.y()*focal*zc;
+        double za=1/a.z,zb=1/b.z,zc=1/c.z;
+        double ax=width*.5+a.x*focal*za,ay=height*.5-a.y*focal*za;
+        double bx=width*.5+b.x*focal*zb,by=height*.5-b.y*focal*zb;
+        double cx=width*.5+c.x*focal*zc,cy=height*.5-c.y*focal*zc;
         double area=edge(ax,ay,bx,by,cx,cy);if(Math.abs(area)<.00001)return;
         int minX=Math.max(0,(int)Math.floor(Math.min(ax,Math.min(bx,cx)))),maxX=Math.min(width-1,(int)Math.ceil(Math.max(ax,Math.max(bx,cx))));
         int minY=Math.max(0,(int)Math.floor(Math.min(ay,Math.min(by,cy)))),maxY=Math.min(height-1,(int)Math.ceil(Math.max(ay,Math.max(by,cy))));
-        var face=visible.face;Texture texture=face.quad().texture();int id=face.blockIndex();
-        for(int y=minY;y<=maxY;y++)for(int x=minX;x<=maxX;x++){
-            double u=edge(bx,by,cx,cy,x+.5,y+.5)/area,v=edge(cx,cy,ax,ay,x+.5,y+.5)/area,w=1-u-v;
-            if(u<-.000001||v<-.000001||w<-.000001)continue;
-            float z=(float)(u*za+v*zb+w*zc);int offset=y*width+x;if(z<=depth[offset])continue;
-            int texel=textured?texture.sample((u*a.u*za+v*b.u*zb+w*c.u*zc)/z,(u*a.v*za+v*b.v*zb+w*c.v*zc)/z):0xff000000|face.color();
-            int alpha=texel>>>24;if(alpha<12)continue;
-            int color=tint(texel,face.quad().tint(),visible.shade);
-            if(id==selected)color=blend(color,0x44eacf,.28);
-            if(wire&&Math.min(u,Math.min(v,w))<.025)color=0xc8fff0;
-            pixels[offset]=alpha<255?blend(pixels[offset],color,alpha/255.0):color;
-            depth[offset]=z;ids[offset]=id;
+        Texture texture=face.quad().texture();int id=face.blockIndex();
+        double du=(cy-by)/area,dv=(ay-cy)/area;
+        for(int y=minY;y<=maxY;y++){
+            double rowU=edge(bx,by,cx,cy,minX+.5,y+.5)/area,rowV=edge(cx,cy,ax,ay,minX+.5,y+.5)/area;
+            for(int x=minX;x<=maxX;x++){
+                double u=rowU+(x-minX)*du,v=rowV+(x-minX)*dv,w=1-u-v;
+                if(u<-.000001||v<-.000001||w<-.000001)continue;
+                float z=(float)(u*za+v*zb+w*zc);int offset=y*width+x;if(z<=depth[offset])continue;
+                int texel=textured?texture.sample((u*a.u*za+v*b.u*zb+w*c.u*zc)/z,(u*a.v*za+v*b.v*zb+w*c.v*zc)/z):0xff000000|face.color();
+                int alpha=texel>>>24;if(alpha<12)continue;
+                int color=tint(texel,face.quad().tint(),shade);
+                if(id==selected)color=blend(color,0x44eacf,.28);
+                if(wire&&Math.min(u,Math.min(v,w))<.025)color=0xc8fff0;
+                pixels[offset]=alpha<255?blend(pixels[offset],color,alpha/255.0):color;
+                depth[offset]=z;ids[offset]=id;
+            }
         }
     }
     private static int tint(int color,int tint,double shade){

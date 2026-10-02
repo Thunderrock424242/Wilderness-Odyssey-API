@@ -17,9 +17,16 @@ public record BlockMesh(StructureData data,List<Face> faces,int duplicatePositio
 
     /** Builds an asset-backed mesh without culling neighbors behind partial or transparent shapes. */
     public static BlockMesh build(StructureData data,boolean showAir,int layer,BlockModelResolver resolver,List<String> sources){
+        if(resolver!=null)return build(data,showAir,layer,ResolvedModels.capture(data,resolver,sources));
         var stateModels=new HashMap<StructureData.BlockState,BlockModel>();
         for(var palette:data.palettes())for(var state:palette)
-            stateModels.computeIfAbsent(state,s->resolver==null?cube(s):resolver.resolve(s));
+            stateModels.computeIfAbsent(state,BlockMesh::cube);
+        return build(data,showAir,layer,new ResolvedModels(stateModels,List.of(),0,0,sources));
+    }
+
+    /** Refilters a structure using the already decoded model snapshot. */
+    public static BlockMesh build(StructureData data,boolean showAir,int layer,ResolvedModels prepared){
+        var stateModels=prepared.models();
         var occupied=new HashMap<Position,Integer>();
         int duplicates=0;
         for(int i=0;i<data.blocks().size();i++){
@@ -48,8 +55,8 @@ public record BlockMesh(StructureData data,List<Face> faces,int duplicatePositio
                 faces.add(new Face(p,index,side,BlockAppearance.color(state),quad));
             }
         }
-        return new BlockMesh(data,List.copyOf(faces),duplicates,resolver==null?List.of():resolver.diagnostics(),
-                resolver==null?0:resolver.resolvedCount(),resolver==null?0:resolver.missingCount(),sources);
+        return new BlockMesh(data,List.copyOf(faces),duplicates,prepared.diagnostics(),
+                prepared.resolved(),prepared.missing(),prepared.sources());
     }
 
     private static BlockModel cube(StructureData.BlockState state){

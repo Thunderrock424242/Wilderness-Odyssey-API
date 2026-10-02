@@ -17,6 +17,7 @@ public final class BlockStateCatalog {
     /** Reads the first available existing snapshot. It is explicitly not certified against the live environment. */
     public static BlockStateCatalog discover(Path project,Path build){
         for(Path root:List.of(build,project.resolve("build"),project.resolve(".codex-build"))){
+            if(!root.toAbsolutePath().normalize().startsWith(project.toAbsolutePath().normalize()))continue;
             Path file=root.resolve("generated/structuregen/catalog/available-content.json");
             if(!Files.isRegularFile(file))continue;
             try{

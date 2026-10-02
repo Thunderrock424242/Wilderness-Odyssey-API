@@ -11,9 +11,12 @@ public final class Camera {
 
     /** Recenters while preserving the current camera mode. */
     public void focus(Position size) {
-        target = new Vec3(size.x() / 2.0, size.y() / 2.0, size.z() / 2.0);
-        distance = Math.max(6, Math.sqrt((double) size.x() * size.x() + (double) size.y() * size.y()
-                + (double) size.z() * size.z()) * 1.35);
+        focus(size.x(),size.y(),size.z(),new Vec3(0,0,0));
+    }
+
+    private void focus(double x,double y,double z,Vec3 origin) {
+        target = origin.add(new Vec3(x/2,y/2,z/2));
+        distance = Math.max(6,Math.sqrt(x*x+y*y+z*z)*1.35);
         yaw = -0.65;
         pitch = -0.4;
         position = target.subtract(forward().multiply(distance));
@@ -26,6 +29,18 @@ public final class Camera {
         distance = 4;
         position = target.subtract(forward().multiply(distance));
         speed = 2;
+    }
+
+    /** Frames occupied geometry instead of empty padding in large structure dimensions. */
+    public void focus(BlockMesh mesh) {
+        if(mesh.faces().isEmpty()){focus(mesh.data().size());return;}
+        double minX=Double.POSITIVE_INFINITY,minY=Double.POSITIVE_INFINITY,minZ=Double.POSITIVE_INFINITY;
+        double maxX=Double.NEGATIVE_INFINITY,maxY=Double.NEGATIVE_INFINITY,maxZ=Double.NEGATIVE_INFINITY;
+        for(var face:mesh.faces()){
+            var p=face.position();minX=Math.min(minX,p.x());minY=Math.min(minY,p.y());minZ=Math.min(minZ,p.z());
+            maxX=Math.max(maxX,p.x()+1.0);maxY=Math.max(maxY,p.y()+1.0);maxZ=Math.max(maxZ,p.z()+1.0);
+        }
+        focus(maxX-minX,maxY-minY,maxZ-minZ,new Vec3(minX,minY,minZ));
     }
 
     /** Switches camera mode without jumping the current eye position. */

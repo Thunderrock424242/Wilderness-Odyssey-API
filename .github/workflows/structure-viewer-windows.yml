@@ -1,0 +1,125 @@
+name: Structure Viewer Windows
+
+on:
+  push:
+    branches: [main, in-dev]
+    paths:
+      - 'tools/structure-viewer/**'
+      - 'gradle/**'
+      - 'gradlew.bat'
+      - 'LICENSE.md'
+      - '.github/workflows/structure-viewer-windows.yml'
+  pull_request:
+    paths:
+      - 'tools/structure-viewer/**'
+      - 'gradle/**'
+      - 'gradlew.bat'
+      - 'LICENSE.md'
+      - '.github/workflows/structure-viewer-windows.yml'
+  workflow_dispatch:
+    inputs:
+      viewer_version:
+        description: 'Installer version (major.minor.patch)'
+        default: '1.0.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: structure-viewer-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installer:
+    name: Build Windows x64 installer
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      VIEWER_VERSION: ${{ inputs.viewer_version || '1.0.0' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          architecture: x64
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Prepare verified Windows packaging tools
+        run: |
+          if ($env:VIEWER_VERSION -notmatch '^\d+\.\d+\.\d+$') {
+            throw 'Installer version must use major.minor.patch.'
+          }
+          .\tools\structure-viewer\prepare-windows-tools.ps1
+
+      - name: Test viewer, build installer, and verify native launcher
+        run: |
+          $toolRoot = Join-Path $env:GITHUB_WORKSPACE '.codex-build/tools/structure-viewer/toolchains'
+          $runtime = Join-Path $toolRoot 'temurin-21-jre/jdk-21.0.12.1+1-jre'
+          $wix = Join-Path $toolRoot 'wix-3.14.1'
+          $viewerArguments = @(
+            '-p', 'tools/structure-viewer',
+            'test', 'windowsInstaller', 'verifyWindowsLauncher',
+            '-PcodexBuildDir=.codex-build',
+            "-PviewerVersion=$env:VIEWER_VERSION",
+            "-PviewerPackagingJdk=$env:JAVA_HOME",
+            "-PviewerRuntimeDir=$runtime",
+            "-PviewerWixDir=$wix",
+            '--no-daemon', '--no-parallel', '--console=plain'
+          )
+          .\gradlew.bat @viewerArguments
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Record installer checksum
+        run: |
+          $installerDirectory = Join-Path $env:GITHUB_WORKSPACE '.codex-build/tools/structure-viewer/windows/installer'
+          $filename = "Wilderness Structure Viewer-$env:VIEWER_VERSION.exe"
+          $installer = Join-Path $installerDirectory $filename
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $filename" | Set-Content -LiteralPath "$installer.sha256" -Encoding utf8
+
+      - name: Upload Windows installer
+        id: installer-artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: wilderness-structure-viewer-windows-x64-${{ env.VIEWER_VERSION }}
+          path: |
+            .codex-build/tools/structure-viewer/windows/installer/*.exe
+            .codex-build/tools/structure-viewer/windows/installer/*.sha256
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30
+          compression-level: 0
+
+      - name: Link installer in run summary
+        env:
+          INSTALLER_ARTIFACT_URL: ${{ steps.installer-artifact.outputs.artifact-url }}
+        run: |
+          "Download the Windows installer: $env:INSTALLER_ARTIFACT_URL" >> $env:GITHUB_STEP_SUMMARY
+          'Includes Java 21 and a SHA-256 checksum. The installer is unsigned.' >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload test and launcher diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: structure-viewer-windows-diagnostics
+          path: |
+            .codex-build/tools/structure-viewer/reports/tests/test/**
+            .codex-build/tools/structure-viewer/test-results/test/**
+            .codex-build/tools/structure-viewer/windows/launcher-diagnostics.json
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14

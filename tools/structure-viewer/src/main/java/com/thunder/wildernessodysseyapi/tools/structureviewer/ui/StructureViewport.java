@@ -141,12 +141,14 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
     /** Publishes a prepared mesh; new files recenter while layer changes preserve the camera. */
     public void setMesh(BlockMesh mesh, boolean recenter) {
         this.mesh = mesh; frame = null; selected = -1;
-        if (recenter) camera.focus(mesh.data().size());
+        if (recenter) camera.focus(mesh);
         changed();
     }
 
     /** Fits the current structure. */
-    public void focusStructure() { if (mesh != null) camera.focus(mesh.data().size()); changed(); }
+    public void focusStructure() { if (mesh != null) camera.focus(mesh); changed(); }
+    /** Clears stale pack content when switching the source root. */
+    public void clear() { mesh=null;frame=null;selected=-1;markers=java.util.List.of();changed(); }
     /** Changes display overlays without rebuilding geometry. */
     public void setOverlays(boolean wireframe, boolean bounds) {
         this.wireframe = wireframe; this.bounds = bounds; changed();

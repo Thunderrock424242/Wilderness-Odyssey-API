@@ -25,10 +25,11 @@ public final class AssetRepository implements AutoCloseable {
         List<Path> paths = new ArrayList<>(additional);
         paths.add(project.resolve("src/main/resources"));
         paths.add(project.resolve("src/generated/resources"));
-        Path mods = project.resolve("run/mods");
-        if (Files.isDirectory(mods)) try (var entries = Files.list(mods)) {
-            entries.filter(p -> p.toString().endsWith(".jar")).sorted().forEach(paths::add);
-        } catch (IOException ignored) { /* Optional local mod directory. */ }
+        String scanFailure = null;
+        try { paths.addAll(com.thunder.wildernessodysseyapi.tools.structureviewer.io.StructureCatalog.archives(project)); }
+        catch (IOException error) { scanFailure = "Could not scan modpack assets: " + error.getMessage(); }
+        Path versions = project.resolve("versions/1.21.1/1.21.1.jar");
+        paths.add(versions);
         String explicit = System.getProperty("structureViewer.minecraftJar", "");
         if (!explicit.isBlank()) paths.add(Path.of(explicit));
         String gradleHome = System.getenv("GRADLE_USER_HOME");
@@ -36,7 +37,9 @@ public final class AssetRepository implements AutoCloseable {
         paths.add(cache.resolve("caches/neoformruntime/artifacts/minecraft_1.21.1_client.jar"));
         String appData = System.getenv("APPDATA");
         if (appData != null) paths.add(Path.of(appData, ".minecraft/versions/1.21.1/1.21.1.jar"));
-        return new AssetRepository(paths);
+        AssetRepository result = new AssetRepository(paths);
+        if(scanFailure!=null)result.diagnostics.add(scanFailure);
+        return result;
     }
 
     /** Reads one asset, bounded to 8 MiB. Resource names cannot escape a source directory. */

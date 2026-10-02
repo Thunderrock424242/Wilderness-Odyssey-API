@@ -13,12 +13,14 @@ public final class StructureDiscovery {
 
     /** Roots mirror the existing main resources and StructureGen output conventions. */
     public static List<Path> roots(Path project, Path selectedBuild) {
-        return List.copyOf(new LinkedHashSet<>(List.of(
+        var roots = new LinkedHashSet<>(List.of(
                 project.resolve("src/main/resources"), project.resolve("src/generated/resources"),
                 project.resolve("src/main/structure_blueprints"),
-                selectedBuild.resolve("generated/structuregen/resources"),
                 project.resolve("build/generated/structuregen/resources"),
-                project.resolve(".codex-build/generated/structuregen/resources"))));
+                project.resolve(".codex-build/generated/structuregen/resources")));
+        if (selectedBuild.toAbsolutePath().normalize().startsWith(project.toAbsolutePath().normalize()))
+            roots.add(selectedBuild.resolve("generated/structuregen/resources"));
+        return List.copyOf(roots);
     }
 
     /** Finds NBT/JSON templates and authored blueprints, excluding tags and worldgen definitions. */

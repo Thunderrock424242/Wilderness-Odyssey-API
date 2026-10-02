@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.tools.structureviewer;
 import com.thunder.wildernessodysseyapi.tools.structureviewer.model.StructureData;
 import com.thunder.wildernessodysseyapi.tools.structureviewer.model.StructureData.*;
 import com.thunder.wildernessodysseyapi.tools.structureviewer.render.*;
+import com.thunder.wildernessodysseyapi.tools.structureviewer.assets.*;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import java.util.List;
@@ -45,6 +46,22 @@ class RendererCameraTest {
         assertTrue(java.util.Arrays.stream(frame.blockIds()).anyMatch(i -> i == 1));
     }
 
+    @Test void translucentFacesKeepTheirOwnVerticesWhenOpaqueFacesReuseScratchStorage() {
+        BlockState glass=new BlockState("demo:glass",Map.of()),stone=new BlockState("demo:stone",Map.of());
+        var data=new StructureData("glass",Path.of("glass.json"),new Position(2,1,1),List.of(
+                new Block(new Position(0,0,0),0,null,Map.of()),new Block(new Position(1,0,0),1,null,Map.of())),
+                List.of(List.of(glass,stone)),List.of(),Map.of(),List.of());
+        var vertices=List.of(new Vec3(0,0,0),new Vec3(0,1,0),new Vec3(1,1,0),new Vec3(1,0,0));
+        var transparent=new BlockModel(List.of(new BlockModel.Quad(vertices,new double[]{0,16,0,0,16,0,16,16},
+                new Texture(1,1,new int[]{0x8034abcd},true,false),0xffffff,-1,false)),false,false);
+        var opaque=new BlockModel(List.of(new BlockModel.Quad(vertices,new double[]{0,16,0,0,16,0,16,16},
+                Texture.solid(0xabcdef),0xffffff,-1,false)),false,false);
+        var models=new ResolvedModels(Map.of(glass,transparent,stone,opaque),List.of(),2,0,List.of());
+        var camera=new Camera.View(new Vec3(1,.5,-3),new Vec3(0,0,1),new Vec3(1,0,0),new Vec3(0,1,0),false,2);
+        var frame=new SoftwareRenderer().render(BlockMesh.build(data,false,-1,models),camera,400,300,-1,false,false);
+        assertEquals(0,frame.pick(170,150));assertEquals(1,frame.pick(230,150));
+    }
+
     @Test void freeCameraMovesAndPrecisionSpeedWheelAndOrbitBehave() {
         Camera camera = new Camera();camera.focus(new Position(10,10,10));
         var initial = camera.view();
@@ -64,6 +81,19 @@ class RendererCameraTest {
         camera.setOrbit(true);
         before = camera.view().position();camera.look(20,10);
         assertNotEquals(before,camera.view().position());
+    }
+
+    @Test void framesOccupiedBlocksWithoutPaddingOrCoordinateOverflow() {
+        for(int x:List.of(100,Integer.MAX_VALUE)) {
+            Camera camera=new Camera();
+            camera.focus(BlockMesh.build(scene(List.of(block(x,2,3))),false,-1));
+            var view=camera.view();
+            Vec3 center=new Vec3(x+.5,2.5,3.5);
+            assertEquals(6,Math.sqrt(view.position().subtract(center).dot(view.position().subtract(center))),.000001);
+            var projected=view.transform(center);
+            assertEquals(0,projected.x(),.000001);assertEquals(0,projected.y(),.000001);
+            assertTrue(projected.z()>0);
+        }
     }
 }
 

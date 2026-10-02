@@ -67,3 +67,14 @@ tasks.register('validate', JavaExec) {
         args providers.gradleProperty('structureViewerFile').get()
     }
 }
+
+tasks.register('renderBenchmark', JavaExec) {
+    group = 'verification'
+    description = 'Measures the same textured bunker view without opening a window.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.thunder.wildernessodysseyapi.tools.structureviewer.RenderBenchmark'
+    maxHeapSize = '2g'
+}
+
+apply from: 'windows.gradle'

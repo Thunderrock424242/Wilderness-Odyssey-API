@@ -2,15 +2,24 @@ package com.thunder.wildernessodysseyapi.tools.structureviewer;
 
 import com.thunder.wildernessodysseyapi.tools.structureviewer.ui.*;
 import com.thunder.wildernessodysseyapi.tools.structureviewer.io.JsonInput;
+import com.thunder.wildernessodysseyapi.tools.structureviewer.io.StructureCatalog;
+import com.thunder.wildernessodysseyapi.tools.structureviewer.io.StructureSource;
 import com.thunder.wildernessodysseyapi.tools.structureviewer.render.RenderQuality;
 import javax.imageio.ImageIO;
 import javax.swing.SwingUtilities;
+import javax.swing.JTree;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.TreePath;
+import java.awt.Component;
+import java.awt.Container;
 import java.awt.Graphics2D;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.nio.file.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Real-window smoke validation using targeted Swing input events. It does not inject global
@@ -21,6 +30,9 @@ public final class UiSmokeTest {
 
     /** Opens an existing resource, exercises input handlers and selection, and captures the window. */
     public static void main(String[] args) throws Exception {
+        if (Boolean.getBoolean("structureViewer.requirePackaged")
+                && !StructureViewer.class.getProtectionDomain().getCodeSource().getLocation().getPath().endsWith(".jar"))
+            throw new AssertionError("Bundled smoke test loaded application classes outside the packaged JAR.");
         Path project = Path.of(System.getProperty("structureViewer.projectDir"));
         Path build = Path.of(System.getProperty("structureViewer.buildDir"));
         Path output = Path.of(args[0]); Files.createDirectories(output);
@@ -115,10 +127,86 @@ public final class UiSmokeTest {
             json.addProperty("name","Recovered reload check");
             Files.writeString(watched,json.toString());
             await(() -> window.loadedStructure().name().equals("Recovered reload check") && window.loadError()==null && window.viewport().renderingIdle(),15000);
+            // A selected layer must clamp before meshing when a fresh export becomes shorter.
+            edt(() -> {window.selectLayer(4);return null;});
+            await(() -> window.viewport().renderingIdle(),15000);
+            json.addProperty("name","Shorter export check");
+            json.getAsJsonArray("size").set(1,new com.google.gson.JsonPrimitive(1));
+            var ground=new com.google.gson.JsonArray();
+            for(var block:json.getAsJsonArray("blocks"))
+                if(block.getAsJsonObject().getAsJsonArray("pos").get(1).getAsInt()==0)ground.add(block);
+            json.add("blocks",ground);Files.writeString(watched,json.toString());
+            await(() -> window.loadedStructure().name().equals("Shorter export check") && window.viewport().renderingIdle(),15000);
+            if(!edt(() -> java.util.Arrays.stream(window.viewport().renderedFrame().blockIds()).anyMatch(id -> id>=0)))
+                throw new AssertionError("Shrinking the export left an empty preview at the old Y layer.");
+            verifyModpack(window,project,output);
             System.out.println("PHASE 2 GUI PASSED: JSON, atomic reload, camera preservation, failed reload recovery, Fast/Ultra resolution "+fastWidth+"/"+ultraWidth+", saved quality, G block focus.");
             System.out.println("GUI SMOKE PASSED: real window, existing " + fixture.getFileName()
                     + ", rendered blocks, click inspector, F2/W movement, mouse look, F1 orbit. Screenshot: " + output);
         } finally { try {snapshot(window,output.resolve("last-window.png"));} finally {edt(() -> {window.dispose();return null;});} }
+    }
+
+    private static void verifyModpack(ViewerWindow window,Path project,Path output) throws Exception {
+        Path pack=Files.createDirectories(output.resolve("modpack-fixture"));
+        Path mods=Files.createDirectories(pack.resolve("mods")),jar=mods.resolve("demo-structures.jar");
+        byte[] shelter=Files.readAllBytes(project.resolve("src/main/structure_blueprints/test_shelter.json"));
+        byte[] binary=Files.readAllBytes(FixtureNbt.write(output.resolve("archive-fixture.nbt"),FixtureNbt.structure(),true));
+        writeMod(jar,binary,shelter,"Archive room");
+        byte[] original=Files.readAllBytes(jar);
+        edt(() -> {window.openModpack(pack);return null;});
+        var house=new StructureSource(jar,"data/demo/structure/shelter.json");
+        await(() -> selectInLibrary(window,house),15000);
+        await(() -> house.equals(window.loadedSource()) && window.viewport().renderingIdle(),120000);
+        var shelterView=edt(() -> window.viewport().cameraView());
+        snapshot(window,output.resolve("modpack-library.png"));
+        var room=new StructureSource(jar,"data/demo/structure/room.json");
+        edt(() -> {if(!selectInLibrary(window,room))throw new AssertionError("Room absent from the JAR library.");return null;});
+        await(() -> room.equals(window.loadedSource()) && window.viewport().renderingIdle(),15000);
+        if(shelterView.equals(edt(() -> window.viewport().cameraView())))throw new AssertionError("Switching entries in one JAR did not fit the new structure.");
+        if(!edt(() -> window.loadedStructure().state(window.loadedStructure().blocks().getFirst()).id()).equals("demo:preview_block"))
+            throw new AssertionError("Selected the wrong JAR entry.");
+        if(!java.util.Arrays.equals(original,Files.readAllBytes(jar)))throw new AssertionError("Preview modified the mod JAR.");
+        var archiveView=edt(() -> window.viewport().cameraView());
+        Path replacement=mods.resolve("replacement.tmp");
+        writeMod(replacement,binary,shelter,"Reloaded archive room");
+        Files.move(replacement,jar,StandardCopyOption.REPLACE_EXISTING);
+        await(() -> room.equals(window.loadedSource()) && window.loadedStructure().name().equals("Reloaded archive room")
+                && window.viewport().renderingIdle(),15000);
+        if(!archiveView.equals(edt(() -> window.viewport().cameraView())))throw new AssertionError("Archive reload reset the camera.");
+        var binarySource=new StructureSource(jar,"data/demo/structures/template.nbt");
+        edt(() -> {if(!selectInLibrary(window,binarySource))throw new AssertionError("NBT absent from the JAR library.");return null;});
+        await(() -> binarySource.equals(window.loadedSource()) && window.viewport().renderingIdle(),120000);
+        if(!edt(() -> window.loadedStructure().source()).equals(jar.toAbsolutePath().normalize()))
+            throw new AssertionError("Archive source identity was lost.");
+        System.out.println("MODPACK GUI PASSED: grouped JAR selection, NBT/JSON, source immutability, switching entries fits camera, atomic JAR reload preserves camera, shrinking Y layer.");
+    }
+
+    private static boolean selectInLibrary(Container component,StructureSource source) {
+        for(Component child:component.getComponents()) {
+            if(child instanceof JTree tree) {
+                var root=(DefaultMutableTreeNode)tree.getModel().getRoot();
+                var nodes=root.depthFirstEnumeration();
+                while(nodes.hasMoreElements()) {
+                    var node=(DefaultMutableTreeNode)nodes.nextElement();
+                    if(node.getUserObject() instanceof StructureCatalog.Entry entry && entry.source().equals(source)) {
+                        tree.setSelectionPath(new TreePath(node.getPath()));return true;
+                    }
+                }
+            }
+            if(child instanceof Container nested && selectInLibrary(nested,source))return true;
+        }
+        return false;
+    }
+
+    private static void writeMod(Path jar,byte[] nbt,byte[] shelter,String roomName) throws Exception {
+        try(var out=new ZipOutputStream(Files.newOutputStream(jar))) {
+            put(out,"data/demo/structures/template.nbt",nbt);
+            put(out,"data/demo/structure/shelter.json",shelter);
+            put(out,"data/demo/structure/room.json",("{\"name\":\""+roomName+"\",\"size\":[1,1,1],\"blocks\":[{\"pos\":[0,0,0],\"block\":\"demo:preview_block\"}]}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+    }
+    private static void put(ZipOutputStream out,String name,byte[] bytes) throws Exception {
+        out.putNextEntry(new ZipEntry(name));out.write(bytes);out.closeEntry();
     }
 
     private static void key(StructureViewport viewport,int code,boolean down) {
