@@ -38,7 +38,7 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
         this.onSelect = onSelect;
         this.onReload = onReload;
         setFocusable(true);
-        setBackground(new Color(0x18232e));
+        setBackground(ViewerTheme.VIEWPORT);
         setToolTipText("Right-drag: look / orbit. Left-click: inspect. F1: orbit. F2: free camera.");
         addKeyListener(new KeyAdapter() {
             @Override public void keyPressed(KeyEvent event) {
@@ -148,7 +148,7 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
     /** Fits the current structure. */
     public void focusStructure() { if (mesh != null) camera.focus(mesh); changed(); }
     /** Clears stale pack content when switching the source root. */
-    public void clear() { mesh=null;frame=null;selected=-1;markers=java.util.List.of();changed(); }
+    public void clear() { mesh=null;frame=null;selected=-1;renderError=null;markers=java.util.List.of();changed(); }
     /** Changes display overlays without rebuilding geometry. */
     public void setOverlays(boolean wireframe, boolean bounds) {
         this.wireframe = wireframe; this.bounds = bounds; changed();
@@ -188,20 +188,44 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
             scaled.drawImage(frame.image(), 0, 0, getWidth(), getHeight(), null);
             scaled.dispose();
         }
-        g.setColor(new Color(0xc2d7df));
-        var view = camera.view();
-        g.drawString(view.orbit() ? "ORBIT CAMERA  ·  F2 to fly inside" :
-                String.format(java.util.Locale.ROOT, "FREE CAMERA  ·  %.1f blocks/s  ·  Ctrl for precision", view.speed()), 16, 24);
-        g.drawString(String.format(java.util.Locale.ROOT, "X %.2f   Y %.2f   Z %.2f",
-                view.position().x(), view.position().y(), view.position().z()), 16, 44);
-        if (mesh == null) g.drawString("Select an NBT or JSON structure from the browser.", 16, 78);
-        g.drawString("Quality: " + quality + (blockEdges ? " · Block edges" : "")
-                + (frame == null ? "" : " · " + frame.image().getWidth() + " × " + frame.image().getHeight()), 16, 64);
-        if (showCoordinates && mesh != null && selected >= 0) {
-            var p = mesh.data().blocks().get(selected).position();
-            g.drawString("Selected block: X " + p.x() + " / Y " + p.y() + " / Z " + p.z(), 16, 84);
+        java.awt.Graphics2D overlay = (java.awt.Graphics2D)g.create();
+        overlay.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+        if (mesh == null) {
+            int center = getWidth()/2, y = Math.max(90, getHeight()/2-65);
+            overlay.drawImage(ViewerTheme.icon(44),center-22,y-50,null);
+            centered(overlay,"Open a modpack to get started",center,y+24,18,true,ViewerTheme.TEXT);
+            centered(overlay,"Choose a structure from the library to preview it here.",center,y+52,13,false,ViewerTheme.MUTED);
+            centered(overlay,"Use Open structure to inspect a single NBT or JSON file.",center,y+74,12,false,ViewerTheme.MUTED);
+        } else {
+            var view = camera.view();
+            String cameraHint = view.orbit() ? "Orbit  ·  Right-drag to rotate  ·  F2 to fly" :
+                    "Free camera  ·  WASD to move  ·  F1 to orbit";
+            badge(overlay,cameraHint,14,getHeight()-38,false);
+            if (frame != null) badge(overlay,frame.image().getWidth()+" × "+frame.image().getHeight(),getWidth()-14,getHeight()-38,true);
+            if (showCoordinates) {
+                String coordinates = String.format(java.util.Locale.ROOT,"Camera  X %.1f  Y %.1f  Z %.1f",view.position().x(),view.position().y(),view.position().z());
+                badge(overlay,coordinates,14,14,false);
+                if (selected >= 0) {
+                    var p = mesh.data().blocks().get(selected).position();
+                    badge(overlay,"Block  X "+p.x()+"  Y "+p.y()+"  Z "+p.z(),14,46,false);
+                }
+            }
         }
-        if (renderError != null) { g.setColor(Color.PINK); g.drawString("Preview error: " + renderError, 16, 100); }
+        if (renderError != null) badge(overlay,"Preview error: "+renderError,14,14,false);
+        overlay.dispose();
+    }
+
+    private static void centered(java.awt.Graphics2D g,String text,int x,int y,int size,boolean bold,Color color) {
+        g.setFont(new java.awt.Font("Segoe UI",bold?java.awt.Font.BOLD:java.awt.Font.PLAIN,size));g.setColor(color);
+        g.drawString(text,x-g.getFontMetrics().stringWidth(text)/2,y);
+    }
+
+    private static void badge(java.awt.Graphics2D g,String text,int x,int y,boolean alignRight) {
+        g.setFont(new java.awt.Font("Segoe UI",java.awt.Font.PLAIN,12));
+        int width=g.getFontMetrics().stringWidth(text)+20;
+        if(alignRight)x-=width;
+        g.setColor(new Color(255,255,255,230));g.fillRoundRect(x,y,width,26,6,6);
+        g.setColor(ViewerTheme.TEXT);g.drawString(text,x+10,y+18);
     }
 
     /** Stops this viewport's timer and renderer when its window closes. */

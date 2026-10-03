@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- jpackage enables application upgrades and downgrades by default. Keep upgrades,
+     but prevent this installer from replacing a newer installed release. -->
+<Include>
+    <?undef JpAllowDowngrades ?>
+</Include>

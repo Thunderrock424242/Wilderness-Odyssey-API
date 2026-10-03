@@ -20,7 +20,7 @@ on:
     inputs:
       viewer_version:
         description: 'Installer version (major.minor.patch)'
-        default: '1.0.0'
+        default: '1.0.1'
         required: true
         type: string
 
@@ -40,7 +40,7 @@ jobs:
       run:
         shell: pwsh
     env:
-      VIEWER_VERSION: ${{ inputs.viewer_version || '1.0.0' }}
+      VIEWER_VERSION: ${{ inputs.viewer_version || '1.0.1' }}
 
     steps:
       - name: Checkout repository
@@ -65,14 +65,14 @@ jobs:
           }
           .\tools\structure-viewer\prepare-windows-tools.ps1
 
-      - name: Test viewer, build installer, and verify native launcher
+      - name: Test viewer, build installer, and verify launcher and upgrades
         run: |
           $toolRoot = Join-Path $env:GITHUB_WORKSPACE '.codex-build/tools/structure-viewer/toolchains'
           $runtime = Join-Path $toolRoot 'temurin-21-jre/jdk-21.0.12.1+1-jre'
           $wix = Join-Path $toolRoot 'wix-3.14.1'
           $viewerArguments = @(
             '-p', 'tools/structure-viewer',
-            'test', 'windowsInstaller', 'verifyWindowsLauncher',
+            'test', 'verifyWindowsInstaller', 'verifyWindowsLauncher',
             '-PcodexBuildDir=.codex-build',
             "-PviewerVersion=$env:VIEWER_VERSION",
             "-PviewerPackagingJdk=$env:JAVA_HOME",
@@ -120,6 +120,7 @@ jobs:
             .codex-build/tools/structure-viewer/reports/tests/test/**
             .codex-build/tools/structure-viewer/test-results/test/**
             .codex-build/tools/structure-viewer/windows/launcher-diagnostics.json
+            .codex-build/tools/structure-viewer/windows/installer-upgrade-diagnostics.json
           if-no-files-found: warn
           include-hidden-files: true
           retention-days: 14

@@ -1,7 +1,10 @@
 // Native packaging is opt-in and never participates in the production mod's build or dependencies.
 def appName = 'Wilderness Structure Viewer'
-def appVersion = providers.gradleProperty('viewerVersion').getOrElse('1.0.0')
+def appVersion = providers.gradleProperty('viewerVersion').getOrElse('1.0.1')
+// Keep this identity unchanged so Windows recognizes every release as the same installed product.
+def upgradeUuid = '27ef4c02-4acd-4711-b59a-0cda1f8d2146'
 def nativeRoot = layout.buildDirectory.dir('windows')
+def installerWork = nativeRoot.map { it.dir("installer-work/${appVersion}") }
 def imageRoot = nativeRoot.map { it.dir('image') }
 def imageDir = imageRoot.map { it.dir(appName) }
 def inputDir = nativeRoot.map { it.dir('input') }
@@ -11,6 +14,8 @@ def packagingJdk = providers.gradleProperty('viewerPackagingJdk').orElse(
                 .map { it.metadata.installationPath.asFile.absolutePath })
 def runtimeDir = providers.gradleProperty('viewerRuntimeDir')
 def wixDir = providers.gradleProperty('viewerWixDir')
+
+tasks.withType(JavaExec).configureEach { systemProperty 'structureViewer.version', appVersion }
 
 // jpackage requires fresh output. Only delete the exact owned image subtree inside this build directory.
 def clearImageOutput = {
@@ -57,7 +62,7 @@ tasks.register('windowsAppImage', Exec) {
                 '--input', inputDir.get().asFile.absolutePath, '--dest', imageRoot.get().asFile.absolutePath,
                 '--main-jar', tasks.named('jar').get().archiveFileName.get(),
                 '--main-class', application.mainClass.get(), '--icon', iconFile.get().asFile.absolutePath,
-                '--java-options', '-Xmx2g', '--vendor', 'Wilderness Odyssey',
+                '--java-options', '-Xmx2g', '--java-options', "-DstructureViewer.version=${appVersion}", '--vendor', 'Wilderness Odyssey',
                 '--description', 'Browse and inspect Minecraft structures from local modpacks.']
         if (runtimeDir.isPresent()) {
             def runtime = file(runtimeDir.get())
@@ -77,21 +82,41 @@ tasks.register('windowsInstaller', Exec) {
     dependsOn windowsAppImage
     inputs.dir(imageDir)
     inputs.property('appVersion', appVersion)
+    inputs.property('upgradeUuid', upgradeUuid)
+    inputs.dir(layout.projectDirectory.dir('src/windows'))
     outputs.file(nativeRoot.map { it.file("installer/${appName}-${appVersion}.exe") })
+    outputs.dir(installerWork)
     doFirst {
         def target = nativeRoot.get().file("installer/${appName}-${appVersion}.exe").asFile.canonicalFile.toPath()
         def owner = layout.buildDirectory.get().asFile.canonicalFile.toPath()
         if (!target.startsWith(owner) || target == owner) throw new GradleException('Unsafe installer output path')
         delete(target.toFile())
+        def work = installerWork.get().asFile.canonicalFile.toPath()
+        if (!work.startsWith(owner) || work == owner) throw new GradleException('Unsafe installer temporary output path')
+        delete(work.toFile())
         if (wixDir.isPresent()) environment 'PATH', file(wixDir.get()).absolutePath + File.pathSeparator + System.getenv('PATH')
         commandLine new File(file(packagingJdk.get()), 'bin/jpackage.exe').absolutePath,
                 '--type', 'exe', '--name', appName, '--app-version', appVersion,
                 '--app-image', imageDir.get().asFile.absolutePath,
                 '--dest', nativeRoot.get().dir('installer').asFile.absolutePath,
+                '--temp', work.toString(),
+                '--resource-dir', layout.projectDirectory.dir('src/windows').asFile.absolutePath,
                 '--vendor', 'Wilderness Odyssey', '--description', 'Minecraft modpack structure browser and inspector',
                 '--win-per-user-install', '--win-dir-chooser', '--win-menu', '--win-shortcut',
                 '--win-menu-group', 'Wilderness Odyssey',
-                '--win-upgrade-uuid', '27ef4c02-4acd-4711-b59a-0cda1f8d2146'
+                '--win-upgrade-uuid', upgradeUuid
+    }
+}
+tasks.register('verifyWindowsInstaller', Exec) {
+    group = 'verification'
+    description = 'Checks the built MSI for older-version detection, replacement, and downgrade protection without installing it.'
+    dependsOn windowsInstaller
+    doFirst {
+        commandLine 'powershell.exe', '-NoProfile', '-NonInteractive', '-File',
+                layout.projectDirectory.file('verify-windows-installer.ps1').asFile.absolutePath,
+                '-WorkDirectory', installerWork.get().asFile.absolutePath,
+                '-Version', appVersion, '-UpgradeCode', upgradeUuid,
+                '-ReportFile', nativeRoot.get().file('installer-upgrade-diagnostics.json').asFile.absolutePath
     }
 }
 tasks.register('verifyWindowsLauncher', Exec) {
@@ -106,7 +131,7 @@ tasks.register('verifyWindowsLauncher', Exec) {
     }
     doLast {
         def data = new groovy.json.JsonSlurper().parse(report.get().asFile)
-        if (!data.archiveSupport || !data.desktopSupport || !data.javaVersion.startsWith('21.')
+        if (data.applicationVersion != appVersion || !data.archiveSupport || !data.desktopSupport || !data.javaVersion.startsWith('21.')
                 || !file(data.javaHome).canonicalPath.startsWith(imageDir.get().asFile.canonicalPath)) {
             throw new GradleException('Native launcher did not use a complete bundled Java 21 runtime.')
         }

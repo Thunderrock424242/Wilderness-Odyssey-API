@@ -2,6 +2,8 @@
 
 The desktop tool browses Minecraft structure templates by mod JAR and previews NBT and supported JSON without starting Minecraft. It includes local block models/textures, manual quality controls, block inspection, validation, and automatic reload. Structures, mod JARs, and assets are read without modification; mod code never runs.
 
+The light desktop interface separates the library, preview, and inspector. Open actions and local assets are in the header; Quality and Layer stay above the preview. **View options** contains textures, edges, bounds, wireframe, markers, camera focus, and automatic reload. **Controls** shows the keyboard/mouse reference. The default layout keeps these controls visible at a 980 × 640 window size.
+
 ## Windows download and modpacks
 
 The Windows `.exe` installer includes a Java 21 runtime. Users do not need to install Java separately. Run `Wilderness Structure Viewer-<version>.exe`, choose the installation folder, and launch **Wilderness Structure Viewer** from the shortcut or installation folder.
@@ -14,7 +16,13 @@ The native build also produces a portable application folder under `<build>/tool
 
 Only concrete template files under `data/<namespace>/structure/` or `structures/` are previewed. A mod may generate structures entirely in Java or assemble many templates through jigsaw/worldgen rules. Those systems require Minecraft; the viewer displays the stored pieces it can find. It never scans saves or generates a world.
 
-The installer does not contain Minecraft assets. Installed local client assets, mod JARs, and **Add assets…** supply textures and models. Missing assets remain visible as placeholders with diagnostics. Native preferences live in `%LOCALAPPDATA%/WildernessOdyssey/StructureViewer/settings.properties`.
+The installer does not contain Minecraft assets. Installed local client assets, mod JARs, and **Assets → Add local assets…** supply textures and models. Missing assets remain visible as placeholders with diagnostics. Native preferences live in `%LOCALAPPDATA%/WildernessOdyssey/StructureViewer/settings.properties`.
+
+### Updating an installed copy
+
+Close the viewer and run the newer installer while signed in as the same Windows user. Version **1.0.1** uses the same Windows upgrade identity as **1.0.0**, so Windows Installer detects and replaces the older registered installation. The 1.0.1 installer refuses to install over a newer installed version. Preferences are stored outside the application directory and are retained. A portable application folder is not a registered installation; replace that entire folder when updating it.
+
+`verifyWindowsInstaller` reads the generated MSI database without installing it. It checks the product version, stable upgrade code, range that detects/replaces 1.0.0, newer-version detection and blocking condition, and scheduled removal of the older product. This is package metadata validation; installation, upgrades, and removal still need acceptance on a clean Windows machine.
 
 ## Launch
 
@@ -38,7 +46,7 @@ The normal build directory is `build`; `-PcodexBuildDir=.codex-build` selects is
 
 ## See individual blocks
 
-**High** is the default. Keep **Textures** and **Block edges** enabled, click a block, then press **G** or choose **Focus block**. Use a single **Y** layer to expose interior floors.
+**High** is the default. Keep **View options → Textures** and **Block edges** enabled, click a block, then press **G** or choose **Focus selected block**. Use a single **Layer** to expose interior floors; **All** shows the whole structure.
 
 | Quality | Internal resolution limit | Intended use |
 | --- | --- | --- |
@@ -67,7 +75,7 @@ Developer launches save quality, edges, textures, automatic reload, added asset 
 
 The inspector shows original ID, coordinates, supplied properties, palette/source index, typed block-entity NBT, and entry metadata. Rendering defaults do not overwrite imported data.
 
-**Bounds**, **Wireframe**, **Stored air**, and **Y (-1 = all)** control inspection. **Entities** and **Block entities** display markers, including jigsaw/structure blocks. **Coordinates** enables marker labels and selected-block coordinates. Markers intentionally show through geometry; entities are markers rather than animated models. Root metadata is available in the Metadata tab.
+**View options → Structure bounds**, **Wireframe**, **Stored air**, and **Layer** control inspection. **Entities** and **Block entities** display markers, including jigsaw/structure blocks. **Coordinates** enables marker labels and selected-block coordinates. Markers intentionally show through geometry; entities are markers rather than animated models. The inspector has **Summary**, **Block**, **Issues**, and **Data** tabs; root metadata is in **Data**.
 
 ## Sources and supported formats
 
@@ -105,7 +113,7 @@ The first matching asset wins, in this order:
 4. The `structureViewer.minecraftJar` JVM property, when supplied.
 5. The selected root's `versions/1.21.1/1.21.1.jar`, local NeoForm Minecraft 1.21.1 client assets, and the standard Windows launcher 1.21.1 JAR.
 
-**Add assets** accepts a directory containing `assets/`, resource-pack ZIP, or mod/client JAR. The tool does not download, unpack, or redistribute Minecraft assets. Reload after editing assets. Diagnostics list actual sources; Clear added assets restores automatic sources.
+**Assets → Add local assets** accepts a directory containing `assets/`, resource-pack ZIP, or mod/client JAR. The tool does not download, unpack, or redistribute Minecraft assets. Reload after editing assets. Diagnostics list actual sources; Clear added assets restores automatic sources.
 
 Supported static features include parent models, texture variables, cuboid elements, element rotation/rescale, face UV/rotation, blockstate rotations and UV lock, variants, multipart AND/OR, cutout pixels, and basic translucent blending. Doors and stairs use their state-selected models.
 
@@ -138,7 +146,7 @@ The headless validator shares import/model resolution. Readable files return suc
 
 ## Architecture and lifecycle
 
-The separate `tools/structure-viewer` application owns its classpath. Gson supplies JSON parsing, with its transitive Error Prone annotation dependency; Java desktop APIs provide the UI/software renderer and JUnit is test-only. The root mod does not depend on or package the viewer.
+The separate `tools/structure-viewer` application owns its classpath. Gson supplies JSON parsing, with its transitive Error Prone annotation dependency; Java desktop APIs provide the UI/software renderer, FlatLaf 3.7.2 supplies consistent light controls and display scaling, and JUnit is test-only. The root mod does not depend on or package the viewer.
 
 - `model`: shared immutable structure records and typed metadata.
 - `io`: bounded readers, discovery, and file watching.
@@ -157,13 +165,13 @@ NBT limits: 64 MiB file, 256 MiB decoded data, depth 64, 4 million collection en
 
 ### GitHub Actions artifact
 
-The **Structure Viewer Windows** workflow (`.github/workflows/structure-viewer-windows.yml`) builds the Windows x64 installer on pushes to `main` and `in-dev` that change the viewer, wrapper, license, or workflow. Pull requests with those changes also build it. Under **Actions → Structure Viewer Windows → a successful run → Artifacts**, download `wilderness-structure-viewer-windows-x64-1.0.0`. Extract the artifact ZIP to obtain the installer `.exe` and its SHA-256 checksum.
+The **Structure Viewer Windows** workflow (`.github/workflows/structure-viewer-windows.yml`) builds the Windows x64 installer on pushes to `main` and `in-dev` that change the viewer, wrapper, license, or workflow. Pull requests with those changes also build it. Under **Actions → Structure Viewer Windows → a successful run → Artifacts**, download `wilderness-structure-viewer-windows-x64-1.0.1`. Extract the artifact ZIP to obtain the installer `.exe` and its SHA-256 checksum.
 
 The installer artifact is retained for 30 days; test and launcher diagnostics are retained for 14 days. The run summary links to the installer download. This uploads a build artifact, without creating a GitHub Release or signing the executable.
 
-**Run workflow** allows a manual build with a `major.minor.patch` installer version, defaulting to `1.0.0`. Until this workflow is on the repository's default branch, its automatic push/PR triggers provide builds; GitHub's manual workflow button requires the workflow on the default branch.
+**Run workflow** allows a manual build with a `major.minor.patch` installer version, defaulting to `1.0.1`. Until this workflow is on the repository's default branch, its automatic push/PR triggers provide builds; GitHub's manual workflow button requires the workflow on the default branch.
 
-CI uses the standalone Gradle module, JDK 21, and the same checksum-verified portable packaging tools as local builds. It runs the viewer unit tests, builds the installer, and launches the packaged `.exe` to verify its bundled runtime and archive support. It does not download Minecraft assets or run the main mod build. The optional vanilla-asset integration test skips when local assets are absent; desktop smoke checks remain local acceptance tests.
+CI uses the standalone Gradle module, JDK 21, and the same checksum-verified portable packaging tools as local builds. It runs the viewer unit tests, builds the installer, checks MSI upgrade metadata, and launches the packaged `.exe` to verify its bundled runtime and archive support. It does not download Minecraft assets or run the main mod build. The optional vanilla-asset integration test skips when local assets are absent; desktop smoke checks remain local acceptance tests.
 
 ### Local build
 
@@ -173,21 +181,22 @@ Build on Windows with JDK 21 containing `jpackage.exe` and WiX 3's `candle.exe`/
 
 ```powershell
 .\tools\structure-viewer\prepare-windows-tools.ps1
-.\gradlew.bat -p tools/structure-viewer windowsInstaller verifyWindowsLauncher bundledUiSmokeTest '-PcodexBuildDir=.codex-build' '-PviewerPackagingJdk=C:/path/to/jdk-21' '-PviewerRuntimeDir=C:/path/printed/by/helper/jdk-21.0.12.1+1-jre' '-PviewerWixDir=C:/path/printed/by/helper/wix-3.14.1' --no-parallel
+.\gradlew.bat -p tools/structure-viewer verifyWindowsInstaller verifyWindowsLauncher bundledUiSmokeTest '-PcodexBuildDir=.codex-build' '-PviewerPackagingJdk=C:/path/to/jdk-21' '-PviewerRuntimeDir=C:/path/printed/by/helper/jdk-21.0.12.1+1-jre' '-PviewerWixDir=C:/path/printed/by/helper/wix-3.14.1' --no-parallel
 ```
 
-`structureViewerInstaller` is the root alias for `:tools:structure-viewer:windowsInstaller`. The standalone invocation avoids configuring NeoForge. `viewerPackagingJdk` defaults to Gradle's Java 21 toolchain. `viewerRuntimeDir` is optional: without it, jpackage builds a reduced Java 21 runtime including desktop and ZIP filesystem modules from that JDK. Choose a runtime licensed for redistribution; the supplied helper uses Temurin and the bundle retains runtime legal files. `-PviewerVersion=1.0.0` controls installer versioning; the upgrade identity stays stable.
+`structureViewerInstaller` is the root alias for `:tools:structure-viewer:windowsInstaller`. The standalone invocation avoids configuring NeoForge. `viewerPackagingJdk` defaults to Gradle's Java 21 toolchain. `viewerRuntimeDir` is optional: without it, jpackage builds a reduced Java 21 runtime including desktop and ZIP filesystem modules from that JDK. Choose a runtime licensed for redistribution; the supplied helper uses Temurin and the bundle retains runtime legal files. `-PviewerVersion=1.0.1` controls installer versioning; the upgrade identity stays stable.
 
 Outputs beneath the selected build directory:
 
 | Artifact | Path |
 | --- | --- |
-| Installer | `tools/structure-viewer/windows/installer/Wilderness Structure Viewer-1.0.0.exe` |
+| Installer | `tools/structure-viewer/windows/installer/Wilderness Structure Viewer-1.0.1.exe` |
 | Portable application folder | `tools/structure-viewer/windows/image/Wilderness Structure Viewer/` |
 | Native-launcher report | `tools/structure-viewer/windows/launcher-diagnostics.json` |
+| Installer-upgrade report | `tools/structure-viewer/windows/installer-upgrade-diagnostics.json` |
 | Packaged UI screenshots | `tools/structure-viewer/reports/bundled-ui-smoke/` |
 
-The per-user installer offers a destination chooser, Start menu entry, and shortcut. Its input contains the application, Gson and its annotation dependency, their licenses, the project license, and bundled runtime. It includes no Minecraft assets, mod JARs, preferences, or test classes. Packages are unsigned until a separately configured release signing step is supplied. Verification runs the native launcher and packaged classes with their bundled runtime; it does not install/uninstall the application on the developer's machine. Installation, upgrades, and removal still need acceptance on a clean Windows machine before a public release.
+The per-user installer offers a destination chooser, Start menu entry, and shortcut. Its input contains the application, Gson and its annotation dependency, FlatLaf, their licenses, the project license, and bundled runtime. It includes no Minecraft assets, mod JARs, preferences, or test classes. Packages are unsigned until a separately configured release signing step is supplied. Verification runs the native launcher and packaged classes with their bundled runtime; it does not install/uninstall the application on the developer's machine. Installation, upgrades, and removal still need acceptance on a clean Windows machine before a stable release.
 
 Phase 3 remains future work: mission-aware markers, thumbnails, additional formats, and separately scoped editing.
 

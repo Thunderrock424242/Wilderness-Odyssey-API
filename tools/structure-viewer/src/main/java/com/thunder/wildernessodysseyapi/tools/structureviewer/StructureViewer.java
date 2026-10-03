@@ -58,6 +58,7 @@ public final class StructureViewer {
         json.addProperty("javaVersion",System.getProperty("java.version"));
         json.addProperty("javaHome",System.getProperty("java.home"));
         json.addProperty("applicationPath",System.getProperty("jpackage.app-path","Gradle / Java launcher"));
+        json.addProperty("applicationVersion",System.getProperty("structureViewer.version","development"));
         json.addProperty("modpack",root.toString());json.addProperty("settings",settings.toString());
         json.addProperty("archiveSupport",java.nio.file.spi.FileSystemProvider.installedProviders().stream().anyMatch(p->p.getScheme().equals("jar")));
         json.addProperty("desktopSupport",!GraphicsEnvironment.isHeadless());

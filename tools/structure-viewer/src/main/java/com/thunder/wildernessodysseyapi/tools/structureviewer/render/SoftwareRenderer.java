@@ -28,7 +28,7 @@ public final class SoftwareRenderer {
                         boolean bounds,boolean blockEdges,boolean textures){
         BufferedImage image=new BufferedImage(width,height,BufferedImage.TYPE_INT_RGB);
         int[] pixels=((DataBufferInt)image.getRaster().getDataBuffer()).getData();
-        for(int y=0;y<height;y++)Arrays.fill(pixels,y*width,(y+1)*width,blend(0x182536,0x101820,(double)y/height));
+        Arrays.fill(pixels,0xebedf0);
         float[] depth=new float[pixels.length];int[] ids=new int[pixels.length];Arrays.fill(ids,-1);
         double focal=height*.9;
         List<Visible> transparent=new ArrayList<>();
@@ -110,8 +110,8 @@ public final class SoftwareRenderer {
                 int texel=textured?texture.sample((u*a.u*za+v*b.u*zb+w*c.u*zc)/z,(u*a.v*za+v*b.v*zb+w*c.v*zc)/z):0xff000000|face.color();
                 int alpha=texel>>>24;if(alpha<12)continue;
                 int color=tint(texel,face.quad().tint(),shade);
-                if(id==selected)color=blend(color,0x44eacf,.28);
-                if(wire&&Math.min(u,Math.min(v,w))<.025)color=0xc8fff0;
+                if(id==selected)color=blend(color,0x64a0e0,.28);
+                if(wire&&Math.min(u,Math.min(v,w))<.025)color=0x446993;
                 pixels[offset]=alpha<255?blend(pixels[offset],color,alpha/255.0):color;
                 depth[offset]=z;ids[offset]=id;
             }
@@ -131,7 +131,7 @@ public final class SoftwareRenderer {
         for(int y=1;y<height-1;y++)for(int x=1;x<width-1;x++){
             int i=y*width+x,id=ids[i];if(id<0)continue;
             if(ids[i-1]!=id||ids[i+1]!=id||ids[i-width]!=id||ids[i+width]!=id)
-                pixels[i]=id==selected?0x55ffe0:blend(pixels[i],0x071019,.5);
+                pixels[i]=id==selected?0x1765bd:blend(pixels[i],0x071019,.5);
         }
     }
 

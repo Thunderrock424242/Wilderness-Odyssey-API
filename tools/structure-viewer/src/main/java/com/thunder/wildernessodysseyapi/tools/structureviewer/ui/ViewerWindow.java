@@ -22,15 +22,15 @@ public final class ViewerWindow extends JFrame {
     private long scanGeneration;
     private Future<?> scan;
     private final List<Path> assetPacks=new ArrayList<>();
-    private final StructureBrowser browser=new StructureBrowser(entry->load(entry.source()));
+    private final StructureBrowser browser=new StructureBrowser(entry->load(entry.source()),this::rescan);
     private final JTextArea info=area(),inspector=area(),diagnostics=area(),metadata=area();
     private final JTabbedPane tabs=new JTabbedPane();
     private final JLabel status=new JLabel("Choose a structure to preview.");
-    private final JCheckBox air=new JCheckBox("Stored air"),bounds=new JCheckBox("Bounds"),wireframe=new JCheckBox("Wireframe"),
-            edges=new JCheckBox("Block edges",true),textures=new JCheckBox("Textures",true),autoReload=new JCheckBox("Auto reload",true),
-            entities=new JCheckBox("Entities"),blockEntities=new JCheckBox("Block entities"),coordinates=new JCheckBox("Coordinates");
+    private final JCheckBoxMenuItem air=new JCheckBoxMenuItem("Stored air"),bounds=new JCheckBoxMenuItem("Structure bounds"),wireframe=new JCheckBoxMenuItem("Wireframe"),
+            edges=new JCheckBoxMenuItem("Block edges",true),textures=new JCheckBoxMenuItem("Textures",true),autoReload=new JCheckBoxMenuItem("Reload automatically",true),
+            entities=new JCheckBoxMenuItem("Entities"),blockEntities=new JCheckBoxMenuItem("Block entities"),coordinates=new JCheckBoxMenuItem("Coordinates");
     private final JComboBox<RenderQuality> quality=new JComboBox<>(RenderQuality.values());
-    private final JSpinner layer=new JSpinner(new SpinnerNumberModel(-1,-1,0,1));
+    private final JSpinner layer=new LayerSpinner();
     private final StructureViewport viewport;
     private final ThreadPoolExecutor loader=new ThreadPoolExecutor(1,1,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(4),r->{
         Thread t=new Thread(r,"structure-viewer-loader");t.setDaemon(true);return t;
@@ -47,7 +47,7 @@ public final class ViewerWindow extends JFrame {
 
     /** Builds the application on the event thread and restores explicit user preferences. */
     public ViewerWindow(Path project,Path build){
-        super("Wilderness Odyssey · Structure Viewer");
+        super("Wilderness Structure Viewer");
         this.project=project.toAbsolutePath().normalize();
         this.build=build;
         setIconImages(List.of(ViewerTheme.icon(32),ViewerTheme.icon(64),ViewerTheme.icon(256)));
@@ -55,25 +55,42 @@ public final class ViewerWindow extends JFrame {
         viewport=new StructureViewport(this::inspect,this::reload);
         restoreSettings();
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
-        setMinimumSize(new Dimension(1080,680));
+        setMinimumSize(new Dimension(980,600));
         Dimension screen=Toolkit.getDefaultToolkit().getScreenSize();
-        setSize(Math.min(1540,screen.width-60),Math.min(960,screen.height-90));
+        setSize(Math.min(1440,screen.width-60),Math.min(900,screen.height-90));
         setLocationRelativeTo(null);
-        setLayout(new BorderLayout(8,8));
-        add(toolbars(),BorderLayout.NORTH);
-        tabs.addTab("Structure",new JScrollPane(info));tabs.addTab("Block",new JScrollPane(inspector));
-        tabs.addTab("Diagnostics",new JScrollPane(diagnostics));tabs.addTab("Metadata",new JScrollPane(metadata));
-        tabs.setPreferredSize(new Dimension(340,600));viewport.setMinimumSize(new Dimension(300,300));
-        JSplitPane detail=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,viewport,tabs);detail.setResizeWeight(1);
+        setLayout(new BorderLayout());
+        add(header(),BorderLayout.NORTH);
+        info.setFont(new Font("Segoe UI",Font.PLAIN,13));
+        tabs.addTab("Summary",scroll(info));tabs.addTab("Block",scroll(inspector));
+        tabs.addTab("Issues",scroll(diagnostics));tabs.addTab("Data",scroll(metadata));
+        tabs.setToolTipTextAt(0,"Structure summary");tabs.setToolTipTextAt(1,"Selected block");
+        tabs.setToolTipTextAt(2,"Validation and missing assets");tabs.setToolTipTextAt(3,"Original metadata");
+        tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+        JPanel inspection=new JPanel(new BorderLayout());
+        JLabel inspectorTitle=new JLabel("Inspector");inspectorTitle.setFont(inspectorTitle.getFont().deriveFont(Font.BOLD,14f));
+        inspectorTitle.setBorder(BorderFactory.createEmptyBorder(14,14,8,14));inspection.add(inspectorTitle,BorderLayout.NORTH);
+        inspection.add(tabs);inspection.setPreferredSize(new Dimension(282,600));inspection.setMinimumSize(new Dimension(250,200));
+        JPanel preview=new JPanel(new BorderLayout());preview.add(previewControls(),BorderLayout.NORTH);preview.add(viewport);
+        preview.setMinimumSize(new Dimension(430,200));
+        JSplitPane detail=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,preview,inspection);detail.setResizeWeight(1);
         JSplitPane main=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,browser,detail);main.setResizeWeight(0);
         main.setBorder(BorderFactory.createEmptyBorder());detail.setBorder(BorderFactory.createEmptyBorder());
+        main.setContinuousLayout(true);detail.setContinuousLayout(true);
         add(main,BorderLayout.CENTER);
-        JPanel footer=new JPanel(new GridLayout(2,1,0,3));footer.setBorder(BorderFactory.createEmptyBorder(2,10,8,10));
-        footer.add(status);footer.add(new JLabel("F1 orbit · F2 fly · Right-drag look · WASD move · Space/Shift vertical · Ctrl slow · Wheel speed/zoom · G focus selected block"));
+        JPanel footer=new JPanel(new BorderLayout(12,0));
+        footer.setBackground(ViewerTheme.BACKGROUND);
+        footer.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(1,0,0,0,ViewerTheme.BORDER),
+                BorderFactory.createEmptyBorder(4,14,4,10)));
+        status.setForeground(ViewerTheme.MUTED);status.setFont(status.getFont().deriveFont(12f));
+        status.setToolTipText(project.toString());footer.add(status);
+        JButton help=button("Controls",this::showControls);help.putClientProperty("JButton.buttonType","borderless");
+        help.setToolTipText("Keyboard and mouse controls · Version "+System.getProperty("structureViewer.version","development"));
+        help.setMargin(new Insets(3,8,3,8));footer.add(help,BorderLayout.EAST);
         add(footer,BorderLayout.SOUTH);
         air.addActionListener(event->rebuild());
         layer.addChangeListener(event->{if(!updatingControls)rebuild();});
-        for(JCheckBox box:List.of(bounds,wireframe,edges,textures,entities,blockEntities,coordinates))
+        for(JCheckBoxMenuItem box:List.of(bounds,wireframe,edges,textures,entities,blockEntities,coordinates))
             box.addActionListener(event->{displayOptions();saveSettings();});
         quality.addActionListener(event->{displayOptions();saveSettings();});
         autoReload.addActionListener(event->{watchCurrent();saveSettings();});
@@ -84,33 +101,54 @@ public final class ViewerWindow extends JFrame {
             }
         });
         inspector.setText("Left-click a visible block to inspect it. Press G to examine it closely.");
-        info.setText("NBT and Blueprint-v1 structure inspection\n\nReal block models/textures are read from local assets. "
-                +"Missing assets remain visible as checkerboard placeholders.\n\nChoose High or Ultra and enable Block edges to distinguish individual blocks.");
+        info.setText("No structure selected\n\nOpen a modpack, then choose a template from the library. Its dimensions and contents will appear here.");
+        SwingUtilities.invokeLater(()->{
+            if(closed)return;
+            main.setDividerLocation(250);detail.setDividerLocation(Math.max(430,detail.getWidth()-287));
+        });
         displayOptions();rescan();
     }
 
-    private JPanel toolbars(){
-        JPanel rows=new JPanel(new BorderLayout(0,8));rows.setBorder(BorderFactory.createEmptyBorder(12,14,8,14));
-        JPanel heading=new JPanel(new BorderLayout());
-        JLabel title=new JLabel("WILDERNESS ODYSSEY  /  Structure Viewer");
-        title.setFont(title.getFont().deriveFont(Font.BOLD,18f));title.setForeground(ViewerTheme.TEXT);
-        heading.add(title,BorderLayout.WEST);JLabel hint=new JLabel("Explore • Inspect • Build");hint.setForeground(ViewerTheme.MUTED);
-        heading.add(hint,BorderLayout.EAST);rows.add(heading,BorderLayout.NORTH);
-        JPanel controls=new JPanel(new GridLayout(2,1,0,5));
-        JToolBar files=new JToolBar();files.setFloatable(false);
-        button(files,"Open modpack…",this::chooseModpack);button(files,"Open structure…",this::openFile);button(files,"Reload (R)",this::reload);
-        button(files,"Rescan",this::rescan);button(files,"Add assets…",this::addAssets);
-        button(files,"Clear added assets",()->{assetPacks.clear();saveSettings();reload();});
-        button(files,"Focus all (F)",viewport::focusStructure);button(files,"Focus block (G)",viewport::focusSelected);
-        files.add(autoReload);controls.add(files);
-        JToolBar view=new JToolBar();view.setFloatable(false);view.add(new JLabel("Quality: "));
-        quality.setMaximumSize(new Dimension(125,30));view.add(quality);
-        view.add(edges);view.add(textures);view.add(bounds);view.add(wireframe);view.add(air);
-        view.add(new JLabel("Y (-1 = all): "));layer.setMaximumSize(new Dimension(75,30));view.add(layer);
-        view.add(entities);view.add(blockEntities);view.add(coordinates);controls.add(view);
-        JScrollPane horizontal=new JScrollPane(controls,JScrollPane.VERTICAL_SCROLLBAR_NEVER,JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        horizontal.setBorder(BorderFactory.createEmptyBorder());horizontal.setPreferredSize(new Dimension(900,controls.getPreferredSize().height+15));
-        rows.add(horizontal,BorderLayout.CENTER);return rows;
+    private JPanel header(){
+        JPanel header=new JPanel(new BorderLayout(20,0));header.setName("app-header");
+        header.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0,0,1,0,ViewerTheme.BORDER),
+                BorderFactory.createEmptyBorder(12,16,12,16)));
+        JLabel title=new JLabel("Structure Viewer",new ImageIcon(ViewerTheme.icon(28)),SwingConstants.LEFT);
+        title.setIconTextGap(10);title.setFont(title.getFont().deriveFont(Font.BOLD,17f));header.add(title);
+        JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0));
+        JButton openPack=button("Open modpack…",this::chooseModpack);openPack.setName("open-modpack");
+        openPack.putClientProperty("FlatLaf.style","background: #1765bd; foreground: #ffffff; borderColor: #1765bd; hoverBackground: #1256a3; pressedBackground: #104c91");
+        JButton openStructure=button("Open structure…",this::openFile);openStructure.setName("open-structure");
+        JButton reload=button("Reload",this::reload);reload.setToolTipText("Reload the selected structure (R)");
+        JPopupMenu assets=new JPopupMenu();menuItem(assets,"Add local assets…",this::addAssets);
+        menuItem(assets,"Clear added assets",()->{assetPacks.clear();saveSettings();reload();});
+        actions.add(openPack);actions.add(openStructure);actions.add(reload);actions.add(popupButton("Assets",assets));
+        header.add(actions,BorderLayout.EAST);return header;
+    }
+
+    private JPanel previewControls(){
+        JPanel controls=new JPanel(new FlowLayout(FlowLayout.LEFT,7,8));controls.setName("preview-toolbar");
+        controls.setBackground(ViewerTheme.BACKGROUND);
+        controls.setBorder(BorderFactory.createMatteBorder(0,0,1,0,ViewerTheme.BORDER));
+        JLabel qualityLabel=new JLabel("Quality");qualityLabel.setLabelFor(quality);controls.add(qualityLabel);
+        quality.setPreferredSize(new Dimension(100,30));quality.setName("render-quality");
+        quality.setToolTipText("Rendering detail: Fast, Balanced, High, or Ultra");controls.add(quality);
+        JLabel layerLabel=new JLabel("Layer");layerLabel.setLabelFor(layer);controls.add(layerLabel);
+        layer.setPreferredSize(new Dimension(64,30));layer.setName("y-layer");controls.add(layer);
+        JPopupMenu options=new JPopupMenu();
+        menuItem(options,"Fit structure (F)",viewport::focusStructure);
+        menuItem(options,"Focus selected block (G)",viewport::focusSelected);options.addSeparator();
+        options.add(textures);options.add(edges);options.add(bounds);options.add(wireframe);options.add(air);
+        options.addSeparator();options.add(entities);options.add(blockEntities);options.add(coordinates);
+        options.addSeparator();options.add(autoReload);
+        JButton view=popupButton("View options",options);view.setName("view-options");controls.add(view);
+        return controls;
+    }
+
+    private void showControls(){
+        JOptionPane.showMessageDialog(this,"Right-drag    Rotate or look around\nMouse wheel    Zoom or change flying speed\n\n"
+                +"F1    Orbit camera\nF2    Free camera\nW / A / S / D    Move in free camera\nSpace / Shift    Move up / down\nCtrl    Precision movement\n\n"
+                +"Left-click    Inspect a block\nF    Fit structure\nG    Focus selected block\nR    Reload structure", "Viewer controls · "+System.getProperty("structureViewer.version","development"),JOptionPane.INFORMATION_MESSAGE);
     }
     private void restoreSettings(){
         try{
@@ -131,10 +169,22 @@ public final class ViewerWindow extends JFrame {
     }
     private static JTextArea area(){
         JTextArea result=new JTextArea();result.setEditable(false);result.setLineWrap(true);result.setWrapStyleWord(true);
-        result.setMargin(new Insets(12,12,12,12));result.setFont(new Font(Font.MONOSPACED,Font.PLAIN,12));return result;
+        result.setMargin(new Insets(16,14,16,14));result.setFont(new Font("Consolas",Font.PLAIN,12));
+        result.setBackground(ViewerTheme.PANEL);result.setForeground(ViewerTheme.TEXT);return result;
     }
-    private static void button(JToolBar bar,String title,Runnable action){
-        JButton button=new JButton(title);button.setFocusable(false);button.setMargin(new Insets(6,10,6,10));button.addActionListener(event->action.run());bar.add(button);
+    private static JScrollPane scroll(JTextArea text){
+        JScrollPane scroll=new JScrollPane(text);scroll.setBorder(BorderFactory.createEmptyBorder());return scroll;
+    }
+    private static JButton button(String title,Runnable action){
+        JButton button=new JButton(title);button.addActionListener(event->action.run());return button;
+    }
+    private static void menuItem(JPopupMenu menu,String title,Runnable action){
+        JMenuItem item=new JMenuItem(title);item.addActionListener(event->action.run());menu.add(item);
+    }
+    private static JButton popupButton(String title,JPopupMenu menu){
+        JButton button=new JButton(title,ViewerTheme.dropdownIcon());
+        button.setHorizontalTextPosition(SwingConstants.LEFT);button.setIconTextGap(8);
+        button.addActionListener(event->menu.show(button,0,button.getHeight()));return button;
     }
     private void openFile(){
         JFileChooser chooser=new JFileChooser(project.toFile());
@@ -164,6 +214,7 @@ public final class ViewerWindow extends JFrame {
         diagnostics.setText("");metadata.setText("");
         info.setText("Modpack: "+project+"\n\nSelect a template from a mod JAR in the library.");
         inspector.setText("Select a structure, then click a block to inspect it.");
+        status.setToolTipText(project.toString());
         saveSettings();rescan();
     }
 
@@ -210,7 +261,7 @@ public final class ViewerWindow extends JFrame {
                     try(var assets=AssetRepository.discover(root,packs)){
                         models=ResolvedModels.capture(data,new BlockModelResolver(assets,BlockStateCatalog.discover(root,build)),assets.sources());
                     }
-                    snapshot=new PreparedPreview(data,models,(source.archived()?"Archive entry: "+source.entry()+"\n\n":"")+StructureDetails.summary(data),
+                    snapshot=new PreparedPreview(data,models,StructureDetails.summary(data)+(source.archived()?"\n\nArchive entry\n"+source.entry():""),
                             String.join("\n",StructureValidation.inspect(data)),DebugOverlay.prepare(data));
                 }
                 PreparedPreview result=snapshot;StructureData data=result.data();

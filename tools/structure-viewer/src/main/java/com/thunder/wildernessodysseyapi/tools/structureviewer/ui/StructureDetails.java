@@ -12,13 +12,13 @@ final class StructureDetails {
     static String summary(StructureData data) {
         long nonAir = data.blocks().stream().filter(block -> !data.state(block).isAir()).count();
         long blockEntities = data.blocks().stream().filter(block -> block.blockEntity() != null).count();
-        return data.name() + "\n\nSource file\n" + data.source()
+        return data.name() + "\n\nSource file\n" + data.source().getFileName()
                 + "\n\nDimensions (X / Y / Z)\n" + data.size().x() + " / " + data.size().y() + " / " + data.size().z()
                 + "\n\nStored blocks: " + data.blocks().size() + "\nNon-air blocks: " + nonAir
                 + "\nPrimary palette: " + data.palettes().getFirst().size() + "\nPalette variants: " + data.palettes().size()
                 + "\nBlock-entity records: " + blockEntities + "\nEntities: " + data.entities().size()
-                + "\n\nTextured model preview\nHigh/Ultra improve pixel detail; Block edges separates neighboring blocks. "
-                + "Select a block and press G to inspect it closely. Custom Java renderers use placeholders.";
+                + "\n\nClick a block to inspect it. Press G to focus the selected block."
+                + "\nUse Layer to inspect a single floor.";
     }
 
     static String inspection(StructureData data, int index) {

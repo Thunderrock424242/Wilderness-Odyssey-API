@@ -52,6 +52,7 @@ public final class UiSmokeTest {
                 if (window.loadError() != null) throw new IllegalStateException(window.loadError());
                 return window.loadedStructure() != null && window.viewport().renderingIdle();
             },120000);
+            verifyLayout(window,output);
             edt(() -> {
                 if (!window.isShowing()) throw new AssertionError("Viewer window did not launch.");
                 if (!window.loadedStructure().source().equals(requestedFixture))
@@ -147,6 +148,10 @@ public final class UiSmokeTest {
     }
 
     private static void verifyModpack(ViewerWindow window,Path project,Path output) throws Exception {
+        Path emptyPack=Files.createDirectories(output.resolve("empty-modpack"));
+        edt(() -> {window.openModpack(emptyPack);return null;});
+        await(() -> window.loadedStructure()==null && window.viewport().renderingIdle(),15000);
+        snapshot(window,output.resolve("empty-state.png"));
         Path pack=Files.createDirectories(output.resolve("modpack-fixture"));
         Path mods=Files.createDirectories(pack.resolve("mods")),jar=mods.resolve("demo-structures.jar");
         byte[] shelter=Files.readAllBytes(project.resolve("src/main/structure_blueprints/test_shelter.json"));
@@ -159,6 +164,12 @@ public final class UiSmokeTest {
         await(() -> house.equals(window.loadedSource()) && window.viewport().renderingIdle(),120000);
         var shelterView=edt(() -> window.viewport().cameraView());
         snapshot(window,output.resolve("modpack-library.png"));
+        java.awt.Dimension fullSize=edt(window::getSize);
+        edt(() -> {window.setSize(1024,680);window.validate();return null;});
+        awaitSizedFrame(window);
+        snapshot(window,output.resolve("laptop-modpack-library.png"));
+        edt(() -> {window.setSize(fullSize);window.validate();return null;});
+        awaitSizedFrame(window);
         var room=new StructureSource(jar,"data/demo/structure/room.json");
         edt(() -> {if(!selectInLibrary(window,room))throw new AssertionError("Room absent from the JAR library.");return null;});
         await(() -> room.equals(window.loadedSource()) && window.viewport().renderingIdle(),15000);
@@ -179,6 +190,86 @@ public final class UiSmokeTest {
         if(!edt(() -> window.loadedStructure().source()).equals(jar.toAbsolutePath().normalize()))
             throw new AssertionError("Archive source identity was lost.");
         System.out.println("MODPACK GUI PASSED: grouped JAR selection, NBT/JSON, source immutability, switching entries fits camera, atomic JAR reload preserves camera, shrinking Y layer.");
+    }
+
+    private static void verifyLayout(ViewerWindow window,Path output) throws Exception {
+        java.awt.Dimension original=edt(window::getSize);
+        edt(() -> {window.setSize(980,640);window.validate();return null;});
+        awaitSizedFrame(window);
+        edt(() -> {
+            for(String name:java.util.List.of("open-modpack","open-structure","render-quality","y-layer","view-options")) {
+                Component control=find(window,name);
+                if(control==null || !control.isShowing())throw new AssertionError("Missing visible control: "+name);
+                for(Container parent=control.getParent();parent!=null;parent=parent.getParent()) {
+                    java.awt.Rectangle rect=SwingUtilities.convertRectangle(control.getParent(),control.getBounds(),parent);
+                    if(!new java.awt.Rectangle(0,0,parent.getWidth(),parent.getHeight()).contains(rect))
+                        throw new AssertionError("Clipped control at laptop size: "+name+" in "+parent.getClass().getSimpleName());
+                }
+            }
+            var spinner=(javax.swing.JSpinner)find(window,"y-layer");
+            var field=((javax.swing.JSpinner.DefaultEditor)spinner.getEditor()).getTextField();
+            if(!field.getText().equals("All"))throw new AssertionError("The full-structure layer should read All.");
+            field.setText("All");field.commitEdit();
+            if(!spinner.getValue().equals(-1))throw new AssertionError("Typing All did not restore the full-structure layer.");
+            return null;
+        });
+        snapshot(window,output.resolve("laptop-layout.png"));
+        edt(() -> {window.setSize(original);window.validate();return null;});
+        awaitSizedFrame(window);
+        var textured=edt(() -> window.viewport().renderedFrame());
+        var structure=edt(window::loadedStructure);
+        var camera=edt(() -> window.viewport().cameraView());
+        clickViewOption(window,"Textures");
+        await(() -> window.viewport().renderingIdle(),15000);
+        var plain=edt(() -> window.viewport().renderedFrame());
+        if(structure!=edt(window::loadedStructure) || !camera.equals(edt(() -> window.viewport().cameraView())))
+            throw new AssertionError("Texture menu toggle reloaded the structure or changed the camera.");
+        if(java.util.Arrays.stream(plain.blockIds()).noneMatch(id -> id>=0))throw new AssertionError("Texture menu toggle lost block picking.");
+        if(java.util.Arrays.equals(textured.image().getRGB(0,0,textured.image().getWidth(),textured.image().getHeight(),null,0,textured.image().getWidth()),
+                plain.image().getRGB(0,0,plain.image().getWidth(),plain.image().getHeight(),null,0,plain.image().getWidth())))
+            throw new AssertionError("The actual View options menu did not change textured rendering.");
+        clickViewOption(window,"Textures");
+        await(() -> window.viewport().renderingIdle(),15000);
+        // Cutout/translucent texels legitimately change visible picks when textures are off.
+        // Restoring textures must restore the original picks for the same mesh and camera.
+        if(!java.util.Arrays.equals(textured.blockIds(),edt(() -> window.viewport().renderedFrame().blockIds())))
+            throw new AssertionError("Restoring textures did not restore the original block picks.");
+        System.out.println("LAYOUT GUI PASSED: controls remain visible at 980x640, All layer input, View options texture toggle and restored picking.");
+    }
+
+    private static void awaitSizedFrame(ViewerWindow window) throws Exception {
+        await(() -> {
+            var viewport=window.viewport();if(!viewport.renderingIdle())return false;
+            double scale=RenderQuality.HIGH.scale(viewport.getWidth(),viewport.getHeight());
+            return viewport.renderedFrame().image().getWidth()==Math.max(1,(int)(viewport.getWidth()*scale))
+                    && viewport.renderedFrame().image().getHeight()==Math.max(1,(int)(viewport.getHeight()*scale));
+        },15000);
+    }
+
+    private static void clickViewOption(ViewerWindow window,String text) throws Exception {
+        edt(() -> {
+            ((javax.swing.JButton)find(window,"view-options")).doClick();
+            for(var element:javax.swing.MenuSelectionManager.defaultManager().getSelectedPath()) {
+                if(element.getComponent() instanceof javax.swing.JPopupMenu popup) {
+                    for(Component component:popup.getComponents()) {
+                        if(component instanceof javax.swing.JCheckBoxMenuItem item && item.getText().equals(text)) {
+                            item.doClick();javax.swing.MenuSelectionManager.defaultManager().clearSelectedPath();return null;
+                        }
+                    }
+                }
+            }
+            throw new AssertionError("View option not found: "+text);
+        });
+    }
+
+    private static Component find(Container root,String name) {
+        for(Component component:root.getComponents()) {
+            if(name.equals(component.getName()))return component;
+            if(component instanceof Container nested) {
+                Component result=find(nested,name);if(result!=null)return result;
+            }
+        }
+        return null;
     }
 
     private static boolean selectInLibrary(Container component,StructureSource source) {
