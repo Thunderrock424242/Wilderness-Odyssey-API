@@ -36,6 +36,7 @@ public final class ViewerWindow extends JFrame {
     private final LoadingScreen loadingScreen=new LoadingScreen();
     private JPanel headerPanel,previewToolbar,footer;
     private JButton openPack;
+    private final ViewerUpdates updates;
     private boolean scanning,preparing,awaitingFrame;
     private final StructureViewport viewport;
     private final ThreadPoolExecutor loader=new ThreadPoolExecutor(1,1,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(4),r->{
@@ -56,6 +57,7 @@ public final class ViewerWindow extends JFrame {
         super("Wilderness Structure Viewer");
         this.project=project.toAbsolutePath().normalize();
         this.build=build;
+        updates=new ViewerUpdates(this,build.resolve("tools/structure-viewer/updates"));
         setIconImages(List.of(ViewerTheme.icon(32),ViewerTheme.icon(64),ViewerTheme.icon(256)));
         settingsFile=Path.of(System.getProperty("structureViewer.settings",build.resolve("tools/structure-viewer/settings.properties").toString()));
         viewport=new StructureViewport(this::inspect,this::reload);
@@ -96,7 +98,9 @@ public final class ViewerWindow extends JFrame {
         status.setToolTipText(project.toString());footer.add(status);
         JButton help=button("Controls",this::showControls);help.putClientProperty("JButton.buttonType","borderless");
         help.setToolTipText("Keyboard and mouse controls · Version "+System.getProperty("structureViewer.version","development"));
-        help.setMargin(new Insets(3,8,3,8));footer.add(help,BorderLayout.EAST);
+        help.setMargin(new Insets(3,8,3,8));
+        JPanel footerActions=new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0));footerActions.setOpaque(false);
+        footerActions.add(updates.button());footerActions.add(help);footer.add(footerActions,BorderLayout.EAST);
         add(footer,BorderLayout.SOUTH);
         air.addActionListener(event->rebuild());
         layer.addChangeListener(event->{if(!updatingControls)rebuild();});
@@ -108,8 +112,10 @@ public final class ViewerWindow extends JFrame {
             ViewerTheme.install(darkMode.isSelected());com.formdev.flatlaf.FlatLaf.updateUI();applyTheme();saveSettings();
         });
         addWindowListener(new WindowAdapter(){
+            @Override public void windowClosing(WindowEvent event){updates.close();}
             @Override public void windowClosed(WindowEvent event){
                 closed=true;generation++;loadingScreen.stop();if(watcher!=null)watcher.close();
+                updates.close();
                 if(pending!=null)pending.cancel(true);if(scan!=null)scan.cancel(true);browser.close();loader.shutdownNow();viewport.close();
             }
         });
@@ -120,6 +126,8 @@ public final class ViewerWindow extends JFrame {
             main.setDividerLocation(250);detail.setDividerLocation(Math.max(430,detail.getWidth()-287));
         });
         applyTheme();displayOptions();rescan();
+        if(System.getProperty("structureViewer.projectDir")==null&&!Boolean.getBoolean("structureViewer.disableUpdateCheck"))
+            SwingUtilities.invokeLater(()->updates.check(false));
     }
 
     private JPanel header(){
@@ -136,7 +144,9 @@ public final class ViewerWindow extends JFrame {
         JButton reload=button("Reload",this::reload);reload.setToolTipText("Reload the selected structure (R)");
         JPopupMenu assets=new JPopupMenu();menuItem(assets,"Add local assets…",this::addAssets);
         menuItem(assets,"Clear added assets",()->{assetPacks.clear();saveSettings();reload();});
-        actions.add(openPack);actions.add(openStructure);actions.add(reload);actions.add(popupButton("Assets",assets));
+        JButton assetButton=popupButton("Assets",assets);
+        assetButton.setToolTipText("Mod textures and block models load automatically from this modpack. Add resource packs or missing client assets here.");
+        actions.add(openPack);actions.add(openStructure);actions.add(reload);actions.add(assetButton);
         darkMode.setName("theme-toggle");darkMode.setIconTextGap(8);darkMode.setMargin(new Insets(6,8,6,8));
         darkMode.setPreferredSize(new Dimension(96,32));
         darkMode.setToolTipText("Switch between light and dark appearance; your choice is saved");

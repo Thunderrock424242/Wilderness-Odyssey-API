@@ -18,11 +18,15 @@ The native build also produces a portable application folder under `<build>/tool
 
 Only concrete template files under `data/<namespace>/structure/` or `structures/` are previewed. A mod may generate structures entirely in Java or assemble many templates through jigsaw/worldgen rules. Those systems require Minecraft; the viewer displays the stored pieces it can find. It never scans saves or generates a world.
 
-The installer does not contain Minecraft assets. Installed local client assets, mod JARs, and **Assets → Add local assets…** supply textures and models. Missing assets remain visible as placeholders with diagnostics. Native preferences live in `%LOCALAPPDATA%/WildernessOdyssey/StructureViewer/settings.properties`.
+The installer does not contain Minecraft assets. Opening a modpack automatically reads its mod JARs for blockstates, static block models, and textures. A structure can reference a block from another mod; all scanned mod JARs participate in asset resolution. Installed local Minecraft client assets supply vanilla parent models used by mods. CurseForge's shared `minecraft/Install/versions/1.21.1/1.21.1.jar` is recognized beside `Instances`, including instances stored outside the default user folder. **Assets → Add local assets…** supplies additional packs or missing client assets. Missing assets remain visible as placeholders with diagnostics. Native preferences live in `%LOCALAPPDATA%/WildernessOdyssey/StructureViewer/settings.properties`.
 
 ### Updating an installed copy
 
-Close the viewer and run the newer installer while signed in as the same Windows user. Version **1.0.2** uses the same Windows upgrade identity as **1.0.0** and **1.0.1**, so Windows Installer detects and replaces the older registered installation. The 1.0.2 installer refuses to install over a newer installed version. Preferences are stored outside the application directory and are retained. A portable application folder is not a registered installation; replace that entire folder when updating it.
+Version **1.0.3** adds **Check for updates** in the footer. Installed launches also check once in the background. The public GitHub releases feed is filtered to `structure-viewer-v<major.minor.patch>` tags and the highest numeric version, including viewer preview releases. Minecraft mod releases do not affect the check. No GitHub account or token is required. Development launches skip automatic checks; `-DstructureViewer.disableUpdateCheck=true` also disables the startup check.
+
+When a newer installer exists, the prompt offers **Update** and **Later**. Update downloads the official Windows installer, checks its size and SHA-256 against both GitHub metadata and the published checksum, starts the normal Windows setup wizard, and then closes the viewer. Later leaves the viewer open and reminds you on the next launch; a manual check can offer it again during the same session. Only clicking Update downloads or starts an installer. Automatic checks remain quiet when offline; manual checks explain the error and let you retry. Download or setup launch failures keep the viewer open. Closing the viewer cancels an active download.
+
+The installer keeps the same Windows upgrade identity as **1.0.0**, **1.0.1**, and **1.0.2**, so Windows Installer detects and replaces an older registered installation for the same Windows user. It refuses to install over a newer version. Preferences are stored outside the application directory and are retained. Copies older than 1.0.3 need this installer downloaded and run manually once to gain the update button. A portable application folder is not a registered installation; replace that entire folder when updating it, or run Update to create/update a registered installation.
 
 `verifyWindowsInstaller` reads the generated MSI database without installing it. It checks the product version, stable upgrade code, range that detects/replaces 1.0.0, newer-version detection and blocking condition, and scheduled removal of the older product. This is package metadata validation; installation, upgrades, and removal still need acceptance on a clean Windows machine.
 
@@ -112,8 +116,8 @@ The first matching asset wins, in this order:
 1. Added sources, newest first.
 2. Project `src/main/resources` and `src/generated/resources`.
 3. The selected root's `mods`, `run/mods`, and `datapacks` archives, in filename order within each folder.
-4. The `structureViewer.minecraftJar` JVM property, when supplied.
-5. The selected root's `versions/1.21.1/1.21.1.jar`, local NeoForm Minecraft 1.21.1 client assets, and the standard Windows launcher 1.21.1 JAR.
+4. The selected root's `versions/1.21.1/1.21.1.jar` and CurseForge's shared 1.21.1 client JAR, when present.
+5. The `structureViewer.minecraftJar` JVM property, when supplied, local NeoForm Minecraft 1.21.1 client assets, and the standard Windows launcher 1.21.1 JAR.
 
 **Assets → Add local assets** accepts a directory containing `assets/`, resource-pack ZIP, or mod/client JAR. The tool does not download, unpack, or redistribute Minecraft assets. Reload after editing assets. Diagnostics list actual sources; Clear added assets restores automatic sources.
 
@@ -155,11 +159,14 @@ The separate `tools/structure-viewer` application owns its classpath. Gson suppl
 - `assets`: ordered sources, existing catalog adapter, model/texture resolution.
 - `render`: cached model faces, camera, perspective-correct textures/picking, quality, markers.
 - `ui`: browser, preferences, asynchronous import/render, inspection.
+- `update`: viewer release selection, bounded HTTPS requests, and verified installer staging.
 - `validation`: shared diagnostics and headless entry point.
 
 StructureGen's existing reader depends on Minecraft and compiler-oriented validity. The isolated viewer adapter follows its formats without pulling in Minecraft or creating another compiler, mission owner, registry, or world-state system.
 
 Swing/camera are owned by the event thread. One loader with a bounded queue prepares the index/data/meshes, one renderer produces complete frames, and the watcher reports changes. Cancelled requests are removed from the queue; generation checks reject stale results. Closing the window closes the watcher, cancels loading, and stops input/render workers. Archives close after preparation. Decoded models/textures are retained for the current structure, so Y-layer and air changes avoid rereading assets or repeating full validation. A new import/reload replaces this snapshot. Frames are requested when the view changes. The renderer caches model-space normals/lighting and reuses opaque-face projection storage; translucent faces retain independent vertices.
+
+The updater owns a separate single daemon worker with a bounded queue. Network work never blocks the Swing event thread or structure loading. HTTPS requests have connect/read and overall deadlines, limited redirects to GitHub download hosts, a 4 MiB release response limit, and a 200 MiB installer limit. Downloads use temporary files and expose a final installer path only after verification; failed partial downloads are removed. Window shutdown disconnects HTTP and cancels the worker. The installed launcher stamps its application version independently of the Minecraft mod version.
 
 NBT limits: 64 MiB file, 256 MiB decoded data, depth 64, 4 million collection entries, 40 million tags. JSON limits: 64 MiB, depth 64, 8 million values. Archive indexing is capped at 20,000 templates, 200,000 entries per archive, and 4,096 archives per source directory. Assets are capped at 8 MiB each; texture dimensions/pixels, cache (32 million pixels), model parent depth, and faces are bounded. The launch heap is 2 GiB. Dense structures/Ultra can be expensive; reduce quality or use layers. Inspector text is capped at 32 KiB. Markers are capped at 10,000 prepared, 1,000 drawn, and 30 labels per frame.
 
@@ -167,11 +174,11 @@ NBT limits: 64 MiB file, 256 MiB decoded data, depth 64, 4 million collection en
 
 ### GitHub Actions artifact
 
-The **Structure Viewer Windows** workflow (`.github/workflows/structure-viewer-windows.yml`) builds the Windows x64 installer on pushes to `main` and `in-dev` that change the viewer, wrapper, license, or workflow. Pull requests with those changes also build it. Under **Actions → Structure Viewer Windows → a successful run → Artifacts**, download `wilderness-structure-viewer-windows-x64-1.0.2`. Extract the artifact ZIP to obtain the installer `.exe` and its SHA-256 checksum.
+The **Structure Viewer Windows** workflow (`.github/workflows/structure-viewer-windows.yml`) builds the Windows x64 installer on pushes to `main` and `in-dev` that change the viewer, wrapper, license, or workflow. Pull requests with those changes also build it. Under **Actions → Structure Viewer Windows → a successful run → Artifacts**, download `wilderness-structure-viewer-windows-x64-1.0.3`. Extract the artifact ZIP to obtain the installer `.exe` and its SHA-256 checksum.
 
 The installer artifact is retained for 30 days; test and launcher diagnostics are retained for 14 days. The run summary links to the installer download. This uploads a build artifact, without creating a GitHub Release or signing the executable.
 
-**Run workflow** allows a manual build with a `major.minor.patch` installer version, defaulting to `1.0.2`. Until this workflow is on the repository's default branch, its automatic push/PR triggers provide builds; GitHub's manual workflow button requires the workflow on the default branch.
+**Run workflow** allows a manual build with a `major.minor.patch` installer version, defaulting to `1.0.3`. Until this workflow is on the repository's default branch, its automatic push/PR triggers provide builds; GitHub's manual workflow button requires the workflow on the default branch.
 
 CI uses the standalone Gradle module, JDK 21, and the same checksum-verified portable packaging tools as local builds. It runs the viewer unit tests, builds the installer, checks MSI upgrade metadata, and launches the packaged `.exe` to verify its bundled runtime and archive support. It does not download Minecraft assets or run the main mod build. The optional vanilla-asset integration test skips when local assets are absent; desktop smoke checks remain local acceptance tests.
 
@@ -186,13 +193,13 @@ Build on Windows with JDK 21 containing `jpackage.exe` and WiX 3's `candle.exe`/
 .\gradlew.bat -p tools/structure-viewer verifyWindowsInstaller verifyWindowsLauncher bundledUiSmokeTest '-PcodexBuildDir=.codex-build' '-PviewerPackagingJdk=C:/path/to/jdk-21' '-PviewerRuntimeDir=C:/path/printed/by/helper/jdk-21.0.12.1+1-jre' '-PviewerWixDir=C:/path/printed/by/helper/wix-3.14.1' --no-parallel
 ```
 
-`structureViewerInstaller` is the root alias for `:tools:structure-viewer:windowsInstaller`. The standalone invocation avoids configuring NeoForge. `viewerPackagingJdk` defaults to Gradle's Java 21 toolchain. `viewerRuntimeDir` is optional: without it, jpackage builds a reduced Java 21 runtime including desktop and ZIP filesystem modules from that JDK. Choose a runtime licensed for redistribution; the supplied helper uses Temurin and the bundle retains runtime legal files. `-PviewerVersion=1.0.2` controls installer versioning; the upgrade identity stays stable.
+`structureViewerInstaller` is the root alias for `:tools:structure-viewer:windowsInstaller`. The standalone invocation avoids configuring NeoForge. `viewerPackagingJdk` defaults to Gradle's Java 21 toolchain. `viewerRuntimeDir` is optional: without it, jpackage builds a reduced Java 21 runtime including desktop and ZIP filesystem modules from that JDK. Choose a runtime licensed for redistribution; the supplied helper uses Temurin and the bundle retains runtime legal files. `-PviewerVersion=1.0.3` controls installer versioning; the upgrade identity stays stable.
 
 Outputs beneath the selected build directory:
 
 | Artifact | Path |
 | --- | --- |
-| Installer | `tools/structure-viewer/windows/installer/Wilderness Structure Viewer-1.0.2.exe` |
+| Installer | `tools/structure-viewer/windows/installer/Wilderness Structure Viewer-1.0.3.exe` |
 | Portable application folder | `tools/structure-viewer/windows/image/Wilderness Structure Viewer/` |
 | Native-launcher report | `tools/structure-viewer/windows/launcher-diagnostics.json` |
 | Installer-upgrade report | `tools/structure-viewer/windows/installer-upgrade-diagnostics.json` |

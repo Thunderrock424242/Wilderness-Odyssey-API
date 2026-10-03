@@ -142,6 +142,7 @@ public final class UiSmokeTest {
             if(!edt(() -> java.util.Arrays.stream(window.viewport().renderedFrame().blockIds()).anyMatch(id -> id>=0)))
                 throw new AssertionError("Shrinking the export left an empty preview at the old Y layer.");
             verifyModpack(window,project,output);
+            UpdateUiSmoke.run(output.resolve("updates"));
             System.out.println("PHASE 2 GUI PASSED: JSON, atomic reload, camera preservation, failed reload recovery, Fast/Ultra resolution "+fastWidth+"/"+ultraWidth+", saved quality, G block focus.");
             System.out.println("GUI SMOKE PASSED: real window, existing " + fixture.getFileName()
                     + ", rendered blocks, click inspector, F2/W movement, mouse look, F1 orbit. Screenshot: " + output);
@@ -177,6 +178,14 @@ public final class UiSmokeTest {
         if(shelterView.equals(edt(() -> window.viewport().cameraView())))throw new AssertionError("Switching entries in one JAR did not fit the new structure.");
         if(!edt(() -> window.loadedStructure().state(window.loadedStructure().blocks().getFirst()).id()).equals("demo:preview_block"))
             throw new AssertionError("Selected the wrong JAR entry.");
+        var modFrame=edt(()->window.viewport().renderedFrame());boolean texturedPixel=false;
+        for(int y=0;y<modFrame.image().getHeight()&&!texturedPixel;y++)for(int x=0;x<modFrame.image().getWidth();x++) {
+            if(modFrame.pick(x,y)<0)continue;int rgb=modFrame.image().getRGB(x,y);
+            int red=(rgb>>16)&255,green=(rgb>>8)&255,blue=rgb&255;
+            if(green>red*1.5&&blue>red*1.5){texturedPixel=true;break;}
+        }
+        if(!texturedPixel)throw new AssertionError("The actual modpack preview did not render its cyan mod JAR texture.");
+        snapshot(window,output.resolve("mod-textured-block.png"));
         if(!java.util.Arrays.equals(original,Files.readAllBytes(jar)))throw new AssertionError("Preview modified the mod JAR.");
         var archiveView=edt(() -> window.viewport().cameraView());
         Path replacement=mods.resolve("replacement.tmp");
@@ -198,7 +207,7 @@ public final class UiSmokeTest {
         edt(() -> {window.setSize(980,640);window.validate();return null;});
         awaitSizedFrame(window);
         edt(() -> {
-            for(String name:java.util.List.of("open-modpack","open-structure","theme-toggle","render-quality","y-layer","view-options")) {
+            for(String name:java.util.List.of("open-modpack","open-structure","theme-toggle","render-quality","y-layer","view-options","check-updates")) {
                 Component control=find(window,name);
                 if(control==null || !control.isShowing())throw new AssertionError("Missing visible control: "+name);
                 for(Container parent=control.getParent();parent!=null;parent=parent.getParent()) {
@@ -338,6 +347,14 @@ public final class UiSmokeTest {
             put(out,"data/demo/structures/template.nbt",nbt);
             put(out,"data/demo/structure/shelter.json",shelter);
             put(out,"data/demo/structure/room.json",("{\"name\":\""+roomName+"\",\"size\":[1,1,1],\"blocks\":[{\"pos\":[0,0,0],\"block\":\"demo:preview_block\"}]}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            put(out,"assets/demo/blockstates/preview_block.json","{\"variants\":{\"\":{\"model\":\"demo:block/preview_block\"}}}".getBytes());
+            put(out,"assets/demo/models/block/preview_block.json","""
+                {"textures":{"all":"demo:block/preview_block"},"elements":[{"from":[0,0,0],"to":[16,8,16],"faces":{
+                "north":{"texture":"#all"},"south":{"texture":"#all"},"west":{"texture":"#all"},
+                "east":{"texture":"#all"},"up":{"texture":"#all"},"down":{"texture":"#all"}}}]}
+                """.getBytes());
+            var png=new java.io.ByteArrayOutputStream();var image=new BufferedImage(1,1,BufferedImage.TYPE_INT_ARGB);
+            image.setRGB(0,0,0xff34abcd);ImageIO.write(image,"png",png);put(out,"assets/demo/textures/block/preview_block.png",png.toByteArray());
         }
     }
     private static void put(ZipOutputStream out,String name,byte[] bytes) throws Exception {

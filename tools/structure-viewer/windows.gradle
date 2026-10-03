@@ -1,6 +1,6 @@
 // Native packaging is opt-in and never participates in the production mod's build or dependencies.
 def appName = 'Wilderness Structure Viewer'
-def appVersion = providers.gradleProperty('viewerVersion').getOrElse('1.0.2')
+def appVersion = providers.gradleProperty('viewerVersion').getOrElse('1.0.3')
 // Keep this identity unchanged so Windows recognizes every release as the same installed product.
 def upgradeUuid = '27ef4c02-4acd-4711-b59a-0cda1f8d2146'
 def nativeRoot = layout.buildDirectory.dir('windows')
@@ -70,10 +70,21 @@ tasks.register('windowsAppImage', Exec) {
             if (!info.getProperty('JAVA_VERSION','').startsWith('"21.')) throw new GradleException('viewerRuntimeDir must contain a Java 21 runtime.')
             command += ['--runtime-image', runtime.absolutePath]
         } else {
-            command += ['--add-modules', 'java.desktop,java.logging,java.management,jdk.management,jdk.unsupported,jdk.zipfs',
+            command += ['--add-modules', 'java.desktop,java.logging,java.management,jdk.management,jdk.unsupported,jdk.zipfs,jdk.crypto.ec',
                         '--jlink-options', '--strip-debug --no-man-pages --no-header-files']
         }
         commandLine command
+    }
+}
+tasks.register('bundledUpdateNetworkSmoke', Exec) {
+    group = 'verification'
+    description = 'Checks public GitHub releases and verifies an installer download with the bundled runtime; never starts setup.'
+    dependsOn windowsAppImage, testClasses
+    def smokeClasspath = files(sourceSets.test.output, fileTree(imageDir.get().dir('app')) { include '*.jar' })
+    doFirst {
+        commandLine imageDir.get().file('runtime/bin/java.exe').asFile.absolutePath,
+                '-cp', smokeClasspath.asPath, 'com.thunder.wildernessodysseyapi.tools.structureviewer.UpdateNetworkSmoke',
+                layout.buildDirectory.dir('reports/update-network-smoke').get().asFile.absolutePath
     }
 }
 tasks.register('windowsInstaller', Exec) {

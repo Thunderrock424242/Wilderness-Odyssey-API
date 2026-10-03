@@ -30,6 +30,13 @@ public final class AssetRepository implements AutoCloseable {
         catch (IOException error) { scanFailure = "Could not scan modpack assets: " + error.getMessage(); }
         Path versions = project.resolve("versions/1.21.1/1.21.1.jar");
         paths.add(versions);
+        // CurseForge keeps the shared client assets beside Instances, outside each pack's mods folder.
+        Path ancestor=project.toAbsolutePath().normalize();
+        for(int depth=0;depth<4&&ancestor!=null;depth++,ancestor=ancestor.getParent()) {
+            if(ancestor.getFileName()!=null&&ancestor.getFileName().toString().equalsIgnoreCase("Instances")&&ancestor.getParent()!=null)
+                paths.add(ancestor.getParent().resolve("Install/versions/1.21.1/1.21.1.jar"));
+        }
+        paths.add(Path.of(System.getProperty("user.home"),"curseforge/minecraft/Install/versions/1.21.1/1.21.1.jar"));
         String explicit = System.getProperty("structureViewer.minecraftJar", "");
         if (!explicit.isBlank()) paths.add(Path.of(explicit));
         String gradleHome = System.getenv("GRADLE_USER_HOME");

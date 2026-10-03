@@ -104,5 +104,44 @@ class ModpackCatalogTest {
             put(out,"data/demo/worldgen/structure/ignored.json","{}".getBytes());
         }
     }
+    @Test void resolvesModelsAndTexturesAcrossModsWithoutLeakingBetweenPacks() throws Exception {
+        Path first=Files.createDirectories(temp.resolve("first/mods")).getParent();
+        Path second=Files.createDirectories(temp.resolve("second/mods")).getParent();
+        for(Path pack:List.of(first,second)) {
+            try(var out=new ZipOutputStream(Files.newOutputStream(pack.resolve("mods/structure.jar")))) {
+                put(out,"data/demo/structure/room.json","{\"size\":[1,1,1],\"blocks\":[{\"pos\":[0,0,0],\"block\":\"demo:panel\"}]}".getBytes());
+                put(out,"assets/demo/blockstates/panel.json","{\"variants\":{\"\":{\"model\":\"demo:block/panel\"}}}".getBytes());
+                put(out,"assets/demo/models/block/panel.json","{\"parent\":\"library:block/slab\",\"textures\":{\"all\":\"materials:block/panel\"}}".getBytes());
+            }
+            try(var out=new ZipOutputStream(Files.newOutputStream(pack.resolve("mods/library.jar")))) {
+                put(out,"assets/library/models/block/slab.json","""
+                    {"elements":[{"from":[0,0,0],"to":[16,8,16],"faces":{
+                    "north":{"texture":"#all"},"south":{"texture":"#all"},"west":{"texture":"#all"},
+                    "east":{"texture":"#all"},"up":{"texture":"#all"},"down":{"texture":"#all"}}}]}
+                    """.getBytes());
+            }
+            var image=new java.awt.image.BufferedImage(1,1,java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            image.setRGB(0,0,pack.equals(first)?0xff34abcd:0xffcd5634);var png=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(image,"png",png);
+            try(var out=new ZipOutputStream(Files.newOutputStream(pack.resolve("mods/materials.jar")))) {put(out,"assets/materials/textures/block/panel.png",png.toByteArray());}
+            var data=StructureCatalog.scan(pack,temp.resolve("build")).entries().getFirst().source().read();
+            try(var assets=AssetRepository.discover(pack,List.of())) {
+                var models=ResolvedModels.capture(data,new BlockModelResolver(assets),assets.sources());
+                assertEquals(1,models.resolved(),models.diagnostics().toString());assertEquals(0,models.missing());
+                var model=models.models().get(data.state(data.blocks().getFirst()));
+                assertFalse(model.occludes());assertFalse(model.fallback());
+                assertTrue(model.quads().stream().flatMap(q->q.vertices().stream()).allMatch(vertex->vertex.y()<=.5));
+                assertEquals(pack.equals(first)?0xff34abcd:0xffcd5634,model.quads().getFirst().texture().sample(0,0));
+            }
+        }
+    }
+    @Test void usesCurseForgeInstallAssetsForVanillaParentsInModModels()throws Exception {
+        Path minecraft=Files.createDirectories(temp.resolve("curseforge/minecraft"));
+        Path pack=Files.createDirectories(minecraft.resolve("Instances/My Pack/mods")).getParent();
+        Path client=minecraft.resolve("Install/versions/1.21.1/1.21.1.jar");Files.createDirectories(client.getParent());
+        try(var out=new ZipOutputStream(Files.newOutputStream(client))) {put(out,"assets/minecraft/models/block/curseforge_fixture.json","{\"elements\":[]}".getBytes());}
+        try(var assets=AssetRepository.discover(pack,List.of())) {
+            assertTrue(assets.read("assets/minecraft/models/block/curseforge_fixture.json").isPresent());
+        }
+    }
     private static void put(ZipOutputStream out,String name,byte[] bytes) throws Exception { out.putNextEntry(new ZipEntry(name));out.write(bytes);out.closeEntry(); }
 }
