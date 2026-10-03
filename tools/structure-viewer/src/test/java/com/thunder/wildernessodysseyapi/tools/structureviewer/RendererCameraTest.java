@@ -62,6 +62,38 @@ class RendererCameraTest {
         assertEquals(0,frame.pick(170,150));assertEquals(1,frame.pick(230,150));
     }
 
+    @Test void keepsInsetFacesWhenAnOpaqueNeighborDoesNotTouchThem() {
+        BlockState slab=new BlockState("demo:slab",Map.of()),stone=new BlockState("demo:stone",Map.of());
+        var data=new StructureData("gap",Path.of("gap.json"),new Position(1,2,1),List.of(
+                new Block(new Position(0,0,0),0,null,Map.of()),new Block(new Position(0,1,0),1,null,Map.of())),
+                List.of(List.of(slab,stone)),List.of(),Map.of(),List.of());
+        var top=new BlockModel.Quad(List.of(new Vec3(0,.5,1),new Vec3(1,.5,1),new Vec3(1,.5,0),new Vec3(0,.5,0)),
+                new double[]{0,0,16,0,16,16,0,16},Texture.solid(0xabcdef),0xffffff,3,true);
+        var models=new ResolvedModels(Map.of(slab,new BlockModel(List.of(top),false,false)),List.of(),1,1,List.of());
+        var mesh=BlockMesh.build(data,false,-1,models);
+        assertTrue(mesh.faces().stream().anyMatch(face -> face.blockIndex()==0 && face.quad()==top),
+                "A solid block one layer above must not erase the inset slab top across an air gap.");
+    }
+
+    @Test void solidCubeHasNoInteriorPixelHolesAcrossAnglesAndResolutions() {
+        var blocks=new java.util.ArrayList<Block>();
+        for(int y=0;y<4;y++)for(int z=0;z<4;z++)for(int x=0;x<4;x++)blocks.add(block(x,y,z));
+        var mesh=BlockMesh.build(scene(blocks),false,-1);
+        for(int width:List.of(128,320,513))for(int angle=0;angle<8;angle++) {
+            Camera camera=new Camera();camera.focus(mesh);camera.look(angle*130,angle%2==0?0:35);
+            var frame=new SoftwareRenderer().render(mesh,camera.view(),width,width*3/4,-1,false,false);
+            int coveredRows=0;
+            for(int y=0;y<frame.image().getHeight();y++) {
+                int first=-1,last=-1;
+                for(int x=0;x<width;x++)if(frame.pick(x,y)>=0){if(first<0)first=x;last=x;}
+                if(first<0)continue;
+                coveredRows++;
+                for(int x=first;x<=last;x++)assertTrue(frame.pick(x,y)>=0,"Hole inside a solid cube at "+x+","+y+", width "+width+", angle "+angle);
+            }
+            assertTrue(coveredRows>10,"Solid cube should remain visible.");
+        }
+    }
+
     @Test void freeCameraMovesAndPrecisionSpeedWheelAndOrbitBehave() {
         Camera camera = new Camera();camera.focus(new Position(10,10,10));
         var initial = camera.view();

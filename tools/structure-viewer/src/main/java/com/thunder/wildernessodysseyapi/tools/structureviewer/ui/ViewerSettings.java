@@ -6,10 +6,13 @@ import java.nio.file.*;
 import java.util.*;
 
 /** Explicit local preferences under ignored tool output; quality is never auto-overridden. */
-public record ViewerSettings(RenderQuality quality,boolean edges,boolean textures,boolean autoReload,List<Path> assets,Path modpack) {
+public record ViewerSettings(RenderQuality quality,boolean edges,boolean textures,boolean autoReload,List<Path> assets,Path modpack,boolean darkMode) {
     public ViewerSettings{assets=List.copyOf(assets);}
     public ViewerSettings(RenderQuality quality,boolean edges,boolean textures,boolean autoReload,List<Path> assets) {
-        this(quality,edges,textures,autoReload,assets,null);
+        this(quality,edges,textures,autoReload,assets,null,false);
+    }
+    public ViewerSettings(RenderQuality quality,boolean edges,boolean textures,boolean autoReload,List<Path> assets,Path modpack) {
+        this(quality,edges,textures,autoReload,assets,modpack,false);
     }
     /** Restores saved controls or reports invalid settings to the caller. */
     public static ViewerSettings read(Path file)throws IOException{
@@ -25,13 +28,14 @@ public record ViewerSettings(RenderQuality quality,boolean edges,boolean texture
         for(int i=0;i<32;i++){String path=values.getProperty("asset."+i);if(path!=null)assets.add(Path.of(path));}
         return new ViewerSettings(quality,Boolean.parseBoolean(values.getProperty("edges","true")),
                 Boolean.parseBoolean(values.getProperty("textures","true")),Boolean.parseBoolean(values.getProperty("autoReload","true")),assets,
-                values.containsKey("modpack")?Path.of(values.getProperty("modpack")):null);
+                values.containsKey("modpack")?Path.of(values.getProperty("modpack")):null,"DARK".equals(values.getProperty("theme")));
     }
     /** Saves via a neighboring temporary file so interruption cannot truncate valid settings. */
     public void save(Path file)throws IOException{
         Files.createDirectories(file.toAbsolutePath().getParent());Properties values=new Properties();
         values.setProperty("quality",quality.name());values.setProperty("edges",Boolean.toString(edges));
         values.setProperty("textures",Boolean.toString(textures));values.setProperty("autoReload",Boolean.toString(autoReload));
+        values.setProperty("theme",darkMode?"DARK":"LIGHT");
         if(modpack!=null)values.setProperty("modpack",modpack.toAbsolutePath().normalize().toString());
         for(int i=0;i<assets.size();i++)values.setProperty("asset."+i,assets.get(i).toString());
         Path temporary=Files.createTempFile(file.toAbsolutePath().getParent(),"viewer-settings-",".tmp");

@@ -79,18 +79,18 @@ public final class BlockModelResolver {
             if(quads.isEmpty())throw new IOException("Model has no static geometry (custom/entity renderer): "+state.id());
             // Occlude neighbors only when an actual opaque full cube was supplied.
             boolean occludes=quads.size()==6;
+            int coveredSides=0;
             if(occludes) for(var q:quads){
-                if(!q.texture().opaque()||q.cullSide()<0) {occludes=false;break;}
-                for(Vec3 v:q.vertices()) if(!unitCorner(v)){occludes=false;break;}
+                if(!q.texture().opaque()||!q.coversBlockBoundary()||(coveredSides&(1<<q.cullSide()))!=0) {occludes=false;break;}
+                coveredSides|=1<<q.cullSide();
             }
+            occludes&=coveredSides==63;
             resolved++;
             return new BlockModel(quads,occludes,false);
         }catch(IOException|RuntimeException e){warn(state.id()+state.properties()+": "+e.getMessage());missing++;
             return ModelGeometry.cube(Texture.missing());}
     }
 
-    private static boolean unitCorner(Vec3 v){return bit(v.x())&&bit(v.y())&&bit(v.z());}
-    private static boolean bit(double d){return Math.abs(d)<1e-6||Math.abs(d-1)<1e-6;}
     private JsonObject choice(JsonElement e,String block) {
         if(!e.isJsonArray())return e.getAsJsonObject();
         if(e.getAsJsonArray().isEmpty())throw new IllegalArgumentException("Empty model choice");
@@ -214,7 +214,7 @@ public final class BlockModelResolver {
                         state.id().contains("redstone")?0xce2020:state.id().contains("water")?0x75a8e0:0x91bd59:0xffffff;
                 int cull=face.has("cullface")?ModelGeometry.rotatedSide(ModelGeometry.SIDES.indexOf(face.get("cullface").getAsString()),x,y):-1;
                 boolean shade=!element.has("shade")||element.get("shade").getAsBoolean();
-                output.add(new BlockModel.Quad(rotated,uv,texture,tint,cull,shade));
+                output.add(new BlockModel.Quad(ModelGeometry.outwardVertices(rotated,side),ModelGeometry.outwardUv(uv,side),texture,tint,cull,shade));
             }
         }
     }

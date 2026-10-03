@@ -32,6 +32,7 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
     private RenderQuality quality = RenderQuality.HIGH;
     private boolean blockEdges = true, textures = true, showEntities, showBlockEntities, showCoordinates;
     private java.util.List<DebugOverlay.Marker> markers = java.util.List.of();
+    private Runnable onFrameReady=()->{};
 
     /** Creates a focusable viewport with freecam/orbit bindings and block picking. */
     public StructureViewport(IntConsumer onSelect, Runnable onReload) {
@@ -112,11 +113,12 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
         boolean wire = wireframe, box = bounds, edges = blockEdges, textured = textures;
         boolean entities = showEntities, blockEntities = showBlockEntities, coordinates = showCoordinates;
         var currentMarkers = markers;
+        int background=ViewerTheme.VIEWPORT.getRGB();
         double scale = quality.scale(getWidth(), getHeight());
         int width = Math.max(1, (int) (getWidth() * scale)), height = Math.max(1, (int) (getHeight() * scale));
         renderer.submit(() -> {
             try {
-                var result = new SoftwareRenderer().render(current, view, width, height, select, wire, box, edges, textured);
+                var result = new SoftwareRenderer().render(current, view, width, height, select, wire, box, edges, textured,background);
                 java.awt.Graphics2D overlay = result.image().createGraphics();
                 DebugOverlay.draw(overlay, width, height, view, currentMarkers, entities, blockEntities, coordinates);
                 overlay.dispose();
@@ -126,12 +128,15 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
                     frame = result;
                     renderError = null;
                     dirty |= submitted != version;
+                    if(!dirty)onFrameReady.run();
                     repaint();
                 });
             } catch (RuntimeException error) {
                 SwingUtilities.invokeLater(() -> {
                     rendering = false;
+                    if(closed||mesh!=current||submitted!=version)return;
                     renderError = error.getClass().getSimpleName() + ": " + error.getMessage();
+                    if(!closed)onFrameReady.run();
                     repaint();
                 });
             }
@@ -177,6 +182,10 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
 
     /** Whether the current mesh and camera have finished producing a frame. */
     public boolean renderingIdle() { return frame != null && !dirty && !rendering; }
+
+    /** Completion returns to the event thread so the loading screen can release the preview. */
+    public void onFrameReady(Runnable listener) { onFrameReady=listener; }
+    public void applyTheme() { setBackground(ViewerTheme.VIEWPORT);changed(); }
 
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -224,7 +233,7 @@ public final class StructureViewport extends JPanel implements AutoCloseable {
         g.setFont(new java.awt.Font("Segoe UI",java.awt.Font.PLAIN,12));
         int width=g.getFontMetrics().stringWidth(text)+20;
         if(alignRight)x-=width;
-        g.setColor(new Color(255,255,255,230));g.fillRoundRect(x,y,width,26,6,6);
+        Color panel=ViewerTheme.PANEL;g.setColor(new Color(panel.getRed(),panel.getGreen(),panel.getBlue(),230));g.fillRoundRect(x,y,width,26,6,6);
         g.setColor(ViewerTheme.TEXT);g.drawString(text,x+10,y+18);
     }
 

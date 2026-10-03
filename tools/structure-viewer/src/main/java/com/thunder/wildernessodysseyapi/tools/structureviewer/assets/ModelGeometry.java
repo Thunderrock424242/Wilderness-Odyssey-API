@@ -21,6 +21,15 @@ final class ModelGeometry {
         return result;
     }
 
+    // North/south's historical corner order points inward. Reverse vertices and their UVs
+    // together after rotation/UV locking so texture placement remains unchanged.
+    static List<Vec3> outwardVertices(List<Vec3> vertices,int side) {
+        return side>=4?List.of(vertices.get(0),vertices.get(3),vertices.get(2),vertices.get(1)):vertices;
+    }
+    static double[] outwardUv(double[] uv,int side) {
+        return side>=4?new double[]{uv[0],uv[1],uv[6],uv[7],uv[4],uv[5],uv[2],uv[3]}:uv;
+    }
+
     static Vec3 vector(JsonArray a) {
         return new Vec3(a.get(0).getAsDouble()/16,a.get(1).getAsDouble()/16,a.get(2).getAsDouble()/16);
     }
@@ -74,8 +83,8 @@ final class ModelGeometry {
 
     static BlockModel cube(Texture texture) {
         List<BlockModel.Quad> quads=new ArrayList<>();
-        for(int side=0;side<6;side++) quads.add(new BlockModel.Quad(vertices(side,new Vec3(0,0,0),new Vec3(1,1,1)),
-                new double[]{0,0,16,0,16,16,0,16},texture,0xffffff,side,true));
+        for(int side=0;side<6;side++) quads.add(new BlockModel.Quad(outwardVertices(vertices(side,new Vec3(0,0,0),new Vec3(1,1,1)),side),
+                outwardUv(new double[]{0,0,16,0,16,16,0,16},side),texture,0xffffff,side,true));
         return new BlockModel(quads,texture.opaque(),true);
     }
 }

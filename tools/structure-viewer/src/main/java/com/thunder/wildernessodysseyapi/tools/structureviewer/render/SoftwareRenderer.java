@@ -26,9 +26,15 @@ public final class SoftwareRenderer {
     /** Draws all retained model geometry. Quality is controlled by the requested framebuffer size. */
     public Frame render(BlockMesh mesh,Camera.View camera,int width,int height,int selected,boolean wireframe,
                         boolean bounds,boolean blockEdges,boolean textures){
+        return render(mesh,camera,width,height,selected,wireframe,bounds,blockEdges,textures,0xebedf0);
+    }
+
+    /** The event thread captures theme colors; the renderer never reads mutable Swing defaults. */
+    public Frame render(BlockMesh mesh,Camera.View camera,int width,int height,int selected,boolean wireframe,
+                        boolean bounds,boolean blockEdges,boolean textures,int background){
         BufferedImage image=new BufferedImage(width,height,BufferedImage.TYPE_INT_RGB);
         int[] pixels=((DataBufferInt)image.getRaster().getDataBuffer()).getData();
-        Arrays.fill(pixels,0xebedf0);
+        Arrays.fill(pixels,background);
         float[] depth=new float[pixels.length];int[] ids=new int[pixels.length];Arrays.fill(ids,-1);
         double focal=height*.9;
         List<Visible> transparent=new ArrayList<>();

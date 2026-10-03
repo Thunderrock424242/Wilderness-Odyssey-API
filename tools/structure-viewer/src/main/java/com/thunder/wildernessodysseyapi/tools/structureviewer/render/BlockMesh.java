@@ -44,7 +44,7 @@ public record BlockMesh(StructureData data,List<Face> faces,int duplicatePositio
             BlockModel model=stateModels.getOrDefault(state,missing);
             for(var quad:model.quads()){
                 int side=quad.cullSide();
-                if(side>=0){
+                if(side>=0&&quad.onBlockBoundary()){
                     int[] normal=NORMALS[side];Integer neighbor=occupied.get(p.offset(normal[0],normal[1],normal[2]));
                     if(neighbor!=null){
                         var adjacent=data.state(data.blocks().get(neighbor));
@@ -67,7 +67,9 @@ public record BlockMesh(StructureData data,List<Face> faces,int duplicatePositio
                 {{1,1,0},{0,1,0},{0,0,0},{1,0,0}},{{0,1,1},{1,1,1},{1,0,1},{0,0,1}}};
         for(int side=0;side<6;side++){
             List<Vec3> v=new ArrayList<>();for(int[] p:points[side])v.add(new Vec3(p[0],p[1],p[2]));
-            quads.add(new BlockModel.Quad(v,new double[]{0,0,16,0,16,16,0,16},
+            double[] uv={0,0,16,0,16,16,0,16};
+            if(side>=4){v=List.of(v.get(0),v.get(3),v.get(2),v.get(1));uv=new double[]{0,0,0,16,16,16,16,0};}
+            quads.add(new BlockModel.Quad(v,uv,
                     Texture.solid(BlockAppearance.color(state)),0xffffff,side,true));
         }
         return new BlockModel(quads,true,true);

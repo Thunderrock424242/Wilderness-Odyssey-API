@@ -194,6 +194,50 @@ class PhaseTwoTest {
             assertEquals(12,mesh.faces().size(),"Half-height blocks have air between them; keep the upper block's bottom face.");
         }
     }
+
+    @Test void repeatedBoundaryQuadsCannotOccludeAWholeNeighbor()throws Exception{
+        pack();
+        write("assets/demo/blockstates/test.json","{\"variants\":{\"\":{\"model\":\"demo:block/repeated\"}}}");
+        var root=new com.google.gson.JsonObject();
+        root.add("textures",JsonInput.read("{\"all\":\"demo:block/color\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        var elements=new com.google.gson.JsonArray();
+        for(int i=0;i<6;i++)elements.add(JsonInput.read("""
+                {"from":[0,0,0],"to":[16,16,16],"faces":{"north":{"texture":"#all","cullface":"north"}}}
+                """.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        root.add("elements",elements);write("assets/demo/models/block/repeated.json",root.toString());
+        try(var assets=new AssetRepository(List.of(temp))) {
+            var model=new BlockModelResolver(assets).resolve(new BlockState("demo:test",Map.of()));
+            assertFalse(model.fallback());assertEquals(6,model.quads().size());
+            assertFalse(model.occludes(),"Six copies of one face do not enclose an opaque cube.");
+        }
+    }
+
+    @Test void bakedCubeFacesPointOutwardAfterBlockstateRotation()throws Exception{
+        pack();
+        Path base=temp.resolve("assets/demo/models/block/base.json");
+        var model=JsonInput.read(base);var element=model.getAsJsonArray("elements").get(0).getAsJsonObject();
+        element.getAsJsonArray("to").set(1,new com.google.gson.JsonPrimitive(16));
+        for(var face:element.getAsJsonObject("faces").entrySet())face.getValue().getAsJsonObject().addProperty("cullface",face.getKey());
+        Files.writeString(base,model.toString());
+        for(int y:List.of(0,90,180,270)) {
+            write("assets/demo/blockstates/test.json","{\"variants\":{\"\":{\"model\":\"demo:block/child\",\"y\":"+y+",\"uvlock\":true}}}");
+            try(var assets=new AssetRepository(List.of(temp))) {
+                var baked=new BlockModelResolver(assets).resolve(new BlockState("demo:test",Map.of()));
+                assertTrue(baked.occludes());
+                for(var face:baked.quads())assertTrue(face.normal().dot(face.center().subtract(new Vec3(.5,.5,.5)))>0,
+                        "A cube face must point away from its center, including north/south and rotated variants.");
+            }
+        }
+    }
+
+    @Test void retainsSavedDarkAppearanceAlongsideExistingPreferences()throws Exception{
+        Path settings=temp.resolve("theme.properties");
+        Files.writeString(settings,"theme=DARK\nquality=ULTRA\nedges=false\ntextures=true\nautoReload=false\n");
+        var restored=ViewerSettings.read(settings);restored.save(settings);
+        Properties values=new Properties();try(var input=Files.newInputStream(settings)){values.load(input);}
+        assertEquals("DARK",values.getProperty("theme"));
+        assertEquals(RenderQuality.ULTRA,restored.quality());assertFalse(restored.edges());assertFalse(restored.autoReload());
+    }
     private void pack()throws Exception{
         write("assets/demo/models/block/base.json","""
             {"textures":{"all":"demo:block/color"},"elements":[{"from":[0,0,0],"to":[16,8,16],"faces":{

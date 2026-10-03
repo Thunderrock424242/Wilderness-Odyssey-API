@@ -1,6 +1,9 @@
 Wilderness Odyssey Structure Viewer
 
 Open a modpack folder (or its mods folder) to browse templates grouped by JAR.
+The folder picker recognizes %USERPROFILE%\curseforge\minecraft\Instances.
+Use the header's Light / Dark switch to change appearance; your choice is saved.
+Loading screens show progress while scanning JARs and preparing a preview.
 The viewer reads files without extracting structures or running Minecraft/mod code.
 Use Assets > Add local assets to supply a Minecraft 1.21.1 client JAR or resource pack.
 
@@ -19,7 +22,7 @@ No Minecraft or third-party mod assets are included in this distribution.
 The installer includes a Java runtime and retains its legal notices.
 Gson 2.11.0 and its Error Prone annotation dependency 2.27.0 are included under
 Apache License 2.0; their licenses are supplied in this folder.
-FlatLaf 3.7.2 supplies the light desktop controls under Apache License 2.0;
+FlatLaf 3.7.2 supplies the light and dark desktop controls under Apache License 2.0;
 its license is supplied as FlatLaf-LICENSE.txt.
 
 You can install into a folder inside the modpack or use Open modpack afterwards.

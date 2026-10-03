@@ -31,6 +31,12 @@ public final class ViewerWindow extends JFrame {
             entities=new JCheckBoxMenuItem("Entities"),blockEntities=new JCheckBoxMenuItem("Block entities"),coordinates=new JCheckBoxMenuItem("Coordinates");
     private final JComboBox<RenderQuality> quality=new JComboBox<>(RenderQuality.values());
     private final JSpinner layer=new LayerSpinner();
+    private final JToggleButton darkMode=new JToggleButton("Light",ViewerTheme.themeSwitchIcon());
+    private final JPanel content=new JPanel(new CardLayout());
+    private final LoadingScreen loadingScreen=new LoadingScreen();
+    private JPanel headerPanel,previewToolbar,footer;
+    private JButton openPack;
+    private boolean scanning,preparing,awaitingFrame;
     private final StructureViewport viewport;
     private final ThreadPoolExecutor loader=new ThreadPoolExecutor(1,1,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(4),r->{
         Thread t=new Thread(r,"structure-viewer-loader");t.setDaemon(true);return t;
@@ -53,6 +59,10 @@ public final class ViewerWindow extends JFrame {
         setIconImages(List.of(ViewerTheme.icon(32),ViewerTheme.icon(64),ViewerTheme.icon(256)));
         settingsFile=Path.of(System.getProperty("structureViewer.settings",build.resolve("tools/structure-viewer/settings.properties").toString()));
         viewport=new StructureViewport(this::inspect,this::reload);
+        viewport.onFrameReady(()->{
+            if(closed||!awaitingFrame||preparing)return;
+            awaitingFrame=false;updateLoading();viewport.requestFocusInWindow();
+        });
         restoreSettings();
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setMinimumSize(new Dimension(980,600));
@@ -77,8 +87,8 @@ public final class ViewerWindow extends JFrame {
         JSplitPane main=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,browser,detail);main.setResizeWeight(0);
         main.setBorder(BorderFactory.createEmptyBorder());detail.setBorder(BorderFactory.createEmptyBorder());
         main.setContinuousLayout(true);detail.setContinuousLayout(true);
-        add(main,BorderLayout.CENTER);
-        JPanel footer=new JPanel(new BorderLayout(12,0));
+        content.add(main,"preview");content.add(loadingScreen,"loading");add(content,BorderLayout.CENTER);
+        footer=new JPanel(new BorderLayout(12,0));
         footer.setBackground(ViewerTheme.BACKGROUND);
         footer.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(1,0,0,0,ViewerTheme.BORDER),
                 BorderFactory.createEmptyBorder(4,14,4,10)));
@@ -94,9 +104,12 @@ public final class ViewerWindow extends JFrame {
             box.addActionListener(event->{displayOptions();saveSettings();});
         quality.addActionListener(event->{displayOptions();saveSettings();});
         autoReload.addActionListener(event->{watchCurrent();saveSettings();});
+        darkMode.addActionListener(event->{
+            ViewerTheme.install(darkMode.isSelected());com.formdev.flatlaf.FlatLaf.updateUI();applyTheme();saveSettings();
+        });
         addWindowListener(new WindowAdapter(){
             @Override public void windowClosed(WindowEvent event){
-                closed=true;generation++;if(watcher!=null)watcher.close();
+                closed=true;generation++;loadingScreen.stop();if(watcher!=null)watcher.close();
                 if(pending!=null)pending.cancel(true);if(scan!=null)scan.cancel(true);browser.close();loader.shutdownNow();viewport.close();
             }
         });
@@ -106,28 +119,33 @@ public final class ViewerWindow extends JFrame {
             if(closed)return;
             main.setDividerLocation(250);detail.setDividerLocation(Math.max(430,detail.getWidth()-287));
         });
-        displayOptions();rescan();
+        applyTheme();displayOptions();rescan();
     }
 
     private JPanel header(){
-        JPanel header=new JPanel(new BorderLayout(20,0));header.setName("app-header");
+        JPanel header=new JPanel(new BorderLayout(12,0));headerPanel=header;header.setName("app-header");
         header.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0,0,1,0,ViewerTheme.BORDER),
                 BorderFactory.createEmptyBorder(12,16,12,16)));
         JLabel title=new JLabel("Structure Viewer",new ImageIcon(ViewerTheme.icon(28)),SwingConstants.LEFT);
         title.setIconTextGap(10);title.setFont(title.getFont().deriveFont(Font.BOLD,17f));header.add(title);
-        JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0));
-        JButton openPack=button("Open modpack…",this::chooseModpack);openPack.setName("open-modpack");
-        openPack.putClientProperty("FlatLaf.style","background: #1765bd; foreground: #ffffff; borderColor: #1765bd; hoverBackground: #1256a3; pressedBackground: #104c91");
+        JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT,6,0));
+        openPack=button("Open modpack…",this::chooseModpack);openPack.setName("open-modpack");
+        openPack.setIcon(ViewerTheme.folderIcon());openPack.setIconTextGap(8);openPack.setFont(openPack.getFont().deriveFont(Font.BOLD));
+        openPack.setToolTipText("Choose a modpack instance, including CurseForge's minecraft/Instances folder");
         JButton openStructure=button("Open structure…",this::openFile);openStructure.setName("open-structure");
         JButton reload=button("Reload",this::reload);reload.setToolTipText("Reload the selected structure (R)");
         JPopupMenu assets=new JPopupMenu();menuItem(assets,"Add local assets…",this::addAssets);
         menuItem(assets,"Clear added assets",()->{assetPacks.clear();saveSettings();reload();});
         actions.add(openPack);actions.add(openStructure);actions.add(reload);actions.add(popupButton("Assets",assets));
+        darkMode.setName("theme-toggle");darkMode.setIconTextGap(8);darkMode.setMargin(new Insets(6,8,6,8));
+        darkMode.setPreferredSize(new Dimension(96,32));
+        darkMode.setToolTipText("Switch between light and dark appearance; your choice is saved");
+        darkMode.getAccessibleContext().setAccessibleName("Dark appearance");actions.add(darkMode);
         header.add(actions,BorderLayout.EAST);return header;
     }
 
     private JPanel previewControls(){
-        JPanel controls=new JPanel(new FlowLayout(FlowLayout.LEFT,7,8));controls.setName("preview-toolbar");
+        JPanel controls=new JPanel(new FlowLayout(FlowLayout.LEFT,7,8));previewToolbar=controls;controls.setName("preview-toolbar");
         controls.setBackground(ViewerTheme.BACKGROUND);
         controls.setBorder(BorderFactory.createMatteBorder(0,0,1,0,ViewerTheme.BORDER));
         JLabel qualityLabel=new JLabel("Quality");qualityLabel.setLabelFor(quality);controls.add(qualityLabel);
@@ -155,17 +173,41 @@ public final class ViewerWindow extends JFrame {
             var saved=ViewerSettings.read(settingsFile);
             quality.setSelectedItem(saved.quality());edges.setSelected(saved.edges());textures.setSelected(saved.textures());
             autoReload.setSelected(saved.autoReload());assetPacks.addAll(saved.assets());
+            darkMode.setSelected(saved.darkMode());
         }catch(IOException|RuntimeException e){quality.setSelectedItem(RenderQuality.HIGH);status.setText("Using default settings: "+e.getMessage());}
     }
     private void saveSettings(){
         try{new ViewerSettings((RenderQuality)quality.getSelectedItem(),edges.isSelected(),textures.isSelected(),
-                autoReload.isSelected(),assetPacks,project).save(settingsFile);}
+                autoReload.isSelected(),assetPacks,project,darkMode.isSelected()).save(settingsFile);}
         catch(IOException e){status.setText("Could not save viewer settings: "+e.getMessage());}
     }
     private void displayOptions(){
         viewport.setOverlays(wireframe.isSelected(),bounds.isSelected());
         viewport.setQuality((RenderQuality)quality.getSelectedItem(),edges.isSelected(),textures.isSelected());
         viewport.setDebugOverlays(entities.isSelected(),blockEntities.isSelected(),coordinates.isSelected());
+    }
+
+    private void applyTheme(){
+        darkMode.setText(darkMode.isSelected()?"Dark":"Light");
+        for(JTextArea text:List.of(info,inspector,diagnostics,metadata)){text.setBackground(ViewerTheme.PANEL);text.setForeground(ViewerTheme.TEXT);}
+        status.setForeground(ViewerTheme.MUTED);browser.applyTheme();loadingScreen.applyTheme();viewport.applyTheme();
+        headerPanel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0,0,1,0,ViewerTheme.BORDER),BorderFactory.createEmptyBorder(12,16,12,16)));
+        previewToolbar.setBackground(ViewerTheme.BACKGROUND);previewToolbar.setBorder(BorderFactory.createMatteBorder(0,0,1,0,ViewerTheme.BORDER));
+        footer.setBackground(ViewerTheme.BACKGROUND);footer.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(1,0,0,0,ViewerTheme.BORDER),BorderFactory.createEmptyBorder(4,14,4,10)));
+        String primary=String.format("#%06x",ViewerTheme.PRIMARY.getRGB()&0xffffff),foreground=String.format("#%06x",ViewerTheme.PRIMARY_TEXT.getRGB()&0xffffff);
+        openPack.putClientProperty("FlatLaf.style","background: "+primary+"; foreground: "+foreground+"; borderColor: "+primary+"; hoverBackground: "+primary+"; pressedBackground: "+primary);
+        repaint();
+    }
+
+    private void updateLoading(){
+        boolean busy=preparing||awaitingFrame||(scanning&&loaded==null);
+        if(awaitingFrame)loadingScreen.showProgress("Loading structure","Drawing the preview…");
+        ((CardLayout)content.getLayout()).show(content,busy?"loading":"preview");
+        if(!busy)loadingScreen.stop();
+    }
+
+    private void loadProgress(long request,String message){
+        SwingUtilities.invokeLater(()->{if(!closed&&request==generation&&preparing)loadingScreen.showProgress("Loading structure",message);});
     }
     private static JTextArea area(){
         JTextArea result=new JTextArea();result.setEditable(false);result.setLineWrap(true);result.setWrapStyleWord(true);
@@ -184,7 +226,7 @@ public final class ViewerWindow extends JFrame {
     private static JButton popupButton(String title,JPopupMenu menu){
         JButton button=new JButton(title,ViewerTheme.dropdownIcon());
         button.setHorizontalTextPosition(SwingConstants.LEFT);button.setIconTextGap(8);
-        button.addActionListener(event->menu.show(button,0,button.getHeight()));return button;
+        button.addActionListener(event->{SwingUtilities.updateComponentTreeUI(menu);menu.show(button,0,button.getHeight());});return button;
     }
     private void openFile(){
         JFileChooser chooser=new JFileChooser(project.toFile());
@@ -200,8 +242,9 @@ public final class ViewerWindow extends JFrame {
         }
     }
     private void chooseModpack(){
-        JFileChooser chooser=new JFileChooser(project.toFile());chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        chooser.setDialogTitle("Choose the modpack folder or its mods folder");
+        Path directory=ModpackLocation.chooserDirectory(project,Path.of(System.getProperty("user.home")));
+        JFileChooser chooser=new JFileChooser(directory.toFile());chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        chooser.setDialogTitle("Choose a modpack instance (CurseForge: minecraft/Instances)");
         if(chooser.showOpenDialog(this)==JFileChooser.APPROVE_OPTION)openModpack(chooser.getSelectedFile().toPath());
     }
 
@@ -211,6 +254,7 @@ public final class ViewerWindow extends JFrame {
         if(pending!=null)pending.cancel(true);loader.purge();
         if(watcher!=null){watcher.close();watcher=null;}
         currentSource=null;loadedSource=null;loaded=null;prepared=null;loadError=null;viewport.clear();browser.clear();
+        preparing=false;awaitingFrame=false;air.setEnabled(true);layer.setEnabled(true);
         diagnostics.setText("");metadata.setText("");
         info.setText("Modpack: "+project+"\n\nSelect a template from a mod JAR in the library.");
         inspector.setText("Select a structure, then click a block to inspect it.");
@@ -220,18 +264,20 @@ public final class ViewerWindow extends JFrame {
 
     private void rescan(){
         long request=++scanGeneration;Path root=project;browser.scanning();
+        scanning=true;if(!preparing&&!awaitingFrame)loadingScreen.showProgress("Loading your library","Scanning mod JARs in "+(root.getFileName()==null?root:root.getFileName())+"…");updateLoading();
         if(scan!=null)scan.cancel(true);loader.purge();
         scan=loader.submit(()->{
             try{
                 var catalog=StructureCatalog.scan(root,build);
                 SwingUtilities.invokeLater(()->{
                     if(closed||request!=scanGeneration)return;
+                    scanning=false;updateLoading();
                     browser.setCatalog(catalog);
                     status.setText(catalog.entries().size()+" structures in "+catalog.archives()+" scanned archives · "+root);
                     if(!catalog.diagnostics().isEmpty())diagnostics.setText(String.join("\n",catalog.diagnostics()));
                 });
             }catch(Exception error){
-                SwingUtilities.invokeLater(()->{if(!closed&&request==scanGeneration)status.setText("Could not scan this folder: "+error.getMessage());});
+                SwingUtilities.invokeLater(()->{if(!closed&&request==scanGeneration){scanning=false;updateLoading();status.setText("Could not scan this folder: "+error.getMessage());}});
             }
         });
     }
@@ -251,12 +297,14 @@ public final class ViewerWindow extends JFrame {
     private void startLoad(StructureSource source,PreparedPreview reuse,boolean recenter,int requestedLayer){
         long request=++generation;if(pending!=null)pending.cancel(true);loader.purge();
         air.setEnabled(false);layer.setEnabled(false);status.setText("Preparing "+source.filename()+"…");
+        preparing=true;awaitingFrame=false;loadingScreen.showProgress("Loading structure","Reading "+source.filename()+"…");updateLoading();
         boolean showAir=air.isSelected();List<Path> packs=List.copyOf(assetPacks);Path root=project;
         pending=loader.submit(()->{
             try{
                 PreparedPreview snapshot=reuse;
                 if(snapshot==null){
                     StructureData data=source.read();
+                    loadProgress(request,"Resolving block models and textures…");
                     ResolvedModels models;
                     try(var assets=AssetRepository.discover(root,packs)){
                         models=ResolvedModels.capture(data,new BlockModelResolver(assets,BlockStateCatalog.discover(root,build)),assets.sources());
@@ -267,6 +315,7 @@ public final class ViewerWindow extends JFrame {
                 PreparedPreview result=snapshot;StructureData data=result.data();
                 // An export may shrink the structure while a higher layer is selected.
                 int y=Math.min(requestedLayer,Math.max(0,data.size().y()-1));
+                loadProgress(request,"Preparing visible block faces…");
                 BlockMesh mesh=BlockMesh.build(data,showAir,y,result.models());
                 String report=StructureDetails.diagnostics(mesh)+"\n\nStructure validation\n"+result.validation();
                 SwingUtilities.invokeLater(()->{
@@ -278,14 +327,15 @@ public final class ViewerWindow extends JFrame {
                     metadata.setText(new NbtValue(10,data.metadata()).display());metadata.setCaretPosition(0);
                     inspector.setText("Left-click a block; G focuses closely on the selection.");
                     viewport.setMesh(mesh,recenter);viewport.setMarkers(result.markers());
+                    preparing=false;awaitingFrame=true;updateLoading();
                     status.setText(data.name()+" · "+String.format(java.util.Locale.ROOT,"%,d",data.blocks().size())+" stored blocks · "
                             +mesh.resolvedStates()+" modeled states · "+mesh.fallbackStates()+" placeholders");
                     if(recenter)tabs.setSelectedIndex(0);
-                    viewport.requestFocusInWindow();
                 });
             }catch(Exception error){
                 SwingUtilities.invokeLater(()->{
                     if(closed||request!=generation)return;
+                    preparing=false;awaitingFrame=false;updateLoading();
                     air.setEnabled(true);layer.setEnabled(true);loadError=error.getClass().getSimpleName()+": "+error.getMessage();
                     status.setText("Could not load "+source.filename()+". Previous preview retained.");
                     diagnostics.setText(source.description()+"\n\n"+loadError);tabs.setSelectedIndex(2);

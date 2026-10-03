@@ -70,6 +70,7 @@ final class StructureBrowser extends JPanel {
     void setCatalog(StructureCatalog.Result catalog) { entries=catalog.entries();filter(); }
     void clear() { entries=List.of();filter(); }
     void scanning() { count.setText("Scanning structures…"); }
+    void applyTheme() { count.setForeground(ViewerTheme.MUTED);emptyHint.setForeground(ViewerTheme.MUTED); }
     void close() { debounce.stop();ToolTipManager.sharedInstance().unregisterComponent(tree); }
     private void filter() {
         Object selected=tree.getLastSelectedPathComponent();

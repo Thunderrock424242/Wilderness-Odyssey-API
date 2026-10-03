@@ -1,6 +1,6 @@
 // Native packaging is opt-in and never participates in the production mod's build or dependencies.
 def appName = 'Wilderness Structure Viewer'
-def appVersion = providers.gradleProperty('viewerVersion').getOrElse('1.0.1')
+def appVersion = providers.gradleProperty('viewerVersion').getOrElse('1.0.2')
 // Keep this identity unchanged so Windows recognizes every release as the same installed product.
 def upgradeUuid = '27ef4c02-4acd-4711-b59a-0cda1f8d2146'
 def nativeRoot = layout.buildDirectory.dir('windows')

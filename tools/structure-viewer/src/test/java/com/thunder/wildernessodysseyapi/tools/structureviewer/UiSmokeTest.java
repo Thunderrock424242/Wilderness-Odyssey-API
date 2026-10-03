@@ -52,6 +52,7 @@ public final class UiSmokeTest {
                 if (window.loadError() != null) throw new IllegalStateException(window.loadError());
                 return window.loadedStructure() != null && window.viewport().renderingIdle();
             },120000);
+            verifyAppearanceAndLoading(window,settings,output);
             verifyLayout(window,output);
             edt(() -> {
                 if (!window.isShowing()) throw new AssertionError("Viewer window did not launch.");
@@ -197,7 +198,7 @@ public final class UiSmokeTest {
         edt(() -> {window.setSize(980,640);window.validate();return null;});
         awaitSizedFrame(window);
         edt(() -> {
-            for(String name:java.util.List.of("open-modpack","open-structure","render-quality","y-layer","view-options")) {
+            for(String name:java.util.List.of("open-modpack","open-structure","theme-toggle","render-quality","y-layer","view-options")) {
                 Component control=find(window,name);
                 if(control==null || !control.isShowing())throw new AssertionError("Missing visible control: "+name);
                 for(Container parent=control.getParent();parent!=null;parent=parent.getParent()) {
@@ -235,6 +236,49 @@ public final class UiSmokeTest {
         if(!java.util.Arrays.equals(textured.blockIds(),edt(() -> window.viewport().renderedFrame().blockIds())))
             throw new AssertionError("Restoring textures did not restore the original block picks.");
         System.out.println("LAYOUT GUI PASSED: controls remain visible at 980x640, All layer input, View options texture toggle and restored picking.");
+    }
+
+    private static void verifyAppearanceAndLoading(ViewerWindow window,Path settings,Path output) throws Exception {
+        var camera=edt(() -> window.viewport().cameraView());
+        var structure=edt(window::loadedStructure);
+        int light=edt(() -> window.viewport().renderedFrame().image().getRGB(0,0));
+        edt(() -> {
+            Component toggle=find(window,"theme-toggle");
+            if(!(toggle instanceof javax.swing.JToggleButton button))throw new AssertionError("No Light/Dark switch in the header.");
+            button.doClick();return null;
+        });
+        await(() -> window.viewport().renderingIdle(),15000);
+        if(!ViewerSettings.read(settings).darkMode())throw new AssertionError("Dark appearance was not saved.");
+        if(light==edt(() -> window.viewport().renderedFrame().image().getRGB(0,0)))throw new AssertionError("Dark appearance did not change the viewport background.");
+        if(structure!=edt(window::loadedStructure)||!camera.equals(edt(() -> window.viewport().cameraView())))throw new AssertionError("Theme switching replaced the preview or camera.");
+        snapshot(window,output.resolve("dark-structure.png"));
+        edt(() -> {
+            window.load(window.loadedSource());
+            Component screen=find(window,"loading-screen");
+            Component progress=find(window,"loading-progress");
+            if(screen==null||!screen.isShowing()||!(progress instanceof javax.swing.JProgressBar bar)||!bar.isIndeterminate())
+                throw new AssertionError("Loading a structure did not show progress.");
+            ((javax.swing.JToggleButton)find(window,"theme-toggle")).doClick();
+            snapshot(window,output.resolve("light-loading.png"));
+            return null;
+        });
+        await(() -> window.viewport().renderingIdle() && !find(window,"loading-screen").isShowing(),120000);
+        if(ViewerSettings.read(settings).darkMode())throw new AssertionError("Light appearance was not saved during loading.");
+        edt(() -> {
+            var button=(javax.swing.JButton)find(window,"open-modpack");
+            if(contrast(button.getBackground(),button.getForeground())<4.5)throw new AssertionError("Open modpack text has insufficient contrast.");
+            return null;
+        });
+        System.out.println("APPEARANCE GUI PASSED: saved Light/Dark switch, themed viewport, preserved camera, loading screen with progress, readable Open modpack.");
+    }
+
+    private static double contrast(java.awt.Color a,java.awt.Color b) {
+        double first=luminance(a),second=luminance(b);return(Math.max(first,second)+.05)/(Math.min(first,second)+.05);
+    }
+    private static double luminance(java.awt.Color color) {
+        double[] channels={color.getRed()/255.0,color.getGreen()/255.0,color.getBlue()/255.0};
+        for(int i=0;i<3;i++)channels[i]=channels[i]<=.04045?channels[i]/12.92:Math.pow((channels[i]+.055)/1.055,2.4);
+        return .2126*channels[0]+.7152*channels[1]+.0722*channels[2];
     }
 
     private static void awaitSizedFrame(ViewerWindow window) throws Exception {
@@ -323,6 +367,7 @@ public final class UiSmokeTest {
     }
 
     private static <T> T edt(Callable<T> action) throws Exception {
+        if(SwingUtilities.isEventDispatchThread())return action.call();
         AtomicReference<T> result = new AtomicReference<>();
         AtomicReference<Throwable> failure = new AtomicReference<>();
         SwingUtilities.invokeAndWait(() -> {try {result.set(action.call());}catch(Throwable e){failure.set(e);}});

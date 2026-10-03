@@ -31,22 +31,26 @@ public final class StructureViewer {
         Path build=Path.of(System.getProperty("structureViewer.buildDir",(development?Path.of(System.getProperty("structureViewer.projectDir")).resolve("build"):local.resolve("cache")).toString()));
         Path settings=Path.of(System.getProperty("structureViewer.settings",(development?build.resolve("tools/structure-viewer/settings.properties"):local.resolve("settings.properties")).toString()));
         System.setProperty("structureViewer.settings",settings.toString());
+        ViewerSettings preferences=new ViewerSettings(com.thunder.wildernessodysseyapi.tools.structureviewer.render.RenderQuality.HIGH,true,true,true,java.util.List.of());
+        try{preferences=ViewerSettings.read(settings);}
+        catch(java.io.IOException|RuntimeException error){System.err.println("Could not restore viewer settings: "+error.getMessage());}
         Path project=requestedPack;
         if(project==null&&development)project=Path.of(System.getProperty("structureViewer.projectDir"));
         String launcher=System.getProperty("jpackage.app-path","");
         if(project==null&&!launcher.isBlank())project=ModpackLocation.nearby(Path.of(launcher).getParent()).orElse(null);
         if(project==null)project=ModpackLocation.nearby(Path.of(".")).orElse(null);
-        if(project==null)try {
-            Path saved=ViewerSettings.read(settings).modpack();
+        if(project==null){
+            Path saved=preferences.modpack();
             if(saved!=null&&Files.isDirectory(saved))project=saved;
-        }catch(java.io.IOException|RuntimeException error){System.err.println("Could not restore last modpack: "+error.getMessage());}
+        }
         if(project==null)project=Path.of(".").toAbsolutePath().normalize();
         if(report!=null){writeDiagnostics(report,project,settings);return;}
         if (GraphicsEnvironment.isHeadless()) throw new IllegalStateException("The viewer requires a desktop display.");
         Path initial = open;
         Path root=project;
+        boolean dark=preferences.darkMode();
         SwingUtilities.invokeLater(() -> {
-            ViewerTheme.install();
+            ViewerTheme.install(dark);
             ViewerWindow window = new ViewerWindow(root, build);
             window.setVisible(true);
             if (initial != null) window.load(initial);

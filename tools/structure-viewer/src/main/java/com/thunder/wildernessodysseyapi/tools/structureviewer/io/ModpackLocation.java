@@ -7,6 +7,16 @@ import java.util.Optional;
 public final class ModpackLocation {
     private ModpackLocation() {}
 
+    /** Uses the user's actual home folder; existing selected instances take precedence. */
+    public static Path chooserDirectory(Path current,Path userHome) {
+        Path root=normalize(current),instances=userHome.resolve("curseforge/minecraft/Instances").toAbsolutePath().normalize();
+        if(Files.isDirectory(root.resolve("mods"))) {
+            Path parent=root.getParent();
+            return parent!=null&&parent.getFileName()!=null&&parent.getFileName().toString().equalsIgnoreCase("Instances")?parent:root;
+        }
+        return Files.isDirectory(instances)?instances:Files.isDirectory(root)?root:userHome;
+    }
+
     /** Accepts an instance root, its mods folder, or a launcher instance containing .minecraft. */
     public static Path normalize(Path selected) {
         Path root = selected.toAbsolutePath().normalize();

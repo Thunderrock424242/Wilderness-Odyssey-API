@@ -52,6 +52,18 @@ class ModpackCatalogTest {
         assertEquals(instance.getParent(),ModpackLocation.nearby(instance.getParent().resolve("Viewer/app")).orElseThrow());
         assertTrue(ModpackLocation.nearby(temp.resolve("unrelated")).isEmpty());
     }
+    @Test void startsAtCurseForgeInstancesWithoutOverridingAnotherSelectedPack() throws Exception {
+        Path user=Files.createDirectories(temp.resolve("user"));
+        Path instances=Files.createDirectories(user.resolve("curseforge/minecraft/Instances"));
+        Path instance=Files.createDirectories(instances.resolve("My Pack/mods")).getParent();
+        Path other=Files.createDirectories(temp.resolve("other/mods")).getParent();
+        assertEquals(instances,ModpackLocation.chooserDirectory(temp.resolve("empty"),user));
+        assertEquals(instances,ModpackLocation.chooserDirectory(instance,user));
+        assertEquals(other,ModpackLocation.chooserDirectory(other,user));
+        assertEquals(instances,ModpackLocation.chooserDirectory(instance.resolve("mods"),user));
+        Path separateUser=Files.createDirectories(temp.resolve("separate-user"));
+        assertEquals(separateUser,ModpackLocation.chooserDirectory(temp.resolve("empty"),separateUser));
+    }
     @Test void resolvesModJarAssetsAndReusesThemAfterTheArchiveCloses() throws Exception {
         Path mods=Files.createDirectories(temp.resolve("mods")),jar=mods.resolve("assets.jar");
         var png=new java.io.ByteArrayOutputStream();
