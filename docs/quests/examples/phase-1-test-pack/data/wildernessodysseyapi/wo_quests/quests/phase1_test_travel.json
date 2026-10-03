@@ -1,0 +1,7 @@
+{
+  "schemaVersion":1,"definitionVersion":1,"chapter":"wildernessodysseyapi:phase1_test_start",
+  "title":"Visit the Nether","description":"After carrying supplies, visit the Nether. Dimension travel remains independent of this quest.","icon":"minecraft:compass","optional":true,
+  "prerequisites":{"mode":"all","quests":["wildernessodysseyapi:phase1_test_supplies"]},
+  "objectives":[{"id":"wildernessodysseyapi:phase1_test_nether","type":"dimension","dimension":"minecraft:the_nether"}],
+  "rewards":[{"id":"wildernessodysseyapi:phase1_test_compass","type":"item","item":"minecraft:compass","count":1}]
+}

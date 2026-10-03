@@ -1,5 +1,7 @@
 # Aether self-contained server
 
+**For a new protected-service setup, start with [Aether setup and verification](../../AETHER_SETUP.md).** It uses the current gateway-only JAR and separately managed Ollama. This document is the optional native-bundle reference.
+
 The platform-specific JAR contains the Java gateway, native Ollama 0.17.7, bundled `llama3.1:8b` weights, and Aether's personality, lore, and specialist prompts. Model startup is now gated by explicit hosting and capacity verification. The existing 8B model is not approved for the shared Kinetic server with a 500% CPU limit, 8 GB RAM and unknown GPU. Built with Llama; original model and runtime licenses are included.
 
 This is a standalone Java 21 server application. Start it as the server application's JAR in a compatible hosting panel, or alongside Minecraft as a separate service. It is not a Bukkit plugin or NeoForge mod to place in `plugins/` or `mods/`. If Minecraft itself also runs on that machine, the gateway needs its own available port.

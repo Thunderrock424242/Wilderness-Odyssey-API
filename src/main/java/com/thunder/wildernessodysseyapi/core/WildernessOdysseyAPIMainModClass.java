@@ -115,6 +115,7 @@ public final class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(EventTelemetryReporter.class);
         NeoForge.EVENT_BUS.register(TelemetryQueueProcessor.class);
         NeoForge.EVENT_BUS.register(LoreBookEvents.class);
+        NeoForge.EVENT_BUS.register(com.thunder.wildernessodysseyapi.quest.runtime.QuestObjectiveEvents.class);
         NeoForge.EVENT_BUS.register(EcosystemEvents.class);
         NeoForge.EVENT_BUS.register(DistantWildlifeServerEvents.class);
         NeoForge.EVENT_BUS.register(MeteorImpactEvent.class);

@@ -1,5 +1,7 @@
 # Deploying the protected Aether gateway
 
+**Setting up Aether for the first time? Follow [Aether setup and verification](../AETHER_SETUP.md).** This document is the detailed deployment reference.
+
 Phase 1 provides a protected origin and Minecraft transport. Production deployment, live restarts, active-model changes and enabling remote administration require separate owner approval. The confirmed Kinetic allocation is a 500% CPU limit and 8 GB RAM, with GPU availability unknown. This does not establish that the existing 8B model fits alongside Minecraft.
 
 ## Trust boundaries

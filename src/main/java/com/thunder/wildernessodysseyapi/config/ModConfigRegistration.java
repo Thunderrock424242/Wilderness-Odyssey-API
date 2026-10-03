@@ -100,6 +100,8 @@ public final class ModConfigRegistration {
         applyRuntimeSettings(event.getConfig());
         if (event.getConfig().getSpec() == WildernessConfigSpecs.serverSpec()) {
             applyOnServerThread(() -> SimulationEngine.get().onConfigurationReload());
+            var questServer = ServerLifecycleHooks.getCurrentServer();
+            if (questServer != null) questServer.execute(() -> com.thunder.wildernessodysseyapi.quest.runtime.QuestServerEvents.onConfigurationReload(questServer));
         }
     }
 

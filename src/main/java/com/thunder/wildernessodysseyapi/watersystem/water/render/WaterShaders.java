@@ -48,6 +48,7 @@ public final class WaterShaders {
 
     /** Registers the core ocean shader during the client shader event. */
     public static void register(RegisterShadersEvent event) throws IOException {
+        releaseOpticalResources();
         event.registerShader(
                 new ShaderInstance(
                         event.getResourceProvider(),
@@ -114,6 +115,26 @@ public final class WaterShaders {
     /** Returns the program used by the Wilderness underwater overlay. */
     public static ShaderInstance getUnderwaterShader() {
         return underwaterShader != null ? underwaterShader : GameRenderer.getPositionTexShader();
+    }
+
+    /** Invalidates scene samplers before their targets or timing queries are released. */
+    public static void releaseOpticalResources() {
+        capturedOpticalFrameKey = Long.MIN_VALUE;
+        invalidateSceneSamplers(oceanShader);
+        invalidateSceneSamplers(underwaterShader);
+        try {
+            WaterSceneCapture.release();
+        } finally {
+            WaterGpuTimer.release();
+        }
+    }
+
+    private static void invalidateSceneSamplers(ShaderInstance shader) {
+        if (shader != null) {
+            shader.safeGetUniform("SceneCaptureValid").set(0.0f);
+            shader.setSampler("SceneColor", -1);
+            shader.setSampler("SceneDepth", -1);
+        }
     }
 
     /** Updates uniforms consumed by the built-in optical water pass. */
@@ -217,11 +238,9 @@ public final class WaterShaders {
                 frameGameTime,
                 framePartialTick
         );
-        long frameKey = sceneFrameKey(
-                minecraft.level,
-                frameGameTime,
-                framePartialTick
-        );
+        // Paused animation can render many different camera views. Scene
+        // identity must follow the actual frame instead of game time.
+        long frameKey = WildernessRenderingFramework.currentFrame().frameIndex();
         Matrix4f inverseProjection = new Matrix4f(RenderSystem.getProjectionMatrix()).invert();
         Matrix4f viewToWorld = new Matrix4f().rotation(
                 minecraft.gameRenderer.getMainCamera().rotation()
@@ -553,11 +572,7 @@ public final class WaterShaders {
         );
         WaterSceneCapture.Capture capture = null;
         if (minecraft.level != null) {
-            long frameKey = sceneFrameKey(
-                    minecraft.level,
-                    frameGameTime,
-                    framePartialTick
-            );
+            long frameKey = WildernessRenderingFramework.currentFrame().frameIndex();
             if (capturedOpticalFrameKey == frameKey) {
                 try {
                     capture = WaterSceneCapture.getIfCurrent(frameKey);
@@ -627,13 +642,6 @@ public final class WaterShaders {
         underwaterShader.safeGetUniform("ScatteringCoefficient").set(
                 UnderwaterOpticsModel.scatteringForClarity(optics.clarity())
         );
-    }
-
-    private static long sceneFrameKey(Object level, long gameTime, float partialTick) {
-        long levelKey = Integer.toUnsignedLong(System.identityHashCode(level));
-        return (levelKey * 0x9E37_79B9L)
-                ^ (gameTime << 32)
-                ^ (Float.floatToRawIntBits(partialTick) & 0xFFFF_FFFFL);
     }
 
     // Fullscreen underwater work consumes pre-reduced phases. Performing the

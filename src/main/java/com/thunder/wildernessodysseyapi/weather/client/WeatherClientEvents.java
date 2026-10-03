@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindManager;
 import com.thunder.wildernessodysseyapi.weather.api.WindSample;
@@ -56,6 +57,7 @@ public final class WeatherClientEvents {
         DistantThunderAudioManager.tick(minecraft);
         if (minecraft.options.getCloudsType() == CloudStatus.OFF
                 || !WeatherRenderingConfig.settings().enabled()
+                || ShaderPackCompatibility.isExternalShaderPackActive()
                 || !ClientWeatherCoordinator.controls(minecraft.level)) {
             LocalizedCloudRenderer.clear();
         }
@@ -123,7 +125,8 @@ public final class WeatherClientEvents {
     /** Blends humid precipitation haze into vanilla's air fog color. */
     @SubscribeEvent
     public static void onFogColor(ViewportEvent.ComputeFogColor event) {
-        if (event.getCamera().getFluidInCamera() != FogType.NONE) {
+        if (event.getCamera().getFluidInCamera() != FogType.NONE
+                || ShaderPackCompatibility.isExternalShaderPackActive()) {
             return;
         }
         ClientLevel level = Minecraft.getInstance().level;
@@ -162,7 +165,8 @@ public final class WeatherClientEvents {
     /** Shortens only the air-fog far plane according to the local weather sample. */
     @SubscribeEvent
     public static void onRenderFog(ViewportEvent.RenderFog event) {
-        if (event.getType() != FogType.NONE) {
+        if (event.getType() != FogType.NONE
+                || ShaderPackCompatibility.isExternalShaderPackActive()) {
             return;
         }
         ClientLevel level = Minecraft.getInstance().level;

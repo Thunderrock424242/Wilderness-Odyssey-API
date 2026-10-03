@@ -3,19 +3,32 @@ package com.thunder.wildernessodysseyapi.rendering.compat;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.neoforged.fml.ModList;
 
-import java.lang.reflect.Method;
-
 /** Shared, cached optional integration boundary for active Iris/Oculus shader packs. */
 public final class ShaderPackCompatibility {
 
-    private static volatile boolean apiResolved;
-    private static Method getInstance;
-    private static Method isPackInUse;
+    private static final IrisShaderPackProbe PROBE = new IrisShaderPackProbe(
+            ShaderPackCompatibility.class.getClassLoader(),
+            "net.irisshaders.iris.api.v0.IrisApi",
+            "net.coderbot.iris.api.v0.IrisApi"
+    );
     private static boolean queryFailureLogged;
     private static volatile long sampledFrame = Long.MIN_VALUE;
-    private static volatile boolean activeForFrame;
+    private static volatile Status statusForFrame = Status.NOT_INSTALLED;
 
     private ShaderPackCompatibility() {
+    }
+
+    /** Distinguishes native rendering from active or uncertain external ownership. */
+    public enum Status {
+        NOT_INSTALLED,
+        DISABLED,
+        ACTIVE,
+        UNKNOWN;
+
+        /** Uncertain optional integrations conservatively retain pack ownership. */
+        public boolean ownsWorldEffects() {
+            return this == ACTIVE || this == UNKNOWN;
+        }
     }
 
     /**
@@ -23,10 +36,15 @@ public final class ShaderPackCompatibility {
      * Unknown installed APIs fail closed to Minecraft's tagged/vanilla paths.
      */
     public static boolean isExternalShaderPackActive() {
+        return status().ownsWorldEffects();
+    }
+
+    /** Returns the ownership sampled for all water and weather consumers this frame. */
+    public static Status status() {
         if (sampledFrame != Long.MIN_VALUE) {
-            return activeForFrame;
+            return statusForFrame;
         }
-        return queryActivePack();
+        return queryStatus();
     }
 
     /** Samples optional shader ownership once for all rendering paths in one frame. */
@@ -38,61 +56,24 @@ public final class ShaderPackCompatibility {
             if (sampledFrame == frameIndex) {
                 return;
             }
-            activeForFrame = queryActivePack();
+            statusForFrame = queryStatus();
             sampledFrame = frameIndex;
         }
     }
 
-    private static boolean queryActivePack() {
+    private static synchronized Status queryStatus() {
         ModList mods = ModList.get();
-        if (!mods.isLoaded("iris") && !mods.isLoaded("oculus")) {
-            return false;
+        if (mods == null) {
+            return Status.UNKNOWN;
         }
-        resolveApi();
-        if (getInstance == null || isPackInUse == null) {
-            return true;
+        Status status = PROBE.sample(mods.isLoaded("iris") || mods.isLoaded("oculus"));
+        if (status == Status.UNKNOWN && !queryFailureLogged) {
+            ModConstants.LOGGER.warn(
+                    "Unable to query the active Iris/Oculus shader pack; preserving compatibility rendering",
+                    PROBE.failure()
+            );
+            queryFailureLogged = true;
         }
-        try {
-            Object api = getInstance.invoke(null);
-            return Boolean.TRUE.equals(isPackInUse.invoke(api));
-        } catch (ReflectiveOperationException | RuntimeException exception) {
-            if (!queryFailureLogged) {
-                ModConstants.LOGGER.warn(
-                        "Unable to query the active Iris/Oculus shader pack; preserving compatibility rendering",
-                        exception
-                );
-                queryFailureLogged = true;
-            }
-            return true;
-        }
-    }
-
-    private static void resolveApi() {
-        if (apiResolved) {
-            return;
-        }
-        synchronized (ShaderPackCompatibility.class) {
-            if (apiResolved) {
-                return;
-            }
-            for (String className : new String[] {
-                    "net.irisshaders.iris.api.v0.IrisApi",
-                    "net.coderbot.iris.api.v0.IrisApi"
-            }) {
-                try {
-                    Class<?> apiClass = Class.forName(
-                            className,
-                            false,
-                            ShaderPackCompatibility.class.getClassLoader()
-                    );
-                    getInstance = apiClass.getMethod("getInstance");
-                    isPackInUse = apiClass.getMethod("isShaderPackInUse");
-                    break;
-                } catch (ClassNotFoundException | NoSuchMethodException ignored) {
-                    // Try the next supported API package without requiring either mod.
-                }
-            }
-            apiResolved = true;
-        }
+        return status;
     }
 }

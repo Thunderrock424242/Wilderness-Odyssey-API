@@ -74,5 +74,6 @@ public final class ModCommands {
         DataEngineCommand.register(dispatcher);
         SimulationDebugCommand.register(dispatcher);
         CinematicCommand.register(dispatcher);
+        com.thunder.wildernessodysseyapi.quest.command.QuestCommand.register(dispatcher);
     }
 }

@@ -183,7 +183,10 @@ public final class WildernessRenderingFramework {
                 ),
                 "WO temporal inputs: "
                         + (frame.temporalData().hasTemporalReconstructionInputs()
-                        ? "available" : "native path; motion/depth/color handoff unavailable")
+                        ? "available" : "native path; motion/depth/color handoff unavailable"),
+                "WO shader ownership: " + ShaderPackCompatibility.status().name().toLowerCase(Locale.ROOT)
+                        + (ShaderPackCompatibility.isExternalShaderPackActive()
+                        ? " | external world effects" : " | native world effects")
         );
     }
 

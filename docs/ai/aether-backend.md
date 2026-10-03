@@ -1,5 +1,7 @@
 # A.E.T.H.E.R. remote backend
 
+**For the step-by-step operator walkthrough, start with [Aether setup and verification](../../AETHER_SETUP.md).** This document covers architecture and configuration details.
+
 For the optional JAR with native Ollama and bundled model weights, see [the bundled server guide](aether-bundled-server.md). Bundled weights are not a capacity approval for Kinetic. See [Phase 1 commissioning and administration](protected-gateway-phase-1.md).
 
 ## Architecture and audit

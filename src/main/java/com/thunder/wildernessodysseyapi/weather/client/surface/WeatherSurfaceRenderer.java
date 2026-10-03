@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.weather.client.surface;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
 import com.thunder.wildernessodysseyapi.weather.api.SurfaceWeatherState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
@@ -47,7 +48,9 @@ public final class WeatherSurfaceRenderer {
         Minecraft minecraft = Minecraft.getInstance();
         ClientLevel level = minecraft.level;
         WeatherRenderingConfig.Settings settings = WeatherRenderingConfig.settings();
-        if (level == null || !settings.surfaceOverlays() || !ClientWeatherCoordinator.controls(level)) {
+        if (level == null || !settings.surfaceOverlays()
+                || ShaderPackCompatibility.isExternalShaderPackActive()
+                || !ClientWeatherCoordinator.controls(level)) {
             clear();
             return;
         }

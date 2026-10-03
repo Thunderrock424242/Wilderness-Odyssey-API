@@ -1,5 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
+import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.LocalizedCloudRenderer;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -28,6 +29,9 @@ public abstract class ClientLevelLocalizedWeatherMixin {
             ClientLevel level,
             float partialTick
     ) {
+        if (ShaderPackCompatibility.isExternalShaderPackActive()) {
+            return level.getRainLevel(partialTick);
+        }
         if (LocalizedCloudRenderer.isSamplingBaseCloudColor()) {
             return 0.0F;
         }
@@ -48,6 +52,9 @@ public abstract class ClientLevelLocalizedWeatherMixin {
             ClientLevel level,
             float partialTick
     ) {
+        if (ShaderPackCompatibility.isExternalShaderPackActive()) {
+            return level.getThunderLevel(partialTick);
+        }
         if (LocalizedCloudRenderer.isSamplingBaseCloudColor()) {
             return 0.0F;
         }

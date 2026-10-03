@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.LocalizedCloudRenderer;
 import com.thunder.wildernessodysseyapi.weather.client.precipitation.LocalizedPrecipitationRenderer;
@@ -73,6 +74,7 @@ public abstract class LevelRendererLocalizedWeatherMixin {
         float cloudHeight = effects.getCloudHeight();
         if (ClientWeatherCoordinator.controls(level)
                 && WeatherRenderingConfig.settings().enabled()
+                && !ShaderPackCompatibility.isExternalShaderPackActive()
                 && !Float.isNaN(cloudHeight)) {
             LocalizedCloudRenderer.render(
                     level,

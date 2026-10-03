@@ -69,6 +69,7 @@ public final class WaterRenderCoordinator {
         ClientLevel level = minecraft.level;
         if (level == null || !WaterRenderingConfig.replacementWaterRenderingEnabled(level)) {
             clear();
+            WaterShaders.releaseOpticalResources();
             externalPackOwnedLastFrame = false;
             WaterRenderDiagnostics.setRenderPath(WaterRenderDiagnostics.RenderPath.DISABLED);
             WaterRenderDiagnostics.setSceneCaptureAvailable(false);
@@ -85,6 +86,7 @@ public final class WaterRenderCoordinator {
             WaterRenderDiagnostics.setSceneCaptureAvailable(false);
             if (!externalPackOwnedLastFrame) {
                 clear();
+                WaterShaders.releaseOpticalResources();
                 event.getLevelRenderer().allChanged();
                 externalPackOwnedLastFrame = true;
             }
@@ -237,13 +239,11 @@ public final class WaterRenderCoordinator {
 
     /** Releases mesh state on client level teardown. */
     @SubscribeEvent
-    @SuppressWarnings("removal") // Releases the temporary OpenGL scene-copy target.
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel().isClientSide()) {
             clear();
             externalPackOwnedLastFrame = false;
-            WaterSceneCapture.release();
-            WaterGpuTimer.release();
+            WaterShaders.releaseOpticalResources();
         }
     }
 

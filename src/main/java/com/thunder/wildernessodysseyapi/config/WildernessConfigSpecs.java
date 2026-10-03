@@ -126,6 +126,7 @@ public final class WildernessConfigSpecs {
         EcosystemConfig.define(builder);
         VegetationConfig.define(builder);
         GlacialConfig.defineServer(builder);
+        com.thunder.wildernessodysseyapi.quest.config.QuestConfig.define(builder);
         return builder.build();
     }
 
@@ -167,6 +168,7 @@ public final class WildernessConfigSpecs {
         WeatherConfig.CONFIG_SPEC = serverSpec;
         EcosystemConfig.CONFIG_SPEC = serverSpec;
         VegetationConfig.CONFIG_SPEC = serverSpec;
+        com.thunder.wildernessodysseyapi.quest.config.QuestConfig.CONFIG_SPEC = serverSpec;
 
         BackgroundEfficiencyConfig.attachSpec(serverSpec);
         TickEngineConfig.attachSpec(serverSpec);

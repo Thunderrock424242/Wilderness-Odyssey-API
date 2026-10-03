@@ -1,0 +1,1 @@
+{"schemaVersion":99,"definitionVersion":1,"chapter":"test:missing","title":"Invalid","objectives":[{"id":"test:bad","type":"client_complete"}],"rewards":[{"id":"test:bad","type":"command","command":"give @s diamond"}]}

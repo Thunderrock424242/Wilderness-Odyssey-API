@@ -30,10 +30,9 @@ import org.joml.Matrix4f;
 /**
  * Applies Phase 8 fog, transition, distortion, and caustic presentation.
  *
- * <p>Fog remains an ordinary NeoForge viewport customization, while the
- * optional overlay replaces vanilla's flat-water texture only when the mod's
- * linked shader owns the effect. Iris/Oculus keeps its normal overlay path, and
- * canonical wave crests remain compatible with vanilla water detection.</p>
+ * <p>Fog and overlays yield to an external shader pack. Native optics use
+ * ordinary NeoForge viewport customization and replace vanilla's flat-water
+ * texture only when the mod's linked shader owns the effect.</p>
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public final class UnderwaterEffectsRenderer {
@@ -48,7 +47,7 @@ public final class UnderwaterEffectsRenderer {
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onFogColor(ViewportEvent.ComputeFogColor event) {
         if (!WaterRenderingConfig.ENABLE_UNDERWATER_OPTICS.get()
-                || !canOwnWaterFog(event.getCamera().getFluidInCamera())) {
+                || !canOwnWaterFog(event.getCamera().getFluidInCamera(), WaterShaders.externalShaderPackOwnsWater())) {
             return;
         }
 
@@ -87,7 +86,7 @@ public final class UnderwaterEffectsRenderer {
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onRenderFog(ViewportEvent.RenderFog event) {
         if (!WaterRenderingConfig.ENABLE_UNDERWATER_OPTICS.get()
-                || !canOwnWaterFog(event.getType())) {
+                || !canOwnWaterFog(event.getType(), WaterShaders.externalShaderPackOwnsWater())) {
             return;
         }
 
@@ -126,7 +125,8 @@ public final class UnderwaterEffectsRenderer {
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onWaterOverlay(RenderBlockScreenEffectEvent event) {
         if (event.getOverlayType() != RenderBlockScreenEffectEvent.OverlayType.WATER
-                || !WaterRenderingConfig.ENABLE_UNDERWATER_OPTICS.get()) {
+                || !WaterRenderingConfig.ENABLE_UNDERWATER_OPTICS.get()
+                || WaterShaders.externalShaderPackOwnsWater()) {
             return;
         }
 
@@ -153,9 +153,12 @@ public final class UnderwaterEffectsRenderer {
     /** Adds an overlay when a rendered wave crest rises above vanilla's fluid plane. */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onRenderGui(RenderGuiEvent.Pre event) {
-        Minecraft minecraft = Minecraft.getInstance();
         if (!WaterRenderingConfig.ENABLE_UNDERWATER_OPTICS.get()
-                || minecraft.player == null
+                || WaterShaders.externalShaderPackOwnsWater()) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null
                 || minecraft.level == null
                 || minecraft.player.isSpectator()
                 || minecraft.player.isEyeInFluid(FluidTags.WATER)) {
@@ -174,8 +177,8 @@ public final class UnderwaterEffectsRenderer {
         if (WaterShaders.shouldUseUnderwaterShader()) {
             renderBuiltInOverlay(minecraft, poseStack, state);
         } else {
-            // Shader packs retain their own water path; this standard overlay
-            // only fills the gap where the animated crest exceeds block water.
+            // Fill the native crest transition when the optional optical
+            // program is unavailable. This fallback only runs for native optics.
             ScreenEffectRenderer.renderFluid(minecraft, poseStack, VANILLA_UNDERWATER_TEXTURE);
         }
     }
@@ -222,8 +225,8 @@ public final class UnderwaterEffectsRenderer {
         }
     }
 
-    private static boolean canOwnWaterFog(FogType fogType) {
-        return fogType == FogType.NONE || fogType == FogType.WATER;
+    static boolean canOwnWaterFog(FogType fogType, boolean externalPackOwnsWater) {
+        return !externalPackOwnsWater && (fogType == FogType.NONE || fogType == FogType.WATER);
     }
 
     private static float mix(float from, float to, float amount) {

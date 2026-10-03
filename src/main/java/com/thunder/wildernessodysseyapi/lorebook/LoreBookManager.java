@@ -88,6 +88,7 @@ public final class LoreBookManager {
         // Push the new id immediately so an already-open Codex updates without
         // waiting for the player to use the item again.
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, new SyncLoreBookPayload(id));
+        com.thunder.wildernessodysseyapi.quest.integration.LoreQuestBridge.onCollected(player, id);
     }
 
     public static Set<String> getCollected(ServerPlayer player) {

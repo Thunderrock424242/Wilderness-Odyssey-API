@@ -81,7 +81,7 @@ A.E.T.H.E.R server companion:
 ----------------------------
 See `docs/ai/purpose-scope.md` for A.E.T.H.E.R's core boundaries and `docs/ai/local-voice.md` for optional faster-whisper/Kokoro setup.
 
-A.E.T.H.E.R sends addressed chat from the logical Minecraft server to a separate authenticated Java gateway, which connects privately to Ollama. Dedicated, LAN and integrated servers share this architecture. Canonical lore, six specialist personalities and factual verification live on the gateway; deterministic recovered-intent replies remain in the mod for outages. Minecraft never launches or downloads a model runtime. See [backend configuration and migration](docs/ai/aether-backend.md) and [deployment](deploy/README.md).
+A.E.T.H.E.R sends addressed chat from the logical Minecraft server to a separate authenticated Java gateway, which connects privately to Ollama. Dedicated, LAN and integrated servers share this architecture. Canonical lore, six specialist personalities and factual verification live on the gateway; deterministic recovered-intent replies remain in the mod for outages. Minecraft never launches or downloads a model runtime. **Start with the [Aether setup and verification guide](AETHER_SETUP.md)** for a complete operator walkthrough. Detailed references: [backend configuration and migration](docs/ai/aether-backend.md) and [deployment](deploy/README.md).
 
 Scripted response data lives in:
 - `src/main/resources/ai_config.yaml`

@@ -1,0 +1,6 @@
+{
+  "schemaVersion":1,"definitionVersion":1,"chapter":"wildernessodysseyapi:phase1_test_start",
+  "title":"Carry four logs","description":"Carry four logs in your inventory. This quest is optional.","icon":"minecraft:oak_log","optional":true,
+  "objectives":[{"id":"wildernessodysseyapi:phase1_test_logs","type":"possession","items":["minecraft:oak_log"],"tags":["minecraft:logs"],"goal":4}],
+  "rewards":[{"id":"wildernessodysseyapi:phase1_test_xp","type":"xp","amount":5}]
+}

@@ -49,6 +49,7 @@ public final class ServerLifecycleEvents {
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         AsyncTaskManager.initialize(AsyncThreadingConfig.values());
+        com.thunder.wildernessodysseyapi.quest.runtime.QuestServerEvents.start(event.getServer());
         TelemetryQueue.get(event.getServer()); // Load the bounded spool before gameplay ticks or player login.
         BackgroundEfficiencyManager.start(BackgroundEfficiencyConfig.values());
         TickEngine.start(TickEngineConfig.values(), BackgroundEfficiencyManager.schedulerControl());
@@ -73,6 +74,7 @@ public final class ServerLifecycleEvents {
     /** Advances gameplay clocks first, then drains optional work while Minecraft reports spare time. */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        com.thunder.wildernessodysseyapi.quest.runtime.QuestServerEvents.tick(event.getServer());
         for (ServerLevel level : event.getServer().getAllLevels()) {
             RiftfallSystem.advanceClock(level);
         }
@@ -99,6 +101,7 @@ public final class ServerLifecycleEvents {
     /** Persists mobile water and stops runtime services during shutdown. */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onServerStopping(ServerStoppingEvent event) {
+        com.thunder.wildernessodysseyapi.quest.runtime.QuestServerEvents.stop(event.getServer());
         SPHSimulationManager waterManager = SPHSimulationManager.get();
         for (ServerLevel level : event.getServer().getAllLevels()) {
             waterManager.capturePersistentLevel(level);
@@ -134,5 +137,6 @@ public final class ServerLifecycleEvents {
     public static void onAddReloadListeners(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
         event.addListener(new SpeciesBehaviorProfileReloadListener());
+        event.addListener(com.thunder.wildernessodysseyapi.quest.runtime.QuestServerEvents.reloadListener(event.getRegistryAccess()));
     }
 }

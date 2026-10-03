@@ -81,9 +81,10 @@ neoForge {
             type = "gameTestServer"
             // Keep automated tests isolated from the developer's normal run/
             // mods and configs so unrelated local mods cannot block startup.
+            def testDirectory = providers.gradleProperty('questGameTests').isPresent() ? 'run-quest-gametest' : 'run-gametest'
             gameDirectory = codexBuildDir.isPresent()
-                    ? layout.buildDirectory.dir('run-gametest').get().asFile
-                    : project.file('run-gametest')
+                    ? layout.buildDirectory.dir(testDirectory).get().asFile
+                    : project.file(testDirectory)
             // Limit GameTests to our namespace by default so third-party mod tests do not fail the run.
             // Either property can be overridden from the command line, e.g.
             //   -Dforge.enabledGameTestNamespaces=
@@ -92,10 +93,14 @@ neoForge {
             def neoforgeNamespaces = System.getProperty('neoforge.enabledGameTestNamespaces')
             def enabledNamespaces = forgeNamespaces != null ? forgeNamespaces : neoforgeNamespaces
             if (enabledNamespaces == null) {
-                enabledNamespaces = project.mod_id
+                enabledNamespaces = providers.gradleProperty('questGameTests').isPresent()
+                        ? 'wildernessodysseyapi_quest_tests' : project.mod_id
             }
             systemProperty 'forge.enabledGameTestNamespaces', enabledNamespaces
             systemProperty 'neoforge.enabledGameTestNamespaces', enabledNamespaces
+            if (providers.gradleProperty('questGameTests').isPresent()) {
+                systemProperty 'wildernessodysseyapi.questTests.disabledWorkers', providers.gradleProperty('questDisabledWorkers').isPresent().toString()
+            }
         }
 
         data {
@@ -182,6 +187,9 @@ tasks.named('processResources') {
         // `structures` is reserved for generated world-save output.
         into 'data/wildernessodysseyapi/structure'
     }
+    from('src/main/resources/data/minecraft/structures/empty.nbt') {
+        into 'data/wildernessodysseyapi_quest_tests/structure'
+    }
     doLast {
         // The historical test asset is raw NBT, while data-pack structure
         // resources are gzip-compressed. Normalize the copied template in the
@@ -190,6 +198,11 @@ tasks.named('processResources') {
         def target = file("${destinationDir}/data/wildernessodysseyapi/structure/empty.nbt")
         target.parentFile.mkdirs()
         new java.util.zip.GZIPOutputStream(new FileOutputStream(target)).withCloseable { stream ->
+            stream.write(sourceBytes)
+        }
+        def questTarget = file("${destinationDir}/data/wildernessodysseyapi_quest_tests/structure/empty.nbt")
+        questTarget.parentFile.mkdirs()
+        new java.util.zip.GZIPOutputStream(new FileOutputStream(questTarget)).withCloseable { stream ->
             stream.write(sourceBytes)
         }
     }
@@ -734,6 +747,47 @@ tasks.register('weatherPhysicsTest', Test) {
     filter {
         includeTestsMatching 'com.thunder.wildernessodysseyapi.weather.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.hydrology.*'
+    }
+}
+
+// Shares the established offline runtime; optical unit tests do not need a GPU or mod bootstrap.
+tasks.register('renderingTest', Test) {
+    group = 'verification'
+    description = 'Runs rendering policy, water optics and client weather regressions without starting Minecraft.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '2g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.rendering.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.render.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.ocean.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.weather.client.*'
+    }
+}
+
+tasks.register('questTest', Test) {
+    group = 'verification'
+    description = 'Runs focused quest definition, progression, persistence and protocol regressions without starting Minecraft.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '1g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.quest.*'
+    }
+}
+
+tasks.register('questCompatibilityTest', Test) {
+    group = 'verification'
+    description = 'Runs the existing config and Codex regressions affected by quest integration.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '1g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.config.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.lorebook.*'
     }
 }
 

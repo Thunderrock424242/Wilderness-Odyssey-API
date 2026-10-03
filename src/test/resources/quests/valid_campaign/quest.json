@@ -1,0 +1,17 @@
+{
+  "schemaVersion":1,"definitionVersion":1,"chapter":"test:start","title":"Prepare for travel",
+  "description":"Keep supplies, visit the Nether and recover a record.","icon":"minecraft:compass",
+  "optional":true,"hidden":false,"repeatable":false,"cooldownTicks":0,
+  "prerequisites":{"mode":"all","quests":[]},
+  "objectives":[
+    {"id":"test:supplies","type":"possession","goal":4,"items":["minecraft:oak_log"],"tags":["minecraft:logs"]},
+    {"id":"test:travel","type":"dimension","dimension":"minecraft:the_nether"},
+    {"id":"test:record","type":"lore","lore":"wildernessodysseyapi:lore_001"},
+    {"id":"test:signal","type":"custom_event","producer":"test:beacon","goal":2,"dependsOn":["test:record"]}
+  ],
+  "rewards":[
+    {"id":"test:compass","type":"item","item":"minecraft:compass","count":1},
+    {"id":"test:experience","type":"xp","amount":5},
+    {"id":"test:memory","type":"lore","lore":"wildernessodysseyapi:lore_002"}
+  ]
+}
