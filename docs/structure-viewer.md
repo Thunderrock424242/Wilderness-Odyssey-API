@@ -8,7 +8,11 @@ The desktop interface separates the library, preview, and inspector. The header'
 
 The Windows `.exe` installer includes a Java 21 runtime. Users do not need to install Java separately. Run `Wilderness Structure Viewer-<version>.exe`, choose the installation folder, and launch **Wilderness Structure Viewer** from the shortcut or installation folder.
 
-Choose **Open modpack…** and select the instance folder or its `mods` folder. Common `instance/.minecraft/mods` and `instance/minecraft/mods` layouts are recognized. The library groups templates beneath their source JAR, with namespace/resource names below each group. Search filters by JAR name, namespace, or path. Different JARs containing the same resource ID remain separate entries. Corrupt JARs are reported while other mods continue scanning.
+Choose **Open modpack…** and select the instance folder or its `mods` folder. Common `instance/.minecraft/mods` and `instance/minecraft/mods` layouts are recognized. The library groups templates beneath their source JAR, with namespace/resource names below each group. Every mod group starts collapsed after a scan; click its arrow to see the templates inside. Search and view changes preserve groups you manually opened or closed. Search filters by JAR name, namespace, or path. Different JARs containing the same resource ID remain separate entries. Corrupt JARs are reported while other mods continue scanning.
+
+Version **1.0.4** adds a library view below Search. **Structures** is the default: it hides clearly decorative cactus, rock, tree, log, bush, and similar template names, plus feature/decoration folders. **All templates** restores every indexed entry, and **Features** shows the filtered decorations. The footer reports how many features are hidden; feature entries are labelled in the tree when shown. Search respects the selected view. Your explicit view choice is saved with the other preferences.
+
+This is a conservative name/folder filter, not Minecraft's registered worldgen type. Mods such as AdditionalStructures register cactus and rock templates through ordinary structure pools, so those definitions cannot reliably identify a building. Names containing building terms, such as `mushroom_house`, `cactus_temple`, or `rock_castle`, stay visible; uncertain names also stay visible. No size cutoff is used, so small rooms and building pieces are retained. Use All templates when an expected piece is missing. Filtering changes only the existing index; it does not reopen JARs, decode NBT, change the current preview/camera, or remove any mod's asset sources.
 
 For CurseForge, the picker recognizes `%USERPROFILE%\curseforge\minecraft\Instances` (`C:\Users\<name>\curseforge\minecraft\Instances`). Choose the individual pack folder inside Instances. A previously selected valid pack elsewhere remains the picker location; an existing CurseForge instance opens the picker at its parent Instances folder. Detection checks this known directory and does not scan unrelated launcher profiles.
 
@@ -174,11 +178,11 @@ NBT limits: 64 MiB file, 256 MiB decoded data, depth 64, 4 million collection en
 
 ### GitHub Actions artifact
 
-The **Structure Viewer Windows** workflow (`.github/workflows/structure-viewer-windows.yml`) builds the Windows x64 installer on pushes to `main` and `in-dev` that change the viewer, wrapper, license, or workflow. Pull requests with those changes also build it. Under **Actions → Structure Viewer Windows → a successful run → Artifacts**, download `wilderness-structure-viewer-windows-x64-1.0.3`. Extract the artifact ZIP to obtain the installer `.exe` and its SHA-256 checksum.
+The **Structure Viewer Windows** workflow (`.github/workflows/structure-viewer-windows.yml`) builds the Windows x64 installer on pushes to `main` and `in-dev` that change the viewer, wrapper, license, or workflow. Pull requests with those changes also build it. Under **Actions → Structure Viewer Windows → a successful run → Artifacts**, download `wilderness-structure-viewer-windows-x64-1.0.4`. Extract the artifact ZIP to obtain the installer `.exe` and its SHA-256 checksum.
 
 The installer artifact is retained for 30 days; test and launcher diagnostics are retained for 14 days. The run summary links to the installer download. This uploads a build artifact, without creating a GitHub Release or signing the executable.
 
-**Run workflow** allows a manual build with a `major.minor.patch` installer version, defaulting to `1.0.3`. Until this workflow is on the repository's default branch, its automatic push/PR triggers provide builds; GitHub's manual workflow button requires the workflow on the default branch.
+**Run workflow** allows a manual build with a `major.minor.patch` installer version, defaulting to `1.0.4`. Until this workflow is on the repository's default branch, its automatic push/PR triggers provide builds; GitHub's manual workflow button requires the workflow on the default branch.
 
 CI uses the standalone Gradle module, JDK 21, and the same checksum-verified portable packaging tools as local builds. It runs the viewer unit tests, builds the installer, checks MSI upgrade metadata, and launches the packaged `.exe` to verify its bundled runtime and archive support. It does not download Minecraft assets or run the main mod build. The optional vanilla-asset integration test skips when local assets are absent; desktop smoke checks remain local acceptance tests.
 
@@ -193,13 +197,13 @@ Build on Windows with JDK 21 containing `jpackage.exe` and WiX 3's `candle.exe`/
 .\gradlew.bat -p tools/structure-viewer verifyWindowsInstaller verifyWindowsLauncher bundledUiSmokeTest '-PcodexBuildDir=.codex-build' '-PviewerPackagingJdk=C:/path/to/jdk-21' '-PviewerRuntimeDir=C:/path/printed/by/helper/jdk-21.0.12.1+1-jre' '-PviewerWixDir=C:/path/printed/by/helper/wix-3.14.1' --no-parallel
 ```
 
-`structureViewerInstaller` is the root alias for `:tools:structure-viewer:windowsInstaller`. The standalone invocation avoids configuring NeoForge. `viewerPackagingJdk` defaults to Gradle's Java 21 toolchain. `viewerRuntimeDir` is optional: without it, jpackage builds a reduced Java 21 runtime including desktop and ZIP filesystem modules from that JDK. Choose a runtime licensed for redistribution; the supplied helper uses Temurin and the bundle retains runtime legal files. `-PviewerVersion=1.0.3` controls installer versioning; the upgrade identity stays stable.
+`structureViewerInstaller` is the root alias for `:tools:structure-viewer:windowsInstaller`. The standalone invocation avoids configuring NeoForge. `viewerPackagingJdk` defaults to Gradle's Java 21 toolchain. `viewerRuntimeDir` is optional: without it, jpackage builds a reduced Java 21 runtime including desktop and ZIP filesystem modules from that JDK. Choose a runtime licensed for redistribution; the supplied helper uses Temurin and the bundle retains runtime legal files. `-PviewerVersion=1.0.4` controls installer versioning; the upgrade identity stays stable.
 
 Outputs beneath the selected build directory:
 
 | Artifact | Path |
 | --- | --- |
-| Installer | `tools/structure-viewer/windows/installer/Wilderness Structure Viewer-1.0.3.exe` |
+| Installer | `tools/structure-viewer/windows/installer/Wilderness Structure Viewer-1.0.4.exe` |
 | Portable application folder | `tools/structure-viewer/windows/image/Wilderness Structure Viewer/` |
 | Native-launcher report | `tools/structure-viewer/windows/launcher-diagnostics.json` |
 | Installer-upgrade report | `tools/structure-viewer/windows/installer-upgrade-diagnostics.json` |

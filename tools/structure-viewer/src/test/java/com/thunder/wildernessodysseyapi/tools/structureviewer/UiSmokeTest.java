@@ -143,6 +143,8 @@ public final class UiSmokeTest {
                 throw new AssertionError("Shrinking the export left an empty preview at the old Y layer.");
             verifyModpack(window,project,output);
             UpdateUiSmoke.run(output.resolve("updates"));
+            String actualModpack=System.getProperty("structureViewer.smokeModpack","");
+            if(!actualModpack.isBlank())verifyActualModpackFilter(window,Path.of(actualModpack),output);
             System.out.println("PHASE 2 GUI PASSED: JSON, atomic reload, camera preservation, failed reload recovery, Fast/Ultra resolution "+fastWidth+"/"+ultraWidth+", saved quality, G block focus.");
             System.out.println("GUI SMOKE PASSED: real window, existing " + fixture.getFileName()
                     + ", rendered blocks, click inspector, F2/W movement, mouse look, F1 orbit. Screenshot: " + output);
@@ -162,8 +164,12 @@ public final class UiSmokeTest {
         byte[] original=Files.readAllBytes(jar);
         edt(() -> {window.openModpack(pack);return null;});
         var house=new StructureSource(jar,"data/demo/structure/shelter.json");
+        await(() -> librarySources(window).contains(house),15000);
+        edt(()->{assertCollapsedLibrary(window);return null;});
+        snapshot(window,output.resolve("collapsed-mod-groups.png"));
         await(() -> selectInLibrary(window,house),15000);
         await(() -> house.equals(window.loadedSource()) && window.viewport().renderingIdle(),120000);
+        verifyFeatureFilter(window,jar,output);
         var shelterView=edt(() -> window.viewport().cameraView());
         snapshot(window,output.resolve("modpack-library.png"));
         java.awt.Dimension fullSize=edt(window::getSize);
@@ -207,7 +213,7 @@ public final class UiSmokeTest {
         edt(() -> {window.setSize(980,640);window.validate();return null;});
         awaitSizedFrame(window);
         edt(() -> {
-            for(String name:java.util.List.of("open-modpack","open-structure","theme-toggle","render-quality","y-layer","view-options","check-updates")) {
+            for(String name:java.util.List.of("open-modpack","open-structure","theme-toggle","render-quality","y-layer","view-options","check-updates","library-filter")) {
                 Component control=find(window,name);
                 if(control==null || !control.isShowing())throw new AssertionError("Missing visible control: "+name);
                 for(Container parent=control.getParent();parent!=null;parent=parent.getParent()) {
@@ -333,6 +339,7 @@ public final class UiSmokeTest {
                 while(nodes.hasMoreElements()) {
                     var node=(DefaultMutableTreeNode)nodes.nextElement();
                     if(node.getUserObject() instanceof StructureCatalog.Entry entry && entry.source().equals(source)) {
+                        tree.expandPath(new TreePath(((DefaultMutableTreeNode)node.getParent()).getPath()));
                         tree.setSelectionPath(new TreePath(node.getPath()));return true;
                     }
                 }
@@ -342,9 +349,79 @@ public final class UiSmokeTest {
         return false;
     }
 
+    private static java.util.Set<StructureSource> librarySources(Container component) {
+        var result=new java.util.HashSet<StructureSource>();
+        for(Component child:component.getComponents()) {
+            if(child instanceof JTree tree) {
+                var nodes=((DefaultMutableTreeNode)tree.getModel().getRoot()).depthFirstEnumeration();
+                while(nodes.hasMoreElements())if(((DefaultMutableTreeNode)nodes.nextElement()).getUserObject() instanceof StructureCatalog.Entry entry)result.add(entry.source());
+            }
+            if(child instanceof Container nested)result.addAll(librarySources(nested));
+        }
+        return result;
+    }
+    private static void assertCollapsedLibrary(Container component) {
+        for(Component child:component.getComponents()) {
+            if(child instanceof JTree tree) {
+                var root=(DefaultMutableTreeNode)tree.getModel().getRoot();
+                if(tree.getRowCount()!=root.getChildCount())throw new AssertionError("A new scan must show only collapsed mod groups.");
+                for(int i=0;i<root.getChildCount();i++)if(tree.isExpanded(new TreePath(((DefaultMutableTreeNode)root.getChildAt(i)).getPath())))
+                    throw new AssertionError("A mod group expanded automatically.");
+            }
+            if(child instanceof Container nested)assertCollapsedLibrary(nested);
+        }
+    }
+    private static void verifyFeatureFilter(ViewerWindow window,Path jar,Path output)throws Exception {
+        var cactus=new StructureSource(jar,"data/demo/structure/cactus_1.nbt");
+        var rock=new StructureSource(jar,"data/demo/structure/sandstone_rock_2.nbt");
+        var house=new StructureSource(jar,"data/demo/structure/mushroom_house_1.nbt");
+        var originalSource=edt(window::loadedSource);var camera=edt(()->window.viewport().cameraView());
+        var defaults=edt(()->librarySources(window));
+        if(defaults.contains(cactus)||defaults.contains(rock)||!defaults.contains(house))
+            throw new AssertionError("The default structure library must hide cactus/rocks and keep mushroom houses.");
+        edt(()->{((javax.swing.JComboBox<?>)find(window,"library-filter")).setSelectedItem(LibraryView.ALL);return null;});
+        if(!edt(()->librarySources(window)).containsAll(java.util.List.of(cactus,rock,house)))throw new AssertionError("All templates lost a filtered entry.");
+        snapshot(window,output.resolve("all-templates-filter.png"));
+        if(ViewerSettings.read(Path.of(System.getProperty("structureViewer.settings"))).libraryView()!=LibraryView.ALL)throw new AssertionError("The explicit library view wasn't saved.");
+        edt(()->{((javax.swing.JTextField)find(window,"library-search")).setText("cactus");return null;});
+        await(()->librarySources(window).equals(java.util.Set.of(cactus)),5000);
+        edt(()->{((javax.swing.JComboBox<?>)find(window,"library-filter")).setSelectedItem(LibraryView.STRUCTURES);return null;});
+        if(!edt(()->librarySources(window)).isEmpty())throw new AssertionError("Searching must respect the Structures filter.");
+        edt(()->{((javax.swing.JTextField)find(window,"library-search")).setText("");((javax.swing.JComboBox<?>)find(window,"library-filter")).setSelectedItem(LibraryView.FEATURES);return null;});
+        if(!edt(()->librarySources(window)).equals(java.util.Set.of(cactus,rock)))throw new AssertionError("Features view should contain the two decorative templates.");
+        snapshot(window,output.resolve("features-filter.png"));
+        edt(()->{((javax.swing.JComboBox<?>)find(window,"library-filter")).setSelectedItem(LibraryView.STRUCTURES);return null;});
+        if(!originalSource.equals(edt(window::loadedSource))||!camera.equals(edt(()->window.viewport().cameraView())))throw new AssertionError("Filtering changed the current preview or camera.");
+        snapshot(window,output.resolve("structures-filter.png"));
+        System.out.println("LIBRARY FILTER GUI PASSED: default hides cactus/rocks, keeps mushroom house, All/Features restore entries, search respects view, preference saved, preview and camera retained.");
+    }
+    private static void verifyActualModpackFilter(ViewerWindow window,Path pack,Path output)throws Exception {
+        edt(()->{window.openModpack(pack);return null;});
+        await(()->((javax.swing.JLabel)find(window,"library-count")).getText().contains("templates"),30000);
+        edt(()->{assertCollapsedLibrary(window);return null;});
+        var structures=edt(()->librarySources(window));
+        edt(()->{((javax.swing.JComboBox<?>)find(window,"library-filter")).setSelectedItem(LibraryView.ALL);return null;});
+        var all=edt(()->librarySources(window));
+        for(String template:java.util.List.of("cactus_1","cobblestone_rock_1","sandstone_rock_2","stone_rock_4")) {
+            var feature=all.stream().filter(source->("data/additionalstructures/structure/"+template+".nbt").equals(source.entry())).findFirst()
+                    .orElseThrow(()->new AssertionError("The acceptance pack must include AdditionalStructures' "+template));
+            if(structures.contains(feature))throw new AssertionError("A reported feature is still visible by default: "+template);
+        }
+        for(String template:java.util.List.of("mushroom_house_1","maya_temple","underground_base_1")) {
+            var building=all.stream().filter(source->("data/additionalstructures/structure/"+template+".nbt").equals(source.entry())).findFirst().orElseThrow();
+            if(!structures.contains(building))throw new AssertionError("A real building was hidden: "+template);
+        }
+        edt(()->{((javax.swing.JComboBox<?>)find(window,"library-filter")).setSelectedItem(LibraryView.STRUCTURES);return null;});
+        snapshot(window,output.resolve("actual-modpack-structures.png"));
+        System.out.println("ACTUAL MODPACK FILTER PASSED: "+structures.size()+" visible templates, "+(all.size()-structures.size())+" decorations hidden; reported AdditionalStructures cactus/rocks hidden, houses/temple/base retained.");
+    }
+
     private static void writeMod(Path jar,byte[] nbt,byte[] shelter,String roomName) throws Exception {
         try(var out=new ZipOutputStream(Files.newOutputStream(jar))) {
             put(out,"data/demo/structures/template.nbt",nbt);
+            put(out,"data/demo/structure/cactus_1.nbt",nbt);
+            put(out,"data/demo/structure/sandstone_rock_2.nbt",nbt);
+            put(out,"data/demo/structure/mushroom_house_1.nbt",nbt);
             put(out,"data/demo/structure/shelter.json",shelter);
             put(out,"data/demo/structure/room.json",("{\"name\":\""+roomName+"\",\"size\":[1,1,1],\"blocks\":[{\"pos\":[0,0,0],\"block\":\"demo:preview_block\"}]}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
             put(out,"assets/demo/blockstates/preview_block.json","{\"variants\":{\"\":{\"model\":\"demo:block/preview_block\"}}}".getBytes());

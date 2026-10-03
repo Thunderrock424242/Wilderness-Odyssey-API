@@ -6,8 +6,11 @@ import java.nio.file.*;
 import java.util.*;
 
 /** Explicit local preferences under ignored tool output; quality is never auto-overridden. */
-public record ViewerSettings(RenderQuality quality,boolean edges,boolean textures,boolean autoReload,List<Path> assets,Path modpack,boolean darkMode) {
+public record ViewerSettings(RenderQuality quality,boolean edges,boolean textures,boolean autoReload,List<Path> assets,Path modpack,boolean darkMode,LibraryView libraryView) {
     public ViewerSettings{assets=List.copyOf(assets);}
+    public ViewerSettings(RenderQuality quality,boolean edges,boolean textures,boolean autoReload,List<Path> assets,Path modpack,boolean darkMode) {
+        this(quality,edges,textures,autoReload,assets,modpack,darkMode,LibraryView.STRUCTURES);
+    }
     public ViewerSettings(RenderQuality quality,boolean edges,boolean textures,boolean autoReload,List<Path> assets) {
         this(quality,edges,textures,autoReload,assets,null,false);
     }
@@ -24,11 +27,14 @@ public record ViewerSettings(RenderQuality quality,boolean edges,boolean texture
         RenderQuality quality;
         try{quality=RenderQuality.valueOf(values.getProperty("quality","HIGH"));}
         catch(IllegalArgumentException e){quality=RenderQuality.HIGH;}
+        LibraryView libraryView;
+        try{libraryView=LibraryView.valueOf(values.getProperty("libraryView","STRUCTURES"));}
+        catch(IllegalArgumentException e){libraryView=LibraryView.STRUCTURES;}
         List<Path> assets=new ArrayList<>();
         for(int i=0;i<32;i++){String path=values.getProperty("asset."+i);if(path!=null)assets.add(Path.of(path));}
         return new ViewerSettings(quality,Boolean.parseBoolean(values.getProperty("edges","true")),
                 Boolean.parseBoolean(values.getProperty("textures","true")),Boolean.parseBoolean(values.getProperty("autoReload","true")),assets,
-                values.containsKey("modpack")?Path.of(values.getProperty("modpack")):null,"DARK".equals(values.getProperty("theme")));
+                values.containsKey("modpack")?Path.of(values.getProperty("modpack")):null,"DARK".equals(values.getProperty("theme")),libraryView);
     }
     /** Saves via a neighboring temporary file so interruption cannot truncate valid settings. */
     public void save(Path file)throws IOException{
@@ -36,6 +42,7 @@ public record ViewerSettings(RenderQuality quality,boolean edges,boolean texture
         values.setProperty("quality",quality.name());values.setProperty("edges",Boolean.toString(edges));
         values.setProperty("textures",Boolean.toString(textures));values.setProperty("autoReload",Boolean.toString(autoReload));
         values.setProperty("theme",darkMode?"DARK":"LIGHT");
+        values.setProperty("libraryView",libraryView.name());
         if(modpack!=null)values.setProperty("modpack",modpack.toAbsolutePath().normalize().toString());
         for(int i=0;i<assets.size();i++)values.setProperty("asset."+i,assets.get(i).toString());
         Path temporary=Files.createTempFile(file.toAbsolutePath().getParent(),"viewer-settings-",".tmp");

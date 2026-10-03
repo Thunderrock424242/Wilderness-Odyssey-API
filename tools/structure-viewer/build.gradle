@@ -49,6 +49,7 @@ tasks.register('uiSmokeTest', JavaExec) {
     group = 'verification'
     description = 'Opens a real viewer window and checks rendering, camera input, and block inspection.'
     systemProperty 'structureViewer.smokeFile', providers.gradleProperty('structureViewerSmokeFile').getOrElse('')
+    systemProperty 'structureViewer.smokeModpack', providers.gradleProperty('structureViewerSmokeModpack').getOrElse('')
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'com.thunder.wildernessodysseyapi.tools.structureviewer.UiSmokeTest'

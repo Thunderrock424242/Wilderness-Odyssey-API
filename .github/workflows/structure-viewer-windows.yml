@@ -20,7 +20,7 @@ on:
     inputs:
       viewer_version:
         description: 'Installer version (major.minor.patch)'
-        default: '1.0.3'
+        default: '1.0.4'
         required: true
         type: string
 
@@ -40,7 +40,7 @@ jobs:
       run:
         shell: pwsh
     env:
-      VIEWER_VERSION: ${{ inputs.viewer_version || '1.0.3' }}
+      VIEWER_VERSION: ${{ inputs.viewer_version || '1.0.4' }}
 
     steps:
       - name: Checkout repository

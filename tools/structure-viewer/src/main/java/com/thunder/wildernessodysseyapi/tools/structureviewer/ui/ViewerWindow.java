@@ -22,7 +22,7 @@ public final class ViewerWindow extends JFrame {
     private long scanGeneration;
     private Future<?> scan;
     private final List<Path> assetPacks=new ArrayList<>();
-    private final StructureBrowser browser=new StructureBrowser(entry->load(entry.source()),this::rescan);
+    private final StructureBrowser browser=new StructureBrowser(entry->load(entry.source()),this::rescan,this::saveSettings);
     private final JTextArea info=area(),inspector=area(),diagnostics=area(),metadata=area();
     private final JTabbedPane tabs=new JTabbedPane();
     private final JLabel status=new JLabel("Choose a structure to preview.");
@@ -184,11 +184,12 @@ public final class ViewerWindow extends JFrame {
             quality.setSelectedItem(saved.quality());edges.setSelected(saved.edges());textures.setSelected(saved.textures());
             autoReload.setSelected(saved.autoReload());assetPacks.addAll(saved.assets());
             darkMode.setSelected(saved.darkMode());
+            browser.setView(saved.libraryView());
         }catch(IOException|RuntimeException e){quality.setSelectedItem(RenderQuality.HIGH);status.setText("Using default settings: "+e.getMessage());}
     }
     private void saveSettings(){
         try{new ViewerSettings((RenderQuality)quality.getSelectedItem(),edges.isSelected(),textures.isSelected(),
-                autoReload.isSelected(),assetPacks,project,darkMode.isSelected()).save(settingsFile);}
+                autoReload.isSelected(),assetPacks,project,darkMode.isSelected(),browser.view()).save(settingsFile);}
         catch(IOException e){status.setText("Could not save viewer settings: "+e.getMessage());}
     }
     private void displayOptions(){
@@ -283,7 +284,7 @@ public final class ViewerWindow extends JFrame {
                     if(closed||request!=scanGeneration)return;
                     scanning=false;updateLoading();
                     browser.setCatalog(catalog);
-                    status.setText(catalog.entries().size()+" structures in "+catalog.archives()+" scanned archives · "+root);
+                    status.setText(catalog.entries().size()+" templates indexed in "+catalog.archives()+" scanned archives · "+root);
                     if(!catalog.diagnostics().isEmpty())diagnostics.setText(String.join("\n",catalog.diagnostics()));
                 });
             }catch(Exception error){

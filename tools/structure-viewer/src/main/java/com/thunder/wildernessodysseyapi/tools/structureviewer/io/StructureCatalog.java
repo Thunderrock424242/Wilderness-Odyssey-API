@@ -9,7 +9,8 @@ import java.util.zip.ZipFile;
 public final class StructureCatalog {
     private static final int MAX_STRUCTURES = 20000;
     private StructureCatalog() {}
-    public record Entry(String group, String path, StructureSource source) {
+    public record Entry(String group, String path, StructureSource source, boolean feature) {
+        public Entry(String group,String path,StructureSource source){this(group,path,source,TemplateFeatures.isFeature(path));}
         public String searchText() { return (group + " " + path).toLowerCase(Locale.ROOT); }
         @Override public String toString() { return path.replaceFirst("/structures?/", "/"); }
     }
