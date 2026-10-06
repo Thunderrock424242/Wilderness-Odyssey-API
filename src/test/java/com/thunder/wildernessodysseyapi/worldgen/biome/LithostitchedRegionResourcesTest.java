@@ -2,8 +2,14 @@ package com.thunder.wildernessodysseyapi.worldgen.biome;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
 import dev.worldgen.lithostitched.api.worldgen.biomeinjector.BiomeInjector;
 import dev.worldgen.lithostitched.api.worldgen.biomeinjector.ParameterBuilder;
+import dev.worldgen.lithostitched.impl.worldgen.biomeinjector.region.Region;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.tags.BiomeTags;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.biome.Biome;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -20,6 +26,12 @@ class LithostitchedRegionResourcesTest {
     void anomalyAndPolarRegionsTargetTheOverworldWithTheirEstablishedWeights() throws IOException {
         assertRegion("anomaly_overworld", 3);
         assertRegion("polar_glacial_region", 12);
+    }
+
+    @Test
+    void regionsDeclareTheBiomeSetRequiredByNewerLithostitchedVersions() throws IOException {
+        assertOverworldBiomeSet("anomaly_overworld");
+        assertOverworldBiomeSet("polar_glacial_region");
     }
 
     @Test
@@ -50,8 +62,19 @@ class LithostitchedRegionResourcesTest {
     private static void assertRegion(String name, int expectedWeight) throws IOException {
         JsonObject region = readJson("src/main/resources/data/wildernessodysseyapi/"
                 + "lithostitched/region/" + name + ".json");
-        assertEquals("minecraft:overworld", region.get("dimension").getAsString(), name);
-        assertEquals(expectedWeight, region.get("weight").getAsInt(), name);
+        Region decoded = Region.CODEC.parse(JsonOps.INSTANCE, region).getOrThrow();
+        assertEquals("minecraft:overworld", decoded.dimension().location().toString(), name);
+        assertEquals(expectedWeight, decoded.weight(), name);
+    }
+
+    private static void assertOverworldBiomeSet(String name) throws IOException {
+        JsonObject region = readJson("src/main/resources/data/wildernessodysseyapi/"
+                + "lithostitched/region/" + name + ".json");
+        // The pinned 1.6.5 region codec ignores this field. Decode the required
+        // named biome set separately to guard compatibility with newer releases.
+        TagKey<Biome> biomes = TagKey.hashedCodec(Registries.BIOME)
+                .fieldOf("biomes").codec().parse(JsonOps.INSTANCE, region).getOrThrow();
+        assertEquals(BiomeTags.IS_OVERWORLD, biomes, name);
     }
 
     private static JsonObject readJson(String relativePath) throws IOException {
