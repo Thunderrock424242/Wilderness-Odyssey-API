@@ -51,7 +51,7 @@ def tickEngineCompilerWorkaround = providers.gradleProperty('tickEngineCompilerW
 
 neoForge {
     // Specify the version of NeoForge to use.
-    version = project.neo_version
+    version = "21.1.256"
 
     parchment {
         mappingsVersion = project.parchment_mappings_version
