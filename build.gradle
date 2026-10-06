@@ -710,6 +710,19 @@ tasks.register('playtestTest', Test) {
     }
 }
 
+// Loading diagnostics use only immutable observations and JVM thread metadata.
+tasks.register('loadingProfilerTest', Test) {
+    group = 'verification'
+    description = 'Runs bounded world-loading diagnostics regressions without starting Minecraft.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '1g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.loading.*'
+    }
+}
+
 tasks.register('aiTest', Test) {
     group = 'verification'
     description = 'Runs focused A.E.T.H.E.R logic tests without starting Minecraft or loading project mods.'

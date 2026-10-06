@@ -292,5 +292,19 @@
   "screen.wildernessodysseyapi.quest_workshop.discard_form": "Discard changes in this property form? Applied draft edits are retained.",
   "screen.wildernessodysseyapi.quest_workshop.required_mods": "Required mod IDs (comma separated)",
   "screen.wildernessodysseyapi.quest_workshop.optional_mods": "Disable chapter if these mod IDs are missing",
-  "screen.wildernessodysseyapi.quest_workshop.invalid_entry": "Entry %s / %s is invalid. Remove it, then Add a supported entry."
+  "screen.wildernessodysseyapi.quest_workshop.invalid_entry": "Entry %s / %s is invalid. Remove it, then Add a supported entry.",
+  "loading.wildernessodysseyapi.elapsed": "Loading: %s | %s",
+  "loading.wildernessodysseyapi.progress": "Spawn progress: %s%% | Last visible change: %s ago",
+  "loading.wildernessodysseyapi.stage_wait": "Last stage change: %s ago | No percentage available",
+  "loading.wildernessodysseyapi.suspect": "Frequently sampled active code: %s (suspect)",
+  "loading.wildernessodysseyapi.sampling": "Collecting loading diagnostics...",
+  "loading.wildernessodysseyapi.saved": "Diagnostics saved in logs/loading-stalls",
+  "loading.wildernessodysseyapi.save_failed": "Could not save diagnostics. Check logs/latest.log for details.",
+  "loading.wildernessodysseyapi.stage.resources": "Loading resources",
+  "loading.wildernessodysseyapi.stage.world_data": "Reading world data",
+  "loading.wildernessodysseyapi.stage.world_resources": "Preparing world resources",
+  "loading.wildernessodysseyapi.stage.world_preparation": "Preparing world creation",
+  "loading.wildernessodysseyapi.stage.spawn": "Generating spawn",
+  "loading.wildernessodysseyapi.stage.terrain": "Receiving terrain",
+  "loading.wildernessodysseyapi.stage.world_operation": "World operation"
 }

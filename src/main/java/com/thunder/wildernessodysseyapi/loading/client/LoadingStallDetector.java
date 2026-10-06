@@ -1,305 +1,232 @@
 package com.thunder.wildernessodysseyapi.loading.client;
 
-import com.thunder.ticktoklib.api.TickTokAPI;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.loading.LoadingModAttribution;
+import com.thunder.wildernessodysseyapi.loading.LoadingProfileMonitor;
+import com.thunder.wildernessodysseyapi.loading.LoadingProfileSession;
+import com.thunder.wildernessodysseyapi.loading.LoadingProfileSettings;
+import com.thunder.wildernessodysseyapi.loading.LoadingScreenPhase;
+import com.thunder.wildernessodysseyapi.mixin.LevelLoadingScreenAccessor;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.GenericMessageScreen;
+import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.gui.screens.LoadingOverlay;
+import net.minecraft.client.gui.screens.ProgressScreen;
+import net.minecraft.client.gui.screens.ReceivingLevelScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.RenderFrameEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
+import net.neoforged.neoforge.event.GameShuttingDownEvent;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.OptionalInt;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Watches the loading overlay and emits a detailed thread + mod snapshot
- * if it stays visible for an extended period (e.g., long modpack hangs).
+ * Client-only bridge from loading screens to an independent JVM diagnostic
+ * worker. The render/tick thread publishes stage/progress metadata only. All
+ * thread sampling, aggregation and local report I/O happen on that worker.
  */
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public final class LoadingStallDetector {
-    private static final int DEFAULT_THRESHOLD_MINUTES = 5;
-    private static final int STALL_THRESHOLD_MINUTES = resolveThresholdMinutes();
-    private static final Duration STALL_THRESHOLD = toDuration(TickTokAPI.toTicksFromMinutes(STALL_THRESHOLD_MINUTES));
-    private static final Duration REMINDER_INTERVAL = toDuration(TickTokAPI.toTicksFromMinutes(1));
-    private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-    private static long overlayStartedAt = 0L;
-    private static long lastProgressAt = 0L;
-    private static long lastReportAt = 0L;
+    private static final boolean ENABLED = Boolean.parseBoolean(System.getProperty("wilderness.loadingstall.enabled", "true"));
+    private static final long OBSERVATION_INTERVAL_NANOS = TimeUnit.MILLISECONDS.toNanos(250);
+    private static LoadingProfileMonitor monitor;
+    private static boolean initializationFailed;
+    private static long lastObservationNanos;
+    private static LoadingScreenPhase observedPhase;
+    private static LoadingProfileMonitor.Status displayedStatus;
+    private static LoadingScreenPhase displayedPhase;
+    private static List<String> displayLines = List.of();
 
     private LoadingStallDetector() {
     }
 
-    /**
-     * Called from the loading overlay mixin every render; marks that we are
-     * still making progress and (if first seen) arms the detector.
-     */
+    /** Retained as a compatibility bridge for callers of the former overlay detector. */
     public static void recordProgress() {
-        long now = System.currentTimeMillis();
-        if (overlayStartedAt == 0L) {
-            overlayStartedAt = now;
-            ModConstants.LOGGER.info("Loading stall detector armed (loading overlay detected).");
-        }
-        lastProgressAt = now;
+        observeCurrentScreen();
     }
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Pre event) {
+        observeCurrentScreen();
+    }
+
+    /** Minecraft's blocking spawn-loading loop still renders without normal client ticks. */
+    @SubscribeEvent
+    public static void onRenderFrame(RenderFrameEvent.Pre event) {
+        observeCurrentScreen();
+    }
+
+    /** Arms the worker before screen initialization or a following synchronous load can block. */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onScreenOpening(ScreenEvent.Opening event) {
+        if (!ENABLED) {
+            return;
+        }
+        Screen next = event.getNewScreen();
+        LoadingScreenPhase phase = classify(next);
+        if (phase != null) {
+            observe(next, phase, System.nanoTime());
+        } else if (next != null && !(Minecraft.getInstance().getOverlay() instanceof LoadingOverlay)) {
+            stop("Loading screen closed or cancelled");
+        }
+    }
+
+    @SubscribeEvent
+    public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        stop("Client connection closed");
+    }
+
+    @SubscribeEvent
+    public static void onShutdown(GameShuttingDownEvent event) {
+        if (monitor != null) {
+            monitor.close();
+        }
+    }
+
+    @SubscribeEvent
+    public static void onScreenRender(ScreenEvent.Render.Post event) {
+        if (!ENABLED || monitor == null || observedPhase == null || classify(event.getScreen()) == null) {
+            return;
+        }
+        var status = monitor.status();
+        if (!status.active() || status.snapshot() == null) {
+            return;
+        }
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft == null) {
-            reset();
+        if (status != displayedStatus || observedPhase != displayedPhase) {
+            displayedStatus = status;
+            displayedPhase = observedPhase;
+            displayLines = buildDisplay(status, observedPhase);
+        }
+        int width = Math.max(0, event.getScreen().width - 20);
+        int height = displayLines.size() * 11 + 8;
+        int top = event.getScreen().height - height - 8;
+        var graphics = event.getGuiGraphics();
+        graphics.fill(10, top, 10 + width, top + height, 0xB0000000);
+        for (int index = 0; index < displayLines.size(); index++) {
+            graphics.drawString(minecraft.font, minecraft.font.plainSubstrByWidth(displayLines.get(index), Math.max(0, width - 8)),
+                    14, top + 4 + index * 11, 0xFFE0E0E0);
+        }
+    }
+
+    private static void observeCurrentScreen() {
+        if (!ENABLED) {
             return;
         }
-
-        boolean onLoadingOverlay = minecraft.getOverlay() instanceof LoadingOverlay;
-        long now = System.currentTimeMillis();
-
-        if (!onLoadingOverlay) {
-            if (overlayStartedAt != 0L) {
-                ModConstants.LOGGER.debug("Loading stall detector disarmed (overlay closed).");
-            }
-            reset();
+        long now = System.nanoTime();
+        if (lastObservationNanos != 0 && now - lastObservationNanos < OBSERVATION_INTERVAL_NANOS) {
             return;
         }
-
-        if (overlayStartedAt == 0L) {
-            overlayStartedAt = now;
-            lastProgressAt = now;
-        }
-
-        boolean pastThreshold = now - overlayStartedAt >= STALL_THRESHOLD.toMillis();
-        boolean remindIntervalElapsed = now - lastReportAt >= REMINDER_INTERVAL.toMillis();
-
-        if (pastThreshold && remindIntervalElapsed) {
-            lastReportAt = now;
-            writeStallReport(now);
+        lastObservationNanos = now;
+        Minecraft minecraft = Minecraft.getInstance();
+        LoadingScreenPhase phase = minecraft.getOverlay() instanceof LoadingOverlay
+                ? LoadingScreenPhase.RESOURCES : classify(minecraft.screen);
+        if (phase == null) {
+            stop(minecraft.level != null ? "World opened" : "Loading screen closed or cancelled");
+        } else {
+            observe(minecraft.screen, phase, now);
         }
     }
 
-    private static void writeStallReport(long now) {
-        Path reportDir = Paths.get("logs", "loading-stalls");
-        String filename = "loading-stall-" + DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(LocalDateTime.now()) + ".log";
-        Path reportFile = reportDir.resolve(filename);
-
-        try {
-            Files.createDirectories(reportDir);
-            String report = buildReport(now);
-            Files.writeString(reportFile, report);
-            ModConstants.LOGGER.warn("Loading screen has been visible for {} minutes. Wrote stall snapshot to {}",
-                    STALL_THRESHOLD.toMinutes(), reportFile.toAbsolutePath());
-        } catch (IOException ioException) {
-            ModConstants.LOGGER.error("Failed to write loading stall report", ioException);
+    private static void observe(Screen screen, LoadingScreenPhase phase, long now) {
+        if (initializationFailed) {
+            return;
         }
-    }
-
-    private static String buildReport(long now) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("=== Loading Stall Snapshot (").append(TIMESTAMP.format(LocalDateTime.now())).append(") ===\n");
-        builder.append("Overlay duration: ").append(formatDuration(now - overlayStartedAt)).append('\n');
-        builder.append("Time since last overlay render: ").append(formatDuration(now - lastProgressAt)).append('\n');
-        builder.append("Mod count: ").append(ModList.get().size()).append('\n');
-
-        appendModList(builder);
-        appendThreadDump(builder);
-
-        return builder.toString();
-    }
-
-    private static void appendModList(StringBuilder builder) {
-        List<String> mods = ModList.get().getMods().stream()
-                .map(mod -> mod.getModId() + "@" + mod.getVersion())
-                .sorted()
-                .toList();
-
-        builder.append("\n[Loaded Mods]\n");
-        mods.forEach(mod -> builder.append(" - ").append(mod).append('\n'));
-    }
-
-    private static void appendThreadDump(StringBuilder builder) {
-        builder.append("\n[Thread Dump]\n");
-        Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
-
-        appendThreadSuspects(builder, traces);
-
-        traces.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey(Comparator.comparing(Thread::getName)))
-                .forEach(entry -> {
-                    Thread thread = entry.getKey();
-                    StackTraceElement[] stack = entry.getValue();
-
-                    builder.append("\nThread: ").append(thread.getName())
-                            .append(" (id=").append(thread.threadId()).append(", state=").append(thread.getState()).append(")\n");
-
-                    for (int i = 0; i < stack.length; i++) {
-                        builder.append("    at ").append(stack[i]).append('\n');
-                        if (i >= 31) {
-                            builder.append("    ... ").append(stack.length - 32).append(" more\n");
-                            break;
-                        }
-                    }
-                });
-
-        builder.append("\n");
-    }
-
-    /**
-     * Emits a lightweight suspect list before the full dump, prioritizing threads that are
-     * RUNNABLE or BLOCKED (often the ones wedging the loader).
-     */
-    private static void appendThreadSuspects(StringBuilder builder, Map<Thread, StackTraceElement[]> traces) {
-        builder.append("[Likely Culprit Threads]\n");
-        traces.entrySet().stream()
-                .sorted((a, b) -> threadPriority(b.getKey()) - threadPriority(a.getKey()))
-                .limit(6)
-                .forEach(entry -> {
-                    Thread thread = entry.getKey();
-                    StackTraceElement[] stack = entry.getValue();
-                    builder.append(" - ")
-                            .append(thread.getName())
-                            .append(" (state=")
-                            .append(thread.getState())
-                            .append(")");
-
-                    resolveJar(stack).ifPresent(jar -> builder.append(" [jar=").append(jar).append("]"));
-
-                    if (stack.length > 0) {
-                        builder.append(" at ").append(stack[0]);
-                    }
-                    builder.append('\n');
-                });
-        builder.append('\n');
-    }
-
-    private static int threadPriority(Thread thread) {
-        // Prefer threads that are RUNNABLE/BLOCKED over waiting/parked ones.
-        return switch (thread.getState()) {
-            case RUNNABLE, BLOCKED -> 3;
-            case WAITING, TIMED_WAITING -> 2;
-            default -> 1;
-        };
-    }
-
-    private static Optional<String> resolveJar(StackTraceElement[] stack) {
-        if (stack.length == 0) {
-            return Optional.empty();
-        }
-        String className = stack[0].getClassName();
-        try {
-            Class<?> cls = Class.forName(className, false, Thread.currentThread().getContextClassLoader());
-            if (cls.getProtectionDomain() != null && cls.getProtectionDomain().getCodeSource() != null) {
-                var source = cls.getProtectionDomain().getCodeSource().getLocation();
-                if (source != null) {
-                    return Optional.of(source.getPath());
-                }
+        if (monitor == null) {
+            try {
+                monitor = createMonitor();
+            } catch (RuntimeException | LinkageError exception) {
+                initializationFailed = true;
+                ModConstants.LOGGER.warn("[Loading profiler] Could not initialize diagnostics; loading continues normally.", exception);
+                return;
             }
-        } catch (ClassNotFoundException ignored) {
-            // Best-effort only; fall back to the raw class name if unavailable.
         }
-        return Optional.empty();
-    }
-
-    private static String formatDuration(long millis) {
-        long safeMillis = Math.max(millis, 0);
-        int ticks = safeMillisToTicks(safeMillis);
-
-        String base = ticks >= TickTokAPI.toTicksFromHours(1)
-                ? formatTicksToHMS(ticks)
-                : formatTicksToMinSec(ticks);
-
-        long remainderMillis = safeMillis % 1000;
-        return base + String.format(".%03d", remainderMillis);
-    }
-
-    private static int safeMillisToTicks(long millis) {
-        long ticks = TickTokAPI.toTicksFromMilliseconds(Math.max(0L, millis));
-        return (int) Math.min(ticks, Integer.MAX_VALUE);
-    }
-
-    private static int resolveThresholdMinutes() {
-        String override = System.getProperty("wilderness.loadingstall.minutes", "").trim();
-        if (override.isEmpty()) {
-            return DEFAULT_THRESHOLD_MINUTES;
+        int progress = -1;
+        if (phase == LoadingScreenPhase.SPAWN && screen instanceof LevelLoadingScreenAccessor accessor) {
+            progress = accessor.wildernessOdysseyApi$getProgressListener().getProgress();
         }
-
-        return parseThresholdOverride(override).orElse(DEFAULT_THRESHOLD_MINUTES);
+        observedPhase = phase;
+        monitor.observe(phase.label(), progress, now);
     }
 
-    private static OptionalInt parseThresholdOverride(String override) {
-        try {
-            if (override.endsWith("t")) { // ticks suffix
-                int ticks = Integer.parseInt(override.substring(0, override.length() - 1));
-                int minutes = (int) Math.ceil(TickTokAPI.toMinutes(ticks));
-                return minutes > 0 ? OptionalInt.of(minutes) : OptionalInt.empty();
+    private static LoadingScreenPhase classify(Screen screen) {
+        if (screen instanceof LevelLoadingScreen) {
+            return LoadingScreenPhase.SPAWN;
+        }
+        if (screen instanceof ReceivingLevelScreen) {
+            return LoadingScreenPhase.TERRAIN;
+        }
+        if (screen instanceof ProgressScreen) {
+            return LoadingScreenPhase.WORLD_OPERATION;
+        }
+        if (screen instanceof GenericMessageScreen && screen.getTitle().getContents() instanceof TranslatableContents message) {
+            return LoadingScreenPhase.fromMessageKey(message.getKey());
+        }
+        return null;
+    }
+
+    private static LoadingProfileMonitor createMonitor() {
+        Map<String, List<String>> modules = new HashMap<>();
+        List<String> mods = new ArrayList<>();
+        for (var mod : ModList.get().getMods()) {
+            String module = mod.getOwningFile().moduleName();
+            if (module != null && !module.isBlank()) {
+                modules.computeIfAbsent(module, ignored -> new ArrayList<>()).add(mod.getModId());
             }
-
-            if (override.contains(":")) { // mm:ss or hh:mm:ss
-                long seconds = parseColonTimeSeconds(override);
-                if (seconds > 0) {
-                    int minutes = (int) Math.max(1L, Math.ceil(seconds / 60.0d));
-                    return OptionalInt.of(minutes);
-                }
-            }
-
-            long minutes = Long.parseLong(override);
-            if (minutes > 0 && minutes <= Integer.MAX_VALUE) {
-                return OptionalInt.of((int) minutes);
-            }
-        } catch (NumberFormatException ignored) {
-            return OptionalInt.empty();
+            mods.add(mod.getModId() + "@" + mod.getVersion());
         }
-        return OptionalInt.empty();
+        Map<String, String> owners = new HashMap<>();
+        modules.forEach((module, ids) -> {
+            ids.sort(String::compareTo);
+            owners.put(module, String.join(", ", ids) + (ids.size() > 1 ? " (shared module)" : ""));
+        });
+        mods.sort(String::compareTo);
+        return new LoadingProfileMonitor(FMLPaths.GAMEDIR.get().resolve("logs").resolve("loading-stalls"),
+                new LoadingModAttribution(owners), mods,
+                LoadingProfileSettings.reportDelayMillis(System.getProperty("wilderness.loadingstall.minutes", "")));
     }
 
-    private static Duration toDuration(int ticks) {
-        long millis = TickTokAPI.toMillisecondsLong(ticks);
-        return Duration.ofMillis(millis);
-    }
-
-    private static String formatTicksToHMS(int ticks) {
-        long seconds = Math.max(0L, Math.round(TickTokAPI.toSeconds(ticks)));
-        long hours = seconds / 3600;
-        long minutes = (seconds % 3600) / 60;
-        long remainderSeconds = seconds % 60;
-        return String.format("%02d:%02d:%02d", hours, minutes, remainderSeconds);
-    }
-
-    private static String formatTicksToMinSec(int ticks) {
-        long seconds = Math.max(0L, Math.round(TickTokAPI.toSeconds(ticks)));
-        long minutes = seconds / 60;
-        long remainderSeconds = seconds % 60;
-        return String.format("%02d:%02d", minutes, remainderSeconds);
-    }
-
-    private static long parseColonTimeSeconds(String value) {
-        String[] parts = value.split(":");
-        if (parts.length < 2 || parts.length > 3) {
-            return -1L;
+    private static void stop(String outcome) {
+        if (monitor != null && observedPhase != null) {
+            monitor.stop(outcome);
         }
-        try {
-            long hours = parts.length == 3 ? Long.parseLong(parts[0]) : 0L;
-            long minutes = Long.parseLong(parts[parts.length - 2]);
-            long seconds = Long.parseLong(parts[parts.length - 1]);
-            return hours * 3600L + minutes * 60L + seconds;
-        } catch (NumberFormatException ignored) {
-            return -1L;
-        }
+        observedPhase = null;
+        displayedStatus = null;
+        displayedPhase = null;
+        displayLines = List.of();
     }
 
-    private static void reset() {
-        overlayStartedAt = 0L;
-        lastProgressAt = 0L;
-        lastReportAt = 0L;
+    private static List<String> buildDisplay(LoadingProfileMonitor.Status status, LoadingScreenPhase phase) {
+        var snapshot = status.snapshot();
+        List<Component> lines = new ArrayList<>();
+        lines.add(Component.translatable("loading.wildernessodysseyapi.elapsed", LoadingProfileSession.duration(snapshot.elapsedNanos()),
+                Component.translatable(phase.translationKey())));
+        String since = LoadingProfileSession.duration(snapshot.noProgressNanos());
+        lines.add(snapshot.progress() >= 0
+                ? Component.translatable("loading.wildernessodysseyapi.progress", snapshot.progress(), since)
+                : Component.translatable("loading.wildernessodysseyapi.stage_wait", since));
+        var activeSite = snapshot.sites().stream().filter(site -> site.runnableSamples() > 0).findFirst();
+        lines.add(activeSite.map(site -> Component.translatable("loading.wildernessodysseyapi.suspect", site.owner()))
+                .orElseGet(() -> Component.translatable("loading.wildernessodysseyapi.sampling")));
+        if (status.saveFailed()) {
+            lines.add(Component.translatable("loading.wildernessodysseyapi.save_failed"));
+        } else if (status.report() != null) {
+            lines.add(Component.translatable("loading.wildernessodysseyapi.saved"));
+        }
+        return lines.stream().map(Component::getString).toList();
     }
 }

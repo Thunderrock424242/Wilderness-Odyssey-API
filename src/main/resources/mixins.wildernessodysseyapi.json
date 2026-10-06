@@ -69,6 +69,7 @@
     "GlStateManagerGpuProfilerMixin",
     "IrisWaterMaterialBridgeMixin",
     "LegacyIrisWaterMaterialBridgeMixin",
+    "LevelLoadingScreenAccessor",
     "LevelRendererLocalizedWeatherMixin",
     "RenderChunkRegionAccessor",
     "RenderSystemGpuDiagnosticsMixin",
