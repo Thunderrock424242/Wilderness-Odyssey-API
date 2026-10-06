@@ -3,7 +3,7 @@ plugins {
     id 'application'
     id 'java-library'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.147'
+    id 'net.neoforged.moddev' version '2.0.148'
 }
 
 // Codex can opt into isolated generated output so Windows locks in the normal
@@ -51,7 +51,7 @@ def tickEngineCompilerWorkaround = providers.gradleProperty('tickEngineCompilerW
 
 neoForge {
     // Specify the version of NeoForge to use.
-    version = "21.1.250"
+    version = project.neo_version
 
     parchment {
         mappingsVersion = project.parchment_mappings_version
@@ -258,6 +258,8 @@ repositories {
     }
 }
 
+// 0.8.13 is released, but its developer artifacts are currently unreachable
+// on the publisher Maven host. Retain the verified 1.21.1 development runtime.
 def sodiumVersion = "0.8.12+mc1.21.1"
 
 // Sodium's published NeoForge release is a bootstrap wrapper whose actual mod
@@ -294,26 +296,30 @@ def sodiumServiceDevJar = tasks.register("sodiumServiceDevJar", Jar) {
 
 dependencies {
 
-    testImplementation platform("org.junit:junit-bom:5.10.2")
+    testImplementation platform("org.junit:junit-bom:5.14.4")
     testImplementation "org.junit.jupiter:junit-jupiter"
     // Protocol integration tests use the actual standalone gateway; never a mod runtime dependency.
-    testImplementation project(':aether-server')
+    testImplementation(project(':aether-server')) {
+        // Minecraft strictly pins Gson 2.10.1. The standalone gateway owns its
+        // newer Gson version, while in-process protocol tests use Minecraft's.
+        exclude group: 'com.google.code.gson', module: 'gson'
+    }
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 
     implementation "curse.maven:worldedit-225608:5830452"
     implementation "curse.maven:tick-tok-lib-1298954:8685795"
     implementation "curse.maven:create-328085:7963363"
-    implementation "curse.maven:regions-unexplored-659110:7826194"
-    implementation "curse.maven:lithostitched-936015:7832789"
-    implementation "curse.maven:biolith-852512:7074761"
-    implementation "curse.maven:geckolib-388172:7023453"
+    implementation "curse.maven:regions-unexplored-659110:8419667"
+    implementation "curse.maven:lithostitched-936015:8944659"
+    implementation "curse.maven:biolith-852512:8435635"
+    implementation "curse.maven:geckolib-388172:8893490"
     implementation "curse.maven:locate-fixer-1301683:8743967"
     implementation "curse.maven:curios-309927:6529130"
-    implementation "curse.maven:amendments-896746:7461027"
-    implementation "curse.maven:selene-499980:8261785"
-    implementation "curse.maven:supplementaries-412082:8244187"
+    implementation "curse.maven:amendments-896746:8825641"
+    implementation "curse.maven:selene-499980:9066398"
+    implementation "curse.maven:supplementaries-412082:8852720"
     implementation "curse.maven:multipart-machines-cooking-885587:5686941"
-    implementation "curse.maven:camera-monitoring-fully-customizable-1686878:8844227"
+    implementation "curse.maven:camera-monitoring-fully-customizable-1686878:9066753"
     // Sodium and its flattened Fabric API support modules are client-only.
     // Keeping them on the client's per-run classpath prevents datagen/server
     // launches from applying Sodium render mixins without its client service.
@@ -328,21 +334,27 @@ dependencies {
         transitive = false
     }
     clientAdditionalRuntimeClasspath files(sodiumServiceDevJar)
-    jarJar(implementation("org.yaml:snakeyaml:2.2")) {
+    jarJar(implementation("org.yaml:snakeyaml:2.7")) {
         version {
-            strictly '[2.2,3.0)'
-            prefer '2.2'
+            strictly '[2.7,3.0)'
+            prefer '2.7'
         }
     }
     compileOnly "curse.maven:spark-361579:6225208"
     localRuntime "curse.maven:spark-361579:6225208"
     // Bundle third-party libraries into the final mod jar (Jar-in-Jar) to avoid missing-class errors at runtime.
-    jarJar(implementation('com.squareup.okhttp3:okhttp:4.12.0'))
-    jarJar(implementation('com.squareup.okio:okio:3.9.0'))
-    jarJar(implementation('io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'))
-    jarJar(implementation('com.github.luben:zstd-jni:1.5.7-6'))
+    // Explicit JVM coordinates keep Jar-in-Jar identities negotiable; the
+    // multiplatform aliases redirect artifacts and otherwise receive hash IDs.
+    jarJar(implementation('com.squareup.okhttp3:okhttp-jvm:5.5.0'))
+    jarJar(implementation('com.squareup.okio:okio-jvm:3.18.2'))
+    // Jar-in-Jar includes direct declarations only. Bundle the runtime support
+    // required by OkHttp/Okio and the circuit breaker as well.
+    jarJar(runtimeOnly('org.jetbrains.kotlin:kotlin-stdlib:2.1.21'))
+    jarJar(implementation('io.github.resilience4j:resilience4j-circuitbreaker:2.4.0'))
+    jarJar(runtimeOnly('io.github.resilience4j:resilience4j-core:2.4.0'))
+    jarJar(implementation('com.github.luben:zstd-jni:1.5.7-21'))
 
-    additionalRuntimeClasspath 'org.yaml:snakeyaml:2.2'
+    additionalRuntimeClasspath 'org.yaml:snakeyaml:2.7'
 }
 
 // Expand release metadata from gradle.properties so dependency ranges and the

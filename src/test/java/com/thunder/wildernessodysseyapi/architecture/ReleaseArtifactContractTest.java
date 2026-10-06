@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.architecture;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.artifact.versioning.InvalidVersionSpecificationException;
 import org.apache.maven.artifact.versioning.VersionRange;
@@ -14,6 +16,7 @@ import java.nio.file.Path;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.jar.JarInputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -108,6 +111,43 @@ class ReleaseArtifactContractTest {
             for (String obsoleteEntry : OBSOLETE_ENTRIES) {
                 assertTrue(jar.getJarEntry(obsoleteEntry) == null, () -> "Obsolete plural resource path " + obsoleteEntry);
             }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "com.squareup.okhttp3, okhttp-jvm, okhttp3/OkHttpClient.class",
+            "com.squareup.okio, okio-jvm, okio/Buffer.class",
+            "org.jetbrains.kotlin, kotlin-stdlib, kotlin/jvm/internal/Intrinsics.class",
+            "io.github.resilience4j, resilience4j-circuitbreaker, io/github/resilience4j/circuitbreaker/CircuitBreaker.class",
+            "io.github.resilience4j, resilience4j-core, io/github/resilience4j/core/functions/Either.class",
+            "org.yaml, snakeyaml, org/yaml/snakeyaml/Yaml.class",
+            "com.github.luben, zstd-jni, com/github/luben/zstd/Zstd.class"
+    })
+    void packagedLibrariesCarryRuntimeClassesUnderMavenCoordinates(
+            String group, String artifact, String runtimeClass
+    ) throws IOException {
+        try (JarFile jar = openBuiltJar()) {
+            for (JsonElement element : JsonParser.parseString(readEntry(jar, "META-INF/jarjar/metadata.json"))
+                    .getAsJsonObject().getAsJsonArray("jars")) {
+                var library = element.getAsJsonObject();
+                var identifier = library.getAsJsonObject("identifier");
+                if (!group.equals(identifier.get("group").getAsString())
+                        || !artifact.equals(identifier.get("artifact").getAsString())) {
+                    continue;
+                }
+                JarEntry nestedJar = jar.getJarEntry(library.get("path").getAsString());
+                assertNotNull(nestedJar, "Missing bundled JAR for " + group + ":" + artifact);
+                try (JarInputStream nested = new JarInputStream(jar.getInputStream(nestedJar))) {
+                    for (JarEntry entry; (entry = nested.getNextJarEntry()) != null;) {
+                        if (runtimeClass.equals(entry.getName())) {
+                            return;
+                        }
+                    }
+                }
+                throw new AssertionError("Bundled " + artifact + " is missing " + runtimeClass);
+            }
+            throw new AssertionError("Missing bundled Maven dependency " + group + ":" + artifact);
         }
     }
 
