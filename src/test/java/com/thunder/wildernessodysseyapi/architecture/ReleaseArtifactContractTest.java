@@ -1,6 +1,11 @@
 package com.thunder.wildernessodysseyapi.architecture;
 
+import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
+import org.apache.maven.artifact.versioning.InvalidVersionSpecificationException;
+import org.apache.maven.artifact.versioning.VersionRange;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -69,6 +74,31 @@ class ReleaseArtifactContractTest {
         }
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "thirst, 1.21.1-2.1.5",
+            "eclipticseasons, 0.15.3.1",
+            "cold_sweat, 2.4.3.1",
+            "sereneseasons, 10.1.0.3-patch11-1"
+    })
+    void packagedOptionalDependenciesAcceptInstalledVersions(String modId, String installedVersion)
+            throws IOException, InvalidVersionSpecificationException {
+        try (JarFile jar = openBuiltJar()) {
+            Matcher matcher = DEPENDENCY_BLOCK.matcher(readEntry(jar, "META-INF/neoforge.mods.toml"));
+            while (matcher.find()) {
+                String block = matcher.group(1);
+                if (modId.equals(scalar(block, "modId"))) {
+                    assertEquals("optional", scalar(block, "type"), modId + " must remain optional");
+                    VersionRange range = VersionRange.createFromVersionSpec(scalar(block, "versionRange"));
+                    assertTrue(range.containsVersion(new DefaultArtifactVersion(installedVersion)),
+                            () -> modId + " rejects installed version " + installedVersion + " with range " + range);
+                    return;
+                }
+            }
+            throw new AssertionError("Missing dependency metadata for " + modId);
+        }
+    }
+
     @Test
     void packagedRecipesAndTagsUseMinecraft121SingularDirectories() throws IOException {
         try (JarFile jar = openBuiltJar()) {
@@ -96,7 +126,7 @@ class ReleaseArtifactContractTest {
     }
 
     private static String scalar(String metadata, String key) {
-        Matcher matcher = Pattern.compile("(?m)^" + Pattern.quote(key) + "=\\\"([^\\\"]+)\\\"")
+        Matcher matcher = Pattern.compile("(?m)^" + Pattern.quote(key) + "=\\\"([^\\\"]*)\\\"")
                 .matcher(metadata);
         assertTrue(matcher.find(), () -> "Missing metadata key " + key);
         return matcher.group(1);

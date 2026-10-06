@@ -124,27 +124,27 @@ side="BOTH"
 [[dependencies.${mod_id}]]
 modId="eclipticseasons"
 type="optional"
-versionRange=""
+versionRange="[0,)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
 modId="sereneseasons"
 type="optional"
-versionRange=""
+versionRange="[0,)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
 modId="cold_sweat"
 type="optional"
-versionRange=""
+versionRange="[0,)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
 modId="thirst"
 type="optional"
-versionRange=""
+versionRange="[0,)"
 ordering="AFTER"
 side="BOTH"
