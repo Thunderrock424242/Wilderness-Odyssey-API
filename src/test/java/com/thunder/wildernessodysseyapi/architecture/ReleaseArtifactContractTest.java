@@ -2,16 +2,19 @@ package com.thunder.wildernessodysseyapi.architecture;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import cpw.mods.jarhandling.SecureJar;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.artifact.versioning.InvalidVersionSpecificationException;
 import org.apache.maven.artifact.versioning.VersionRange;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.jar.JarEntry;
@@ -21,6 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -148,6 +152,30 @@ class ReleaseArtifactContractTest {
                 throw new AssertionError("Bundled " + artifact + " is missing " + runtimeClass);
             }
             throw new AssertionError("Missing bundled Maven dependency " + group + ":" + artifact);
+        }
+    }
+
+    @Test
+    void packagedLibrariesHaveReadableNeoForgeModuleDescriptors(@TempDir Path nestedLibraries) throws IOException {
+        try (JarFile jar = openBuiltJar()) {
+            for (JsonElement element : JsonParser.parseString(readEntry(jar, "META-INF/jarjar/metadata.json"))
+                    .getAsJsonObject().getAsJsonArray("jars")) {
+                String nestedPath = element.getAsJsonObject().get("path").getAsString();
+                JarEntry nestedEntry = jar.getJarEntry(nestedPath);
+                assertNotNull(nestedEntry, "Missing bundled JAR " + nestedPath);
+                Path extractedJar = nestedLibraries.resolve(Path.of(nestedPath).getFileName());
+                try (InputStream input = jar.getInputStream(nestedEntry)) {
+                    Files.copy(input, extractedJar);
+                }
+                assertDoesNotThrow(() -> {
+                    SecureJar library = SecureJar.from(extractedJar);
+                    try {
+                        assertNotNull(library.moduleDataProvider().descriptor());
+                    } finally {
+                        library.close();
+                    }
+                }, "NeoForge cannot read the module descriptor of " + nestedPath);
+            }
         }
     }
 

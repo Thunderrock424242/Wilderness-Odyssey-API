@@ -352,7 +352,15 @@ dependencies {
     jarJar(runtimeOnly('org.jetbrains.kotlin:kotlin-stdlib:2.1.21'))
     jarJar(implementation('io.github.resilience4j:resilience4j-circuitbreaker:2.4.0'))
     jarJar(runtimeOnly('io.github.resilience4j:resilience4j-core:2.4.0'))
-    jarJar(implementation('com.github.luben:zstd-jni:1.5.7-21'))
+    // Newer multi-release Zstd JARs export META-INF/versions/22 as a Java
+    // package, which NeoForge's SecureJar reader rejects. Bound Jar-in-Jar
+    // negotiation to the preceding release until that descriptor is fixed.
+    jarJar(implementation('com.github.luben:zstd-jni:1.5.7-17')) {
+        version {
+            strictly '[1.5.7-17,1.5.7-18)'
+            prefer '1.5.7-17'
+        }
+    }
 
     additionalRuntimeClasspath 'org.yaml:snakeyaml:2.7'
 }
