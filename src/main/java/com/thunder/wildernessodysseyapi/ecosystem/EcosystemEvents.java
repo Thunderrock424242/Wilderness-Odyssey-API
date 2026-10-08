@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.ecosystem.behavior.EcosystemBehaviorGoal;
 import com.thunder.wildernessodysseyapi.ecosystem.behavior.GroupFollowerGoal;
 import com.thunder.wildernessodysseyapi.ecosystem.api.EnvironmentalContext;
+import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemParticipation;
 import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
 import com.thunder.wildernessodysseyapi.ecosystem.behavior.WildlifeDisturbancePolicy;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
@@ -13,6 +14,7 @@ import com.thunder.wildernessodysseyapi.ecosystem.memory.DisturbanceSource;
 import com.thunder.wildernessodysseyapi.ecosystem.memory.EnvironmentalMemoryManager;
 import com.thunder.wildernessodysseyapi.ecosystem.service.EcosystemServices;
 import com.thunder.wildernessodysseyapi.ecosystem.state.AnimalNeedsState;
+import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -59,30 +61,30 @@ public final class EcosystemEvents {
     /** Adds one conditional goal to server animals that have a loaded profile. */
     @SubscribeEvent
     public static void onEntityJoin(EntityJoinLevelEvent event) {
-        if (!(event.getLevel() instanceof ServerLevel)
+        if (!(event.getLevel() instanceof ServerLevel level)
                 || !(event.getEntity() instanceof PathfinderMob animal)) {
             return;
         }
+        EcosystemSimulationManager.get().onEntityJoin(level, animal, event);
         installController(animal);
     }
 
     /** Installs controllers on already-loaded mobs after a data-pack profile reload. */
     public static void refreshLoadedControllers(MinecraftServer server) {
         EcosystemServices.groups().clearAll();
-        if (!EcosystemConfig.ENABLED.get()) {
-            return;
-        }
         for (ServerLevel level : server.getAllLevels()) {
-            for (Entity entity : level.getAllEntities()) {
-                if (entity instanceof PathfinderMob animal) {
-                    installController(animal);
-                }
+            EcosystemSimulationManager.get().refreshLoadedWildlife(level);
+            for (PathfinderMob animal : EcosystemSimulationManager.get().loadedWildlife(level)) {
+                installController(animal);
             }
         }
     }
 
-    private static void installController(PathfinderMob animal) {
-        if (!EcosystemConfig.ENABLED.get() || SpeciesBehaviorProfileManager.profileFor(animal).isEmpty()) {
+    /** Installs this feature's goals once, including eligibility restored after hidden tracking. */
+    public static void installController(PathfinderMob animal) {
+        if (!(animal.level() instanceof ServerLevel level)
+                || !EcosystemParticipation.isEnabled(level)
+                || SpeciesBehaviorProfileManager.profileFor(animal).isEmpty()) {
             return;
         }
         AnimalNeedsState needs = animal.getData(ModAttachments.ANIMAL_NEEDS);
@@ -93,6 +95,17 @@ public final class EcosystemEvents {
         animal.goalSelector.addGoal(GROUP_FOLLOW_GOAL_PRIORITY, new GroupFollowerGoal(animal));
         needs.markControllerInstalled();
         needs.scheduleEvaluation(animal.level().getGameTime() + Math.floorMod(animal.getId(), 40));
+    }
+
+    /** Stops only this feature's running goals when its dimension/species policy is revoked. */
+    public static void stopControllers(PathfinderMob animal) {
+        for (var wrapped : animal.goalSelector.getAvailableGoals()) {
+            if (wrapped.isRunning() && (wrapped.getGoal() instanceof EcosystemBehaviorGoal
+                    || wrapped.getGoal() instanceof GroupFollowerGoal)) {
+                wrapped.stop();
+            }
+        }
+        animal.getData(ModAttachments.ANIMAL_NEEDS).idle();
     }
 
     /**
@@ -123,7 +136,7 @@ public final class EcosystemEvents {
             if (!player.isSpectator()
                     && current.distSqr(sample.lastRecordedPosition) >= MINIMUM_RECORDED_MOVEMENT_SQUARED) {
                 double amount = EcosystemConfig.MOVEMENT_DISTURBANCE.get();
-                if (EcosystemConfig.ENABLED.get() && amount > 0.0) {
+                if (EcosystemParticipation.isEnabled(level) && amount > 0.0) {
                     EnvironmentalMemoryManager.addDisturbance(
                             level, current, amount, DisturbanceSource.PLAYER_MOVEMENT, player.getUUID());
                 }
@@ -144,6 +157,7 @@ public final class EcosystemEvents {
     public static void onLivingDamaged(LivingDamageEvent.Post event) {
         if (!EcosystemConfig.ENABLED.get()
                 || !(event.getEntity().level() instanceof ServerLevel level)
+                || !EcosystemParticipation.isEnabled(level)
                 || event.getNewDamage() <= 0.0F) {
             return;
         }
@@ -161,6 +175,7 @@ public final class EcosystemEvents {
             );
         }
         if (event.getEntity() instanceof PathfinderMob animal) {
+            EcosystemSimulationManager.get().restoreAiIfProtected(level, animal);
             Optional<SpeciesBehaviorProfile> profile = SpeciesBehaviorProfileManager.profileFor(animal);
             if (profile.isEmpty()) {
                 return;
@@ -192,6 +207,7 @@ public final class EcosystemEvents {
         if (event.getLevel() instanceof ServerLevel level
                 && event.getEntity() instanceof PathfinderMob animal) {
             EcosystemServices.groups().onEntityLeave(level, animal);
+            EcosystemSimulationManager.get().onEntityLeave(level, animal);
         }
     }
 
@@ -202,7 +218,8 @@ public final class EcosystemEvents {
         if (EcosystemConfig.ENABLED.get()
                 && !event.isCanceled()
                 && amount > 0.0
-                && event.getLevel() instanceof ServerLevel level) {
+                && event.getLevel() instanceof ServerLevel level
+                && EcosystemParticipation.isEnabled(level)) {
             EcosystemServices.disturbances().record(
                     level,
                     event.getPos(),
@@ -221,7 +238,8 @@ public final class EcosystemEvents {
                 && !event.isCanceled()
                 && amount > 0.0
                 && event.getEntity() instanceof ServerPlayer player
-                && event.getLevel() instanceof ServerLevel level) {
+                && event.getLevel() instanceof ServerLevel level
+                && EcosystemParticipation.isEnabled(level)) {
             EcosystemServices.disturbances().record(
                     level,
                     event.getPos(),
@@ -238,7 +256,8 @@ public final class EcosystemEvents {
         double configured = EcosystemConfig.EXPLOSION_DISTURBANCE.get();
         if (!EcosystemConfig.ENABLED.get()
                 || configured <= 0.0
-                || !(event.getLevel() instanceof ServerLevel level)) {
+                || !(event.getLevel() instanceof ServerLevel level)
+                || !EcosystemParticipation.isEnabled(level)) {
             return;
         }
         double scale = Math.max(0.5, Math.min(2.0, event.getExplosion().radius() / 4.0));
@@ -267,6 +286,9 @@ public final class EcosystemEvents {
             return;
         }
         ServerLevel level = event.getLevel().getLevel();
+        if (!EcosystemParticipation.isEnabled(level)) {
+            return;
+        }
         double disturbance = EnvironmentalMemoryManager.getDisturbance(
                 level, BlockPos.containing(event.getX(), event.getY(), event.getZ()));
         double chance = WildlifeDisturbancePolicy.spawnChance(disturbance);

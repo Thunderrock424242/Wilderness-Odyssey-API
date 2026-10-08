@@ -1,6 +1,8 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.hydrology;
 
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
+import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 
@@ -47,7 +49,7 @@ public final class AtmosphericWaterExchange {
     /** Captures immutable outstanding feedback for a weather worker without consuming it. */
     public static synchronized Receipt capture(ServerLevel level, AtmosphereCellKey cell, int cellSize) {
         ReceiptBook book = RegionalHydrologySavedData.get(level).atmosphereExchange();
-        return book == null ? Receipt.EMPTY : book.capture(cell, cellSize);
+        return book == null ? Receipt.EMPTY : book.capture(cell, cellSize, couplingEnabled(level));
     }
 
     /** Acknowledges only the captured totals; publications made during calculation remain pending. */
@@ -73,15 +75,19 @@ public final class AtmosphericWaterExchange {
     public static synchronized void publishPrecipitation(ServerLevel level, AtmosphereCellKey cell, int cellSize,
             com.thunder.wildernessodysseyapi.weather.simulation.AtmosphericWaterFlux flux, long throughTick) {
         RegionalHydrologySavedData data = RegionalHydrologySavedData.get(level);
-        if (data.atmosphereExchange().publishPrecipitation(cell, cellSize, flux, throughTick)) data.setDirty();
+        if (data.atmosphereExchange().publishPrecipitation(cell, cellSize, flux, throughTick, couplingEnabled(level))) data.setDirty();
     }
 
     /** Applies accepted queued precipitation to the existing surface/SWE/ice owners exactly once. */
     public static synchronized long applyPrecipitation(ServerLevel level, RegionalHydrologyState state) {
         RegionalHydrologySavedData data = RegionalHydrologySavedData.get(level);
-        long accepted = data.atmosphereExchange().applyPrecipitation(state);
+        long accepted = data.atmosphereExchange().applyPrecipitation(state, couplingEnabled(level));
         if (accepted > 0) data.setDirty();
         return accepted;
+    }
+
+    private static boolean couplingEnabled(ServerLevel level) {
+        return WaterSimulationConfig.weatherWaterCouplingEnabled() && WeatherConfig.dimensionEnabled(level.dimension());
     }
 
     /** Read-only snow-water equivalent supplied by regional storage, not an independent snowpack. */
@@ -228,6 +234,13 @@ public final class AtmosphericWaterExchange {
         /** Queues exact cell-depth times admitted chunk area, retaining fractional milli-units. */
         public boolean publishPrecipitation(AtmosphereCellKey cell, int size,
                 com.thunder.wildernessodysseyapi.weather.simulation.AtmosphericWaterFlux flux, long throughTick) {
+            return publishPrecipitation(cell, size, flux, throughTick, true);
+        }
+
+        /** Disabled new rainfall is an explicit export to unmodeled terrain. */
+        public boolean publishPrecipitation(AtmosphereCellKey cell, int size,
+                com.thunder.wildernessodysseyapi.weather.simulation.AtmosphericWaterFlux flux, long throughTick, boolean enabled) {
+            if (!enabled) return false;
             if (throughTick <= precipitationClocks.getOrDefault(cell.packed(), Long.MIN_VALUE)) return false;
             capture(cell, size); // builds the bounded spatial index
             Set<Long> members = cells.getOrDefault(cell.packed(), Set.of());
@@ -248,6 +261,12 @@ public final class AtmosphericWaterExchange {
 
         /** The same saved book and regional store are dirtied together, including capacity-rejected remainder. */
         public long applyPrecipitation(RegionalHydrologyState state) {
+            return applyPrecipitation(state, true);
+        }
+
+        /** A pause never discards already debited atmospheric water or fractions. */
+        public long applyPrecipitation(RegionalHydrologyState state, boolean enabled) {
+            if (!enabled) return 0;
             double[] amounts = pendingPrecipitation.get(state.key);
             if (amounts == null) return 0;
             long accepted = 0;
@@ -261,6 +280,11 @@ public final class AtmosphericWaterExchange {
             }
             state.physicalPrecipitation = true;
             return accepted;
+        }
+
+        /** Disabled coupling cannot feed regional vapor or supported-area forcing. */
+        public Receipt capture(AtmosphereCellKey cell, int size, boolean enabled) {
+            return enabled ? capture(cell, size) : Receipt.EMPTY;
         }
 
         /** Exact receipts and pending fractional precipitation survive orderly save/load. */

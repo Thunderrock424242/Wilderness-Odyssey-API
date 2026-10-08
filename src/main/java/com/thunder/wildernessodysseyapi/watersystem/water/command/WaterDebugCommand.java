@@ -261,6 +261,13 @@ public final class WaterDebugCommand {
                 + " hosted=" + finalHosted
                 + " projected=" + finalProjected
                 + " mobile=" + finalMobile), false);
+        var work = CanonicalWater.diagnostics(level);
+        var sync = com.thunder.wildernessodysseyapi.watersystem.water.network.WaterVolumeSynchronizer.diagnostics(level);
+        source.sendSuccess(() -> Component.literal("WO water work: active cells=" + work.queuedCells()
+                + ", generated cells materialized=" + work.generatedMaterializations()
+                + "; sync pending chunks=" + sync.pendingChunks()
+                + ", oldest pending ticks=" + sync.oldestPendingTicks()
+                + ", paged baselines=" + sync.pagedBaselines()), false);
         return 1;
     }
 

@@ -9,6 +9,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class UnderwaterFogOwnershipTest {
 
     @Test
+    void gameplayVisionRestrictionsRetainTheirFogThroughWaveTransitions() {
+        assertFalse(UnderwaterEffectsRenderer.canOwnWaterFog(FogType.WATER, false, true));
+        assertFalse(UnderwaterEffectsRenderer.canOwnWaterFog(FogType.NONE, false, true));
+        assertTrue(UnderwaterEffectsRenderer.canOwnWaterFog(FogType.WATER, false, false));
+    }
+
+    @Test
     void externalShaderPackRetainsBothAirAndWaterFog() {
         assertFalse(UnderwaterEffectsRenderer.canOwnWaterFog(FogType.NONE, true));
         assertFalse(UnderwaterEffectsRenderer.canOwnWaterFog(FogType.WATER, true));

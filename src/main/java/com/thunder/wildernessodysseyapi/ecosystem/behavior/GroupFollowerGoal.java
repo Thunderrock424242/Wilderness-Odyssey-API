@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.ecosystem.behavior;
 
 import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
+import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemParticipation;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileManager;
 import com.thunder.wildernessodysseyapi.ecosystem.group.AnimalGroup;
@@ -53,7 +54,7 @@ public final class GroupFollowerGoal extends Goal {
     public boolean canUse() {
         if (!(animal.level() instanceof ServerLevel level)
                 || !animal.isAlive()
-                || !EcosystemConfig.ENABLED.get()
+                || !EcosystemParticipation.isEnabled(level)
                 || !EcosystemConfig.HERD_BEHAVIOR_ENABLED.get()
                 || !EcosystemConfig.GROUP_AI_ENABLED.get()) {
             return false;
@@ -114,6 +115,10 @@ public final class GroupFollowerGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         if (group == null || leader == null || memberPlan == null || profile == null
+                || !(animal.level() instanceof ServerLevel level)
+                || !EcosystemParticipation.isEnabled(level)
+                || !EcosystemConfig.HERD_BEHAVIOR_ENABLED.get()
+                || !EcosystemConfig.GROUP_AI_ENABLED.get()
                 || !animal.isAlive() || !leader.isAlive()
                 || group.roleOf(animal.getUUID()).orElse(null) != GroupRole.FOLLOWER) {
             return false;
@@ -152,7 +157,9 @@ public final class GroupFollowerGoal extends Goal {
 
     @Override
     public void tick() {
-        if (group == null || leader == null || memberPlan == null || profile == null) {
+        if (!(animal.level() instanceof ServerLevel level)
+                || !EcosystemParticipation.isEnabled(level)
+                || group == null || leader == null || memberPlan == null || profile == null) {
             return;
         }
         long gameTime = animal.level().getGameTime();

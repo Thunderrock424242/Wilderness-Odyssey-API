@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.ecosystem.distant;
 
 import com.thunder.wildernessodysseyapi.ecosystem.api.EnvironmentalContext;
+import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemParticipation;
 import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
 import com.thunder.wildernessodysseyapi.ecosystem.api.WildlifeSimulationLod;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
@@ -21,18 +22,14 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.SpawnPlacements;
-import net.minecraft.world.entity.TamableAnimal;
-import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.animal.FlyingAnimal;
 import net.minecraft.world.entity.animal.WaterAnimal;
-import net.minecraft.world.entity.animal.horse.AbstractHorse;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -81,6 +78,11 @@ public final class DistantWildlifeManager {
         long serverTick = server.getTickCount();
 
         for (ServerLevel level : server.getAllLevels()) {
+            if (!EcosystemParticipation.isEnabled(level)) {
+                syncDisabled(level, settings);
+                runtimes.remove(level);
+                continue;
+            }
             RuntimeState runtime = runtime(level);
             boolean groupUpdateDue = intervalElapsed(
                     serverTick,
@@ -150,7 +152,9 @@ public final class DistantWildlifeManager {
 
     /** Requests a bounded corrective snapshot after an ecology-owned count change. */
     public void markPopulationChanged(ServerLevel level) {
-        runtime(level).transitionSyncDirty = true;
+        if (EcosystemParticipation.isEnabled(level)) {
+            runtime(level).transitionSyncDirty = true;
+        }
     }
 
     /** Releases per-player state immediately after disconnect. */
@@ -181,7 +185,7 @@ public final class DistantWildlifeManager {
         EcosystemConfig.DistantWildlifeSettings settings = EcosystemConfig.distantWildlifeSettings();
         int packets = 0;
         for (ServerLevel level : server.getAllLevels()) {
-            if (settings.enabled()) {
+            if (settings.enabled() && EcosystemParticipation.isEnabled(level)) {
                 int levelPackets = syncEnabled(
                         level,
                         DistantWildlifeSavedData.get(level),
@@ -257,12 +261,9 @@ public final class DistantWildlifeManager {
         long minimumUnobservedTicks = Math.max(200L, settings.updateInterval() * 2L);
         Set<UUID> presentMobs = new HashSet<>();
         int absorbed = 0;
-        for (Entity entity : level.getAllEntities()) {
-            if (!(entity instanceof PathfinderMob animal)) {
-                continue;
-            }
+        for (PathfinderMob animal : EcosystemSimulationManager.get().loadedWildlife(level)) {
             presentMobs.add(animal.getUUID());
-            if (!isSafeToAbstract(animal, gameTime, runtime)) {
+            if (!isSafeToAbstract(animal)) {
                 runtime.unobservedSince.remove(animal.getUUID());
                 continue;
             }
@@ -680,33 +681,17 @@ public final class DistantWildlifeManager {
                 || currentTick - lastTick >= Math.max(1, intervalTicks);
     }
 
-    private static boolean isSafeToAbstract(PathfinderMob animal, long gameTime, RuntimeState runtime) {
-        if (!EcosystemEntitySafety.mayAbstract(animal)
-                || !(animal instanceof Animal || animal instanceof WaterAnimal || animal instanceof FlyingAnimal)
-                || !animal.isAlive()
-                || animal.isRemoved()
-                || !animal.getTags().isEmpty()
-                || animal.getHealth() + 0.01F < animal.getMaxHealth()) {
+    /** Shared suspension/abstraction veto, including the transition owner's materialization cooldown. */
+    public boolean isSafeToAbstract(PathfinderMob animal) {
+        if (!(animal.level() instanceof ServerLevel level)
+                || !EcosystemParticipation.isEnabled(level)
+                || !EcosystemEntitySafety.mayAbstract(animal)) {
             return false;
         }
-        Long materializedUntil = runtime.materializedUntil.get(animal.getUUID());
-        if (materializedUntil != null && materializedUntil > gameTime) {
-            return false;
-        }
-        if (animal.getLastHurtByMob() != null
-                && animal.tickCount - animal.getLastHurtByMobTimestamp() < 400) {
-            return false;
-        }
-        if (animal instanceof AgeableMob ageable && ageable.isBaby()) {
-            return false;
-        }
-        if (animal instanceof Animal breedingAnimal && breedingAnimal.isInLove()) {
-            return false;
-        }
-        if (animal instanceof TamableAnimal tamable && tamable.isTame()) {
-            return false;
-        }
-        return !(animal instanceof AbstractHorse horse) || !horse.isTamed();
+        RuntimeState runtime = runtimes.get(level);
+        return runtime == null || DistantWildlifeTransitionPolicy.materializationCooldownElapsed(
+                level.getGameTime(), runtime.materializedUntil.getOrDefault(animal.getUUID(), 0L)
+        );
     }
 
     private static PlayerObservation observePlayers(

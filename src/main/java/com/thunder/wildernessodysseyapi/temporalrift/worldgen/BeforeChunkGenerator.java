@@ -33,8 +33,7 @@ public class BeforeChunkGenerator extends NoiseBasedChunkGenerator {
 
     @Override
     public ChunkGeneratorStructureState createState(HolderLookup<StructureSet> structureSets, RandomState randomState, long seed) {
-        HolderLookup.RegistryLookup<StructureSet> lookup = (HolderLookup.RegistryLookup<StructureSet>) structureSets;
-        Stream<Holder<StructureSet>> allowed = lookup.listElements()
+        Stream<Holder<StructureSet>> allowed = structureSets.listElements()
                 .filter(holder -> holder.unwrapKey().map(BeforeStructurePolicy::isAllowed).orElse(false))
                 .map(holder -> (Holder<StructureSet>) holder);
         return ChunkGeneratorStructureState.createForFlat(randomState, seed, this.biomeSource, allowed);

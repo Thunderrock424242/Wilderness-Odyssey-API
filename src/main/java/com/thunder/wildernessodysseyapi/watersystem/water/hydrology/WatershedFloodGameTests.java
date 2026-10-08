@@ -49,7 +49,7 @@ public final class WatershedFloodGameTests {
         helper.succeed();
     }
 
-    /** A player replacement wins over the old flood ledger claim. */
+    /** Recession preserves the player's solid and any still-funded hidden displacement. */
     @GameTest(template = "empty")
     public static void playerReplacementIsNeverOverwrittenByRecession(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
@@ -70,9 +70,12 @@ public final class WatershedFloodGameTests {
         level.setBlock(position, Blocks.STONE.defaultBlockState(), 3);
 
         TemporaryFloodManager.recede(level, new WatershedSavedData(), 1);
+        var retained = CanonicalWater.getTracked(level, position);
+        int expectedClaim = retained != null && retained.temporaryFlood() && retained.displacementReservoir()
+                ? retained.volumeUnits() : 0;
         helper.assertTrue(
-                level.getBlockState(position).is(Blocks.STONE) && ledger.size() == 0,
-                "Flood recession overwrote a player replacement or retained a stale claim"
+                level.getBlockState(position).is(Blocks.STONE) && ledger.ownedUnits(position.asLong()) == expectedClaim,
+                "Flood recession overwrote a player replacement or lost its exact displacement claim"
         );
         helper.succeed();
     }

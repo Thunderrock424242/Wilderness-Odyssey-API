@@ -357,11 +357,12 @@ public final class WeatherClientEvents {
                 ),
                 String.format(
                         Locale.ROOT,
-                        "Surface mesh %s | %d wet cells | %d puddle cells | %d triangles",
+                        "Surface mesh %s | %d wet cells | %d puddle cells | %d triangles | terrain %d candidates/%d probes | %d cached columns",
                         surfaces.active() ? "connected-noise" : "inactive",
                         surfaces.wetCells(),
                         surfaces.puddleCells(),
-                        surfaces.triangles()
+                        surfaces.triangles(),
+                        surfaces.terrainCandidates(), surfaces.terrainProbes(), surfaces.cachedHeightColumns()
                 ),
                 distantThunderSelectionLine(thunderAudio),
                 distantThunderTimerLine(thunderAudio)

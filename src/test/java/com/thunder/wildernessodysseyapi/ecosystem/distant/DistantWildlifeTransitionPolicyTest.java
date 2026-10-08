@@ -10,6 +10,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DistantWildlifeTransitionPolicyTest {
 
     @Test
+    void materializedIndividualsCannotBeFrozenBeforeTheirCooldownExpires() {
+        assertFalse(DistantWildlifeTransitionPolicy.materializationCooldownElapsed(100L, 300L));
+        assertFalse(DistantWildlifeTransitionPolicy.materializationCooldownElapsed(299L, 300L));
+        assertTrue(DistantWildlifeTransitionPolicy.materializationCooldownElapsed(300L, 300L));
+        assertTrue(DistantWildlifeTransitionPolicy.materializationCooldownElapsed(301L, 300L));
+    }
+
+    @Test
     void classifiesConfiguredBandsWithoutHardcodedWorldDistances() {
         assertEquals(DistantWildlifeTransitionPolicy.LodState.REAL, state(95.9));
         assertEquals(DistantWildlifeTransitionPolicy.LodState.TRANSITION, state(96.0));

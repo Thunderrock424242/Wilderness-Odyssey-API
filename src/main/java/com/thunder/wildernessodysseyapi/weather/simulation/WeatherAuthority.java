@@ -656,6 +656,11 @@ public final class WeatherAuthority implements WeatherQuery {
 
     /** Invalidates cached inputs and forces full snapshots after config reload. */
     public synchronized void onConfigurationReload() {
+        var server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+        if (server != null && !server.isSameThread()) {
+            server.execute(this::onConfigurationReload);
+            return;
+        }
         WeatherConfig.SchedulingSettings scheduling = WeatherConfig.scheduling();
         for (Map.Entry<ServerLevel, LevelRuntime> entry : runtimes.entrySet()) {
             data(entry.getKey(), scheduling, entry.getValue());
@@ -723,6 +728,11 @@ public final class WeatherAuthority implements WeatherQuery {
         WeatherSystemsSavedData systemsData = WeatherSystemsSavedData.get(level, features);
         WeatherSystemTracker tracker = systemsData.tracker();
         Set<Long> activeKeys = collectActiveKeys(level, scheduling);
+
+        Set<Long> retainedInputs = new HashSet<>(grid.snapshotByPackedKey().keySet());
+        retainedInputs.addAll(activeKeys);
+        runtime.inputSampler.beginSamplingPass(retainedInputs, gameTime,
+                scheduling.environmentResampleIntervalTicks());
 
         // New cells sample loaded environmental context once, then become
         // normal compact state shared by overlapping players.
@@ -1421,6 +1431,12 @@ public final class WeatherAuthority implements WeatherQuery {
     public PhysicsDiagnostics physicsDiagnostics(ServerLevel level) {
         LevelRuntime runtime = runtimes.get(level);
         return runtime == null ? PhysicsDiagnostics.EMPTY : runtime.physicsDiagnostics;
+    }
+
+    /** Terrain probe attempts in the most recent immutable input capture. */
+    public int terrainProbes(ServerLevel level) {
+        LevelRuntime runtime = runtimes.get(level);
+        return runtime == null ? 0 : runtime.inputSampler.terrainProbes();
     }
 
     public record PhysicsDiagnostics(int cellSteps, long calculationNanos, long deferredTicks,

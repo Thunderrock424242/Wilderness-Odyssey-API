@@ -55,16 +55,23 @@ public final class ReactiveVegetationState implements INBTSerializable<CompoundT
         );
     }
 
-    /** Applies one completed localized-weather sample and marks chunk persistence dirty. */
+    /** Marks persistence only when authoritative climate fields change. */
     public void applyClimate(VegetationClimateState state) {
         VegetationClimateState safe = state == null ? VegetationClimateState.DEFAULT : state;
+        boolean changed = Double.compare(moisture, safe.moisture()) != 0
+                || Double.compare(recentRainfall, safe.recentRainfall()) != 0
+                || Double.compare(droughtLevel, safe.droughtLevel()) != 0
+                || Double.compare(stormIntensity, safe.stormIntensity()) != 0
+                || seasonState != safe.seasonState();
         moisture = safe.moisture();
         recentRainfall = safe.recentRainfall();
         droughtLevel = safe.droughtLevel();
         stormIntensity = safe.stormIntensity();
         seasonState = safe.seasonState();
         lastClimateUpdateTick = safe.lastClimateUpdateTick();
-        dirtyListener.run();
+        if (changed) {
+            dirtyListener.run();
+        }
     }
 
     /** Records one bounded plant pass and an exponentially smoothed processing time. */
@@ -75,7 +82,8 @@ public final class ReactiveVegetationState implements INBTSerializable<CompoundT
         averageProcessingMicros = averageProcessingMicros <= 0.0
                 ? elapsedMicros
                 : averageProcessingMicros * 0.85 + elapsedMicros * 0.15;
-        dirtyListener.run();
+        // Timings and counters remain available in memory and in the next
+        // normal save, but diagnostics alone must not force a chunk save.
     }
 
     @Override

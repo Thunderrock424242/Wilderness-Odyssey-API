@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public final class LoadingStallDetector {
     private static final boolean ENABLED = Boolean.parseBoolean(System.getProperty("wilderness.loadingstall.enabled", "true"));
+    private static final boolean SHOW_PANEL = Boolean.parseBoolean(System.getProperty("wilderness.loadingstall.showPanel", "false"));
     private static final long OBSERVATION_INTERVAL_NANOS = TimeUnit.MILLISECONDS.toNanos(250);
     private static LoadingProfileMonitor monitor;
     private static boolean initializationFailed;
@@ -99,7 +100,7 @@ public final class LoadingStallDetector {
 
     @SubscribeEvent
     public static void onScreenRender(ScreenEvent.Render.Post event) {
-        if (!ENABLED || monitor == null || observedPhase == null || classify(event.getScreen()) == null) {
+        if (!ENABLED || !SHOW_PANEL || monitor == null || observedPhase == null || classify(event.getScreen()) == null) {
             return;
         }
         var status = monitor.status();

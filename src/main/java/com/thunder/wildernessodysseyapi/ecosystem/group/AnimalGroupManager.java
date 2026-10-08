@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.ecosystem.api.EnvironmentalContext;
 import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileManager;
 import com.thunder.wildernessodysseyapi.ecosystem.state.AnimalNeedsState;
+import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemParticipation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -45,7 +46,7 @@ public final class AnimalGroupManager {
 
     /** Returns a cached group without performing discovery or validation. */
     public Optional<AnimalGroup> groupFor(PathfinderMob animal) {
-        if (!(animal.level() instanceof ServerLevel level)) {
+        if (!(animal.level() instanceof ServerLevel level) || !EcosystemParticipation.isEnabled(level)) {
             return Optional.empty();
         }
         LevelGroups state = levels.get(level);
@@ -75,6 +76,9 @@ public final class AnimalGroupManager {
         }
         if (!(animal.level() instanceof ServerLevel level)) {
             throw new IllegalArgumentException("Animal groups require a server-level entity");
+        }
+        if (!EcosystemParticipation.isEnabled(level)) {
+            throw new IllegalArgumentException("Animal groups require an enabled ecosystem dimension");
         }
         if (!eligible(animal, profile)) {
             throw new IllegalArgumentException("Animal is not eligible for the supplied social profile");
@@ -141,7 +145,7 @@ public final class AnimalGroupManager {
             long validationInterval
     ) {
         ServerLevel level = levelFor(group);
-        if (level == null) {
+        if (level == null || !EcosystemParticipation.isEnabled(level)) {
             return;
         }
         LevelGroups levelGroups = levels.get(level);

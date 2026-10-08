@@ -141,6 +141,7 @@ public final class RegionalEnvironmentManager implements EnvironmentQuery {
         MeteorSiteSnapshot meteor = profile.radiation()
                 ? MeteorSiteServices.nearest(level, anchor, METEOR_QUERY_RADIUS).orElse(MeteorSiteSnapshot.NONE)
                 : MeteorSiteSnapshot.NONE;
+        double radiation = profile.radiation() ? MeteorSiteServices.radiationAt(level, anchor) : 0.0;
         RiftfallStage riftfall = profile.riftfall() ? RiftfallSystem.stage(level) : RiftfallStage.CLEAR;
         var influence = profile.participates()
                 ? EnvironmentInfluenceModel.evaluate(
@@ -152,7 +153,8 @@ public final class RegionalEnvironmentManager implements EnvironmentQuery {
                         vegetation,
                         vegetationDisturbance,
                         meteor,
-                        riftfall
+                        riftfall,
+                        radiation
                 )
                 : EnvironmentInfluence.INERT;
         return new RegionalEnvironmentSnapshot(
@@ -169,7 +171,8 @@ public final class RegionalEnvironmentManager implements EnvironmentQuery {
                 vegetationDisturbance,
                 meteor,
                 riftfall,
-                influence
+                influence,
+                radiation
         );
     }
 

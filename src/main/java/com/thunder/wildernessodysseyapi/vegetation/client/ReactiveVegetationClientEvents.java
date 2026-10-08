@@ -3,10 +3,9 @@ package com.thunder.wildernessodysseyapi.vegetation.client;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -14,10 +13,9 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.function.IntConsumer;
 
-/** Client lifecycle and gradual surface-section invalidation for vegetation tints. */
+/** Client lifecycle and gradual occupied-section invalidation for vegetation tints. */
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public final class ReactiveVegetationClientEvents {
 
@@ -35,7 +33,7 @@ public final class ReactiveVegetationClientEvents {
         }
     }
 
-    /** Rebuilds only surface-bearing sections and caps invalidation work per frame. */
+    /** Includes plants beneath roofs and canopies under a two-chunk tick cap. */
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -53,19 +51,16 @@ public final class ReactiveVegetationClientEvents {
             if (chunk == null) {
                 continue;
             }
-            Set<Integer> surfaceSections = new HashSet<>();
-            for (int localZ = 0; localZ < 16; localZ++) {
-                for (int localX = 0; localX < 16; localX++) {
-                    int surfaceY = chunk.getHeight(
-                            Heightmap.Types.WORLD_SURFACE,
-                            localX,
-                            localZ
-                    ) - 1;
-                    surfaceSections.add(SectionPos.blockToSectionCoord(surfaceY));
-                }
-            }
-            for (int sectionY : surfaceSections) {
-                minecraft.levelRenderer.setSectionDirty(chunkX, sectionY, chunkZ);
+            forEachOccupiedSection(chunk,
+                    sectionY -> minecraft.levelRenderer.setSectionDirty(chunkX, sectionY, chunkZ));
+        }
+    }
+
+    static void forEachOccupiedSection(ChunkAccess chunk, IntConsumer invalidate) {
+        var sections = chunk.getSections();
+        for (int index = 0; index < sections.length; index++) {
+            if (!sections[index].hasOnlyAir()) {
+                invalidate.accept(chunk.getSectionYFromSectionIndex(index));
             }
         }
     }

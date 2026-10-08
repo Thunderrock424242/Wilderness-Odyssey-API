@@ -12,9 +12,8 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.levelgen.Heightmap;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Captures compact environmental inputs for the pure atmosphere engine.
@@ -27,12 +26,23 @@ import java.util.Objects;
 public final class AtmosphereInputSampler {
 
     private static final int CLIMATE_PROBES_PER_AXIS = 3;
-    private static final int MAX_CACHED_CELLS = 2048;
+    private static final int MAX_REFRESHED_CELLS_PER_PASS = 64;
 
     private final WeatherWaterInfluence waterInfluence;
     private final SeasonalWeatherInfluence seasonalInfluence;
-    private final LinkedHashMap<Long, CachedClimate> climateCache =
-            new LinkedHashMap<>(128, 0.75f, true);
+    private final AtmosphereClimateCache<Climate> climateCache = new AtmosphereClimateCache<>();
+
+    /** Retains the admitted grid and staggers expired terrain reads across captures. */
+    public synchronized void beginSamplingPass(Set<Long> retained, long tick, int refreshTicks) {
+        climateCache.beginPass(retained, tick, refreshTicks, MAX_REFRESHED_CELLS_PER_PASS);
+        waterInfluence.beginSamplingPass(retained, tick, refreshTicks, MAX_REFRESHED_CELLS_PER_PASS);
+    }
+
+    /** Actual lattice work in the most recent capture, including unloaded misses. */
+    public synchronized int terrainProbes() {
+        return climateCache.samplesThisPass() * CLIMATE_PROBES_PER_AXIS * CLIMATE_PROBES_PER_AXIS
+                + waterInfluence.terrainProbes();
+    }
 
     /** Creates the normal sampler with optional integrations injected at the boundary. */
     public AtmosphereInputSampler(
@@ -62,23 +72,15 @@ public final class AtmosphereInputSampler {
         Objects.requireNonNull(cell, "cell");
         int refresh = Math.max(20, refreshIntervalTicks);
         long gameTime = level.getGameTime();
-        CachedClimate cached = climateCache.get(cell.packed());
-        if (cached == null || gameTime - cached.sampledAtTick >= refresh) {
-            Climate climate = sampleLoadedClimate(level, cell, cellSize);
-            if (climate.loadedProbes > 0 || cached == null) {
-                Climate fallback = persistedEnvironment == null ? dimensionFallback(level)
-                        : new Climate(persistedEnvironment.biomeTemperatureCelsius(), persistedEnvironment.terrainHumidity(),
-                        persistedEnvironment.elevationBlocks(), 1, persistedEnvironment.terrainGradientX(),
-                        persistedEnvironment.terrainGradientZ(), persistedEnvironment.terrainRoughness());
-                cached = new CachedClimate(gameTime, climate.withFallback(fallback));
-            } else {
-                // Keep the last known terrain climate while a formerly active
-                // region is dormant; repeated misses do not cause hot polling.
-                cached = new CachedClimate(gameTime, cached.climate);
-            }
-            climateCache.put(cell.packed(), cached);
-            trimCache();
-        }
+        Climate previous = climateCache.peek(cell.packed());
+        java.util.function.Supplier<Climate> fallback = () -> persistedEnvironment == null
+                ? dimensionFallback(level)
+                : new Climate(persistedEnvironment.biomeTemperatureCelsius(), persistedEnvironment.terrainHumidity(),
+                persistedEnvironment.elevationBlocks(), 1, persistedEnvironment.terrainGradientX(),
+                persistedEnvironment.terrainGradientZ(), persistedEnvironment.terrainRoughness());
+        Climate climate = climateCache.sample(cell.packed(), gameTime,
+                () -> sampleLoadedClimate(level, cell, cellSize)
+                        .withFallback(previous == null ? fallback.get() : previous), fallback);
 
         WaterInfluenceSample water = waterInfluence.sample(
                 level,
@@ -88,7 +90,6 @@ public final class AtmosphereInputSampler {
         );
         SeasonalWeatherInfluence.SeasonalOffset season =
                 seasonalInfluence.sample(level, cell, cellSize);
-        Climate climate = cached.climate;
         double humidity = clamp01(climate.humidity + season.humidity());
         return new AtmosphereEnvironment(
                 climate.temperatureCelsius,
@@ -257,22 +258,12 @@ public final class AtmosphereInputSampler {
         return ((value >>> 11) * 0x1.0p-53) * 2.0 - 1.0;
     }
 
-    private void trimCache() {
-        while (climateCache.size() > MAX_CACHED_CELLS) {
-            Map.Entry<Long, CachedClimate> eldest = climateCache.entrySet().iterator().next();
-            climateCache.remove(eldest.getKey());
-        }
-    }
-
     private static int boundedBlock(long coordinate) {
         return (int) Math.max(-30_000_000L, Math.min(30_000_000L, coordinate));
     }
 
     private static double clamp01(double value) {
         return Math.max(0.0, Math.min(1.0, Double.isFinite(value) ? value : 0.0));
-    }
-
-    private record CachedClimate(long sampledAtTick, Climate climate) {
     }
 
     private record Climate(

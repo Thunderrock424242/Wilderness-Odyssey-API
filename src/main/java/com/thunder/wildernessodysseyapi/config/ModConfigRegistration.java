@@ -123,10 +123,10 @@ public final class ModConfigRegistration {
                 BackgroundEfficiencyManager.reload(BackgroundEfficiencyConfig.values());
                 TickEngine.reload(TickEngineConfig.values());
                 DataEngine.get().reload(DataEngineConfig.values());
+                WeatherConfig.reload();
+                WeatherAuthority.get().onConfigurationReload();
             });
             StructureBlockSettings.reloadFromConfig();
-            WeatherConfig.reload();
-            WeatherAuthority.get().onConfigurationReload();
             EcosystemConfig.reload();
             SpeciesBehaviorProfileManager.clearConfiguredProfiles();
             var server = ServerLifecycleHooks.getCurrentServer();

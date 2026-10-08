@@ -40,7 +40,7 @@ class CanonicalWaterDisplacementTest {
                 () -> assertEquals(source.volumeUnits(), movedUnits + residual.volumeUnits()),
                 () -> assertTrue(residual.displacementReservoir()),
                 () -> assertFalse(residual.hostedWater()),
-                () -> assertFalse(residual.sleeping()),
+                () -> assertTrue(residual.sleeping()),
                 () -> assertEquals(0,
                         residual.flags() & WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED),
                 () -> assertEquals(source.velocityX(), residual.velocityX()),

@@ -5,6 +5,11 @@ import com.thunder.wildernessodysseyapi.ecosystem.EcosystemTags;
 import com.thunder.wildernessodysseyapi.ecosystem.state.AnimalNeedsState;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.animal.FlyingAnimal;
+import net.minecraft.world.entity.animal.WaterAnimal;
+import net.minecraft.world.entity.animal.horse.AbstractHorse;
 
 /**
  * Conservative veto policy for converting real wildlife into abstract population.
@@ -15,7 +20,7 @@ import net.minecraft.world.entity.TamableAnimal;
  */
 public final class EcosystemEntitySafety {
 
-    private static final int COMBAT_PROTECTION_TICKS = 100;
+    private static final int COMBAT_PROTECTION_TICKS = 400;
 
     private EcosystemEntitySafety() {
     }
@@ -29,7 +34,8 @@ public final class EcosystemEntitySafety {
         boolean externalNoAi = animal.isNoAi() && !needs.simulationAiSuspended();
         return mayAbstract(new ProtectionFacts(
                 animal.hasCustomName(),
-                animal instanceof TamableAnimal tamable && tamable.isTame(),
+                animal instanceof TamableAnimal tamable && tamable.isTame()
+                        || animal instanceof AbstractHorse horse && horse.isTamed(),
                 animal.isPersistenceRequired(),
                 animal.requiresCustomPersistence(),
                 animal.getType().builtInRegistryHolder().is(EcosystemTags.NEVER_ABSTRACT),
@@ -37,7 +43,13 @@ public final class EcosystemEntitySafety {
                 animal.isVehicle(),
                 animal.isLeashed(),
                 animal.getTarget() != null || recentCombat,
-                externalNoAi
+                externalNoAi,
+                !(animal instanceof Animal || animal instanceof WaterAnimal || animal instanceof FlyingAnimal),
+                !animal.isAlive() || animal.isRemoved(),
+                !animal.getTags().isEmpty(),
+                animal.getHealth() + 0.01F < animal.getMaxHealth(),
+                animal instanceof AgeableMob ageable && ageable.isBaby(),
+                animal instanceof Animal breedingAnimal && breedingAnimal.isInLove()
         ));
     }
 
@@ -52,10 +64,16 @@ public final class EcosystemEntitySafety {
                 && !facts.vehicle()
                 && !facts.leashed()
                 && !facts.interactingOrInCombat()
-                && !facts.externallyNoAi();
+                && !facts.externallyNoAi()
+                && !facts.notWildlife()
+                && !facts.notLive()
+                && !facts.taggedEntity()
+                && !facts.injured()
+                && !facts.juvenile()
+                && !facts.breeding();
     }
 
-    private static boolean recent(int currentTick, int eventTick) {
+    static boolean recent(int currentTick, int eventTick) {
         return eventTick > 0 && currentTick - eventTick <= COMBAT_PROTECTION_TICKS;
     }
 
@@ -70,7 +88,23 @@ public final class EcosystemEntitySafety {
             boolean vehicle,
             boolean leashed,
             boolean interactingOrInCombat,
-            boolean externallyNoAi
+            boolean externallyNoAi,
+            boolean notWildlife,
+            boolean notLive,
+            boolean taggedEntity,
+            boolean injured,
+            boolean juvenile,
+            boolean breeding
     ) {
+        /** Retains the original protection-facts API for integrations. */
+        public ProtectionFacts(
+                boolean named, boolean tamed, boolean persistenceRequired, boolean customPersistence,
+                boolean taggedNeverAbstract, boolean passenger, boolean vehicle, boolean leashed,
+                boolean interactingOrInCombat, boolean externallyNoAi
+        ) {
+            this(named, tamed, persistenceRequired, customPersistence, taggedNeverAbstract,
+                    passenger, vehicle, leashed, interactingOrInCombat, externallyNoAi,
+                    false, false, false, false, false, false);
+        }
     }
 }

@@ -55,6 +55,7 @@ public class MeteorSavedData extends SavedData {
 
     private final List<MeteorRecord> meteors = new ArrayList<>();
     private final Map<Long, List<MeteorRecord>> regionIndex = new HashMap<>();
+    private int maximumRadiationRadius;
 
     // ---- Factory ----
 
@@ -185,9 +186,32 @@ public class MeteorSavedData extends SavedData {
         return Optional.ofNullable(nearest);
     }
 
+    /** Returns strongest exposure, including overlapping or large legacy sites. */
+    public double radiationAt(BlockPos position) {
+        if (position == null || maximumRadiationRadius == 0) {
+            return 0.0;
+        }
+        double strongest = 0.0;
+        for (MeteorRecord record : findWithin(position, maximumRadiationRadius)) {
+            strongest = Math.max(strongest, radiationFrom(record, position));
+        }
+        return strongest;
+    }
+
+    /** Shared horizontal falloff used by site metadata and aggregate exposure. */
+    public static double radiationFrom(MeteorRecord record, BlockPos position) {
+        double radius = Math.max(1.0, record.craterRadius() * 1.5);
+        long dx = (long) record.center().getX() - position.getX();
+        long dz = (long) record.center().getZ() - position.getZ();
+        double distance = Math.sqrt((double) dx * dx + (double) dz * dz);
+        return Math.max(0.0, Math.min(1.0, record.intensity() * (1.0 - distance / radius)));
+    }
+
     private void addLoaded(MeteorRecord record) {
         meteors.add(record);
         regionIndex.computeIfAbsent(indexKey(record.center()), ignored -> new ArrayList<>()).add(record);
+        maximumRadiationRadius = Math.max(maximumRadiationRadius,
+                (int) Math.ceil(record.craterRadius() * 1.5));
     }
 
     private static long indexKey(BlockPos center) {

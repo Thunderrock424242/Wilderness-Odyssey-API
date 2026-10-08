@@ -6,6 +6,7 @@
   "plugin": "com.thunder.wildernessodysseyapi.mixinconfig.WildernessMixinConfigPlugin",
   "refmap": "mixins.wildernessodysseyapi.refmap.json",
   "mixins": [
+    "AcceptedWaterPlacementMixin",
     "BlockEntityMixin",
     "BubbleColumnWaterMixin",
     "BucketableWaterBucketMixin",
@@ -33,6 +34,7 @@
     "NaturalAquaticFeatureWaterMixin",
     "NoiseBasedChunkGeneratorWaterMixin",
     "ProtoChunkWaterMixin",
+    "SableWaterShapeMixin",
     "ServerboundSetStructureBlockPacketMixin",
     "ServerGamePacketListenerImplMixin",
     "ServerLevelLightningAccessor",

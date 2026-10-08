@@ -18,9 +18,22 @@ import org.junit.jupiter.api.Test;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** Exercises the allocation-light cross-system model without loading a world. */
 class EnvironmentInfluenceModelTest {
+
+    @Test
+    void aggregateRadiationDrivesInfluenceIndependentlyOfNearestSiteMetadata() {
+        EnvironmentInfluence influence = EnvironmentInfluenceModel.evaluate(
+                WeatherSample.CLEAR, WeatherThreatForecast.NONE, SeasonalClimateState.NONE,
+                WatershedConditions.NONE, null, VegetationClimateState.DEFAULT,
+                VegetationDisturbanceSample.NONE, MeteorSiteSnapshot.NONE, RiftfallStage.CLEAR, 0.84);
+
+        assertEquals(0.84, influence.overallHazard(), 0.00001);
+        assertEquals(0.84, influence.migrationPressure(), 0.00001);
+        assertEquals(0.84, influence.vegetationStress(), 0.00001);
+    }
 
     @Test
     void droughtLowersHabitatAndRaisesMigrationPressure() {

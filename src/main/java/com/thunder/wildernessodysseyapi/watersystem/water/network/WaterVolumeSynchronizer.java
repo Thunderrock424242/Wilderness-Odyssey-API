@@ -57,15 +57,32 @@ public final class WaterVolumeSynchronizer {
             }
             syncState.retainLoadedChunks(retainedChunks);
 
+            Map<Long, TrackedChunk> pendingChunks = new HashMap<>();
+            List<WaterSyncSchedule.Candidate> pending = new ArrayList<>();
+            for (TrackedChunk tracked : trackedChunks) {
+                var volume = tracked.chunk().getExistingData(ModAttachments.WATER_VOLUME);
+                if (volume.isEmpty()) continue;
+                long known = syncState.revisions.getOrDefault(tracked.chunkKey(), Long.MIN_VALUE);
+                if (known == volume.get().revision()) continue;
+                int dx = tracked.chunk().getPos().x - player.chunkPosition().x;
+                int dz = tracked.chunk().getPos().z - player.chunkPosition().z;
+                pendingChunks.put(tracked.chunkKey(), tracked);
+                pending.add(new WaterSyncSchedule.Candidate(tracked.chunkKey(), dx * dx + dz * dz,
+                        known == Long.MIN_VALUE));
+            }
+            List<Long> ordered = syncState.schedule.order(pending, level.getGameTime());
+
             SyncBudget budget = new SyncBudget();
             if (syncState.baseline != null && !sendPendingBaseline(player, syncState, budget)) {
                 continue;
             }
 
-            for (TrackedChunk tracked : trackedChunks) {
+            for (long chunkKey : ordered) {
                 if (!budget.canSendAnything()) {
                     break;
                 }
+                TrackedChunk tracked = pendingChunks.get(chunkKey);
+                syncState.schedule.visited(chunkKey);
                 var existingVolume = tracked.chunk().getExistingData(ModAttachments.WATER_VOLUME);
                 if (existingVolume.isEmpty()) {
                     continue;
@@ -115,6 +132,23 @@ public final class WaterVolumeSynchronizer {
     public static void forgetPlayer(ServerPlayer player) {
         PLAYER_REVISIONS.remove(player);
     }
+
+    /** Bounded aggregate backlog facts for the existing water diagnostics. */
+    public static Diagnostics diagnostics(ServerLevel level) {
+        int pendingChunks = 0;
+        int pagedBaselines = 0;
+        long oldestTicks = 0;
+        for (ServerPlayer player : level.players()) {
+            PlayerSyncState state = PLAYER_REVISIONS.get(player);
+            if (state == null || !state.dimension.equals(level.dimension())) continue;
+            pendingChunks += state.schedule.backlog();
+            oldestTicks = Math.max(oldestTicks, state.schedule.oldestPendingTicks(level.getGameTime()));
+            if (state.baseline != null) pagedBaselines++;
+        }
+        return new Diagnostics(pendingChunks, oldestTicks, pagedBaselines);
+    }
+
+    public record Diagnostics(int pendingChunks, long oldestPendingTicks, int pagedBaselines) { }
 
     /**
      * Forgets a chunk revision after Minecraft stops tracking it for a player.
@@ -241,6 +275,7 @@ public final class WaterVolumeSynchronizer {
     private static final class PlayerSyncState {
         private final ResourceKey<Level> dimension;
         private final Map<Long, Long> revisions = new HashMap<>();
+        private final WaterSyncSchedule schedule = new WaterSyncSchedule();
         private BaselineTransfer baseline;
 
         private PlayerSyncState(ResourceKey<Level> dimension) {
@@ -256,6 +291,7 @@ public final class WaterVolumeSynchronizer {
 
         private void forget(long chunkKey) {
             revisions.remove(chunkKey);
+            schedule.forget(chunkKey);
             if (baseline != null && baseline.chunkKey == chunkKey) {
                 baseline = null;
             }

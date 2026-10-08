@@ -17,6 +17,19 @@ class WeatherSnapshotTest {
     private static final ResourceLocation OVERWORLD = ResourceLocation.withDefaultNamespace("overworld");
 
     @Test
+    void visualPhaseBlendWeightsAuthoritativeNeighborsByPrecipitation() {
+        WeatherSnapshot snapshot = snapshot(Map.of(
+                WeatherSnapshot.packCell(0, 0), cell(0, 0, sample(-10.0, 0.2, PrecipitationType.RAIN)),
+                WeatherSnapshot.packCell(1, 0), cell(1, 0, sample(10.0, 0.8, PrecipitationType.SNOW))
+        ));
+        PrecipitationBlend blend = snapshot.precipitationBlend(256.0, 128.0);
+        assertEquals(0.2F, blend.rain(), 1.0E-6F);
+        assertEquals(0.8F, blend.snow(), 1.0E-6F);
+        assertEquals(0.0F, blend.hail());
+        assertEquals(PrecipitationBlend.NONE, snapshot.precipitationBlend(10000, 10000));
+    }
+
+    @Test
     void interpolatesBetweenAtmosphericCellCenters() {
         WeatherSnapshot snapshot = snapshot(Map.of(
                 WeatherSnapshot.packCell(0, 0), cell(0, 0, sample(10.0, 0.0, PrecipitationType.NONE)),

@@ -21,6 +21,19 @@ class ReactiveVegetationSchedulerTest {
     }
 
     @Test
+    void reloadedChunkDoesNotRetainItsEarlierDueTurn() {
+        ReactiveVegetationScheduler.LevelRuntime runtime =
+                new ReactiveVegetationScheduler.LevelRuntime();
+        runtime.add(42L, 100L, 200);
+        runtime.remove(42L);
+        runtime.add(42L, 10_000L, 200);
+
+        assertNull(runtime.pollDue(500L));
+        assertEquals(42L, runtime.pollDue(10_201L));
+        assertNull(runtime.pollDue(Long.MAX_VALUE));
+    }
+
+    @Test
     void largeLoadedAreaRetainsAFlatPerTickProbeBudget() {
         int chunksPerTick = VegetationWorkBudget.maximumChunksPerTick(1_024, 200);
         int defaultPlantProbes = chunksPerTick * 4;

@@ -29,6 +29,23 @@ public final class EnvironmentInfluenceModel {
             MeteorSiteSnapshot meteor,
             RiftfallStage riftfallStage
     ) {
+        return evaluate(weather, forecast, season, watershed, tide, vegetation,
+                vegetationDisturbance, meteor, riftfallStage, meteor == null ? 0.0 : meteor.radiation());
+    }
+
+    /** Uses aggregate exposure separately from nearest-site discovery metadata. */
+    public static EnvironmentInfluence evaluate(
+            WeatherSample weather,
+            WeatherThreatForecast forecast,
+            SeasonalClimateState season,
+            WatershedConditions watershed,
+            TideSystem.TideSample tide,
+            VegetationClimateState vegetation,
+            VegetationDisturbanceSample vegetationDisturbance,
+            MeteorSiteSnapshot meteor,
+            RiftfallStage riftfallStage,
+            double radiation
+    ) {
         WeatherSample air = weather == null ? WeatherSample.CLEAR : weather;
         WeatherThreatForecast outlook = forecast == null ? WeatherThreatForecast.NONE : forecast;
         SeasonalClimateState calendar = season == null ? SeasonalClimateState.NONE : season;
@@ -36,7 +53,7 @@ public final class EnvironmentInfluenceModel {
         VegetationClimateState plants = vegetation == null ? VegetationClimateState.DEFAULT : vegetation;
         VegetationDisturbanceSample plantEvent = vegetationDisturbance == null
                 ? VegetationDisturbanceSample.NONE : vegetationDisturbance;
-        MeteorSiteSnapshot site = meteor == null ? MeteorSiteSnapshot.NONE : meteor;
+        double exposure = unit(radiation);
         RiftfallStage rift = riftfallStage == null ? RiftfallStage.CLEAR : riftfallStage;
 
         double waterAvailability = Math.max(
@@ -51,7 +68,7 @@ public final class EnvironmentInfluenceModel {
                         + (1.0 - seasonalDormancy) * 0.16
                         + waterAvailability * 0.18
                         - plantEvent.intensity() * 0.24
-                        - site.radiation() * 0.42
+                        - exposure * 0.42
         );
 
         double weatherHazard = Math.max(
@@ -68,7 +85,7 @@ public final class EnvironmentInfluenceModel {
         };
         double overallHazard = Math.max(
                 Math.max(weatherHazard, floodHazard),
-                Math.max(Math.max(site.radiation(), riftHazard), plantEvent.intensity())
+                Math.max(Math.max(exposure, riftHazard), plantEvent.intensity())
         );
         double shelterPressure = Math.max(
                 Math.max(weatherHazard, floodHazard * 0.75),
@@ -76,7 +93,7 @@ public final class EnvironmentInfluenceModel {
         );
         double migrationPressure = Math.max(
                 Math.max(plants.droughtLevel(), floodHazard),
-                Math.max(Math.max(site.radiation(), riftHazard), seasonalDormancy * 0.72)
+                Math.max(Math.max(exposure, riftHazard), seasonalDormancy * 0.72)
         );
 
         double forecastActivity = outlook.ambientWildlifeActivityScale();
@@ -92,7 +109,7 @@ public final class EnvironmentInfluenceModel {
         }
         double vegetationStress = Math.max(
                 Math.max(plants.droughtLevel(), plantEvent.intensity()),
-                Math.max(site.radiation(), Math.max(riftHazard, floodHazard * 0.68))
+                Math.max(exposure, Math.max(riftHazard, floodHazard * 0.68))
         );
         return new EnvironmentInfluence(
                 waterAvailability,

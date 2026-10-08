@@ -5,7 +5,10 @@ import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterAccess;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterInteractionResult;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import net.minecraft.tags.FluidTags;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -55,7 +58,7 @@ public final class WorldFluidMutationReconciler {
         int previousDepth = RECONCILIATION_DEPTH.get();
         RECONCILIATION_DEPTH.set(previousDepth + 1);
         try {
-            return level.setBlock(position, state, flags);
+            return WaterMutationSafety.setBlock(level, position, state, flags);
         } finally {
             restoreDepth(previousDepth);
         }
@@ -66,13 +69,16 @@ public final class WorldFluidMutationReconciler {
      *
      * <p>An exact authority transfer returns {@link MutationDecision#COMMITTED}
      * because canonical projection has already performed the physical write.
-     * Failed transfers return {@link MutationDecision#REJECTED}; irrelevant,
-     * no-delta, disabled, and recursive projection calls continue normally.</p>
+     * Failed transfers return {@link MutationDecision#REJECTED}; relevant direct
+     * writes without a transfer still use the loaded shape context. Irrelevant
+     * and recursive projection calls continue normally.</p>
      */
     public static MutationDecision beforeSetBlock(
             Level level,
             BlockPos position,
-            BlockState newState
+            BlockState newState,
+            int flags,
+            int recursionLeft
     ) {
         if (!active
                 || RECONCILIATION_DEPTH.get() > 0
@@ -84,7 +90,9 @@ public final class WorldFluidMutationReconciler {
                 position,
                 newState,
                 WaterServices.access(),
-                WaterSimulationConfig::fluidHandlerCompatEnabled
+                WaterSimulationConfig::fluidHandlerCompatEnabled,
+                flags,
+                recursionLeft
         );
     }
 
@@ -95,10 +103,17 @@ public final class WorldFluidMutationReconciler {
             WaterAccess waterAccess,
             BooleanSupplier compatibilityEnabled
     ) {
-        if (!compatibilityEnabled.getAsBoolean()
+        return reconcile(level, position, newState, waterAccess, compatibilityEnabled, 3, 512);
+    }
+
+    private static MutationDecision reconcile(ServerLevel level, BlockPos position, BlockState newState,
+            WaterAccess waterAccess, BooleanSupplier compatibilityEnabled, int flags, int recursionLeft) {
+        if (!WildernessWaterRules.isEnabled(level)
                 || level.isDebug()
                 || level.isOutsideBuildHeight(position)
-                || !level.hasChunkAt(position)) {
+                || !level.hasChunkAt(position)
+                || level.captureBlockSnapshots
+                || level.restoringBlockSnapshots) {
             return MutationDecision.CONTINUE;
         }
 
@@ -109,18 +124,40 @@ public final class WorldFluidMutationReconciler {
             return MutationDecision.CONTINUE;
         }
 
-        // Only an air replacement represents a direct fluid extraction. Solid
-        // and other-fluid replacements must continue to the normal placement
-        // path so displacement logic can preserve both the block and the water.
-        if (oldProjection && !newProjection && !newState.isAir()) {
-            return MutationDecision.CONTINUE;
-        }
         if (!level.getServer().isSameThread()) {
             ModConstants.LOGGER.warn(
                     "Rejected off-thread Wilderness water projection mutation at {}",
                     position
             );
             return MutationDecision.REJECTED;
+        }
+        if (!WaterMutationSafety.isReady(level, position, WaterMutationSafety.CALLBACK_RADIUS)) {
+            return MutationDecision.REJECTED;
+        }
+
+        // Provisional player placements are handled by the accepted placement
+        // event. Direct writes have no such event: commit the solid first, then
+        // conserve its displaced parcel. A failed block write changes no volume.
+        if (oldProjection && !newProjection && !newState.isAir()
+                && !newState.canBeReplaced() && !newState.getFluidState().is(FluidTags.WATER)
+                && !newState.getCollisionShape(level, position).isEmpty()) {
+            int previousDepth = RECONCILIATION_DEPTH.get();
+            RECONCILIATION_DEPTH.set(previousDepth + 1);
+            try {
+                if (!WaterMutationSafety.withLoadedShapeContext(level,
+                        () -> level.setBlock(position, newState, flags, recursionLeft))) {
+                    return MutationDecision.REJECTED;
+                }
+                CanonicalWater.displaceForSolidPlacement(level, position, oldState, newState);
+                WildernessFluidRegistry.notifyTerrainChanged(level, position);
+                return MutationDecision.COMMITTED;
+            } finally {
+                restoreDepth(previousDepth);
+            }
+        }
+        if (!compatibilityEnabled.getAsBoolean()
+                || (oldProjection && !newProjection && !newState.isAir())) {
+            return commitPhysicalWrite(level, position, newState, flags, recursionLeft);
         }
 
         WildernessWaterAuthority.CellAuthority authority =
@@ -132,7 +169,10 @@ public final class WorldFluidMutationReconciler {
                 ? WildernessWaterAuthority.volumeUnitsFromFluid(newState.getFluidState())
                 : 0L;
         if (currentUnits == targetUnits) {
-            return MutationDecision.CONTINUE;
+            // A deferred cell can already own the target volume while its old
+            // physical projection differs. Protect that no-delta write too.
+            return oldState.equals(newState) ? MutationDecision.CONTINUE
+                    : commitPhysicalWrite(level, position, newState, flags, recursionLeft);
         }
 
         long deltaUnits = Math.abs(targetUnits - currentUnits);
@@ -166,6 +206,19 @@ public final class WorldFluidMutationReconciler {
                 );
             }
             return MutationDecision.REJECTED;
+        } finally {
+            restoreDepth(previousDepth);
+        }
+    }
+
+    private static MutationDecision commitPhysicalWrite(ServerLevel level, BlockPos position,
+            BlockState newState, int flags, int recursionLeft) {
+        int previousDepth = RECONCILIATION_DEPTH.get();
+        RECONCILIATION_DEPTH.set(previousDepth + 1);
+        try {
+            return WaterMutationSafety.withLoadedShapeContext(level,
+                    () -> level.setBlock(position, newState, flags, recursionLeft))
+                    ? MutationDecision.COMMITTED : MutationDecision.REJECTED;
         } finally {
             restoreDepth(previousDepth);
         }

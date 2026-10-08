@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.vegetation.network;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.environment.api.EnvironmentDimensionProfile;
 import com.thunder.wildernessodysseyapi.vegetation.api.VegetationClimateState;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -40,6 +41,9 @@ public final class ReactiveVegetationSyncService {
     /** Sends the current state only after NeoForge reports that vanilla sent the chunk. */
     @SubscribeEvent
     public static void onChunkSent(ChunkWatchEvent.Sent event) {
+        if (!EnvironmentDimensionProfile.forDimension(event.getLevel().dimension()).reactiveVegetation()) {
+            return;
+        }
         var existing = event.getChunk().getExistingData(ModAttachments.REACTIVE_VEGETATION);
         if (existing.isEmpty()) {
             // Absence already renders as the neutral climate on the client, so
@@ -65,6 +69,9 @@ public final class ReactiveVegetationSyncService {
             VegetationClimateState previous,
             VegetationClimateState current
     ) {
+        if (!EnvironmentDimensionProfile.forDimension(level.dimension()).reactiveVegetation()) {
+            return;
+        }
         if (!shouldSynchronize(previous, current)) {
             UNCHANGED_SKIPPED.incrementAndGet();
             logDiagnosticsIfDue();

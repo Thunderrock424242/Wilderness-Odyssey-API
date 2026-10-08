@@ -18,6 +18,7 @@ import com.thunder.wildernessodysseyapi.ecosystem.group.GroupRole;
 import com.thunder.wildernessodysseyapi.ecosystem.service.EcosystemServices;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
 import com.thunder.wildernessodysseyapi.ecosystem.state.AnimalNeedsState;
+import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemParticipation;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
@@ -66,7 +67,7 @@ public final class EcosystemBehaviorGoal extends Goal {
     public boolean canUse() {
         if (!(animal.level() instanceof ServerLevel level)
                 || !animal.isAlive()
-                || !EcosystemConfig.ENABLED.get()) {
+                || !EcosystemParticipation.isEnabled(level)) {
             return false;
         }
         long gameTime = level.getGameTime();
@@ -245,9 +246,9 @@ public final class EcosystemBehaviorGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         return animal.isAlive()
-                && EcosystemConfig.ENABLED.get()
-                && needs.behavior() != EcosystemBehaviorState.IDLE
-                && animal.level() instanceof ServerLevel;
+                && animal.level() instanceof ServerLevel level
+                && EcosystemParticipation.isEnabled(level)
+                && needs.behavior() != EcosystemBehaviorState.IDLE;
     }
 
     @Override
@@ -280,7 +281,8 @@ public final class EcosystemBehaviorGoal extends Goal {
 
     @Override
     public void tick() {
-        if (!(animal.level() instanceof ServerLevel level) || activeProfile == null) {
+        if (!(animal.level() instanceof ServerLevel level)
+                || !EcosystemParticipation.isEnabled(level) || activeProfile == null) {
             needs.idle();
             return;
         }

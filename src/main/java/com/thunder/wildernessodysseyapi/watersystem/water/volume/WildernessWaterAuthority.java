@@ -556,7 +556,10 @@ public final class WildernessWaterAuthority {
         if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
             return null;
         }
-        LevelChunk chunk = level.getChunkAt(pos);
+        LevelChunk chunk = level instanceof ServerLevel serverLevel
+                ? serverLevel.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4)
+                : level.getChunkAt(pos);
+        if (chunk == null) return null;
         return chunk.getExistingData(ModAttachments.GENERATED_WATER)
                 .map(generated -> generated.spanAt(pos))
                 .orElse(null);

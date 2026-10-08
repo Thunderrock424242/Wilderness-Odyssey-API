@@ -1,7 +1,6 @@
 package com.thunder.wildernessodysseyapi.meteor.worldgen;
 
 import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyBlocks;
-import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteServices;
 import com.thunder.wildernessodysseyapi.util.SimplexNoise;
 import net.minecraft.core.BlockPos;
@@ -14,6 +13,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
 public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
 
@@ -42,50 +43,60 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
 
     @Override
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> ctx) {
-        WorldGenLevel world  = ctx.level();
-        BlockPos      origin = ctx.origin();
-        RandomSource  rng    = ctx.random();
-
-        // ---- Size parameters ----
-        int craterRadius = 60 + rng.nextInt(66);         // 60–125 blocks
-        int bowlDepth    = craterRadius / 5 + rng.nextInt(8); // ~15–33 blocks
-        int rimHeight    = 8 + rng.nextInt(13);          // 8–20 blocks
-        int ejectaRange  = (int)(craterRadius * 0.4) + rng.nextInt(20);
-
-        BlockPos center = snapToSurface(world, origin);
-
-        long seed = (long) center.getX() * 341873128712L ^ (long) center.getZ() * 132897987541L;
-        SimplexNoise noise = new SimplexNoise(seed);
-
-        ModConstants.LOGGER.info("Generating meteor impact at {} radius={}", center, craterRadius);
-
-        // ---- Generation passes ----
-        excavateBowl(world, center, craterRadius, bowlDepth, noise);
-        buildRim(world, center, craterRadius, rimHeight, noise, rng);
-        resurfaceBowlFloor(world, center, craterRadius, rng);
-        placeMeteorFragment(world, center, craterRadius, bowlDepth, noise, rng);
-        placeLavaPools(world, center, craterRadius, rng, noise);
-        placeEjecta(world, center, craterRadius, ejectaRange, rng, noise);
-        ageSite(world, center, craterRadius, rimHeight, noise, rng);
-        carveUndergroundCave(world, center, craterRadius, bowlDepth);
-
-        // ---- Persist site for radiation system ----
-        if (world instanceof ServerLevel serverLevel) {
-            MeteorSiteServices.recordGeneratedSite(serverLevel, center, craterRadius);
+        WorldGenLevel level = ctx.level();
+        MeteorCraterPlan proposed = MeteorCraterPlan.create(ctx.origin(), ctx.random());
+        BoundingBox bounds = proposed.bounds(level.getMinBuildHeight(), level.getMaxBuildHeight() - 1);
+        // The legacy resource ID remains available, but cannot partly modify a
+        // normal feature region. Natural large craters use structure pieces.
+        for (int chunkX = bounds.minX() >> 4; chunkX <= bounds.maxX() >> 4; chunkX++) {
+            for (int chunkZ = bounds.minZ() >> 4; chunkZ <= bounds.maxZ() >> 4; chunkZ++) {
+                BlockPos check = new BlockPos(chunkX * 16, ctx.origin().getY(), chunkZ * 16);
+                if (!level.ensureCanWrite(check)
+                        || level instanceof ServerLevel server && !server.hasChunk(chunkX, chunkZ)) {
+                    return false;
+                }
+            }
         }
-
+        BlockPos center = new BlockPos(ctx.origin().getX(),
+                level.getHeight(Heightmap.Types.WORLD_SURFACE, ctx.origin().getX(), ctx.origin().getZ()) - 1,
+                ctx.origin().getZ());
+        MeteorCraterPlan plan = new MeteorCraterPlan(center, proposed.radius(), proposed.depth(),
+                proposed.rimHeight(), proposed.ejectaRange(), proposed.seed());
+        placeChunk(level, plan, bounds);
+        if (level instanceof ServerLevel serverLevel) {
+            MeteorSiteServices.recordGeneratedSite(serverLevel, center, plan.radius());
+        }
         return true;
+    }
+
+    /** Applies only the supplied chunk slice of a persisted structure plan. */
+    public void placeChunk(WorldGenLevel level, MeteorCraterPlan plan, BoundingBox clip) {
+        MeteorPlacementContext world = new MeteorPlacementContext(level, plan, clip);
+        BlockPos center = plan.center();
+        SimplexNoise noise = new SimplexNoise(plan.seed());
+        long chunkSalt = ((long) clip.minX() << 32) ^ (clip.minZ() & 0xFFFFFFFFL);
+        excavateBowl(world, center, plan.radius(), plan.depth(), noise);
+        buildRim(world, center, plan.radius(), plan.rimHeight(), noise,
+                RandomSource.create(plan.seed() ^ chunkSalt ^ 1L));
+        resurfaceBowlFloor(world, center, plan.radius(), RandomSource.create(plan.seed() ^ chunkSalt ^ 2L));
+        placeMeteorFragment(world, center, plan.radius(), plan.depth(), noise,
+                RandomSource.create(plan.seed() ^ chunkSalt ^ 3L));
+        placeLavaPools(world, center, plan.radius(), RandomSource.create(plan.seed() ^ 4L), noise);
+        placeEjecta(world, center, plan.radius(), plan.ejectaRange(), RandomSource.create(plan.seed() ^ 5L), noise);
+        ageSite(world, center, plan.radius(), plan.rimHeight(), noise,
+                RandomSource.create(plan.seed() ^ chunkSalt ^ 6L));
+        carveUndergroundCave(world, center, plan.radius(), plan.depth());
     }
 
     // =========================================================
     //  PASS 1 — Excavate the bowl
     // =========================================================
-    private void excavateBowl(WorldGenLevel world, BlockPos center,
+    private void excavateBowl(MeteorPlacementContext world, BlockPos center,
                                int craterRadius, int bowlDepth, SimplexNoise noise) {
         long r2 = (long) craterRadius * craterRadius;
 
-        for (int x = -craterRadius; x <= craterRadius; x++) {
-            for (int z = -craterRadius; z <= craterRadius; z++) {
+        for (int x = world.minimumX(craterRadius); x <= world.maximumX(craterRadius); x++) {
+            for (int z = world.minimumZ(craterRadius); z <= world.maximumZ(craterRadius); z++) {
                 long distSq = (long) x * x + (long) z * z;
                 if (distSq > r2) continue;
 
@@ -109,13 +120,14 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
     // =========================================================
     //  PASS 2 — Build raised rim (Barringer-style ejecta wall)
     // =========================================================
-    private void buildRim(WorldGenLevel world, BlockPos center,
+    private void buildRim(MeteorPlacementContext world, BlockPos center,
                           int craterRadius, int rimHeight,
                           SimplexNoise noise, RandomSource rng) {
         int rimWidth = rimHeight + 6;
 
-        for (int x = -(craterRadius + rimWidth); x <= craterRadius + rimWidth; x++) {
-            for (int z = -(craterRadius + rimWidth); z <= craterRadius + rimWidth; z++) {
+        int range = Math.min(world.plan.footprintRadius(), craterRadius + rimWidth);
+        for (int x = world.minimumX(range); x <= world.maximumX(range); x++) {
+            for (int z = world.minimumZ(range); z <= world.maximumZ(range); z++) {
                 double dist = Math.sqrt((double) x * x + (double) z * z);
                 if (dist < craterRadius - 2 || dist > craterRadius + rimWidth) continue;
 
@@ -148,11 +160,11 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
     // =========================================================
     //  PASS 3 — Re-surface the bowl floor
     // =========================================================
-    private void resurfaceBowlFloor(WorldGenLevel world, BlockPos center,
+    private void resurfaceBowlFloor(MeteorPlacementContext world, BlockPos center,
                                     int craterRadius, RandomSource rng) {
         long r2 = (long) craterRadius * craterRadius;
-        for (int x = -craterRadius; x <= craterRadius; x++) {
-            for (int z = -craterRadius; z <= craterRadius; z++) {
+        for (int x = world.minimumX(craterRadius); x <= world.maximumX(craterRadius); x++) {
+            for (int z = world.minimumZ(craterRadius); z <= world.maximumZ(craterRadius); z++) {
                 if ((long) x * x + (long) z * z > r2) continue;
                 int surfY  = getSurfaceY(world, center.getX() + x, center.getZ() + z);
                 int layers = 1 + rng.nextInt(3);
@@ -170,12 +182,15 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
     // =========================================================
     //  PASS 4 — Meteor fragment spire at center
     // =========================================================
-    private void placeMeteorFragment(WorldGenLevel world, BlockPos center,
+    private void placeMeteorFragment(MeteorPlacementContext world, BlockPos center,
                                      int craterRadius, int bowlDepth,
                                      SimplexNoise noise, RandomSource rng) {
-        int spireHeight    = 5 + rng.nextInt(11);
-        int spireBaseWidth = 6 + rng.nextInt(5);
-        int surfY = getSurfaceY(world, center.getX(), center.getZ());
+        // Every slice samples the same geometry before any local palette draws.
+        RandomSource geometry = RandomSource.create(world.plan.seed() ^ 3L);
+        int spireHeight    = 5 + geometry.nextInt(11);
+        int spireBaseWidth = 6 + geometry.nextInt(5);
+        int rootDepth = 4 + geometry.nextInt(5);
+        int surfY = center.getY() - bowlDepth - 2;
 
         // Above-ground spire
         for (int dy = 0; dy <= spireHeight; dy++) {
@@ -183,8 +198,8 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
             double radius  = spireBaseWidth * (1.0 - progress * 0.85);
             int ir = (int) Math.ceil(radius);
 
-            for (int x = -ir; x <= ir; x++) {
-                for (int z = -ir; z <= ir; z++) {
+            for (int x = world.minimumX(ir); x <= world.maximumX(ir); x++) {
+                for (int z = world.minimumZ(ir); z <= world.maximumZ(ir); z++) {
                     double nv  = noise.fractal(x * 0.3 + dy * 0.15, z * 0.3 + dy * 0.15, 2, 0.5);
                     double effR = radius * (0.7 + nv * 0.4);
                     if ((double) x * x + (double) z * z > effR * effR) continue;
@@ -195,12 +210,11 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
         }
 
         // Buried root
-        int rootDepth = 4 + rng.nextInt(5);
         for (int dy = 1; dy <= rootDepth; dy++) {
             int r = spireBaseWidth - dy;
             if (r <= 0) break;
-            for (int x = -r; x <= r; x++) {
-                for (int z = -r; z <= r; z++) {
+            for (int x = world.minimumX(r); x <= world.maximumX(r); x++) {
+                for (int z = world.minimumZ(r); z <= world.maximumZ(r); z++) {
                     if ((double) x * x + (double) z * z > (double) r * r * 1.2) continue;
                     world.setBlock(
                         new BlockPos(center.getX() + x, surfY - dy, center.getZ() + z),
@@ -225,7 +239,7 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
     // =========================================================
     //  PASS 5 — Lava pools
     // =========================================================
-    private void placeLavaPools(WorldGenLevel world, BlockPos center,
+    private void placeLavaPools(MeteorPlacementContext world, BlockPos center,
                                 int craterRadius, RandomSource rng, SimplexNoise noise) {
         int poolCount = 2 + rng.nextInt(4);
 
@@ -234,7 +248,6 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
             double dist  = rng.nextDouble() * craterRadius * 0.6;
             int px = (int)(Math.cos(angle) * dist);
             int pz = (int)(Math.sin(angle) * dist);
-            int py = getSurfaceY(world, center.getX() + px, center.getZ() + pz);
             int poolR = 2 + rng.nextInt(5);
 
             for (int x = -poolR; x <= poolR; x++) {
@@ -242,6 +255,10 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
                     double nv  = noise.noise(px * 0.1 + x * 0.2, pz * 0.1 + z * 0.2);
                     double eff = poolR * (0.8 + nv * 0.3);
                     if ((double) x * x + (double) z * z > eff * eff) continue;
+                    int worldX = center.getX() + px + x;
+                    int worldZ = center.getZ() + pz + z;
+                    if (!world.containsColumn(worldX, worldZ)) continue;
+                    int py = getSurfaceY(world, worldX, worldZ);
 
                     world.setBlock(new BlockPos(center.getX() + px + x, py - 1, center.getZ() + pz + z), MAGMA, Block.UPDATE_CLIENTS);
                     world.setBlock(new BlockPos(center.getX() + px + x, py,     center.getZ() + pz + z), LAVA,  Block.UPDATE_CLIENTS);
@@ -253,7 +270,7 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
     // =========================================================
     //  PASS 6 — Ejecta debris field
     // =========================================================
-    private void placeEjecta(WorldGenLevel world, BlockPos center,
+    private void placeEjecta(MeteorPlacementContext world, BlockPos center,
                               int craterRadius, int ejectaRange,
                               RandomSource rng, SimplexNoise noise) {
         int debrisCount = 200 + rng.nextInt(200);
@@ -269,14 +286,14 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
             int dz = (int)(Math.sin(angle) * dist);
             int worldX = center.getX() + dx;
             int worldZ = center.getZ() + dz;
-            int surfY  = getSurfaceY(world, worldX, worldZ);
-
             int boulderSize = 1 + rng.nextInt(4);
             for (int b = 0; b < boulderSize; b++) {
                 int bx = worldX + rng.nextInt(3) - 1;
                 int bz = worldZ + rng.nextInt(3) - 1;
+                BlockState debris = rng.nextInt(3) == 0 ? COBBLE : STONE;
+                if (!world.containsColumn(bx, bz)) continue;
                 int by = getSurfaceY(world, bx, bz) + 1;
-                world.setBlock(new BlockPos(bx, by, bz), rng.nextInt(3) == 0 ? COBBLE : STONE, Block.UPDATE_CLIENTS);
+                world.setBlock(new BlockPos(bx, by, bz), debris, Block.UPDATE_CLIENTS);
             }
         }
     }
@@ -284,13 +301,13 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
     // =========================================================
     //  PASS 7 — Age the site (50 years of regrowth)
     // =========================================================
-    private void ageSite(WorldGenLevel world, BlockPos center,
+    private void ageSite(MeteorPlacementContext world, BlockPos center,
                          int craterRadius, int rimHeight,
                          SimplexNoise noise, RandomSource rng) {
-        int totalRange = craterRadius + rimHeight + 8;
+        int totalRange = Math.min(world.plan.footprintRadius(), craterRadius + rimHeight + 8);
 
-        for (int x = -totalRange; x <= totalRange; x++) {
-            for (int z = -totalRange; z <= totalRange; z++) {
+        for (int x = world.minimumX(totalRange); x <= world.maximumX(totalRange); x++) {
+            for (int z = world.minimumZ(totalRange); z <= world.maximumZ(totalRange); z++) {
                 double dist  = Math.sqrt((double) x * x + (double) z * z);
                 int worldX   = center.getX() + x;
                 int worldZ   = center.getZ() + z;
@@ -332,18 +349,18 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
     // =========================================================
     //  PASS 8 — Underground cave void
     // =========================================================
-    private void carveUndergroundCave(WorldGenLevel world, BlockPos center,
+    private void carveUndergroundCave(MeteorPlacementContext world, BlockPos center,
                                        int craterRadius, int bowlDepth) {
         int caveRadius  = craterRadius / 3;
-        int surfY       = getSurfaceY(world, center.getX(), center.getZ());
+        int surfY       = center.getY() - bowlDepth - 2;
         int caveDepth   = bowlDepth + 8 + caveRadius;
         int caveCenterY = surfY - caveDepth;
         int r2          = caveRadius * caveRadius;
 
         // Flattened ellipsoid
-        for (int x = -caveRadius; x <= caveRadius; x++) {
+        for (int x = world.minimumX(caveRadius); x <= world.maximumX(caveRadius); x++) {
             for (int y = -(caveRadius / 2); y <= caveRadius / 2; y++) {
-                for (int z = -caveRadius; z <= caveRadius; z++) {
+                for (int z = world.minimumZ(caveRadius); z <= world.maximumZ(caveRadius); z++) {
                     double check = (double) x * x + (double) y * y * 4.0 + (double) z * z;
                     if (check > r2) continue;
                     world.setBlock(new BlockPos(center.getX() + x, caveCenterY + y, center.getZ() + z), AIR, Block.UPDATE_CLIENTS);
@@ -352,17 +369,20 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
         }
 
         // 1–3 crack tunnels to the surface
-        int crackCount = 1 + (int)(Math.random() * 2);
+        int crackCount = 1 + RandomSource.create(world.plan.seed() ^ 7L).nextInt(2);
         for (int c = 0; c < crackCount; c++) {
             double angle = c * (Math.PI * 2.0 / crackCount) + Math.PI / 6;
             int crackX = (int)(Math.cos(angle) * caveRadius * 0.5);
             int crackZ = (int)(Math.sin(angle) * caveRadius * 0.5);
-            int topY   = getSurfaceY(world, center.getX() + crackX, center.getZ() + crackZ);
-
-            for (int y = caveCenterY + caveRadius / 2; y <= topY; y++) {
-                world.setBlock(new BlockPos(center.getX() + crackX, y, center.getZ() + crackZ), AIR, Block.UPDATE_CLIENTS);
-                if (y % 3 == 0) {
-                    world.setBlock(new BlockPos(center.getX() + crackX + 1, y, center.getZ() + crackZ), AIR, Block.UPDATE_CLIENTS);
+            for (int width = 0; width <= 1; width++) {
+                int worldX = center.getX() + crackX + width;
+                int worldZ = center.getZ() + crackZ;
+                if (!world.containsColumn(worldX, worldZ)) continue;
+                int topY = getSurfaceY(world, worldX, worldZ);
+                for (int y = caveCenterY + caveRadius / 2; y <= topY; y++) {
+                    if (width == 0 || y % 3 == 0) {
+                        world.setBlock(new BlockPos(worldX, y, worldZ), AIR, Block.UPDATE_CLIENTS);
+                    }
                 }
             }
         }
@@ -371,20 +391,11 @@ public class MeteorFeature extends Feature<NoneFeatureConfiguration> {
     // =========================================================
     //  Helpers
     // =========================================================
-    private BlockPos snapToSurface(WorldGenLevel world, BlockPos pos) {
-        int y = getSurfaceY(world, pos.getX(), pos.getZ());
-        return new BlockPos(pos.getX(), y, pos.getZ());
+    private int getSurfaceY(MeteorPlacementContext world, int x, int z) {
+        return world.surfaceY(x, z);
     }
 
-    private int getSurfaceY(WorldGenLevel world, int x, int z) {
-        int y = world.getMaxBuildHeight() - 1;
-        while (y > world.getMinBuildHeight() && world.getBlockState(new BlockPos(x, y, z)).isAir()) {
-            y--;
-        }
-        return y;
-    }
-
-    private void setIfReplaceable(WorldGenLevel world, BlockPos pos, BlockState state) {
+    private void setIfReplaceable(MeteorPlacementContext world, BlockPos pos, BlockState state) {
         BlockState existing = world.getBlockState(pos);
         if (existing.isAir()
             || existing.is(Blocks.GRASS_BLOCK)

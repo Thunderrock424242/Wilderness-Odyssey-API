@@ -65,16 +65,14 @@ public final class ClientGlacialState {
         DIRTY_KEYS.remove(key);
     }
 
-    /** Returns one unique chunk queued for surface section rebuilding. */
+    /** Inspects at most one queued entry, so unloaded chunks also consume the tick budget. */
     public static Long pollDirty(ClientLevel level) {
         if (activeLevel != level) {
             return null;
         }
-        Long key;
-        while ((key = DIRTY.poll()) != null) {
-            if (DIRTY_KEYS.remove(key) && GLACIAL_CHUNKS.contains(key)) {
-                return key;
-            }
+        Long key = DIRTY.poll();
+        if (key != null && DIRTY_KEYS.remove(key) && GLACIAL_CHUNKS.contains(key)) {
+            return key;
         }
         return null;
     }

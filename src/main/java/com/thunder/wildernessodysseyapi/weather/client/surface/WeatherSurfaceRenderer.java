@@ -11,11 +11,16 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Comparator;
+import java.util.function.IntBinaryOperator;
 
 /**
  * Draws bounded wetness, puddle and cosmetic snow contours from synchronized surface memory.
@@ -30,6 +35,9 @@ public final class WeatherSurfaceRenderer {
     private static final long PUDDLE_SALT = 0xC2B2AE3D27D4EB4FL;
     private static final long SNOW_SALT = 0xD6E8FEB86659FD93L;
     private static final List<SurfaceTriangle> TRIANGLES = new ArrayList<>();
+    private static final SurfaceHeightCache HEIGHTS = new SurfaceHeightCache();
+    private static final SurfaceCandidateScan CANDIDATES = new SurfaceCandidateScan();
+    private static final Map<Long, List<SurfaceTriangle>> PATCHES = new HashMap<>();
 
     private static ClientLevel cachedLevel;
     private static int cachedX = Integer.MIN_VALUE;
@@ -93,6 +101,9 @@ public final class WeatherSurfaceRenderer {
     /** Clears cached terrain samples on disconnect and dimension changes. */
     public static void clear() {
         TRIANGLES.clear();
+        HEIGHTS.clear();
+        CANDIDATES.clear();
+        PATCHES.clear();
         cachedLevel = null;
         cachedX = Integer.MIN_VALUE;
         cachedZ = Integer.MIN_VALUE;
@@ -113,6 +124,11 @@ public final class WeatherSurfaceRenderer {
                 && tick - cachedTick < 10L) {
             return;
         }
+        if (cachedLevel != level) {
+            HEIGHTS.clear();
+            CANDIDATES.clear();
+            PATCHES.clear();
+        }
         cachedLevel = level;
         cachedX = centerX;
         cachedZ = centerZ;
@@ -121,111 +137,93 @@ public final class WeatherSurfaceRenderer {
 
         int radius = settings.surfaceOverlayRadiusBlocks();
         int maximumCells = settings.maximumSurfacePatches();
-        int minimumX = centerX - radius - 1;
-        int minimumZ = centerZ - radius - 1;
-        int diameter = radius * 2 + 3;
-        int[] heights = sampleHeights(level, minimumX, minimumZ, diameter);
+        int terrainBudget = Math.min(4096, Math.max(256, maximumCells * 5));
+        int candidateBudget = Math.min(4096, Math.max(256, maximumCells * 4));
+        HEIGHTS.beginRefresh(centerX, centerZ, radius, tick, terrainBudget);
+        CANDIDATES.configure(centerX, centerZ, radius);
+        PATCHES.keySet().removeIf(key -> distanceSquared(key, centerX, centerZ) > (long) radius * radius);
+        BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
+        IntBinaryOperator sampleHeight = (x, z) -> {
+            probe.set(x, 64, z);
+            return level.hasChunkAt(probe)
+                    ? level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z)
+                    : Integer.MIN_VALUE;
+        };
+        int terrainCandidates = 0;
+        BlockPos.MutableBlockPos ground = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos sky = new BlockPos.MutableBlockPos();
+        // Keep published patches between bounded scans. Resuming the next
+        // candidate reaches outer wet terrain even when nearby columns are dry.
+        for (int candidate = 0; candidate < Math.min(candidateBudget, CANDIDATES.size())
+                && !HEIGHTS.exhausted(); candidate++) {
+            var column = CANDIDATES.next();
+            int x = column.x();
+            int z = column.z();
+            long key = ChunkPos.asLong(x, z);
+            PATCHES.remove(key);
+            TRIANGLES.clear();
+            terrainCandidates++;
+            int y = HEIGHTS.height(x, z, sampleHeight);
+            if (y == Integer.MIN_VALUE) {
+                continue;
+            }
+            ground.set(x, y - 1, z);
+            sky.set(x, y, z);
+            var blockState = level.getBlockState(ground);
+            if (!level.getFluidState(ground).isEmpty()
+                    || !blockState.isFaceSturdy(level, ground, Direction.UP)
+                    || !level.canSeeSky(sky)) {
+                continue;
+            }
+
+            WeatherSample sample = ClientWeatherCoordinator.sampleAt(level, sky);
+            SurfaceWeatherState surface = sample.surface();
+            if (surface.wetness() < 0.08D && surface.puddleCoverage() < 0.04D
+                    && surface.snowpack() < 0.025D) continue;
+            int north = HEIGHTS.height(x, z - 1, sampleHeight);
+            int east = HEIGHTS.height(x + 1, z, sampleHeight);
+            int south = HEIGHTS.height(x, z + 1, sampleHeight);
+            int west = HEIGHTS.height(x - 1, z, sampleHeight);
+            boolean wetSuitable = surface.wetness() >= 0.08D
+                    && SurfacePatchModel.flatEnough(y, north, east, south, west, 1);
+            boolean puddleSuitable = surface.puddleCoverage() >= 0.04D
+                    && SurfacePatchModel.flatEnough(y, north, east, south, west, 0);
+            boolean snowSuitable = surface.snowpack() >= 0.025D
+                    && SurfacePatchModel.flatEnough(y, north, east, south, west, 1);
+            if (wetSuitable) {
+                appendContour(x, y, z, surface.wetness(), SurfaceKind.WET, WET_SALT);
+            }
+            if (puddleSuitable) {
+                appendContour(x, y, z, surface.puddleCoverage(), SurfaceKind.PUDDLE, PUDDLE_SALT);
+            }
+            if (snowSuitable) {
+                appendContour(x, y, z, surface.snowpack(), SurfaceKind.SNOW, SNOW_SALT);
+            }
+            if (!TRIANGLES.isEmpty()) PATCHES.put(key, List.copyOf(TRIANGLES));
+        }
+        List<Long> published = PATCHES.keySet().stream()
+                .sorted(Comparator.<Long>comparingLong(key -> distanceSquared(key, centerX, centerZ))
+                        .thenComparingLong(Long::longValue)).limit(maximumCells).toList();
+        PATCHES.keySet().retainAll(new java.util.HashSet<>(published));
+        TRIANGLES.clear();
         int wetCells = 0;
         int puddleCells = 0;
         int snowCells = 0;
-        int surfaceCells = 0;
-        BlockPos.MutableBlockPos ground = new BlockPos.MutableBlockPos();
-        BlockPos.MutableBlockPos sky = new BlockPos.MutableBlockPos();
-        // Center-out square rings keep a reduced patch budget distributed around
-        // the camera instead of cutting off one side in scan-line order.
-        for (int ring = 0; ring <= radius && surfaceCells < maximumCells; ring++) {
-            for (int deltaZ = -ring; deltaZ <= ring && surfaceCells < maximumCells; deltaZ++) {
-                for (int deltaX = -ring; deltaX <= ring && surfaceCells < maximumCells; deltaX++) {
-                    if (Math.max(Math.abs(deltaX), Math.abs(deltaZ)) != ring) {
-                        continue;
-                    }
-                    int x = centerX + deltaX;
-                    int z = centerZ + deltaZ;
-                    if ((long) deltaX * deltaX + (long) deltaZ * deltaZ > (long) radius * radius) {
-                        continue;
-                    }
-                    int localX = x - minimumX;
-                    int localZ = z - minimumZ;
-                    int y = heightAt(heights, diameter, localX, localZ);
-                    if (y == Integer.MIN_VALUE) {
-                        continue;
-                    }
-                    ground.set(x, y - 1, z);
-                    sky.set(x, y, z);
-                    var blockState = level.getBlockState(ground);
-                    if (!level.getFluidState(ground).isEmpty()
-                            || !blockState.isFaceSturdy(level, ground, Direction.UP)
-                            || !level.canSeeSky(sky)) {
-                        continue;
-                    }
-
-                    WeatherSample sample = ClientWeatherCoordinator.sampleAt(level, sky);
-                    SurfaceWeatherState surface = sample.surface();
-                    int north = heightAt(heights, diameter, localX, localZ - 1);
-                    int east = heightAt(heights, diameter, localX + 1, localZ);
-                    int south = heightAt(heights, diameter, localX, localZ + 1);
-                    int west = heightAt(heights, diameter, localX - 1, localZ);
-                    boolean wetSuitable = surface.wetness() >= 0.08D
-                            && SurfacePatchModel.flatEnough(y, north, east, south, west, 1);
-                    boolean puddleSuitable = surface.puddleCoverage() >= 0.04D
-                            && SurfacePatchModel.flatEnough(y, north, east, south, west, 0);
-                    boolean snowSuitable = surface.snowpack() >= 0.025D
-                            && SurfacePatchModel.flatEnough(y, north, east, south, west, 1);
-                    boolean added = false;
-                    if (wetSuitable) {
-                        int before = TRIANGLES.size();
-                        appendContour(x, y, z, surface.wetness(), SurfaceKind.WET, WET_SALT);
-                        if (TRIANGLES.size() > before) {
-                            wetCells++;
-                            added = true;
-                        }
-                    }
-                    if (puddleSuitable) {
-                        int before = TRIANGLES.size();
-                        appendContour(x, y, z, surface.puddleCoverage(), SurfaceKind.PUDDLE, PUDDLE_SALT);
-                        if (TRIANGLES.size() > before) {
-                            puddleCells++;
-                            added = true;
-                        }
-                    }
-                    if (snowSuitable) {
-                        int before = TRIANGLES.size();
-                        appendContour(x, y, z, surface.snowpack(), SurfaceKind.SNOW, SNOW_SALT);
-                        if (TRIANGLES.size() > before) {
-                            snowCells++;
-                            added = true;
-                        }
-                    }
-                    if (added) {
-                        surfaceCells++;
-                    }
-                }
-            }
+        for (long key : published) {
+            List<SurfaceTriangle> triangles = PATCHES.get(key);
+            if (triangles.stream().anyMatch(triangle -> triangle.kind == SurfaceKind.WET)) wetCells++;
+            if (triangles.stream().anyMatch(triangle -> triangle.kind == SurfaceKind.PUDDLE)) puddleCells++;
+            if (triangles.stream().anyMatch(triangle -> triangle.kind == SurfaceKind.SNOW)) snowCells++;
+            TRIANGLES.addAll(triangles);
         }
-        diagnostics = new Diagnostics(true, wetCells, puddleCells, TRIANGLES.size(), snowCells);
+        diagnostics = new Diagnostics(true, wetCells, puddleCells, TRIANGLES.size(), snowCells,
+                terrainCandidates, HEIGHTS.probesThisRefresh(), HEIGHTS.size());
     }
 
-    private static int[] sampleHeights(ClientLevel level, int minimumX, int minimumZ, int diameter) {
-        int[] heights = new int[diameter * diameter];
-        BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
-        for (int localZ = 0; localZ < diameter; localZ++) {
-            for (int localX = 0; localX < diameter; localX++) {
-                int x = minimumX + localX;
-                int z = minimumZ + localZ;
-                probe.set(x, 64, z);
-                heights[localZ * diameter + localX] = level.hasChunkAt(probe)
-                        ? level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z)
-                        : Integer.MIN_VALUE;
-            }
-        }
-        return heights;
-    }
-
-    private static int heightAt(int[] heights, int diameter, int x, int z) {
-        if (x < 0 || z < 0 || x >= diameter || z >= diameter) {
-            return Integer.MIN_VALUE;
-        }
-        return heights[z * diameter + x];
+    private static long distanceSquared(long key, int x, int z) {
+        long dx = (long) ChunkPos.getX(key) - x;
+        long dz = (long) ChunkPos.getZ(key) - z;
+        return dx * dx + dz * dz;
     }
 
     private static void appendContour(
@@ -272,8 +270,14 @@ public final class WeatherSurfaceRenderer {
     }
 
     /** Renderer facts kept separate from synchronized surface state. */
-    public record Diagnostics(boolean active, int wetCells, int puddleCells, int triangles, int snowCells) {
+    public record Diagnostics(boolean active, int wetCells, int puddleCells, int triangles, int snowCells,
+            int terrainCandidates, int terrainProbes, int cachedHeightColumns) {
         public static final Diagnostics INACTIVE = new Diagnostics(false, 0, 0, 0, 0);
+
+        /** Preserves the previous diagnostics construction shape for integrations. */
+        public Diagnostics(boolean active, int wetCells, int puddleCells, int triangles, int snowCells) {
+            this(active, wetCells, puddleCells, triangles, snowCells, 0, 0, 0);
+        }
 
         /** Preserves the previous diagnostics construction shape for integrations. */
         public Diagnostics(boolean active, int wetCells, int puddleCells, int triangles) {

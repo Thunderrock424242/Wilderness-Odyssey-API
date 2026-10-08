@@ -1,7 +1,9 @@
 package com.thunder.wildernessodysseyapi.vegetation.simulation;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
+import com.thunder.wildernessodysseyapi.environment.api.EnvironmentDimensionProfile;
 import com.thunder.wildernessodysseyapi.vegetation.api.ReactiveVegetationServices;
+import com.thunder.wildernessodysseyapi.vegetation.api.ReactivePlantRegistry;
 import com.thunder.wildernessodysseyapi.vegetation.api.VegetationClimateState;
 import com.thunder.wildernessodysseyapi.vegetation.api.VegetationDisturbanceSample;
 import com.thunder.wildernessodysseyapi.vegetation.config.VegetationConfig;
@@ -15,13 +17,16 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.BushBlock;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.PriorityQueue;
+import java.util.NavigableSet;
+import java.util.TreeSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -42,6 +47,9 @@ public final class ReactiveVegetationScheduler {
 
     /** Adds one promoted server chunk to the staggered due queue. */
     public static void onChunkLoad(ServerLevel level, LevelChunk chunk) {
+        if (!EnvironmentDimensionProfile.forDimension(level.dimension()).reactiveVegetation()) {
+            return;
+        }
         int interval = VegetationConfig.UPDATE_INTERVAL.get();
         RUNTIMES.computeIfAbsent(level, ignored -> new LevelRuntime())
                 .add(chunk.getPos().toLong(), level.getGameTime(), interval);
@@ -57,6 +65,10 @@ public final class ReactiveVegetationScheduler {
 
     /** Advances due loaded chunks under the per-level work cap. */
     public static void tickLevel(ServerLevel level) {
+        if (!EnvironmentDimensionProfile.forDimension(level.dimension()).reactiveVegetation()) {
+            clearLevel(level);
+            return;
+        }
         LevelRuntime runtime = RUNTIMES.computeIfAbsent(level, ignored -> new LevelRuntime());
         long gameTime = level.getGameTime();
         int interval = VegetationConfig.UPDATE_INTERVAL.get();
@@ -139,8 +151,6 @@ public final class ReactiveVegetationScheduler {
                 gameTime
         );
         stored.applyClimate(climate);
-        VegetationDisturbanceSample disturbance = ReactiveVegetationServices.disturbanceAt(
-                level, samplePosition);
 
         int configuredAttempts = VegetationConfig.UPDATES_PER_CHUNK.get();
         int plantsProcessed = 0;
@@ -154,15 +164,11 @@ public final class ReactiveVegetationScheduler {
             );
             int localX = (int) (randomBits & 15L);
             int localZ = (int) ((randomBits >>> 8) & 15L);
-            int y = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX, localZ) - 1;
+            BlockPos position = selectedPosition(chunk, localX, localZ, attempt);
+            int y = position.getY();
             if (y < level.getMinBuildHeight() || y >= level.getMaxBuildHeight()) {
                 continue;
             }
-            BlockPos position = new BlockPos(
-                    chunk.getPos().getMinBlockX() + localX,
-                    y,
-                    chunk.getPos().getMinBlockZ() + localZ
-            );
             BlockState state = chunk.getBlockState(position);
             ReactiveVegetationServices.PlantUpdateResult result =
                     ReactiveVegetationServices.processSelectedPlant(
@@ -181,6 +187,7 @@ public final class ReactiveVegetationScheduler {
             // Regional damage remains stochastic and uses the scheduler's
             // existing bounded sample budget rather than scanning affected blocks.
             double disturbanceRoll = ((randomBits >>> 11) * 0x1.0p-53);
+            VegetationDisturbanceSample disturbance = ReactiveVegetationServices.disturbanceAt(level, position);
             if (disturbance.active()
                     && disturbance.blockDamageAllowed()
                     && disturbanceRoll < disturbance.intensity() * 0.08) {
@@ -204,6 +211,28 @@ public final class ReactiveVegetationScheduler {
         // changes through the dimension-aware tracking payload.
         ReactiveVegetationSyncService.publishIfChanged(level, chunk, previous, climate);
         return new ChunkResult(configuredAttempts, plantsProcessed, blockStateChanges, elapsed);
+    }
+
+    /** Alternates surface plants and a bounded ground probe below foliage. */
+    static BlockPos selectedPosition(ChunkAccess chunk, int localX, int localZ, int attempt) {
+        int x = chunk.getPos().getMinBlockX() + localX;
+        int z = chunk.getPos().getMinBlockZ() + localZ;
+        // ChunkAccess returns the highest occupied block, unlike Level#getHeight.
+        int surfaceY = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX, localZ);
+        if ((attempt & 1) == 0) {
+            return new BlockPos(x, surfaceY, z);
+        }
+        int groundY = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, localX, localZ);
+        int startY = Math.min(surfaceY, groundY + 1);
+        int minimumY = Math.max(chunk.getMinBuildHeight(), startY - 7);
+        for (int y = startY; y >= minimumY; y--) {
+            BlockPos position = new BlockPos(x, y, z);
+            BlockState state = chunk.getBlockState(position);
+            if (state.getBlock() instanceof BushBlock || ReactivePlantRegistry.definition(state).isPresent()) {
+                return position;
+            }
+        }
+        return new BlockPos(x, groundY, z);
     }
 
     private static long mix(long value) {
@@ -238,7 +267,7 @@ public final class ReactiveVegetationScheduler {
 
     static final class LevelRuntime {
         private final Set<Long> loaded = new HashSet<>();
-        private final PriorityQueue<ScheduledChunk> due = new PriorityQueue<>();
+        private final NavigableSet<ScheduledChunk> due = new TreeSet<>();
         private final Map<Long, ScheduledChunk> scheduled = new HashMap<>();
         private int interval = -1;
         private double averageChunkMicros;
@@ -274,13 +303,13 @@ public final class ReactiveVegetationScheduler {
         }
 
         Long pollDue(long gameTime) {
-            ScheduledChunk entry = due.peek();
+            ScheduledChunk entry = due.isEmpty() ? null : due.first();
             if (entry == null || entry.dueTick() > gameTime) {
                 return null;
             }
-            due.remove();
+            due.pollFirst();
             scheduled.remove(entry.chunkKey());
-            return loaded.contains(entry.chunkKey()) ? entry.chunkKey() : pollDue(gameTime);
+            return entry.chunkKey();
         }
 
         private void reschedule(long chunkKey, long dueTick) {

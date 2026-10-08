@@ -13,6 +13,32 @@ class PhysicalAtmosphericExchangeTest {
     private static final AtmosphereCellKey CELL = new AtmosphereCellKey(0, 0);
 
     @Test
+    void disablingCouplingRetainsCommittedRainAcrossRestartWithoutApplyingIt() {
+        var book = book();
+        var flux = new AtmosphericWaterFlux(1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0);
+        book.publishPrecipitation(CELL, 16, flux, 20);
+        var region = new RegionalHydrologyState(CHUNK, 0, 64);
+        assertEquals(0, book.applyPrecipitation(region, false));
+        assertEquals(0, region.totalStored());
+        book = AtmosphericWaterExchange.ReceiptBook.load(book.save());
+        assertEquals(1048576, book.applyPrecipitation(region, true));
+        assertEquals(0, book.applyPrecipitation(region, true));
+        assertEquals(0, region.residualMilliUnits());
+    }
+
+    @Test
+    void disabledCouplingExportsNewRainAndDoesNotCaptureRegionalFeedback() {
+        var book = book();
+        book.publish(CHUNK, 0, 100, 0, 256, 20);
+        assertEquals(AtmosphericWaterExchange.Receipt.EMPTY, book.capture(CELL, 16, false));
+        var flux = new AtmosphericWaterFlux(1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0);
+        assertFalse(book.publishPrecipitation(CELL, 16, flux, 40, false));
+        var region = new RegionalHydrologyState(CHUNK, 0, 64);
+        assertEquals(0, book.applyPrecipitation(region, true));
+        assertEquals(100, book.capture(CELL, 16, true).evaporationMilliUnits());
+    }
+
+    @Test
     void persistedEvaporationReceiptEqualsRegionalDebitAndIsNotCreditedTwice() {
         var region = new RegionalHydrologyState(CHUNK, 0, 64);
         region.credit(HydrologicReservoir.LAKE, 4096000, RegionalHydrologyState.Boundary.PRECIPITATION);

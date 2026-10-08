@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.ecosystem.memory;
 
 import com.thunder.wildernessodysseyapi.ecosystem.api.EnvironmentalContext;
+import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemParticipation;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -31,6 +32,9 @@ public final class EnvironmentalMemoryManager {
     public static Optional<EnvironmentalMemory> getMemory(ServerLevel level, BlockPos position) {
         Objects.requireNonNull(level, "Server level is required");
         Objects.requireNonNull(position, "Memory position is required");
+        if (!EcosystemParticipation.isEnabled(level)) {
+            return Optional.empty();
+        }
         EnvironmentalMemorySavedData data = EnvironmentalMemorySavedData.get(level);
         EnvironmentalMemorySavedData.Settings settings = settings();
         data.pruneOne(level.getGameTime(), settings);
@@ -72,6 +76,11 @@ public final class EnvironmentalMemoryManager {
             throw new IllegalArgumentException("Disturbance amount must be finite and greater than zero");
         }
         DisturbanceSource safeSource = source == null ? DisturbanceSource.OTHER : source;
+        // An inert/disabled ecosystem does not create or change a saved ledger.
+        if (!EcosystemParticipation.isEnabled(level)) {
+            return new EnvironmentalMemory(new ChunkPos(position), 0.0, 0.0, 0.0, 0.0,
+                    level.getGameTime(), level.getGameTime(), 0.0, safeSource, position, sourceId);
+        }
         EnvironmentalMemorySavedData data = EnvironmentalMemorySavedData.get(level);
         EnvironmentalMemorySavedData.Settings settings = settings();
         data.pruneOne(level.getGameTime(), settings);
@@ -90,6 +99,9 @@ public final class EnvironmentalMemoryManager {
     public static boolean clearRegion(ServerLevel level, ChunkPos cell) {
         Objects.requireNonNull(level, "Server level is required");
         Objects.requireNonNull(cell, "Memory cell is required");
+        if (!EcosystemParticipation.isEnabled(level)) {
+            return false;
+        }
         return EnvironmentalMemorySavedData.get(level).clear(cell.toLong());
     }
 
@@ -103,6 +115,9 @@ public final class EnvironmentalMemoryManager {
         Objects.requireNonNull(center, "Region center is required");
         if (chunkRadius < 0 || chunkRadius > 32) {
             throw new IllegalArgumentException("Chunk radius must be between 0 and 32");
+        }
+        if (!EcosystemParticipation.isEnabled(level)) {
+            return 0;
         }
         EnvironmentalMemorySavedData data = EnvironmentalMemorySavedData.get(level);
         ChunkPos origin = new ChunkPos(center);
@@ -120,6 +135,9 @@ public final class EnvironmentalMemoryManager {
     /** Returns the number of currently stored cells in this dimension. */
     public static int getActiveCellCount(ServerLevel level) {
         Objects.requireNonNull(level, "Server level is required");
+        if (!EcosystemParticipation.isEnabled(level)) {
+            return 0;
+        }
         EnvironmentalMemorySavedData data = EnvironmentalMemorySavedData.get(level);
         EnvironmentalMemorySavedData.Settings settings = settings();
         data.pruneOne(level.getGameTime(), settings);
@@ -139,7 +157,7 @@ public final class EnvironmentalMemoryManager {
     ) {
         Objects.requireNonNull(level, "Server level is required");
         Objects.requireNonNull(position, "Query position is required");
-        if (radius <= 0) {
+        if (radius <= 0 || !EcosystemParticipation.isEnabled(level)) {
             return Optional.empty();
         }
         int boundedRadius = Math.min(64, radius);

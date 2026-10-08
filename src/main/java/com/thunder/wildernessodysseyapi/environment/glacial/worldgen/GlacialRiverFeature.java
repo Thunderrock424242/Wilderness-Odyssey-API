@@ -91,14 +91,18 @@ public final class GlacialRiverFeature extends Feature<NoneFeatureConfiguration>
                 int channelX = targetX == startX ? x + offset : x;
                 int channelZ = targetZ == startZ ? z + offset : z;
                 BlockPos top = new BlockPos(channelX, surfaceY, channelZ);
+                int channelY = surfaceY - 1;
+                BlockPos channel = new BlockPos(channelX, channelY, channelZ);
+                BlockPos bed = channel.below();
                 if (structures.contains(top)
+                        || structures.contains(channel)
+                        || structures.contains(bed)
                         || !GlacialFeatureSupport.naturalTerrain(level.getBlockState(top))) {
                     continue;
                 }
-                int channelY = surfaceY - 1;
                 GlacialFeatureSupport.set(level, top, AIR);
-                GlacialFeatureSupport.set(level, new BlockPos(channelX, channelY - 1, channelZ), GRAVEL);
-                GlacialFeatureSupport.set(level, new BlockPos(channelX, channelY, channelZ), WATER);
+                GlacialFeatureSupport.set(level, bed, GRAVEL);
+                GlacialFeatureSupport.set(level, channel, WATER);
                 if (step % 7 == 4 && offset == 0) {
                     GlacialFeatureSupport.set(level, top, PACKED_ICE);
                 }

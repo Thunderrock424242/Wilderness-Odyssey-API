@@ -90,9 +90,11 @@ public final class GlacialCrevasseFeature extends Feature<NoneFeatureConfigurati
                     continue;
                 }
                 int bottomY = Math.max(level.getMinBuildHeight() + 5, surfaceY - localDepth);
+                boolean blockedColumn = false;
                 for (int y = surfaceY; y >= bottomY; y--) {
                     BlockPos position = new BlockPos(x, y, z);
                     if (structures.contains(position)) {
+                        blockedColumn = true;
                         break;
                     }
                     BlockState existing = level.getBlockState(position);
@@ -101,23 +103,33 @@ public final class GlacialCrevasseFeature extends Feature<NoneFeatureConfigurati
                         changes++;
                     }
                     if (Math.abs(side) == localWidth) {
-                        accentWall(level, position.offset(
+                        accentWall(level, structures, position.offset(
                                 (int) Math.signum(side) * (int) Math.round(sideX),
                                 0,
                                 (int) Math.signum(side) * (int) Math.round(sideZ)
                         ), surfaceY - y);
                     }
                 }
-                if (side == 0 && GlacialConfig.ENABLE_GLACIAL_RIVERS.get()
+                BlockPos bottom = new BlockPos(x, bottomY, z);
+                if (!blockedColumn && side == 0 && !structures.contains(bottom)
+                        && GlacialConfig.ENABLE_GLACIAL_RIVERS.get()
                         && random.nextInt(6) == 0) {
-                    GlacialFeatureSupport.set(level, new BlockPos(x, bottomY, z), WATER);
+                    GlacialFeatureSupport.set(level, bottom, WATER);
                 }
             }
         }
         return changes > 0;
     }
 
-    private static void accentWall(WorldGenLevel level, BlockPos position, int depth) {
+    private static void accentWall(
+            WorldGenLevel level,
+            GlacialFeatureSupport.StructureGuard structures,
+            BlockPos position,
+            int depth
+    ) {
+        if (structures.contains(position)) {
+            return;
+        }
         BlockState existing = level.getBlockState(position);
         if (!GlacialFeatureSupport.carvable(existing)) {
             return;

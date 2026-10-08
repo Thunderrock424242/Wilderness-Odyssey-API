@@ -83,7 +83,8 @@ public final class ErosionManager {
     private static void evaluate(ServerLevel level, ErosionSavedData data, Runtime runtime, BlockPos pos, long now) {
         long key = pos.asLong();
         LevelChunk chunk = level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4);
-        if (chunk == null || !safeChunk(level, data, chunk) || !nearPlayer(level, pos)) {
+        if (chunk == null || !safeChunk(level, data, chunk) || !nearPlayer(level, pos)
+                || !com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.WaterMutationSafety.isReady(level, pos, 2)) {
             runtime.exposure.remove(key);
             return;
         }
@@ -118,7 +119,8 @@ public final class ErosionManager {
         exposure.energy = HydrodynamicResponse.accumulate(exposure.energy, pressure, seconds, resistance);
         if (exposure.energy >= resistance && data.canCredit(chunkKey, material)
                 && runtime.budget.allows(now, chunkKey, ErosionConfig.changes())) {
-            if (level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3)) {
+            if (com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.WaterMutationSafety
+                    .setBlock(level, pos, Blocks.AIR.defaultBlockState(), 3)) {
                 data.credit(chunkKey, material);
                 runtime.budget.record(now, chunkKey);
                 runtime.eroded++;
@@ -151,7 +153,8 @@ public final class ErosionManager {
                 || !level.getEntities(null, new net.minecraft.world.phys.AABB(deposit)).isEmpty()
                 || !level.getBlockState(deposit.above()).isAir()
                 || !runtime.budget.allows(now, chunk, ErosionConfig.changes())) return;
-        if (level.setBlock(deposit, material.depositState(), 3)) {
+        if (com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.WaterMutationSafety
+                .setBlock(level, deposit, material.depositState(), 3)) {
             CanonicalWater.displaceForSolidPlacement(level, deposit, previous, material.depositState());
             data.spend(chunk, material);
             runtime.budget.record(now, chunk);

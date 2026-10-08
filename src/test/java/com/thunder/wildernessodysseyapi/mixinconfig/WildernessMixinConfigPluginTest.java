@@ -14,6 +14,12 @@ class WildernessMixinConfigPluginTest {
     private static final String PACKAGE = "com.thunder.wildernessodysseyapi.mixin.";
 
     @Test
+    void sableWaterBridgeIsSkippedWhenSableIsAbsent() {
+        assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
+                PACKAGE + "SableWaterShapeMixin", ignored -> false));
+    }
+
+    @Test
     void missingOptionalTargetsAreSkippedWithoutAClassLoad() {
         assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
                 PACKAGE + "ForwardExtentCopyMixin", ignored -> false));

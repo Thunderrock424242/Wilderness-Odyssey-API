@@ -81,10 +81,6 @@ public final class LocalizedPrecipitationRenderer {
     private static final int[] DISTANT_BOTTOM_Y = new int[MAX_DISTANT_SHAFTS];
     private static final int[] DISTANT_TOP_Y = new int[MAX_DISTANT_SHAFTS];
     private static final float[] DISTANT_INTENSITY = new float[MAX_DISTANT_SHAFTS];
-    private static final float[] DISTANT_TEMPERATURE = new float[MAX_DISTANT_SHAFTS];
-    private static final float[] DISTANT_STORM = new float[MAX_DISTANT_SHAFTS];
-    private static final float[] DISTANT_INSTABILITY = new float[MAX_DISTANT_SHAFTS];
-    private static final PrecipitationType[] DISTANT_TYPE = new PrecipitationType[MAX_DISTANT_SHAFTS];
 
     private static ClientLevel renderedLevel;
     private static int renderColumnCount;
@@ -142,7 +138,7 @@ public final class LocalizedPrecipitationRenderer {
                     cloudHeight,
                     nearRadius
             );
-            appendDistantShafts(camX, camY, camZ, nearRadius, cachedDistantRadius);
+            appendDistantShafts(level, camX, camY, camZ, nearRadius, cachedDistantRadius);
         } else {
             clearDistantCache();
         }
@@ -415,12 +411,8 @@ public final class LocalizedPrecipitationRenderer {
                     continue;
                 }
                 double distance = Math.hypot(blockX + 0.5 - camX, blockZ + 0.5 - camZ);
-                PrecipitationBlend blend = PrecipitationBlend.fromPhase(
-                        type,
-                        cloudField.temperature(),
-                        cloudField.stormEnergy(),
-                        cloudField.instability()
-                );
+                PrecipitationBlend blend = ClientWeatherCoordinator.precipitationBlendAt(
+                        level, blockX + 0.5, blockZ + 0.5);
                 boolean snow = blend.snow() > blend.rain() + blend.hail();
                 float alpha = PrecipitationVisualModel.scaledAlpha(
                         PrecipitationVisualModel.nearAlpha(intensity, distance, radius, snow),
@@ -536,10 +528,6 @@ public final class LocalizedPrecipitationRenderer {
                 DISTANT_BOTTOM_Y[index] = surfaceY;
                 DISTANT_TOP_Y[index] = topY;
                 DISTANT_INTENSITY[index] = (float) intensity;
-                DISTANT_TEMPERATURE[index] = (float) cloudField.temperature();
-                DISTANT_STORM[index] = (float) cloudField.stormEnergy();
-                DISTANT_INSTABILITY[index] = (float) cloudField.instability();
-                DISTANT_TYPE[index] = type;
             }
         }
 
@@ -553,6 +541,7 @@ public final class LocalizedPrecipitationRenderer {
     }
 
     private static void appendDistantShafts(
+            ClientLevel level,
             double camX,
             double camY,
             double camZ,
@@ -578,13 +567,8 @@ public final class LocalizedPrecipitationRenderer {
             if (alpha <= 0.001F) {
                 continue;
             }
-            PrecipitationType type = DISTANT_TYPE[index];
-            PrecipitationBlend blend = PrecipitationBlend.fromPhase(
-                    type,
-                    DISTANT_TEMPERATURE[index],
-                    DISTANT_STORM[index],
-                    DISTANT_INSTABILITY[index]
-            );
+            PrecipitationBlend blend = ClientWeatherCoordinator.precipitationBlendAt(
+                    level, DISTANT_X[index] + 0.5, DISTANT_Z[index] + 0.5);
             double transitionCenter = Math.min(MID_FIELD_RADIUS, Math.max(nearRadius + 12, farRadius - 12));
             double farWeight = smoothstep(transitionCenter - 8.0, transitionCenter + 8.0, distance);
             if (farWeight < 0.999D) {

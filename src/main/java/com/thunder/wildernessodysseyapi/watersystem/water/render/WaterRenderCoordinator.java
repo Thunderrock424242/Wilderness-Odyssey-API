@@ -48,7 +48,7 @@ public final class WaterRenderCoordinator {
     private static final ThreadLocal<WaterHandoffReceipt> COMPLETED_COMPILATION = new ThreadLocal<>();
     private static final Long2ObjectOpenHashMap<OceanSeaState.Sample> REGIONAL_SEA_CORNERS =
             new Long2ObjectOpenHashMap<>(256);
-    private static boolean externalPackOwnedLastFrame;
+    private static final WaterRenderOwnership OWNERSHIP = new WaterRenderOwnership();
 
     private WaterRenderCoordinator() {
     }
@@ -67,12 +67,34 @@ public final class WaterRenderCoordinator {
         Minecraft minecraft = Minecraft.getInstance();
         RenderFrameContext renderFrame = WildernessRenderingFramework.currentFrame();
         ClientLevel level = minecraft.level;
-        if (level == null || !WaterRenderingConfig.replacementWaterRenderingEnabled(level)) {
+        if (level == null) {
             clear();
             WaterShaders.releaseOpticalResources();
-            externalPackOwnedLastFrame = false;
+            OWNERSHIP.reset();
             WaterRenderDiagnostics.setRenderPath(WaterRenderDiagnostics.RenderPath.DISABLED);
             WaterRenderDiagnostics.setSceneCaptureAvailable(false);
+            return;
+        }
+
+        WaterRenderOwnership.Owner owner = !WaterRenderingConfig.replacementWaterRenderingEnabled(level)
+                ? WaterRenderOwnership.Owner.FALLBACK
+                : WaterShaders.externalShaderPackOwnsWater()
+                ? WaterRenderOwnership.Owner.EXTERNAL : WaterRenderOwnership.Owner.NATIVE;
+        WaterRenderOwnership.Transition transition = OWNERSHIP.update(owner);
+        if (transition.releaseResources()) {
+            clear();
+            WaterShaders.releaseOpticalResources();
+        }
+        if (transition.rebuildMeshes()) {
+            ClientWaterSnapshotStore.markAllDirtyMeshes(level);
+        }
+        if (transition.rebuildBaked()) {
+            event.getLevelRenderer().allChanged();
+        }
+        if (owner == WaterRenderOwnership.Owner.FALLBACK) {
+            WaterRenderDiagnostics.setRenderPath(WaterRenderDiagnostics.RenderPath.DISABLED);
+            WaterRenderDiagnostics.setSceneCaptureAvailable(false);
+            WaterRenderDiagnostics.publishFrame(0, 0, 0, 0, 0L, -1L);
             return;
         }
 
@@ -80,24 +102,13 @@ public final class WaterRenderCoordinator {
         // snapshot mesh depends on our vertex shader for its displacement, so
         // drawing it through stock translucent here would create the flat ring
         // seen around the GPU-wave surface and would hide pack-owned fluid tops.
-        if (WaterShaders.externalShaderPackOwnsWater()) {
+        if (owner == WaterRenderOwnership.Owner.EXTERNAL) {
             WaterRenderDiagnostics.setRenderPath(
                     WaterRenderDiagnostics.RenderPath.EXTERNAL_SHADER_PACK);
             WaterRenderDiagnostics.setSceneCaptureAvailable(false);
-            if (!externalPackOwnedLastFrame) {
-                clear();
-                WaterShaders.releaseOpticalResources();
-                event.getLevelRenderer().allChanged();
-                externalPackOwnedLastFrame = true;
-            }
             renderDetailSubpasses(minecraft, event);
             WaterRenderDiagnostics.publishFrame(0, 0, 0, 0, 0L, -1L);
             return;
-        }
-        if (externalPackOwnedLastFrame) {
-            externalPackOwnedLastFrame = false;
-            ClientWaterSnapshotStore.markAllDirtyMeshes(level);
-            event.getLevelRenderer().allChanged();
         }
         WaterRenderDiagnostics.setRenderPath(WaterShaders.shouldUseCoreShader()
                 ? WaterRenderDiagnostics.RenderPath.CORE_SHADER
@@ -242,7 +253,7 @@ public final class WaterRenderCoordinator {
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel().isClientSide()) {
             clear();
-            externalPackOwnedLastFrame = false;
+            OWNERSHIP.reset();
             WaterShaders.releaseOpticalResources();
         }
     }

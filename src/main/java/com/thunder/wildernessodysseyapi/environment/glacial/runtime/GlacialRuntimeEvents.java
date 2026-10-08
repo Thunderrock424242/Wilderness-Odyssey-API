@@ -4,9 +4,11 @@ import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.environment.glacial.GlacialSeasonManager;
 import com.thunder.wildernessodysseyapi.environment.glacial.network.GlacialSeasonSyncService;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
@@ -17,6 +19,30 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 public final class GlacialRuntimeEvents {
 
     private GlacialRuntimeEvents() {
+    }
+
+    /** Initializes presentation even when this dimension's periodic send is not due. */
+    @SubscribeEvent
+    public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            GlacialSeasonSyncService.publishToPlayer(player);
+        }
+    }
+
+    /** Initializes the new client level after a dimension transition. */
+    @SubscribeEvent
+    public static void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            GlacialSeasonSyncService.publishToPlayer(player);
+        }
+    }
+
+    /** Restores the client mirror when respawning replaces the player's client level. */
+    @SubscribeEvent
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            GlacialSeasonSyncService.publishToPlayer(player);
+        }
     }
 
     /** Tracks normally promoted server chunks without retaining unloaded regions. */

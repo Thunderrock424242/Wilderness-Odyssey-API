@@ -56,4 +56,16 @@ class AnimalNeedsStateTest {
         assertFalse(restored.resumeAiFromSimulation());
         assertFalse(restored.simulationAiSuspended());
     }
+
+    @Test
+    void restoringOwnedSuspensionPreservesOriginalExternalNoAi() {
+        AnimalNeedsState original = new AnimalNeedsState();
+        original.suspendAiForSimulation(true);
+
+        AnimalNeedsState restored = new AnimalNeedsState();
+        restored.deserializeNBT(null, original.serializeNBT(null));
+
+        assertTrue(restored.resumeAiFromSimulation());
+        assertFalse(restored.simulationAiSuspended());
+    }
 }

@@ -52,6 +52,11 @@ public final class DistantWildlifeTransitionPolicy {
         return closestPlayerDistance <= realDistance + transitionBuffer;
     }
 
+    /** Keeps a materialized individual active until its owner-supplied cooldown ends. */
+    public static boolean materializationCooldownElapsed(long gameTime, long protectedUntil) {
+        return gameTime >= protectedUntil;
+    }
+
     /** Requires both configured separation and a sustained unobserved period before absorption. */
     public static boolean canAbstract(
             double closestPlayerDistance,

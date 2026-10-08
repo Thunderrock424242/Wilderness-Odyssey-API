@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
+import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -17,8 +18,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Prevents vanilla water ticks from creating a second, competing flow state.
  *
  * <p>NeoForge does not expose an event before {@link FlowingFluid} mutates
- * neighboring blocks, so this narrow mixin redirects only water cells already
- * tracked by the canonical finite-volume ticker. Untracked vanilla water keeps
+ * neighboring blocks, so this narrow mixin redirects tracked cells and hands
+ * disturbed, untracked Wilderness projections to finite authority before spread.
+ * Untracked vanilla water keeps
  * normal gamerule behavior, preserving mods that intentionally use its flow.</p>
  */
 @Mixin(FlowingFluid.class)
@@ -35,10 +37,15 @@ public abstract class CanonicalWaterFlowMixin {
         if (!WaterCompatibility.isTaggedWater(state)) {
             return;
         }
-        if (level instanceof ServerLevel serverLevel
-                && WildernessWaterRules.isEnabled(serverLevel)
-                && CanonicalWater.isTracked(serverLevel, pos)) {
-            callbackInfo.cancel();
+        if (level instanceof ServerLevel serverLevel && WildernessWaterRules.isEnabled(serverLevel)) {
+            if (!CanonicalWater.isTracked(serverLevel, pos)
+                    && serverLevel.getBlockState(pos).is(WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get())) {
+                CanonicalWater.getOrImport(serverLevel, pos);
+                CanonicalWater.schedule(serverLevel, pos);
+            }
+            if (CanonicalWater.isTracked(serverLevel, pos)) {
+                callbackInfo.cancel();
+            }
         }
     }
 }

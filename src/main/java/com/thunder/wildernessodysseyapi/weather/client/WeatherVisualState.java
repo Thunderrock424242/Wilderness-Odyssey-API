@@ -64,6 +64,14 @@ public record WeatherVisualState(
             float lightningIllumination,
             double weatherTime
     ) {
+        return from(weather, cloud, wind, fogDensity, skyDarkening, lightningIllumination,
+                weatherTime, PrecipitationBlend.from(weather));
+    }
+
+    /** Creates frame state with a mixture already interpolated from canonical cell phases. */
+    public static WeatherVisualState from(WeatherSample weather, CloudFieldSample cloud, WindSample wind,
+            float fogDensity, float skyDarkening, float lightningIllumination, double weatherTime,
+            PrecipitationBlend blend) {
         WeatherSample sample = weather == null ? WeatherSample.CLEAR : weather;
         CloudFieldSample field = cloud == null ? CloudFieldSample.CLEAR : cloud;
         WindSample resolvedWind = wind == null ? WindSample.calm(null) : wind;
@@ -78,7 +86,7 @@ public record WeatherVisualState(
                 resolvedWind.velocity(),
                 new Vec3(sample.cloudWind().x(), sample.verticalMotion() * 0.10D, sample.cloudWind().z())
                         .scale(Math.max(1.0F, resolvedWind.speed())),
-                PrecipitationBlend.from(sample),
+                blend,
                 (float) sample.precipitationIntensity(),
                 coverage,
                 density,

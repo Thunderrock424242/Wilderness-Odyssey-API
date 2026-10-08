@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.fluid;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.WaterMutationSafety;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.TemporaryFloodManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.TemporaryFloodSavedData;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
@@ -36,6 +37,8 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.util.BlockSnapshot;
 import net.neoforged.neoforge.common.SoundActions;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.fluids.BaseFlowingFluid;
 import net.neoforged.neoforge.fluids.FluidType;
@@ -48,6 +51,7 @@ import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 import java.util.WeakHashMap;
 
 /**
@@ -183,17 +187,20 @@ public final class WildernessFluidRegistry {
         if (!(event.getLevel() instanceof ServerLevel level)) {
             return;
         }
-        if (!WildernessWaterRules.isEnabled(level)) {
+        if (!WildernessWaterRules.isEnabled(level) || level.getServer().isStopped()) {
             return;
         }
 
         long started = System.nanoTime();
+        WaterMutationSafety.beginTick(level);
         long[] measurements = FLOW_MEASUREMENTS.computeIfAbsent(level, ignored -> new long[3]);
         Arrays.fill(measurements, 0);
         int maxCells = WaterSimulationConfig.localFlowCellsPerTick();
+        long budgetNanos = WaterSimulationConfig.localFlowBudgetNanos();
         java.util.Set<Long> evaluated = new java.util.HashSet<>();
         java.util.List<BlockPos> deferred = new java.util.ArrayList<>();
         for (int processed = 0; processed < maxCells; processed++) {
+            if (System.nanoTime() - started >= budgetNanos) break;
             BlockPos pos = CanonicalWater.pollActive(level);
             if (pos == null) {
                 break;
@@ -206,13 +213,15 @@ public final class WildernessFluidRegistry {
         }
         for (BlockPos pos : deferred) CanonicalWater.schedule(level, pos);
         measurements[2] = System.nanoTime() - started;
+        WaterMutationSafety.finishTick(level, measurements[2]);
     }
 
     /** Latest bounded local-flow pass; volume includes accepted canonical-to-SPH handoffs. */
     public static String diagnostics(ServerLevel level) {
         long[] measurement = FLOW_MEASUREMENTS.get(level);
         return measurement == null ? "canonical flow has not run" : "canonical cells processed=" + measurement[0]
-                + ", canonical units moved=" + measurement[1] + ", solver microseconds=" + measurement[2] / 1000;
+                + ", canonical units moved=" + measurement[1] + ", solver microseconds=" + measurement[2] / 1000
+                + "; " + WaterMutationSafety.diagnostics(level);
     }
 
     /** Releases only scheduling clocks and measurements, never persisted water. */
@@ -221,19 +230,34 @@ public final class WildernessFluidRegistry {
         FLOW_MEASUREMENTS.remove(level);
     }
 
+    @SubscribeEvent
+    public static void onChunkLoad(ChunkEvent.Load event) {
+        if (event.getLevel() instanceof ServerLevel level && event.getChunk() instanceof LevelChunk chunk) {
+            CanonicalWater.onChunkLoad(level, chunk);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onChunkUnload(ChunkEvent.Unload event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            CanonicalWater.onChunkUnload(level, event.getChunk().getPos());
+        }
+    }
+
     /**
      * Wakes nearby canonical water after terrain changes.
      *
      * <p>Placed buckets enter finite flow immediately, while settled canonical
      * water may later sleep after pressure equalizes. A block edit can create a
-     * new outlet, so only already-tracked nearby cells are queued; normal block
-     * edits never trigger chunk-wide water imports.</p>
+     * new outlet, so a bounded loaded neighborhood is materialized and queued;
+     * normal block edits never trigger chunk-wide water imports.</p>
      */
     @SubscribeEvent
     public static void onBlockBroken(BlockEvent.BreakEvent event) {
         if (event.getLevel() instanceof ServerLevel level) {
             WaterBodyClassifier.invalidate(level, event.getPos());
             if (WildernessWaterRules.isEnabled(level)) {
+                CanonicalWater.materializeGeneratedNeighborhood(level, event.getPos());
                 wakeTrackedWaterAround(level, event.getPos());
             }
         }
@@ -242,22 +266,44 @@ public final class WildernessFluidRegistry {
     /**
      * Wakes nearby canonical water after player or automation block placement.
      *
-     * <p>This lets the authority re-check local pressure when a new block
-     * dams, redirects, or exposes a small water feature.</p>
+     * <p>Called only after NeoForge's placement hooks return their final
+     * acceptance result, including cancellation by the last event listener.</p>
      */
-    @SubscribeEvent
-    public static void onBlockPlaced(BlockEvent.EntityPlaceEvent event) {
-        if (event.getLevel() instanceof ServerLevel level) {
-            WaterBodyClassifier.invalidate(level, event.getPos());
-            if (WildernessWaterRules.isEnabled(level)) {
-                displaceWaterForPlacedBlocks(level, event);
-                wakeTrackedWaterAround(level, event.getPos());
+    public static void onAcceptedPlacement(List<BlockSnapshot> snapshots) {
+        for (BlockSnapshot snapshot : snapshots) {
+            if (snapshot.getLevel() instanceof ServerLevel level && WildernessWaterRules.isEnabled(level)) {
+                displaceWaterForPlacedSnapshot(level, snapshot);
+                notifyTerrainChanged(level, snapshot.getPos());
             }
         }
     }
 
     static void tickCell(ServerLevel level, BlockPos pos) {
+        // Include each possible destination's callback halo before reading
+        // collision shapes or starting a multi-cell transfer. A deferral owns
+        // no debit, and an awake persisted cell resumes after reload.
+        if (!WaterMutationSafety.isReady(level, pos, WaterMutationSafety.CALLBACK_RADIUS + 1)) {
+            CanonicalWater.defer(level, pos);
+            return;
+        }
+        WaterVolumeChunk.WaterCell tracked = CanonicalWater.getTracked(level, pos);
+        if (tracked != null && tracked.projectionPending()) {
+            CanonicalWater.reprojectCompatibility(level, pos);
+            tracked = CanonicalWater.getTracked(level, pos);
+            if (tracked != null && tracked.projectionPending()) return;
+        }
         WaterVolumeChunk.WaterCell current = CanonicalWater.getOrImport(level, pos);
+        if (current.displacementReservoir()) {
+            if (!CanonicalWater.canAcceptVolume(level, pos)) {
+                CanonicalWater.set(level, pos, current.withAddedFlags(WaterVolumeChunk.FLAG_SLEEPING), false, false);
+                return;
+            }
+            // Removing the solid makes the hidden parcel ordinary water again,
+            // even when every outlet remains closed and no transfer can occur.
+            current = current.withoutFlags(WaterVolumeChunk.FLAG_DISPLACEMENT_RESERVOIR
+                    | WaterVolumeChunk.FLAG_SLEEPING).withAddedFlags(WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED);
+            CanonicalWater.set(level, pos, current, true, false);
+        }
         if (current.volumeUnits() <= 0 || current.imported() || current.sleeping()) {
             forgetFlowTime(level, pos);
             return;
@@ -572,16 +618,6 @@ public final class WildernessFluidRegistry {
         boolean waterPresent = !level.getFluidState(source).isEmpty()
                 || !level.getFluidState(target).isEmpty();
         return waterPresent ? 0.25 : 0.0;
-    }
-
-    private static void displaceWaterForPlacedBlocks(ServerLevel level, BlockEvent.EntityPlaceEvent event) {
-        if (event instanceof BlockEvent.EntityMultiPlaceEvent multiPlaceEvent) {
-            for (BlockSnapshot snapshot : multiPlaceEvent.getReplacedBlockSnapshots()) {
-                displaceWaterForPlacedSnapshot(level, snapshot);
-            }
-            return;
-        }
-        displaceWaterForPlacedSnapshot(level, event.getBlockSnapshot());
     }
 
     private static void displaceWaterForPlacedSnapshot(ServerLevel level, BlockSnapshot snapshot) {

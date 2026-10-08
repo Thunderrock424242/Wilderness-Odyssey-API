@@ -19,6 +19,17 @@ public final class GlacialSeasonSyncService {
     private GlacialSeasonSyncService() {
     }
 
+    /**
+     * Initializes one player's current dimension without postponing the shared
+     * dimension refresh for players who already received a snapshot.
+     */
+    public static void publishToPlayer(ServerPlayer player) {
+        ServerLevel level = player.serverLevel();
+        GlacialSeasonSnapshot snapshot = GlacialSeasonManager.sample(level, player.blockPosition());
+        PacketDistributor.sendToPlayer(player, GlacialSeasonSyncPayload.from(
+                level.dimension().location(), level.getGameTime(), snapshot));
+    }
+
     /** Sends the current season to players in this dimension when needed. */
     public static void tickLevel(ServerLevel level) {
         if (level.players().isEmpty()) {

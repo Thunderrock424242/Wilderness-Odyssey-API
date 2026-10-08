@@ -144,10 +144,13 @@ public final class WaterFluidCompatibilityGameTests {
                         () -> true
                 );
         helper.assertTrue(
-                solidReplacement == WorldFluidMutationReconciler.MutationDecision.CONTINUE
-                        && access.getWaterUnits(level, position) == blockUnits,
-                "Projection reconciliation swallowed a solid placement or pre-drained its water"
+                solidReplacement == WorldFluidMutationReconciler.MutationDecision.COMMITTED
+                        && level.getBlockState(position).is(Blocks.STONE)
+                        && access.getWaterUnits(level, position) == 0,
+                "Direct solid placement did not commit displacement and preserve the solid"
         );
+        level.setBlock(position, Blocks.AIR.defaultBlockState(), 3);
+        access.addWater(level, position, blockUnits, false);
 
         WorldFluidMutationReconciler.MutationDecision removal =
                 WorldFluidMutationReconciler.reconcile(

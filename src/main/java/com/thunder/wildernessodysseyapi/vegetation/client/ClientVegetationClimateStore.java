@@ -6,10 +6,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,8 +27,7 @@ public final class ClientVegetationClimateStore {
     // Chunk compilation can ask for colors off the client thread, so visual
     // lookups use a lock-free map while queue mutations remain synchronized.
     private static final Map<Long, VegetationClimateState> STATES = new ConcurrentHashMap<>();
-    private static final ArrayDeque<Long> DIRTY_CHUNKS = new ArrayDeque<>();
-    private static final Set<Long> QUEUED_DIRTY_CHUNKS = new HashSet<>();
+    private static final Set<Long> DIRTY_CHUNKS = new LinkedHashSet<>();
     private static final int MAXIMUM_PENDING_SNAPSHOTS = 4_096;
     private static final Map<Long, Long> REVISIONS = new LinkedHashMap<>();
     private static final Map<Long, PendingSnapshot> PENDING = new LinkedHashMap<>();
@@ -115,7 +113,7 @@ public final class ClientVegetationClimateStore {
         long key = ChunkPos.asLong(chunkX, chunkZ);
         STATES.remove(key);
         PENDING.remove(key);
-        QUEUED_DIRTY_CHUNKS.remove(key);
+        DIRTY_CHUNKS.remove(key);
     }
 
     /** Drains a small number of surface rebuild requests for the client tick. */
@@ -124,9 +122,12 @@ public final class ClientVegetationClimateStore {
             return List.of();
         }
         List<Long> drained = new ArrayList<>(Math.min(maximumChunks, DIRTY_CHUNKS.size()));
-        while (drained.size() < maximumChunks && !DIRTY_CHUNKS.isEmpty()) {
-            long key = DIRTY_CHUNKS.removeFirst();
-            if (QUEUED_DIRTY_CHUNKS.remove(key) && STATES.containsKey(key)) {
+        var iterator = DIRTY_CHUNKS.iterator();
+        int inspected = 0;
+        while (inspected++ < maximumChunks && iterator.hasNext()) {
+            long key = iterator.next();
+            iterator.remove();
+            if (STATES.containsKey(key)) {
                 drained.add(key);
             }
         }
@@ -139,7 +140,6 @@ public final class ClientVegetationClimateStore {
             activeLevel = null;
             STATES.clear();
             DIRTY_CHUNKS.clear();
-            QUEUED_DIRTY_CHUNKS.clear();
             REVISIONS.clear();
             PENDING.clear();
         }
@@ -150,16 +150,13 @@ public final class ClientVegetationClimateStore {
             activeLevel = level;
             STATES.clear();
             DIRTY_CHUNKS.clear();
-            QUEUED_DIRTY_CHUNKS.clear();
             REVISIONS.clear();
             PENDING.clear();
         }
     }
 
     private static void offerDirty(long key) {
-        if (QUEUED_DIRTY_CHUNKS.add(key)) {
-            DIRTY_CHUNKS.addLast(key);
-        }
+        DIRTY_CHUNKS.add(key);
     }
 
     static boolean isNewerRevision(Long previousRevision, long incomingRevision) {

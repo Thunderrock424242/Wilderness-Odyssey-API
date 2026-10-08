@@ -5,10 +5,59 @@ import com.thunder.wildernessodysseyapi.vegetation.api.VegetationSeasonState;
 import net.minecraft.nbt.CompoundTag;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReactiveVegetationStateTest {
+
+    @Test
+    void processingDiagnosticsDoNotForceAChunkSave() {
+        ReactiveVegetationState state = new ReactiveVegetationState();
+        AtomicInteger dirtyCalls = new AtomicInteger();
+        state.setDirtyListener(dirtyCalls::incrementAndGet);
+
+        state.recordProcessing(200L, 3, 25_000L);
+
+        assertEquals(0, dirtyCalls.get());
+        assertEquals(200L, state.snapshot().lastVegetationUpdateTick());
+        assertEquals(3, state.snapshot().plantsProcessed());
+        assertEquals(25.0, state.snapshot().averageProcessingMicros());
+    }
+
+    @Test
+    void advancingOnlyTheClimateTimestampDoesNotForceAChunkSave() {
+        ReactiveVegetationState state = new ReactiveVegetationState();
+        AtomicInteger dirtyCalls = new AtomicInteger();
+        state.setDirtyListener(dirtyCalls::incrementAndGet);
+
+        state.applyClimate(new VegetationClimateState(
+                0.5, 0.0, 0.0, 0.0, VegetationSeasonState.UNKNOWN,
+                200L, 0L, 0, 0.0
+        ));
+
+        assertEquals(0, dirtyCalls.get());
+        assertEquals(200L, state.snapshot().lastClimateUpdateTick());
+    }
+
+    @Test
+    void changedClimateStillMarksTheOwningChunkDirty() {
+        ReactiveVegetationState state = new ReactiveVegetationState();
+        AtomicInteger dirtyCalls = new AtomicInteger();
+        state.setDirtyListener(dirtyCalls::incrementAndGet);
+
+        state.applyClimate(new VegetationClimateState(
+                0.8, 0.6, 0.1, 0.2, VegetationSeasonState.WET,
+                200L, 0L, 0, 0.0
+        ));
+
+        assertEquals(1, dirtyCalls.get());
+        ReactiveVegetationState restored = new ReactiveVegetationState();
+        restored.deserializeNBT(null, state.serializeNBT(null));
+        assertEquals(0.8, restored.snapshot().moisture());
+        assertEquals(0.6, restored.snapshot().recentRainfall());
+    }
 
     @Test
     void chunkAttachmentRoundTripPreservesClimateAndDiagnostics() {

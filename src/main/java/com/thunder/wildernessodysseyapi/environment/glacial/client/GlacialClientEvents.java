@@ -38,7 +38,7 @@ public final class GlacialClientEvents {
         }
     }
 
-    /** Rebuilds at most two surface-bearing chunk sections per client tick. */
+    /** Inspects at most two queued chunks and rebuilds their surface-bearing sections per tick. */
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -49,7 +49,7 @@ public final class GlacialClientEvents {
         for (int count = 0; count < MAXIMUM_DIRTY_CHUNKS_PER_TICK; count++) {
             Long key = ClientGlacialState.pollDirty(level);
             if (key == null) {
-                break;
+                continue;
             }
             int chunkX = ChunkPos.getX(key);
             int chunkZ = ChunkPos.getZ(key);

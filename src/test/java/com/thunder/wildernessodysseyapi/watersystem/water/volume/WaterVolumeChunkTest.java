@@ -13,6 +13,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WaterVolumeChunkTest {
 
     @Test
+    void deferredDryProjectionSurvivesSaveAndReload() {
+        BlockPos pos = new BlockPos(15, 62, 0);
+        WaterVolumeChunk original = new WaterVolumeChunk();
+        // The next unused durable flag records projection work, including air.
+        int pendingProjection = 1 << 8;
+        original.set(pos, WaterVolumeChunk.WaterCell.EMPTY.withAddedFlags(pendingProjection));
+
+        WaterVolumeChunk decoded = new WaterVolumeChunk();
+        decoded.deserializeNBT(null, original.serializeNBT(null));
+
+        assertTrue(decoded.contains(pos), "A deferred removal must not disappear on save");
+        assertEquals(0, decoded.get(pos).volumeUnits());
+        assertEquals(pendingProjection, decoded.get(pos).flags());
+    }
+
+    @Test
     void roundTripsVolumeVelocityFlagsAndTemperature() {
         BlockPos pos = new BlockPos(31, -42, -17);
         WaterVolumeChunk original = new WaterVolumeChunk();

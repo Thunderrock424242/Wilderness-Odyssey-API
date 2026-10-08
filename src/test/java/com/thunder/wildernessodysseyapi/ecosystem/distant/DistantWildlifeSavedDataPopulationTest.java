@@ -16,6 +16,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DistantWildlifeSavedDataPopulationTest {
 
     @Test
+    void representedCountTracksMaterializationReplacementAndNewAbsorption() {
+        DistantWildlifeSavedData data = dataWithPopulation(4);
+        DistantWildlifeGroup group = data.groups().getFirst();
+        assertEquals(4, data.representedAnimals());
+        assertEquals(4, data.representedAnimals());
+
+        assertTrue(data.materializedOne(group.id()));
+        assertEquals(3, data.representedAnimals());
+        assertTrue(data.replace(data.groups().getFirst().withPopulation(2)));
+        assertEquals(2, data.representedAnimals());
+        addPopulation(data, ResourceLocation.withDefaultNamespace("pig"), 1);
+        assertEquals(3, data.representedAnimals());
+    }
+
+    @Test
     void regionSnapshotUsesKnownGroupsWithoutWorldOrChunkDiscovery() {
         DistantWildlifeSavedData data = dataWithPopulation(4);
 

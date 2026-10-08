@@ -308,12 +308,15 @@ public final class TemporaryFloodManager {
             BlockPos position,
             BlockState originalState
     ) {
-        if (originalState == null || originalState.isAir()) {
+        if (originalState == null || originalState.isAir()
+                || !com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.WaterMutationSafety
+                .isReady(level, position, 2)) {
             return;
         }
         BlockState current = level.getBlockState(position);
         if (current.isAir() && originalState.canSurvive(level, position)) {
-            level.setBlock(position, originalState, 3);
+            com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.WaterMutationSafety
+                    .setBlock(level, position, originalState, 3);
         }
     }
 

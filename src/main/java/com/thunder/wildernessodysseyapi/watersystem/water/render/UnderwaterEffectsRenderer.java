@@ -18,6 +18,9 @@ import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.material.FogType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.client.Camera;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -47,7 +50,8 @@ public final class UnderwaterEffectsRenderer {
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onFogColor(ViewportEvent.ComputeFogColor event) {
         if (!WaterRenderingConfig.ENABLE_UNDERWATER_OPTICS.get()
-                || !canOwnWaterFog(event.getCamera().getFluidInCamera(), WaterShaders.externalShaderPackOwnsWater())) {
+                || !canOwnWaterFog(event.getCamera().getFluidInCamera(), WaterShaders.externalShaderPackOwnsWater(),
+                        hasRestrictedVision(event.getCamera()))) {
             return;
         }
 
@@ -86,7 +90,8 @@ public final class UnderwaterEffectsRenderer {
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onRenderFog(ViewportEvent.RenderFog event) {
         if (!WaterRenderingConfig.ENABLE_UNDERWATER_OPTICS.get()
-                || !canOwnWaterFog(event.getType(), WaterShaders.externalShaderPackOwnsWater())) {
+                || !canOwnWaterFog(event.getType(), WaterShaders.externalShaderPackOwnsWater(),
+                        hasRestrictedVision(event.getCamera())) || event.isCanceled()) {
             return;
         }
 
@@ -226,7 +231,16 @@ public final class UnderwaterEffectsRenderer {
     }
 
     static boolean canOwnWaterFog(FogType fogType, boolean externalPackOwnsWater) {
-        return !externalPackOwnsWater && (fogType == FogType.NONE || fogType == FogType.WATER);
+        return canOwnWaterFog(fogType, externalPackOwnsWater, false);
+    }
+
+    static boolean canOwnWaterFog(FogType fogType, boolean externalPackOwnsWater, boolean restrictedVision) {
+        return !externalPackOwnsWater && !restrictedVision && (fogType == FogType.NONE || fogType == FogType.WATER);
+    }
+
+    private static boolean hasRestrictedVision(Camera camera) {
+        return camera.getEntity() instanceof LivingEntity living
+                && (living.hasEffect(MobEffects.BLINDNESS) || living.hasEffect(MobEffects.DARKNESS));
     }
 
     private static float mix(float from, float to, float amount) {

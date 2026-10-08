@@ -18,9 +18,6 @@ import java.util.Optional;
  */
 public final class MeteorSiteServices {
 
-    /** Covers the 125-block worldgen crater maximum at the 1.5x radiation scale. */
-    private static final int RADIATION_QUERY_RADIUS = 192;
-
     private MeteorSiteServices() {
     }
 
@@ -43,12 +40,7 @@ public final class MeteorSiteServices {
         if (level == null || position == null) {
             return 0.0;
         }
-        double strongest = 0.0;
-        for (MeteorSavedData.MeteorRecord record : MeteorSavedData.get(level)
-                .findWithin(position, RADIATION_QUERY_RADIUS)) {
-            strongest = Math.max(strongest, radiation(record, position));
-        }
-        return strongest;
+        return MeteorSavedData.get(level).radiationAt(position);
     }
 
     /**
@@ -123,12 +115,7 @@ public final class MeteorSiteServices {
     }
 
     private static double radiation(MeteorSavedData.MeteorRecord record, BlockPos position) {
-        double radius = Math.max(1.0, record.craterRadius() * 1.5);
-        double distance = horizontalDistance(record.center(), position);
-        if (distance > radius) {
-            return 0.0;
-        }
-        return Math.max(0.0, Math.min(1.0, record.intensity() * (1.0 - distance / radius)));
+        return MeteorSavedData.radiationFrom(record, position);
     }
 
     private static double horizontalDistance(BlockPos first, BlockPos second) {

@@ -88,7 +88,7 @@ public final class EnvironmentSyncManager {
                     false
             );
         }
-        boolean irradiated = snapshot.meteorSite().radiation() >= 0.20;
+        boolean irradiated = snapshot.radiation() >= 0.20;
         if (irradiated && (!sameDimension || !previous.irradiated())) {
             WorldDisturbanceService.publish(
                     level,

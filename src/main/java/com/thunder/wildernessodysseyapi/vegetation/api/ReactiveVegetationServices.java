@@ -1,10 +1,12 @@
 package com.thunder.wildernessodysseyapi.vegetation.api;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
+import com.thunder.wildernessodysseyapi.environment.api.EnvironmentDimensionProfile;
 import com.thunder.wildernessodysseyapi.vegetation.client.ClientVegetationClimateStore;
 import com.thunder.wildernessodysseyapi.vegetation.config.VegetationConfig;
 import com.thunder.wildernessodysseyapi.vegetation.simulation.VegetationDisturbanceLedger;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -30,7 +32,8 @@ public final class ReactiveVegetationServices {
 
     /** Returns synchronized or server-owned climate without forcing a chunk load. */
     public static Optional<VegetationClimateState> climateAt(Level level, BlockPos position) {
-        if (level == null || position == null) {
+        if (level == null || position == null
+                || !EnvironmentDimensionProfile.forDimension(level.dimension()).reactiveVegetation()) {
             return Optional.empty();
         }
         if (level.isClientSide) {
@@ -53,12 +56,15 @@ public final class ReactiveVegetationServices {
 
     /** Records regional plant pressure without granting the publisher block ownership. */
     public static void recordDisturbance(ServerLevel level, PlantDisturbance disturbance) {
-        VegetationDisturbanceLedger.record(level, disturbance);
+        if (updatesEnabled(level)) {
+            VegetationDisturbanceLedger.record(level, disturbance);
+        }
     }
 
     /** Returns the strongest active regional pressure at a loaded server position. */
     public static VegetationDisturbanceSample disturbanceAt(ServerLevel level, BlockPos position) {
-        return VegetationDisturbanceLedger.sample(level, position);
+        return updatesEnabled(level) ? VegetationDisturbanceLedger.sample(level, position)
+                : VegetationDisturbanceSample.NONE;
     }
 
     /**
@@ -75,7 +81,7 @@ public final class ReactiveVegetationServices {
             double intensity,
             boolean allowBlockDamage
     ) {
-        if (level == null || position == null || type == null || !allowBlockDamage) {
+        if (!updatesEnabled(level) || position == null || type == null || !allowBlockDamage) {
             return PlantDisturbanceResult.NOT_APPLIED;
         }
         double boundedIntensity = Math.max(0.0, Math.min(1.0,
@@ -126,6 +132,9 @@ public final class ReactiveVegetationServices {
             BlockState state,
             long randomBits
     ) {
+        if (!updatesEnabled(level) || position == null || state == null) {
+            return PlantUpdateResult.NOT_REGISTERED;
+        }
         Optional<VegetationClimateState> climate = climateAt(level, position);
         if (climate.isEmpty()) {
             return PlantUpdateResult.NOT_REGISTERED;
@@ -141,6 +150,10 @@ public final class ReactiveVegetationServices {
             VegetationClimateState climate,
             long randomBits
     ) {
+        if (!updatesEnabled(level) || position == null || state == null || climate == null
+                || level.getChunkSource().getChunkNow(position.getX() >> 4, position.getZ() >> 4) == null) {
+            return PlantUpdateResult.NOT_REGISTERED;
+        }
         Optional<ReactivePlantDefinition> definition = ReactivePlantRegistry.definition(state);
         if (definition.isEmpty()) {
             return PlantUpdateResult.NOT_REGISTERED;
@@ -164,6 +177,17 @@ public final class ReactiveVegetationServices {
         }
         boolean changed = level.setBlock(position, desired, Block.UPDATE_CLIENTS);
         return new PlantUpdateResult(true, changed);
+    }
+
+    /** Shared producer gate; queries may still inspect saved state while updates are paused. */
+    public static boolean updatesEnabled(Level level) {
+        return level != null && !level.isClientSide
+                && updatesEnabled(level.dimension(), VegetationConfig.VEGETATION_UPDATES_ENABLED.get());
+    }
+
+    /** Applies existing dimension capabilities to a captured server enablement value. */
+    public static boolean updatesEnabled(ResourceKey<Level> dimension, boolean enabled) {
+        return enabled && EnvironmentDimensionProfile.forDimension(dimension).reactiveVegetation();
     }
 
     private static boolean suitableDaylight(ServerLevel level, BlockPos position) {

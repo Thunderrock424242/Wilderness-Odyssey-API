@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.ecosystem.behavior;
 import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemBehaviorController;
 import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemBehaviorState;
 import com.thunder.wildernessodysseyapi.ecosystem.api.EnvironmentalContext;
+import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemParticipation;
 import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
 import com.thunder.wildernessodysseyapi.ecosystem.api.StormReaction;
 import com.thunder.wildernessodysseyapi.ecosystem.api.WildlifeWeatherResponse;
@@ -20,6 +21,10 @@ public final class DefaultEcosystemBehaviorController implements EcosystemBehavi
 
     @Override
     public boolean evaluate(EnvironmentalContext context, AnimalNeedsState needs) {
+        if (!EcosystemParticipation.isEnabled(context.level())) {
+            needs.idle();
+            return false;
+        }
         SpeciesBehaviorProfile profile = context.profile();
         WildlifeWeatherResponse weatherResponse = EnvironmentalBehaviorDecisionModel.classifyWeather(
                 context.weather(), context.watershed(), profile.shelter());

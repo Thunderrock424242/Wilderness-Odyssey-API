@@ -81,7 +81,13 @@ neoForge {
             type = "gameTestServer"
             // Keep automated tests isolated from the developer's normal run/
             // mods and configs so unrelated local mods cannot block startup.
-            def testDirectory = providers.gradleProperty('questGameTests').isPresent() ? 'run-quest-gametest' : 'run-gametest'
+            def waterSafetyTests = providers.gradleProperty('waterSafetyGameTests').isPresent()
+            def waterSafetyProfile = providers.gradleProperty('waterSafetyProfile').orElse('baseline').get()
+            if (waterSafetyTests && !(waterSafetyProfile in ['baseline', 'sable', 'c2me', 'sable-c2me'])) {
+                throw new GradleException('waterSafetyProfile must be baseline, sable, c2me, or sable-c2me')
+            }
+            def testDirectory = waterSafetyTests ? "run-water-safety-${waterSafetyProfile}"
+                    : providers.gradleProperty('questGameTests').isPresent() ? 'run-quest-gametest' : 'run-gametest'
             gameDirectory = codexBuildDir.isPresent()
                     ? layout.buildDirectory.dir(testDirectory).get().asFile
                     : project.file(testDirectory)
@@ -93,7 +99,8 @@ neoForge {
             def neoforgeNamespaces = System.getProperty('neoforge.enabledGameTestNamespaces')
             def enabledNamespaces = forgeNamespaces != null ? forgeNamespaces : neoforgeNamespaces
             if (enabledNamespaces == null) {
-                enabledNamespaces = providers.gradleProperty('questGameTests').isPresent()
+                enabledNamespaces = waterSafetyTests ? 'wildernessodysseyapi_water_safety_tests'
+                        : providers.gradleProperty('questGameTests').isPresent()
                         ? 'wildernessodysseyapi_quest_tests' : project.mod_id
             }
             systemProperty 'forge.enabledGameTestNamespaces', enabledNamespaces
@@ -190,6 +197,12 @@ tasks.named('processResources') {
     from('src/main/resources/data/minecraft/structures/empty.nbt') {
         into 'data/wildernessodysseyapi_quest_tests/structure'
     }
+    from('src/main/resources/data/minecraft/structures/empty.nbt') {
+        into 'data/wildernessodysseyapi_environment_tests/structure'
+    }
+    from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
+        into 'data/wildernessodysseyapi_water_safety_tests/structure'
+    }
     doLast {
         // The historical test asset is raw NBT, while data-pack structure
         // resources are gzip-compressed. Normalize the copied template in the
@@ -203,6 +216,11 @@ tasks.named('processResources') {
         def questTarget = file("${destinationDir}/data/wildernessodysseyapi_quest_tests/structure/empty.nbt")
         questTarget.parentFile.mkdirs()
         new java.util.zip.GZIPOutputStream(new FileOutputStream(questTarget)).withCloseable { stream ->
+            stream.write(sourceBytes)
+        }
+        def environmentTarget = file("${destinationDir}/data/wildernessodysseyapi_environment_tests/structure/empty.nbt")
+        environmentTarget.parentFile.mkdirs()
+        new java.util.zip.GZIPOutputStream(new FileOutputStream(environmentTarget)).withCloseable { stream ->
             stream.write(sourceBytes)
         }
     }
@@ -780,6 +798,24 @@ tasks.register('weatherPhysicsTest', Test) {
     filter {
         includeTestsMatching 'com.thunder.wildernessodysseyapi.weather.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.hydrology.*'
+    }
+}
+
+// Canonical storage, flow planning and optional water bridges use the same offline runtime.
+tasks.register('waterSimulationTest', Test) {
+    group = 'verification'
+    description = 'Runs canonical water simulation and optional compatibility regressions without starting Minecraft.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '2g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.volume.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.fluid.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.hydrology.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.sph.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.mixinconfig.*'
     }
 }
 

@@ -15,6 +15,7 @@ import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootConditions;
 import com.thunder.wildernessodysseyapi.lorebook.loot.ModLootFunctions;
 import com.thunder.wildernessodysseyapi.meteor.worldgen.MeteorFeature;
+import com.thunder.wildernessodysseyapi.meteor.worldgen.MeteorWorldgenRegistries;
 import com.thunder.wildernessodysseyapi.radiation.RadiationEffect;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockEntities;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
@@ -92,6 +93,7 @@ public final class ModRegistries {
     public static void register(IEventBus modEventBus) {
         MOB_EFFECTS.register(modEventBus);
         FEATURES.register(modEventBus);
+        MeteorWorldgenRegistries.register(modEventBus);
         ModProcessors.PROCESSORS.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         ModAttachments.ATTACHMENTS.register(modEventBus);

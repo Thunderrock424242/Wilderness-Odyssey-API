@@ -38,4 +38,25 @@ class MeteorSavedDataTest {
         assertEquals(1, data.getMeteors().size());
         assertTrue(data.findNearest(center, 0).isPresent());
     }
+
+    @Test
+    void strongestExposureCanComeFromAFartherOverlappingSite() {
+        MeteorSavedData data = new MeteorSavedData();
+        BlockPos position = new BlockPos(8, 64, 8);
+        MeteorSavedData.MeteorRecord nearby = data.addMeteor(
+                new BlockPos(18, 70, 8), 5, 0L, 1.0, MeteorSiteSource.WORLDGEN);
+        data.addMeteor(new BlockPos(38, 70, 8), 125, 0L, 1.0, MeteorSiteSource.WORLDGEN);
+
+        assertEquals(nearby, data.findNearest(position, 512).orElseThrow());
+        assertEquals(0.0, MeteorSavedData.radiationFrom(nearby, position), 0.00001);
+        assertEquals(0.84, data.radiationAt(position), 0.00001);
+    }
+
+    @Test
+    void largeLegacySitesAreNotSilentlyExcludedByASmallSearchRadius() {
+        MeteorSavedData data = new MeteorSavedData();
+        data.addMeteor(new BlockPos(1_000, 70, 0), 1_024, 0L, 1.0, MeteorSiteSource.UNKNOWN);
+
+        assertEquals(1.0 - 1_000.0 / 1_536.0, data.radiationAt(BlockPos.ZERO), 0.00001);
+    }
 }

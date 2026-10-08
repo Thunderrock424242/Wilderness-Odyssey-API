@@ -6,6 +6,7 @@ import com.thunder.wildernessodysseyapi.dataengine.DataSystemRegistration;
 import com.thunder.wildernessodysseyapi.dataengine.async.AsyncDataTask;
 import com.thunder.wildernessodysseyapi.dataengine.queue.UpdatePriority;
 import com.thunder.wildernessodysseyapi.ecosystem.api.EnvironmentalContext;
+import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemParticipation;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.DistantWildlifeGroup;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.DistantWildlifeManager;
@@ -98,6 +99,9 @@ public final class PopulationEcologySimulationSystem implements SimulationSystem
         }
         EcosystemConfig.PopulationEcologySettings settings = EcosystemConfig.populationEcologySettings();
         for (ServerLevel level : currentServer.getAllLevels()) {
+            if (!EcosystemParticipation.isEnabled(level)) {
+                continue;
+            }
             ResourceLocation dimension = level.dimension().location();
             long gameTime = level.getGameTime();
             long nextCollection = nextCollectionTicks.getOrDefault(dimension, Long.MIN_VALUE);
@@ -142,6 +146,9 @@ public final class PopulationEcologySimulationSystem implements SimulationSystem
 
     @Override
     public boolean shouldUpdate(SimulationContext context) {
+        if (!EcosystemParticipation.isEnabled(context.level())) {
+            return false;
+        }
         Optional<EcosystemRegionSnapshot> ecosystem = context.ecosystem();
         if (ecosystem.isEmpty() || ecosystem.get().groupCount() == 0) {
             return false;
@@ -160,6 +167,9 @@ public final class PopulationEcologySimulationSystem implements SimulationSystem
 
     @Override
     public void update(SimulationContext context) {
+        if (!EcosystemParticipation.isEnabled(context.level())) {
+            return;
+        }
         EcosystemRegionSnapshot ecosystem = context.ecosystem().orElse(null);
         if (ecosystem == null) {
             return;
@@ -266,7 +276,7 @@ public final class PopulationEcologySimulationSystem implements SimulationSystem
             EcosystemConfig.PopulationEcologySettings settings
     ) {
         ServerLevel level = resolveLevel(key.dimension());
-        if (level == null) {
+        if (level == null || !EcosystemParticipation.isEnabled(level)) {
             inFlight.remove(key, submission);
             return;
         }
@@ -301,6 +311,7 @@ public final class PopulationEcologySimulationSystem implements SimulationSystem
     ) {
         ServerLevel level = resolveLevel(key.dimension());
         return level != null
+                && EcosystemParticipation.isEnabled(level)
                 && generation == submission.generation()
                 && inFlight.get(key) == submission
                 && isEnabled()

@@ -7,6 +7,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
@@ -121,10 +122,10 @@ final class GlacialFeatureSupport {
         return from + (to - from) * amount;
     }
 
-    /** Caches structure boxes per touched chunk for one feature placement. */
+    /** Caches local boxes and conservative neighboring-start protection for one placement. */
     static final class StructureGuard {
         private final WorldGenLevel level;
-        private final Map<Long, List<BoundingBox>> boxesByChunk = new HashMap<>();
+        private final Map<Long, ChunkStructures> structuresByChunk = new HashMap<>();
 
         private StructureGuard(WorldGenLevel level) {
             this.level = level;
@@ -137,14 +138,34 @@ final class GlacialFeatureSupport {
                 return true;
             }
             long chunkKey = ChunkPos.asLong(position.getX() >> 4, position.getZ() >> 4);
-            List<BoundingBox> boxes = boxesByChunk.computeIfAbsent(
+            ChunkStructures structures = structuresByChunk.computeIfAbsent(
                     chunkKey,
-                    ignored -> level.getChunk(position).getAllStarts().values().stream()
-                            .filter(start -> start.isValid())
-                            .map(start -> start.getBoundingBox())
-                            .toList()
+                    ignored -> inspectChunk(level.getChunk(position), chunkKey)
             );
-            return boxes.stream().anyMatch(box -> box.isInside(position));
+            if (structures.neighboringStart()) {
+                return true;
+            }
+            for (BoundingBox box : structures.localBoxes()) {
+                if (box.isInside(position)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static ChunkStructures inspectChunk(ChunkAccess chunk, long chunkKey) {
+            // A reference may name a start outside the writable region. Protect
+            // this chunk conservatively rather than fetching that distant start.
+            boolean neighboringStart = chunk.getAllReferences().values().stream()
+                    .anyMatch(references -> references.longStream().anyMatch(reference -> reference != chunkKey));
+            List<BoundingBox> localBoxes = chunk.getAllStarts().values().stream()
+                    .filter(start -> start.isValid())
+                    .map(start -> start.getBoundingBox())
+                    .toList();
+            return new ChunkStructures(neighboringStart, localBoxes);
+        }
+
+        private record ChunkStructures(boolean neighboringStart, List<BoundingBox> localBoxes) {
         }
     }
 }

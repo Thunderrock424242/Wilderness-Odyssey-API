@@ -12,6 +12,15 @@ import net.minecraft.server.level.ServerLevel;
  */
 public interface WeatherWaterInfluence {
 
+    /** Bounds terrain refreshes to retained cells before a server capture pass. */
+    default void beginSamplingPass(java.util.Set<Long> retained, long tick, int refreshTicks, int budget) {
+    }
+
+    /** Number of loaded-column probe attempts in the latest capture pass. */
+    default int terrainProbes() {
+        return 0;
+    }
+
     /**
      * Samples or returns a cached surface-water aggregate for one atmosphere cell.
      *

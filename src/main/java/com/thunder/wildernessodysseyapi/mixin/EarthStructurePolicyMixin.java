@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.thunder.wildernessodysseyapi.temporalrift.echo.structure.EchoStructurePolicy;
+import com.thunder.wildernessodysseyapi.meteor.worldgen.MeteorWorldgenRegistries;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
@@ -15,7 +16,8 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 /**
  * Excludes explicitly Echo-only sets from Earth at structure-state construction. There is no
  * dimension-aware structure-set event; biome modifiers cannot separate these shared biome sources.
- * In 1.21.1 ChunkMap assigns level before this sole createState call. Other dimensions are untouched.
+ * The same seam excludes the natural crater set outside its dimension policy.
+ * In 1.21.1 ChunkMap assigns level before this sole createState call.
  */
 @Mixin(ChunkMap.class)
 public abstract class EarthStructurePolicyMixin {
@@ -24,6 +26,7 @@ public abstract class EarthStructurePolicyMixin {
     @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target =
             "Lnet/minecraft/world/level/chunk/ChunkGenerator;createState(Lnet/minecraft/core/HolderLookup;Lnet/minecraft/world/level/levelgen/RandomState;J)Lnet/minecraft/world/level/chunk/ChunkGeneratorStructureState;"), index = 0)
     private HolderLookup<StructureSet> wildernessodysseyapi$earthStructureSets(HolderLookup<StructureSet> original) {
-        return level.dimension().equals(Level.OVERWORLD) ? EchoStructurePolicy.forDimension(original, false) : original;
+        HolderLookup<StructureSet> candidates = MeteorWorldgenRegistries.forDimension(original, level.dimension());
+        return level.dimension().equals(Level.OVERWORLD) ? EchoStructurePolicy.forDimension(candidates, false) : candidates;
     }
 }

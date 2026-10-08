@@ -47,6 +47,8 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
     public static final int FLAG_DISPLACEMENT_RESERVOIR = 1 << 6;
     /** Exact reversible floodwater owned by the temporary-flood ledger. */
     public static final int FLAG_TEMPORARY_FLOOD = 1 << 7;
+    /** Desired physical projection is durable but awaits a loaded callback neighborhood. */
+    public static final int FLAG_PROJECTION_PENDING = 1 << 8;
     /** Primitive integers encoded for each persisted or networked cell. */
     public static final int SERIALIZED_CELL_STRIDE = 7;
     /** Structural limit prevents malformed attachments from allocating unbounded maps. */
@@ -60,6 +62,7 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
     private static final String REVISION_KEY = "revision";
     private static final String CELL_DATA_KEY = "cells";
     private final Map<Integer, WaterCell> cells = new HashMap<>();
+    private final WaterCellWorkQueue activeWork = new WaterCellWorkQueue();
     private final ArrayDeque<CellDelta> deltaHistory = new ArrayDeque<>();
     private long revision;
     private boolean dirty;
@@ -78,6 +81,33 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
     /** Returns whether this chunk has authoritative state for the position. */
     public boolean contains(BlockPos pos) {
         return cells.containsKey(pack(pos));
+    }
+
+    /** Schedules only an existing authority cell; air never grows the work index. */
+    void scheduleWork(BlockPos pos, long dueTick) {
+        int packed = pack(pos);
+        WaterCell cell = cells.get(packed);
+        if (cell != null && (cell.projectionPending() || (!cell.sleeping()
+                && !cell.imported() && cell.volumeUnits() > 0))) {
+            // Terrain wakes can expose a reservoir. Sleeping state persists
+            // whether a hidden parcel is dormant or waiting for release.
+            activeWork.offer(packed, dueTick);
+        }
+    }
+
+    Integer pollWork(long tick) { return activeWork.poll(tick); }
+    int pendingWork() { return activeWork.size(); }
+
+    /** Reconstructs work after load; no transient queue needs its own save format. */
+    private void rebuildWork() {
+        activeWork.clear();
+        for (var entry : cells.entrySet()) {
+            WaterCell cell = entry.getValue();
+            if (cell.projectionPending() || (!cell.sleeping() && !cell.imported()
+                    && cell.volumeUnits() > 0)) {
+                activeWork.offer(entry.getKey(), 0L);
+            }
+        }
     }
 
     /**
@@ -124,6 +154,7 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
         cells.clear();
         cells.putAll(decoded);
         this.revision = Math.max(0L, revision);
+        rebuildWork();
         deltaHistory.clear();
         dirty = false;
     }
@@ -250,6 +281,7 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
         cells.clear();
         cells.putAll(decoded);
         revision = Math.max(0L, tag.getLong(REVISION_KEY));
+        rebuildWork();
         deltaHistory.clear();
         dirty = false;
     }
@@ -259,7 +291,7 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
         WaterCell sanitized = cell == null ? WaterCell.EMPTY : cell.sanitized();
         WaterCell previous;
         boolean retainDryOverride = sanitized.volumeUnits == 0
-                && (sanitized.flags & FLAG_DRY_OVERRIDE) != 0;
+                && (sanitized.flags & (FLAG_DRY_OVERRIDE | FLAG_PROJECTION_PENDING)) != 0;
         if (sanitized.volumeUnits == 0 && !retainDryOverride) {
             previous = cells.remove(packedPosition);
             if (previous == null) {
@@ -270,6 +302,11 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
             if (sanitized.equals(previous)) {
                 return;
             }
+        }
+
+        if (!cells.containsKey(packedPosition) || (!sanitized.projectionPending()
+                && (sanitized.sleeping() || sanitized.displacementReservoir() || sanitized.volumeUnits() == 0))) {
+            activeWork.remove(packedPosition);
         }
 
         if (notify) {
@@ -482,6 +519,9 @@ public final class WaterVolumeChunk implements INBTSerializable<CompoundTag> {
         public boolean temporaryFlood() {
             return (flags & FLAG_TEMPORARY_FLOOD) != 0;
         }
+
+        /** Includes pending air projections, preventing stale physical water from being reimported. */
+        public boolean projectionPending() { return (flags & FLAG_PROJECTION_PENDING) != 0; }
 
         /** Returns a copy with additional provenance flags preserved through synchronization. */
         public WaterCell withAddedFlags(int addedFlags) {

@@ -36,7 +36,7 @@ class ClientWeatherTimelineTest {
     }
 
     @Test
-    void precipitationBlendProducesAContinuousWintryMixWithoutChangingGameplayType() {
+    void surfaceTemperatureDoesNotReclassifyCanonicalRain() {
         WeatherSample sample = new WeatherSample(
                 1.0D, 0.9D, 0.98D, WindVector.ZERO,
                 0.8D, 0.4D, 0.3D, 0.7D, PrecipitationType.RAIN
@@ -45,7 +45,7 @@ class ClientWeatherTimelineTest {
         PrecipitationBlend blend = PrecipitationBlend.from(sample);
 
         assertTrue(blend.rain() > 0.0F);
-        assertTrue(blend.snow() > 0.0F);
+        assertEquals(0.0F, blend.snow());
         assertEquals(1.0F, blend.rain() + blend.snow() + blend.hail(), 1.0E-6F);
         assertEquals(PrecipitationType.RAIN, sample.precipitationType());
     }

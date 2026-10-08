@@ -33,8 +33,22 @@ public record RegionalEnvironmentSnapshot(
         VegetationDisturbanceSample vegetationDisturbance,
         MeteorSiteSnapshot meteorSite,
         RiftfallStage riftfallStage,
-        EnvironmentInfluence influence
+        EnvironmentInfluence influence,
+        double radiation
 ) {
+
+    /** Retains the original construction contract for integrations with a single site. */
+    public RegionalEnvironmentSnapshot(
+            BlockPos anchor, long gameTime, EnvironmentDimensionProfile dimensionProfile,
+            WeatherSample weather, WeatherThreatForecast forecast, SeasonalClimateState season,
+            WatershedConditions watershed, WatershedLocalFlow localFlow, TideSystem.TideSample tide,
+            VegetationClimateState vegetation, VegetationDisturbanceSample vegetationDisturbance,
+            MeteorSiteSnapshot meteorSite, RiftfallStage riftfallStage, EnvironmentInfluence influence
+    ) {
+        this(anchor, gameTime, dimensionProfile, weather, forecast, season, watershed, localFlow,
+                tide, vegetation, vegetationDisturbance, meteorSite, riftfallStage, influence,
+                meteorSite == null ? 0.0 : meteorSite.radiation());
+    }
 
     /** Shared neutral fallback used by compatibility constructors and isolated tests. */
     public static final RegionalEnvironmentSnapshot EMPTY = new RegionalEnvironmentSnapshot(
@@ -72,6 +86,7 @@ public record RegionalEnvironmentSnapshot(
         meteorSite = meteorSite == null ? MeteorSiteSnapshot.NONE : meteorSite;
         riftfallStage = riftfallStage == null ? RiftfallStage.CLEAR : riftfallStage;
         influence = influence == null ? EnvironmentInfluence.NEUTRAL : influence;
+        radiation = Double.isFinite(radiation) ? Math.max(0.0, Math.min(1.0, radiation)) : 0.0;
     }
 
     /** Returns whether the authoritative watershed classifies this region as coastal. */

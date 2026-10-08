@@ -194,6 +194,18 @@ public final class ClientWeatherCoordinator {
         );
     }
 
+    /** Smooths the server's phases without classifying them from client surface temperature. */
+    public static PrecipitationBlend precipitationBlendAt(ClientLevel level, double blockX, double blockZ) {
+        State state = matchingState(level);
+        if (state == null) return PrecipitationBlend.NONE;
+        return PrecipitationBlend.temporal(
+                state.previous().precipitationBlend(blockX, blockZ),
+                state.previous().supportedPrecipitationIntensity(blockX, blockZ),
+                state.current().precipitationBlend(blockX, blockZ),
+                state.current().supportedPrecipitationIntensity(blockX, blockZ),
+                state.timelineAmount(System.nanoTime()));
+    }
+
     /** Returns the local precipitation intensity in the canonical {@code [0, 1]} range. */
     public static float precipitationIntensityAt(ClientLevel level, BlockPos pos) {
         return pos == null ? 0.0F : (float) precipitationIntensityAt(level, pos.getX(), pos.getZ());
@@ -403,7 +415,8 @@ public final class ClientWeatherCoordinator {
                 fog,
                 localSkyDarkening(level),
                 WeatherLightningIllumination.cameraIllumination(level, position),
-                weatherTime
+                weatherTime,
+                precipitationBlendAt(level, position.x, position.z)
         );
         cachedFrameVisual = new FrameVisual(level, Math.max(0L, frameIndex), visual);
         return visual;

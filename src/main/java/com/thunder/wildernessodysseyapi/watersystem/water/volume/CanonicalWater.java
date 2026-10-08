@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.volume;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.WaterMutationSafety;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -14,13 +15,13 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.LinkedHashMap;
+import net.minecraft.world.level.ChunkPos;
 
 /**
  * Public access point for the server-authoritative Wilderness water volume.
@@ -55,7 +56,8 @@ public final class CanonicalWater {
         if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
             return null;
         }
-        LevelChunk chunk = level.getChunkAt(pos);
+        LevelChunk chunk = loadedChunk(level, pos);
+        if (chunk == null) return null;
         var existing = chunk.getExistingData(ModAttachments.WATER_VOLUME);
         if (existing.isEmpty() || !existing.get().contains(pos)) {
             return null;
@@ -85,7 +87,8 @@ public final class CanonicalWater {
         if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
             return WaterVolumeChunk.WaterCell.EMPTY;
         }
-        LevelChunk chunk = level.getChunkAt(pos);
+        LevelChunk chunk = loadedChunk(level, pos);
+        if (chunk == null) return WaterVolumeChunk.WaterCell.EMPTY;
         var existing = chunk.getExistingData(ModAttachments.WATER_VOLUME);
         if (existing.isPresent() && existing.get().contains(pos)) {
             return existing.get().get(pos);
@@ -184,13 +187,15 @@ public final class CanonicalWater {
         }
 
         WaterVolumeChunk.WaterCell source = displacementSource(level, pos, replacedState);
-        if (source.volumeUnits() <= 0 || source.hostedWater()) {
+        if (source.volumeUnits() <= 0 || source.hostedWater() || source.displacementReservoir()) {
             return 0;
         }
 
         // Remove the source before writing destinations so block callbacks can
         // never observe both the original cell and its displaced copies.
-        set(level, pos, WaterVolumeChunk.WaterCell.EMPTY, false, false);
+        // Retain an explicit dry cell so repeated placement notifications cannot
+        // re-import the replaced projection and displace the same parcel twice.
+        set(level, pos, WaterVolumeChunk.WaterCell.EMPTY.withAddedFlags(WaterVolumeChunk.FLAG_DRY_OVERRIDE), false, false);
 
         int remaining = source.volumeUnits();
         int moved = 0;
@@ -254,7 +259,8 @@ public final class CanonicalWater {
                 & ~WaterVolumeChunk.FLAG_SLEEPING
                 & ~WaterVolumeChunk.FLAG_DRY_OVERRIDE
                 & ~WaterVolumeChunk.FLAG_HOSTED_WATER;
-        residualFlags |= WaterVolumeChunk.FLAG_DISPLACEMENT_RESERVOIR;
+        residualFlags &= ~WaterVolumeChunk.FLAG_PROJECTION_PENDING;
+        residualFlags |= WaterVolumeChunk.FLAG_DISPLACEMENT_RESERVOIR | WaterVolumeChunk.FLAG_SLEEPING;
         return new WaterVolumeChunk.WaterCell(
                 retainedUnits,
                 source.velocityX(),
@@ -300,7 +306,8 @@ public final class CanonicalWater {
         // Canonical water may replace air, replaceable vegetation, and an
         // existing plain-water projection, but it must never hide inside a
         // solid or waterlogged host block where players cannot see it.
-        if (!canAcceptVolume(level, pos)) {
+        if (!WaterMutationSafety.isReady(level, pos, WaterMutationSafety.CALLBACK_RADIUS)
+                || !canAcceptVolume(level, pos)) {
             return 0;
         }
         WaterVolumeChunk.WaterCell previous = getOrImport(level, pos);
@@ -370,7 +377,8 @@ public final class CanonicalWater {
 
     /** Drains bounded volume and returns the amount removed. */
     public static int drainVolume(ServerLevel level, BlockPos pos, int requestedUnits) {
-        if (requestedUnits <= 0) {
+        if (requestedUnits <= 0
+                || !WaterMutationSafety.isReady(level, pos, WaterMutationSafety.CALLBACK_RADIUS)) {
             return 0;
         }
         WaterVolumeChunk.WaterCell previous = getOrImport(level, pos);
@@ -438,6 +446,7 @@ public final class CanonicalWater {
         if (level == null
                 || pos == null
                 || volumeUnits <= 0
+                || !WaterMutationSafety.isReady(level, pos, WaterMutationSafety.CALLBACK_RADIUS)
                 || !level.hasChunkAt(pos)
                 || getTracked(level, pos) != null
                 || WildernessWaterAuthority.generatedSpanAt(level, pos) != null
@@ -477,7 +486,8 @@ public final class CanonicalWater {
             BlockPos pos,
             int ownedUnits
     ) {
-        if (level == null || pos == null || !level.hasChunkAt(pos)) {
+        if (level == null || pos == null || !level.hasChunkAt(pos)
+                || !WaterMutationSafety.isReady(level, pos, WaterMutationSafety.CALLBACK_RADIUS)) {
             return false;
         }
         WaterVolumeChunk.WaterCell tracked = getTracked(level, pos);
@@ -509,8 +519,16 @@ public final class CanonicalWater {
      * block state match the tracked cell.</p>
      */
     public static void reprojectCompatibility(ServerLevel level, BlockPos pos) {
-        WaterVolumeChunk.WaterCell cell = get(level, pos);
-        projectCompatibility(level, pos, cell.volumeUnits());
+        WaterVolumeChunk.WaterCell cell = getTracked(level, pos);
+        if (cell == null || cell.displacementReservoir()) return;
+        if (projectCompatibility(level, pos, cell.volumeUnits())) {
+            if (cell.equals(getTracked(level, pos))) {
+                volume(level, pos).set(pos, cell.withoutFlags(WaterVolumeChunk.FLAG_PROJECTION_PENDING));
+            }
+        } else {
+            volume(level, pos).set(pos, cell.withAddedFlags(WaterVolumeChunk.FLAG_PROJECTION_PENDING));
+            defer(level, pos);
+        }
     }
 
     /** Replaces one cell and optionally updates the vanilla compatibility block. */
@@ -539,7 +557,8 @@ public final class CanonicalWater {
         // Runtime water writes are restricted to already-loaded chunks. This is
         // especially important for SPH settlement, whose bounded search can
         // cross a chunk edge while the neighboring chunk is absent.
-        if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
+        if (!level.getServer().isSameThread() || level.getServer().isStopped()
+                || level.isOutsideBuildHeight(pos) || loadedChunk(level, pos) == null) {
             return;
         }
         GeneratedWaterChunk.WaterSpan generated = WildernessWaterAuthority.generatedSpanAt(level, pos);
@@ -547,9 +566,19 @@ public final class CanonicalWater {
             materializeGeneratedNeighborhood(level, pos);
         }
         WaterVolumeChunk.WaterCell effectiveCell = generatedOverrideCell(cell, generated != null);
+        boolean deferProjection = projectCompatibility
+                && !WaterMutationSafety.isReady(level, pos, WaterMutationSafety.CALLBACK_RADIUS);
+        if (deferProjection) effectiveCell = effectiveCell.withAddedFlags(WaterVolumeChunk.FLAG_PROJECTION_PENDING);
         volume(level, pos).set(pos, effectiveCell);
         if (projectCompatibility) {
-            projectCompatibility(level, pos, effectiveCell.volumeUnits());
+            if (deferProjection) {
+                defer(level, pos);
+            } else if (!projectCompatibility(level, pos, effectiveCell.volumeUnits())) {
+                volume(level, pos).set(pos, effectiveCell.withAddedFlags(WaterVolumeChunk.FLAG_PROJECTION_PENDING));
+                defer(level, pos);
+            } else if (effectiveCell.projectionPending() && effectiveCell.equals(getTracked(level, pos))) {
+                volume(level, pos).set(pos, effectiveCell.withoutFlags(WaterVolumeChunk.FLAG_PROJECTION_PENDING));
+            }
         }
         if (scheduleUpdates) {
             scheduleAround(level, pos);
@@ -587,6 +616,7 @@ public final class CanonicalWater {
                                     | WaterVolumeChunk.FLAG_SLEEPING
                     );
                     volume(level, cursor).set(cursor, generatedCell);
+                    queue(level).generatedMaterializations++;
                 }
             }
         }
@@ -598,39 +628,69 @@ public final class CanonicalWater {
             return;
         }
         WaterVolumeChunk.WaterCell tracked = getTracked(level, pos);
+        if (tracked == null) return;
         if (tracked != null && tracked.sleeping()) {
             volume(level, pos).set(pos, tracked.withoutFlags(WaterVolumeChunk.FLAG_SLEEPING));
         }
-        queue(level).offer(pos.immutable());
+        WaterVolumeChunk volume = volume(level, pos);
+        volume.scheduleWork(pos, level.getGameTime());
+        queue(level).offer(new ChunkPos(pos).toLong(), volume);
     }
+
+    /** Retains exact canonical state while unavailable neighborhoods cool down. */
+    public static void defer(ServerLevel level, BlockPos pos) {
+        LevelChunk chunk = loadedChunk(level, pos);
+        if (chunk == null) return;
+        WaterVolumeChunk volume = chunk.getData(ModAttachments.WATER_VOLUME);
+        volume.scheduleWork(pos, level.getGameTime() + 10L);
+        queue(level).offer(chunk.getPos().toLong(), volume);
+        WaterMutationSafety.deferred(level);
+    }
+
+    /** Load/unload only registers existing data; these hooks never project blocks. */
+    public static void onChunkLoad(ServerLevel level, LevelChunk chunk) {
+        chunk.getExistingData(ModAttachments.WATER_VOLUME).ifPresent(volume -> {
+            if (volume.pendingWork() > 0) queue(level).offer(chunk.getPos().toLong(), volume);
+        });
+    }
+
+    public static void onChunkUnload(ServerLevel level, ChunkPos chunk) {
+        ActiveQueue active = ACTIVE_QUEUES.get(level);
+        if (active != null) active.chunks.remove(chunk.toLong());
+    }
+
+    /** Reads existing disturbance work without creating a queue or importing water. */
+    public static Diagnostics diagnostics(ServerLevel level) {
+        ActiveQueue active = ACTIVE_QUEUES.get(level);
+        return active == null ? new Diagnostics(0, 0)
+                : new Diagnostics(active.chunks.values().stream().mapToInt(WaterVolumeChunk::pendingWork).sum(), active.generatedMaterializations);
+    }
+
+    public record Diagnostics(int queuedCells, long generatedMaterializations) { }
 
     /** Polls one active cell for the finite-volume ticker. */
     public static BlockPos pollActive(ServerLevel level) {
-        BlockPos next = queue(level).poll();
-        while (next != null) {
-            WaterVolumeChunk.WaterCell tracked = getTracked(level, next);
-            if (tracked == null
-                    || !tracked.displacementReservoir()
-                    || canAcceptVolume(level, next)) {
-                return next;
-            }
-
-            // Placement callbacks may enqueue a hidden reservoir while its
-            // solid still exists. Drop that attempt; a later terrain callback
-            // queues it again after the cell becomes occupiable.
-            next = queue(level).poll();
-        }
-        return null;
+        return queue(level).poll(level);
     }
 
     /** Releases runtime queues when a server dimension unloads. */
     public static void clearLevel(ServerLevel level) {
         ACTIVE_QUEUES.remove(level);
+        WaterMutationSafety.clearLevel(level);
         com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry.clearLevel(level);
     }
 
     private static WaterVolumeChunk volume(Level level, BlockPos pos) {
-        return level.getChunkAt(pos).getData(ModAttachments.WATER_VOLUME);
+        LevelChunk chunk = loadedChunk(level, pos);
+        if (chunk == null) throw new IllegalStateException("Canonical mutation requires a loaded chunk");
+        return chunk.getData(ModAttachments.WATER_VOLUME);
+    }
+
+    @Nullable
+    private static LevelChunk loadedChunk(Level level, BlockPos pos) {
+        return level instanceof ServerLevel serverLevel
+                ? serverLevel.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4)
+                : level.hasChunkAt(pos) ? level.getChunkAt(pos) : null;
     }
 
     private static WaterVolumeChunk.WaterCell generatedOverrideCell(
@@ -663,7 +723,7 @@ public final class CanonicalWater {
             BlockState replacedState
     ) {
         WaterVolumeChunk.WaterCell tracked = getTracked(level, pos);
-        if (tracked != null && tracked.volumeUnits() > 0) {
+        if (tracked != null) {
             return tracked.withoutFlags(WaterVolumeChunk.FLAG_SLEEPING);
         }
 
@@ -810,7 +870,8 @@ public final class CanonicalWater {
 
     // Projects fixed-point volume back to the namespaced Wilderness fluid's
     // eight physical levels.
-    private static void projectCompatibility(ServerLevel level, BlockPos pos, int volumeUnits) {
+    private static boolean projectCompatibility(ServerLevel level, BlockPos pos, int volumeUnits) {
+        if (!WaterMutationSafety.isReady(level, pos, WaterMutationSafety.CALLBACK_RADIUS)) return false;
         BlockState current = level.getBlockState(pos);
 
         // A vanilla bubble column is a hosted projection of one full canonical
@@ -818,22 +879,23 @@ public final class CanonicalWater {
         // as soon as canonical volume no longer supports a source block.
         if (current.is(Blocks.BUBBLE_COLUMN)) {
             if (volumeUnits >= WildernessWaterAuthority.MIN_FULL_VOLUME_UNITS) {
-                return;
+                WaterMutationSafety.deduplicated(level);
+                return true;
             }
             if (volumeUnits <= 0) {
-                level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-                return;
+                return level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
             }
         }
 
         if (volumeUnits <= 0) {
             if (isPlainWaterProjection(current)) {
-                level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                return level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
             }
-            return;
+            WaterMutationSafety.deduplicated(level);
+            return true;
         }
         if (!current.isAir() && !isPlainWaterProjection(current) && !current.canBeReplaced()) {
-            return;
+            return true;
         }
 
         int amount = Math.max(1, Math.min(VANILLA_LEVELS,
@@ -842,8 +904,10 @@ public final class CanonicalWater {
                 ? WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get().defaultBlockState()
                 : WildernessFluidRegistry.WILDERNESS_WATER.get().getFlowing(amount, false).createLegacyBlock();
         if (!current.equals(projected)) {
-            level.setBlock(pos, projected, 3);
+            return level.setBlock(pos, projected, 3);
         }
+        WaterMutationSafety.deduplicated(level);
+        return true;
     }
 
     private static boolean isPlainWaterProjection(BlockState state) {
@@ -855,21 +919,29 @@ public final class CanonicalWater {
     }
 
     private static final class ActiveQueue {
-        private final ArrayDeque<BlockPos> positions = new ArrayDeque<>();
-        private final Set<BlockPos> queued = new java.util.HashSet<>();
+        private final LinkedHashMap<Long, WaterVolumeChunk> chunks = new LinkedHashMap<>();
+        private long generatedMaterializations;
 
-        private void offer(BlockPos pos) {
-            if (queued.add(pos)) {
-                positions.addLast(pos);
-            }
+        private void offer(long chunk, WaterVolumeChunk volume) {
+            if (volume.pendingWork() > 0) chunks.put(chunk, volume);
         }
 
-        private BlockPos poll() {
-            BlockPos next = positions.pollFirst();
-            if (next != null) {
-                queued.remove(next);
+        private BlockPos poll(ServerLevel level) {
+            // Both levels of the queue have fixed probe bounds. Stale/unloaded
+            // chunks cannot turn one poll into an unbounded cleanup loop.
+            int probes = Math.min(8, chunks.size());
+            for (int probe = 0; probe < probes; probe++) {
+                var iterator = chunks.entrySet().iterator();
+                var entry = iterator.next();
+                long key = entry.getKey();
+                WaterVolumeChunk volume = entry.getValue();
+                iterator.remove();
+                if (level.getChunkSource().getChunkNow(ChunkPos.getX(key), ChunkPos.getZ(key)) == null) continue;
+                Integer packed = volume.pollWork(level.getGameTime());
+                offer(key, volume);
+                if (packed != null) return WaterVolumeChunk.unpack(ChunkPos.getX(key), ChunkPos.getZ(key), packed);
             }
-            return next;
+            return null;
         }
     }
 }

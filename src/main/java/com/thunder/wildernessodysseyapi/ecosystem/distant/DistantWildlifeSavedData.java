@@ -35,6 +35,8 @@ public final class DistantWildlifeSavedData extends SavedData {
 
     private final List<DistantWildlifeGroup> groups = new ArrayList<>();
     private long nextGroupId = 1L;
+    private long revision;
+    private int cachedRepresentedAnimals = -1;
 
     /** Returns the persistent abstract population owner for one dimension. */
     public static DistantWildlifeSavedData get(ServerLevel level) {
@@ -60,7 +62,7 @@ public final class DistantWildlifeSavedData extends SavedData {
                         index,
                         exception.getMessage()
                 );
-                data.setDirty();
+                data.markChanged();
             }
         }
         if (list.size() > MAXIMUM_PERSISTED_GROUPS) {
@@ -69,7 +71,7 @@ public final class DistantWildlifeSavedData extends SavedData {
                     list.size(),
                     MAXIMUM_PERSISTED_GROUPS
             );
-            data.setDirty();
+            data.markChanged();
         }
         return data;
     }
@@ -98,7 +100,21 @@ public final class DistantWildlifeSavedData extends SavedData {
 
     /** Returns the number of real entities currently avoided by this ledger. */
     public int representedAnimals() {
-        return groups.stream().mapToInt(DistantWildlifeGroup::populationEstimate).sum();
+        if (cachedRepresentedAnimals < 0) {
+            cachedRepresentedAnimals = groups.stream().mapToInt(DistantWildlifeGroup::populationEstimate).sum();
+        }
+        return cachedRepresentedAnimals;
+    }
+
+    /** Session-local mutation generation for derived occupancy caches; never persisted. */
+    public long revision() {
+        return revision;
+    }
+
+    private void markChanged() {
+        cachedRepresentedAnimals = -1;
+        revision++;
+        setDirty();
     }
 
     /** Returns immutable groups currently occupying one existing ecosystem region. */
@@ -210,7 +226,7 @@ public final class DistantWildlifeSavedData extends SavedData {
         }
 
         if (changed) {
-            setDirty();
+            markChanged();
         }
         return new PopulationApplyResult(applied, stale, added, removed);
     }
@@ -271,7 +287,7 @@ public final class DistantWildlifeSavedData extends SavedData {
                 seed, gameTime, form, nocturnal, weatherSensitive
         );
         groups.add(created);
-        setDirty();
+        markChanged();
         return true;
     }
 
@@ -283,7 +299,7 @@ public final class DistantWildlifeSavedData extends SavedData {
                     return false;
                 }
                 groups.set(index, replacement);
-                setDirty();
+                markChanged();
                 return true;
             }
         }
@@ -305,7 +321,7 @@ public final class DistantWildlifeSavedData extends SavedData {
             } else {
                 groups.set(index, group.withPopulation(group.populationEstimate() - 1));
             }
-            setDirty();
+            markChanged();
             return true;
         }
         return false;
@@ -331,6 +347,7 @@ public final class DistantWildlifeSavedData extends SavedData {
         for (int index = 0; index < groups.size(); index++) {
             if (groups.get(index).id() == replacement.id()) {
                 groups.set(index, replacement);
+                cachedRepresentedAnimals = -1;
                 return;
             }
         }

@@ -22,6 +22,41 @@ public final class WeatherDataEngineGameTests {
     private WeatherDataEngineGameTests() {
     }
 
+    /** File-watcher callbacks enqueue invalidation before touching server-owned weather. */
+    @GameTest(template = "empty", timeoutTicks = 600)
+    public static void workerConfigReloadDefersAuthorityInvalidationToServer(GameTestHelper helper) {
+        // Existing shared-worker proof ends by tick 400. Delay the global reload
+        // so this test does not intentionally reject that proof's worker result.
+        helper.runAtTickTime(450, () -> runWorkerReloadRegression(helper));
+    }
+
+    private static void runWorkerReloadRegression(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        WeatherAuthority authority = WeatherAuthority.get();
+        authority.clearLocalWeather(level, helper.absolutePos(new BlockPos(8, 2, 8)));
+        authority.onConfigurationReload();
+        var batch = authority.prepareOptionalMaintenance(level, true).simulationBatch();
+        helper.assertTrue(batch != null, "Reload fixture did not capture an atmosphere batch");
+        var result = authority.calculateSimulationBatch(batch);
+        helper.assertTrue(authority.isSimulationResultCurrent(level, result), "Captured batch was already stale");
+        Thread watcher = new Thread(authority::onConfigurationReload, "water-weather-reload-test");
+        watcher.setDaemon(true);
+        watcher.start();
+        try {
+            watcher.join(1000);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted config reload regression", exception);
+        }
+        helper.assertTrue(!watcher.isAlive(), "Config reload blocked waiting for the server thread");
+        helper.assertTrue(authority.isSimulationResultCurrent(level, result),
+                "Watcher thread mutated the server's atmosphere generation directly");
+        helper.startSequence().thenWaitUntil(() -> helper.assertTrue(
+                !authority.isSimulationResultCurrent(level, result),
+                "Queued reload did not invalidate the captured worker generation"))
+                .thenSucceed();
+    }
+
     /**
      * Creates real level-owned cells and waits for the normal scheduler,
      * shared worker calculation, stale check, and server-thread apply path.

@@ -268,6 +268,9 @@ public final class WeatherDebugCommand {
         }
         WeatherAuthority.PhysicsDiagnostics physics = authority.physicsDiagnostics(source.getLevel());
         var engine = com.thunder.wildernessodysseyapi.dataengine.DataEngine.get().metricsSnapshot();
+        int terrainProbes = authority.terrainProbes(source.getLevel());
+        source.sendSuccess(() -> Component.literal("Input capture terrain probes=" + terrainProbes
+                + " (maximum 4672 per pass; cached context retained for the admitted grid)."), false);
         double volumePerMm = Math.pow(WeatherConfig.scheduling().cellSize(), 2) / 1000.0;
         source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
                 "Last batch: %d cell steps, %.3f ms, %d ticks deferred; ET %.6f m3, precipitation %.6f m3, open-boundary vapor %+.6f m3. %d systems; shared worker queue %d, rejected %d.",

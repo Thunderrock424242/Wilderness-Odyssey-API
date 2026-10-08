@@ -57,6 +57,8 @@ public final class WildernessMixinConfigPlugin implements IMixinConfigPlugin {
 
     static String optionalTarget(String mixinClassName) {
         return switch (mixinClassName) {
+            case MIXIN_PACKAGE + "SableWaterShapeMixin" ->
+                    "dev.ryanhcode.sable.physics.chunk.VoxelNeighborhoodState";
             case MIXIN_PACKAGE + "ForwardExtentCopyMixin" -> WORLDEDIT_TARGET;
             case MIXIN_PACKAGE + "IrisWaterMaterialBridgeMixin" ->
                     "net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings";

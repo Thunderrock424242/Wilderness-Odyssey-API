@@ -3,11 +3,10 @@ package com.thunder.wildernessodysseyapi.meteor.worldgen;
 /**
  * Legacy entry point retained for integrations compiled against older builds.
  *
- * <p>Meteor biome injection is entirely data-driven through
- * {@code data/neoforge/biome_modifier/add_meteor_impact.json}. Calling this
- * compatibility method is intentionally a no-op.</p>
+ * <p>Natural craters use the data-pack {@code meteor_craters} structure set
+ * and bounded structure pieces. Calling this compatibility method is a no-op.</p>
  *
- * @deprecated biome modifiers are loaded from data packs and require no Java registration
+ * @deprecated natural placement is owned by the crater structure set
  */
 @Deprecated(forRemoval = true)
 public final class MeteorBiomeModifier {
@@ -18,10 +17,10 @@ public final class MeteorBiomeModifier {
     /**
      * Retains source and binary compatibility with the former registration hook.
      *
-     * @deprecated no registration call is required for the data-driven feature
+     * @deprecated the structure registry owns natural crater placement
      */
     @Deprecated(forRemoval = true)
     public static void register() {
-        // Intentionally empty: NeoForge discovers the JSON biome modifier.
+        // Retained for integrations using the former biome-injection hook.
     }
 }

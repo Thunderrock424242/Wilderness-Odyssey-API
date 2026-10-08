@@ -102,13 +102,20 @@ fresh validation of subsequent edits. Record new results below.
 
 ## 3. Commands and interpreting the numbers
 
+The October 2026 hardening cases and exact current validation results are kept
+in [water/weather hardening](water-weather-hardening.md). Its focused regression
+commands include precipitation presentation, cache work, synchronization fairness
+and placement cancellation alongside world-backed conservation.
+
 Run these individually at the test location:
 
 ```mcfunction
 /wowater mode
 /wowater watershed
 /wowater budget
+/wowater summary
 /wilderness weather sample
+/wilderness weather physics
 ```
 
 Budget and weather controls require cheats/operator permission. The default

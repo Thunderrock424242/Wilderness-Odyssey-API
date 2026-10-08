@@ -50,11 +50,19 @@ them. Supported terrain suppresses legacy heuristic evaporation/moisture gains.
 See [atmospheric exchange](atmospheric-exchange.md) for the receipt and 25-mm
 normalized vapor-column conversion.
 
-The atmosphere is still a normalized open-boundary model, not a globally finite
-m3 inventory. Precipitation is not debited a second time from its existing cloud
-process. Atmospheric transport/clamps and uncovered terrain remain
-approximations; exact balance applies to regional water. Unacknowledged feedback
-is ephemeral, but losing that feedback on a crash cannot change water inventory.
+The atmosphere retains physical vapor, cloud-liquid and cloud-ice mass and
+debits sedimented precipitation before publishing its typed flux. Its public
+weather sample is a normalized projection. Transport at uncovered boundaries
+remains an approximation; this is not a globally closed climate simulation.
+Outstanding feedback, precipitation and fractional receipts persist with
+regional SavedData. See [physical atmosphere](../weather/physical-atmosphere.md).
+
+Disabling weather-water coupling or localized weather for a dimension prevents
+new atmospheric precipitation publications, feedback capture and application
+of pending precipitation. Already committed receipts remain saved while the
+coupling is disabled. Re-enabling resumes their exact application once; it does
+not replay rain that occurred while coupling was disabled. A captured receipt
+is acknowledged only by a successfully applied worker result.
 
 Admitted regional records evolve without nearby players. They hold cached
 forcing over old elapsed intervals, refresh weather for future intervals after
@@ -93,6 +101,13 @@ Unit-bearing hydrology rates, aquifer timescale, thermal toggle, admission,
 topology/catch-up budgets and audit tolerance are documented in
 [watersheds and flooding](watersheds-and-flooding.md#configuration).
 Normalized client packet shapes remain unchanged.
+
+Live weather configuration publication and authority invalidation run together
+on the server thread. Reload invalidates outstanding captures before another
+generation can apply, clears terrain input caches and requests fresh snapshots.
+Climate and water-coverage caches retain the admitted atmosphere grid rather
+than evicting a fixed 2048 entries on every large pass. At most 64 cells per
+capture refresh each terrain lattice (4672 total column probe attempts).
 
 ## Validation
 

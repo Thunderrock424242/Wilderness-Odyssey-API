@@ -30,6 +30,7 @@ public final class WaterSimulationConfig {
     public static ModConfigSpec.BooleanValue ENABLE_FLUID_HANDLER_COMPAT;
     public static ModConfigSpec.BooleanValue ENABLE_CREATE_WATER_COMPAT;
     public static ModConfigSpec.IntValue LOCAL_FLOW_CELLS_PER_TICK;
+    public static ModConfigSpec.DoubleValue LOCAL_FLOW_BUDGET_MILLIS;
     public static ModConfigSpec.DoubleValue LOCAL_FLOW_SLEEP_SPEED;
     public static ModConfigSpec.IntValue LARGE_BODY_CACHE_MAX_COLUMNS;
     public static ModConfigSpec.IntValue WATER_BODY_UPDATES_PER_TICK;
@@ -142,6 +143,9 @@ public final class WaterSimulationConfig {
         LOCAL_FLOW_CELLS_PER_TICK = builder
                 .comment("Maximum active detailed water cells processed per server tick. Sleeping cells are skipped until nearby water changes.")
                 .defineInRange("localFlowCellsPerTick", 128, 16, 1024);
+        LOCAL_FLOW_BUDGET_MILLIS = builder
+                .comment("Elapsed milliseconds allowed for starting additional local-flow cells per dimension tick. An in-progress block callback cannot be interrupted.")
+                .defineInRange("localFlowBudgetMillis", 5.0, 0.25, 25.0);
         LOCAL_FLOW_SLEEP_SPEED = builder
                 .comment("Velocity below this value lets a detailed local water cell sleep when it cannot flow.")
                 .defineInRange("localFlowSleepSpeed", 0.025, 0.001, 0.20);
@@ -391,6 +395,11 @@ public final class WaterSimulationConfig {
     /** Returns the active local-cell flow budget for one server tick. */
     public static int localFlowCellsPerTick() {
         return wildernessWaterEnabled() ? LOCAL_FLOW_CELLS_PER_TICK.get() : 0;
+    }
+
+    /** Soft server-thread flow budget, checked between cell transactions. */
+    public static long localFlowBudgetNanos() {
+        return (long) (LOCAL_FLOW_BUDGET_MILLIS.get() * 1_000_000L);
     }
 
     /** Returns the speed threshold under which immobile local cells can sleep. */

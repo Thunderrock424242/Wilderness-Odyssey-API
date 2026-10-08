@@ -75,7 +75,6 @@ public record EnvironmentSyncPayload(
         riftfallStage = Math.max(0, Math.min(RiftfallStage.values().length - 1, riftfallStage));
         if (!meteorPresent) {
             meteorRadius = 0;
-            radiation = 0.0F;
         }
     }
 
@@ -103,7 +102,7 @@ public record EnvironmentSyncPayload(
                 (float) snapshot.vegetation().droughtLevel(),
                 snapshot.tide().offset(),
                 snapshot.tide().rate(),
-                (float) meteor.radiation(),
+                (float) snapshot.radiation(),
                 snapshot.watershed().flooding(),
                 snapshot.coastal(),
                 meteor.present(),

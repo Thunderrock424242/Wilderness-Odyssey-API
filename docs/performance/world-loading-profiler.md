@@ -2,7 +2,7 @@
 
 Wilderness Odyssey automatically samples long client/world loads. No chat command or Spark installation is required. It covers vanilla world-data reads, world-resource preparation, world creation preparation, spawn generation, terrain reception, progress screens, and resource-loading overlays.
 
-On recognized loading screens, a small panel shows elapsed time, the current stage, spawn percentage when available, the time since the visible stage/percentage last changed, and frequently sampled active code. It appears after the first worker sampling pass. Resource overlays are monitored even when they cover the underlying panel.
+The loading diagnostics panel is hidden by default. Automatic sampling and local reports remain enabled. When explicitly enabled, the panel shows elapsed time, the current stage, spawn percentage when available, the time since the visible stage/percentage last changed, and frequently sampled active code on recognized loading screens. It appears after the first worker sampling pass. Resource overlays are monitored even when they cover the underlying panel.
 
 ## Finding a report
 
@@ -25,6 +25,12 @@ The nearest identifiable mod frame in a sampled stack is a **suspect**, not a pr
 This client can see an integrated single-player server's threads. It cannot profile generation happening on a separate multiplayer server. Screens replaced completely by another mod may not be recognized. JVM sampling cannot diagnose a hang that occurs before the client event bridge has armed, or recover diagnostics after a JVM/process crash.
 
 ## Optional launcher JVM arguments
+
+```text
+-Dwilderness.loadingstall.showPanel=true
+```
+
+This opts into the loading diagnostics panel. Omit this argument or set it to `false` to keep the panel hidden. Restart Minecraft after changing JVM arguments. Panel visibility does not change automatic sampling or report collection.
 
 ```text
 -Dwilderness.loadingstall.minutes=5
@@ -57,7 +63,7 @@ The focused tests cover stage/progress tracking, ownership, waiting versus runna
 
 Live acceptance remains separate from unit tests and packaging:
 
-1. Install the regular mod JAR in a disposable launcher profile and create a world. Check the loading panel and spawn percentage, including small windows/high GUI scale.
+1. Install the regular mod JAR in a disposable launcher profile and create a world. Confirm the loading panel is hidden by default. Restart with `-Dwilderness.loadingstall.showPanel=true` and check the panel and spawn percentage, including small windows/high GUI scale.
 2. Reproduce a load lasting over a minute. Check the report while the screen is still open and compare the next update. Confirm it names actual mod modules or explicitly shows unresolved ownership.
 3. Let the world open, cancel a load, disconnect, and start a second world. Confirm sampling ends and reports do not carry the previous operation's stage/progress into the new one.
 4. Reproduce a blocked client thread after loading has armed. Check that heartbeat age rises and the local report continues updating. A frozen render thread cannot refresh the panel.

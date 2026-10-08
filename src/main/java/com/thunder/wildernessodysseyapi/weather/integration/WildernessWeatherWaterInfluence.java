@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.integration;
 
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
+import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphereClimateCache;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterAccess;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
 import net.minecraft.core.BlockPos;
@@ -13,8 +14,7 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.Set;
 
 /**
  * Samples vanilla, mod-tagged, and Wilderness-owned surface water without mutation.
@@ -28,10 +28,19 @@ public final class WildernessWeatherWaterInfluence implements WeatherWaterInflue
 
     private static final int PROBES_PER_AXIS = 8;
     private static final int TOTAL_PROBES = PROBES_PER_AXIS * PROBES_PER_AXIS;
-    private static final int MAX_CACHED_CELLS = 2048;
 
     private final WaterAccess waterAccess;
-    private final LinkedHashMap<Long, CachedSample> cache = new LinkedHashMap<>(128, 0.75f, true);
+    private final AtmosphereClimateCache<WaterInfluenceSample> cache = new AtmosphereClimateCache<>();
+
+    @Override
+    public synchronized void beginSamplingPass(Set<Long> retained, long tick, int refreshTicks, int budget) {
+        cache.beginPass(retained, tick, refreshTicks, budget);
+    }
+
+    @Override
+    public synchronized int terrainProbes() {
+        return cache.samplesThisPass() * TOTAL_PROBES;
+    }
 
     /** Creates an adapter backed by the stable public Wilderness water service. */
     public WildernessWeatherWaterInfluence() {
@@ -51,21 +60,12 @@ public final class WildernessWeatherWaterInfluence implements WeatherWaterInflue
     ) {
         long gameTime = level.getGameTime();
         long packedCell = cell.packed();
-        CachedSample cached = cache.get(packedCell);
-        if (cached != null && gameTime - cached.sampledAtTick < Math.max(20, refreshIntervalTicks)) {
-            return cached.sample;
-        }
-
-        WaterInfluenceSample sampled = sampleLoadedSurface(level, cell, Math.max(16, cellSize));
-        if (sampled.loadedProbeFraction() == 0.0f && cached != null) {
-            // Preserve the last known surface context when a dormant region's
-            // chunks unload; an absence of loaded probes is not evidence that
-            // the water disappeared.
-            sampled = cached.sample;
-        }
-        cache.put(packedCell, new CachedSample(gameTime, sampled));
-        trimCache();
-        return sampled;
+        WaterInfluenceSample previous = cache.peek(packedCell);
+        return cache.sample(packedCell, gameTime, () -> {
+            WaterInfluenceSample sampled = sampleLoadedSurface(level, cell, Math.max(16, cellSize));
+            // Unloaded terrain does not erase a region's last known water.
+            return sampled.loadedProbeFraction() == 0.0f && previous != null ? previous : sampled;
+        }, () -> WaterInfluenceSample.UNKNOWN);
     }
 
     @Override
@@ -140,17 +140,8 @@ public final class WildernessWeatherWaterInfluence implements WeatherWaterInflue
         );
     }
 
-    private void trimCache() {
-        while (cache.size() > MAX_CACHED_CELLS) {
-            Map.Entry<Long, CachedSample> eldest = cache.entrySet().iterator().next();
-            cache.remove(eldest.getKey());
-        }
-    }
-
     private static int boundedBlock(long coordinate) {
         return (int) Math.max(-30_000_000L, Math.min(30_000_000L, coordinate));
     }
 
-    private record CachedSample(long sampledAtTick, WaterInfluenceSample sample) {
-    }
 }

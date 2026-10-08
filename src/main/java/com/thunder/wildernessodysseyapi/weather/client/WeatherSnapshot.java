@@ -116,6 +116,16 @@ public final class WeatherSnapshot {
         return result == null ? WeatherSample.CLEAR : result;
     }
 
+    /** Samples a visual mixture of synchronized phases, with missing cells treated as clear. */
+    public PrecipitationBlend precipitationBlend(double blockX, double blockZ) {
+        double gridX = blockX / cellSize - 0.5D;
+        double gridZ = blockZ / cellSize - 0.5D;
+        int x = floorToInt(gridX);
+        int z = floorToInt(gridZ);
+        return PrecipitationBlend.spatial(sampleInCell(x, z), sampleInCell(x + 1, z),
+                sampleInCell(x, z + 1), sampleInCell(x + 1, z + 1), gridX - x, gridZ - z);
+    }
+
     /**
      * Samples only the atmospheric fields needed to construct cloud geometry.
      *

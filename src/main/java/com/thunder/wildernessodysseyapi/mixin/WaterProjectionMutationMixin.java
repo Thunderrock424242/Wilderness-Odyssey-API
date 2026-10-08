@@ -43,7 +43,9 @@ public abstract class WaterProjectionMutationMixin {
                 WorldFluidMutationReconciler.beforeSetBlock(
                         (Level) (Object) this,
                         position,
-                        newState
+                        newState,
+                        flags,
+                        recursionLeft
                 );
         if (decision.interceptsOriginal()) {
             callbackInfo.setReturnValue(decision.returnValue());
