@@ -2,6 +2,8 @@
 
 **Setting up Aether for the first time? Follow [Aether setup and verification](../AETHER_SETUP.md).** This document is the detailed deployment reference.
 
+For local release preparation, SFTP staging, behavior changes and rollback, use [the terminal operator workflow](operator/README.md). Host credentials and addresses belong in its ignored local connection config or named environment variables.
+
 Phase 1 provides a protected origin and Minecraft transport. Production deployment, live restarts, active-model changes and enabling remote administration require separate owner approval. The confirmed Kinetic allocation is a 500% CPU limit and 8 GB RAM, with GPU availability unknown. This does not establish that the existing 8B model fits alongside Minecraft.
 
 ## Trust boundaries
@@ -21,7 +23,7 @@ Use JDK 21 and the repository wrapper, with one Gradle process at a time:
 .\gradlew.bat :aether-server:build '-PcodexBuildDir=.codex-build' --no-parallel
 ```
 
-The gateway-only output is `aether-server/.codex-build/libs/Aether-Gateway.jar`. It does not contain model weights or Minecraft dependencies. See the [bundle guide](../docs/ai/aether-bundled-server.md) for optional native distributions; they were not rebuilt for Phase 1.
+The gateway-only output is `aether-server/.codex-build/libs/Aether-Gateway.jar`. It does not contain model weights or Minecraft dependencies. See the [bundle guide](../docs/ai/aether-bundled-server.md) for optional native distributions. Historical Phase 1 rebuilt only the gateway; [the October 9 readiness record](../docs/ai/aether-readiness-2026-10-09.md) identifies the current Linux rebuild and the remaining host checks.
 
 Copy [the example](aether-server.example.yml) into operator-owned configuration. Provision three different, cryptographically random secrets of at least 32 characters through the named environment variables. The allowed token alphabet is letters, digits, period, underscore, tilde and hyphen. Never commit their values or include them in a public client pack. Optional `inference_expires_at`, `monitoring_expires_at` and `administration_expires_at` settings accept ISO-8601 UTC timestamps; expired credentials fail closed. Rotation is an operator-controlled configuration/restart action requiring the production approval gate.
 

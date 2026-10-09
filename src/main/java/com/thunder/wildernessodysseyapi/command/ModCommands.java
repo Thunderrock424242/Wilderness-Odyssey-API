@@ -72,6 +72,7 @@ public final class ModCommands {
         ReactiveVegetationDebugCommand.register(dispatcher);
         GlacialDebugCommand.register(dispatcher);
         DataEngineCommand.register(dispatcher);
+        com.thunder.wildernessodysseyapi.diagnostics.performance.PerformanceCommand.register(dispatcher);
         SimulationDebugCommand.register(dispatcher);
         CinematicCommand.register(dispatcher);
         com.thunder.wildernessodysseyapi.quest.command.QuestCommand.register(dispatcher);

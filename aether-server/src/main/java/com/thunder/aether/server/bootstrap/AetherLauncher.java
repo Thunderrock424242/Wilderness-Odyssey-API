@@ -2,6 +2,8 @@ package com.thunder.aether.server.bootstrap;
 
 import com.thunder.aether.server.AetherServer;
 import com.thunder.aether.server.config.ServerConfig;
+import com.thunder.aether.server.model.PromptCatalog;
+import com.thunder.aether.server.api.JsonHttp;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -19,6 +21,27 @@ public final class AetherLauncher {
             System.out.println("Aether server: java -jar Aether-AI-Server-<platform>.jar [--data-dir directory] [--setup-only]");
             System.out.println("Gateway-only mode: --external [--config file]. Existing --config file usage is also supported.");
             System.out.println("Bundled mode extracts Ollama and the model beside the application data; no system installation.");
+            System.out.println("Offline checks: --validate-config file or --validate-prompts file (no service or model startup).");
+            return;
+        }
+        if (args.length == 2 && (args[0].equals("--validate-config") || args[0].equals("--validate-prompts"))) {
+            try {
+                if (args[0].equals("--validate-config")) {
+                    ServerConfig config = ServerConfig.load(Path.of(args[1]), System.getenv());
+                    PromptCatalog prompts = new PromptCatalog(config.promptsFile());
+                    System.out.println(JsonHttp.JSON.toJson(java.util.Map.of("configurationValid", true,
+                            "inferenceActivated", config.activation().permits(config.model()),
+                            "model", config.model(), "speakers", prompts.speakers())));
+                } else {
+                    PromptCatalog prompts = new PromptCatalog(args[1]);
+                    System.out.println(JsonHttp.JSON.toJson(java.util.Map.of("promptsValid", true,
+                            "speakers", prompts.speakers())));
+                }
+            } catch (Exception failure) {
+                // YAML and library failures can embed operator data; never print the offending source.
+                System.err.println("Operator validation failed. Check YAML, prompt files and secret references.");
+                System.exit(1);
+            }
             return;
         }
         if (args.length > 0 && args[0].equals("--external")) {

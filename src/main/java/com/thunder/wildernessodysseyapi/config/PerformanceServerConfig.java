@@ -31,6 +31,7 @@ public final class PerformanceServerConfig {
                         "Minecraft and NeoForge ticking, chunks, entities, and networking remain authoritative."
                 )
                 .define("enabled", true);
+        com.thunder.wildernessodysseyapi.diagnostics.performance.PerformanceDiagnosticsConfig.define(builder);
         BackgroundEfficiencyConfig.define(builder);
         TickEngineConfig.define(builder);
         DataEngineConfig.define(builder);

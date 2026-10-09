@@ -14,6 +14,25 @@ class WildernessMixinConfigPluginTest {
     private static final String PACKAGE = "com.thunder.wildernessodysseyapi.mixin.";
 
     @Test
+    void performanceHooksCanBeRemovedAtStartupWithoutDisablingGameplayMixins() {
+        String previous = System.getProperty("wilderness.perf.instrumentation");
+        try {
+            System.setProperty("wilderness.perf.instrumentation", "false");
+            assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
+                    PACKAGE + "PerformanceSaveDiagnosticsMixin", ignored -> { throw new AssertionError("Target loaded"); }));
+            assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
+                    PACKAGE + "PerformanceChunkWaitDiagnosticsMixin", ignored -> { throw new AssertionError("Target loaded"); }));
+            assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(PACKAGE + "BoatRenderMixin", ignored -> false));
+            System.clearProperty("wilderness.perf.instrumentation");
+            assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(PACKAGE + "PerformanceSaveDiagnosticsMixin", ignored -> false));
+            assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(PACKAGE + "PerformanceChunkWaitDiagnosticsMixin", ignored -> false));
+        } finally {
+            if (previous == null) System.clearProperty("wilderness.perf.instrumentation");
+            else System.setProperty("wilderness.perf.instrumentation", previous);
+        }
+    }
+
+    @Test
     void sableWaterBridgeIsSkippedWhenSableIsAbsent() {
         assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
                 PACKAGE + "SableWaterShapeMixin", ignored -> false));

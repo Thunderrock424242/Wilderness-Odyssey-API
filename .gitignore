@@ -45,6 +45,10 @@ repo
 /aether-server/.codex-build/
 /aether-server/aether-server.yml
 /deploy/aether-server.yml
+/deploy/operator/aether-connection.local.json
+/src/main/resources/aether/aether-connection.local.json
+/src/main/resources/aether/aether-server.yml
+/src/main/resources/aether/aether-prompts.yml
 **/aether-state/
 /deploy/docker/state/
 **/credentials.env

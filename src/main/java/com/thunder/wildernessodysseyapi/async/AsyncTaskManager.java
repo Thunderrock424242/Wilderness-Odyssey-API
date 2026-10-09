@@ -309,6 +309,29 @@ public final class AsyncTaskManager {
         return executor == null ? 0 : executor.getQueue().size();
     }
 
+    /** Read-only current and retired pool gauges; Data Engine workers are already included in CPU totals. */
+    public static WorkerPools workerPools() {
+        int retiredActive = 0;
+        int retiredQueued = 0;
+        int retiredCount = 0;
+        for (ThreadPoolExecutor executor : RETIRED_EXECUTORS) {
+            if (!executor.isTerminated()) {
+                retiredCount++;
+                retiredActive += executor.getActiveCount();
+                retiredQueued += executor.getQueue().size();
+            }
+        }
+        return new WorkerPools(poolGauge(cpuExecutor), poolGauge(ioExecutor), retiredCount, retiredActive, retiredQueued);
+    }
+
+    private static PoolGauge poolGauge(ThreadPoolExecutor executor) {
+        return executor == null ? new PoolGauge(0, 0, 0) : new PoolGauge(
+                executor.getMaximumPoolSize(), executor.getActiveCount(), executor.getQueue().size());
+    }
+
+    public record PoolGauge(int maximumWorkers, int activeWorkers, int queuedTasks) { }
+    public record WorkerPools(PoolGauge cpu, PoolGauge io, int retiredPools, int retiredActive, int retiredQueued) { }
+
     private static ThreadPoolExecutor buildExecutor(String prefix, int threads, int queueSize) {
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<>(queueSize);
         ThreadFactory factory = runnable -> {

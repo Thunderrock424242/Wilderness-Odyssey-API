@@ -1,0 +1,25 @@
+{
+  "gatewayUrl": "",
+  "minecraftServerId": "wilderness-server",
+  "inferenceTokenEnv": "AETHER_INFERENCE_TOKEN",
+  "monitoringTokenEnv": "AETHER_MONITORING_TOKEN",
+  "javaHome": "",
+  "platform": "linux-amd64",
+  "runtimeDirectory": "",
+  "modelDirectory": "",
+  "sourceModel": "llama3.1:8b",
+  "sftp": {
+    "host": "",
+    "port": 2022,
+    "user": "",
+    "identityFile": "",
+    "releaseDirectory": "aether-releases",
+    "dataDirectory": "aether"
+  },
+  "panel": {
+    "baseUrl": "https://kineticpanel.net",
+    "apiTokenEnv": "KINETIC_API_TOKEN",
+    "restartPath": "",
+    "restartBody": {}
+  }
+}

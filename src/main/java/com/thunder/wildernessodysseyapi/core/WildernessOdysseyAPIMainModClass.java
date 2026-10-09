@@ -120,6 +120,7 @@ public final class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(DistantWildlifeServerEvents.class);
         NeoForge.EVENT_BUS.register(MeteorImpactEvent.class);
         NeoForge.EVENT_BUS.register(PerformanceServerEvents.class);
+        NeoForge.EVENT_BUS.register(com.thunder.wildernessodysseyapi.diagnostics.performance.PerformanceDiagnosticEvents.class);
         NeoForge.EVENT_BUS.register(TideWorldUpdater.class);
         NeoForge.EVENT_BUS.register(ModCommands.class);
         NeoForge.EVENT_BUS.register(ServerLifecycleEvents.class);

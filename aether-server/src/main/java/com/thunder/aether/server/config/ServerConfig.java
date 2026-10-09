@@ -50,6 +50,11 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
         }
         Map<?, ?> server = section(root, "server"), ollama = section(root, "ollama"),
                 limits = section(root, "limits"), logging = section(root, "logging");
+        String prompts = text(root, "prompts_file", "");
+        // Operator behavior files travel with the configuration, independently of panel working directories.
+        Path configDirectory = file == null ? Path.of(".").toAbsolutePath()
+                : file.toAbsolutePath().getParent();
+        if (!prompts.isBlank()) { prompts = configDirectory.resolve(prompts).normalize().toString(); }
         return new ServerConfig(text(server,"bind","127.0.0.1"), number(server,"port",8085),
                 number(server,"request_timeout_seconds",10), text(ollama,"url","http://127.0.0.1:11434"),
                 text(ollama,"model","aether-custom:8b"), number(ollama,"timeout_seconds",30),
@@ -57,7 +62,7 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
                 number(limits,"max_queue_size",20), requestLimit(limits),
                 number(limits,"max_request_bytes",65536), number(limits,"http_workers",8),
                 flag(logging,"log_requests"), flag(logging,"log_player_messages"), flag(logging,"log_responses"),
-                text(root,"prompts_file",""),
+                prompts,
                 GatewaySecurityConfig.load(section(root,"security"), environment,
                         (file == null ? Path.of(".") : file.toAbsolutePath().getParent()).resolve("aether-state")),
                 ActivationConfig.load(section(root,"activation")));

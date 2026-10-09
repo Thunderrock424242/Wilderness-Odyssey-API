@@ -2,7 +2,11 @@
 
 **Start here.** This is the operator walkthrough for the current protected Aether service. You do not need to read the design and historical verification documents to follow it.
 
-Use the **gateway-only JAR with separately managed Ollama** for this setup. The older large Windows/Linux bundles predate the protection changes; do not use them for this walkthrough.
+For repeatable PowerShell preparation, SFTP staging, behavior updates, rollback and connection checks, see [Aether terminal operations for Kinetic](deploy/operator/README.md). Its ignored connection config can be filled in when the host details are available. Offline validation commands are `--validate-config <file>` and `--validate-prompts <file>`; relative `prompts_file` paths resolve beside the gateway configuration.
+
+To fill in the settings from the resources area, run `.\deploy\operator\aether.ps1 -Action Init`, then edit the local connection, server and behavior files in [src/main/resources/aether/](src/main/resources/aether/README.md). The terminal tool uses those files by default. They are ignored by Git and excluded from the Minecraft mod JAR.
+
+Use the **gateway-only JAR with separately managed Ollama** for this walkthrough. The Linux native bundle was rebuilt with the current protections on October 9; see [the current readiness record](docs/ai/aether-readiness-2026-10-09.md) for its artifact identity and unverified host checks. Older bundles, including the September Windows package, predate those protections.
 
 There are two milestones:
 

@@ -32,6 +32,8 @@
     "LivingEntityMixin",
     "MixinWeatherCommand",
     "NaturalAquaticFeatureWaterMixin",
+    "PerformanceSaveDiagnosticsMixin",
+    "PerformanceChunkWaitDiagnosticsMixin",
     "NoiseBasedChunkGeneratorWaterMixin",
     "ProtoChunkWaterMixin",
     "SableWaterShapeMixin",

@@ -1,0 +1,40 @@
+# Fill in aether-server.yml, created by the operator Init command, rather than this example.
+# This template is for the standalone bundle: its managed Ollama listens on port 11435.
+# For separately managed Ollama, use its verified private address/port instead.
+# Tokens remain in the named environment variables; enter no token values here.
+server:
+  # The protected gateway origin must remain on loopback.
+  bind: "127.0.0.1"
+  # Match the approved connector/startup configuration on the Aether instance.
+  port: 8085
+  request_timeout_seconds: 10
+ollama:
+  url: "http://127.0.0.1:11435"
+  model: "aether-custom:8b"
+  timeout_seconds: 30
+  max_output_tokens: 256
+limits:
+  max_concurrent_generations: 1
+  max_queue_size: 2
+  requests_per_minute: 60
+  max_request_bytes: 65536
+  http_workers: 8
+logging:
+  log_requests: false
+  log_player_messages: false
+  log_responses: false
+# Keep this filename: Prepare stages your behavior file beside the server config.
+prompts_file: "aether-prompts.yml"
+security:
+  # Match minecraftServerId in the connection JSON and ai_backend.server_id in Minecraft.
+  minecraft_server_id: "wilderness-server"
+  inference_token_env: "AETHER_INFERENCE_TOKEN"
+  monitoring_token_env: "AETHER_MONITORING_TOKEN"
+  administration_token_env: "AETHER_ADMINISTRATION_TOKEN"
+  administration_enabled: false
+activation:
+  # Leave these locked until the host, capacity and exact model are verified.
+  hosting_verified: false
+  capacity_verified: false
+  inference_enabled: false
+  verified_model: ""

@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileReloadListener;
 import com.thunder.wildernessodysseyapi.dataengine.DataEngine;
+import com.thunder.wildernessodysseyapi.diagnostics.performance.PerformanceDiagnostics;
 import com.thunder.wildernessodysseyapi.ecosystem.debug.map.EcosystemDebugMapService;
 import com.thunder.wildernessodysseyapi.ecosystem.integration.EcosystemPerformanceIntegration;
 import com.thunder.wildernessodysseyapi.faq.FaqReloadListener;
@@ -101,23 +102,30 @@ public final class ServerLifecycleEvents {
     /** Persists mobile water and stops runtime services during shutdown. */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onServerStopping(ServerStoppingEvent event) {
-        com.thunder.wildernessodysseyapi.quest.runtime.QuestServerEvents.stop(event.getServer());
-        SPHSimulationManager waterManager = SPHSimulationManager.get();
-        for (ServerLevel level : event.getServer().getAllLevels()) {
-            waterManager.capturePersistentLevel(level);
-        }
-        waterManager.shutdown();
-        WaterPerformanceIntegration.shutdown();
-        EcosystemDebugMapService.shutdown(event.getServer());
-        SimulationEngine.get().shutdown();
-        TickEngine.shutdown();
-        BackgroundEfficiencyManager.shutdown();
-        DataEngine.get().shutdown();
-        AsyncTaskManager.shutdown();
-        // Persist the final retry spool only after accepted telemetry workers
-        // have drained or been cancelled, then release process-wide UUID caches.
-        TelemetryQueue.shutdown(event.getServer());
-        PlayerTelemetryReporter.clearCaches();
+        PerformanceDiagnostics.runPhase(event.getServer(), "wo/shutdown_handler", () -> {
+            PerformanceDiagnostics.runPhase(event.getServer(), "wo/quest_close",
+                    () -> com.thunder.wildernessodysseyapi.quest.runtime.QuestServerEvents.stop(event.getServer()));
+            SPHSimulationManager waterManager = SPHSimulationManager.get();
+            PerformanceDiagnostics.runPhase(event.getServer(), "wo/water_capture", () -> {
+                for (ServerLevel level : event.getServer().getAllLevels()) {
+                    waterManager.capturePersistentLevel(level);
+                }
+            });
+            PerformanceDiagnostics.runPhase(event.getServer(), "wo/runtime_cleanup", () -> {
+                waterManager.shutdown();
+                WaterPerformanceIntegration.shutdown();
+                EcosystemDebugMapService.shutdown(event.getServer());
+                SimulationEngine.get().shutdown();
+            });
+            PerformanceDiagnostics.runPhase(event.getServer(), "wo/tick_shutdown", TickEngine::shutdown);
+            PerformanceDiagnostics.runPhase(event.getServer(), "wo/background_shutdown", BackgroundEfficiencyManager::shutdown);
+            PerformanceDiagnostics.runPhase(event.getServer(), "wo/data_shutdown", () -> DataEngine.get().shutdown());
+            PerformanceDiagnostics.runPhase(event.getServer(), "wo/async_shutdown", AsyncTaskManager::shutdown);
+            // Persist the final retry spool only after accepted telemetry workers
+            // have drained or been cancelled, then release process-wide UUID caches.
+            PerformanceDiagnostics.runPhase(event.getServer(), "wo/telemetry_flush", () -> TelemetryQueue.shutdown(event.getServer()));
+            PlayerTelemetryReporter.clearCaches();
+        });
     }
 
     /** Clears world-derived caches when a level is unloaded to avoid retaining stale state. */

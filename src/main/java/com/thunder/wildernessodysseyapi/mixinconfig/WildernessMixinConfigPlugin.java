@@ -51,6 +51,11 @@ public final class WildernessMixinConfigPlugin implements IMixinConfigPlugin {
             String mixinClassName,
             Predicate<String> classExists
     ) {
+        if ((mixinClassName.equals(MIXIN_PACKAGE + "PerformanceSaveDiagnosticsMixin")
+                || mixinClassName.equals(MIXIN_PACKAGE + "PerformanceChunkWaitDiagnosticsMixin"))
+                && !Boolean.parseBoolean(System.getProperty("wilderness.perf.instrumentation", "true"))) {
+            return false;
+        }
         String optionalTarget = optionalTarget(mixinClassName);
         return optionalTarget == null || classExists.test(optionalTarget);
     }

@@ -178,6 +178,8 @@ tasks.named('processResources') {
     // Minecraft datagen stores provider hashes beneath its output root. Those
     // local cache records are build bookkeeping, not mod resources.
     exclude '.cache/**'
+    // Local Aether hosting settings are edited here but never distributed to players.
+    exclude 'aether/**'
     // The authored bunker is stored in the legacy plural source folder for
     // existing editor/StructureGen paths, but Minecraft 1.21.1 loads packaged
     // structure templates from the singular folder.
@@ -757,6 +759,22 @@ tasks.register('loadingProfilerTest', Test) {
     classpath = structureGenOfflineRuntime
     maxHeapSize = '1g'
     filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.loading.*'
+    }
+}
+
+tasks.register('performanceDiagnosticsTest', Test) {
+    group = 'verification'
+    description = 'Runs read-only performance observation and ownership regressions.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '1g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.diagnostics.performance.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.architecture.ChunkLifecycleIsolationTest'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.config.PerformanceServerConfigTest'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.mixinconfig.WildernessMixinConfigPluginTest'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.loading.*'
     }
 }
