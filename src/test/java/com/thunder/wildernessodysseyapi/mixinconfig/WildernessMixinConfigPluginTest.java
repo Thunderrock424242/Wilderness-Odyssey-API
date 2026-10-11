@@ -22,6 +22,8 @@ class WildernessMixinConfigPluginTest {
                     PACKAGE + "PerformanceSaveDiagnosticsMixin", ignored -> { throw new AssertionError("Target loaded"); }));
             assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(
                     PACKAGE + "PerformanceChunkWaitDiagnosticsMixin", ignored -> { throw new AssertionError("Target loaded"); }));
+            for (String hook : List.of("CoordinatorDirtyChunkMixin", "CoordinatorLevelChunkDirtyMixin", "CoordinatorChunkSaveMixin"))
+                assertFalse(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(PACKAGE + hook, ignored -> { throw new AssertionError("Target loaded"); }));
             assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(PACKAGE + "BoatRenderMixin", ignored -> false));
             System.clearProperty("wilderness.perf.instrumentation");
             assertTrue(WildernessMixinConfigPlugin.shouldApplyOptionalMixin(PACKAGE + "PerformanceSaveDiagnosticsMixin", ignored -> false));

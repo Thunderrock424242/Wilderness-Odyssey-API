@@ -92,6 +92,7 @@ public final class WildernessConfigSpecs {
         defineCategory(builder, "structures", StructureConfig::define);
         GlacialConfig.defineCommon(builder);
         CoastalWorldgenConfig.defineCommon(builder);
+        com.thunder.wildernessodysseyapi.worldgen.anomaly.config.AnomalyWorldgenConfig.defineCommon(builder);
         AsyncThreadingConfig.define(builder);
         OwnershipConfig.define(builder);
         FeedbackConfig.define(builder);
@@ -111,6 +112,8 @@ public final class WildernessConfigSpecs {
         WaterRenderingConfig.define(builder);
         defineCategory(builder, "weather_rendering", WeatherRenderingConfig::define);
         GlacialConfig.defineClient(builder);
+        com.thunder.wildernessodysseyapi.anomaly.config.AnomalyClientConfig.define(builder);
+        com.thunder.wildernessodysseyapi.temporalrift.hybrid.RiftConfig.defineClient(builder);
         return builder.build();
     }
 
@@ -121,6 +124,7 @@ public final class WildernessConfigSpecs {
         RiftfallConfig.define(builder);
         MeteorConfig.define(builder);
         TemporalRiftConfig.define(builder);
+        com.thunder.wildernessodysseyapi.temporalrift.hybrid.RiftConfig.defineServer(builder);
         WaterSimulationConfig.define(builder);
         WeatherConfig.define(builder);
         EcosystemConfig.define(builder);
@@ -144,6 +148,8 @@ public final class WildernessConfigSpecs {
         StructureConfig.CONFIG_SPEC = commonSpec;
         GlacialConfig.attachSpecs(commonSpec, clientSpec, serverSpec);
         CoastalWorldgenConfig.attachSpec(commonSpec);
+        com.thunder.wildernessodysseyapi.worldgen.anomaly.config.AnomalyWorldgenConfig.attachSpec(commonSpec);
+        com.thunder.wildernessodysseyapi.anomaly.config.AnomalyClientConfig.attachSpec(clientSpec);
         AsyncThreadingConfig.CONFIG_SPEC = commonSpec;
         OwnershipConfig.CONFIG_SPEC = commonSpec;
 

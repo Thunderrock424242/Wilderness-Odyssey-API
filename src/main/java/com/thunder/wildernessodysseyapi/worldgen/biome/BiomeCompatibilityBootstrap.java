@@ -102,6 +102,19 @@ public final class BiomeCompatibilityBootstrap {
                 Biomes.DARK_FOREST
         );
 
+        registerTargets(biomes, registrar, ANOMALY_REGION, ModBiomes.ANOMALY_FOREST_KEY,
+                Biomes.TAIGA, Biomes.OLD_GROWTH_PINE_TAIGA, Biomes.OLD_GROWTH_SPRUCE_TAIGA);
+        registerTargets(biomes, registrar, ANOMALY_REGION, ModBiomes.ANOMALY_PLAINS_KEY,
+                Biomes.PLAINS, Biomes.SUNFLOWER_PLAINS, Biomes.MEADOW);
+        registerTargets(biomes, registrar, ANOMALY_REGION, ModBiomes.ANOMALY_HILLS_KEY,
+                Biomes.WINDSWEPT_HILLS, Biomes.WINDSWEPT_FOREST, Biomes.WINDSWEPT_GRAVELLY_HILLS);
+        registerTarget(biomes, registrar, ModBiomes.FLOATING_FRINGE_KEY, Biomes.TAIGA,
+                REGION_REPLACEMENT_PRIORITY - 10, ParameterBuilder.create().region(ANOMALY_REGION)
+                        .climateRange(BiomeInjector.ClimateParameter.WEIRDNESS, 0.85, 2.0));
+        registerTarget(biomes, registrar, ModBiomes.RIFT_CORE_KEY, Biomes.DARK_FOREST,
+                REGION_REPLACEMENT_PRIORITY - 10, ParameterBuilder.create().region(ANOMALY_REGION)
+                        .climateRange(BiomeInjector.ClimateParameter.WEIRDNESS, -2.0, -0.85));
+
         registerCoastalInjectors(biomes, registrar);
 
         if (!GlacialConfig.ENABLE_POLAR_BIOME_SYSTEM.get()) {

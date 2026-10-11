@@ -5,6 +5,10 @@ import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.dataengine.DataEngine;
 import com.thunder.wildernessodysseyapi.performance.background.BackgroundEfficiencyManager;
 import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
+import com.thunder.wildernessodysseyapi.performance.coordinator.CoordinatorConfig;
+import com.thunder.wildernessodysseyapi.performance.coordinator.PerformanceCoordinator;
+import com.thunder.wildernessodysseyapi.performance.coordinator.CoordinatorGovernor;
+import com.thunder.wildernessodysseyapi.saving.coordinator.SavingCoordinator;
 import net.minecraft.SharedConstants;
 import net.minecraft.Util;
 import net.minecraft.server.MinecraftServer;
@@ -38,11 +42,27 @@ public final class PerformanceDiagnostics {
     public static void start(MinecraftServer server) {
         safely(() -> {
             current = null;
+            lastReport = null;
+            PerformanceCoordinator.clear();
+            SavingCoordinator.start(server, false, false, 1, 1, 1, "disabled by coordinator master switch");
             FAILURE_LOGGED.set(false);
+            var settings = PerformanceDiagnosticsConfig.values();
+            if (!settings.enabled()) return;
             Map<String, String> mods = new HashMap<>();
             ModList.get().getMods().stream().limit(4096).forEach(mod -> mods.put(mod.getModId(), mod.getVersion().toString()));
-            var settings = PerformanceDiagnosticsConfig.values();
             current = new Session(server, settings, mods, environment(settings, mods));
+            if (settings.observation() != PerformanceDiagnosticsConfig.Mode.OFF) {
+                var control = CoordinatorConfig.values();
+                PerformanceCoordinator.start(server, control);
+                boolean blocked = PerformanceOwnershipRegistry.blocksOptionalSaving(current.ownership)
+                        || !Boolean.parseBoolean(System.getProperty("wilderness.perf.instrumentation", "true"));
+                boolean drain = !blocked && control.saveDrain() != PerformanceDiagnosticsConfig.Mode.OFF;
+                SavingCoordinator.start(server, !blocked, drain, control.maximumTrackedChunks(), control.minimumDirtyTicks(),
+                        control.minimumQuietTicks(), blocked ? "save owner or instrumentation gate vetoes tracking/drain"
+                                : drain ? "native drain enabled" : "saveDrain OFF; tracking only");
+            } else {
+                SavingCoordinator.start(server, false, false, 1, 1, 1, "observation OFF; coordinator controls disabled");
+            }
             if (writer == null) {
                 writer = new PerformanceReportWriter(FMLPaths.GAMEDIR.get().resolve("logs/wo-performance"),
                         task -> Util.ioPool().execute(task), status -> {
@@ -58,6 +78,10 @@ public final class PerformanceDiagnostics {
         if (session != null) safely(() -> session.timings.recordPhase(name, System.nanoTime() - session.startedNanos, true));
     }
 
+    public static void serverReady(MinecraftServer server) {
+        if (server.isDedicatedServer()) PerformanceCoordinator.ready(server);
+    }
+
     public static void playerLoggedIn(MinecraftServer server) {
         Session session = observed(server);
         if (session != null && !session.playerTickRecorded) session.playerTickPending = true;
@@ -65,40 +89,49 @@ public final class PerformanceDiagnostics {
 
     public static void beginTick(MinecraftServer server) {
         Session session = observed(server);
-        if (session != null) session.tickStartNanos = System.nanoTime();
+        if (session != null) {
+            session.tickStartNanos = System.nanoTime();
+            PerformanceCoordinator.beginTick(server, server.getTickCount(), session.tickStartNanos);
+            SavingCoordinator.poll(server);
+        }
     }
 
-    public static void endTick(MinecraftServer server) {
+    public static void endTick(MinecraftServer server, java.util.function.BooleanSupplier hasTime) {
         Session session = observed(server);
         if (session == null) return;
         safely(() -> {
             long now = System.nanoTime();
+            long allowance = PerformanceCoordinator.budget(CoordinatorGovernor.Module.SAVE, Long.MAX_VALUE);
+            long saveCost = SavingCoordinator.drain(server, allowance, hasTime);
+            PerformanceCoordinator.recordCost(CoordinatorGovernor.Module.SAVE, saveCost, allowance);
+            now = System.nanoTime();
             if (session.tickStartNanos != 0) session.observer.recordTick(now - session.tickStartNanos);
             session.tickStartNanos = 0;
             if (session.playerTickPending) {
                 session.timings.recordPhase("entry/about_to_first_player_tick", now - session.startedNanos, true);
                 session.playerTickPending = false;
                 session.playerTickRecorded = true;
+                PerformanceCoordinator.ready(server);
             }
             if (++session.ticksSinceSample >= session.settings.sampleIntervalTicks()) {
                 session.ticksSinceSample = 0;
-                if (!session.jvmUnavailable) {
-                    try {
-                        session.observer.recordJvm(session.jvm.sample(now));
-                    } catch (RuntimeException | LinkageError unsupported) {
-                        session.jvmUnavailable = true;
-                        logFailure(unsupported);
-                    }
-                }
+                session.sampleJvm(now);
                 if (session.recording) session.addSample(now, queues());
             }
+            var jvm = session.observer.jvmSample();
+            double queuePressure = AsyncTaskManager.queuedCpuWorkTasks()
+                    / (double) Math.max(1, AsyncTaskManager.getConfigValues().queueSize());
+            PerformanceCoordinator.observe(server, session.observer.ewmaMillis(), jvm.processCpuLoad(), jvm.gcTimeFraction(), queuePressure);
         });
     }
 
     public static void stopping(MinecraftServer server) {
+        PerformanceCoordinator.stopping(server);
+        SavingCoordinator.stopping(server);
         Session session = observed(server);
         if (session != null) safely(() -> {
             session.stoppingNanos = System.nanoTime();
+            session.sampleJvm(session.stoppingNanos);
             session.shutdownQueues = queues();
         });
     }
@@ -109,15 +142,19 @@ public final class PerformanceDiagnostics {
         try {
             safely(() -> {
                 if (session.settings.observation() != PerformanceDiagnosticsConfig.Mode.OFF) {
+                    long now = System.nanoTime();
                     if (session.stoppingNanos != 0)
-                        session.timings.recordPhase("shutdown/stopping_to_stopped", System.nanoTime() - session.stoppingNanos, true);
+                        session.timings.recordPhase("shutdown/stopping_to_stopped", now - session.stoppingNanos, true);
+                    session.sampleJvm(now);
                     lastReport = session.report("server stopped", queues());
-                    if (session.recording && !writer.submit(lastReport))
+                    if (session.recording && !writer.submitFinal(lastReport))
                         ModConstants.LOGGER.warn("[WO Performance] Final report retained in memory; writer is busy or unavailable.");
                 }
             });
         } finally {
             current = null;
+            PerformanceCoordinator.clear();
+            SavingCoordinator.clear();
         }
     }
 
@@ -140,6 +177,7 @@ public final class PerformanceDiagnostics {
         return PerformanceMeasurement.call(System::nanoTime, original, (duration, success) -> {
             if (current != session) return;
             if (duration < session.waitThresholdNanos) return;
+            PerformanceCoordinator.chunkWait(server);
             session.timings.recordChunkWait(dimension, x, z, duration, Thread.currentThread().getName(), System.nanoTime(),
                     () -> session.settings.chunkWaitStacks() ? StackWalker.getInstance().walk(frames ->
                             frames.limit(16).map(Object::toString).toList()) : List.of());
@@ -198,6 +236,8 @@ public final class PerformanceDiagnostics {
         values.put("tickOptionalBudgetNanos", (long) (tick.optionalBudgetMillis() * 1_000_000));
         values.put("dataQueued", data.enabled() ? data.queuedWork() : -1L);
         values.put("dataDirtyEntries", data.enabled() ? data.dirtyEntries() : -1L);
+        values.putAll(PerformanceCoordinator.metrics());
+        values.putAll(SavingCoordinator.metrics());
         return Map.copyOf(values);
     }
 
@@ -222,6 +262,12 @@ public final class PerformanceDiagnostics {
         metadata.put("sampleIntervalTicks", Integer.toString(settings.sampleIntervalTicks()));
         metadata.put("chunkWaitThresholdMillis", Double.toString(settings.chunkWaitThresholdMillis()));
         metadata.put("chunkWaitStacks", Boolean.toString(settings.chunkWaitStacks()));
+        var control = CoordinatorConfig.values();
+        metadata.put("coordinatorEnabled", Boolean.toString(settings.enabled()));
+        metadata.put("asyncGovernor", control.asyncGovernor().name());
+        metadata.put("saveDrain", control.saveDrain().name());
+        metadata.put("maximumOptionalMillis", Double.toString(control.maximumOptionalMillis()));
+        metadata.put("headroomFraction", Double.toString(control.headroomFraction()));
         // Arbitrary -D arguments may contain credentials; export only heap/GC settings.
         metadata.put("heapAndGcArguments", ManagementFactory.getRuntimeMXBean().getInputArguments().stream()
                 .filter(argument -> argument.startsWith("-Xmx") || argument.startsWith("-Xms")
@@ -262,16 +308,28 @@ public final class PerformanceDiagnostics {
             observer = new PerformanceObserver(settings.windowTicks());
             timings = new PerformanceTimings(96, 32, (long) (settings.chunkWaitThresholdMillis() * 1_000_000), 10_000_000_000L);
             ownership = PerformanceOwnershipRegistry.detect(mods);
-            recording = settings.recording() && settings.observation() != PerformanceDiagnosticsConfig.Mode.OFF;
+            recording = settings.enabled() && settings.recording() && settings.observation() != PerformanceDiagnosticsConfig.Mode.OFF;
             this.environment = Map.copyOf(environment);
+            if (settings.enabled() && settings.observation() != PerformanceDiagnosticsConfig.Mode.OFF) sampleJvm(startedNanos);
+        }
+
+        /** Low-frequency and lifecycle sampling; unsupported diagnostics never interrupt server work. */
+        void sampleJvm(long now) {
+            if (!settings.enabled() || jvmUnavailable || settings.observation() == PerformanceDiagnosticsConfig.Mode.OFF) return;
+            try {
+                observer.recordJvm(jvm.sample(now));
+            } catch (RuntimeException | LinkageError unsupported) {
+                jvmUnavailable = true;
+                logFailure(unsupported);
+            }
         }
 
         boolean observes(Object candidate) {
-            return server == candidate && settings.observation() != PerformanceDiagnosticsConfig.Mode.OFF;
+            return settings.enabled() && server == candidate && settings.observation() != PerformanceDiagnosticsConfig.Mode.OFF;
         }
 
         boolean setRecording(boolean enabled) {
-            if (settings.observation() == PerformanceDiagnosticsConfig.Mode.OFF) return false;
+            if (!settings.enabled() || settings.observation() == PerformanceDiagnosticsConfig.Mode.OFF) return false;
             recording = enabled;
             return true;
         }
@@ -283,17 +341,24 @@ public final class PerformanceDiagnostics {
         }
 
         PerformanceReport report(String outcome, Map<String, Long> currentQueues) {
+            Map<String, String> metadata = new HashMap<>(environment);
+            metadata.put("coordinatorState", PerformanceCoordinator.state());
+            metadata.put("phase3", "not enabled: profiling has not established a detached persistence bottleneck");
+            metadata.put("phase4", "not enabled: profiling has not established a chunk scheduling bottleneck");
             Map<String, Long> workQueues = new HashMap<>(currentQueues);
             shutdownQueues.forEach((name, value) -> workQueues.put("atShutdown/" + name, value));
-            return new PerformanceReport(1, id, startedAt, outcome, settings.safeMode(), settings.observation().name(),
-                    environment, ownership, observer.snapshot(), timings.snapshot(), workQueues, List.copyOf(history),
-                    "unavailable in Phase 0", List.of(
-                    "Observation only: no save replacement, worker governor or chunk priority changes.",
+            return new PerformanceReport(3, id, startedAt, outcome, settings.safeMode(), settings.observation().name(),
+                    metadata, ownership, observer.snapshot(), timings.snapshot(), workQueues, List.copyOf(history),
+                    SavingCoordinator.describe(), List.of(
+                    "Opt-in WO controls; native serialization, IO ordering and chunk scheduling remain authoritative.",
                     "Tick percentiles cover the rolling window; they are not whole-trial percentiles.",
                     "GC collection time is a pressure proxy, not exact stop-the-world pause time.",
+                    "JVM gcCollectionMillis is cumulative; gcCollectionSinceStartMillis subtracts the first supported session sample.",
                     "Chunk timings cover managedBlock and off-thread join spans, not the whole getChunk call or generation throughput.",
                     "One off-thread request can produce both a caller span and a server span; counts are observed spans, not unique chunks.",
-                    "Worldgen pressure, lighting stalls and save backlog are unavailable without additional proven hooks.",
+                    "Chunk waits are request-pressure signals; generation throughput and lighting pressure are unavailable.",
+                    "Save backlog covers observed loaded full chunks only, excludes entities/SavedData and may omit direct mod mutations.",
+                    "Native serialization is non-preemptible; unknown cost can exceed its allowance and trigger later backoff.",
                     "Startup begins at ServerAboutToStart; first-player tick is a server milestone, not a rendered playable frame.",
                     "Shutdown spans ServerStopping to ServerStopped; the client Save & Quit screen can include additional time.",
                     "Native timing mixins are optional. Absent phases can mean no match/call or bounded phase retention; inspect omittedPhaseMeasurements.",

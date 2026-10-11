@@ -8,6 +8,7 @@ import net.minecraft.world.level.biome.Biome;
 public class ModTags {
     public static class Biomes {
         public static final TagKey<Biome> IS_ANOMALY_FOREST = tag("is_anomaly_forest");
+        public static final TagKey<Biome> IS_ANOMALY = tag("is_anomaly");
         public static final TagKey<Biome> IS_GLACIAL = tag("is_glacial");
         public static final TagKey<Biome> IS_GLACIAL_INLAND = tag("is_glacial_inland");
         public static final TagKey<Biome> HAS_GLACIAL_RIVERS = tag("has_glacial_rivers");

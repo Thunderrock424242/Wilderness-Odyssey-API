@@ -20,6 +20,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockEntities;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
@@ -49,6 +52,12 @@ public class RiftCoreBlock extends BaseEntityBlock {
     }
 
     @Override
+    public <T extends BlockEntity> @Nullable BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+        return level.isClientSide ? null : createTickerHelper(type, TemporalRiftBlockEntities.RIFT_CORE.get(),
+                (tickerLevel, pos, tickerState, core) -> core.tickHybrid((ServerLevel) tickerLevel));
+    }
+
+    @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
         if (!level.isClientSide && player instanceof ServerPlayer serverPlayer && level instanceof ServerLevel serverLevel) {
             handlePortalUse(serverPlayer, serverLevel, pos);
@@ -66,6 +75,7 @@ public class RiftCoreBlock extends BaseEntityBlock {
 
     @Override
     protected void entityInside(BlockState state, Level level, BlockPos pos, Entity entity) {
+        if (level.getBlockEntity(pos) instanceof RiftCoreBlockEntity core && core.isHybrid()) return;
         if (!level.isClientSide && entity instanceof ServerPlayer serverPlayer && level instanceof ServerLevel serverLevel) {
             if (level.dimension().equals(Level.OVERWORLD)) {
                 handleEntry(serverPlayer, serverLevel, pos);
@@ -76,6 +86,8 @@ public class RiftCoreBlock extends BaseEntityBlock {
     }
 
     private void handlePortalUse(ServerPlayer player, ServerLevel level, BlockPos pos) {
+        // The hollow aperture has its own swept server trigger, independent of this anchor block.
+        if (level.getBlockEntity(pos) instanceof RiftCoreBlockEntity core && core.isHybrid()) return;
         if (level.dimension().equals(Level.OVERWORLD)) {
             handleEntry(player, level, pos);
         } else if (level.dimension().equals(TemporalRiftDimensions.THE_BEFORE_KEY)) {

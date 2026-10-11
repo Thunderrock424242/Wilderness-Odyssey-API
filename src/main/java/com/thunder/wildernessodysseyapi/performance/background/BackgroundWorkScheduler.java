@@ -218,6 +218,8 @@ public final class BackgroundWorkScheduler implements BackgroundSchedulerControl
 
     private BackgroundTask pollNext(BackgroundBudgetControl control) {
         for (WorkPriority priority : PRIORITIES) {
+            if ((priority == WorkPriority.BACKGROUND || priority == WorkPriority.IDLE)
+                    && !com.thunder.wildernessodysseyapi.performance.coordinator.PerformanceCoordinator.backgroundAllowed()) continue;
             if (priority == WorkPriority.BACKGROUND && !control.backgroundAllowed()) {
                 continue;
             }

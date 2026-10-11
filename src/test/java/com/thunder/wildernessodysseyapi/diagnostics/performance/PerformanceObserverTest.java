@@ -43,4 +43,41 @@ class PerformanceObserverTest {
         assertEquals(100, observer.snapshot().heapPeakBytes());
         assertEquals(40, observer.snapshot().jvm().heapUsedBytes());
     }
+
+    @Test
+    void separatesSessionGcCollectionTimeFromEarlierJvmActivity() {
+        var observer = new PerformanceObserver(4);
+        assertEquals(-1, observer.snapshot().gcCollectionSinceStartMillis());
+        observer.recordJvm(new JvmPerformanceSample(100, 1000, 2, 800, 0.2, -1));
+        assertEquals(0, observer.snapshot().gcCollectionSinceStartMillis());
+        observer.recordJvm(new JvmPerformanceSample(40, 1000, 2, 825, 0.1, 0.1));
+        assertEquals(25, observer.snapshot().gcCollectionSinceStartMillis());
+        assertEquals(825, observer.snapshot().jvm().gcCollectionMillis());
+
+        var nextSession = new PerformanceObserver(4);
+        nextSession.recordJvm(new JvmPerformanceSample(40, 1000, 2, 825, 0.1, -1));
+        assertEquals(0, nextSession.snapshot().gcCollectionSinceStartMillis());
+    }
+
+    @Test
+    void unavailableOrResetGcCountersDoNotInventSessionCollectionTime() {
+        var observer = new PerformanceObserver(4);
+        observer.recordJvm(JvmPerformanceSample.unavailable());
+        assertEquals(-1, observer.snapshot().gcCollectionSinceStartMillis());
+        observer.recordJvm(new JvmPerformanceSample(100, 1000, 2, 20, 0.2, -1));
+        observer.recordJvm(new JvmPerformanceSample(100, 1000, 2, 5, 0.2, -1));
+        assertEquals(-1, observer.snapshot().gcCollectionSinceStartMillis());
+        observer.recordJvm(JvmPerformanceSample.unavailable());
+        assertEquals(-1, observer.snapshot().gcCollectionSinceStartMillis());
+        observer.recordJvm(new JvmPerformanceSample(100, 1000, 2, 25, 0.2, -1));
+        assertEquals(-1, observer.snapshot().gcCollectionSinceStartMillis());
+        assertEquals(25, observer.snapshot().jvm().gcCollectionMillis());
+
+        var aboveBaseline = new PerformanceObserver(4);
+        aboveBaseline.recordJvm(new JvmPerformanceSample(100, 1000, 2, 20, 0.2, -1));
+        aboveBaseline.recordJvm(new JvmPerformanceSample(100, 1000, 2, 50, 0.2, -1));
+        assertEquals(30, aboveBaseline.snapshot().gcCollectionSinceStartMillis());
+        aboveBaseline.recordJvm(new JvmPerformanceSample(100, 1000, 2, 30, 0.2, -1));
+        assertEquals(-1, aboveBaseline.snapshot().gcCollectionSinceStartMillis());
+    }
 }

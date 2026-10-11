@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "wildernessodysseyapi:block/fractured_energy_block"
+  }
+}

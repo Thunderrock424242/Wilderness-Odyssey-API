@@ -1,0 +1,334 @@
+{
+  "formatVersion": 1,
+  "name": "rift_platform_02",
+  "size": [
+    6,
+    2,
+    5
+  ],
+  "metadata": {
+    "description": "Provisional floating anomaly rock with a flat landing surface and tapered underside. Replace this blueprint with artist terrain as needed."
+  },
+  "markers": [
+    "anomaly_rift",
+    "floating_rock",
+    "vanilla_only"
+  ],
+  "blocks": [
+    {
+      "pos": [
+        2,
+        0,
+        1
+      ],
+      "block": "minecraft:blackstone"
+    },
+    {
+      "pos": [
+        3,
+        0,
+        1
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        1,
+        0,
+        2
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        2,
+        0,
+        2
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        3,
+        0,
+        2
+      ],
+      "block": "minecraft:crying_obsidian"
+    },
+    {
+      "pos": [
+        4,
+        0,
+        2
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        2,
+        0,
+        3
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        3,
+        0,
+        3
+      ],
+      "block": "minecraft:blackstone"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        0
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        0
+      ],
+      "block": "minecraft:crying_obsidian"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        0
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        4,
+        1,
+        0
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        1
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        2,
+        1,
+        1
+      ],
+      "block": "minecraft:blackstone"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        1
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        4,
+        1,
+        1
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        5,
+        1,
+        1
+      ],
+      "block": "minecraft:blackstone"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        2
+      ],
+      "block": "minecraft:blackstone"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        2
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        2,
+        1,
+        2
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        3,
+        1,
+        2
+      ],
+      "block": "minecraft:crying_obsidian"
+    },
+    {
+      "pos": [
+        4,
+        1,
+        2
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        5,
+        1,
+        2
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        0,
+        1,
+        3
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        3
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        2,
+        1,
+        3
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        3,
+        1,
+        3
+      ],
+      "block": "minecraft:blackstone"
+    },
+    {
+      "pos": [
+        4,
+        1,
+        3
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        5,
+        1,
+        3
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        4
+      ],
+      "block": "minecraft:blackstone"
+    },
+    {
+      "pos": [
+        2,
+        1,
+        4
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        3,
+        1,
+        4
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        4,
+        1,
+        4
+      ],
+      "block": "minecraft:crying_obsidian"
+    }
+  ],
+  "entities": []
+}

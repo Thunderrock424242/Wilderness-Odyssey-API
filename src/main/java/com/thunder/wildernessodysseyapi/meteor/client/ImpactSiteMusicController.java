@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.meteor.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.environment.client.ClientEnvironmentState;
-import com.thunder.wildernessodysseyapi.worldgen.biome.ModBiomes;
+import com.thunder.wildernessodysseyapi.core.ModTags;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -85,6 +85,6 @@ public final class ImpactSiteMusicController {
 
     private static boolean isInAnomalyBiome(ClientLevel level, BlockPos pos) {
         Holder<Biome> biome = level.getBiome(pos);
-        return biome.is(ModBiomes.ANOMALY_FOREST_KEY);
+        return biome.is(ModTags.Biomes.IS_ANOMALY);
     }
 }

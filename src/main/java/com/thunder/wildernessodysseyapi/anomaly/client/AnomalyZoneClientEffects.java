@@ -1,87 +1,141 @@
 package com.thunder.wildernessodysseyapi.anomaly.client;
 
-import com.thunder.wildernessodysseyapi.anomaly.registry.AnomalyDimensions;
+import com.thunder.wildernessodysseyapi.anomaly.config.AnomalyClientConfig;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.core.ModTags;
+import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.client.ParticleStatus;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.FogType;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
+import org.joml.Vector3f;
 
-/**
- * Supplies the lightweight client atmosphere shared by the Anomaly dimension
- * and smaller Anomaly Forest incursions in the Overworld.
- */
+/** Air-only, bounded atmosphere driven by local server conclusions. */
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public final class AnomalyZoneClientEffects {
-    private static final float DIMENSION_FOG_RED = 0.12F;
-    private static final float DIMENSION_FOG_GREEN = 0.035F;
-    private static final float DIMENSION_FOG_BLUE = 0.19F;
-    private static final float BIOME_FOG_BLEND = 0.38F;
-    private static final int PARTICLE_INTERVAL_TICKS = 4;
+    private static final DustParticleOptions COOL_MOTE = new DustParticleOptions(new Vector3f(0.45F, 0.72F, 0.79F), 0.55F);
+    private static final DustParticleOptions RIFT_MOTE = new DustParticleOptions(new Vector3f(0.62F, 0.48F, 0.78F), 0.55F);
 
     private AnomalyZoneClientEffects() {
     }
 
-    /** Tints only Anomaly-owned air fog, leaving other dimensions untouched. */
+    /** Leaves fluid fog and external shader-pack color ownership intact. */
     @SubscribeEvent
     public static void onFogColor(ViewportEvent.ComputeFogColor event) {
         Minecraft minecraft = Minecraft.getInstance();
-        Level level = minecraft.level;
-        if (level == null) {
+        if (!AnomalyClientConfig.fogEnabled() || !AnomalyClientState.controls(minecraft.level)
+                || event.getCamera().getFluidInCamera() != FogType.NONE
+                || ShaderPackCompatibility.isExternalShaderPackActive()) {
             return;
         }
-
-        if (level.dimension().equals(AnomalyDimensions.ANOMALY_DIMENSION_KEY)) {
-            event.setRed(DIMENSION_FOG_RED);
-            event.setGreen(DIMENSION_FOG_GREEN);
-            event.setBlue(DIMENSION_FOG_BLUE);
-            return;
-        }
-
-        BlockPos cameraPos = BlockPos.containing(event.getCamera().getPosition());
-        if (level.getBiome(cameraPos).is(ModTags.Biomes.IS_ANOMALY_FOREST)) {
-            event.setRed(mix(event.getRed(), DIMENSION_FOG_RED, BIOME_FOG_BLEND));
-            event.setGreen(mix(event.getGreen(), DIMENSION_FOG_GREEN, BIOME_FOG_BLEND));
-            event.setBlue(mix(event.getBlue(), DIMENSION_FOG_BLUE, BIOME_FOG_BLEND));
-        }
+        float biome = AnomalyClientState.intensity() * AnomalyClientConfig.intensityScale();
+        float rift = AnomalyClientState.riftIntensity() * AnomalyClientConfig.intensityScale();
+        float blend = AnomalyEffectPolicy.fogBlend(biome, rift);
+        float violet = AnomalyEffectPolicy.violetStrength(biome, rift);
+        event.setRed(mix(event.getRed(), mix(0.59F, 0.66F, violet), blend));
+        event.setGreen(mix(event.getGreen(), mix(0.70F, 0.62F, violet), blend));
+        event.setBlue(mix(event.getBlue(), 0.80F, blend));
     }
 
-    /** Adds sparse portal motes that mark the Anomaly's unstable space. */
+    /** A small far-plane reduction preserves existing short-distance weather/fluid visibility. */
+    @SubscribeEvent
+    public static void onRenderFog(ViewportEvent.RenderFog event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!AnomalyClientConfig.fogEnabled() || !AnomalyClientState.controls(minecraft.level)
+                || event.getType() != FogType.NONE || ShaderPackCompatibility.isExternalShaderPackActive()) {
+            return;
+        }
+        float strength = AnomalyEffectPolicy.combinedStrength(AnomalyClientState.intensity(),
+                AnomalyClientState.riftIntensity()) * AnomalyClientConfig.intensityScale();
+        if (strength <= 0.001F) {
+            return;
+        }
+        float far = AnomalyEffectPolicy.fogFarPlane(event.getFarPlaneDistance(), strength);
+        event.setFarPlaneDistance(far);
+        event.setNearPlaneDistance(Math.min(event.getNearPlaneDistance(), far * 0.9F));
+        event.setCanceled(true);
+    }
+
+    /** Smooths visual conclusions and emits at most two nearby motes every twelve ticks. */
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
+        float accessibility = minecraft.options.screenEffectScale().get().floatValue();
+        AnomalyClientConfig.setAccessibilityScale(accessibility);
         Level level = minecraft.level;
-        if (level == null || minecraft.player == null || minecraft.player.tickCount % PARTICLE_INTERVAL_TICKS != 0) {
+        if (level == null) {
+            AnomalyClientState.clear();
+            AnomalyPostEffectController.release();
             return;
         }
-
-        BlockPos playerPos = minecraft.player.blockPosition();
-        boolean anomalyDimension = level.dimension().equals(AnomalyDimensions.ANOMALY_DIMENSION_KEY);
-        if (!anomalyDimension && !level.getBiome(playerPos).is(ModTags.Biomes.IS_ANOMALY_FOREST)) {
+        if (minecraft.isPaused()) {
             return;
         }
-
+        AnomalyClientState.tick(level);
+        if (minecraft.player == null || minecraft.options.particles().get() == ParticleStatus.MINIMAL) {
+            return;
+        }
+        float strength = AnomalyEffectPolicy.screenStrength(AnomalyClientState.intensity(),
+                AnomalyClientState.riftIntensity(), AnomalyClientConfig.intensityScale(), accessibility);
+        int count = AnomalyEffectPolicy.particleCount(AnomalyClientConfig.particlesEnabled(), strength,
+                AnomalyClientState.visualTicks());
         RandomSource random = level.getRandom();
-        int particleCount = anomalyDimension ? 3 : 1;
-        for (int i = 0; i < particleCount; i++) {
-            double x = minecraft.player.getX() + random.nextDouble() * 14.0D - 7.0D;
-            double y = minecraft.player.getY() + random.nextDouble() * 5.0D - 1.0D;
-            double z = minecraft.player.getZ() + random.nextDouble() * 14.0D - 7.0D;
-            level.addParticle(ParticleTypes.PORTAL, x, y, z, 0.0D, 0.015D, 0.0D);
-            if (anomalyDimension && random.nextInt(7) == 0) {
-                level.addParticle(ParticleTypes.ELECTRIC_SPARK, x, y, z, 0.0D, 0.01D, 0.0D);
-            }
+        for (int index = 0; index < count; index++) {
+            double x = minecraft.player.getX() + random.nextDouble() * 12.0D - 6.0D;
+            double y = minecraft.player.getY() + random.nextDouble() * 4.0D;
+            double z = minecraft.player.getZ() + random.nextDouble() * 12.0D - 6.0D;
+            level.addParticle(AnomalyClientState.riftIntensity() > 0.4F ? RIFT_MOTE : COOL_MOTE,
+                    x, y, z, 0.0D, 0.004D, 0.0D);
         }
     }
 
+    /** Runs before the HUD so text and controls keep their normal colors. */
+    @SubscribeEvent
+    public static void onRenderGui(RenderGuiEvent.Pre event) {
+        AnomalyPostEffectController.render(event.getPartialTick().getGameTimeDeltaPartialTick(false));
+    }
+
+    @SubscribeEvent
+    public static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
+        clearPresentation();
+    }
+
+    @SubscribeEvent
+    public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        clearPresentation();
+    }
+
+    /** Same-dimension respawns can reuse the client level, so level identity is insufficient. */
+    @SubscribeEvent
+    public static void onRespawn(ClientPlayerNetworkEvent.Clone event) {
+        clearPresentation();
+    }
+
+    @SubscribeEvent
+    public static void onLevelUnload(LevelEvent.Unload event) {
+        if (event.getLevel() instanceof ClientLevel level) {
+            AnomalyClientState.clearLevel(level);
+            AnomalyPostEffectController.release();
+        }
+    }
+
+    private static void clearPresentation() {
+        AnomalyClientState.clear();
+        AnomalyPostEffectController.release();
+        AnomalyClientConfig.setAccessibilityScale(Minecraft.getInstance().options.screenEffectScale().get().floatValue());
+    }
+
     private static float mix(float from, float to, float amount) {
-        return from + (to - from) * amount;
+        return from + (to - from) * AnomalyEffectPolicy.clampUnit(amount);
     }
 }

@@ -2,6 +2,11 @@
   "replace": false,
   "values": [
     "wildernessodysseyapi:anomaly_ore",
-    "wildernessodysseyapi:anomaly_gateway"
+    "wildernessodysseyapi:anomaly_gateway",
+    "wildernessodysseyapi:distorted_stone",
+    "wildernessodysseyapi:distorted_cliff_stone",
+    "wildernessodysseyapi:unstable_rift_stone",
+    "wildernessodysseyapi:anomaly_crystal_block",
+    "wildernessodysseyapi:fractured_energy_block"
   ]
 }

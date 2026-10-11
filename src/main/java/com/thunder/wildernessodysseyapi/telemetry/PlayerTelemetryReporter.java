@@ -82,7 +82,7 @@ public final class PlayerTelemetryReporter {
         // Persist a usable report before optional lookups or HTTP can fail or be interrupted.
         var pending = enqueuePayload(queue, "player", buildPayload(snapshot, GeoInfo.empty(),
                 AccountAgeInfo.empty(), null, "login", config), config.sheetWebhookUrl(), config);
-        AsyncTaskManager.trySubmitIoWork("player-telemetry-enrichment", () -> {
+        AsyncTaskManager.trySubmitDisposableIoWork("player-telemetry-enrichment", () -> {
             GeoInfo geo = resolveGeoInfo(snapshot.uuid(), snapshot.ipAddress(), config);
             AccountAgeInfo age = resolveAccountAge(snapshot.uuid(), config);
             queue.enrich(pending, buildPayload(snapshot, geo, age, null, "login", config));
@@ -111,7 +111,7 @@ public final class PlayerTelemetryReporter {
                 null, "logout", config), config.sheetWebhookUrl(), config);
         if (config.includeSparkReport()) {
             var server = player.server;
-            AsyncTaskManager.trySubmitIoWork("player-telemetry-spark-report", () -> {
+            AsyncTaskManager.trySubmitDisposableIoWork("player-telemetry-spark-report", () -> {
                 String report = fetchSparkReportUrl(snapshot,
                         cappedSparkTimeout(config.logoutBlockTimeoutSeconds()), server).orElse(null);
                 if (report != null && config.sparkWebhookUrl() != null && !config.sparkWebhookUrl().isBlank()) {

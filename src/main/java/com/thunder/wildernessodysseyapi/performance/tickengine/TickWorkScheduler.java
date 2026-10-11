@@ -214,6 +214,8 @@ public final class TickWorkScheduler {
     }
 
     private static boolean permitted(TickPriority priority, TickPressure pressure, long currentTick) {
+        if ((priority == TickPriority.BACKGROUND || priority == TickPriority.IDLE)
+                && !com.thunder.wildernessodysseyapi.performance.coordinator.PerformanceCoordinator.backgroundAllowed()) return false;
         return switch (pressure) {
             case RELAXED -> true;
             case BUSY -> priority != TickPriority.IDLE || Math.floorMod(currentTick, 4L) == 0L;

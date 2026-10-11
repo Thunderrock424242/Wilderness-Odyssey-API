@@ -16,6 +16,10 @@ public final class ModBiomes {
 
     public static final ResourceKey<Biome> ANOMALY_FOREST_KEY = ResourceKey.create(Registries.BIOME,
             ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "anomaly_forest"));
+    public static final ResourceKey<Biome> ANOMALY_PLAINS_KEY = key("anomaly_plains");
+    public static final ResourceKey<Biome> ANOMALY_HILLS_KEY = key("anomaly_hills");
+    public static final ResourceKey<Biome> FLOATING_FRINGE_KEY = key("floating_fringe");
+    public static final ResourceKey<Biome> RIFT_CORE_KEY = key("rift_core");
     public static final ResourceKey<Biome> POLAR_ICE_SHEET_KEY = key("polar_ice_sheet");
     public static final ResourceKey<Biome> GLACIAL_HIGHLANDS_KEY = key("glacial_highlands");
     public static final ResourceKey<Biome> POLAR_GLACIAL_BASIN_KEY = key("polar_glacial_basin");

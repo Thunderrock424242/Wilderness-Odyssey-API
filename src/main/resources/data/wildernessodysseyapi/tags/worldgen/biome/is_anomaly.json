@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "wildernessodysseyapi:anomaly_forest",
+    "wildernessodysseyapi:anomaly_plains",
+    "wildernessodysseyapi:anomaly_hills",
+    "wildernessodysseyapi:floating_fringe",
+    "wildernessodysseyapi:rift_core"
+  ]
+}

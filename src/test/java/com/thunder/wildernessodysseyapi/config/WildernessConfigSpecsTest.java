@@ -44,6 +44,8 @@ class WildernessConfigSpecsTest {
         assertSame(WildernessConfigSpecs.commonSpec(), StructureConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.commonSpec(), GlacialConfig.COMMON_SPEC);
         assertSame(WildernessConfigSpecs.commonSpec(), CoastalWorldgenConfig.COMMON_SPEC);
+        assertSame(WildernessConfigSpecs.commonSpec(),
+                com.thunder.wildernessodysseyapi.worldgen.anomaly.config.AnomalyWorldgenConfig.COMMON_SPEC);
         assertSame(WildernessConfigSpecs.commonSpec(), AsyncThreadingConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.commonSpec(), OwnershipConfig.CONFIG_SPEC);
 
@@ -54,6 +56,8 @@ class WildernessConfigSpecsTest {
         assertSame(WildernessConfigSpecs.clientSpec(), WaterRenderingConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.clientSpec(), WeatherRenderingConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.clientSpec(), GlacialConfig.CLIENT_SPEC);
+        assertSame(WildernessConfigSpecs.clientSpec(),
+                com.thunder.wildernessodysseyapi.anomaly.config.AnomalyClientConfig.CONFIG_SPEC);
 
         assertSame(WildernessConfigSpecs.serverSpec(), StructureBlockConfig.CONFIG_SPEC);
         assertSame(WildernessConfigSpecs.serverSpec(), PerformanceServerConfig.CONFIG_SPEC);

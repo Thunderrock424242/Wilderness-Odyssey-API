@@ -38,11 +38,11 @@ public final class AnomalyBiomes {
         BiomeDefaultFeatures.addForestFlowers(generation);
         BiomeDefaultFeatures.addDefaultFlowers(generation);
         BiomeDefaultFeatures.addForestGrass(generation);
-        BiomeDefaultFeatures.addOtherBirchTrees(generation);
+        BiomeDefaultFeatures.addTaigaTrees(generation);
         BiomeDefaultFeatures.addDefaultMushrooms(generation);
         BiomeDefaultFeatures.addDefaultExtraVegetation(generation);
 
-        return baseBiome(true, 0.7F, 0.8F, spawns, generation);
+        return baseBiome(true, 0.45F, 0.8F, spawns, generation);
     }
 
     private static Biome baseBiome(boolean hasPrecipitation, float temperature, float downfall,

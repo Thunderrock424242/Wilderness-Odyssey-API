@@ -1,0 +1,14 @@
+{
+  "vertex": "minecraft:blit",
+  "fragment": "wildernessodysseyapi:anomaly_atmosphere",
+  "attributes": ["Position"],
+  "samplers": [{"name": "DiffuseSampler"}],
+  "uniforms": [
+    {"name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]},
+    {"name": "OutSize", "type": "float", "count": 2, "values": [1.0, 1.0]},
+    {"name": "GradeAmount", "type": "float", "count": 1, "values": [0.0]},
+    {"name": "RiftAmount", "type": "float", "count": 1, "values": [0.0]},
+    {"name": "MotionAmount", "type": "float", "count": 1, "values": [0.0]},
+    {"name": "MotionPhase", "type": "float", "count": 1, "values": [0.0]}
+  ]
+}

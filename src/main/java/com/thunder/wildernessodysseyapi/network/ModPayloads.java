@@ -57,7 +57,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class ModPayloads {
 
     // This channel version covers every payload registered below; bump it for wire-shape changes.
-    private static final String NETWORK_VERSION = "33";
+    private static final String NETWORK_VERSION = "35";
 
     private ModPayloads() {
     }
@@ -70,7 +70,17 @@ public final class ModPayloads {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(NETWORK_VERSION);
         DataEnginePayloads.register(registrar);
+        registrar.playToClient(
+                com.thunder.wildernessodysseyapi.temporalrift.hybrid.RiftFieldPayload.TYPE,
+                com.thunder.wildernessodysseyapi.temporalrift.hybrid.RiftFieldPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        com.thunder.wildernessodysseyapi.temporalrift.client.hybrid.RiftClientEffects.accept(payload)));
         com.thunder.wildernessodysseyapi.quest.network.QuestPayloads.register(registrar);
+        registrar.playToClient(
+                com.thunder.wildernessodysseyapi.anomaly.network.AnomalyAtmospherePayload.TYPE,
+                com.thunder.wildernessodysseyapi.anomaly.network.AnomalyAtmospherePayload.STREAM_CODEC,
+                (payload, context) -> com.thunder.wildernessodysseyapi.anomaly.client.AnomalyClientState.accept(
+                        context.player().level(), payload));
         registrar.playToClient(
                 com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityPayload.TYPE,
                 com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityPayload.STREAM_CODEC,

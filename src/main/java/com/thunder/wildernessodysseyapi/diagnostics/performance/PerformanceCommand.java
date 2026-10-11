@@ -34,7 +34,7 @@ public final class PerformanceCommand {
 
     private static int recording(CommandSourceStack source, boolean enabled) {
         if (!PerformanceDiagnostics.setRecording(enabled)) {
-            line(source, "Observation is OFF or no server session is active. Enable performance.coordinator.observation and restart.");
+            line(source, "The coordinator or observation is disabled. Set performance.coordinator.enabled=true and observation=AUTO, then restart the world/server.");
             return 0;
         }
         line(source, enabled ? "Bounded performance recording started. It exports when this server stops."
@@ -45,10 +45,11 @@ public final class PerformanceCommand {
     private static int show(CommandSourceStack source, String section) {
         PerformanceReport report = PerformanceDiagnostics.report();
         if (report == null) {
-            line(source, "No performance session is available.");
+            line(source, "The performance coordinator is disabled or no session is available. Set performance.coordinator.enabled=true and restart the world/server.");
             return 0;
         }
-        line(source, "WO performance — Phase 0 observation | " + report.observation() + " | safe mode " + report.safeMode());
+        line(source, "WO performance coordinator | " + report.observation() + " | safe mode " + report.safeMode()
+                + " | " + report.environment().getOrDefault("coordinatorState", "unavailable"));
         switch (section) {
             case "status" -> {
                 var ticks = report.performance();
@@ -59,15 +60,21 @@ public final class PerformanceCommand {
                 line(source, "Heap used " + bytes(jvm.heapUsedBytes()) + ", peak " + bytes(ticks.heapPeakBytes())
                         + ", maximum " + bytes(jvm.heapMaximumBytes()) + "; processors " + jvm.processors());
                 line(source, "Process CPU " + percent(jvm.processCpuLoad()) + "; GC collection-time pressure " + percent(jvm.gcTimeFraction()));
+                line(source, "GC collection time since session start: " + (ticks.gcCollectionSinceStartMillis() < 0
+                        ? "unavailable" : ticks.gcCollectionSinceStartMillis() + " ms (collection-time proxy)"));
                 line(source, "Existing Tick Engine optional budget: "
                         + millis(report.workQueues().getOrDefault("tickOptionalBudgetNanos", 0L) / 1_000_000.0));
+                line(source, "Coordinator optional allowance: "
+                        + millis(report.workQueues().getOrDefault("coordinatorOptionalBudgetNanos", 0L) / 1_000_000.0)
+                        + "; async governor " + report.environment().getOrDefault("asyncGovernor", "unavailable")
+                        + "; save drain " + report.environment().getOrDefault("saveDrain", "unavailable"));
                 line(source, "Recording " + PerformanceDiagnostics.recording() + "; retained samples " + report.history().size());
                 line(source, "Last report: " + PerformanceDiagnostics.writerStatus().result() + " " + PerformanceDiagnostics.writerStatus().path());
             }
             case "async" -> {
                 report.workQueues().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey())
                         .forEach(entry -> line(source, entry.getKey() + ": " + (entry.getValue() < 0 ? "unavailable" : entry.getValue())));
-                line(source, "These are existing FIFO/shared and feature queues. Priority queue breakdown is unavailable.");
+                line(source, "Worker queues remain bounded FIFO. Existing tick/background priorities remain owned by their schedulers.");
                 line(source, "Data workers are included in shared CPU totals. Voice, structure-block and JDK HTTP lanes are not included.");
             }
             case "save" -> {
@@ -84,12 +91,14 @@ public final class PerformanceCommand {
                         + report.timings().omittedPhaseMeasurements() + " measurements omitted.");
             }
             case "worldgen" -> {
-                line(source, "Worldgen pressure/throughput: unavailable. Slow synchronous chunk blocking spans: "
+                line(source, "Coordinator state: " + report.environment().getOrDefault("coordinatorState", "unavailable")
+                        + ". Generation throughput: unavailable. Slow synchronous chunk blocking spans: "
                         + report.timings().slowChunkWaitSpans() + "; maximum " + millis(report.timings().maximumChunkWaitNanos() / 1_000_000.0));
                 for (var wait : report.timings().waits()) line(source, wait.dimension() + " [" + wait.x() + ", " + wait.z()
                         + "] " + millis(wait.durationNanos() / 1_000_000.0) + " on " + wait.thread());
                 line(source, "These are managedBlock/caller join spans, not whole getChunk durations. A request may appear on both threads.");
                 line(source, "Spans do not identify a responsible mod or count generated chunks.");
+                line(source, "Detached async persistence and chunk-priority changes await actual-pack profiling.");
             }
             case "ownership" -> {
                 for (PerformanceArea area : PerformanceArea.values()) {

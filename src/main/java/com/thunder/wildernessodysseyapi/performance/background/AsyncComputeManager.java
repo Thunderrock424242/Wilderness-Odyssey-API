@@ -125,12 +125,14 @@ public final class AsyncComputeManager {
             return false;
         }
         try {
-            currentExecutor.execute(() -> compute(currentExecutor, normalizedSubsystem, immutableSnapshot, snapshot -> {
+            boolean accepted = com.thunder.wildernessodysseyapi.performance.coordinator.PerformanceCoordinator.submitDisposable(
+                    currentExecutor, () -> compute(currentExecutor, normalizedSubsystem, immutableSnapshot, snapshot -> {
                 operation.accept(snapshot);
                 return Boolean.TRUE;
             }, null));
+            if (!accepted) metrics.recordAsyncRejected();
             updateMetrics(currentExecutor);
-            return true;
+            return accepted;
         } catch (RejectedExecutionException exception) {
             metrics.recordAsyncRejected();
             updateMetrics(currentExecutor);

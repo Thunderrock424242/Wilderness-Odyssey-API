@@ -1,0 +1,15 @@
+{
+  "targets": ["anomaly_swap"],
+  "passes": [
+    {
+      "name": "wildernessodysseyapi:anomaly_atmosphere",
+      "intarget": "minecraft:main",
+      "outtarget": "anomaly_swap"
+    },
+    {
+      "name": "minecraft:blit",
+      "intarget": "anomaly_swap",
+      "outtarget": "minecraft:main"
+    }
+  ]
+}

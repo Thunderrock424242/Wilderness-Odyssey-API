@@ -9,18 +9,19 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
-/** One admitted file-only job on an existing executor; no owned thread, queue or blocking handoff. */
+/** One file-only job and one coalesced terminal snapshot; no owned thread or blocking IO handoff. */
 public final class PerformanceReportWriter {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final AtomicLong SEQUENCE = new AtomicLong();
     private final Path directory;
     private final Executor executor;
     private final Consumer<Status> completed;
-    private final AtomicBoolean pending = new AtomicBoolean();
+    // Admission and handoff use this object's monitor; disk IO never holds it.
+    private boolean pending;
+    private PerformanceReport terminalReport;
     private volatile Status status = new Status(null, false, "No report requested");
 
     public PerformanceReportWriter(Path directory, Executor executor, Consumer<Status> completed) {
@@ -29,8 +30,22 @@ public final class PerformanceReportWriter {
         this.completed = completed;
     }
 
-    public boolean submit(PerformanceReport report) {
-        if (!pending.compareAndSet(false, true)) return false;
+    public synchronized boolean submit(PerformanceReport report) {
+        if (pending) return false;
+        return dispatch(report);
+    }
+
+    /** Keeps at most the newest terminal snapshot while a prior export finishes, without waiting for IO. */
+    public synchronized boolean submitFinal(PerformanceReport report) {
+        if (pending) {
+            terminalReport = report;
+            return true;
+        }
+        return dispatch(report);
+    }
+
+    private boolean dispatch(PerformanceReport report) {
+        pending = true;
         Path target = directory.resolve("wo-perf-%013d-%06d.json".formatted(System.currentTimeMillis(), SEQUENCE.incrementAndGet()));
         status = new Status(target, true, "Queued");
         try {
@@ -38,7 +53,7 @@ public final class PerformanceReportWriter {
             return true;
         } catch (RuntimeException rejected) {
             status = new Status(target, false, "Rejected: " + rejected.getClass().getSimpleName());
-            pending.set(false);
+            pending = false;
             return false;
         }
     }
@@ -46,22 +61,32 @@ public final class PerformanceReportWriter {
     public Status status() { return status; }
 
     private void write(Path target, PerformanceReport report) {
-        Status finished;
+        Status finished = new Status(target, false, "Failed");
         try {
             Files.createDirectories(directory);
             Files.writeString(target, GSON.toJson(report), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
             rotate();
             finished = new Status(target, false, "Written");
-            status = finished;
         } catch (IOException | RuntimeException failure) {
             finished = new Status(target, false, "Failed: " + failure.getClass().getSimpleName());
-            status = finished;
         } finally {
-            pending.set(false);
+            complete(finished);
+        }
+    }
+
+    private void complete(Status finished) {
+        Status rejected = null;
+        synchronized (this) {
+            status = finished;
+            pending = false;
+            PerformanceReport next = terminalReport;
+            terminalReport = null;
+            if (next != null && !dispatch(next)) rejected = status;
         }
         // A new report may be admitted now. Publish this job's result rather
         // than accidentally logging the newer job's volatile status.
         completed.accept(finished);
+        if (rejected != null) completed.accept(rejected);
     }
 
     private void rotate() throws IOException {

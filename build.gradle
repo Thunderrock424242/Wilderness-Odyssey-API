@@ -86,8 +86,10 @@ neoForge {
             if (waterSafetyTests && !(waterSafetyProfile in ['baseline', 'sable', 'c2me', 'sable-c2me'])) {
                 throw new GradleException('waterSafetyProfile must be baseline, sable, c2me, or sable-c2me')
             }
-            def testDirectory = waterSafetyTests ? "run-water-safety-${waterSafetyProfile}"
-                    : providers.gradleProperty('questGameTests').isPresent() ? 'run-quest-gametest' : 'run-gametest'
+            def testDirectory = providers.gradleProperty('coordinatorGameTests').isPresent() ? 'run-coordinator-gametest'
+                    : waterSafetyTests ? "run-water-safety-${waterSafetyProfile}"
+                    : providers.gradleProperty('questGameTests').isPresent() ? 'run-quest-gametest'
+                    : providers.gradleProperty('riftGameTests').isPresent() ? 'run-rift-gametest' : 'run-gametest'
             gameDirectory = codexBuildDir.isPresent()
                     ? layout.buildDirectory.dir(testDirectory).get().asFile
                     : project.file(testDirectory)
@@ -99,9 +101,11 @@ neoForge {
             def neoforgeNamespaces = System.getProperty('neoforge.enabledGameTestNamespaces')
             def enabledNamespaces = forgeNamespaces != null ? forgeNamespaces : neoforgeNamespaces
             if (enabledNamespaces == null) {
-                enabledNamespaces = waterSafetyTests ? 'wildernessodysseyapi_water_safety_tests'
+                enabledNamespaces = providers.gradleProperty('coordinatorGameTests').isPresent() ? 'wildernessodysseyapi_coordinator_tests'
+                        : waterSafetyTests ? 'wildernessodysseyapi_water_safety_tests'
                         : providers.gradleProperty('questGameTests').isPresent()
-                        ? 'wildernessodysseyapi_quest_tests' : project.mod_id
+                        ? 'wildernessodysseyapi_quest_tests'
+                        : providers.gradleProperty('riftGameTests').isPresent() ? 'wildernessodysseyapi_rift_tests' : project.mod_id
             }
             systemProperty 'forge.enabledGameTestNamespaces', enabledNamespaces
             systemProperty 'neoforge.enabledGameTestNamespaces', enabledNamespaces
@@ -202,6 +206,12 @@ tasks.named('processResources') {
     from('src/main/resources/data/minecraft/structures/empty.nbt') {
         into 'data/wildernessodysseyapi_environment_tests/structure'
     }
+    from('src/main/resources/data/minecraft/structures/empty.nbt') {
+        into 'data/wildernessodysseyapi_coordinator_tests/structure'
+    }
+    from(structureGenResourceRoot.map { it.file('data/wildernessodysseyapi/structure/rift_test_clear.nbt') }) {
+        into 'data/wildernessodysseyapi_rift_tests/structure'
+    }
     from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
         into 'data/wildernessodysseyapi_water_safety_tests/structure'
     }
@@ -223,6 +233,11 @@ tasks.named('processResources') {
         def environmentTarget = file("${destinationDir}/data/wildernessodysseyapi_environment_tests/structure/empty.nbt")
         environmentTarget.parentFile.mkdirs()
         new java.util.zip.GZIPOutputStream(new FileOutputStream(environmentTarget)).withCloseable { stream ->
+            stream.write(sourceBytes)
+        }
+        def coordinatorTarget = file("${destinationDir}/data/wildernessodysseyapi_coordinator_tests/structure/empty.nbt")
+        coordinatorTarget.parentFile.mkdirs()
+        new java.util.zip.GZIPOutputStream(new FileOutputStream(coordinatorTarget)).withCloseable { stream ->
             stream.write(sourceBytes)
         }
     }
@@ -735,6 +750,18 @@ tasks.register('structureGenTest', Test) {
     }
 }
 
+tasks.register('riftTest', Test) {
+    group = 'verification'
+    description = 'Runs focused hybrid rift geometry, interaction, composition and resource regressions without starting Minecraft.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '1g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.temporalrift.hybrid.*'
+    }
+}
+
 tasks.register('playtestTest', Test) {
     group = 'verification'
     description = 'Runs focused playtesting, feedback, telemetry and configuration regressions.'
@@ -765,13 +792,16 @@ tasks.register('loadingProfilerTest', Test) {
 
 tasks.register('performanceDiagnosticsTest', Test) {
     group = 'verification'
-    description = 'Runs read-only performance observation and ownership regressions.'
+    description = 'Runs performance observation, coordination, save-model and ownership regressions.'
     dependsOn tasks.named('compileTestJava')
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = structureGenOfflineRuntime
     maxHeapSize = '1g'
     filter {
         includeTestsMatching 'com.thunder.wildernessodysseyapi.diagnostics.performance.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.performance.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.saving.coordinator.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.async.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.architecture.ChunkLifecycleIsolationTest'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.config.PerformanceServerConfigTest'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.mixinconfig.WildernessMixinConfigPluginTest'
@@ -801,6 +831,20 @@ tasks.register('echoTest', Test) {
     filter {
         includeTestsMatching 'com.thunder.wildernessodysseyapi.temporalrift.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.ai.story.EchoDiscoveryFallbackTest'
+    }
+}
+
+// Anomaly policy and resource checks share the established offline JUnit runtime.
+tasks.register('anomalyTest', Test) {
+    group = 'verification'
+    description = 'Runs anomaly biome, template safety, atmosphere and block resource regressions.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '2g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.anomaly.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.worldgen.anomaly.*'
     }
 }
 

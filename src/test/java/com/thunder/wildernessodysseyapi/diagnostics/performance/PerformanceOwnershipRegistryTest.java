@@ -8,6 +8,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PerformanceOwnershipRegistryTest {
     @Test
+    void saveOrC2mePresenceVetoesOptionalSavingRegardlessOfUnverifiedConfig() {
+        for (String mod : java.util.List.of("betterautosave", "shinoyuki_betterautosave", "smoothchunk", "fastasyncworldsave", "c2me", "c2me_opts_chunkio"))
+            assertTrue(PerformanceOwnershipRegistry.blocksOptionalSaving(PerformanceOwnershipRegistry.detect(Map.of(mod, "1"))));
+        assertFalse(PerformanceOwnershipRegistry.blocksOptionalSaving(PerformanceOwnershipRegistry.detect(Map.of("ferritecore", "1", "sodium", "1"))));
+    }
+    @Test
     void retainsOverlappingSaveCandidatesInsteadOfChoosingAWinner() {
         var owners = PerformanceOwnershipRegistry.detect(Map.of(
                 "shinoyuki_betterautosave", "0.20", "smoothchunk", "1.0", "fastasyncworldsave", "2.6"));

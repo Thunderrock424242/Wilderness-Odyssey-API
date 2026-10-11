@@ -12,6 +12,10 @@
     "wildernessodysseyapi:glacial_meltwater_valley",
     "wildernessodysseyapi:polar_glacial_basin",
     "wildernessodysseyapi:glacial_highlands",
-    "wildernessodysseyapi:polar_ice_sheet"
+    "wildernessodysseyapi:polar_ice_sheet",
+    "wildernessodysseyapi:anomaly_plains",
+    "wildernessodysseyapi:anomaly_hills",
+    "wildernessodysseyapi:floating_fringe",
+    "wildernessodysseyapi:rift_core"
   ]
 }

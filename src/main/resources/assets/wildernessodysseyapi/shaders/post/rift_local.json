@@ -1,0 +1,7 @@
+{
+  "targets": ["rift_swap"],
+  "passes": [
+    {"name": "wildernessodysseyapi:rift_local", "intarget": "minecraft:main", "outtarget": "rift_swap"},
+    {"name": "minecraft:blit", "intarget": "rift_swap", "outtarget": "minecraft:main"}
+  ]
+}

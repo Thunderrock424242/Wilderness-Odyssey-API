@@ -117,11 +117,22 @@ public final class AsyncTaskManager {
         // A task that ignores interruption can no longer enqueue work for the
         // next integrated or dedicated server instance.
         LIFECYCLE_GENERATION.incrementAndGet();
-        shutdownExecutor(cpuExecutor);
-        shutdownExecutor(ioExecutor);
-        ThreadPoolExecutor retiredExecutor;
-        while ((retiredExecutor = RETIRED_EXECUTORS.poll()) != null) {
-            shutdownExecutor(retiredExecutor);
+        if (com.thunder.wildernessodysseyapi.performance.coordinator.PerformanceCoordinator.governsAsync()) {
+            var pools = new java.util.ArrayList<ThreadPoolExecutor>();
+            if (cpuExecutor != null) pools.add(cpuExecutor);
+            if (ioExecutor != null) pools.add(ioExecutor);
+            ThreadPoolExecutor retired;
+            while ((retired = RETIRED_EXECUTORS.poll()) != null) pools.add(retired);
+            // Preserve the existing two current-pool grace windows as one total
+            // deadline; retired pools drain concurrently instead of adding two seconds each.
+            ExecutorShutdown.drain(pools, TimeUnit.SECONDS.toNanos(4), System::nanoTime);
+        } else {
+            shutdownExecutor(cpuExecutor);
+            shutdownExecutor(ioExecutor);
+            ThreadPoolExecutor retiredExecutor;
+            while ((retiredExecutor = RETIRED_EXECUTORS.poll()) != null) {
+                shutdownExecutor(retiredExecutor);
+            }
         }
         cpuExecutor = null;
         ioExecutor = null;
@@ -164,6 +175,17 @@ public final class AsyncTaskManager {
      */
     public static boolean trySubmitIoWork(String label, Runnable task) {
         return trySubmitWork(ioExecutor, label, task, "I/O");
+    }
+
+    /** Explicitly disposable IO, admitted by the opt-in coordinator; required persistence uses trySubmitIoWork. */
+    public static boolean trySubmitDisposableIoWork(String label, Runnable task) {
+        Objects.requireNonNull(label);
+        Objects.requireNonNull(task);
+        if (!com.thunder.wildernessodysseyapi.performance.coordinator.PerformanceCoordinator.governsAsync())
+            return trySubmitIoWork(label, task);
+        ThreadPoolExecutor executor = ioExecutor;
+        if (!configValues.enabled() || executor == null || !INITIALIZED.get() || executor.isShutdown()) return false;
+        return com.thunder.wildernessodysseyapi.performance.coordinator.PerformanceCoordinator.submitDisposable(executor, task);
     }
 
     private static CompletableFuture<Boolean> submitTask(ThreadPoolExecutor executor, String label, TaskPayload taskPayload) {

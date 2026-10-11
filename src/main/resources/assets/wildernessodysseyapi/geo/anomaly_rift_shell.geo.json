@@ -1,0 +1,2020 @@
+{
+	"format_version": "1.12.0",
+	"minecraft:geometry": [
+		{
+			"description": {
+				"identifier": "geometry.unknown",
+				"texture_width": 256,
+				"texture_height": 256,
+				"visible_bounds_width": 8,
+				"visible_bounds_height": 7.5,
+				"visible_bounds_offset": [0, 3.25, 0]
+			},
+			"bones": [
+				{
+					"name": "Anomaly Rift Shell",
+					"pivot": [0, 48, 0]
+				},
+				{
+					"name": "Vortex Row Inner",
+					"parent": "Anomaly Rift Shell",
+					"pivot": [0, 48, 0]
+				},
+				{
+					"name": "Shell Fragments",
+					"parent": "Vortex Row Inner",
+					"pivot": [0, 48, 0]
+				},
+				{
+					"name": "Shell Upper Left",
+					"parent": "Shell Fragments",
+					"pivot": [28.303, 78.351, -10],
+					"cubes": [
+						{
+							"origin": [19.951, 72.829, -20.528],
+							"size": [13.572, 19.072, 9.367],
+							"pivot": [26.737, 82.365, -15.845],
+							"rotation": [3.464, -9.888, 225.188],
+							"uv": {
+								"north": {"uv": [224, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [96, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [0, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [192, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [256, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [96, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [20.529, 72.113, -16.507],
+							"size": [15.208, 14.571, 11.628],
+							"pivot": [28.133, 79.399, -10.693],
+							"rotation": [4.127, 4.012, 212.78],
+							"uv": {
+								"north": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [96, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [15.312, 73.363, -12.609],
+							"size": [20.52, 14.605, 12.28],
+							"pivot": [25.572, 80.665, -6.469],
+							"rotation": [-2.947, 7.482, 208.013],
+							"uv": {
+								"north": {"uv": [32, 32], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"east": {"uv": [224, 0], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"south": {"uv": [64, 64], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"west": {"uv": [0, 64], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"up": {"uv": [192, 32], "uv_size": [-32, -32], "material_instance": "rift_stone"},
+								"down": {"uv": [224, 64], "uv_size": [-32, -32], "material_instance": "rift_stone"}
+							}
+						},
+						{
+							"origin": [19.221, 72.107, -18.358],
+							"size": [14.699, 18.155, 9.451],
+							"pivot": [26.57, 81.185, -13.633],
+							"rotation": [5.366, -7.689, 223.006],
+							"uv": {
+								"north": {"uv": [96, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [224, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [192, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [192, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [224, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [23.406, 79.296, 1.311],
+							"size": [9.657, 5.091, 4.939],
+							"pivot": [28.234, 81.841, 3.781],
+							"rotation": [-3.026, -7.221, 238.513],
+							"uv": {
+								"north": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [256, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [29.729, 76.357, -20.163],
+							"size": [6.677, 6.086, 3.496],
+							"pivot": [33.067, 79.4, -18.415],
+							"rotation": [-7.702, -11.138, 248.851],
+							"uv": {
+								"north": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [96, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [29.962, 70.28, 2.028],
+							"size": [9.432, 5.05, 3.417],
+							"pivot": [34.678, 72.805, 3.736],
+							"rotation": [-9.949, 2.477, 195.764],
+							"uv": {
+								"north": {"uv": [224, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [64, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [160, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [29.827, 75.763, -22.231],
+							"size": [9.144, 5.214, 3.281],
+							"pivot": [34.399, 78.37, -20.591],
+							"rotation": [7.205, -5.74, 249.558],
+							"uv": {
+								"north": {"uv": [224, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [96, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [0, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [192, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [256, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [96, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [31.574, 73.921, -20.159],
+							"size": [8.019, 4.75, 3.878],
+							"pivot": [35.583, 76.296, -18.22],
+							"rotation": [7.883, 8.134, 242.613],
+							"uv": {
+								"north": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [256, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [35.499, 77.037, -15.724],
+							"size": [5.577, 3.874, 4.748],
+							"pivot": [38.287, 78.974, -13.35],
+							"rotation": [-14.014, -9.296, 230.857],
+							"uv": {
+								"north": {"uv": [224, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [96, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [0, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [192, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [256, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [96, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [34.492, 77.929, -14.667],
+							"size": [4.051, 4.543, 3.801],
+							"pivot": [36.518, 80.201, -12.766],
+							"rotation": [2.323, -14.39, 249.218],
+							"uv": {
+								"north": {"uv": [160, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [32, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [0, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [128, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [256, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [32, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [33.349, 79.676, -11.926],
+							"size": [4.224, 4.575, 4.638],
+							"pivot": [35.461, 81.963, -9.607],
+							"rotation": [-12.722, -3.021, 212.748],
+							"uv": {
+								"north": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [24.638, 68.474, -14.015],
+							"size": [3.947, 8.172, 5.437],
+							"pivot": [26.612, 72.56, -11.297],
+							"rotation": [7.129, -0.991, 218.783],
+							"uv": {
+								"north": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [20.779, 70.848, -10.6],
+							"size": [5.402, 6.973, 5.199],
+							"pivot": [23.48, 74.334, -8.001],
+							"rotation": [-0.641, 0.58, 214.84],
+							"uv": {
+								"north": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [25.118, 73.585, -8.6],
+							"size": [1.2, 8, 1.2],
+							"pivot": [25.718, 77.585, -8],
+							"rotation": [0, 0, 207.508],
+							"uv": {
+								"north": {"uv": [224, 192], "uv_size": [32, 32], "material_instance": "rift_crack_violet"},
+								"east": {"uv": [160, 224], "uv_size": [32, 32], "material_instance": "rift_crack_violet"},
+								"south": {"uv": [224, 224], "uv_size": [32, 32], "material_instance": "rift_crack_violet"},
+								"west": {"uv": [96, 224], "uv_size": [32, 32], "material_instance": "rift_crack_violet"},
+								"up": {"uv": [64, 256], "uv_size": [-32, -32], "material_instance": "rift_crack_violet"},
+								"down": {"uv": [256, 224], "uv_size": [-32, -32], "material_instance": "rift_crack_violet"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Shell Upper",
+					"parent": "Shell Fragments",
+					"pivot": [-1.396, 87.976, 10],
+					"cubes": [
+						{
+							"origin": [-4.636, 84.127, -3.288],
+							"size": [15.711, 13.904, 11.215],
+							"pivot": [3.22, 91.079, 2.32],
+							"rotation": [-5.785, 9.28, 191.678],
+							"uv": {
+								"north": {"uv": [160, 0], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"east": {"uv": [96, 0], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"south": {"uv": [192, 32], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"west": {"uv": [128, 32], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"up": {"uv": [64, 32], "uv_size": [-32, -32], "material_instance": "rift_stone"},
+								"down": {"uv": [96, 64], "uv_size": [-32, -32], "material_instance": "rift_stone"}
+							}
+						},
+						{
+							"origin": [-9.487, 84.052, 4.609],
+							"size": [14.643, 10.644, 10.674],
+							"pivot": [-2.166, 89.374, 9.946],
+							"rotation": [-2.252, 8.375, 170.846],
+							"uv": {
+								"north": {"uv": [32, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [160, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [128, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [0, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [64, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [160, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-7.219, 83.772, 5.672],
+							"size": [17.238, 9.53, 12.297],
+							"pivot": [1.4, 88.537, 11.82],
+							"rotation": [-5.135, -2.608, 165.067],
+							"uv": {
+								"north": {"uv": [224, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [64, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [160, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-3.164, 84.515, 7.131],
+							"size": [12.052, 10.976, 10.853],
+							"pivot": [2.862, 90.003, 12.557],
+							"rotation": [-2.049, 2.093, 167.824],
+							"uv": {
+								"north": {"uv": [96, 0], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"east": {"uv": [32, 0], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"south": {"uv": [128, 32], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"west": {"uv": [64, 32], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"up": {"uv": [128, 96], "uv_size": [-32, -32], "material_instance": "rift_stone"},
+								"down": {"uv": [32, 64], "uv_size": [-32, -32], "material_instance": "rift_stone"}
+							}
+						},
+						{
+							"origin": [0.483, 87.541, 15.897],
+							"size": [7.23, 7.135, 3.712],
+							"pivot": [4.098, 91.108, 17.753],
+							"rotation": [3.328, -5.849, 189.661],
+							"uv": {
+								"north": {"uv": [224, 160], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"east": {"uv": [32, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"south": {"uv": [0, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"west": {"uv": [64, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"up": {"uv": [128, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"},
+								"down": {"uv": [160, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"}
+							}
+						},
+						{
+							"origin": [-0.899, 86.167, 21.36],
+							"size": [6.171, 7.819, 3.497],
+							"pivot": [2.187, 90.077, 23.109],
+							"rotation": [-1.68, 0.965, 171.457],
+							"uv": {
+								"north": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-1.284, 87.029, -4.328],
+							"size": [6.828, 4.701, 4.37],
+							"pivot": [2.13, 89.379, -2.143],
+							"rotation": [-9.592, -8.395, 176.652],
+							"uv": {
+								"north": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-12.797, 88.805, 13.629],
+							"size": [9.359, 4.775, 5.02],
+							"pivot": [-8.118, 91.193, 16.139],
+							"rotation": [-4.542, -10.434, 195.44],
+							"uv": {
+								"north": {"uv": [32, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"east": {"uv": [96, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"south": {"uv": [64, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"west": {"uv": [128, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"up": {"uv": [192, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"},
+								"down": {"uv": [224, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"}
+							}
+						},
+						{
+							"origin": [-8.436, 94.521, 9.934],
+							"size": [4.694, 4.101, 3.986],
+							"pivot": [-6.089, 96.571, 11.927],
+							"rotation": [5.912, -6.235, 211.439],
+							"uv": {
+								"north": {"uv": [128, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [0, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [224, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [96, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [224, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [256, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-6.285, 93.884, -2.041],
+							"size": [5.073, 3.887, 5.306],
+							"pivot": [-3.748, 95.828, 0.612],
+							"rotation": [-6.909, 0.292, 189.086],
+							"uv": {
+								"north": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-0.274, 93.516, -0.048],
+							"size": [3.297, 4.522, 5.894],
+							"pivot": [1.375, 95.777, 2.899],
+							"rotation": [-17.101, 17.695, 214.843],
+							"uv": {
+								"north": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [32, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [160, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [192, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-0.657, 77.756, 8.422],
+							"size": [5.069, 7.88, 4.894],
+							"pivot": [1.878, 81.696, 10.869],
+							"rotation": [-0.024, 0.607, 167.21],
+							"uv": {
+								"north": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [256, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-2.761, 79.383, 5.86],
+							"size": [4.678, 6.782, 4.374],
+							"pivot": [-0.422, 82.774, 8.047],
+							"rotation": [-6.054, -3.01, 165.316],
+							"uv": {
+								"north": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-1.926, 81.977, 10.9],
+							"size": [1.2, 8, 1.2],
+							"pivot": [-1.326, 85.977, 11.5],
+							"rotation": [0, 0, 167.802],
+							"uv": {
+								"north": {"uv": [128, 224], "uv_size": [32, 32], "material_instance": "rift_crack_cyan"},
+								"east": {"uv": [0, 224], "uv_size": [32, 32], "material_instance": "rift_crack_cyan"},
+								"south": {"uv": [64, 224], "uv_size": [32, 32], "material_instance": "rift_crack_cyan"},
+								"west": {"uv": [192, 192], "uv_size": [32, 32], "material_instance": "rift_crack_cyan"},
+								"up": {"uv": [224, 256], "uv_size": [-32, -32], "material_instance": "rift_crack_cyan"},
+								"down": {"uv": [160, 256], "uv_size": [-32, -32], "material_instance": "rift_crack_cyan"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Shell Upper Right",
+					"parent": "Shell Fragments",
+					"pivot": [-28.888, 74.939, -14],
+					"cubes": [
+						{
+							"origin": [-35.798, 68.388, -15.939],
+							"size": [9.414, 12.037, 8.428],
+							"pivot": [-31.091, 74.406, -11.725],
+							"rotation": [7.713, -5.639, 132.312],
+							"uv": {
+								"north": {"uv": [224, 0], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"east": {"uv": [160, 0], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"south": {"uv": [0, 64], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"west": {"uv": [192, 32], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"up": {"uv": [128, 32], "uv_size": [-32, -32], "material_instance": "rift_stone"},
+								"down": {"uv": [160, 64], "uv_size": [-32, -32], "material_instance": "rift_stone"}
+							}
+						},
+						{
+							"origin": [-35.191, 71.52, -17.195],
+							"size": [12.916, 11.41, 9.184],
+							"pivot": [-28.733, 77.225, -12.603],
+							"rotation": [7.645, -2.831, 129.342],
+							"uv": {
+								"north": {"uv": [96, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [224, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [192, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [192, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [224, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-36.771, 70.276, -17.097],
+							"size": [9.668, 10.318, 7.243],
+							"pivot": [-31.937, 75.435, -13.475],
+							"rotation": [7.123, 9.064, 146.896],
+							"uv": {
+								"north": {"uv": [96, 64], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"east": {"uv": [32, 64], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"south": {"uv": [0, 32], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"west": {"uv": [192, 0], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"up": {"uv": [256, 64], "uv_size": [-32, -32], "material_instance": "rift_stone"},
+								"down": {"uv": [160, 32], "uv_size": [-32, -32], "material_instance": "rift_stone"}
+							}
+						},
+						{
+							"origin": [-36.097, 74.895, -23.309],
+							"size": [8.601, 7.26, 3.958],
+							"pivot": [-31.796, 78.525, -21.33],
+							"rotation": [3.898, -11.815, 143.052],
+							"uv": {
+								"north": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [32, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [160, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [192, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-32.002, 77.721, -7.852],
+							"size": [6.404, 6.312, 3.508],
+							"pivot": [-28.8, 80.877, -6.098],
+							"rotation": [-3.602, 0.569, 113.656],
+							"uv": {
+								"north": {"uv": [192, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [128, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [96, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [32, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [224, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [128, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-40.275, 69.979, -26.247],
+							"size": [6.294, 5.151, 3.406],
+							"pivot": [-37.128, 72.555, -24.544],
+							"rotation": [1.783, -2.807, 127.853],
+							"uv": {
+								"north": {"uv": [128, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [192, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [32, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [96, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [64, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-39.82, 73.109, -25.874],
+							"size": [4.279, 3.59, 4.474],
+							"pivot": [-37.68, 74.904, -23.637],
+							"rotation": [14.035, -12.721, 107.706],
+							"uv": {
+								"north": {"uv": [192, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [128, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [96, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [32, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [224, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [128, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-41.493, 73.393, -9.195],
+							"size": [3.265, 5.219, 5.469],
+							"pivot": [-39.86, 76.002, -6.461],
+							"rotation": [9.133, 4.215, 134.919],
+							"uv": {
+								"north": {"uv": [128, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [192, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [32, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [96, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [64, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-26.223, 66.964, -17.475],
+							"size": [4.813, 7.876, 6.424],
+							"pivot": [-23.817, 70.902, -14.263],
+							"rotation": [-1.535, 3.716, 141.312],
+							"uv": {
+								"north": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [96, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-27.498, 66.554, -15.244],
+							"size": [4.53, 5.638, 6.336],
+							"pivot": [-25.233, 69.373, -12.076],
+							"rotation": [-3.01, 0.277, 121.997],
+							"uv": {
+								"north": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [256, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Shell Left",
+					"parent": "Shell Fragments",
+					"pivot": [40.401, 45.175, 11],
+					"cubes": [
+						{
+							"origin": [31.416, 34.036, 1.522],
+							"size": [16.141, 15.416, 8.632],
+							"pivot": [39.487, 41.744, 5.838],
+							"rotation": [-0.302, 0.773, 264.965],
+							"uv": {
+								"north": {"uv": [96, 32], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"east": {"uv": [32, 32], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"south": {"uv": [0, 0], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"west": {"uv": [64, 64], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"up": {"uv": [256, 32], "uv_size": [-32, -32], "material_instance": "rift_stone"},
+								"down": {"uv": [32, 96], "uv_size": [-32, -32], "material_instance": "rift_stone"}
+							}
+						},
+						{
+							"origin": [33.074, 32.26, 4.437],
+							"size": [12.758, 16.138, 8.632],
+							"pivot": [39.453, 40.329, 8.753],
+							"rotation": [1.011, -2.372, 281.054],
+							"uv": {
+								"north": {"uv": [96, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [32, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [128, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [192, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [128, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [160, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [31.125, 32.829, 7.322],
+							"size": [17.493, 16.312, 9.611],
+							"pivot": [39.871, 40.985, 12.127],
+							"rotation": [5.748, 1.175, 266.629],
+							"uv": {
+								"north": {"uv": [224, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [64, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [160, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [33.83, 42.804, 4.503],
+							"size": [14.685, 12.958, 9.405],
+							"pivot": [41.172, 49.283, 9.205],
+							"rotation": [2.207, 2.892, 273.74],
+							"uv": {
+								"north": {"uv": [32, 32], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"east": {"uv": [224, 0], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"south": {"uv": [64, 64], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"west": {"uv": [0, 64], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"up": {"uv": [192, 32], "uv_size": [-32, -32], "material_instance": "rift_stone"},
+								"down": {"uv": [224, 64], "uv_size": [-32, -32], "material_instance": "rift_stone"}
+							}
+						},
+						{
+							"origin": [41.194, 49.967, -0.339],
+							"size": [5.888, 6.51, 3.393],
+							"pivot": [44.138, 53.222, 1.358],
+							"rotation": [0.4, 0.553, 283.355],
+							"uv": {
+								"north": {"uv": [160, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [32, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [0, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [128, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [256, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [32, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [39.215, 37.443, 19.598],
+							"size": [9.079, 6.332, 5.025],
+							"pivot": [43.755, 40.609, 22.111],
+							"rotation": [-6.148, 9.319, 262.421],
+							"uv": {
+								"north": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [32, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [128, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [192, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [32, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [39.236, 50.331, 16.537],
+							"size": [8.426, 7.105, 4.339],
+							"pivot": [43.449, 53.883, 18.707],
+							"rotation": [1.057, -10.705, 289.879],
+							"uv": {
+								"north": {"uv": [32, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [192, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [128, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [64, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [224, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [38.885, 48.937, 16.751],
+							"size": [7.592, 4.627, 3.59],
+							"pivot": [42.681, 51.25, 18.546],
+							"rotation": [-9.502, 7.391, 251.442],
+							"uv": {
+								"north": {"uv": [32, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [224, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [128, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [0, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [128, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [224, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [44.96, 37.178, 6.544],
+							"size": [5.479, 5.856, 3.906],
+							"pivot": [47.699, 40.106, 8.497],
+							"rotation": [11.489, -1.437, 267.235],
+							"uv": {
+								"north": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [47.621, 43.778, 5.615],
+							"size": [3.358, 3.544, 3.222],
+							"pivot": [49.3, 45.55, 7.226],
+							"rotation": [-16.033, -14.054, 259.784],
+							"uv": {
+								"north": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [44.095, 40.772, 4.779],
+							"size": [5.193, 4.121, 5.399],
+							"pivot": [46.692, 42.833, 7.478],
+							"rotation": [-12.074, -1.634, 286.76],
+							"uv": {
+								"north": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [32, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [160, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [192, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [32.38, 46.305, 6.182],
+							"size": [5.235, 6.66, 5.879],
+							"pivot": [34.998, 49.635, 9.121],
+							"rotation": [-7.479, -4.051, 278.587],
+							"uv": {
+								"north": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [32.889, 44.575, 11.516],
+							"size": [4.02, 8.055, 6.542],
+							"pivot": [34.899, 48.603, 14.787],
+							"rotation": [-4.664, 3.108, 258.128],
+							"uv": {
+								"north": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [37.148, 42.022, 7.4],
+							"size": [1.2, 8, 1.2],
+							"pivot": [37.748, 46.022, 8],
+							"rotation": [0, 0, 290.253],
+							"uv": {
+								"north": {"uv": [224, 224], "uv_size": [32, 32], "material_instance": "rift_crack_violet"},
+								"east": {"uv": [96, 224], "uv_size": [32, 32], "material_instance": "rift_crack_violet"},
+								"south": {"uv": [160, 224], "uv_size": [32, 32], "material_instance": "rift_crack_violet"},
+								"west": {"uv": [32, 224], "uv_size": [32, 32], "material_instance": "rift_crack_violet"},
+								"up": {"uv": [256, 224], "uv_size": [-32, -32], "material_instance": "rift_crack_violet"},
+								"down": {"uv": [256, 256], "uv_size": [-32, -32], "material_instance": "rift_crack_violet"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Shell Right",
+					"parent": "Shell Fragments",
+					"pivot": [-38.947, 50.041, -13],
+					"cubes": [
+						{
+							"origin": [-43.148, 39.411, -14.513],
+							"size": [9.853, 12.584, 10.572],
+							"pivot": [-38.222, 45.703, -9.227],
+							"rotation": [1.655, -1.276, 79.186],
+							"uv": {
+								"north": {"uv": [32, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [192, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [128, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [64, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [224, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-47.742, 42.918, -20.768],
+							"size": [11.557, 12.137, 9.794],
+							"pivot": [-41.963, 48.987, -15.871],
+							"rotation": [7.609, 4.815, 105.246],
+							"uv": {
+								"north": {"uv": [224, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [96, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [0, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [192, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [256, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [96, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-45.011, 48.637, -15.758],
+							"size": [13.479, 7.633, 8.456],
+							"pivot": [-38.272, 52.454, -11.53],
+							"rotation": [-5.202, -7.836, 92.457],
+							"uv": {
+								"north": {"uv": [96, 0], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"east": {"uv": [32, 0], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"south": {"uv": [128, 32], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"west": {"uv": [64, 32], "uv_size": [32, 32], "material_instance": "rift_stone"},
+								"up": {"uv": [128, 96], "uv_size": [-32, -32], "material_instance": "rift_stone"},
+								"down": {"uv": [32, 64], "uv_size": [-32, -32], "material_instance": "rift_stone"}
+							}
+						},
+						{
+							"origin": [-48.313, 45.271, -25.834],
+							"size": [7.009, 5.934, 3.019],
+							"pivot": [-44.809, 48.238, -24.325],
+							"rotation": [0.034, -11.081, 96.992],
+							"uv": {
+								"north": {"uv": [0, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"east": {"uv": [64, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"south": {"uv": [32, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"west": {"uv": [96, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"up": {"uv": [160, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"},
+								"down": {"uv": [192, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"}
+							}
+						},
+						{
+							"origin": [-46.825, 47.356, -2.913],
+							"size": [7.73, 7.473, 3.204],
+							"pivot": [-42.96, 51.092, -1.311],
+							"rotation": [4.6, 11.795, 119.721],
+							"uv": {
+								"north": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [256, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-48.138, 40.414, -24.545],
+							"size": [6.655, 6.154, 4.887],
+							"pivot": [-44.811, 43.491, -22.102],
+							"rotation": [-4.141, 10.116, 121.815],
+							"uv": {
+								"north": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-48.64, 48.134, -14.213],
+							"size": [3.731, 4.637, 5.889],
+							"pivot": [-46.775, 50.453, -11.268],
+							"rotation": [7.921, 0.1, 93.516],
+							"uv": {
+								"north": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [128, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [32, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [160, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [32, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [64, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-49.364, 52.335, -18.985],
+							"size": [5.153, 4.509, 3.105],
+							"pivot": [-46.788, 54.59, -17.433],
+							"rotation": [-5.143, -13.841, 85.391],
+							"uv": {
+								"north": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-34.51, 42.66, -18.165],
+							"size": [4.887, 6.634, 4.775],
+							"pivot": [-32.067, 45.977, -15.778],
+							"rotation": [7.374, 5.111, 91.54],
+							"uv": {
+								"north": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-33.994, 48.601, -18.102],
+							"size": [4.517, 7.871, 5.751],
+							"pivot": [-31.736, 52.536, -15.226],
+							"rotation": [-1.401, -7.389, 113.873],
+							"uv": {
+								"north": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-38.077, 45.309, -12.1],
+							"size": [1.2, 8, 1.2],
+							"pivot": [-37.477, 49.309, -11.5],
+							"rotation": [0, 0, 77.668],
+							"uv": {
+								"north": {"uv": [192, 224], "uv_size": [32, 32], "material_instance": "rift_crack_cyan"},
+								"east": {"uv": [64, 224], "uv_size": [32, 32], "material_instance": "rift_crack_cyan"},
+								"south": {"uv": [128, 224], "uv_size": [32, 32], "material_instance": "rift_crack_cyan"},
+								"west": {"uv": [0, 224], "uv_size": [32, 32], "material_instance": "rift_crack_cyan"},
+								"up": {"uv": [224, 224], "uv_size": [-32, -32], "material_instance": "rift_crack_cyan"},
+								"down": {"uv": [224, 256], "uv_size": [-32, -32], "material_instance": "rift_crack_cyan"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Shell Lower Left",
+					"parent": "Shell Fragments",
+					"pivot": [22.647, 14.424, 13],
+					"cubes": [
+						{
+							"origin": [15.27, 7.212, 7.497],
+							"size": [14.202, 12.086, 10.097],
+							"pivot": [22.371, 13.255, 12.546],
+							"rotation": [3.811, 5.246, 326.556],
+							"uv": {
+								"north": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [32, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [160, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [192, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [13.214, 6.234, 5.689],
+							"size": [14.982, 12.798, 7.694],
+							"pivot": [20.705, 12.633, 9.536],
+							"rotation": [7.806, -2.869, 327.351],
+							"uv": {
+								"north": {"uv": [0, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [192, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [96, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [224, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [96, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [192, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [20.176, 9.655, 4.67],
+							"size": [14.108, 10.327, 10.976],
+							"pivot": [27.23, 14.819, 10.158],
+							"rotation": [-3.203, 5.455, 343.466],
+							"uv": {
+								"north": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [19.206, 8.497, 8.377],
+							"size": [15.405, 11.626, 8.598],
+							"pivot": [26.909, 14.31, 12.676],
+							"rotation": [-4.563, -9.687, 340.657],
+							"uv": {
+								"north": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [256, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [23.436, 8.425, 0.774],
+							"size": [6.592, 4.812, 4.628],
+							"pivot": [26.732, 10.831, 3.088],
+							"rotation": [-3.677, 10.081, 308.678],
+							"uv": {
+								"north": {"uv": [192, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [224, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [224, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [64, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [24.685, 11.147, 17.725],
+							"size": [6.79, 6.506, 4.554],
+							"pivot": [28.08, 14.4, 20.002],
+							"rotation": [0.118, 0.023, 345.448],
+							"uv": {
+								"north": {"uv": [128, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [0, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [224, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [96, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [224, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [256, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [12.657, 4.492, 17.992],
+							"size": [7.489, 6.758, 4.503],
+							"pivot": [16.402, 7.871, 20.244],
+							"rotation": [-7.25, -8.448, 316.859],
+							"uv": {
+								"north": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [25.134, 6.529, 7.579],
+							"size": [5.167, 5.582, 4.28],
+							"pivot": [27.718, 9.32, 9.719],
+							"rotation": [15.55, -8.075, 315.883],
+							"uv": {
+								"north": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [256, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [28.339, 6.539, 12.931],
+							"size": [4.945, 5.146, 5.326],
+							"pivot": [30.812, 9.112, 15.594],
+							"rotation": [13.686, 1.633, 308.322],
+							"uv": {
+								"north": {"uv": [192, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [224, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [224, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [64, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [27.48, 6.164, 8.352],
+							"size": [4.322, 4.429, 3.533],
+							"pivot": [29.641, 8.379, 10.118],
+							"rotation": [-9.386, 2.82, 305.211],
+							"uv": {
+								"north": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [256, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [14.747, 14.969, 11.924],
+							"size": [4.606, 7.908, 5.881],
+							"pivot": [17.05, 18.923, 14.865],
+							"rotation": [2.553, 2.258, 309.571],
+							"uv": {
+								"north": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [256, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [19.978, 19.704, 11.596],
+							"size": [4.666, 7.07, 5.01],
+							"pivot": [22.311, 23.239, 14.101],
+							"rotation": [-4.994, 3.555, 335.426],
+							"uv": {
+								"north": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [20.649, 12.497, 11.4],
+							"size": [1.2, 8, 1.2],
+							"pivot": [21.249, 16.497, 12],
+							"rotation": [0, 0, 315.439],
+							"uv": {
+								"north": {"uv": [64, 224], "uv_size": [32, 32], "material_instance": "rift_crack_cyan"},
+								"east": {"uv": [192, 192], "uv_size": [32, 32], "material_instance": "rift_crack_cyan"},
+								"south": {"uv": [0, 224], "uv_size": [32, 32], "material_instance": "rift_crack_cyan"},
+								"west": {"uv": [192, 224], "uv_size": [32, 32], "material_instance": "rift_crack_cyan"},
+								"up": {"uv": [160, 256], "uv_size": [-32, -32], "material_instance": "rift_crack_cyan"},
+								"down": {"uv": [96, 256], "uv_size": [-32, -32], "material_instance": "rift_crack_cyan"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Shell Lower",
+					"parent": "Shell Fragments",
+					"pivot": [-1.344, 9.523, -8],
+					"cubes": [
+						{
+							"origin": [-6.094, 3.038, -16.595],
+							"size": [15.067, 14.754, 10.1],
+							"pivot": [1.44, 10.415, -11.545],
+							"rotation": [2.992, -1.904, 367.675],
+							"uv": {
+								"north": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [256, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-11.575, 1.369, -15.994],
+							"size": [13.559, 13.023, 10.016],
+							"pivot": [-4.795, 7.881, -10.986],
+							"rotation": [-0.685, 1.412, 368.219],
+							"uv": {
+								"north": {"uv": [0, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [192, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [96, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [224, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [96, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [192, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-8.843, 0.277, -12.635],
+							"size": [16.193, 17.633, 12.06],
+							"pivot": [-0.747, 9.094, -6.605],
+							"rotation": [1.776, -3.925, 372.648],
+							"uv": {
+								"north": {"uv": [0, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [128, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [32, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [224, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [32, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [128, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-10.029, 1.534, -10.012],
+							"size": [15.346, 10.44, 10.998],
+							"pivot": [-2.356, 6.754, -4.513],
+							"rotation": [6.559, 9.153, 355.546],
+							"uv": {
+								"north": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-8.924, 4.968, 1.459],
+							"size": [9.192, 7.478, 3.085],
+							"pivot": [-4.328, 8.707, 3.001],
+							"rotation": [6.791, 8.595, 343.024],
+							"uv": {
+								"north": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [256, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-2.67, 5.224, -16.939],
+							"size": [6.459, 7.739, 4.704],
+							"pivot": [0.559, 9.094, -14.587],
+							"rotation": [-8.668, -2.38, 335.469],
+							"uv": {
+								"north": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-1.333, 4.931, 3.266],
+							"size": [8.385, 5.01, 4.991],
+							"pivot": [2.859, 7.436, 5.761],
+							"rotation": [3.369, 4.174, 334.827],
+							"uv": {
+								"north": {"uv": [64, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"east": {"uv": [128, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"south": {"uv": [96, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"west": {"uv": [160, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"up": {"uv": [224, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"},
+								"down": {"uv": [256, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"}
+							}
+						},
+						{
+							"origin": [-6.968, 1.703, -20.609],
+							"size": [9.314, 4.59, 3.846],
+							"pivot": [-2.311, 3.998, -18.686],
+							"rotation": [0.582, -2.92, 333.737],
+							"uv": {
+								"north": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-7.953, -0.041, -19.675],
+							"size": [7.344, 7.79, 4.034],
+							"pivot": [-4.281, 3.854, -17.658],
+							"rotation": [-6.585, 5.177, 357.521],
+							"uv": {
+								"north": {"uv": [192, 160], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"east": {"uv": [0, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"south": {"uv": [224, 160], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"west": {"uv": [32, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"up": {"uv": [96, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"},
+								"down": {"uv": [128, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"}
+							}
+						},
+						{
+							"origin": [1.628, 0.811, -8.975],
+							"size": [5.752, 3.774, 4.971],
+							"pivot": [4.504, 2.698, -6.489],
+							"rotation": [-8.557, -13.379, 344.326],
+							"uv": {
+								"north": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [32, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [160, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [192, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-5.18, -1.39, -8.362],
+							"size": [5.04, 4.934, 4.124],
+							"pivot": [-2.66, 1.077, -6.3],
+							"rotation": [10.368, -13.621, 359.55],
+							"uv": {
+								"north": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-1.504, 0.295, -2.306],
+							"size": [5.29, 3.767, 3.203],
+							"pivot": [1.141, 2.179, -0.705],
+							"rotation": [-9.843, 12.333, 395.511],
+							"uv": {
+								"north": {"uv": [0, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [128, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [32, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [224, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [32, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [128, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-2.09, 12.558, -9.661],
+							"size": [4.749, 6.365, 5.119],
+							"pivot": [0.285, 15.741, -7.102],
+							"rotation": [4.305, -5.478, 371.163],
+							"uv": {
+								"north": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-7.059, 12.642, -13.123],
+							"size": [4.003, 7.413, 4.34],
+							"pivot": [-5.057, 16.349, -10.953],
+							"rotation": [6.409, 1.62, 357.295],
+							"uv": {
+								"north": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-1.884, 7.222, -9.1],
+							"size": [1.2, 8, 1.2],
+							"pivot": [-1.284, 11.222, -8.5],
+							"rotation": [0, 0, 361.467],
+							"uv": {
+								"north": {"uv": [224, 192], "uv_size": [32, 32], "material_instance": "rift_crack_violet"},
+								"east": {"uv": [160, 224], "uv_size": [32, 32], "material_instance": "rift_crack_violet"},
+								"south": {"uv": [224, 224], "uv_size": [32, 32], "material_instance": "rift_crack_violet"},
+								"west": {"uv": [96, 224], "uv_size": [32, 32], "material_instance": "rift_crack_violet"},
+								"up": {"uv": [64, 256], "uv_size": [-32, -32], "material_instance": "rift_crack_violet"},
+								"down": {"uv": [256, 224], "uv_size": [-32, -32], "material_instance": "rift_crack_violet"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Shell Lower Right",
+					"parent": "Shell Fragments",
+					"pivot": [-30.259, 22.61, -16],
+					"cubes": [
+						{
+							"origin": [-34.01, 14.41, -16.786],
+							"size": [10.973, 10.156, 7.989],
+							"pivot": [-28.523, 19.488, -12.791],
+							"rotation": [-7.01, -4.165, 400.438],
+							"uv": {
+								"north": {"uv": [32, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [192, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [128, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [64, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [224, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-37.972, 23.095, -19.245],
+							"size": [10.134, 6.153, 6.163],
+							"pivot": [-32.905, 26.172, -16.163],
+							"rotation": [-3.556, 3.201, 421.356],
+							"uv": {
+								"north": {"uv": [96, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [32, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [128, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [192, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [128, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [160, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-38.134, 20.045, -21.485],
+							"size": [10.486, 10.423, 6.995],
+							"pivot": [-32.891, 25.256, -17.988],
+							"rotation": [1.259, 2.008, 407.157],
+							"uv": {
+								"north": {"uv": [224, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [64, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [160, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-41.328, 23.03, -30.807],
+							"size": [8.78, 6.963, 4.814],
+							"pivot": [-36.938, 26.512, -28.4],
+							"rotation": [2.462, -1.789, 407.769],
+							"uv": {
+								"north": {"uv": [128, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"east": {"uv": [192, 160], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"south": {"uv": [160, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"west": {"uv": [224, 160], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"up": {"uv": [32, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"},
+								"down": {"uv": [64, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"}
+							}
+						},
+						{
+							"origin": [-35.737, 14.494, -24.944],
+							"size": [8.262, 6.184, 3.308],
+							"pivot": [-31.606, 17.586, -23.29],
+							"rotation": [5.793, 7.256, 399.4],
+							"uv": {
+								"north": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [128, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [32, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [160, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [32, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [64, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-41.267, 18.402, -18.557],
+							"size": [4.635, 4.592, 3.147],
+							"pivot": [-38.949, 20.698, -16.984],
+							"rotation": [2.728, 17.625, 426.911],
+							"uv": {
+								"north": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-36.773, 12.555, -25.473],
+							"size": [5.607, 6.174, 5.13],
+							"pivot": [-33.97, 15.642, -22.908],
+							"rotation": [-17.996, -10.177, 415.723],
+							"uv": {
+								"north": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [-26.064, 20.53, -17.671],
+							"size": [4.902, 5.627, 4.409],
+							"pivot": [-23.613, 23.344, -15.467],
+							"rotation": [4.516, 1.585, 412.899],
+							"uv": {
+								"north": {"uv": [128, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [192, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [32, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [96, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [160, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [64, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Vortex Row Middle",
+					"parent": "Anomaly Rift Shell",
+					"pivot": [0, 48, 0]
+				},
+				{
+					"name": "Floating Shards",
+					"parent": "Vortex Row Middle",
+					"pivot": [0, 48, 0]
+				},
+				{
+					"name": "Major Shard 01",
+					"parent": "Floating Shards",
+					"pivot": [17.981, 92.505, 15],
+					"cubes": [
+						{
+							"origin": [14.911, 87.111, 12.092],
+							"size": [7.05, 6.795, 6.206],
+							"pivot": [18.436, 90.508, 15.195],
+							"rotation": [3.181, -7.522, 225.06],
+							"uv": {
+								"north": {"uv": [128, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"east": {"uv": [192, 160], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"south": {"uv": [160, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"west": {"uv": [224, 160], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"up": {"uv": [32, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"},
+								"down": {"uv": [64, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"}
+							}
+						},
+						{
+							"origin": [12.678, 87.974, 10.257],
+							"size": [6.263, 6.364, 4.821],
+							"pivot": [15.809, 91.156, 12.668],
+							"rotation": [-5.606, 17.995, 221.81],
+							"uv": {
+								"north": {"uv": [64, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"east": {"uv": [128, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"south": {"uv": [96, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"west": {"uv": [160, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"up": {"uv": [224, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"},
+								"down": {"uv": [256, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"}
+							}
+						},
+						{
+							"origin": [14.711, 90.247, 10.615],
+							"size": [6.892, 7.576, 4.346],
+							"pivot": [18.157, 94.035, 12.788],
+							"rotation": [9.724, -11.565, 220.366],
+							"uv": {
+								"north": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Major Shard 02",
+					"parent": "Floating Shards",
+					"pivot": [-18.364, 91.264, -14],
+					"cubes": [
+						{
+							"origin": [-20.917, 88.809, -18.58],
+							"size": [4.26, 6.705, 4.339],
+							"pivot": [-18.787, 92.161, -16.411],
+							"rotation": [-7.905, -6.117, 139.854],
+							"uv": {
+								"north": {"uv": [128, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"east": {"uv": [192, 160], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"south": {"uv": [160, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"west": {"uv": [224, 160], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"up": {"uv": [32, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"},
+								"down": {"uv": [64, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"}
+							}
+						},
+						{
+							"origin": [-20.382, 86.776, -18.611],
+							"size": [5.63, 5.493, 6.229],
+							"pivot": [-17.567, 89.522, -15.496],
+							"rotation": [17.67, 3.291, 164.437],
+							"uv": {
+								"north": {"uv": [64, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"east": {"uv": [128, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"south": {"uv": [96, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"west": {"uv": [160, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"up": {"uv": [224, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"},
+								"down": {"uv": [256, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Major Shard 03",
+					"parent": "Floating Shards",
+					"pivot": [43.05, 27.926, 13],
+					"cubes": [
+						{
+							"origin": [39.7, 24.423, 9.173],
+							"size": [4.803, 7.287, 6.342],
+							"pivot": [42.101, 28.066, 12.344],
+							"rotation": [-17.993, -4.031, 279.947],
+							"uv": {
+								"north": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [32, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [128, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [192, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [32, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [41.35, 22.761, 13.099],
+							"size": [6.64, 5.511, 4.714],
+							"pivot": [44.67, 25.517, 15.456],
+							"rotation": [-8.928, -0.843, 307.651],
+							"uv": {
+								"north": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [42.502, 25.283, 8.313],
+							"size": [4.103, 5.969, 5.404],
+							"pivot": [44.554, 28.267, 11.015],
+							"rotation": [3.51, -0.553, 266.088],
+							"uv": {
+								"north": {"uv": [96, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"east": {"uv": [160, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"south": {"uv": [128, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"west": {"uv": [192, 160], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"up": {"uv": [256, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"},
+								"down": {"uv": [32, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Major Shard 04",
+					"parent": "Floating Shards",
+					"pivot": [-43.393, 28.68, -14],
+					"cubes": [
+						{
+							"origin": [-46.295, 23.753, -17.511],
+							"size": [5.103, 5.758, 4.205],
+							"pivot": [-43.744, 26.632, -15.409],
+							"rotation": [4.845, 3.125, 434.269],
+							"uv": {
+								"north": {"uv": [224, 160], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"east": {"uv": [32, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"south": {"uv": [0, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"west": {"uv": [64, 192], "uv_size": [32, 32], "material_instance": "rift_stone_cool"},
+								"up": {"uv": [128, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"},
+								"down": {"uv": [160, 224], "uv_size": [-32, -32], "material_instance": "rift_stone_cool"}
+							}
+						},
+						{
+							"origin": [-47.325, 27.03, -16.557],
+							"size": [4.959, 7.949, 5.234],
+							"pivot": [-44.846, 31.005, -13.94],
+							"rotation": [13.911, 16.9, 424.055],
+							"uv": {
+								"north": {"uv": [32, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [192, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [128, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [64, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [224, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Major Shard 05",
+					"parent": "Floating Shards",
+					"pivot": [42.48, 66.913, -16],
+					"cubes": [
+						{
+							"origin": [39.586, 64.574, -18.114],
+							"size": [7.014, 5.83, 4.853],
+							"pivot": [43.093, 67.489, -15.687],
+							"rotation": [-9.004, 12.182, 230.882],
+							"uv": {
+								"north": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						},
+						{
+							"origin": [41.033, 64.256, -17.43],
+							"size": [4.729, 6.718, 5.646],
+							"pivot": [43.397, 67.615, -14.607],
+							"rotation": [-2.601, -7.141, 225.511],
+							"uv": {
+								"north": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Major Shard 06",
+					"parent": "Floating Shards",
+					"pivot": [-17.607, 4.422, 15],
+					"cubes": [
+						{
+							"origin": [-20.339, 0.293, 9.963],
+							"size": [5.063, 6.603, 4.083],
+							"pivot": [-17.807, 3.594, 12.005],
+							"rotation": [14.779, -10.579, 394.807],
+							"uv": {
+								"north": {"uv": [224, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [160, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [64, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [192, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [64, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [160, 96], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						},
+						{
+							"origin": [-22.417, 1.419, 13.269],
+							"size": [4.761, 7.326, 5.838],
+							"pivot": [-20.037, 5.082, 16.188],
+							"rotation": [4.723, -1.75, 364.076],
+							"uv": {
+								"north": {"uv": [224, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [160, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [128, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [64, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [256, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [160, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Vortex Row Outer",
+					"parent": "Anomaly Rift Shell",
+					"pivot": [0, 48, 0]
+				},
+				{
+					"name": "Decorative Debris",
+					"parent": "Vortex Row Outer",
+					"pivot": [0, 48, 0]
+				},
+				{
+					"name": "Debris 01",
+					"parent": "Decorative Debris",
+					"pivot": [27.96, 89.452, 18],
+					"cubes": [
+						{
+							"origin": [26.744, 87.215, 16.254],
+							"size": [2.431, 4.474, 3.492],
+							"pivot": [27.96, 89.452, 18],
+							"rotation": [24.745, 16.683, -10.866],
+							"uv": {
+								"north": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Debris 02",
+					"parent": "Decorative Debris",
+					"pivot": [9.98, 94.951, -18],
+					"cubes": [
+						{
+							"origin": [8.258, 93.024, -19.358],
+							"size": [3.444, 3.855, 2.716],
+							"pivot": [9.98, 94.951, -18],
+							"rotation": [15.627, 21.218, -6.685],
+							"uv": {
+								"north": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Debris 03",
+					"parent": "Decorative Debris",
+					"pivot": [-28.679, 88.958, -18],
+					"cubes": [
+						{
+							"origin": [-30.166, 87.551, -19.541],
+							"size": [2.974, 2.813, 3.082],
+							"pivot": [-28.679, 88.958, -18],
+							"rotation": [-5.821, -24.788, -0.128],
+							"uv": {
+								"north": {"uv": [224, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [96, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [0, 128], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [192, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [256, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [96, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Debris 04",
+					"parent": "Decorative Debris",
+					"pivot": [-46.045, 64.759, 17],
+					"cubes": [
+						{
+							"origin": [-48, 63.161, 15.264],
+							"size": [3.91, 3.196, 3.472],
+							"pivot": [-46.045, 64.759, 17],
+							"rotation": [-15.678, -19.571, 1.356],
+							"uv": {
+								"north": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Debris 05",
+					"parent": "Decorative Debris",
+					"pivot": [-46.33, 32.047, -18],
+					"cubes": [
+						{
+							"origin": [-47.848, 29.715, -19.386],
+							"size": [3.036, 4.664, 2.772],
+							"pivot": [-46.33, 32.047, -18],
+							"rotation": [-20.799, -11.175, -22.058],
+							"uv": {
+								"north": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Debris 06",
+					"parent": "Decorative Debris",
+					"pivot": [-19.93, 3.236, -18],
+					"cubes": [
+						{
+							"origin": [-21.536, 1.753, -19.451],
+							"size": [3.211, 2.967, 2.902],
+							"pivot": [-19.93, 3.236, -18],
+							"rotation": [12.778, -17.512, -19.67],
+							"uv": {
+								"north": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [32, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Debris 07",
+					"parent": "Decorative Debris",
+					"pivot": [21.042, 4.858, 16],
+					"cubes": [
+						{
+							"origin": [19.701, 3.236, 14.178],
+							"size": [2.682, 3.244, 3.644],
+							"pivot": [21.042, 4.858, 16],
+							"rotation": [20.193, 14.532, 27.459],
+							"uv": {
+								"north": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Debris 08",
+					"parent": "Decorative Debris",
+					"pivot": [39.932, 17.909, -17],
+					"cubes": [
+						{
+							"origin": [37.851, 16.104, -18.833],
+							"size": [4.162, 3.61, 3.666],
+							"pivot": [39.932, 17.909, -17],
+							"rotation": [-24.208, 20.042, -19.201],
+							"uv": {
+								"north": {"uv": [32, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"east": {"uv": [160, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"south": {"uv": [128, 64], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"west": {"uv": [0, 96], "uv_size": [32, 32], "material_instance": "rift_stone_mid"},
+								"up": {"uv": [64, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"},
+								"down": {"uv": [160, 128], "uv_size": [-32, -32], "material_instance": "rift_stone_mid"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Debris 09",
+					"parent": "Decorative Debris",
+					"pivot": [47.118, 38.841, 18],
+					"cubes": [
+						{
+							"origin": [45.454, 37.108, 15.992],
+							"size": [3.328, 3.467, 4.016],
+							"pivot": [47.118, 38.841, 18],
+							"rotation": [-20.296, 12.069, 3.233],
+							"uv": {
+								"north": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [192, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "Debris 10",
+					"parent": "Decorative Debris",
+					"pivot": [47.33, 60.682, -16],
+					"cubes": [
+						{
+							"origin": [45.762, 58.27, -17.599],
+							"size": [3.137, 4.824, 3.198],
+							"pivot": [47.33, 60.682, -16],
+							"rotation": [-12.182, 17.726, 2.779],
+							"uv": {
+								"north": {"uv": [64, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"east": {"uv": [0, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"south": {"uv": [96, 160], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"west": {"uv": [160, 128], "uv_size": [32, 32], "material_instance": "rift_stone_dark"},
+								"up": {"uv": [96, 160], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"},
+								"down": {"uv": [128, 192], "uv_size": [-32, -32], "material_instance": "rift_stone_dark"}
+							}
+						}
+					]
+				},
+				{
+					"name": "FX Anchors",
+					"parent": "Anomaly Rift Shell",
+					"pivot": [0, 48, 0]
+				},
+				{
+					"name": "Rift Core",
+					"parent": "FX Anchors",
+					"pivot": [0, 48, 0]
+				},
+				{
+					"name": "Rift Core Front",
+					"parent": "FX Anchors",
+					"pivot": [0, 48, -18]
+				},
+				{
+					"name": "Rift Core Back",
+					"parent": "FX Anchors",
+					"pivot": [0, 48, 18]
+				},
+				{
+					"name": "Particle Upper",
+					"parent": "FX Anchors",
+					"pivot": [0, 89, 2]
+				},
+				{
+					"name": "Particle Lower",
+					"parent": "FX Anchors",
+					"pivot": [0, 6, -2]
+				},
+				{
+					"name": "Particle Left",
+					"parent": "FX Anchors",
+					"pivot": [43, 48, 3]
+				},
+				{
+					"name": "Particle Right",
+					"parent": "FX Anchors",
+					"pivot": [-43, 48, -3]
+				},
+				{
+					"name": "Lightning Upper Left",
+					"parent": "FX Anchors",
+					"pivot": [30, 78, -5]
+				},
+				{
+					"name": "Lightning Upper Right",
+					"parent": "FX Anchors",
+					"pivot": [-28, 77, 5]
+				},
+				{
+					"name": "Lightning Lower",
+					"parent": "FX Anchors",
+					"pivot": [0, 15, -2]
+				},
+				{
+					"name": "Debris Field Left",
+					"parent": "FX Anchors",
+					"pivot": [49, 52, 2]
+				},
+				{
+					"name": "Debris Field Right",
+					"parent": "FX Anchors",
+					"pivot": [-49, 52, -2]
+				}
+			]
+		}
+	]
+}

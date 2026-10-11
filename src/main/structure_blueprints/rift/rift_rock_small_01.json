@@ -1,0 +1,158 @@
+{
+  "formatVersion": 1,
+  "name": "rift_rock_small_01",
+  "size": [
+    3,
+    3,
+    3
+  ],
+  "metadata": {
+    "description": "Provisional floating anomaly rock with a flat landing surface and tapered underside. Replace this blueprint with artist terrain as needed."
+  },
+  "markers": [
+    "anomaly_rift",
+    "floating_rock",
+    "vanilla_only"
+  ],
+  "blocks": [
+    {
+      "pos": [
+        1,
+        0,
+        1
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        1,
+        1,
+        0
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        0,
+        1,
+        1
+      ],
+      "block": "minecraft:blackstone"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        1
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        2,
+        1,
+        1
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        1,
+        1,
+        2
+      ],
+      "block": "minecraft:crying_obsidian"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        0
+      ],
+      "block": "minecraft:crying_obsidian"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        0
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        2,
+        2,
+        0
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        1
+      ],
+      "block": "minecraft:blackstone"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        1
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "pos": [
+        2,
+        2,
+        1
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        0,
+        2,
+        2
+      ],
+      "block": "minecraft:cobbled_deepslate"
+    },
+    {
+      "pos": [
+        1,
+        2,
+        2
+      ],
+      "block": "minecraft:crying_obsidian"
+    },
+    {
+      "pos": [
+        2,
+        2,
+        2
+      ],
+      "block": "minecraft:deepslate",
+      "properties": {
+        "axis": "y"
+      }
+    }
+  ],
+  "entities": []
+}

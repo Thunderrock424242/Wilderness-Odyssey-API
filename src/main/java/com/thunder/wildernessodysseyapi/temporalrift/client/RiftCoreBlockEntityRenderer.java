@@ -11,6 +11,8 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.world.level.Level;
 
 public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCoreBlockEntity> {
+    private final com.thunder.wildernessodysseyapi.temporalrift.client.hybrid.RiftShellRenderer shellRenderer =
+            new com.thunder.wildernessodysseyapi.temporalrift.client.hybrid.RiftShellRenderer();
     private static final int VIOLET = color(184, 70, 255, 178);
     private static final int CYAN = color(48, 226, 255, 138);
     private static final int WHITE_CORE = color(238, 247, 255, 118);
@@ -68,6 +70,11 @@ public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCore
     @Override
     public void render(RiftCoreBlockEntity blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
         try (GpuDiagnostics.Scope ignored = GpuDiagnostics.scope("temporal_rift.geometry")) {
+        if (blockEntity.isHybrid()) {
+            shellRenderer.render(blockEntity, partialTick, poseStack, bufferSource, packedLight, packedOverlay);
+            com.thunder.wildernessodysseyapi.temporalrift.client.hybrid.RiftVortexRenderer.render(blockEntity, partialTick, poseStack, bufferSource);
+            return;
+        }
         Level level = blockEntity.getLevel();
         float age = (level == null ? 0.0F : level.getGameTime()) + partialTick;
         VertexConsumer buffer = bufferSource.getBuffer(TemporalRiftRenderTypes.rift());
@@ -102,7 +109,18 @@ public class RiftCoreBlockEntityRenderer implements BlockEntityRenderer<RiftCore
 
     @Override
     public boolean shouldRenderOffScreen(RiftCoreBlockEntity blockEntity) {
-        return true;
+        return !blockEntity.isHybrid();
+    }
+
+    @Override
+    public net.minecraft.world.phys.AABB getRenderBoundingBox(RiftCoreBlockEntity core) {
+        if (core.isHybrid()) return new net.minecraft.world.phys.AABB(core.getBlockPos()).inflate(3.5).expandTowards(0, 3, 0);
+        return net.minecraft.world.phys.AABB.INFINITE;
+    }
+
+    @Override
+    public boolean shouldRender(RiftCoreBlockEntity core, net.minecraft.world.phys.Vec3 camera) {
+        return !core.isHybrid() || camera.distanceToSqr(com.thunder.wildernessodysseyapi.temporalrift.hybrid.RiftTrigger.center(core.getBlockPos())) < 64 * 64;
     }
 
     @Override

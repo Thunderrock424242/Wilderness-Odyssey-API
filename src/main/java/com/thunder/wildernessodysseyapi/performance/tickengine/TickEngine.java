@@ -178,9 +178,15 @@ public final class TickEngine {
         TickPressure priorPressure = monitor.pressure();
         TickBudget budget = budgetManager.begin(start, optionalStart, priorPressure, recoveryMultiplier);
         long effectiveDeadline = serverHasTime.getAsBoolean() ? budget.deadlineNanos() : optionalStart;
+        long coordinatorAllowance = com.thunder.wildernessodysseyapi.performance.coordinator.PerformanceCoordinator
+                .constrainBudget(Math.max(0, effectiveDeadline - optionalStart));
+        effectiveDeadline = Math.min(effectiveDeadline, optionalStart + coordinatorAllowance);
         scheduler.processTick(server.getTickCount(), effectiveDeadline, priorPressure, serverHasTime);
 
         long beforeBackground = System.nanoTime();
+        com.thunder.wildernessodysseyapi.performance.coordinator.PerformanceCoordinator.recordCost(
+                com.thunder.wildernessodysseyapi.performance.coordinator.CoordinatorGovernor.Module.BACKGROUND,
+                beforeBackground - optionalStart, coordinatorAllowance);
         long remaining = serverHasTime.getAsBoolean() ? budget.remainingNanos(beforeBackground) : 0L;
         applyBackgroundControl(server.getTickCount(), priorPressure);
         BackgroundEfficiencyManager.tick(server, server.getTickCount(), remaining, serverHasTime);

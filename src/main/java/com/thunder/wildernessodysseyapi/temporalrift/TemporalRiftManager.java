@@ -4,6 +4,8 @@ import com.thunder.wildernessodysseyapi.temporalrift.blockentity.RiftCoreBlockEn
 import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftDimensions;
+import com.thunder.wildernessodysseyapi.temporalrift.hybrid.RiftConfig;
+import com.thunder.wildernessodysseyapi.temporalrift.hybrid.RiftSites;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -52,16 +54,19 @@ public final class TemporalRiftManager {
             if (gameTime >= data.getRiftCloseGameTime()) {
                 closeRift(server, overworld, data);
             } else if (data.getRiftPosition() != null) {
-                RiftEffectHelper.tickOpenRift(overworld, data.getRiftPosition());
-                captureSinkholeEntries(server, overworld, data.getRiftPosition());
-                if (data.getBeforeSkyRiftPosition() == null || data.getBeforeGroundRiftPosition() == null) {
-                    placeBeforeRifts(server, data, data.getRiftPosition());
+                // Hybrid block entities own their loaded field/trigger; preserve the established legacy lifecycle.
+                if (!data.isHybridRift()) {
+                    RiftEffectHelper.tickOpenRift(overworld, data.getRiftPosition());
+                    captureSinkholeEntries(server, overworld, data.getRiftPosition());
+                    if (data.getBeforeSkyRiftPosition() == null || data.getBeforeGroundRiftPosition() == null) {
+                        placeBeforeRifts(server, data, data.getRiftPosition());
+                    }
+                    keepBeforeGroundRiftAwayFromArrival(server, data);
+                    updateBeforeRiftClosingVisuals(server, data, data.getRiftCloseGameTime() - gameTime);
                 }
-                keepBeforeGroundRiftAwayFromArrival(server, data);
-                updateBeforeRiftClosingVisuals(server, data, data.getRiftCloseGameTime() - gameTime);
             }
         } else if (currentDay >= data.getNextRiftDay()) {
-            openRift(server, overworld, data, gameTime);
+            if (!RiftConfig.HYBRID_SCHEDULED_RIFTS.get() || gameTime % 200 == 0) openRift(server, overworld, data, gameTime);
         }
 
         TemporalTransferManager.tick(server);
@@ -76,6 +81,14 @@ public final class TemporalRiftManager {
         }
 
         TemporalRiftSavedData data = TemporalRiftSavedData.get(server);
+        if (RiftConfig.HYBRID_SCHEDULED_RIFTS.get()) {
+            var result = RiftSites.create(overworld, pos.above(3), net.minecraft.core.Direction.NORTH, true);
+            if (result.core() == null) throw new IllegalArgumentException(result.message());
+            if (data.isRiftOpen()) closeRift(server, overworld, data);
+            recordHybrid(overworld, data, result.core().getBlockPos());
+            LOGGER.info("[TemporalRift] Hybrid ring opened at {}. {}", result.core().getBlockPos(), result.message());
+            return;
+        }
         if (data.isRiftOpen()) {
             closeRift(server, overworld, data);
         }
@@ -86,6 +99,7 @@ public final class TemporalRiftManager {
         setRiftVisualMode(overworld, riftPos, RiftCoreBlockEntity.VisualMode.OVERWORLD_SINKHOLE);
         RiftEffectHelper.playOpeningEffects(overworld, riftPos);
         data.setRiftOpen(true);
+        data.setHybridRift(false);
         data.setRiftPosition(riftPos);
         com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityManager.recordMajorFracture(overworld, riftPos);
         data.setRiftCloseGameTime(gameTime + TemporalRiftConfig.RIFT_OPEN_DURATION_TICKS.get());
@@ -107,6 +121,16 @@ public final class TemporalRiftManager {
 
     private static void openRift(MinecraftServer server, ServerLevel overworld, TemporalRiftSavedData data, long currentGameTime) {
         int radius = TemporalRiftConfig.RIFT_SPAWN_RADIUS.get();
+        if (RiftConfig.HYBRID_SCHEDULED_RIFTS.get()) {
+            BlockPos site = RiftSites.findLoadedSite(overworld, radius);
+            if (site == null) return;
+            var result = RiftSites.create(overworld, site, net.minecraft.core.Direction.NORTH, true);
+            if (result.core() == null) return;
+            recordHybrid(overworld, data, site);
+            if (TemporalRiftConfig.CHAT_BROADCASTS.get()) broadcast(server, Component.literal("[Anomaly Rift] A fracture has opened near " + site.toShortString() + ". Its core is unstable."));
+            LOGGER.info("[TemporalRift] Hybrid ring opened at {}. {}", site, result.message());
+            return;
+        }
         int duration = TemporalRiftConfig.RIFT_OPEN_DURATION_TICKS.get();
         BlockPos surfacePos = RiftSpawnHelper.findRiftSpawnPosition(overworld, radius);
         BlockPos riftPos = prepareRiftSite(overworld, surfacePos);
@@ -115,6 +139,7 @@ public final class TemporalRiftManager {
         setRiftVisualMode(overworld, riftPos, RiftCoreBlockEntity.VisualMode.OVERWORLD_SINKHOLE);
         RiftEffectHelper.playOpeningEffects(overworld, riftPos);
         data.setRiftOpen(true);
+        data.setHybridRift(false);
         data.setRiftPosition(riftPos);
         com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityManager.recordMajorFracture(overworld, riftPos);
         data.setRiftCloseGameTime(currentGameTime + duration);
@@ -130,24 +155,34 @@ public final class TemporalRiftManager {
 
     private static void closeRift(MinecraftServer server, ServerLevel overworld, TemporalRiftSavedData data) {
         BlockPos riftPos = data.getRiftPosition();
+        boolean hybrid = data.isHybridRift();
         // Also retain a major fracture that was already open when an older save adopted Echo stability.
         if (riftPos != null) {
             com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityManager.recordMajorFracture(overworld, riftPos);
         }
-        if (riftPos != null && overworld.getBlockState(riftPos).is(TemporalRiftBlocks.RIFT_CORE.get())) {
+        // Only new hybrid cores defer unloaded cleanup to their own persisted deadline.
+        // Legacy cores retain the original close path because they have no deferred-expiry tag.
+        if (riftPos != null && (!hybrid || overworld.getChunkSource().getChunkNow(riftPos.getX() >> 4, riftPos.getZ() >> 4) != null)
+                && overworld.getBlockState(riftPos).is(TemporalRiftBlocks.RIFT_CORE.get())) {
             overworld.removeBlock(riftPos, false);
-            RiftEffectHelper.playClosingEffects(overworld, riftPos);
+            if (!hybrid) RiftEffectHelper.playClosingEffects(overworld, riftPos);
             LOGGER.info("[TemporalRift] Rift core removed at {}.", riftPos);
         }
         removeBeforeRifts(server, data);
 
         data.setRiftOpen(false);
+        data.setHybridRift(false);
         data.setRiftPosition(null);
 
         long currentDay = overworld.getGameTime() / 24000L;
         long nextRiftDay = currentDay + TemporalRiftConfig.RIFT_INTERVAL_DAYS.get();
         data.setNextRiftDay(nextRiftDay);
         LOGGER.info("[TemporalRift] Rift closed. Next rift on day {}.", nextRiftDay);
+
+        if (hybrid) {
+            if (TemporalRiftConfig.CHAT_BROADCASTS.get()) broadcast(server, Component.literal("[Anomaly Rift] The fracture has sealed."));
+            return;
+        }
 
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (player.level().dimension().equals(TemporalRiftDimensions.THE_BEFORE_KEY)) {
@@ -159,6 +194,15 @@ public final class TemporalRiftManager {
         if (TemporalRiftConfig.CHAT_BROADCASTS.get()) {
             broadcast(server, Component.literal("[Temporal Rift] The temporal rift has sealed. Those left behind are lost to time."));
         }
+    }
+
+    private static void recordHybrid(ServerLevel level, TemporalRiftSavedData data, BlockPos anchor) {
+        data.setRiftOpen(true);
+        data.setHybridRift(true);
+        data.setRiftPosition(anchor);
+        data.setRiftCloseGameTime(level.getGameTime() + TemporalRiftConfig.RIFT_OPEN_DURATION_TICKS.get());
+        if (level.getBlockEntity(anchor) instanceof RiftCoreBlockEntity core) core.setManagedCloseTick(data.getRiftCloseGameTime());
+        com.thunder.wildernessodysseyapi.temporalrift.echo.EchoStabilityManager.recordMajorFracture(level, anchor);
     }
 
     private static void broadcast(MinecraftServer server, Component message) {

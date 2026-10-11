@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "wildernessodysseyapi:block/unstable_rift_stone"
+  }
+}

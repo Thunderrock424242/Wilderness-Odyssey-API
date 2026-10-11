@@ -60,6 +60,12 @@ public final class PerformanceOwnershipRegistry {
         for (PerformanceArea area : areas) found.get(area).add(candidate);
     }
 
+    /** Presence alone vetoes optional saving; uncertain third-party settings never override that veto. */
+    public static boolean blocksOptionalSaving(Map<PerformanceArea, Ownership> ownership) {
+        return !ownership.get(PerformanceArea.SAVE).candidates().isEmpty()
+                || !ownership.get(PerformanceArea.CHUNK_IO).candidates().isEmpty();
+    }
+
     public record Candidate(String modId, String version, String scope, String activity) { }
     public record Ownership(String baseline, List<Candidate> candidates, boolean overlap, boolean woTakeoverAllowed) { }
 }

@@ -32,6 +32,7 @@ public final class TemporalRiftCommand {
         dispatcher.register(
                 Commands.literal("wildernessrift")
                         .requires(source -> source.hasPermission(2))
+                        .then(HybridRiftCommands.tree())
                         .then(Commands.literal("open").executes(TemporalRiftCommand::cmdOpen))
                         .then(Commands.literal("debug_open_near")
                                 .executes(context -> cmdDebugOpenNear(context, 10))
@@ -49,7 +50,12 @@ public final class TemporalRiftCommand {
     private static int cmdOpen(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
         BlockPos pos = BlockPos.containing(source.getPosition());
-        TemporalRiftManager.forceOpenRift(source.getServer(), pos);
+        try {
+            TemporalRiftManager.forceOpenRift(source.getServer(), pos);
+        } catch (IllegalArgumentException exception) {
+            source.sendFailure(Component.literal(exception.getMessage()));
+            return 0;
+        }
         source.sendSuccess(() -> Component.literal("Temporal rift force-opened at " + pos + "."), true);
         return 1;
     }
@@ -76,6 +82,10 @@ public final class TemporalRiftCommand {
             Vec3 offset = horizontalLook.scale(distance);
             int x = Mth.floor(player.getX() + offset.x);
             int z = Mth.floor(player.getZ() + offset.z);
+            if (overworld.getChunkSource().getChunkNow(x >> 4, z >> 4) == null) {
+                source.sendFailure(Component.literal("The target chunk is not loaded."));
+                return 0;
+            }
             int y = overworld.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
             BlockPos pos = new BlockPos(x, y, z);
 

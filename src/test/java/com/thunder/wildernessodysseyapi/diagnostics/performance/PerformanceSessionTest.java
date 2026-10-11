@@ -9,6 +9,29 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PerformanceSessionTest {
     @Test
+    void disabledMasterPreventsObservationSamplingAndRecordingEvenInOnMode() {
+        Object server = new Object();
+        var session = new PerformanceDiagnostics.Session(server,
+                new PerformanceDiagnosticsConfig.Values(false, true, PerformanceDiagnosticsConfig.Mode.ON,
+                        true, 100, 600, 50, true), Map.of(), Map.of());
+        assertFalse(session.observes(server));
+        assertFalse(session.setRecording(true));
+        session.sampleJvm(System.nanoTime());
+        session.addSample(System.nanoTime(), Map.of());
+        assertTrue(session.report("disabled", Map.of()).history().isEmpty());
+        assertEquals(-1, session.report("disabled", Map.of()).performance().jvm().heapUsedBytes());
+    }
+    @Test
+    void capturesJvmEvidenceBeforeTheFirstPeriodicTickSample() {
+        var session = session(new Object(), PerformanceDiagnosticsConfig.Mode.AUTO, false);
+        var observed = session.report("short session", Map.of()).performance();
+        assertTrue(observed.jvm().heapUsedBytes() > 0);
+        assertTrue(observed.jvm().processors() > 0);
+        assertEquals(observed.jvm().heapUsedBytes(), observed.heapPeakBytes());
+        assertEquals(0, observed.totalTicks());
+    }
+
+    @Test
     void newSessionDoesNotAcceptOldServerIdentityOrRetainHistory() {
         Object oldServer = new Object();
         var old = session(oldServer, PerformanceDiagnosticsConfig.Mode.AUTO, true);
@@ -30,6 +53,7 @@ class PerformanceSessionTest {
         assertFalse(session.setRecording(true));
         session.addSample(System.nanoTime(), Map.of());
         assertTrue(session.report("off", Map.of()).history().isEmpty());
+        assertEquals(-1, session.report("off", Map.of()).performance().jvm().heapUsedBytes());
     }
 
     @Test
@@ -56,6 +80,6 @@ class PerformanceSessionTest {
 
     private static PerformanceDiagnostics.Session session(Object identity, PerformanceDiagnosticsConfig.Mode mode, boolean recording) {
         return new PerformanceDiagnostics.Session(identity,
-                new PerformanceDiagnosticsConfig.Values(true, mode, recording, 100, 600, 50, false), Map.of(), Map.of());
+                new PerformanceDiagnosticsConfig.Values(true, true, mode, recording, 100, 600, 50, false), Map.of(), Map.of());
     }
 }

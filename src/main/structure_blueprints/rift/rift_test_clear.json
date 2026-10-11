@@ -1,0 +1,9 @@
+{
+  "formatVersion": 1,
+  "name": "rift_test_clear",
+  "size": [32, 18, 32],
+  "metadata": {"description": "Clear allocated volume for focused hybrid rift GameTests."},
+  "markers": ["gametest"],
+  "blocks": [{"pos": [0, 0, 0], "block": "minecraft:air"}],
+  "entities": []
+}

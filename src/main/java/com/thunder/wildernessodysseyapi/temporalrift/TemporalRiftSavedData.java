@@ -15,6 +15,7 @@ public class TemporalRiftSavedData extends SavedData {
             new SavedData.Factory<>(TemporalRiftSavedData::new, TemporalRiftSavedData::load);
 
     private boolean riftOpen;
+    private boolean hybridRift;
     private long nextRiftDay;
     private long riftCloseGameTime;
     private long transientReturnRiftCloseGameTime;
@@ -29,6 +30,14 @@ public class TemporalRiftSavedData extends SavedData {
 
     public boolean isRiftOpen() {
         return riftOpen;
+    }
+
+    /** Missing tags identify legacy temporal rifts, whose historical cleanup must remain intact. */
+    public boolean isHybridRift() { return hybridRift; }
+
+    public void setHybridRift(boolean hybridRift) {
+        this.hybridRift = hybridRift;
+        setDirty();
     }
 
     public long getNextRiftDay() {
@@ -102,6 +111,7 @@ public class TemporalRiftSavedData extends SavedData {
     private static TemporalRiftSavedData load(CompoundTag tag, HolderLookup.Provider registries) {
         TemporalRiftSavedData data = new TemporalRiftSavedData();
         data.riftOpen = tag.getBoolean("riftOpen");
+        data.hybridRift = tag.getBoolean("hybridRift");
         data.nextRiftDay = tag.getLong("nextRiftDay");
         data.riftCloseGameTime = tag.getLong("riftCloseGameTime");
         data.transientReturnRiftCloseGameTime = tag.getLong("transientReturnRiftCloseGameTime");
@@ -135,6 +145,7 @@ public class TemporalRiftSavedData extends SavedData {
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
         tag.putBoolean("riftOpen", riftOpen);
+        tag.putBoolean("hybridRift", hybridRift);
         tag.putLong("nextRiftDay", nextRiftDay);
         tag.putLong("riftCloseGameTime", riftCloseGameTime);
         tag.putLong("transientReturnRiftCloseGameTime", transientReturnRiftCloseGameTime);

@@ -14,6 +14,9 @@ public final class PerformanceObserver {
     private double ewmaMillis;
     private long lastTickNanos;
     private long heapPeakBytes = -1;
+    private long gcBaselineMillis = -1;
+    private long previousGcMillis = -1;
+    private boolean gcCounterReset;
     private JvmPerformanceSample jvm = JvmPerformanceSample.unavailable();
 
     public PerformanceObserver(int windowTicks) {
@@ -34,14 +37,26 @@ public final class PerformanceObserver {
     public void recordJvm(JvmPerformanceSample sample) {
         jvm = sample;
         heapPeakBytes = Math.max(heapPeakBytes, sample.heapUsedBytes());
+        long gcMillis = sample.gcCollectionMillis();
+        if (gcMillis >= 0) {
+            if (previousGcMillis >= 0 && gcMillis < previousGcMillis) gcCounterReset = true;
+            if (gcBaselineMillis < 0) gcBaselineMillis = gcMillis;
+            previousGcMillis = gcMillis;
+        }
     }
+
+    /** Allocation-free control inputs; exact percentile snapshots remain a cold-path operation. */
+    public double ewmaMillis() { return ewmaMillis; }
+    public JvmPerformanceSample jvmSample() { return jvm; }
 
     public Snapshot snapshot() {
         long[] sorted = Arrays.copyOf(ticks, count);
         Arrays.sort(sorted);
         return new Snapshot(totalTicks, count, ewmaMillis, percentile(sorted, 0.50),
                 percentile(sorted, 0.95), percentile(sorted, 0.99), lastTickNanos / 1_000_000.0,
-                count == 0 ? 0 : sorted[count - 1] / 1_000_000.0, heapPeakBytes, jvm);
+                count == 0 ? 0 : sorted[count - 1] / 1_000_000.0, heapPeakBytes, jvm,
+                !gcCounterReset && gcBaselineMillis >= 0 && jvm.gcCollectionMillis() >= gcBaselineMillis
+                        ? jvm.gcCollectionMillis() - gcBaselineMillis : -1);
     }
 
     private static double percentile(long[] sorted, double percentile) {
@@ -50,5 +65,5 @@ public final class PerformanceObserver {
 
     public record Snapshot(long totalTicks, int windowSamples, double ewmaMillis, double p50Millis,
                            double p95Millis, double p99Millis, double lastTickMillis, double windowMaximumMillis,
-                           long heapPeakBytes, JvmPerformanceSample jvm) { }
+                           long heapPeakBytes, JvmPerformanceSample jvm, long gcCollectionSinceStartMillis) { }
 }

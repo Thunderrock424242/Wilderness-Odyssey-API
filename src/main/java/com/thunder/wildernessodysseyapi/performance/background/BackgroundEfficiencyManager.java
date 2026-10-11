@@ -104,24 +104,31 @@ public final class BackgroundEfficiencyManager {
                 availableBudgetNanos,
                 (long) (values.maximumBackgroundTimeMillis() * TimeUnit.MILLISECONDS.toNanos(1L))
         ));
+        boundedBudget = com.thunder.wildernessodysseyapi.performance.coordinator.PerformanceCoordinator.constrainBudget(boundedBudget);
         long deadline = saturatedAdd(startedNanos, boundedBudget);
 
-        ASYNC.drainServerThreadResults(
-                server,
-                values.asyncMaximumApplyPerTick(),
-                deadline,
-                serverHasTime
-        );
-        if (!serverHasTime.getAsBoolean()) {
-            return;
+        try {
+            ASYNC.drainServerThreadResults(
+                    server,
+                    values.asyncMaximumApplyPerTick(),
+                    deadline,
+                    serverHasTime
+            );
+            if (!serverHasTime.getAsBoolean()) {
+                return;
+            }
+            NETWORK.flushDue(server, currentTick, deadline, serverHasTime);
+            if (!serverHasTime.getAsBoolean()) {
+                return;
+            }
+            ANALYTICS.flushDue(currentTick, ASYNC, deadline, serverHasTime);
+            long remaining = Math.max(0L, deadline - System.nanoTime());
+            SCHEDULER.processTick(currentTick, remaining, serverHasTime);
+        } finally {
+            com.thunder.wildernessodysseyapi.performance.coordinator.PerformanceCoordinator.recordCost(
+                    com.thunder.wildernessodysseyapi.performance.coordinator.CoordinatorGovernor.Module.BACKGROUND,
+                    System.nanoTime() - startedNanos, boundedBudget);
         }
-        NETWORK.flushDue(server, currentTick, deadline, serverHasTime);
-        if (!serverHasTime.getAsBoolean()) {
-            return;
-        }
-        ANALYTICS.flushDue(currentTick, ASYNC, deadline, serverHasTime);
-        long remaining = Math.max(0L, deadline - System.nanoTime());
-        SCHEDULER.processTick(currentTick, remaining, serverHasTime);
     }
 
     /** Stops workers and releases process-scoped queues after the server saves. */

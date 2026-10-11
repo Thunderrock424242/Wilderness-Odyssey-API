@@ -1,6 +1,6 @@
 {
   "has_precipitation": true,
-  "temperature": 0.7,
+  "temperature": 0.45,
   "downfall": 0.8,
   "temperature_modifier": "none",
   "effects": {
@@ -45,7 +45,32 @@
         "weight": 4
       }
     ],
-    "creature": [],
+    "creature": [
+      {
+        "weight": 4,
+        "type": "minecraft:rabbit",
+        "minCount": 2,
+        "maxCount": 3
+      },
+      {
+        "weight": 6,
+        "type": "minecraft:wolf",
+        "minCount": 2,
+        "maxCount": 4
+      },
+      {
+        "weight": 4,
+        "type": "minecraft:fox",
+        "minCount": 2,
+        "maxCount": 3
+      },
+      {
+        "weight": 8,
+        "type": "minecraft:sheep",
+        "minCount": 2,
+        "maxCount": 4
+      }
+    ],
     "ambient": [],
     "axolotls": [],
     "underground_water_creature": [],
@@ -115,16 +140,17 @@
     [
       "minecraft:glow_lichen",
       "minecraft:forest_flowers",
-      "minecraft:trees_birch_and_oak",
+      "minecraft:trees_taiga",
       "minecraft:flower_default",
-      "minecraft:patch_grass_forest",
+      "minecraft:patch_grass_taiga",
       "minecraft:brown_mushroom_normal",
       "minecraft:red_mushroom_normal",
       "minecraft:patch_sugar_cane",
       "minecraft:patch_pumpkin"
     ],
     [
-      "minecraft:freeze_top_layer"
+      "minecraft:freeze_top_layer",
+      "wildernessodysseyapi:anomaly_terrain"
     ]
   ]
 }

@@ -82,6 +82,11 @@ public final class ModRegistries {
     public static final DeferredHolder<Feature<?>, CoastalTerrainFeature> COASTAL_TERRAIN_FEATURE =
             FEATURES.register("coastal_terrain", CoastalTerrainFeature::new);
 
+    /** Bounded anomaly surfaces, crystal remnants and stationary template islands. */
+    public static final DeferredHolder<Feature<?>, com.thunder.wildernessodysseyapi.worldgen.anomaly.AnomalyTerrainFeature>
+            ANOMALY_TERRAIN_FEATURE = FEATURES.register("anomaly_terrain",
+            com.thunder.wildernessodysseyapi.worldgen.anomaly.AnomalyTerrainFeature::new);
+
     private ModRegistries() {
     }
 
