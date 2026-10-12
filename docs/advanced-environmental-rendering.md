@@ -101,6 +101,12 @@ concept.
    time and partial tick are animation inputs, not reliable rendered-frame
    identity while paused. Underwater overlays may only reuse that frame's
    water-stage capture; they must not capture cleared GUI/hand depth.
+   Match the private capture depth texture to the main target's actual internal
+   format, including packed depth/stencil enabled by NeoForge or other renderers.
+   Depth blits do not convert formats, and OpenGL errors do not throw Java
+   exceptions. Check format compatibility and framebuffer completeness before
+   copying; missing, unknown, or multisampled depth uses the existing optical
+   fallback. Restore texture bindings along with read/draw framebuffer bindings.
 4. Release scene-copy resources and timing queries at shader ownership changes,
    shader reload, disabled rendering, and client-level teardown. Keep geometry
    handoff and rebuilds with `WaterRenderCoordinator`.

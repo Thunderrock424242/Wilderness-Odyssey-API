@@ -95,9 +95,11 @@ only existing canonical cells, partitioned by naturally loaded chunks. Each
 cell appears at most once; it cannot grow by enqueueing arbitrary air positions.
 The index is bounded by the canonical attachment's finite packed positions,
 and the level index holds only participating loaded water chunks. Each poll
-examines at most eight chunks and eight cells per chunk. Deferred entries rotate
-fairly and use a ten-tick cooldown, preventing busy retries and head-of-line
-starvation.
+examines at most eight chunks. Within a chunk, retry deadlines are indexed and
+equal-deadline cells retain insertion order. A ready cell can be selected without
+scanning unavailable cells ahead of it. Deferred cells retain their ten-tick
+cooldown, preventing busy retries; the chunk-local poll returns empty only when
+that chunk has no ready work.
 
 Chunk unload drops the level's reference. Chunk load restores work from awake
 and pending cells. Covered displacement residuals start sleeping; an explicit

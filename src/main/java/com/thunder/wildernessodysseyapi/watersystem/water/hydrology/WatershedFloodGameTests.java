@@ -12,7 +12,11 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
-/** World-backed regression checks for reversible temporary flood ownership. */
+/**
+ * World-backed regression checks for reversible temporary flood ownership.
+ * The larger fixture keeps vegetation and displaced parcels inside the test's
+ * reserved footprint instead of sharing the legacy one-block template's neighbors.
+ */
 @GameTestHolder(ModConstants.MOD_ID)
 @PrefixGameTestTemplate(false)
 public final class WatershedFloodGameTests {
@@ -21,7 +25,7 @@ public final class WatershedFloodGameTests {
     }
 
     /** Recession restores opted-in vegetation after removing canonical floodwater. */
-    @GameTest(template = "empty")
+    @GameTest(template = "water_flow")
     public static void recessionRestoresOriginalReplaceableState(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         BlockPos position = helper.absolutePos(new BlockPos(2, 2, 2));
@@ -50,7 +54,7 @@ public final class WatershedFloodGameTests {
     }
 
     /** Recession preserves the player's solid and any still-funded hidden displacement. */
-    @GameTest(template = "empty")
+    @GameTest(template = "water_flow")
     public static void playerReplacementIsNeverOverwrittenByRecession(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         BlockPos position = helper.absolutePos(new BlockPos(2, 2, 2));
@@ -81,7 +85,7 @@ public final class WatershedFloodGameTests {
     }
 
     /** A shallow wetland cell remains canonical, owned, and exactly reversible. */
-    @GameTest(template = "empty")
+    @GameTest(template = "water_flow")
     public static void shallowWetlandUsesPartialCanonicalVolume(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         BlockPos position = helper.absolutePos(new BlockPos(2, 2, 2));
@@ -106,7 +110,8 @@ public final class WatershedFloodGameTests {
                         original,
                         SurfaceWaterKind.WETLAND
                 ),
-                "Regression fixture could not record the wetland ownership kind"
+                "Regression fixture could not record the wetland ownership kind; ledger size="
+                        + ledger.size() + ", existing kind=" + ledger.kind(position.asLong())
         );
         var tracked = CanonicalWater.getTracked(level, position);
         helper.assertTrue(

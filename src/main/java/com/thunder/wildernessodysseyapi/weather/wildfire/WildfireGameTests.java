@@ -17,7 +17,11 @@ import net.minecraft.world.level.block.LeavesBlock;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
-/** Loaded-world regression coverage for campfire source and vanilla-fire placement rules. */
+/**
+ * Loaded-world regression coverage for campfire source and vanilla-fire placement rules.
+ * The larger fixture contains the fuel ring; sky access keeps the test harness's
+ * barrier roof out of the ignition heightmap query.
+ */
 @GameTestHolder(ModConstants.MOD_ID)
 @PrefixGameTestTemplate(false)
 public final class WildfireGameTests {
@@ -44,7 +48,7 @@ public final class WildfireGameTests {
     }
 
     /** Confirms a forced open normal campfire ember places exactly normal vanilla fire on tagged leaves. */
-    @GameTest(template = "empty", timeoutTicks = 100)
+    @GameTest(template = "water_flow", timeoutTicks = 100, skyAccess = true)
     public static void openCampfireIgnitesTaggedLoadedFuel(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         BlockPos campfire = helper.absolutePos(new BlockPos(8, 2, 8));
@@ -59,7 +63,9 @@ public final class WildfireGameTests {
                 WildfireScheduler.IgnitionResult result = scheduler(WeatherSample.CLEAR)
                         .forceIgnition(level, campfire, 256, TEST_SETTINGS);
                 helper.assertTrue(result == WildfireScheduler.IgnitionResult.IGNITED,
-                        "Forced ember result was " + result + " instead of IGNITED");
+                        "Forced ember result was " + result + " instead of IGNITED; source="
+                                + level.getBlockState(campfire) + ", sky=" + level.canSeeSky(campfire.above())
+                                + ", ticking=" + level.isPositionEntityTicking(campfire));
                 int fire = countFireNear(level, campfire);
                 helper.assertTrue(fire == 1,
                         "Forced ember placed " + fire + " fire blocks instead of exactly one");
@@ -72,7 +78,7 @@ public final class WildfireGameTests {
     }
 
     /** Confirms covered normal campfires and open soul campfires are not wildfire sources. */
-    @GameTest(template = "empty", timeoutTicks = 100)
+    @GameTest(template = "water_flow", timeoutTicks = 100, skyAccess = true)
     public static void coveredAndSoulCampfiresRemainSafe(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         BlockPos covered = helper.absolutePos(new BlockPos(6, 2, 8));

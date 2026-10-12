@@ -56,6 +56,37 @@ public final class CanonicalWaterFlowGameTests {
         helper.succeed();
     }
 
+    /** Native neighbor notifications must wake finite water after an outlet opens. */
+    @GameTest(template = "water_flow")
+    public static void nativeTickWakesSleepingWaterAfterOutletOpens(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos source = helper.absolutePos(new BlockPos(4, 4, 4));
+        BlockPos outlet = source.east();
+        level.setBlock(source.below(), Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(outlet.below(), Blocks.STONE.defaultBlockState(), 3);
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            level.setBlock(source.relative(direction), Blocks.STONE.defaultBlockState(), 3);
+        }
+        setCanonical(level, source, WaterVolumeChunk.UNITS_PER_BLOCK);
+        CanonicalWater.set(level, source,
+                CanonicalWater.get(level, source).withAddedFlags(WaterVolumeChunk.FLAG_SLEEPING),
+                false, false);
+
+        level.setBlock(outlet, Blocks.AIR.defaultBlockState(), 3);
+        level.getFluidState(source).tick(level, source);
+
+        helper.assertTrue(!CanonicalWater.get(level, source).sleeping(),
+                "Native fluid tick was cancelled without waking water beside the opened outlet");
+        helper.assertTrue(localUnits(level, source) == WaterVolumeChunk.UNITS_PER_BLOCK,
+                "Native wake created or drained water before the finite solver ran");
+        WildernessFluidRegistry.tickCell(level, source);
+        helper.assertTrue(CanonicalWater.get(level, outlet).volumeUnits() > 0,
+                "Woken water did not enter the opened outlet");
+        helper.assertTrue(localUnits(level, source) == WaterVolumeChunk.UNITS_PER_BLOCK,
+                "Outlet flow did not conserve exactly one bucket");
+        helper.succeed();
+    }
+
     /** Direct non-player solid writes must conserve water and remove its visible authority. */
     @GameTest(template = "water_flow")
     public static void directSolidWriteDisplacesWaterExactlyOnce(GameTestHelper helper) {

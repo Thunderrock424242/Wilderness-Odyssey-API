@@ -65,6 +65,20 @@ class WaterCellWorkQueueTest {
     }
 
     @Test
+    void readyWaterDoesNotWaitForUnrelatedUnavailableNeighborhoods() {
+        WaterCellWorkQueue queue = new WaterCellWorkQueue();
+        for (int position = 0; position < 100; position++) {
+            queue.offer(position, 100);
+        }
+        queue.offer(500, 0);
+
+        assertEquals(500, queue.poll(0),
+                "A null poll ends the flow pass even when this cell can move now");
+        assertEquals(100, queue.size());
+        assertNull(queue.poll(99));
+    }
+
+    @Test
     void reloadResumesAwakeAndPendingCellsButLeavesStableAndHiddenCellsDormant() {
         WaterVolumeChunk original = new WaterVolumeChunk();
         BlockPos awake = new BlockPos(0, 60, 0);

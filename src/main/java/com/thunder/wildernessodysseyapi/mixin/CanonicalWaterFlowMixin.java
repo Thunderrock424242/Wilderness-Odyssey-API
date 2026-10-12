@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(FlowingFluid.class)
 public abstract class CanonicalWaterFlowMixin {
 
-    /** Cancels vanilla propagation only after the replacement system owns this cell. */
+    /** Hands native neighbor wake-ups to finite authority before cancelling vanilla spread. */
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
     private void wildernessOdysseyApi$replaceVanillaWaterTick(
             Level level,
@@ -41,9 +41,11 @@ public abstract class CanonicalWaterFlowMixin {
             if (!CanonicalWater.isTracked(serverLevel, pos)
                     && serverLevel.getBlockState(pos).is(WildernessFluidRegistry.WILDERNESS_WATER_BLOCK.get())) {
                 CanonicalWater.getOrImport(serverLevel, pos);
-                CanonicalWater.schedule(serverLevel, pos);
             }
             if (CanonicalWater.isTracked(serverLevel, pos)) {
+                // Native ticks also report terrain changes around sleeping water.
+                // Cancelling the tick must preserve that wake-up for the finite solver.
+                CanonicalWater.schedule(serverLevel, pos);
                 callbackInfo.cancel();
             }
         }

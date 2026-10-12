@@ -49,6 +49,12 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 def tickEngineCompilerWorkaround = providers.gradleProperty('tickEngineCompilerWorkaround')
         .map { it.toBoolean() }.orElse(true)
 
+// A later Corretto crash executed C2-compiled Biolith biome search on init_biomes.
+// Exclude only the observed method for a controlled runtime retest; the native
+// crash report does not establish the underlying JVM or mod defect.
+def biolithCompilerWorkaround = providers.gradleProperty('biolithCompilerWorkaround')
+        .map { it.toBoolean() }.orElse(true)
+
 neoForge {
     // Specify the version of NeoForge to use.
     version = "21.1.256"
@@ -133,6 +139,9 @@ neoForge {
         configureEach {
             if (name in ['client', 'server', 'gameTestServer'] && tickEngineCompilerWorkaround.get()) {
                 jvmArgument '-XX:CompileCommand=exclude,com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine::finishTick'
+            }
+            if (name in ['client', 'server', 'gameTestServer'] && biolithCompilerWorkaround.get()) {
+                jvmArgument '-XX:CompileCommand=exclude,net.minecraft.world.level.biome.Climate$RTree::biolith$searchTreeGet'
             }
             // Recommended logging data for a userdev environment
             // The markers can be added/remove as needed separated by commas.

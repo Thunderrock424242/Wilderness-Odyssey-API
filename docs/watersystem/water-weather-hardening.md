@@ -102,6 +102,61 @@ SHA-256 at packaging: `226595625BBB9EF8FF7731CB26CC5115F8FA5AF3765126630BF0E91AF
 
 ## Manual acceptance still required
 
+### October 11 local-flow follow-up
+
+The gameplay follow-up reproduced two gaps missed by the original audit's
+conservation tests:
+
+- The new chunk-local queue could return no work after probing eight cooling
+  cells even when another cell was ready. The level ticker then ended its flow
+  pass. A regression with 100 cooling cells and one ready cell reproduced this.
+  Retry deadlines are now indexed; polling can select ready water directly
+  while repeated neighbor wakes still preserve an unavailable cell's cooldown.
+- Cancelling a native fluid tick on already-tracked water discarded its neighbor
+  wake notification. A settled cell could remain asleep after a bank opened.
+  Native ticks now schedule the existing finite solver before vanilla spreading
+  is cancelled. The new GameTest opens an outlet beside sleeping water and
+  checks both resumed lateral flow and exact one-bucket conservation.
+
+The missing native wake predated the audit, but the audit's generated-water
+handoff brought more disturbed water under that path. The queue delay was
+introduced with the audit's loaded-neighborhood retry scheduling. These repairs
+retain the existing authority, loaded-only mutation guards, cell/time budgets,
+retry cooldowns and save format. They do not restore infinite-source conversion.
+
+The follow-up also moves watershed and wildfire GameTests onto the existing
+16x12x16 fixture. Their setup extended outside the legacy one-block template,
+allowing adjacent test initialization to clear it. Wildfire tests explicitly
+request sky access so the harness's barrier roof cannot replace the leaf
+surface in the ignition heightmap query. These are test-isolation changes,
+not changes to flood ownership or wildfire gameplay.
+
+Executed October 11, 2026:
+
+| Check | Result |
+| --- | --- |
+| Focused `WaterCellWorkQueueTest` | Eight tests, zero failures/errors/skips |
+| `waterSimulationTest` | 130 tests, zero failures/errors/skips |
+| `runGameTestServer` with the corrected fixtures | All 41 required tests passed; clean server shutdown and successful task completion |
+| Explicit root `:jar` | Completed successfully; repaired classes and the 16x12x16 fixture confirmed in the regular mod JAR |
+
+Test-first runs reproduced the ready-cell delay and discarded native wake
+before their production repairs. The final server log is
+`.codex-build/water-flow-regression-final.log`; the full water unit results are
+under `.codex-build/test-results/waterSimulationTest/`.
+
+The follow-up artifact is `.codex-build/libs/wildernessodysseyapi-5.0.0.jar`,
+SHA-256 `F7993161DE487A6AD03FF635F0E1076173CEF4441E8BD0DE161FE9B798FE4FC5`.
+It contains the shared checkout's other existing changes as well as these flow
+repairs; this follow-up's validation does not certify every concurrent change.
+
+Live acceptance should include settled pools with outlets opened by ordinary
+block breaking and automation, ready interior water beside deferred chunk-edge
+cells, and save/reload while flow is pending. Headless fixtures do not establish
+how the complete modpack feels or whether every reported refill is explained.
+
+### Original acceptance matrix
+
 Use a disposable fresh world or a backed-up older world and record the exact
 artifact/settings. These cases require a real client or multiple clients:
 
