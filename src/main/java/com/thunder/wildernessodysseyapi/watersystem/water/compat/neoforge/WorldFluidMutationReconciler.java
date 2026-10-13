@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterAccess;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterInteractionResult;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
@@ -8,14 +9,18 @@ import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulation
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.GenerationWaterStateMapper;
 import net.minecraft.tags.FluidTags;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /**
  * Reconciles direct projected-block writes with canonical water authority.
@@ -23,15 +28,18 @@ import java.util.function.BooleanSupplier;
  * <p>Some machines, including Create open-ended pipes, place or remove fluid
  * blocks without querying a block capability. This boundary runs immediately
  * before {@link Level#setBlock(BlockPos, BlockState, int, int)} and only does
- * work when the old or new state is the standalone Wilderness liquid block.
+ * runtime work when the old or new state is the standalone Wilderness liquid block.
  * An exact authority commit owns the physical projection and intercepts the
  * original write, preventing duplicate writes and false failure results after
- * canonical projection has already reached the target state.</p>
+ * canonical projection has already reached the target state. Initial starter
+ * construction has a separate bounded generation scope that also removes
+ * obsolete sparse overrides when its final terrain is stored.</p>
  */
 public final class WorldFluidMutationReconciler {
 
     private static final ThreadLocal<Integer> RECONCILIATION_DEPTH =
             ThreadLocal.withInitial(() -> 0);
+    private static final ThreadLocal<StarterTerrainContext> STARTER_TERRAIN = new ThreadLocal<>();
     private static volatile boolean active;
 
     private WorldFluidMutationReconciler() {
@@ -40,6 +48,30 @@ public final class WorldFluidMutationReconciler {
     /** Activates the mixin boundary after the NeoForge compatibility adapter initializes. */
     public static void activate() {
         active = true;
+    }
+
+    /**
+     * Runs initial starter-island construction using final generation state.
+     *
+     * <p>The starter is built through ServerLevel after its selected chunks are
+     * generated. Treating its ocean fill as runtime solid placement would push
+     * the removed ocean onto the island and retain hidden parcels in its rooms.
+     * Only synchronous writes in this level and footprint use generation
+     * semantics; nested calls restore their owner, including on failure.</p>
+     */
+    public static <T> T withStarterTerrainGeneration(ServerLevel level, BoundingBox bounds, Supplier<T> generation) {
+        if (!level.getServer().isSameThread() || level.getServer().isStopped()) {
+            throw new IllegalStateException("Starter terrain generation requires the active server thread");
+        }
+        StarterTerrainContext previous = STARTER_TERRAIN.get();
+        STARTER_TERRAIN.set(new StarterTerrainContext(level, new BoundingBox(
+                bounds.minX(), bounds.minY(), bounds.minZ(), bounds.maxX(), bounds.maxY(), bounds.maxZ())));
+        try {
+            return generation.get();
+        } finally {
+            if (previous == null) STARTER_TERRAIN.remove();
+            else STARTER_TERRAIN.set(previous);
+        }
     }
 
     /**
@@ -85,6 +117,12 @@ public final class WorldFluidMutationReconciler {
                 || !(level instanceof ServerLevel serverLevel)) {
             return MutationDecision.CONTINUE;
         }
+        StarterTerrainContext generation = STARTER_TERRAIN.get();
+        if (generation != null && generation.level() == serverLevel && generation.bounds().isInside(position)
+                && WildernessWaterRules.isEnabled(serverLevel)
+                && !serverLevel.captureBlockSnapshots && !serverLevel.restoringBlockSnapshots) {
+            return reconcileStarterTerrain(serverLevel, position, newState, flags, recursionLeft);
+        }
         return reconcile(
                 serverLevel,
                 position,
@@ -95,6 +133,43 @@ public final class WorldFluidMutationReconciler {
                 recursionLeft
         );
     }
+
+    private static MutationDecision reconcileStarterTerrain(ServerLevel level, BlockPos position,
+            BlockState requestedState, int flags, int recursionLeft) {
+        if (level.isOutsideBuildHeight(position)) return MutationDecision.REJECTED;
+        var chunk = level.getChunkSource().getChunkNow(position.getX() >> 4, position.getZ() >> 4);
+        if (chunk == null) return MutationDecision.REJECTED;
+        BlockState mapped = GenerationWaterStateMapper.map(requestedState);
+        var volume = chunk.getExistingData(ModAttachments.WATER_VOLUME);
+        var generated = chunk.getExistingData(ModAttachments.GENERATED_WATER);
+        if (!isWildernessProjection(chunk.getBlockState(position)) && !isWildernessProjection(mapped)
+                && (volume.isEmpty() || !volume.get().contains(position))
+                && (generated.isEmpty() || generated.get().spanAt(position) == null)) {
+            return MutationDecision.CONTINUE;
+        }
+
+        int previousDepth = RECONCILIATION_DEPTH.get();
+        RECONCILIATION_DEPTH.set(previousDepth + 1);
+        try {
+            // The constructor already owns generation of its selected columns.
+            // Require the target chunk, but never generate callback neighbors:
+            // the loaded shape view supplies the same bounded boundary used by
+            // water projection. Normal flags and block callbacks remain intact.
+            boolean changed = WaterMutationSafety.withLoadedShapeContext(level,
+                    () -> level.setBlock(position, mapped, flags, recursionLeft));
+            BlockState stored = chunk.getBlockState(position);
+            if (!changed && !stored.equals(mapped)) return MutationDecision.REJECTED;
+
+            volume.ifPresent(water -> water.set(position, WaterVolumeChunk.WaterCell.EMPTY));
+            GenerationWaterStateMapper.recordStoredState(chunk, position, stored);
+            chunk.setUnsaved(true);
+            return changed ? MutationDecision.COMMITTED : MutationDecision.REJECTED;
+        } finally {
+            restoreDepth(previousDepth);
+        }
+    }
+
+    private record StarterTerrainContext(ServerLevel level, BoundingBox bounds) { }
 
     static MutationDecision reconcile(
             ServerLevel level,

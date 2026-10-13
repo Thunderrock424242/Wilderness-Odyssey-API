@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.worldgen.spawn;
 
 import com.mojang.datafixers.util.Pair;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
+import com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.WorldFluidMutationReconciler;
 import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
 import com.thunder.wildernessodysseyapi.worldgen.processor.BunkerPlacementProcessor;
 import com.thunder.wildernessodysseyapi.worldgen.structure.NBTStructurePlacer;
@@ -19,6 +20,7 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -87,6 +89,14 @@ public final class SpawnBunkerPlacer {
      */
     public static NBTStructurePlacer.PlacementResult placeBunker(ServerLevel level, BlockPos anchor) {
         Vec3i bunkerSize = BUNKER_PLACER.peekSize(level);
+        BlockPos origin = getPlacementOrigin(level, anchor);
+        BoundingBox terrainBounds = starterTerrainBounds(origin, bunkerSize,
+                level.getMinBuildHeight(), level.getMaxBuildHeight());
+        return WorldFluidMutationReconciler.withStarterTerrainGeneration(level, terrainBounds,
+                () -> placeBunkerTerrain(level, anchor, bunkerSize));
+    }
+
+    private static NBTStructurePlacer.PlacementResult placeBunkerTerrain(ServerLevel level, BlockPos anchor, Vec3i bunkerSize) {
         StarterIslandLayout island = prepareStarterIsland(level, anchor, bunkerSize);
         NBTStructurePlacer.PlacementResult result = BUNKER_PLACER.placeAnchored(level, anchor);
         if (result != null) {
@@ -103,6 +113,17 @@ public final class SpawnBunkerPlacer {
                     result.bounds());
         }
         return result;
+    }
+
+    /** Covers the selected island, buried template, and its bounded landscaping writes. */
+    static BoundingBox starterTerrainBounds(BlockPos origin, Vec3i bunkerSize, int minBuildHeight, int maxBuildHeight) {
+        int sizeX = Math.max(1, bunkerSize.getX());
+        int sizeZ = Math.max(1, bunkerSize.getZ());
+        int centerX = origin.getX() + sizeX / 2;
+        int centerZ = origin.getZ() + sizeZ / 2;
+        int shoreRadius = Math.max(sizeX, sizeZ) / 2 + ISLAND_PLATFORM_PADDING + ISLAND_SHORE_RADIUS_PADDING;
+        return new BoundingBox(centerX - shoreRadius, minBuildHeight, centerZ - shoreRadius,
+                centerX + shoreRadius, maxBuildHeight - 1, centerZ + shoreRadius);
     }
 
     static BlockPos resolveAnchor(ServerLevel level) {

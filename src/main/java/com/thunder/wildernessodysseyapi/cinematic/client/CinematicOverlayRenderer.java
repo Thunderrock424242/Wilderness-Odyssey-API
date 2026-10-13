@@ -13,6 +13,8 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
 /** Renders resolution-independent cinematic overlays after the ordinary HUD pass. */
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public final class CinematicOverlayRenderer {
+    private static final Component SKIP_HINT = Component.translatable("cinematic.wildernessodysseyapi.skip_hint");
+
     private CinematicOverlayRenderer() {
     }
 
@@ -29,6 +31,11 @@ public final class CinematicOverlayRenderer {
             ClientCinematicPresentation presentation = state.presentation();
             if (presentation != null) {
                 presentation.renderOverlay(state, graphics, width, height, partialTick);
+            }
+            if (state.canSkip() && minecraft.screen == null) {
+                graphics.drawString(minecraft.font, SKIP_HINT,
+                        Math.max(8, width - minecraft.font.width(SKIP_HINT) - 12),
+                        height - minecraft.font.lineHeight - 3, 0xFFB7C9C6, true);
             }
             return;
         }

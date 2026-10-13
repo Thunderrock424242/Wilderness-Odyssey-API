@@ -4,6 +4,8 @@ import com.thunder.wildernessodysseyapi.cinematic.network.CinematicStagePayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.CinematicNarrationPayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.EndCinematicPayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.StartCinematicPayload;
+import com.thunder.wildernessodysseyapi.cinematic.network.SkipCinematicPayload;
+import com.thunder.wildernessodysseyapi.cinematic.sequence.CryoWakeupSequence;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
@@ -24,6 +26,8 @@ import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.MovementInputUpdateEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.UUID;
 
@@ -38,6 +42,7 @@ import java.util.UUID;
 public final class CinematicClientController {
     private static final CinematicClientController INSTANCE = new CinematicClientController();
     private static final Input LOCKED_INPUT = new Input();
+    private final CinematicSkipInput skipInput = new CinematicSkipInput();
 
     private ResourceLocation sequenceId;
     private ResourceLocation stageId;
@@ -97,6 +102,10 @@ public final class CinematicClientController {
 
     public boolean controlsLocked() {
         return isActive() && controlsLocked;
+    }
+
+    public boolean canSkip() {
+        return CryoWakeupSequence.ID.equals(sequenceId);
     }
 
     public ResourceLocation sequenceId() {
@@ -330,6 +339,7 @@ public final class CinematicClientController {
         }
 
         sequenceId = null;
+        skipInput.reset();
         stageId = null;
         presentation = null;
         sequenceStartGameTime = 0L;
@@ -359,6 +369,9 @@ public final class CinematicClientController {
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen != null || !minecraft.isWindowActive()) {
+            INSTANCE.skipInput.disarm();
+        }
         if (INSTANCE.isActive()) {
             if (minecraft.player == null || minecraft.level == null) {
                 INSTANCE.reset(false);
@@ -386,6 +399,25 @@ public final class CinematicClientController {
         }
     }
 
+    /** Reads raw key edges even while the cinematic substitutes inert movement input. */
+    @SubscribeEvent
+    public static void onKeyInput(InputEvent.Key event) {
+        if (event.getKey() != GLFW.GLFW_KEY_SPACE) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!INSTANCE.canSkip() || minecraft.screen != null || !minecraft.isWindowActive()
+                || minecraft.player == null || minecraft.getConnection() == null) {
+            INSTANCE.skipInput.disarm();
+            return;
+        }
+        if (INSTANCE.skipInput.onSpaceKey(event.getAction(), System.nanoTime())) {
+            PacketDistributor.sendToServer(new SkipCinematicPayload(
+                    INSTANCE.sequenceId, INSTANCE.sequenceStartGameTime
+            ));
+        }
+    }
+
     /** Clears any movement state another client input listener attempted to add after the inert input tick. */
     @SubscribeEvent
     public static void onMovementInput(MovementInputUpdateEvent event) {
@@ -406,6 +438,7 @@ public final class CinematicClientController {
     /** Blocks inventory/container screens while retaining chat and the pause menu for safe operator control. */
     @SubscribeEvent
     public static void onScreenOpening(ScreenEvent.Opening event) {
+        INSTANCE.skipInput.disarm();
         if (INSTANCE.controlsLocked() && event.getNewScreen() instanceof AbstractContainerScreen<?>) {
             event.setCanceled(true);
         }

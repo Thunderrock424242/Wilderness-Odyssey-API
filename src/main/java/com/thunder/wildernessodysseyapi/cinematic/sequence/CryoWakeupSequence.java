@@ -281,7 +281,13 @@ public final class CryoWakeupSequence implements CinematicSequence {
 
     @Override
     public void onStop(CinematicSequenceContext context, CinematicStopReason reason) {
-        context.cueActor(reason == CinematicStopReason.COMPLETE ? CUE_OPEN : CUE_IDLE);
+        if (reason == CinematicStopReason.SKIPPED && context.stage().locksControls()) {
+            // The recovery stage normally performs this handoff. An early skip
+            // must leave the player outside the pod before the shared lock cleanup.
+            releasePlayer(context);
+            applyRecoveryEffects(context.player());
+        }
+        context.cueActor(reason.completesSequence() ? CUE_OPEN : CUE_IDLE);
     }
 
     /** Returns the centralized start tick of a stage for tests and documentation. */

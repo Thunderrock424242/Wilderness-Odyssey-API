@@ -1,12 +1,38 @@
 package com.thunder.wildernessodysseyapi.cinematic.sequence;
 
 import com.thunder.wildernessodysseyapi.cinematic.CinematicControlPolicy;
+import com.thunder.wildernessodysseyapi.cinematic.CinematicSequenceContext;
+import com.thunder.wildernessodysseyapi.cinematic.CinematicStage;
+import com.thunder.wildernessodysseyapi.cinematic.CinematicStopReason;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CryoWakeupSequenceTest {
+    @Test
+    void skippingTheWalkingBriefingLeavesThePlayerAloneAndTheTubeOpen() {
+        var sequence = new CryoWakeupSequence();
+        var context = new StopContext(sequence.stages().getLast());
+
+        sequence.onStop(context, CinematicStopReason.SKIPPED);
+
+        assertEquals(CryoWakeupSequence.CUE_OPEN, context.actorCue);
+    }
+
+    @Test
+    void cancellingALockedStageRetainsTheExistingIdleCleanup() {
+        var sequence = new CryoWakeupSequence();
+        var context = new StopContext(sequence.stages().getFirst());
+
+        sequence.onStop(context, CinematicStopReason.MANUAL_CANCEL);
+
+        assertEquals(CryoWakeupSequence.CUE_IDLE, context.actorCue);
+    }
+
     @Test
     void timelineMatchesTheRevivalAndRecoveryCueSheet() {
         assertEquals(0, CryoWakeupSequence.startTick(CryoWakeupSequence.BLACK_SCREEN));
@@ -67,5 +93,50 @@ class CryoWakeupSequenceTest {
         assertTrue(identityEnd <= 125);
         assertTrue(limitsEnd <= 240);
         assertTrue(exitEnd <= 350);
+    }
+
+    private static final class StopContext implements CinematicSequenceContext {
+        private final CinematicStage stage;
+        private ResourceLocation actorCue;
+
+        private StopContext(CinematicStage stage) {
+            this.stage = stage;
+        }
+
+        @Override
+        public ServerPlayer player() {
+            throw new AssertionError("This stop path must not teleport the player or reapply recovery effects");
+        }
+
+        @Override
+        public BlockPos anchor() {
+            return BlockPos.ZERO;
+        }
+
+        @Override
+        public CinematicStage stage() {
+            return stage;
+        }
+
+        @Override
+        public int stageElapsedTicks() {
+            return 0;
+        }
+
+        @Override
+        public boolean marksCompletion() {
+            return false;
+        }
+
+        @Override
+        public boolean cueActor(ResourceLocation cueId) {
+            actorCue = cueId;
+            return true;
+        }
+
+        @Override
+        public boolean narrateOnce(ResourceLocation cueId, int durationTicks) {
+            throw new AssertionError("Stopping must not start narration");
+        }
     }
 }

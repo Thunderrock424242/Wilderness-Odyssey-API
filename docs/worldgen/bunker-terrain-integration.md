@@ -52,3 +52,52 @@ Pack authors can tune or disable this pass in `serverconfig/wildernessodysseyapi
 - `starterIslandJungleDensity = 0.75`
 
 These changes apply when the starter bunker is first generated. Existing worlds whose starter bunker has already been placed are intentionally not redecorated.
+
+## Starter water placement boundary
+
+The initial starter island and bunker are constructed through `ServerLevel`
+after the selected columns have generated. Those writes use a synchronous,
+bounded starter-generation scope in `WorldFluidMutationReconciler`. It covers
+the selected island shore, buried bunker, and landscaping within build height.
+The context is level-specific and restored in `finally`, including on failure.
+
+In this scope, final terrain replaces generated water instead of performing a
+runtime water-displacement transaction. Successful writes update the existing
+`GenerationWaterStateMapper` metadata and remove sparse water overrides at the
+same position. This prevents ocean fill from piling conserved water over the
+island, and prevents carved bunker rooms from releasing hidden displacement
+parcels. Authored template water is still mapped into generated Wilderness
+water. The bunker NBT asset is unchanged.
+
+The water boundary only accepts an already-loaded target chunk. It uses the
+existing loaded shape view for synchronous callbacks, which returns the bounded
+boundary approximation for absent neighboring columns instead of loading them.
+The starter constructor retains ownership of generating its selected island
+columns; the water adapter adds no tickets, futures, worker, or chunk scan.
+Normal block flags and callbacks still run. Ordinary player/machine writes,
+writes outside the selected footprint, and later gameplay retain finite-volume
+conservation and the existing live-water admission guards.
+
+The October 12 regression pass reproduced island-fill displacement and retained
+interior parcels before the fix. Five GameTests cover terrain fill, interior
+carving and subsequent server ticks, authored water, cleanup after an exception,
+and writes outside the generation footprint. All 46 required GameTests passed,
+as did all 130 water simulation unit tests and four focused
+`SpawnBunkerPlacerTest` checks, including build-height and shore bounds. The
+targeted root `:test` task also completed normal JAR packaging. The final water server log is
+`.codex-build/starter-water-regression-green.log`.
+
+The tested artifact is `.codex-build/libs/wildernessodysseyapi-5.0.0.jar`,
+SHA-256 `D72D3F48CB3F61A7394CE30768280AEA8CE4DB9065E12B98B1050135FBB56409`.
+The packaged bunker asset still matches the source SHA-256
+`81D61F883D056FC9BB8D9F0AC7BDC3E653CBA9B23D1FB468844CF3E4331E6900`.
+This shared-checkout artifact includes concurrent changes from other work;
+the checks above establish this starter-water repair's scope.
+
+This prevents flooding during new starter placement. Updating the mod does not
+automatically remove water already saved by an older placement; automatic
+cleanup cannot safely distinguish those parcels from later player water.
+Validate the updated artifact in a fresh test world: the raised platform and
+authored dry bunker rooms should stay dry, while the surrounding ocean and any
+template-authored water remain present. Full-size starter placement in the
+original modpack remains a live-client acceptance check.

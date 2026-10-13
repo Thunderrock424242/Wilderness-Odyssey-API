@@ -771,6 +771,18 @@ tasks.register('riftTest', Test) {
     }
 }
 
+tasks.register('cinematicTest', Test) {
+    group = 'verification'
+    description = 'Runs cinematic timing, skip input, protocol and presentation regressions without starting Minecraft.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '1g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.cinematic.*'
+    }
+}
+
 tasks.register('playtestTest', Test) {
     group = 'verification'
     description = 'Runs focused playtesting, feedback, telemetry and configuration regressions.'

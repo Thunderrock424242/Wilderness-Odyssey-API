@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.cinematic.network.CinematicStagePayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.CinematicNarrationPayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.EndCinematicPayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.StartCinematicPayload;
+import com.thunder.wildernessodysseyapi.cinematic.sequence.CryoWakeupSequence;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -172,6 +173,32 @@ public final class CinematicManager {
         }
     }
 
+    /** Validates a player skip request against the current intro on the authoritative server thread. */
+    public static boolean skip(ServerPlayer player, ResourceLocation sequenceId, long sequenceStartGameTime) {
+        RunningSequence running = ACTIVE.get(player.getUUID());
+        if (running == null || running.player != player
+                || !CryoWakeupSequence.ID.equals(running.sequence.id())
+                || !running.sequence.id().equals(sequenceId)
+                || running.sequenceStartGameTime != sequenceStartGameTime
+                || !player.isAlive() || player.isRemoved()
+                || !player.level().dimension().equals(running.dimension)
+                || !running.sequence.isPlaybackAllowed(player)) {
+            return false;
+        }
+        try {
+            if (running.sequence.validateStart(player, running.options.anchor()).isPresent()) {
+                stop(player, CinematicStopReason.INVALID_STATE);
+                return false;
+            }
+        } catch (RuntimeException exception) {
+            ModConstants.LOGGER.error("Cinematic {} could not validate a skip for {}",
+                    sequenceId, player.getGameProfile().getName(), exception);
+            stop(player, CinematicStopReason.ERROR);
+            return false;
+        }
+        return stop(player, CinematicStopReason.SKIPPED);
+    }
+
     /** Stops one active session and restores all server-owned temporary state. */
     public static boolean stop(ServerPlayer player, CinematicStopReason reason) {
         RunningSequence running = ACTIVE.remove(player.getUUID());
@@ -182,7 +209,7 @@ public final class CinematicManager {
             ACTIVE_ACTORS.remove(new ActorKey(running.dimension, running.options.anchor()), player.getUUID());
         }
 
-        boolean completed = reason == CinematicStopReason.COMPLETE;
+        boolean completed = reason.completesSequence();
         try {
             running.sequence.onStop(running, reason);
         } catch (RuntimeException exception) {
@@ -332,6 +359,7 @@ public final class CinematicManager {
         private final float baseYaw;
         private final float basePitch;
         private final boolean originalNoGravity;
+        private final long sequenceStartGameTime;
         private long stageStartGameTime;
         private boolean lockApplied;
         private final Set<ResourceLocation> narrationCues = new HashSet<>();
@@ -350,7 +378,8 @@ public final class CinematicManager {
             this.baseYaw = sequence.initialYaw(player, options.anchor());
             this.basePitch = sequence.initialPitch(player, options.anchor());
             this.originalNoGravity = player.isNoGravity();
-            this.stageStartGameTime = player.level().getGameTime();
+            this.sequenceStartGameTime = player.level().getGameTime();
+            this.stageStartGameTime = sequenceStartGameTime;
         }
 
         @Override

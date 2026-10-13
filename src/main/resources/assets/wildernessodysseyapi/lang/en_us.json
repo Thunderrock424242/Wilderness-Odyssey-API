@@ -8,6 +8,7 @@
   "message.wildernessodysseyapi.echo_mask_breath_overuse_warning": "Warning: relying on the Echo Breathing Mask to suppress breathing for too long can cause side effects.",
   "message.wildernessodysseyapi.phase_rejection": "Phase rejection. The cloak collapses and nearby enemies hear the pulse.",
   "message.wildernessodysseyapi.inhaler_used": "Inhaler used. Breath strain reduced.",
+  "cinematic.wildernessodysseyapi.skip_hint": "Double-tap Space to skip",
   "cinematic.wildernessodysseyapi.cryo.system_failure": "CRYOGENIC SYSTEM FAILURE",
   "cinematic.wildernessodysseyapi.cryo.release_initiated": "CRYO RELEASE INITIATED",
   "cinematic.wildernessodysseyapi.cryo.contamination": "SUSPENSION MEDIUM CONTAMINATED",

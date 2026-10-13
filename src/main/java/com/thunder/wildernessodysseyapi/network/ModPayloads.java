@@ -3,10 +3,12 @@ package com.thunder.wildernessodysseyapi.network;
 import com.thunder.wildernessodysseyapi.ai.voice.client.AetherVoiceClient;
 import com.thunder.wildernessodysseyapi.ai.voice.network.AetherVoiceLinePayload;
 import com.thunder.wildernessodysseyapi.cinematic.client.CinematicClientController;
+import com.thunder.wildernessodysseyapi.cinematic.CinematicManager;
 import com.thunder.wildernessodysseyapi.cinematic.network.CinematicStagePayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.CinematicNarrationPayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.EndCinematicPayload;
 import com.thunder.wildernessodysseyapi.cinematic.network.StartCinematicPayload;
+import com.thunder.wildernessodysseyapi.cinematic.network.SkipCinematicPayload;
 import com.thunder.wildernessodysseyapi.cloak.item.CloakState;
 import com.thunder.wildernessodysseyapi.cloak.item.CloakTickHandler;
 import com.thunder.wildernessodysseyapi.cloak.network.CloakInputPayload;
@@ -57,7 +59,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class ModPayloads {
 
     // This channel version covers every payload registered below; bump it for wire-shape changes.
-    private static final String NETWORK_VERSION = "35";
+    private static final String NETWORK_VERSION = "36";
 
     private ModPayloads() {
     }
@@ -110,6 +112,12 @@ public final class ModPayloads {
                 (payload, context) -> context.enqueueWork(() -> CinematicClientController.accept(payload)));
         registrar.playToClient(EndCinematicPayload.TYPE, EndCinematicPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> CinematicClientController.accept(payload)));
+        registrar.playToServer(SkipCinematicPayload.TYPE, SkipCinematicPayload.STREAM_CODEC,
+                (payload, context) -> {
+                    if (context.player() instanceof ServerPlayer serverPlayer) {
+                        CinematicManager.skip(serverPlayer, payload.sequenceId(), payload.sequenceStartGameTime());
+                    }
+                });
 
         // PayloadRegistrar already marshals play handlers to the main thread.
         // Handle this dimension-sensitive state immediately so a second queue
