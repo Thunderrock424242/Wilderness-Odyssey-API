@@ -53,6 +53,71 @@ Pack authors can tune or disable this pass in `serverconfig/wildernessodysseyapi
 
 These changes apply when the starter bunker is first generated. Existing worlds whose starter bunker has already been placed are intentionally not redecorated.
 
+## Required starter bunker placement
+
+During initial overworld spawn creation, starter bunker placement is required
+unless `debugDisableStarterBunker` is enabled. If placement returns no result or
+throws a runtime exception, `SpawnBunkerPlacer` logs a fatal error and throws a
+Minecraft `ReportedException` to abort world startup. The crash report includes
+the structure ID, attempted spawn anchor, and this recovery instruction:
+
+> Starter bunker failed to spawn. Please create a different world and try again.
+
+An existing Minecraft placement crash report retains its original diagnostics
+and receives the same recovery instruction. Failure does not mark the bunker as
+placed or continue with vanilla spawn. Successful placements, saved bunker
+markers, other dimensions, and the explicit debug-disable path keep their
+existing behavior. The failed world is not automatically deleted or rolled back;
+placement may already have written some terrain before failing.
+
+`SpawnBunkerPlacerTest` covers missing placement results, runtime exceptions,
+existing Minecraft crash reports, and successful results. For client acceptance,
+use a disposable test instance with a data pack overriding
+`wildernessodysseyapi:bunker` with an empty structure template, then create a
+new world with starter placement enabled. Confirm startup aborts, the log has a
+fatal starter-bunker error, and the crash report tells you to create a different
+world. Remove the override and confirm a fresh world starts normally.
+
+## Starter construction chunk lifetime
+
+Initial world creation owns the selected starter footprint through
+`StarterBunkerChunkPreparation`. It validates the existing template and
+256-chunk placement budgets before requesting any chunks, adds temporary
+non-ticking region tickets for that footprint, and prepares its full chunks
+before island construction starts. Those tickets remain through island fill,
+bunker placement, and decoration, and are removed in `finally`, including when
+construction fails. Each scope has its own ticket value; no persistent
+forced-chunk state is created. Minecraft still owns generation and unloading.
+
+The general `LargeStructurePlacementOptimizer` guard remains loaded-only. Its
+caller must arrange availability. Island surface sampling alone was insufficient:
+Minecraft's transient lookup tickets could expire while later island columns
+were generated, causing the subsequent bunker guard to reject an otherwise
+valid placement. The October 12 client log recorded exactly this failure for
+132 touched chunks, below the 256-chunk limit, followed by vanilla spawn fallback.
+
+Three native GameTests cover missing-chunk preparation, retention after transient
+lookup tickets expire, release after successful or throwing construction, and
+rejection before loading an over-budget footprint. All three failed before
+preparation was implemented; the corrected run passed all 49 required tests,
+including the existing starter-water regressions. The server log is
+`.codex-build/starter-chunk-regression-green.log`.
+
+The final combined root `:test` run passed 25 checks across starter spawn,
+surface/decorating behavior, placement limits, and chunk-ownership architecture,
+including all eight `SpawnBunkerPlacerTest` checks for the coordinated fatal
+placement policy. Its log is `.codex-build/starter-spawn-integration-test.log`.
+That task rebuilt the regular `.codex-build/libs/wildernessodysseyapi-5.0.0.jar`,
+SHA-256 `A7C0915E91D8A7C10741071F91A7AC919D3C3F64577902BD00129510DC59EBB7`.
+The new preparation classes are packaged, and the packaged bunker still matches
+the unchanged source SHA-256
+`81D61F883D056FC9BB8D9F0AC7BDC3E653CBA9B23D1FB468844CF3E4331E6900`.
+
+The selected footprint is prepared only when initially constructing a starter.
+This does not place a new bunker automatically into an already-created world
+whose initial placement failed. Full-sized new-world placement and the first
+player's cryo handoff remain live-client acceptance checks.
+
 ## Starter water placement boundary
 
 The initial starter island and bunker are constructed through `ServerLevel`
@@ -87,7 +152,7 @@ as did all 130 water simulation unit tests and four focused
 targeted root `:test` task also completed normal JAR packaging. The final water server log is
 `.codex-build/starter-water-regression-green.log`.
 
-The tested artifact is `.codex-build/libs/wildernessodysseyapi-5.0.0.jar`,
+The October 12 water-repair artifact was `.codex-build/libs/wildernessodysseyapi-5.0.0.jar`,
 SHA-256 `D72D3F48CB3F61A7394CE30768280AEA8CE4DB9065E12B98B1050135FBB56409`.
 The packaged bunker asset still matches the source SHA-256
 `81D61F883D056FC9BB8D9F0AC7BDC3E653CBA9B23D1FB468844CF3E4331E6900`.

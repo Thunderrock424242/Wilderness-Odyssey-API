@@ -8,6 +8,9 @@ import com.thunder.wildernessodysseyapi.worldgen.processor.BunkerPlacementProces
 import com.thunder.wildernessodysseyapi.worldgen.structure.NBTStructurePlacer;
 import com.thunder.wildernessodysseyapi.worldgen.structure.StarterStructureSpawnGuard;
 import com.thunder.wildernessodysseyapi.worldgen.structure.TerrainReplacerEngine;
+import net.minecraft.CrashReport;
+import net.minecraft.CrashReportCategory;
+import net.minecraft.ReportedException;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
@@ -28,6 +31,7 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * Selects an ocean world spawn and places the starter bunker during initial world creation.
@@ -39,6 +43,8 @@ import java.util.function.Predicate;
 @EventBusSubscriber(modid = ModConstants.MOD_ID)
 public final class SpawnBunkerPlacer {
     private static final ResourceLocation BUNKER_ID = ResourceLocation.fromNamespaceAndPath(ModConstants.MOD_ID, "bunker");
+    private static final String BUNKER_FAILURE_MESSAGE =
+            "Starter bunker failed to spawn. Please create a different world and try again.";
     private static final int DEEP_OCEAN_SEARCH_RADIUS = 6400;
     private static final int OCEAN_SEARCH_RADIUS = 25000;
     private static final int BIOME_SEARCH_COARSE_STEP = 256;
@@ -57,7 +63,8 @@ public final class SpawnBunkerPlacer {
      * Chooses and prepares the initial overworld spawn before Minecraft generates its spawn-chunk region.
      *
      * <p>Canceling this event prevents vanilla from replacing the bunker spawn after placement. Other dimensions
-     * and the debug-disabled path are intentionally left to vanilla.</p>
+     * and the debug-disabled path are intentionally left to vanilla. A failed required placement aborts world
+     * creation through Minecraft's normal crash-report handling instead of falling back to vanilla spawn.</p>
      *
      * @param event the NeoForge initial spawn-position event
      */
@@ -75,13 +82,38 @@ public final class SpawnBunkerPlacer {
         }
 
         BlockPos anchor = resolveAnchor(level);
-        NBTStructurePlacer.PlacementResult result = placeBunker(level, anchor);
-        if (result == null) {
-            ModConstants.LOGGER.warn("Spawn bunker placement failed at {}; falling back.", anchor);
-            return;
-        }
+        NBTStructurePlacer.PlacementResult result = requireBunkerPlacement(anchor, () -> placeBunker(level, anchor));
         applySpawnData(level, result);
         event.setCanceled(true);
+    }
+
+    /** Enforces the required starter placement before any successful spawn data is persisted. */
+    static NBTStructurePlacer.PlacementResult requireBunkerPlacement(
+            BlockPos anchor, Supplier<NBTStructurePlacer.PlacementResult> placement) {
+        NBTStructurePlacer.PlacementResult result;
+        try {
+            result = placement.get();
+        } catch (RuntimeException exception) {
+            throw bunkerPlacementFailure(anchor, exception);
+        }
+        if (result == null) {
+            throw bunkerPlacementFailure(anchor, new IllegalStateException(
+                    "Required starter bunker placement returned no result. See preceding structure placement logs."));
+        }
+        return result;
+    }
+
+    private static ReportedException bunkerPlacementFailure(BlockPos anchor, RuntimeException cause) {
+        ModConstants.LOGGER.fatal("{} Structure: {}. Spawn anchor: {}.", BUNKER_FAILURE_MESSAGE, BUNKER_ID, anchor, cause);
+        // Preserve an existing Minecraft crash report so its original block/world diagnostics survive startup handling.
+        CrashReport report = CrashReport.forThrowable(cause, BUNKER_FAILURE_MESSAGE);
+        CrashReportCategory details = report.addCategory("Starter bunker placement");
+        // Recovery metadata needs no duplicate stack; the original exception retains the placement trace.
+        details.setStackTrace(new StackTraceElement[0]);
+        details.setDetail("Structure", BUNKER_ID);
+        details.setDetail("Spawn anchor", anchor.toShortString());
+        details.setDetail("Recovery", BUNKER_FAILURE_MESSAGE);
+        return new ReportedException(report);
     }
 
     /**
@@ -92,8 +124,9 @@ public final class SpawnBunkerPlacer {
         BlockPos origin = getPlacementOrigin(level, anchor);
         BoundingBox terrainBounds = starterTerrainBounds(origin, bunkerSize,
                 level.getMinBuildHeight(), level.getMaxBuildHeight());
-        return WorldFluidMutationReconciler.withStarterTerrainGeneration(level, terrainBounds,
-                () -> placeBunkerTerrain(level, anchor, bunkerSize));
+        return StarterBunkerChunkPreparation.withChunks(level, origin, bunkerSize,
+                () -> WorldFluidMutationReconciler.withStarterTerrainGeneration(level, terrainBounds,
+                        () -> placeBunkerTerrain(level, anchor, bunkerSize)));
     }
 
     private static NBTStructurePlacer.PlacementResult placeBunkerTerrain(ServerLevel level, BlockPos anchor, Vec3i bunkerSize) {
