@@ -5,6 +5,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
+import java.lang.ref.WeakReference;
+
 /**
  * Cached custom-water state for one entity.
  *
@@ -14,7 +16,9 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class EntityWaterState {
 
-    private Level sampledLevel;
+    // A cached value must not retain its weak entity key through the level's
+    // entity manager. Allocate a new reference only when the level changes.
+    private WeakReference<Level> sampledLevel = new WeakReference<>(null);
     private long sampledGameTime = Long.MIN_VALUE;
     private boolean authoritativeContactKnown;
     private boolean touchingWater;
@@ -53,8 +57,11 @@ public final class EntityWaterState {
         this.currentX = currentX;
         this.currentY = currentY;
         this.currentZ = currentZ;
-        sampledLevel = entity.level();
-        sampledGameTime = sampledLevel.getGameTime();
+        Level level = entity.level();
+        if (sampledLevel.get() != level) {
+            sampledLevel = new WeakReference<>(level);
+        }
+        sampledGameTime = level.getGameTime();
 
         if (this.touchingWater) {
             ticksInWater = wasTouching ? ticksInWater + 1 : 1;
@@ -78,7 +85,7 @@ public final class EntityWaterState {
     }
 
     boolean sampledAt(Level level, long gameTime) {
-        return sampledLevel == level && sampledGameTime == gameTime;
+        return sampledLevel.get() == level && sampledGameTime == gameTime;
     }
 
     /**

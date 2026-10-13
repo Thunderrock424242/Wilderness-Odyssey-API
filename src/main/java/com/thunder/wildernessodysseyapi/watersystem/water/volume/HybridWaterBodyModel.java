@@ -85,6 +85,9 @@ final class HybridWaterBodyModel {
      * gameplay can share this without each reinventing the water equation.</p>
      */
     static SurfaceSample sampleSurface(Level level, double x, double z, float partialTick) {
+        if (!LoadedWaterReadAccess.canRead(level)) {
+            return SurfaceSample.INVALID;
+        }
         BlockPos columnPos = BlockPos.containing(x, level.getSeaLevel(), z);
         MutableShorelineDirection shoreline = SHORELINE_DIRECTION_SCRATCH.get();
         SurfaceColumn column = findSurfaceColumn(
@@ -182,10 +185,10 @@ final class HybridWaterBodyModel {
             shorelineDirection.clear();
         }
         BlockPos chunkProbe = new BlockPos(x, level.getSeaLevel(), z);
-        if (level.isOutsideBuildHeight(chunkProbe) || !level.hasChunkAt(chunkProbe)) {
+        LevelChunk chunk = LoadedWaterReadAccess.loadedChunk(level, chunkProbe);
+        if (chunk == null) {
             return SurfaceColumn.INVALID;
         }
-        LevelChunk chunk = level.getChunkAt(chunkProbe);
         GeneratedWaterChunk generated = chunk.getExistingData(ModAttachments.GENERATED_WATER).orElse(null);
         if (generated == null) {
             return SurfaceColumn.INVALID;
@@ -262,7 +265,7 @@ final class HybridWaterBodyModel {
         float normalZ = 0.0f;
         for (int[] offset : CARDINAL_OFFSETS) {
             cursor.set(x + offset[0], y, z + offset[1]);
-            if (!level.hasChunkAt(cursor)) {
+            if (LoadedWaterReadAccess.loadedChunk(level, cursor) == null) {
                 shoreline = true;
                 continue;
             }

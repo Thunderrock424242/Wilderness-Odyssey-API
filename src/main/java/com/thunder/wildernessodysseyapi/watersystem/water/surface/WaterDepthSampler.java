@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.surface;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.LoadedWaterReadAccess;
 
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -21,6 +22,8 @@ public final class WaterDepthSampler {
 
     /** Resolves the first solid floor of an already-loaded edited column. */
     public static int floor(ServerLevel level, int x, int z, int surfaceY, int fallbackFloor, long revision) {
+        var chunk = LoadedWaterReadAccess.loadedChunk(level, new BlockPos(x, surfaceY, z));
+        if (chunk == null) return fallbackFloor;
         Cache cache = LEVELS.computeIfAbsent(level, ignored -> new Cache());
         long now = level.getGameTime();
         if (cache.tick != now) { cache.tick = now; cache.scans = 0; }
@@ -30,12 +33,12 @@ public final class WaterDepthSampler {
         if (cache.scans >= MAX_SCANS_PER_TICK) return cached == null ? fallbackFloor : cached.floor;
         BlockPos.MutableBlockPos cursor = cache.cursor;
         cursor.set(x, surfaceY, z);
-        if (!level.hasChunkAt(cursor)) { cache.columns.remove(key); return fallbackFloor; }
         cache.scans++;
+        var reader = LoadedWaterReadAccess.blockReader(level);
         int floor = Math.max(level.getMinBuildHeight(), surfaceY - MAX_DEPTH);
         for (int y = surfaceY - 1; y >= floor; y--) {
             cursor.set(x, y, z);
-            if (!level.getBlockState(cursor).getCollisionShape(level, cursor).isEmpty()) { floor = y; break; }
+            if (!chunk.getBlockState(cursor).getCollisionShape(reader, cursor).isEmpty()) { floor = y; break; }
         }
         if (cache.columns.size() >= MAX_COLUMNS && !cache.columns.containsKey(key)) {
             cache.columns.remove(cache.columns.keySet().iterator().next());

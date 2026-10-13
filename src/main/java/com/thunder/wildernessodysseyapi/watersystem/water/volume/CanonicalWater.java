@@ -53,9 +53,6 @@ public final class CanonicalWater {
     /** Returns tracked sparse state, including explicit generated-water dry overrides. */
     @Nullable
     public static WaterVolumeChunk.WaterCell getTracked(Level level, BlockPos pos) {
-        if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
-            return null;
-        }
         LevelChunk chunk = loadedChunk(level, pos);
         if (chunk == null) return null;
         var existing = chunk.getExistingData(ModAttachments.WATER_VOLUME);
@@ -688,9 +685,7 @@ public final class CanonicalWater {
 
     @Nullable
     private static LevelChunk loadedChunk(Level level, BlockPos pos) {
-        return level instanceof ServerLevel serverLevel
-                ? serverLevel.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4)
-                : level.hasChunkAt(pos) ? level.getChunkAt(pos) : null;
+        return LoadedWaterReadAccess.loadedChunk(level, pos);
     }
 
     private static WaterVolumeChunk.WaterCell generatedOverrideCell(

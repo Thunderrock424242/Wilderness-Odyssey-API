@@ -51,7 +51,7 @@ public final class WildernessWaterAuthority {
      * or non-authoritative tagged water.</p>
      */
     public static CellAuthority sample(Level level, BlockPos pos) {
-        if (!WildernessWaterRules.isEnabled(level)) {
+        if (!LoadedWaterReadAccess.canRead(level) || !WildernessWaterRules.isEnabled(level)) {
             return CellAuthority.DRY;
         }
         return sampleCellOnly(level, pos);
@@ -61,15 +61,13 @@ public final class WildernessWaterAuthority {
      * Samples explicit sparse, generated, and physical projection state.
      */
     static CellAuthority sampleCellOnly(Level level, BlockPos pos) {
-        if (!WildernessWaterRules.isEnabled(level)) {
-            return CellAuthority.DRY;
-        }
-        if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
+        LevelChunk chunk = LoadedWaterReadAccess.loadedChunk(level, pos);
+        if (chunk == null || !WildernessWaterRules.isEnabled(level)) {
             return CellAuthority.DRY;
         }
 
         WaterVolumeChunk.WaterCell canonical = CanonicalWater.getTracked(level, pos);
-        BlockState blockState = level.getBlockState(pos);
+        BlockState blockState = chunk.getBlockState(pos);
         FluidState fluidState = blockState.getFluidState();
         boolean tagWater = fluidState.is(FluidTags.WATER);
         boolean plainProjection = isPlainWaterProjection(blockState);
@@ -92,7 +90,7 @@ public final class WildernessWaterAuthority {
         }
         int volumeUnits = volumeUnitsFromFluid(fluidState);
         float fillFraction = volumeUnits / (float) WaterVolumeChunk.UNITS_PER_BLOCK;
-        Vec3 flow = fluidState.getFlow(level, pos);
+        Vec3 flow = fluidState.getFlow(LoadedWaterReadAccess.blockReader(level), pos);
         boolean vanillaPlain = blockState.is(Blocks.WATER);
         boolean hosted = !(blockState.getBlock() instanceof LiquidBlock);
         WaterSource source = vanillaPlain
@@ -211,6 +209,9 @@ public final class WildernessWaterAuthority {
      * currently owned by Wilderness water.</p>
      */
     public static float getSurfaceHeight(Level level, double x, double z, float partialTick) {
+        if (!LoadedWaterReadAccess.canRead(level)) {
+            return Float.NaN;
+        }
         HybridWaterBodyModel.SurfaceSample sample = HybridWaterBodyModel.sampleSurface(level, x, z, partialTick);
         return sample.valid() ? sample.surfaceHeight() : Float.NaN;
     }
@@ -224,6 +225,9 @@ public final class WildernessWaterAuthority {
      * safe to reuse as a short-lived query result.</p>
      */
     public static SurfaceAuthority sampleSurface(Level level, double x, double z, float partialTick) {
+        if (!LoadedWaterReadAccess.canRead(level)) {
+            return SurfaceAuthority.INVALID;
+        }
         HybridWaterBodyModel.SurfaceSample sample = HybridWaterBodyModel.sampleSurface(level, x, z, partialTick);
         if (!sample.valid()) {
             return SurfaceAuthority.INVALID;
@@ -258,6 +262,9 @@ public final class WildernessWaterAuthority {
             double z,
             float partialTick
     ) {
+        if (!LoadedWaterReadAccess.canRead(level)) {
+            return WaterEnvironmentState.CALM_POND;
+        }
         HybridWaterBodyModel.SurfaceSample sample = HybridWaterBodyModel.sampleSurface(
                 level, x, z, partialTick);
         return sample.valid() ? sample.environment() : WaterEnvironmentState.CALM_POND;
@@ -530,7 +537,7 @@ public final class WildernessWaterAuthority {
     ) {
         int volumeUnits = volumeUnitsFromFluid(fluidState);
         float fillFraction = volumeUnits / (float) WaterVolumeChunk.UNITS_PER_BLOCK;
-        Vec3 flow = fluidState.getFlow(level, pos);
+        Vec3 flow = fluidState.getFlow(LoadedWaterReadAccess.blockReader(level), pos);
         return new CellAuthority(
                 WaterSource.WILDERNESS_PROJECTION,
                 true,
@@ -553,12 +560,7 @@ public final class WildernessWaterAuthority {
 
     /** Returns the compact generated span at a loaded position, or {@code null}. */
     static GeneratedWaterChunk.WaterSpan generatedSpanAt(Level level, BlockPos pos) {
-        if (level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
-            return null;
-        }
-        LevelChunk chunk = level instanceof ServerLevel serverLevel
-                ? serverLevel.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4)
-                : level.getChunkAt(pos);
+        LevelChunk chunk = LoadedWaterReadAccess.loadedChunk(level, pos);
         if (chunk == null) return null;
         return chunk.getExistingData(ModAttachments.GENERATED_WATER)
                 .map(generated -> generated.spanAt(pos))
@@ -567,10 +569,11 @@ public final class WildernessWaterAuthority {
 
     /** Returns whether the physical Wilderness fluid still matches its immutable generated baseline. */
     static boolean matchesGeneratedProjection(Level level, BlockPos pos, GeneratedWaterChunk.WaterSpan span) {
-        if (span == null || level.isOutsideBuildHeight(pos) || !level.hasChunkAt(pos)) {
+        LevelChunk chunk = LoadedWaterReadAccess.loadedChunk(level, pos);
+        if (span == null || chunk == null) {
             return false;
         }
-        BlockState state = level.getBlockState(pos);
+        BlockState state = chunk.getBlockState(pos);
         FluidState fluidState = state.getFluidState();
         return isWildernessProjection(state, fluidState)
                 && volumeUnitsFromFluid(fluidState) == span.amountUnits();

@@ -9,6 +9,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.LoadedWaterReadAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -154,7 +155,7 @@ public final class AuthorityWaterAccess implements WaterAccess {
             WaterSample result
     ) {
         result.clear();
-        if (level == null || !WildernessWaterRules.isEnabled(level)) {
+        if (!LoadedWaterReadAccess.canRead(level) || !WildernessWaterRules.isEnabled(level)) {
             return;
         }
 
